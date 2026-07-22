@@ -227,7 +227,6 @@ from .app.routers import provider_ratings as provider_ratings_router
 from .app.routers import hr_vendor_performance as hr_vendor_performance_router
 from .app.routers import employee_steps as employee_steps_router
 from .app.routers import hr_vendors as hr_vendors_router
-from .app.routers import hr_rfq as hr_rfq_router
 from .app.routers import immigration_intake_consent as immigration_intake_consent_router
 from .app.routers import immigration_intake_profile as immigration_intake_profile_router
 from .app.routers import immigration_intake_interview as immigration_intake_interview_router
@@ -886,7 +885,6 @@ app.include_router(provider_ratings_router.router)  # CATALOG-3 employee provide
 app.include_router(hr_vendor_performance_router.router)  # NAV-SP-2 HR vendor performance dashboard
 app.include_router(employee_steps_router.router)  # [B11/AIQ-421] /api/employee/steps/4
 app.include_router(hr_vendors_router.router)
-app.include_router(hr_rfq_router.router)
 app.include_router(immigration_intake_consent_router.router)  # [AUDIT-B9-imm-6] 1/5 — consent + immigration-requirements (3 handlers)
 app.include_router(immigration_intake_profile_router.router)  # [AUDIT-B9-imm-6] 2/5 — HR/employee profile + OCR passport (5 handlers)
 app.include_router(immigration_intake_interview_router.router)  # [AUDIT-B9-imm-6] 3/5 — interview next/answer (2 handlers)

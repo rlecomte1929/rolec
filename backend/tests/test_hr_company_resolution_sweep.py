@@ -30,7 +30,7 @@ if _REPO_ROOT not in sys.path:
 from fastapi import HTTPException
 
 from backend.database import db as real_db
-from backend.app.routers import hr_catalog, hr_policies, hr_rfq, services_state, branding
+from backend.app.routers import hr_catalog, hr_policies, services_state, branding
 from backend.app.services import policy_canonical_access
 
 _COMPANY = "c0000000-0000-0000-0000-000000000001"
@@ -87,14 +87,6 @@ class HrPoliciesResolution(unittest.TestCase):
         p1, p2 = _patch_no_company()
         with p1, p2, self.assertRaises(HTTPException):
             hr_policies._org_id(_LEGACY_HR)
-
-
-class HrRfqResolution(unittest.TestCase):
-    def test_require_hr_resolves_company_via_hr_users(self):
-        p1, p2 = _patch_legacy_hr()
-        with p1, p2:
-            company_id, _email, _name = hr_rfq._require_hr(_LEGACY_HR)
-            self.assertEqual(company_id, _COMPANY)
 
 
 class ServicesStateResolution(unittest.TestCase):

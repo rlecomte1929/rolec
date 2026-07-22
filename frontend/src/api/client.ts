@@ -701,25 +701,6 @@ export interface ProcessErasureResponse {
   reviewed_at: string;
 }
 
-export interface HrRfqRequestsResponse {
-  rfqs: Array<{
-    id: string;
-    case_id: string;
-    vendor_id: string;
-    vendor_name: string;
-    vendor_email: string;
-    service_category: string;
-    move_date: string | null;
-    budget_range: string | null;
-    special_requirements: string | null;
-    hr_email: string;
-    hr_name: string;
-    status: string;
-    created_at: string;
-  }>;
-  total: number;
-}
-
 export interface HrAnalyticsResponse {
   workspace: {
     avg_completion_days: number | null;
@@ -1255,19 +1236,10 @@ export const hrAPI = {
     return response.data;
   },
 
-  // ── AIQ-40-C: RFQ flow (HR Command Center) — legacy read-only remnant ─────
-  // [AIQ-1682] The HR-initiated RFQ *create* (POST) and *status update* (PATCH)
-  // wrappers were removed as part of the two-models consolidation: RFQs are now
-  // employee-led (CANONICAL model = `rfqs` + `rfq_items` + `rfq_recipients` via
-  // servicesAPI.createRfq → POST /api/rfqs), with HR acting as payer/approver. Only
-  // the read below remains, until legacy `rfq_requests` is archived (AIQ-1683) and its
-  // last reader is retired (AIQ-1684).
-
-  /** GET /api/hr/rfq-requests?case_id=X */
-  getRfqRequests: async (params?: { case_id?: string }): Promise<HrRfqRequestsResponse> => {
-    const response = await api.get<HrRfqRequestsResponse>('/api/hr/rfq-requests', { params });
-    return response.data;
-  },
+  // [AIQ-1683] The HR-initiated `rfq_requests` model is fully retired — RFQs are
+  // employee-led (canonical `rfqs`/`rfq_items`/`quotes` via servicesAPI.createRfq →
+  // POST /api/rfqs), HR is payer/approver. The last `/api/hr/rfq-requests` reader was
+  // removed and the table archived to `rfq_requests_legacy` (read-only).
 
   // ── AIQ-34-C: Employee task management (HR side) ──────────────────────────
 
