@@ -9,6 +9,8 @@ export interface RecommendationExplanation {
   budget_fit: string;
   family_fit: string;
   policy_fit: string;
+  /** Estimated monthly cost as a % of the company housing cap (FX-normalized). */
+  budget_pct_of_cap?: number | null;
   coverage_fit: string;
   warning_flags: string[];
   explanation_summary: string;
