@@ -661,6 +661,16 @@ const CredentialResult: React.FC<{
         credential={result.employee}
       />
     </div>
+    {/* Test card, right where the logins are — the tester needs it at the roadmap unlock. */}
+    <div className="mt-6 mx-auto max-w-md rounded-xl border border-marketing-border bg-marketing-surface-muted p-4">
+      <p className="text-sm font-semibold text-marketing-primary">{c.paymentTest.reminderHeader}</p>
+      <p className="mt-1 text-xs text-marketing-text-muted leading-relaxed">{c.paymentTest.reminderIntro}</p>
+      <div className="mt-3 space-y-2">
+        {c.paymentTest.card.map((row) => (
+          <CopyRow key={row.label} label={row.label} value={row.value} />
+        ))}
+      </div>
+    </div>
     {/* AIQ-1539: plain line — where the test ends, and that the survey is required. */}
     <p className="mt-8 text-center text-marketing-body text-marketing-text leading-relaxed">
       {c.credentials.doneNote}

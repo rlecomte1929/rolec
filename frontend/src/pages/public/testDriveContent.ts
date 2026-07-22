@@ -96,6 +96,11 @@ export const testDriveContent = {
       { label: 'Postal code', value: '12345' },
     ],
     note: 'A real card would be declined here — only this test card works, and nothing is charged.',
+    // Compact restatement shown in the credentials block, so the card is right where the
+    // tester grabs their logins (they'll need it at the employee roadmap step).
+    reminderHeader: 'Test card for the roadmap unlock',
+    reminderIntro:
+      "When the employee reaches the roadmap there's a one-time €800 unlock in Stripe test mode. Use this card — nothing is charged:",
   },
 
   aboutData: {
