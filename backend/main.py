@@ -143,6 +143,7 @@ from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import case_forms_adhoc as case_forms_adhoc_router  # [P4-3]
 from .app.routers import ai_decisions as ai_decisions_router  # [AI-002] EU AI Act Art. 14 human oversight log
 from .app.routers import payment as payment_router  # Stripe roadmap paywall (TEST MODE) — POST /api/payment/checkout
+from .app.routers import stripe_webhook as stripe_webhook_router  # Stripe webhook Path A — POST /api/stripe/webhook
 from .app.routers import auth_page_config as auth_page_config_router  # GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 from .app.routers import requirement_facts as requirement_facts_router  # [AIQ-1091] P4-02 requirement-facts extract
 from .app.routers import nlg as nlg_router  # [Parker-J] dual-layer registration (PR #207 §9)
@@ -565,6 +566,9 @@ _RATE_LIMIT_EXEMPT_ENDPOINTS = (
     # Service-role / external-webhook routes live in the support router:
     "backend.app.routers.support.inbound_email_webhook",  # POST /webhooks/support-email (Postmark)
     "backend.app.routers.support.triage_ticket",          # POST /api/support/triage (Supabase trigger)
+    # Stripe webhook (Path A): Stripe bursts + retries must never be throttled, or a
+    # 429 becomes a dropped payment event. It verifies its own signature (spec §4).
+    "backend.app.routers.stripe_webhook.stripe_webhook",  # POST /api/stripe/webhook
 )
 for _exempt_name in _RATE_LIMIT_EXEMPT_ENDPOINTS:
     limiter._exempt_routes.add(_exempt_name)
@@ -822,6 +826,7 @@ app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-UR
 app.include_router(case_forms_adhoc_router.router)  # [P4-3] ad-hoc "Add document"
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
 app.include_router(payment_router.router)  # Stripe roadmap paywall (TEST MODE) — POST /api/payment/checkout
+app.include_router(stripe_webhook_router.router)  # Stripe webhook Path A — POST /api/stripe/webhook
 app.include_router(auth_page_config_router.router)  # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 app.include_router(requirement_facts_router.router)  # [AIQ-1091] P4-02 — POST /api/admin/requirement-facts/extract
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review

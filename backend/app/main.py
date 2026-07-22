@@ -24,6 +24,7 @@ from .routers import (
     ai_decisions,
     ai_feedback,
     payment,
+    stripe_webhook,
     resources_activities,
     auth_page_config,
     assistant_router,
@@ -213,6 +214,7 @@ def create_app() -> FastAPI:
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
     app.include_router(payment.router)  # Stripe roadmap paywall (TEST MODE) — POST /api/payment/checkout
+    app.include_router(stripe_webhook.router)  # Stripe webhook Path A — POST /api/stripe/webhook
     # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
     app.include_router(auth_page_config.router)
     app.include_router(assistant_router.router)  # policy-bridge domain routing — POST /api/assistant/route
