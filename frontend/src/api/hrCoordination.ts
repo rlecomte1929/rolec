@@ -98,11 +98,24 @@ export async function getCaseRfqs(caseId: string): Promise<CaseRfq[]> {
   return data.rfqs
 }
 
+/** [AIQ-1677] Per-recipient outcome of a dispatch (from supplier_link_dispatch). `sent` is
+ * true only when an email actually went out; `error` explains a skip (no verified address,
+ * placeholder domain, RESEND not configured, …). */
+export interface DispatchRfqTargetResult {
+  recipient_id: string | null
+  supplier_name: string | null
+  ok: boolean
+  sent: boolean
+  error?: string | null
+}
+
 /** [AIQ-1670] Result of an HR-gated RFQ dispatch. */
 export interface DispatchRfqResult {
   ok: boolean
   rfq_id: string
   dispatched: number
+  /** [AIQ-1677] Per-recipient results — count `sent === true` for the honest emailed-count. */
+  results?: DispatchRfqTargetResult[]
 }
 
 /**
