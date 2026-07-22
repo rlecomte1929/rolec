@@ -170,9 +170,24 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     }
     let alive = true;
     setRoadmapUnlocked(null);
-    void fetchRoadmapUnlocked(caseId).then((unlocked) => {
-      if (alive) setRoadmapUnlocked(unlocked);
-    });
+    // Returning from Stripe checkout (?payment=success) the webhook that flips access_tier
+    // can lag the browser redirect by a beat. Poll the server status briefly so a just-paid
+    // user lands on their roadmap, not the paywall again. Normal loads check once.
+    const justPaid = new URLSearchParams(window.location.search).get('payment') === 'success';
+    const maxAttempts = justPaid ? 6 : 1; // ~6 × 2.5s ≈ 15s grace for the webhook
+    let attempt = 0;
+    const check = () => {
+      void fetchRoadmapUnlocked(caseId).then((unlocked) => {
+        if (!alive) return;
+        attempt += 1;
+        if (unlocked || attempt >= maxAttempts) {
+          setRoadmapUnlocked(unlocked);
+        } else {
+          window.setTimeout(check, 2500);
+        }
+      });
+    };
+    check();
     return () => {
       alive = false;
     };
