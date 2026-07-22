@@ -413,3 +413,17 @@ def list_employee_destination_requests(
     if role == UserRole.EMPLOYEE.value:
         return [r for r in all_reqs if r.get("requested_by") == str(user["id"])]
     return all_reqs
+
+
+@router.get("/api/employee/destinations")
+def list_employee_destinations(
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+) -> List[Dict[str, Any]]:
+    """[AIQ-1656] Employee-readable supported-destination catalogue (same list as the
+    HR-only GET /api/hr/catalog/destinations). The employee intake uses this to seed the
+    destination-city typeahead; a city not in this list is still accepted (never blocks
+    intake) and fires a POST /api/employee/destination-request so an admin can validate
+    it into the catalogue — controlled scaling of supported destinations."""
+    from ..services import scrape_safety
+
+    return scrape_safety.list_allowlist()
