@@ -32,6 +32,11 @@ jobs:
       E2E_APP_URL: ${{ vars.E2E_APP_URL || 'https://relopass.com' }}
       RELOPASS_E2E_PASSWORD: ${{ secrets.RELOPASS_E2E_PASSWORD }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # [AIQ-1685] Lets the deep journey complete a test-mode roadmap payment (locally-signed
+      # checkout.session.completed) so [DEEP-ROADMAP-API] validates generation for a PAID case
+      # while the paywall (RELOPASS_ROADMAP_PAYWALL_ENABLED) is on. Must equal the value the
+      # backend verifies against; if unset, that check skips cleanly (no false P0).
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
     steps:
       - uses: actions/checkout@v4
 
