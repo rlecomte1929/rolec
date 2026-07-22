@@ -343,11 +343,13 @@ export const ServicesRfqNew: React.FC = () => {
         >
           ✅{' '}
           <span>
-            {/* [AIQ-1668] contacted===0 → nobody outside ReloPass has seen this yet: no
-                supplier was reached, and no HR surface reads the employee-led `rfqs` table.
-                State only what is true (recorded + on the roadmap). Restore an HR-visibility
-                claim only once the RFQ loop (HR read + dispatch) is actually wired. */}
-            Request recorded — we&apos;ve added it to your roadmap.
+            {/* [AIQ-1671] contacted===0 → no supplier has been reached yet (dispatch is
+                AIQ-1670), but HR can now SEE the picks: the RFQ is surfaced in the case's
+                Provider Coordination view (AIQ-1669 read + panel wiring). So the HR-visibility
+                claim is true again. We still do NOT promise supplier contact or HR follow-up —
+                only what is now real: HR can see it, and it's on the roadmap. */}
+            Request recorded — your HR team can now see the providers you picked, and
+            we&apos;ve added it to your roadmap.
           </span>
         </div>
       ) : null}
