@@ -162,8 +162,8 @@ def get_case_rfqs(
 ) -> Dict[str, Any]:
     """[AIQ-1669] List the canonical RFQs an EMPLOYEE submitted for a case, read from
     `rfqs` (+ `rfq_items` + `rfq_recipients`) — the tables the employee actually writes,
-    which no HR surface read before (the orphaned `GET /api/hr/rfq-requests` reads the
-    separate HR-initiated `rfq_requests` model). Company-scoped: 404 (not 403) on a case
+    which no HR surface read before (the HR-initiated `rfq_requests` model was retired in
+    AIQ-1681..1683 and its table archived to `rfq_requests_legacy`). Company-scoped: 404 (not 403) on a case
     outside the org so we don't leak case existence across tenants. Read-only — dispatch
     and supplier-token minting are AIQ-1670.
     """
