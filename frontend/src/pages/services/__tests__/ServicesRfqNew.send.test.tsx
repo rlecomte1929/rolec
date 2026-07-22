@@ -132,8 +132,10 @@ describe('ServicesRfqNew send', () => {
   });
 
   it('does NOT claim the providers were contacted when dispatch is off', async () => {
-    // `contacted: []` means nobody outside ReloPass has seen this request. The old copy
-    // ("Sent to your HR team") is the honest one here, and must be what renders.
+    // `contacted: []` means nobody outside ReloPass has seen this request. [AIQ-1668] the
+    // honest copy here states only what is true — recorded + on the roadmap — and must NOT
+    // claim HR can see the picks or will follow up (no HR surface reads the employee `rfqs`
+    // table), nor that any supplier was contacted.
     mockCreateRfq.mockResolvedValue({
       ok: true,
       rfq: { id: 'rfq-1', rfq_ref: 'RFQ-1' },
@@ -146,7 +148,11 @@ describe('ServicesRfqNew send', () => {
     fireEvent.click(await screen.findByRole('button', { name: /send quotation requests/i }));
 
     const sent = await screen.findByTestId('rfq-sent');
-    expect(sent).toHaveTextContent(/your HR team can see the providers you picked/i);
+    expect(sent).toHaveTextContent(/Request recorded/i);
+    expect(sent).toHaveTextContent(/added it to your roadmap/i);
+    // The false claims must be gone (AIQ-1668): HR visibility, HR follow-up, supplier contact.
+    expect(sent).not.toHaveTextContent(/your HR team can see the providers/i);
+    expect(sent).not.toHaveTextContent(/will follow up/i);
     expect(sent).not.toHaveTextContent(/Sent to \d+ provider/i);
   });
 
