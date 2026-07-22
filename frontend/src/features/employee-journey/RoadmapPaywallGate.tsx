@@ -17,8 +17,10 @@
  *     See docs/stripe-relopass-package/ for the full spec.
  */
 import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Lock, Shield } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FlaskConical, Lock, Shield } from 'lucide-react';
 import api from '../../api/client';
+import { getAuthItem } from '../../utils/demo';
+import { looksLikeTestEmail } from '../../utils/testAccount';
 
 interface RoadmapPaywallGateProps {
   /** Assignment UUID — passed as the checkout `assignmentId` payload. */
@@ -43,6 +45,11 @@ export const RoadmapPaywallGate: React.FC<RoadmapPaywallGateProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Test-drive (synthetic @probe.test/@testco.com) users are on Stripe TEST mode — show
+  // the test-card instructions so there are no surprises and it's clear no real money moves.
+  // Real customers never see this. Mirrors profiles.is_test via looksLikeTestEmail.
+  const isTestDrive = looksLikeTestEmail(getAuthItem('relopass_email'));
 
   const destination = [destCity, destCountry].filter(Boolean).join(', ') || 'your destination';
 
@@ -107,6 +114,23 @@ export const RoadmapPaywallGate: React.FC<RoadmapPaywallGateProps> = ({
         <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" aria-hidden />
           <p className="text-sm text-red-700">{error}</p>
+        </div>
+      ) : null}
+
+      {/* Test-mode instructions — test-drive users only. No real charge is possible. */}
+      {isTestDrive ? (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200">
+          <div className="flex items-start gap-2">
+            <FlaskConical className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" aria-hidden />
+            <div className="text-sm text-amber-800">
+              <p className="font-semibold">Test mode — you will not be charged.</p>
+              <p className="mt-0.5">
+                This is a demo checkout. On the Stripe page, pay with test card{' '}
+                <span className="font-mono font-medium">4242&nbsp;4242&nbsp;4242&nbsp;4242</span>,
+                any future expiry date, and any 3-digit CVC. No real payment is taken.
+              </p>
+            </div>
+          </div>
         </div>
       ) : null}
 
