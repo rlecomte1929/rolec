@@ -1,6 +1,6 @@
 # Sub-Processor Register — ReloPass (GDPR Art. 28 & 44)
 
-**Task:** PRIV-004 (AIQ-472) · **Version:** v1.7 · **Last verified:** 2026-07-22 (against `main`)
+**Task:** PRIV-004 (AIQ-472) · **Version:** v1.8 · **Last verified:** 2026-07-22 (against `main`)
 **Owner:** Romain Lecomte · **Status:** register complete; DPA signatures pending (human action)
 
 > GDPR Art. 28 requires a signed Data Processing Agreement (DPA) with every sub-processor
@@ -21,6 +21,30 @@
 | **Resend** | Transactional email | US entity | SCCs via Resend DPA | ⬜ Self-service DPA | `RESEND_API_KEY` / `EMAIL_PROVIDER=resend`; `dossier_notifications.py`, edge fn `send-notification-email` |
 | **PostHog** | Product analytics (frontend `posthog-js` + **backend server-side events**) + session replay (**replay gated to test-drive only**) | **EU host** (`eu.i.posthog.com`) ✅ | EU Cloud — no transfer | ⬜ Confirm DPA on EU project | `frontend/src/analytics.ts` (`posthog-js`); replay gate `frontend/src/components/TestDriveReplayGate.tsx`; backend `backend/app/posthog_client.py` (`posthog` Python SDK) |
 | **Geoapify** | Address autocomplete for the intake office-address field (AIQ-1607) **and** forward geocoding of the office address for housing recommendations (AIQ-1661) | **EU (Germany)** ✅ | Data in EU — no transfer | ⬜ Confirm/sign DPA on console | `GEOAPIFY_API_KEY`; `geocoding_service.py`, `geocoding.py`, `recommendations/geo.py` |
+| **Stripe** | Payment processing — Stripe Checkout (hosted) + webhook | US parent (Stripe, Inc.); EU contracting entity Stripe Payments Europe Ltd (Ireland) | Stripe DPA (auto-incorporated in the Stripe Services Agreement) + SCCs for US transfer | ⬜ Confirm DPA in Services Agreement — **before live keys** | `stripe>=9,<12`; `payment.py` (checkout), `stripe_webhook.py` (webhook). **WIP — not on `main`, not live** |
+
+## Notes & corrections (v1.8)
+
+- **Stripe added (payments integration — WIP, 🔴 human-gated; not on `main`, not live).** The roadmap
+  paywall uses **Stripe Checkout hosted pages** (`payment.py` creates the session; `stripe_webhook.py`
+  verifies + fulfils), which keeps the personal-data surface deliberately small:
+  - **No card data ever touches ReloPass.** The card number/CVC are entered on Stripe's own hosted page,
+    never on a ReloPass form — PCI scope stays at SAQ-A. "Your card details never touch ReloPass" is the
+    substantiated claim shown on the paywall.
+  - **What ReloPass sends Stripe is minimal + pseudonymous:** the server-side price (€800, fixed) plus
+    `metadata` = internal identifiers only (`case_id` = a `relocation_cases` UUID, `assignmentId`, `tier`,
+    `source`). **No names, emails, addresses, or case contents** are sent in the checkout call. The
+    customer's email is collected by Stripe on its hosted page (Stripe↔customer), not forwarded by us.
+  - **Inbound (webhook):** the fulfilment brain (`stripe_fulfillment.py`) masks identifiers via
+    `safe_log_text()` and **never logs the raw event body** (which can carry customer email/name from
+    Stripe's `customer_details`).
+  - **Residency / transfer:** Stripe processes globally with a US parent (Stripe, Inc.); European customers
+    typically contract with **Stripe Payments Europe Ltd (Ireland)**. US transfer is covered by Stripe's
+    SCCs, and Stripe's **DPA is auto-incorporated into the Stripe Services Agreement** — so no separate
+    signature is usually required, but the account's DPA posture must be **confirmed before live keys**.
+  - **Gated off:** `RELOPASS_STRIPE_ENABLED` is unset (webhook + checkout 503), so nothing is processed
+    until a human enables it. This register row documents the pending integration on the `feat/stripe-*`
+    branches; re-verify against `main` when it merges.
 
 ## Notes & corrections (v1.7)
 
@@ -138,7 +162,9 @@
 1. **Sign DPAs** — Supabase (dashboard/PandaDoc), Render (`render.com/privacy`),
    OpenAI (`openai.com/policies/data-processing-addendum`), Anthropic (confirm Commercial Terms),
    Resend (`resend.com/dpa`), Cloudflare (account Legal), PostHog (only if enabled),
-   **Geoapify** (console DPA — required before `GEOAPIFY_API_KEY` is set in prod, AIQ-1607).
+   **Geoapify** (console DPA — required before `GEOAPIFY_API_KEY` is set in prod, AIQ-1607),
+   **Stripe** (confirm the DPA is auto-incorporated in the Stripe Services Agreement + the account's
+   SCC posture — **required before live Stripe keys are enabled**).
 2. **Confirm Render deployment region** and whether EU hosting is available on the current plan.
 3. **Store signed DPA copies** in a durable legal/compliance location.
 4. **Re-run this register** whenever a sub-processor is added.
