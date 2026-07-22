@@ -9,13 +9,19 @@ Two callers, one path:
   - POST /api/rfqs                       (employee or HR — dispatch on create)
   - POST /api/hr/rfqs/{id}/supplier-links (HR/admin — explicit, can override the address)
 
-SAFETY. Emailing a real company that has never heard of us must never happen by accident. Two
-independent guards, and BOTH must hold before a message goes out:
+SAFETY. Emailing a real company that has never heard of us must never happen by accident. Three
+independent guards, and ALL must hold before a message goes out:
   1. `send_email` is False by default at every call site.
   2. An address is only ever taken from `suppliers.contact_email`. A supplier with no address on
      record is not an error and not a guess — it is reported, honestly, as not contacted.
-Neither guard is a feature flag; the flag (SUPPLIER_RFQ_DISPATCH_ENABLED) sits above them at the
-RFQ-create call site. A mail failure never raises: the RFQ and the minted link survive it.
+  3. The SENDER must not be a test persona. If the acting user's email is on a synthetic seeder
+     domain (`@probe.test` / `@testco.com`), the real email is suppressed unconditionally — even
+     with the flag on and `RESEND_API_KEY` set. The token still mints and the link is returned, so
+     the test flow stays fully functional, but nothing leaves the platform. This is the hard guard
+     that lets QA run RFQ flows against the real (now partly contactable) catalog with zero risk of
+     a test persona mailing a real mover.
+Guards 1 and 2 are not feature flags; the flag (SUPPLIER_RFQ_DISPATCH_ENABLED) sits above them at
+the RFQ-create call site. A mail failure never raises: the RFQ and the minted link survive it.
 """
 from __future__ import annotations
 
@@ -29,6 +35,7 @@ import requests
 from sqlalchemy import text
 
 from ...database import db
+from ...db.test_data_filter import looks_like_test_email
 from .rfq_brief import RESPONSE_EXPECTATIONS, render_brief_lines, respond_by
 from .supplier_jwt import expires_at, generate_supplier_token, hash_token
 
@@ -160,6 +167,7 @@ def dispatch_supplier_links(
     rfq_id: str,
     targets: List[Dict[str, Any]],
     send_email: bool = False,
+    actor_email: Optional[str] = None,
     request_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Mint one link per target, persist it, and email it if asked to.
@@ -168,9 +176,24 @@ def dispatch_supplier_links(
     skipped with `ok: False, error: NO_ADDRESS` — we never invent an address, and we never
     silently drop a supplier the employee chose.
 
+    `actor_email` is the email of the user triggering the dispatch. If it is a test persona
+    (`@probe.test` / `@testco.com`), the real email is suppressed unconditionally (guard 3 in the
+    module docstring) — the token still mints and the link is returned, but nothing is emailed.
+    Every real call site MUST pass it; a missing/unknown actor is treated as non-test (fail-open on
+    the identity so a legitimate HR send is never silently swallowed — the flag + address guards
+    still gate real sends).
+
     Returns one result per target. Never raises.
     """
     resend_key = os.getenv("RESEND_API_KEY")
+    # Guard 3: a test persona can never trigger a real send, even with the flag on and a key set.
+    actor_is_test = looks_like_test_email(actor_email)
+    if actor_is_test and send_email:
+        log.warning(
+            "AIQ-1521 dispatch: test-persona sender (%s) — real email SUPPRESSED for rfq=%s "
+            "(tokens still minted; links returned). request_id=%s",
+            actor_email, rfq_id, request_id,
+        )
     results: List[Dict[str, Any]] = []
 
     # The brief goes IN the email. A vendor who cannot see the route, the date and the scope
@@ -275,7 +298,12 @@ def dispatch_supplier_links(
 
         sent = False
         error: Optional[str] = None
-        if send_email and resend_key:
+        if send_email and actor_is_test:
+            # Guard 3 (hard): the sender is a test persona — never email a real supplier.
+            # The link is already minted and returned below, so the QA flow works end-to-end
+            # virtually; this only stops the outbound message.
+            error = "test-persona sender — real email suppressed (safeguard)"
+        elif send_email and resend_key:
             try:
                 r = requests.post(
                     "https://api.resend.com/emails",
@@ -308,11 +336,13 @@ def dispatch_supplier_links(
         })
 
     log.info(
-        "AIQ-1521 dispatch rfq=%s targets=%s minted=%s emailed=%s no_address=%s request_id=%s",
+        "AIQ-1521 dispatch rfq=%s targets=%s minted=%s emailed=%s no_address=%s "
+        "actor_is_test=%s request_id=%s",
         rfq_id, len(targets),
         sum(1 for r in results if r.get("ok")),
         sum(1 for r in results if r.get("sent")),
         sum(1 for r in results if r.get("error") == NO_ADDRESS),
+        actor_is_test,
         request_id,
     )
     return results

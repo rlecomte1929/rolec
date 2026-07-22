@@ -9318,6 +9318,7 @@ def create_rfq(
                 rfq_id=str(result.get("id")),
                 targets=targets,
                 send_email=True,
+                actor_email=user.get("email"),
                 request_id=req_id,
             ):
                 name = r.get("supplier_name") or r.get("recipient_id") or "A supplier"

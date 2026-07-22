@@ -280,6 +280,9 @@ def send_supplier_links(
         })
 
     results.extend(
-        dispatch_supplier_links(rfq_id=rfq_id, targets=targets, send_email=payload.send_email)
+        dispatch_supplier_links(
+            rfq_id=rfq_id, targets=targets, send_email=payload.send_email,
+            actor_email=user.get("email"),
+        )
     )
     return {"ok": True, "rfq_ref": rfq.get("rfq_ref"), "results": results}

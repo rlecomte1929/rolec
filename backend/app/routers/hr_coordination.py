@@ -300,7 +300,10 @@ def dispatch_case_rfq(
 
     # Reuse the audited path: resolve every recipient, then mint tokens (+ opt-in email).
     targets = resolve_rfq_targets(rfq_id)
-    results = dispatch_supplier_links(rfq_id=rfq_id, targets=targets, send_email=body.send_email)
+    results = dispatch_supplier_links(
+        rfq_id=rfq_id, targets=targets, send_email=body.send_email,
+        actor_email=hr_user.get("email"),
+    )
 
     try:
         with db.engine.begin() as conn:

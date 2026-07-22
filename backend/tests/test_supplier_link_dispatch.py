@@ -178,5 +178,66 @@ class EmailBodyTests(unittest.TestCase):
         self.assertIn("&lt;script&gt;", html)
 
 
+class TestPersonaSenderGuardTests(unittest.TestCase):
+    """Guard 3: a test persona (the SENDER) can never trigger a real email, even with the flag on
+    and RESEND_API_KEY set. This is the hard safeguard that lets QA run RFQ flows against the real,
+    now partly-contactable catalog with zero risk of a test user mailing a real mover."""
+
+    def setUp(self):
+        self.engine = MagicMock()
+        patcher = patch.object(sld, "db", MagicMock(engine=self.engine))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_test_persona_sender_never_emails_even_with_key_and_send_email(self):
+        # Exactly the scenario where a real send WOULD fire (verified business address, key set,
+        # requests.post would return 200) — but the sender is a test persona.
+        with patch.dict(os.environ, {"RESEND_API_KEY": "re_test"}), \
+                patch.object(sld.requests, "post", return_value=MagicMock(status_code=200)) as post:
+            results = sld.dispatch_supplier_links(
+                rfq_id="rfq-1",
+                targets=[_target(email="ops@santafe.example")],
+                send_email=True,
+                actor_email="e2e-employee@probe.test",
+            )
+
+        post.assert_not_called()                 # nothing left the building
+        self.assertFalse(results[0]["sent"])
+        self.assertIn("suppressed", results[0]["error"])
+        self.assertTrue(results[0]["ok"])        # the token was still minted (virtual flow works)
+        self.assertIn("/supplier/quote?token=", results[0]["link"])
+
+    def test_testco_domain_sender_is_also_blocked(self):
+        with patch.dict(os.environ, {"RESEND_API_KEY": "re_test"}), \
+                patch.object(sld.requests, "post", return_value=MagicMock(status_code=200)) as post:
+            results = sld.dispatch_supplier_links(
+                rfq_id="rfq-1", targets=[_target(email="ops@santafe.example")],
+                send_email=True, actor_email="hr@testco.com",
+            )
+        post.assert_not_called()
+        self.assertFalse(results[0]["sent"])
+
+    def test_a_real_sender_still_emails(self):
+        # The guard must NOT break a legitimate send: a non-test actor still emails.
+        with patch.dict(os.environ, {"RESEND_API_KEY": "re_test"}), \
+                patch.object(sld.requests, "post", return_value=MagicMock(status_code=200)) as post:
+            results = sld.dispatch_supplier_links(
+                rfq_id="rfq-1", targets=[_target(email="ops@santafe.example")],
+                send_email=True, actor_email="real.hr@acme-corp.com",
+            )
+        post.assert_called_once()
+        self.assertTrue(results[0]["sent"])
+
+    def test_unknown_actor_is_treated_as_non_test(self):
+        # No actor_email passed → fail-open on identity (the flag + address guards still gate).
+        with patch.dict(os.environ, {"RESEND_API_KEY": "re_test"}), \
+                patch.object(sld.requests, "post", return_value=MagicMock(status_code=200)) as post:
+            results = sld.dispatch_supplier_links(
+                rfq_id="rfq-1", targets=[_target(email="ops@santafe.example")], send_email=True,
+            )
+        post.assert_called_once()
+        self.assertTrue(results[0]["sent"])
+
+
 if __name__ == "__main__":
     unittest.main()

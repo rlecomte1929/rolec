@@ -89,7 +89,7 @@ class HrRfqDispatchTests(unittest.TestCase):
         self.assertEqual(out["dispatched"], 2)
         # Reused the audited dispatcher with THIS rfq, its resolved targets, send_email OFF.
         self.mock_dispatch.assert_called_once_with(
-            rfq_id=self.rfq_id, targets=self.targets, send_email=False
+            rfq_id=self.rfq_id, targets=self.targets, send_email=False, actor_email=None
         )
 
     def test_send_email_defaults_off_no_auto_blast(self) -> None:
