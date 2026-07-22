@@ -4,6 +4,7 @@ import { supabase } from "../api/supabase"
 import {
   assignTask,
   cancelTask,
+  dispatchCaseRfq,
   getCaseProviders,
   getCaseRfqs,
   updateTask,
@@ -493,7 +494,95 @@ function ProviderRowSkeleton() {
 // here; dispatch to suppliers is AIQ-1670.
 // ---------------------------------------------------------------------------
 
-function EmployeeRfqSection({ rfqs }: { rfqs: CaseRfq[] }) {
+function RfqCard({
+  caseId,
+  rfq,
+  onDispatched,
+}: {
+  caseId: string
+  rfq: CaseRfq
+  onDispatched: () => void
+}) {
+  const [dispatching, setDispatching] = useState(false)
+  const [dispatchError, setDispatchError] = useState<string | null>(null)
+  const [dispatchedCount, setDispatchedCount] = useState<number | null>(null)
+
+  // [AIQ-1670] HR-gated dispatch: mint a supplier token for every recipient (reuses the
+  // audited path). send_email stays OFF here — clicking mints the links; it never emails a
+  // real supplier by accident.
+  const handleDispatch = async () => {
+    setDispatching(true)
+    setDispatchError(null)
+    try {
+      const res = await dispatchCaseRfq(caseId, rfq.id)
+      setDispatchedCount(res.dispatched)
+      onDispatched()
+    } catch (err) {
+      setDispatchError(err instanceof Error ? err.message : "Dispatch failed.")
+    } finally {
+      setDispatching(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-[#e2e8f0] bg-white p-4">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="font-mono text-xs font-medium text-navy-800">
+          {rfq.rfq_ref ?? rfq.id}
+        </span>
+        {rfq.status && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-navy-50 text-navy-700 border border-navy-100">
+            {rfq.status}
+          </span>
+        )}
+      </div>
+      {rfq.service_keys.length > 0 && (
+        <div className="text-xs text-gray-500 mb-2">
+          Services: {rfq.service_keys.join(", ")}
+        </div>
+      )}
+      <ul className="divide-y divide-[#f1f5f9] border border-[#f1f5f9] rounded-lg overflow-hidden">
+        {rfq.recipients.map((r, i) => (
+          <li
+            key={r.supplier_id ?? i}
+            className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+          >
+            <span className="text-gray-800 truncate">
+              {r.supplier_name ?? r.supplier_id ?? "Provider"}
+            </span>
+            <span className="text-xs text-gray-500 shrink-0">{r.status ?? "—"}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 flex items-center gap-3">
+        <Button unstyled
+          type="button"
+          onClick={handleDispatch}
+          disabled={dispatching}
+          className="px-3 py-1.5 bg-navy-800 hover:bg-navy-900 disabled:opacity-60 text-white text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+        >
+          {dispatching ? "Dispatching…" : "Dispatch to suppliers"}
+        </Button>
+        {dispatchedCount != null && !dispatchError && (
+          <span className="text-xs text-green-700">
+            ✅ Links prepared for {dispatchedCount} {dispatchedCount === 1 ? "supplier" : "suppliers"}.
+          </span>
+        )}
+        {dispatchError && <span className="text-xs text-red-600">{dispatchError}</span>}
+      </div>
+    </div>
+  )
+}
+
+function EmployeeRfqSection({
+  caseId,
+  rfqs,
+  onDispatched,
+}: {
+  caseId: string
+  rfqs: CaseRfq[]
+  onDispatched: () => void
+}) {
   if (rfqs.length === 0) return null
   return (
     <div className="mb-6" data-testid="employee-rfqs">
@@ -502,39 +591,7 @@ function EmployeeRfqSection({ rfqs }: { rfqs: CaseRfq[] }) {
       </h2>
       <div className="flex flex-col gap-3">
         {rfqs.map((rfq) => (
-          <div
-            key={rfq.id}
-            className="rounded-xl border border-[#e2e8f0] bg-white p-4"
-          >
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="font-mono text-xs font-medium text-navy-800">
-                {rfq.rfq_ref ?? rfq.id}
-              </span>
-              {rfq.status && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-navy-50 text-navy-700 border border-navy-100">
-                  {rfq.status}
-                </span>
-              )}
-            </div>
-            {rfq.service_keys.length > 0 && (
-              <div className="text-xs text-gray-500 mb-2">
-                Services: {rfq.service_keys.join(", ")}
-              </div>
-            )}
-            <ul className="divide-y divide-[#f1f5f9] border border-[#f1f5f9] rounded-lg overflow-hidden">
-              {rfq.recipients.map((r, i) => (
-                <li
-                  key={r.supplier_id ?? i}
-                  className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
-                >
-                  <span className="text-gray-800 truncate">
-                    {r.supplier_name ?? r.supplier_id ?? "Provider"}
-                  </span>
-                  <span className="text-xs text-gray-500 shrink-0">{r.status ?? "—"}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <RfqCard key={rfq.id} caseId={caseId} rfq={rfq} onDispatched={onDispatched} />
         ))}
       </div>
     </div>
@@ -625,8 +682,9 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
       </div>
 
       {/* [AIQ-1671] Employee's canonical RFQs — shown above providers (and even when no
-          provider tasks exist yet) so HR actually sees the picks the employee submitted. */}
-      <EmployeeRfqSection rfqs={rfqs} />
+          provider tasks exist yet) so HR actually sees the picks the employee submitted.
+          [AIQ-1670] each card carries the HR-gated "Dispatch to suppliers" action. */}
+      <EmployeeRfqSection caseId={caseId} rfqs={rfqs} onDispatched={fetchRfqs} />
 
       {/* Error state */}
       {fetchError && (

@@ -98,6 +98,34 @@ export async function getCaseRfqs(caseId: string): Promise<CaseRfq[]> {
   return data.rfqs
 }
 
+/** [AIQ-1670] Result of an HR-gated RFQ dispatch. */
+export interface DispatchRfqResult {
+  ok: boolean
+  rfq_id: string
+  dispatched: number
+}
+
+/**
+ * [AIQ-1670] HR-gated dispatch: mint a supplier token for every recipient of this RFQ
+ * (reusing the audited supplier magic-link path). `sendEmail` defaults OFF — minting a link
+ * is harmless, but emailing a real supplier is opt-in and only fires with RESEND configured.
+ */
+export async function dispatchCaseRfq(
+  caseId: string,
+  rfqId: string,
+  sendEmail = false
+): Promise<DispatchRfqResult> {
+  const res = await fetch(
+    `${BASE}/api/hr/cases/${encodeURIComponent(caseId)}/rfqs/${encodeURIComponent(rfqId)}/dispatch`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ send_email: sendEmail }),
+    }
+  )
+  return handleResponse<DispatchRfqResult>(res)
+}
+
 export async function getCaseProviders(caseId: string): Promise<CaseProvider[]> {
   const res = await fetch(`${BASE}/api/hr/cases/${encodeURIComponent(caseId)}/providers`, {
     method: "GET",

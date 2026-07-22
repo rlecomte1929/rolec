@@ -27,6 +27,10 @@ from ..services.audit_log_service import (
 )
 from ..services.events_tracker import track as track_event
 from ..services.outcome_recorder import record_outcome
+from ..services.supplier_link_dispatch import (
+    dispatch_supplier_links,
+    resolve_rfq_targets,
+)
 
 router = APIRouter(prefix="/api/hr", tags=["hr-coordination"])
 
@@ -242,6 +246,87 @@ def get_case_rfqs(
         )
 
     return {"rfqs": result}
+
+
+# ---------------------------------------------------------------------------
+# POST /api/hr/cases/{case_id}/rfqs/{rfq_id}/dispatch
+# ---------------------------------------------------------------------------
+
+class DispatchRfqBody(BaseModel):
+    # Minting the link (token_hash) is harmless; emailing a real supplier is not, so sending
+    # is OPT-IN and default OFF (and no-ops entirely without RESEND_API_KEY). See
+    # supplier_link_dispatch. HR triggers this deliberately — never auto on employee submit.
+    send_email: bool = False
+
+
+@router.post("/cases/{case_id}/rfqs/{rfq_id}/dispatch")
+def dispatch_case_rfq(
+    case_id: str,
+    rfq_id: str,
+    body: DispatchRfqBody,
+    hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """[AIQ-1670] HR-gated dispatch of an employee-submitted RFQ: mint a supplier token for
+    every recipient and (opt-in) email them, by REUSING the M1/M2/M3-audited
+    `dispatch_supplier_links`. This is the HR action per the HR-payer model — dispatch never
+    happens automatically on employee submit.
+
+    Company-scoped, unlike the raw `POST /api/hr/rfqs/{rfq_id}/supplier-links`: the case must
+    belong to the HR's org AND the RFQ must belong to that case, so an HR from another company
+    cannot dispatch someone else's RFQ (404, no existence leak).
+    """
+    # Tenant scope — the case must belong to the HR's org.
+    with db.engine.begin() as conn:
+        case_ok = conn.execute(
+            text(
+                "SELECT 1 FROM relocation_cases WHERE CAST(id AS TEXT) = :cid AND CAST(company_id AS TEXT) = :org "
+                "UNION SELECT 1 FROM cases WHERE CAST(id AS TEXT) = :cid AND CAST(company_id AS TEXT) = :org LIMIT 1"
+            ),
+            {"cid": case_id, "org": org_id},
+        ).first()
+    if not case_ok:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+
+    # …and the RFQ must belong to THAT case (else a valid-for-org case_id could be paired with
+    # any rfq_id to dispatch a foreign request).
+    with db.engine.begin() as conn:
+        rfq_ok = conn.execute(
+            text("SELECT 1 FROM rfqs WHERE CAST(id AS TEXT) = :rid AND CAST(case_id AS TEXT) = :cid LIMIT 1"),
+            {"rid": rfq_id, "cid": case_id},
+        ).first()
+    if not rfq_ok:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RFQ not found for this case")
+
+    # Reuse the audited path: resolve every recipient, then mint tokens (+ opt-in email).
+    targets = resolve_rfq_targets(rfq_id)
+    results = dispatch_supplier_links(rfq_id=rfq_id, targets=targets, send_email=body.send_email)
+
+    try:
+        with db.engine.begin() as conn:
+            insert_audit_log(
+                conn,
+                entity_type="rfq",
+                entity_id=rfq_id,
+                action_type=ACTION_UPDATE,
+                actor_type=ACTOR_HUMAN,
+                actor_id=hr_user.get("id"),
+                new_value={"event": "rfq_dispatched", "case_id": case_id,
+                           "recipients": len(targets), "send_email": body.send_email},
+            )
+    except Exception:
+        log.exception("audit: dispatch_case_rfq rfq=%s", rfq_id)
+
+    track_event(
+        "rfq.dispatched",
+        entity_type="rfq",
+        entity_id=rfq_id,
+        user_id=hr_user.get("id"),
+        company_id=org_id,
+        properties={"case_id": case_id, "recipients": len(targets), "send_email": body.send_email},
+    )
+
+    return {"ok": True, "rfq_id": rfq_id, "dispatched": len(targets), "results": results}
 
 
 # ---------------------------------------------------------------------------
