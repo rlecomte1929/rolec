@@ -1255,55 +1255,17 @@ export const hrAPI = {
     return response.data;
   },
 
-  // ── AIQ-40-C: RFQ flow (HR Command Center) ────────────────────────────────
-  // [AIQ-1647] CANONICAL RFQ model = `rfqs` + `rfq_items` + `rfq_recipients` — the
-  // employee-led services vendor shortlist (servicesAPI.createRfq → POST /api/rfqs).
-  // The `rfq_requests` wrappers below are a SEPARATE, still-live model that backs the
-  // HR Command Center "Pending RFQs" panel (RfqModal + PendingRfqsPanel on
-  // HrCommandCenterCaseDetail, and covered by test_hr_rfq_create/list). They are NOT
-  // orphaned — this is the intentional HR-initiated RFQ path. The two models coexist on
-  // purpose; do NOT add a third. If they are ever unified, port these callers onto
-  // /api/rfqs and backfill rfq_requests (its own migration) — never add another endpoint.
-  // (Mirrors the AIQ-1525 quote_requests note further down this file.)
-
-  /** POST /api/hr/rfq-requests */
-  createRfqRequest: async (payload: {
-    case_id: string;
-    vendor_id: string;
-    service_category: string;
-    move_date?: string;
-    budget_range?: string;
-    special_requirements?: string;
-    // IMM-15: optional immigration case context (immigration-originated RFQs)
-    visa_type?: string;
-    corridor_from?: string;
-    corridor_to?: string;
-    employee_nationality?: string;
-    has_dependents?: boolean;
-    risk_flags?: string[];
-  }): Promise<{ ok: boolean; rfq_id: string; vendor_name: string; status: string; message: string }> => {
-    const response = await api.post<{ ok: boolean; rfq_id: string; vendor_name: string; status: string; message: string }>('/api/hr/rfq-requests', payload);
-    return response.data;
-  },
+  // ── AIQ-40-C: RFQ flow (HR Command Center) — legacy read-only remnant ─────
+  // [AIQ-1682] The HR-initiated RFQ *create* (POST) and *status update* (PATCH)
+  // wrappers were removed as part of the two-models consolidation: RFQs are now
+  // employee-led (CANONICAL model = `rfqs` + `rfq_items` + `rfq_recipients` via
+  // servicesAPI.createRfq → POST /api/rfqs), with HR acting as payer/approver. Only
+  // the read below remains, until legacy `rfq_requests` is archived (AIQ-1683) and its
+  // last reader is retired (AIQ-1684).
 
   /** GET /api/hr/rfq-requests?case_id=X */
   getRfqRequests: async (params?: { case_id?: string }): Promise<HrRfqRequestsResponse> => {
     const response = await api.get<HrRfqRequestsResponse>('/api/hr/rfq-requests', { params });
-    return response.data;
-  },
-
-  /** PATCH /api/hr/rfq-requests/{id} */
-  updateRfqStatus: async (
-    rfqId: string,
-    status: 'quote_received' | 'accepted' | 'cancelled',
-    quoteDetails?: {
-      quote_amount?: number;
-      quote_currency?: string;
-      quote_deadline?: string;
-      quote_deliverable?: string;
-    }
-  ): Promise<{ ok: boolean; rfq_id: string; status: string }> => {
-    const response = await api.patch<{ ok: boolean; rfq_id: string; status: string }>(`/api/hr/rfq-requests/${rfqId}`, { status, ...quoteDetails });
     return response.data;
   },
 

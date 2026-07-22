@@ -14,7 +14,6 @@ import { RoadmapReviewPanel } from '../components/case/RoadmapReviewPanel';
 import { statusLabel } from '../lib/statusLabel';
 import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
 import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
-import { RfqModal } from '../components/case/RfqModal';
 import type { ImmigrationContext } from '../components/case/immigrationContext';
 import { PendingRfqsPanel } from '../components/case/PendingRfqsPanel';
 import { ImmigrationStatusPanel } from '../components/case/ImmigrationStatusPanel';
@@ -142,8 +141,6 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
-  const [rfqVendor, setRfqVendor] = useState<{ id: string; name: string; service_categories: string[]; contact_email: string } | null>(null);
-  const [rfqSuccessMsg, setRfqSuccessMsg] = useState('');
   // NAV-HR-2: case-level escalate — the one case action missing from this view
   // (approve/reject already live in the exception panels below).
   const [escalateOpen, setEscalateOpen] = useState(false);
@@ -151,7 +148,6 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   // AIQ-1136: case-level reassign — HR hands a case to another HR in the company.
   const [reassignOpen, setReassignOpen] = useState(false);
   const [reassignSuccessMsg, setReassignSuccessMsg] = useState('');
-  const [rfqListKey, setRfqListKey] = useState(0);
 
   const handleQuoteStatusUpdate = async (
     qrId: string,
@@ -435,7 +431,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
               Find a vendor
             </Button>
           </div>
-          <PendingRfqsPanel key={rfqListKey} caseId={detail.id} />
+          <PendingRfqsPanel caseId={detail.id} />
         </Card>
 
         {/* ── Quote Requests from employee (Step 4) ── */}
@@ -558,31 +554,6 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         destCountry={detail.destCountry}
         initialCategory={vendorPanelInitialCategory}
         immigrationContext={vendorImmigrationContext}
-        onRequestQuote={(vendor) => {
-          setVendorPanelOpen(false);
-          setVendorPanelInitialCategory('');
-          setRfqVendor(vendor);
-        }}
-      />
-
-      {/* ── AIQ-40-C: RFQ modal ── */}
-      {rfqSuccessMsg && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-5 py-3 shadow-lg text-sm text-[#166534] font-medium">
-          ✓ {rfqSuccessMsg}
-          <Button unstyled type="button" aria-label="Dismiss notification" onClick={() => setRfqSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</Button>
-        </div>
-      )}
-      <RfqModal
-        vendor={rfqVendor}
-        caseId={detail.id}
-        immigrationContext={vendorImmigrationContext}
-        onClose={() => { setRfqVendor(null); setVendorImmigrationContext(null); }}
-        onSent={(vendorName) => {
-          setRfqVendor(null);
-          setVendorImmigrationContext(null);
-          setRfqSuccessMsg(`Quote request sent to ${vendorName}`);
-          setRfqListKey((k) => k + 1);
-        }}
       />
 
       {/* ── NAV-HR-2: case-level escalate ── */}
