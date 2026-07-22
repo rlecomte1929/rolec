@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from './antigravity';
 import { getAnalyticsConsent, grantAnalyticsConsent, revokeAnalyticsConsent } from '../analytics';
+import { useIsAdmin } from '../features/admin/useIsAdmin';
 
 /**
  * GDPR analytics consent banner.
@@ -13,13 +14,18 @@ import { getAnalyticsConsent, grantAnalyticsConsent, revokeAnalyticsConsent } fr
  * synthetic test-drive sessions. A returning visitor who has decided never sees it.
  */
 export function ConsentBanner() {
+  // AIQ-1660: hide the analytics-consent band on the admin profile only — internal
+  // staff don't need the opt-in prompt on the admin console. Every other profile
+  // (employee, HR, signed-out visitor) still sees it. Render-layer suppression only;
+  // the consent state itself is untouched.
+  const isAdmin = useIsAdmin();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (getAnalyticsConsent() === null) setVisible(true);
   }, []);
 
-  if (!visible) return null;
+  if (isAdmin || !visible) return null;
 
   function handleAccept() {
     grantAnalyticsConsent();
