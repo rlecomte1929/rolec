@@ -63,3 +63,14 @@ export const isCoordinatorEnabled = (): boolean =>
  */
 export const isTriggerFixEnabled = (): boolean =>
   isOn(import.meta.env.VITE_FEATURE_FEEDBACK_FIX);
+
+/**
+ * Per-move roadmap paywall (TEST MODE). Gates the employee roadmap behind an
+ * €800 Stripe Checkout unlock (`RoadmapPaywallGate` on the roadmap page; the
+ * dashboard consumes the `?payment=success` return and marks it unlocked). Kept
+ * OFF so the live roadmap is never paywalled until we turn it on per environment.
+ *
+ * Set `VITE_ENABLE_ROADMAP_PAYWALL=true` to activate the gate.
+ */
+export const isRoadmapPaywallEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_ENABLE_ROADMAP_PAYWALL);
