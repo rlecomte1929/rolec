@@ -2150,6 +2150,33 @@ def _selected_services_for_case(case_id: str) -> List[str]:
     return []
 
 
+def _budget_status(
+    cap_amount: Optional[float],
+    cap_currency: Optional[str],
+    estimated_amount: Optional[float],
+    estimated_currency: Optional[str],
+) -> str:
+    """[AIQ-1527] The honest per-service budget decision — never claim within_budget
+    having compared nothing. Extracted from ``_budget_categories_from_policy_config`` so
+    the decision is unit-testable in isolation (tests/test_budget_summary_honest.py).
+
+    - no cap                        -> ``no_cap``
+    - cap but no estimate           -> ``no_estimate`` (the common case; a fake tick is worse)
+    - cap + estimate, diff currency -> ``not_comparable`` (refuse to invent an FX rate)
+    - estimate <= cap               -> ``within_budget`` (== cap; a zero estimate is an answer)
+    - estimate  > cap               -> ``over_budget``
+    """
+    if cap_amount is None:
+        return "no_cap"
+    if estimated_amount is None:
+        return "no_estimate"
+    if estimated_currency and cap_currency and estimated_currency != cap_currency:
+        return "not_comparable"
+    if float(estimated_amount) <= float(cap_amount):
+        return "within_budget"
+    return "over_budget"
+
+
 def _budget_categories_from_policy_config(
     company_id: str,
     selected_services: List[str],
@@ -2209,20 +2236,10 @@ def _budget_categories_from_policy_config(
         estimated_amount: Optional[float] = est.get("amount")
         estimated_currency: Optional[str] = est.get("currency")
 
-        if total is None:
-            status = "no_cap"
-        elif estimated_amount is None:
-            # Still the common case — only 3 of 31 case_services rows carry an estimated_cost in
-            # prod. "We don't know yet" is fine. A fake green tick is not.
-            status = "no_estimate"
-        elif estimated_currency and currency and estimated_currency != currency:
-            # Refuse to rank rather than invent an FX rate — the same refusal
-            # policy_config_cap_compare already makes on a currency mismatch.
-            status = "not_comparable"
-        elif float(estimated_amount) <= float(total):
-            status = "within_budget"
-        else:
-            status = "over_budget"
+        # Honest decision (extracted to _budget_status for unit-testability). Only 3 of 31
+        # case_services rows carry an estimated_cost in prod, so "no_estimate" is the common,
+        # correct answer — a fake green tick is not.
+        status = _budget_status(total, currency, estimated_amount, estimated_currency)
         categories.append({
             "name": svc_name,
             "cap_amount": total,
