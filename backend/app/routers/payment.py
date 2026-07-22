@@ -133,9 +133,11 @@ def create_checkout(
         )
 
     app_base = _app_base_url()
-    # success_url returns to the dashboard, which marks the roadmap unlocked and
-    # strips the query params; cancel returns to the gated roadmap page.
-    success_url = f"{app_base}/employee/dashboard?payment=success&session_id={{CHECKOUT_SESSION_ID}}"
+    # Both return to the ROADMAP the user paid to unlock — NOT the dashboard, which bounces
+    # a mid-journey case to /employee/welcome. By the time the page loads the webhook has
+    # usually flipped access_tier; the page re-checks status on ?payment=success (short poll)
+    # so it shows the roadmap rather than the paywall if the flip is a beat behind.
+    success_url = f"{app_base}/employee/case/{body.assignmentId}/roadmap?payment=success&session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{app_base}/employee/case/{body.assignmentId}/roadmap?payment=cancelled"
 
     # Stripe's form-encoded API — pricing is fixed server-side (price_data), so a
