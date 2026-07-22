@@ -16,9 +16,8 @@ import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistan
 import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import { RoadmapBeingBuilt } from '../../features/employee-journey/RoadmapBeingBuilt';
 import { RoadmapPaywallGate } from '../../features/employee-journey/RoadmapPaywallGate';
-import { isRoadmapUnlocked } from '../../utils/paymentStatus';
+import { fetchRoadmapUnlocked } from '../../utils/paymentStatus';
 import { isRoadmapPaywallEnabled } from '../../featureFlags';
-import { getAuthItem } from '../../utils/demo';
 import { RuleUpdateBanner } from '../../features/platform-v2/roadmap/RuleUpdateBanner';
 import { useEmployeeRelocationPlanPageData } from '../../features/relocation-plan-employee/useEmployeeRelocationPlanPageData';
 import { useRelocationPlanCtaHandler } from '../../features/relocation-plan-employee/relocationPlanCtaNavigate';
@@ -157,6 +156,28 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   const [windowElapsed, setWindowElapsed] = useState(false);
   const [genStarted, setGenStarted] = useState(false);
   const attemptsRef = useRef(0);
+
+  // ── Roadmap paywall (Phase 4a is the server-side enforcement; this is the UX) ──
+  // Flag-gated (default off). We resolve the unlock from the SERVER (not localStorage)
+  // and gate the render BEFORE the roadmap fetch below: the roadmap endpoints 402 when
+  // locked, so a locked case must reach the paywall, not the "being built" fallback.
+  const paywallOn = isRoadmapPaywallEnabled();
+  const [roadmapUnlocked, setRoadmapUnlocked] = useState<boolean | null>(paywallOn ? null : true);
+  useEffect(() => {
+    if (!paywallOn || !caseId) {
+      setRoadmapUnlocked(true);
+      return;
+    }
+    let alive = true;
+    setRoadmapUnlocked(null);
+    void fetchRoadmapUnlocked(caseId).then((unlocked) => {
+      if (alive) setRoadmapUnlocked(unlocked);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [paywallOn, caseId]);
+
   const planEmpty = !!data && data.summary.total_tasks === 0;
   const planReady = !!data && data.summary.total_tasks > 0 && data.phases.length > 0;
   // "not ready" = a transient error OR an empty plan still generating. Both retried.
@@ -195,6 +216,29 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     resetWindow();
     void refetch();
   }, [resetWindow, refetch]);
+
+  // Paywall gate — runs BEFORE the loading/build-state returns so a locked case reaches
+  // the paywall rather than the "being built" fallback (the roadmap fetch 402s when locked).
+  if (paywallOn && roadmapUnlocked === null) {
+    return (
+      <AppShell>
+        <div style={{ padding: '24px', color: 'var(--text-muted)' }}>Loading roadmap…</div>
+      </AppShell>
+    );
+  }
+  if (paywallOn && roadmapUnlocked === false) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-5xl px-6 py-6">
+          <RoadmapPaywallGate
+            assignmentId={data?.assignment_id || caseId || ''}
+            destCity={header?.destCity}
+            destCountry={header?.destCountry}
+          />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (loading && !data && !genStarted) {
     return (
@@ -239,27 +283,6 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   // `=== false`, NOT `!released` — see roadmapReleaseGate.ts. The backend fails open and
   // the field is optional, so `undefined` means RELEASED.
   const pendingReview = isRoadmapHeldForHrReview(data);
-
-  // ── Roadmap paywall gate (TEST MODE) ────────────────────────────────────────
-  // The plan is BUILT; gate the render behind the €800 unlock. Flag-gated so the
-  // live roadmap is never paywalled unless VITE_ENABLE_ROADMAP_PAYWALL is on. The
-  // unlock is client-side for this phase (paymentStatus.ts / localStorage), set when
-  // the dashboard consumes the Stripe ?payment=success return.
-  const paywalled =
-    isRoadmapPaywallEnabled() && !isRoadmapUnlocked(getAuthItem('relopass_user_id') ?? '');
-  if (paywalled) {
-    return (
-      <AppShell>
-        <div className="mx-auto max-w-5xl px-6 py-6">
-          <RoadmapPaywallGate
-            assignmentId={data.assignment_id || caseId || ''}
-            destCity={header?.destCity}
-            destCountry={header?.destCountry}
-          />
-        </div>
-      </AppShell>
-    );
-  }
 
   return (
     <AppShell>

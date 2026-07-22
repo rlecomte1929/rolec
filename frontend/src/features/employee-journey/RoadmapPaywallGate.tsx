@@ -32,7 +32,7 @@ interface RoadmapPaywallGateProps {
 const FEATURES = [
   'All requirements in chronological order, anchored to your move date',
   'Feasibility flags — see immediately if any windows are tight or already missed',
-  '5 verified vendors per category: movers, immigration lawyers, tax advisors, schools',
+  'Recommended vendors per category: movers, immigration lawyers, tax advisors, schools',
   'Responsible-party tagging on every item (HR / you / both)',
 ] as const;
 
@@ -93,7 +93,7 @@ export const RoadmapPaywallGate: React.FC<RoadmapPaywallGateProps> = ({
       <div className="rounded-xl border border-accent-200 bg-accent-50 p-5 mb-6">
         <div className="flex items-center gap-3 mb-4">
           <Shield className="w-5 h-5 text-accent-600 flex-shrink-0" aria-hidden />
-          <h3 className="font-semibold text-navy-800">Full roadmap + verified vendor list</h3>
+          <h3 className="font-semibold text-navy-800">Full roadmap + vendor recommendations</h3>
         </div>
         <ul className="space-y-2">
           {FEATURES.map((line) => (
@@ -136,7 +136,7 @@ export const RoadmapPaywallGate: React.FC<RoadmapPaywallGateProps> = ({
         )}
       </button>
       <p className="text-center text-xs text-slate-500 mt-3">
-        Expensable as a professional service · Receipt issued automatically
+        Secure checkout via Stripe · Your card details never touch ReloPass
       </p>
     </div>
   );

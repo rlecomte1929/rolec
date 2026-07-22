@@ -163,6 +163,13 @@ backend/app/routers/integrations_personio_webhook.py:personio_webhook
 # PERSONIO_WEBHOOK_SECRET (integrations_personio_webhook.py:_verify_signature,
 # raises 401 on mismatch) before any work.
 
+backend/app/routers/stripe_webhook.py:stripe_webhook
+# WEBHOOK (PERMANENT): Stripe webhook (Path A). Intentionally public — Stripe calls it.
+# Authenticates by verifying the Stripe signature on the RAW request body via the SDK's
+# stripe.Webhook.construct_event (timing-safe HMAC + timestamp tolerance), returning 400
+# on an invalid signature, not a FastAPI Depends the AST scanner can see. Also 503s when
+# RELOPASS_STRIPE_ENABLED is off. Same pattern as the Personio webhook above.
+
 # ── Cron (invoked by the scheduler, not an end user; inline secret check) ──────
 backend/app/routers/crons.py:deadline_reminder
 backend/app/routers/crons.py:autopilot_canary
