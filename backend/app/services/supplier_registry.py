@@ -298,6 +298,29 @@ def search_by_service_destination(
         )
         item["specialization_tags"] = _parse_json_array(cap.specialization_tags) if cap else []
         result.append(item)
+
+    # Attach real per-agency neighbourhood coverage (supplier_service_area_coverage) so
+    # category plugins can boost by served areas from the curated table rather than the
+    # `area:*` tag heuristic. Best-effort: one batched query; if the table is absent
+    # (pre-migration / SQLite) the plugins fall back to the specialization_tags.
+    if result:
+        try:
+            from sqlalchemy import bindparam as _bindparam, text as _text
+            ids = [str(it.get("item_id")) for it in result if it.get("item_id")]
+            cov_rows = session.execute(
+                _text(
+                    "SELECT supplier_id, area_id FROM supplier_service_area_coverage "
+                    "WHERE service_category = :cat AND supplier_id IN :ids"
+                ).bindparams(_bindparam("ids", expanding=True)),
+                {"cat": service_category, "ids": ids},
+            ).fetchall()
+            by_supplier: Dict[str, List[str]] = {}
+            for sup_id, area_id in cov_rows:
+                by_supplier.setdefault(str(sup_id), []).append(str(area_id))
+            for it in result:
+                it["served_area_ids"] = by_supplier.get(str(it.get("item_id")), [])
+        except Exception:
+            pass
     return result
 
 

@@ -112,7 +112,10 @@ class HousingAgenciesPlugin(BasePlugin):
         # Δ2: additive boost for agencies serving the shortlisted neighbourhoods. Never a
         # filter — an agency with no overlap keeps its rating/availability score and stays
         # reachable; overlapping agencies simply rank higher (capped).
-        served = _served_area_ids(tags)
+        # Prefer the curated coverage table (served_area_ids attached by the registry);
+        # fall back to the `area:*` tokens in specialization_tags during rollout.
+        table_areas = item.get("served_area_ids")
+        served = set(table_areas) if table_areas else _served_area_ids(tags)
         overlap = served & set(c.shortlisted_area_ids or [])
         area_boost = min(AREA_MATCH_BOOST * len(overlap), AREA_MATCH_BOOST_CAP)
         score_raw += area_boost

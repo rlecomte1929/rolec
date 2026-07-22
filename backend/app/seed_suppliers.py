@@ -90,6 +90,14 @@ def seed_housing_agencies() -> int:
     now = datetime.utcnow().isoformat()
     created = 0
     with SessionLocal() as session:
+        # One-time check: the coverage table may not exist yet (applied out-of-band).
+        # Seed coverage only when present; the plugin falls back to area:* tags otherwise.
+        try:
+            session.execute(text("SELECT 1 FROM supplier_service_area_coverage LIMIT 1"))
+            _has_coverage_table = True
+        except Exception:
+            session.rollback()
+            _has_coverage_table = False
         for item in items:
             item_id = item.get("item_id")
             name = item.get("name")
@@ -132,6 +140,19 @@ def seed_housing_agencies() -> int:
                     {"cat": "housing_agencies", "name": name, "city": city, "country": country,
                      "eid": item_id, "sid": item_id, "now": now},
                 )
+            # Real per-agency neighbourhood coverage — the curated source for the Δ2
+            # shortlist boost. Idempotent (ON CONFLICT DO NOTHING).
+            if _has_coverage_table:
+                for area_id in (item.get("areas") or []):
+                    session.execute(
+                        text(
+                            "INSERT INTO supplier_service_area_coverage "
+                            "(supplier_id, service_category, area_id) "
+                            "VALUES (:sid, 'housing_agencies', :area) "
+                            "ON CONFLICT (supplier_id, service_category, area_id) DO NOTHING"
+                        ),
+                        {"sid": item_id, "area": area_id},
+                    )
         session.commit()
     return created
 

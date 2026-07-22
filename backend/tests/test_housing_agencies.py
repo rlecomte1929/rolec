@@ -126,6 +126,27 @@ def test_no_shortlist_means_no_area_boost():
     assert with_areas["breakdown"]["shortlisted_area_match"] == 0
 
 
+def test_served_area_ids_from_table_take_priority_over_tags():
+    # Real coverage table says the agency serves la-o1; the legacy area:* tag says la-o9.
+    # The table wins, so a la-o1 shortlist boosts it (and la-o9 would not).
+    p = HousingAgenciesPlugin()
+    crit = HousingAgenciesCriteria(destination_city="Oslo", shortlisted_area_ids=["la-o1"])
+    item = _agency("p1", PERMANENT_TAG, areas=["la-o9"])   # tag says la-o9
+    item["served_area_ids"] = ["la-o1"]                     # table says la-o1
+    out = p.score(crit, item)
+    assert out["metadata"]["matched_shortlisted_areas"] == ["la-o1"]
+    assert out["breakdown"]["shortlisted_area_match"] > 0
+
+
+def test_falls_back_to_area_tags_when_no_table_coverage():
+    # No served_area_ids (pre-migration / uncurated) → use the area:* tags.
+    p = HousingAgenciesPlugin()
+    crit = HousingAgenciesCriteria(destination_city="Oslo", shortlisted_area_ids=["la-o9"])
+    item = _agency("p1", PERMANENT_TAG, areas=["la-o9"])   # no served_area_ids key
+    out = p.score(crit, item)
+    assert out["metadata"]["matched_shortlisted_areas"] == ["la-o9"]
+
+
 def test_area_boost_is_capped():
     p = HousingAgenciesPlugin()
     crit = HousingAgenciesCriteria(
