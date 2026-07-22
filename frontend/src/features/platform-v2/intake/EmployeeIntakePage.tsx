@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
-import { SegmentedOptionCards } from '../../../components/antigravity/SegmentedOptionCards';
 import { useGeocodedAddress } from '../../../components/geocode';
 import { AddressAutocompleteInput } from '../../../components/AddressAutocompleteInput';
 import { patchCase } from '../../../api/cases';
@@ -1367,8 +1366,13 @@ export function EmployeeIntakePage() {
                         <div className="text-xs text-gray-400">Shorter = fewer neighborhoods but better matches.</div>
                       </FieldWrap>
                       <FieldWrap label="Preferred way to commute">
-                        <SegmentedOptionCards value={data.commute_preference}
-                          onChange={(v) => setField('commute_preference', v)}
+                        {/* AIQ-1657: single-select MultiChip (like Work pattern / Assignment
+                            type above) so the commute options are homogeneous with the rest of
+                            the page and each label fits inside its pill — the previous
+                            SegmentedOptionCards forced 5 equal narrow columns in this half-width
+                            cell, so "Public transport" overflowed. */}
+                        <MultiChip value={data.commute_preference ? [data.commute_preference] : []}
+                          onChange={(v) => setField('commute_preference', v[v.length - 1] || '')}
                           options={COMMUTE_OPTIONS} />
                       </FieldWrap>
                     </div>
