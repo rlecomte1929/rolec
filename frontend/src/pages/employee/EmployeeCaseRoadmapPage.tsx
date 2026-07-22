@@ -15,6 +15,10 @@ import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
 import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
 import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import { RoadmapBeingBuilt } from '../../features/employee-journey/RoadmapBeingBuilt';
+import { RoadmapPaywallGate } from '../../features/employee-journey/RoadmapPaywallGate';
+import { isRoadmapUnlocked } from '../../utils/paymentStatus';
+import { isRoadmapPaywallEnabled } from '../../featureFlags';
+import { getAuthItem } from '../../utils/demo';
 import { RuleUpdateBanner } from '../../features/platform-v2/roadmap/RuleUpdateBanner';
 import { useEmployeeRelocationPlanPageData } from '../../features/relocation-plan-employee/useEmployeeRelocationPlanPageData';
 import { useRelocationPlanCtaHandler } from '../../features/relocation-plan-employee/relocationPlanCtaNavigate';
@@ -235,6 +239,27 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   // `=== false`, NOT `!released` — see roadmapReleaseGate.ts. The backend fails open and
   // the field is optional, so `undefined` means RELEASED.
   const pendingReview = isRoadmapHeldForHrReview(data);
+
+  // ── Roadmap paywall gate (TEST MODE) ────────────────────────────────────────
+  // The plan is BUILT; gate the render behind the €800 unlock. Flag-gated so the
+  // live roadmap is never paywalled unless VITE_ENABLE_ROADMAP_PAYWALL is on. The
+  // unlock is client-side for this phase (paymentStatus.ts / localStorage), set when
+  // the dashboard consumes the Stripe ?payment=success return.
+  const paywalled =
+    isRoadmapPaywallEnabled() && !isRoadmapUnlocked(getAuthItem('relopass_user_id') ?? '');
+  if (paywalled) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-5xl px-6 py-6">
+          <RoadmapPaywallGate
+            assignmentId={data.assignment_id || caseId || ''}
+            destCity={header?.destCity}
+            destCountry={header?.destCountry}
+          />
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
