@@ -21,6 +21,7 @@ from backend.app.services.fx_service import (  # noqa: E402
     SUPPORTED_DISPLAY_CURRENCIES,
     USD_TO,
     convert_usd_to_display,
+    default_currency_for_country,
     normalize_display_currency,
 )
 
@@ -77,6 +78,24 @@ class FxServiceTests(unittest.TestCase):
         # JPY has the largest multiplier; check the result is well-formed.
         result = convert_usd_to_display(1000, "JPY")
         self.assertEqual(result, 150_000.0)
+
+    def test_default_currency_for_country_destination(self) -> None:
+        # Destination country → display currency (AIQ-1661 staged-fixture fix).
+        # The FR_NO corridor's destination is NO (Oslo) → NOK, not EUR.
+        self.assertEqual(default_currency_for_country("NO"), "NOK")
+        self.assertEqual(default_currency_for_country("DE"), "EUR")  # eurozone
+        self.assertEqual(default_currency_for_country("US"), "USD")
+        self.assertEqual(default_currency_for_country("gb"), "GBP")  # case-insensitive
+        self.assertEqual(default_currency_for_country(" UK "), "GBP")  # alias + strip
+
+    def test_default_currency_for_country_falls_back_to_usd(self) -> None:
+        # Non-covered / unsupported / unknown destinations degrade to USD, so a
+        # seeded corridor whose currency we don't display never shows a bad value.
+        self.assertEqual(default_currency_for_country("SG"), "USD")  # SGD not displayed
+        self.assertEqual(default_currency_for_country("AE"), "USD")  # AED not displayed
+        self.assertEqual(default_currency_for_country("ZZ"), "USD")
+        self.assertEqual(default_currency_for_country(None), "USD")
+        self.assertEqual(default_currency_for_country(""), "USD")
 
 
 if __name__ == "__main__":
