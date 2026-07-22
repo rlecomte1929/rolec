@@ -1,42 +1,24 @@
 /**
- * Client-side roadmap payment status helper — TEST PHASE ONLY.
+ * Roadmap payment-status helper — SERVER-backed.
  *
- * The flag is set when the employee lands on
- *   /employee/dashboard?payment=success&session_id=…
- * after Stripe checkout, and persists in localStorage so the roadmap page
- * lets them through on subsequent visits without re-paying.
- *
- * ⚠️  Replace with a real API call once the platform has a payment-status
- *     endpoint (e.g. GET /api/payment/status/:assignmentId that reads from
- *     the backend `case_access` table written by the Stripe webhook).
- *
- * Key: `rp_roadmap_unlocked_{userId}` → '1' | absent
+ * Replaces the earlier client-trusted localStorage unlock: the roadmap gate is now
+ * enforced server-side (`assert_roadmap_access`, Phase 4a), and this reads the same
+ * source of truth via GET /api/payment/status/:caseId. Setting a localStorage flag or
+ * visiting `?payment=success` no longer unlocks anything — only a real paid tier does.
  */
-
-const payKey = (userId: string) => `rp_roadmap_unlocked_${userId}`;
+import { getPaymentStatus } from '../api/payment';
 
 /**
- * Returns true when the current user's roadmap is unlocked (paid or test-unlocked).
- * Falls back to `false` on localStorage errors so the gate shows rather than hides.
+ * True when the case's roadmap may be shown. Fails OPEN (true) when there's no caseId or
+ * the status call errors — a transient network failure must never wrongly paywall a user
+ * (and the server still enforces the gate on the roadmap fetch itself as the backstop).
  */
-export function isRoadmapUnlocked(userId: string): boolean {
-  if (!userId) return false;
+export async function fetchRoadmapUnlocked(caseId: string): Promise<boolean> {
+  if (!caseId) return true;
   try {
-    return localStorage.getItem(payKey(userId)) === '1';
+    const status = await getPaymentStatus(caseId);
+    return status.roadmap_unlocked;
   } catch {
-    return false;
-  }
-}
-
-/**
- * Marks the roadmap as unlocked for this user.
- * Called from EmployeeJourney when ?payment=success lands.
- */
-export function markRoadmapUnlocked(userId: string): void {
-  if (!userId) return;
-  try {
-    localStorage.setItem(payKey(userId), '1');
-  } catch {
-    // ignore quota / private-browsing restrictions
+    return true;
   }
 }
