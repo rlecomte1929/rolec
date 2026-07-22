@@ -14,6 +14,7 @@ import {
 } from "../api/hrCoordination"
 import { Input } from './antigravity/Input';
 import { Button } from './antigravity/Button';
+import { isSupplierEmailEnabled } from '../featureFlags';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -507,6 +508,17 @@ function RfqCard({
   const [dispatchError, setDispatchError] = useState<string | null>(null)
   const [dispatchedCount, setDispatchedCount] = useState<number | null>(null)
 
+  // [AIQ-1673] Separate, confirm-gated "email suppliers" action (send_email=true). Distinct
+  // from the mint-only button above and only reachable when VITE_ENABLE_SUPPLIER_EMAIL is on,
+  // because it emails REAL external companies. `emailConfirm` shows the inline confirm; nothing
+  // is sent until it is explicitly accepted.
+  const supplierEmailEnabled = isSupplierEmailEnabled()
+  const [emailing, setEmailing] = useState(false)
+  const [emailConfirm, setEmailConfirm] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [emailedCount, setEmailedCount] = useState<number | null>(null)
+  const recipientCount = rfq.recipients.length
+
   // [AIQ-1670] HR-gated dispatch: mint a supplier token for every recipient (reuses the
   // audited path). send_email stays OFF here — clicking mints the links; it never emails a
   // real supplier by accident.
@@ -521,6 +533,24 @@ function RfqCard({
       setDispatchError(err instanceof Error ? err.message : "Dispatch failed.")
     } finally {
       setDispatching(false)
+    }
+  }
+
+  // [AIQ-1673] Only runs after the HR explicitly confirms. Dispatches with send_email=true so
+  // suppliers are actually emailed via the audited Resend path (a no-op backend-side without
+  // RESEND_API_KEY). Never auto-fires.
+  const handleEmailSuppliers = async () => {
+    setEmailConfirm(false)
+    setEmailing(true)
+    setEmailError(null)
+    try {
+      const res = await dispatchCaseRfq(caseId, rfq.id, true)
+      setEmailedCount(res.dispatched)
+      onDispatched()
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "Email dispatch failed.")
+    } finally {
+      setEmailing(false)
     }
   }
 
@@ -570,6 +600,56 @@ function RfqCard({
         )}
         {dispatchError && <span className="text-xs text-red-600">{dispatchError}</span>}
       </div>
+
+      {/* [AIQ-1673] Separate, confirm-gated "email suppliers" action (send_email=true). Only
+          rendered when VITE_ENABLE_SUPPLIER_EMAIL is on, because it emails REAL external
+          companies. Distinct from the mint-only button above; nothing sends without the
+          explicit confirm below. */}
+      {supplierEmailEnabled && (
+        <div className="mt-3 border-t border-[#f1f5f9] pt-3">
+          {!emailConfirm ? (
+            <div className="flex items-center gap-3 flex-wrap">
+              <Button unstyled
+                type="button"
+                onClick={() => setEmailConfirm(true)}
+                disabled={emailing || recipientCount === 0}
+                className="px-3 py-1.5 bg-accent-600 hover:bg-accent-700 disabled:opacity-60 text-white text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-accent-400"
+              >
+                {emailing ? "Emailing…" : "✉ Email suppliers"}
+              </Button>
+              {emailedCount != null && !emailError && (
+                <span className="text-xs text-green-700">
+                  ✅ Email dispatch requested for {emailedCount} {emailedCount === 1 ? "supplier" : "suppliers"}.
+                </span>
+              )}
+              {emailError && <span className="text-xs text-red-600">{emailError}</span>}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs text-amber-800 mb-2">
+                This will email {recipientCount} real {recipientCount === 1 ? "supplier" : "suppliers"} who
+                may not have heard from us before. This action cannot be undone. Continue?
+              </p>
+              <div className="flex items-center gap-2">
+                <Button unstyled
+                  type="button"
+                  onClick={handleEmailSuppliers}
+                  className="px-3 py-1.5 bg-accent-600 hover:bg-accent-700 text-white text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-accent-400"
+                >
+                  Yes, email {recipientCount === 1 ? "supplier" : "suppliers"}
+                </Button>
+                <Button unstyled
+                  type="button"
+                  onClick={() => setEmailConfirm(false)}
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -74,3 +74,16 @@ export const isTriggerFixEnabled = (): boolean =>
  */
 export const isRoadmapPaywallEnabled = (): boolean =>
   isOn(import.meta.env.VITE_ENABLE_ROADMAP_PAYWALL);
+
+/**
+ * AIQ-1673 — HR "Email suppliers" action on an employee's RFQ card. Gates the
+ * confirm-gated action that dispatches with `send_email=true`, which actually
+ * emails REAL external suppliers via the audited Resend path. Kept OFF so the
+ * action is not even reachable until the business decides to contact suppliers
+ * (go-live sign-off). The mint-only "Dispatch to suppliers" button is unaffected
+ * by this flag. Defense in depth: the backend still no-ops without RESEND_API_KEY.
+ *
+ * Set `VITE_ENABLE_SUPPLIER_EMAIL=true` to surface the action.
+ */
+export const isSupplierEmailEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_ENABLE_SUPPLIER_EMAIL);
