@@ -260,7 +260,7 @@ def post_recommendations_batch(
         )
     try:
         from ..services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED
-        total_count = sum(len(r.get("items", [])) for r in results.values())
+        total_count = sum(len(r.recommendations) for r in results.values())
         emit_event(
             EVENT_RECOMMENDATIONS_GENERATED,
             request_id=request_id,
@@ -278,7 +278,7 @@ def post_recommendations_batch(
         from ..posthog_client import get_posthog_client
         ph = get_posthog_client()
         if ph and user.get("id"):
-            total_count = sum(len(r.get("items", [])) for r in results.values())
+            total_count = sum(len(r.recommendations) for r in results.values())
             ph.capture(
                 distinct_id=user["id"],
                 event="recommendations_requested",
