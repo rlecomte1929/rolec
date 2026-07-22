@@ -21,7 +21,7 @@
 | **Resend** | Transactional email | US entity | SCCs via Resend DPA | ⬜ Self-service DPA | `RESEND_API_KEY` / `EMAIL_PROVIDER=resend`; `dossier_notifications.py`, edge fn `send-notification-email` |
 | **PostHog** | Product analytics (frontend `posthog-js` + **backend server-side events**) + session replay (**replay gated to test-drive only**) | **EU host** (`eu.i.posthog.com`) ✅ | EU Cloud — no transfer | ⬜ Confirm DPA on EU project | `frontend/src/analytics.ts` (`posthog-js`); replay gate `frontend/src/components/TestDriveReplayGate.tsx`; backend `backend/app/posthog_client.py` (`posthog` Python SDK) |
 | **Geoapify** | Address autocomplete for the intake office-address field (AIQ-1607) **and** forward geocoding of the office address for housing recommendations (AIQ-1661) | **EU (Germany)** ✅ | Data in EU — no transfer | ⬜ Confirm/sign DPA on console | `GEOAPIFY_API_KEY`; `geocoding_service.py`, `geocoding.py`, `recommendations/geo.py` |
-| **Stripe** | Payment processing — Stripe Checkout (hosted) + webhook | US parent (Stripe, Inc.); EU contracting entity Stripe Payments Europe Ltd (Ireland) | Stripe DPA (auto-incorporated in the Stripe Services Agreement) + SCCs for US transfer | ⬜ Confirm DPA in Services Agreement — **before live keys** | `stripe>=9,<12`; `payment.py` (checkout), `stripe_webhook.py` (webhook). **WIP — not on `main`, not live** |
+| **Stripe** | Payment processing — Stripe Checkout (hosted) + webhook | US parent (Stripe, Inc.); EU contracting entity Stripe Payments Europe Ltd (Ireland) | Stripe DPA (auto-incorporated in the Stripe Services Agreement) + SCCs for US transfer | ⬜ Confirm DPA in Services Agreement — **before live keys** | `stripe>=9,<12`; `payment.py` (checkout), `stripe_webhook.py` (webhook). **On `main` (PR #1626), deployed in Stripe TEST mode** (`sk_test`); **live keys + DPA still human-gated** — no real payment PII processed yet |
 
 ## Notes & corrections (v1.8)
 
@@ -42,9 +42,27 @@
     typically contract with **Stripe Payments Europe Ltd (Ireland)**. US transfer is covered by Stripe's
     SCCs, and Stripe's **DPA is auto-incorporated into the Stripe Services Agreement** — so no separate
     signature is usually required, but the account's DPA posture must be **confirmed before live keys**.
-  - **Gated off:** `RELOPASS_STRIPE_ENABLED` is unset (webhook + checkout 503), so nothing is processed
-    until a human enables it. This register row documents the pending integration on the `feat/stripe-*`
-    branches; re-verify against `main` when it merges.
+  - **Status (superseded — see v1.9 below).** Originally documented as WIP on `feat/stripe-*` with
+    `RELOPASS_STRIPE_ENABLED` unset (503). That is no longer accurate: the integration merged (PR #1626)
+    and is deployed in **Stripe TEST mode**.
+
+## Notes & corrections (v1.9 — 2026-07-22)
+
+- **Stripe integration is now on `main` and deployed in TEST mode** (corrects the v1.8 "not on `main`,
+  gated off / 503" claim). Verified against prod (`rolec-eu`) on 2026-07-22:
+  - `STRIPE_SECRET_KEY` = `sk_test_…` (**test mode — no real charge is possible**); `RELOPASS_STRIPE_ENABLED=true`
+    (checkout + webhook are live, but test-mode only).
+  - **No real payment PII is processed.** The platform is pre-launch (no real customers), the keys are
+    test-mode, and card data never touches ReloPass regardless (hosted Checkout, PCI SAQ-A). The GDPR
+    posture is unchanged: the DPA confirmation (C1) and **live** keys (C4) remain the human gate before any
+    real payment PII — still ⬜ pending.
+  - **Two config items are out of the go-live sequence** (`docs/stripe-stage-c-go-live-checklist.md`),
+    tracked as ops fixes, not compliance issues: `STRIPE_WEBHOOK_SECRET` is set to the webhook URL rather
+    than a `whsec_…` signing secret (so test webhooks don't verify), and `RELOPASS_ROADMAP_PAYWALL_ENABLED=true`
+    was enabled ahead of step C7 (before the paid→unlock loop is proven at C6). Neither changes the
+    sub-processor/DPA posture; both are noted so this register matches reality.
+  - **Before live keys (unchanged human gate):** confirm the Stripe DPA + SCC posture (C1) and flip the row's
+    DPA status to confirmed at that point.
 
 ## Notes & corrections (v1.7)
 
