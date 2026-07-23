@@ -195,23 +195,40 @@ def _post_inbox_message(rfq_id: str, supplier_name: str, link: str) -> None:
     The employee's inbox reads `quote_conversations` + `quote_messages` (InboxV2Page ->
     list_quote_threads_for_employee). `db.create_rfq` already opened one conversation per RFQ; here
     we add a message carrying the working link, so the loop is runnable end to end with NO email
-    leaving the building. The sender is the RFQ's own creator (`rfqs.created_by_user_id`), the one
-    NOT-NULL uuid we already hold for this thread.
+    leaving the building.
 
-    Best-effort: a missing conversation/sender, or any write error, is swallowed by the caller —
-    the minted token stands on its own and the HR RFQ list surfaces the recipient regardless.
+    `quote_messages.sender_user_id` FKs `auth.users(id)`, so the notice must be attributed to a real
+    Supabase auth user — there is no system user, and the RFQ creator id is frequently a legacy TEXT
+    value (e.g. "seed-emp-testingapril") that is neither a uuid nor in auth.users. We resolve the
+    creator's auth uuid by email (the same direct-SELECT pattern supabase_auth_sync uses — GoTrue has
+    no get-by-email) and attribute the notice to them: it is their RFQ and their thread.
+
+    Best-effort: a missing conversation, an unresolvable sender, or any write error is swallowed by
+    the caller — the minted token stands on its own and the HR RFQ list surfaces the recipient
+    regardless.
     """
     now = datetime.now(tz=timezone.utc).isoformat()
     with db.engine.begin() as conn:
         row = conn.execute(
             text(
-                "SELECT qc.id AS conv_id, r.created_by_user_id AS sender "
-                "FROM quote_conversations qc JOIN rfqs r ON r.id = qc.rfq_id "
+                "SELECT qc.id AS conv_id, u.email AS creator_email "
+                "FROM quote_conversations qc "
+                "JOIN rfqs r ON r.id = qc.rfq_id "
+                "LEFT JOIN users u ON u.id = r.created_by_user_id "
                 "WHERE qc.rfq_id = :rfq ORDER BY qc.created_at LIMIT 1"
             ),
             {"rfq": str(rfq_id)},
         ).mappings().first()
-        if not row or not row.get("conv_id") or not row.get("sender"):
+        if not row or not row.get("conv_id"):
+            return
+        email = (row.get("creator_email") or "").strip().lower()
+        if not email:
+            return
+        sender = conn.execute(
+            text("SELECT id FROM auth.users WHERE lower(email) = :e ORDER BY created_at LIMIT 1"),
+            {"e": email},
+        ).scalar()
+        if not sender:
             return
         body = (
             f"Quote request ready for {supplier_name}. They can open it and reply with a price — "
@@ -225,7 +242,7 @@ def _post_inbox_message(rfq_id: str, supplier_name: str, link: str) -> None:
             {
                 "id": str(uuid.uuid4()),
                 "cid": str(row["conv_id"]),
-                "sender": str(row["sender"]),
+                "sender": str(sender),
                 "body": body,
                 "now": now,
             },
