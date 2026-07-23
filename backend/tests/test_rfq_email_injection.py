@@ -96,9 +96,12 @@ class PersonalDomainGuardTests(unittest.TestCase):
     def test_personal_domain_blocked_not_sent(self):
         # dispatch_supplier_links must not email a personal inbox even with send_email=True.
         # (No real email actually goes out here — RESEND_API_KEY is unset in tests.)
+        # dispatch_mode="email": these guards are EMAIL-mode semantics; the inbox mode has no
+        # address to guard because it never emails.
         results = dispatch_supplier_links(
             rfq_id="rfq-test-1",
             targets=self._targets("someone@hotmail.com"),
+            dispatch_mode="email",
             send_email=True,
         )
         self.assertEqual(len(results), 1)
@@ -110,6 +113,7 @@ class PersonalDomainGuardTests(unittest.TestCase):
         results = dispatch_supplier_links(
             rfq_id="rfq-test-2",
             targets=self._targets(None),
+            dispatch_mode="email",
             send_email=False,
         )
         self.assertEqual(len(results), 1)
@@ -123,6 +127,7 @@ class PersonalDomainGuardTests(unittest.TestCase):
         results = dispatch_supplier_links(
             rfq_id="rfq-test-3",
             targets=self._targets("rfq@asiantigers-worldwide.com"),
+            dispatch_mode="email",
             send_email=False,
         )
         self.assertEqual(len(results), 1)
@@ -138,6 +143,7 @@ class PersonalDomainGuardTests(unittest.TestCase):
         results = dispatch_supplier_links(
             rfq_id="rfq-test-4",
             targets=self._targets("contact@gmail.com"),
+            dispatch_mode="email",
             send_email=True,
         )
         self.assertFalse(results[0]["ok"])

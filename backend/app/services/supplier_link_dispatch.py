@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 from datetime import datetime, timezone
 from html import escape
 from typing import Any, Dict, List, Optional
@@ -155,46 +156,172 @@ def resolve_rfq_targets(rfq_id: str) -> List[Dict[str, Any]]:
     ]
 
 
+def _mint_link(rfq_id: str, target: Dict[str, Any], email: str) -> str:
+    """Generate a supplier token, persist its hash on the recipient row, and return the magic link.
+
+    Shared by both dispatch modes. `email` may be "" in inbox mode (no address on record): the
+    token carries the address only as an unchecked claim, and the invite row stores NULL rather
+    than a blank string when we hold no address.
+    """
+    token = generate_supplier_token(
+        recipient_id=str(target["recipient_id"]),
+        rfq_id=str(rfq_id),
+        vendor_id=str(target["vendor_id"]),
+        email=email or "",
+    )
+    link = f"{APP_BASE_URL}/supplier/quote?token={token}"
+    now = datetime.now(tz=timezone.utc).isoformat()
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE rfq_recipients SET token_hash = :h, invited_email = :e, "
+                "invited_at = :now, expires_at = :exp, revoked_at = NULL, status = 'sent', "
+                "last_activity_at = :now WHERE id = :id"
+            ),
+            {
+                "h": hash_token(token),
+                "e": email or None,
+                "now": now,
+                "exp": expires_at().isoformat(),
+                "id": str(target["recipient_id"]),
+            },
+        )
+    return link
+
+
+def _post_inbox_message(rfq_id: str, supplier_name: str, link: str) -> None:
+    """Surface the supplier magic link in the in-app inbox (INBOX dispatch mode).
+
+    The employee's inbox reads `quote_conversations` + `quote_messages` (InboxV2Page ->
+    list_quote_threads_for_employee). `db.create_rfq` already opened one conversation per RFQ; here
+    we add a message carrying the working link, so the loop is runnable end to end with NO email
+    leaving the building. The sender is the RFQ's own creator (`rfqs.created_by_user_id`), the one
+    NOT-NULL uuid we already hold for this thread.
+
+    Best-effort: a missing conversation/sender, or any write error, is swallowed by the caller —
+    the minted token stands on its own and the HR RFQ list surfaces the recipient regardless.
+    """
+    now = datetime.now(tz=timezone.utc).isoformat()
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT qc.id AS conv_id, r.created_by_user_id AS sender "
+                "FROM quote_conversations qc JOIN rfqs r ON r.id = qc.rfq_id "
+                "WHERE qc.rfq_id = :rfq ORDER BY qc.created_at LIMIT 1"
+            ),
+            {"rfq": str(rfq_id)},
+        ).mappings().first()
+        if not row or not row.get("conv_id") or not row.get("sender"):
+            return
+        body = (
+            f"Quote request ready for {supplier_name}. They can open it and reply with a price — "
+            f"no account needed: {link}"
+        )
+        conn.execute(
+            text(
+                "INSERT INTO quote_messages (id, conversation_id, sender_user_id, body, created_at) "
+                "VALUES (:id, :cid, :sender, :body, :now)"
+            ),
+            {
+                "id": str(uuid.uuid4()),
+                "cid": str(row["conv_id"]),
+                "sender": str(row["sender"]),
+                "body": body,
+                "now": now,
+            },
+        )
+
+
 def dispatch_supplier_links(
     *,
     rfq_id: str,
     targets: List[Dict[str, Any]],
     send_email: bool = False,
+    dispatch_mode: str = "inbox",
     request_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Mint one link per target, persist it, and email it if asked to.
+    """Mint one link per target and deliver it according to `dispatch_mode`.
 
-    Each target: {recipient_id, vendor_id, supplier_name, email|None}. A target with no email is
-    skipped with `ok: False, error: NO_ADDRESS` — we never invent an address, and we never
-    silently drop a supplier the employee chose.
+    Two modes, one seam:
+      * ``"inbox"`` (default): mint the token for EVERY recipient and surface the working link in
+        the in-app inbox. No address is required, and the verified / personal-domain guards do NOT
+        apply — those exist only to protect email egress, and inbox mode emails no one. Resend is
+        never called. This is what makes the loop live without spending a single email. The future
+        go-live on email is one config flip (`dispatch_mode="email"`), not a rewrite.
+      * ``"email"``: the address-and-provenance guards apply (no address / unverified /
+        personal-domain -> not contacted, no token minted), then the link is emailed via Resend
+        when ``send_email`` is set.
 
-    Returns one result per target. Never raises.
+    Each target: {recipient_id, vendor_id, supplier_name, email|None, verified}. Returns one result
+    per target. Never raises.
     """
+    mode = "email" if dispatch_mode == "email" else "inbox"
     resend_key = os.getenv("RESEND_API_KEY")
     results: List[Dict[str, Any]] = []
 
     # The brief goes IN the email. A vendor who cannot see the route, the date and the scope
-    # without clicking has no reason to click — and their silence would be misread as
-    # "suppliers don't respond" when it is really "we asked badly".
+    # without clicking has no reason to click. Only needed for the email body, so skip it in inbox
+    # mode (the link is carried by the inbox message, not by a rendered email).
     brief_rows: List[Dict[str, str]] = []
-    try:
-        rfq = db.get_rfq(rfq_id) or {}
-        for item in rfq.get("items") or []:
-            brief_rows.extend(render_brief_lines(item.get("requirements") or {}))
-    except Exception:
-        log.warning("AIQ-1521 could not build the brief for rfq=%s — sending without it", rfq_id)
     deadline = respond_by()
-    subject = rfq_email_subject(brief_rows)
+    subject = ""
+    if mode == "email":
+        try:
+            rfq = db.get_rfq(rfq_id) or {}
+            for item in rfq.get("items") or []:
+                brief_rows.extend(render_brief_lines(item.get("requirements") or {}))
+        except Exception:
+            log.warning("AIQ-1521 could not build the brief for rfq=%s — sending without it", rfq_id)
+        subject = rfq_email_subject(brief_rows)
 
     for target in targets:
         email = (target.get("email") or "").strip()
         name = target.get("supplier_name") or ""
+
+        # ── INBOX mode ────────────────────────────────────────────────────────────────────────
+        # No email leaves the building, so the deliverability guards do not apply: mint for every
+        # recipient the employee chose — address or not, verified or not — and surface the link
+        # in-app. This is precisely why the addressless catalog (schools, most movers) can still
+        # run the loop; the "6/6 token_hash" outcome is only reachable here.
+        if mode == "inbox":
+            try:
+                link = _mint_link(rfq_id, target, email)
+            except Exception as e:
+                log.warning(
+                    "inbox dispatch could not mint link rfq=%s recipient=%s request_id=%s error=%s",
+                    rfq_id, target.get("recipient_id"), request_id, e, exc_info=True,
+                )
+                results.append({
+                    "recipient_id": target.get("recipient_id"),
+                    "supplier_name": name,
+                    "ok": False, "sent": False, "mode": "inbox",
+                    "error": "could not create the link",
+                })
+                continue
+            try:
+                _post_inbox_message(rfq_id, name, link)
+            except Exception:
+                # The token is minted and returned; a failed inbox write must not lose it.
+                log.warning(
+                    "inbox dispatch could not post inbox message rfq=%s recipient=%s",
+                    rfq_id, target.get("recipient_id"), exc_info=True,
+                )
+            results.append({
+                "recipient_id": str(target["recipient_id"]),
+                "supplier_name": name,
+                "email": email or None,
+                "ok": True, "sent": False, "mode": "inbox",
+                "error": None, "queued_inbox": True,
+                "link": link,
+            })
+            continue
+
+        # ── EMAIL mode ────────────────────────────────────────────────────────────────────────
         if not email:
             results.append({
                 "recipient_id": target.get("recipient_id"),
                 "supplier_name": name,
-                "ok": False,
-                "sent": False,
+                "ok": False, "sent": False, "mode": "email",
                 "error": NO_ADDRESS,
             })
             continue
@@ -211,8 +338,7 @@ def dispatch_supplier_links(
             results.append({
                 "recipient_id": target.get("recipient_id"),
                 "supplier_name": name,
-                "ok": False,
-                "sent": False,
+                "ok": False, "sent": False, "mode": "email",
                 "error": f"placeholder email detected (@{_domain}); update the supplier catalog",
             })
             continue
@@ -227,37 +353,13 @@ def dispatch_supplier_links(
             results.append({
                 "recipient_id": target.get("recipient_id"),
                 "supplier_name": name,
-                "ok": False,
-                "sent": False,
+                "ok": False, "sent": False, "mode": "email",
                 "error": UNVERIFIED_ADDRESS,
             })
             continue
 
         try:
-            token = generate_supplier_token(
-                recipient_id=str(target["recipient_id"]),
-                rfq_id=str(rfq_id),
-                vendor_id=str(target["vendor_id"]),
-                email=email,
-            )
-            link = f"{APP_BASE_URL}/supplier/quote?token={token}"
-
-            now = datetime.now(tz=timezone.utc).isoformat()
-            with db.engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "UPDATE rfq_recipients SET token_hash = :h, invited_email = :e, "
-                        "invited_at = :now, expires_at = :exp, revoked_at = NULL, status = 'sent', "
-                        "last_activity_at = :now WHERE id = :id"
-                    ),
-                    {
-                        "h": hash_token(token),
-                        "e": email,
-                        "now": now,
-                        "exp": expires_at().isoformat(),
-                        "id": str(target["recipient_id"]),
-                    },
-                )
+            link = _mint_link(rfq_id, target, email)
         except Exception as e:
             # Minting/persisting failed for this one supplier. Say so; carry on with the rest.
             log.warning(
@@ -267,8 +369,7 @@ def dispatch_supplier_links(
             results.append({
                 "recipient_id": target.get("recipient_id"),
                 "supplier_name": name,
-                "ok": False,
-                "sent": False,
+                "ok": False, "sent": False, "mode": "email",
                 "error": "could not create the link",
             })
             continue
@@ -300,16 +401,15 @@ def dispatch_supplier_links(
             "recipient_id": str(target["recipient_id"]),
             "supplier_name": name,
             "email": email,
-            "ok": True,
-            "sent": sent,
+            "ok": True, "sent": sent, "mode": "email",
             "error": error,
             # Returned so a human can review it, or open it themselves, before anything goes out.
             "link": link,
         })
 
     log.info(
-        "AIQ-1521 dispatch rfq=%s targets=%s minted=%s emailed=%s no_address=%s request_id=%s",
-        rfq_id, len(targets),
+        "AIQ-1521 dispatch rfq=%s mode=%s targets=%s minted=%s emailed=%s no_address=%s request_id=%s",
+        rfq_id, mode, len(targets),
         sum(1 for r in results if r.get("ok")),
         sum(1 for r in results if r.get("sent")),
         sum(1 for r in results if r.get("error") == NO_ADDRESS),

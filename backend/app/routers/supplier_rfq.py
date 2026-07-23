@@ -258,7 +258,16 @@ def send_supplier_links(
             "supplier_name": target.supplier_name or base.get("supplier_name"),
         })
 
+    # `send_email` selects the dispatch mode: True -> email (guards + Resend), False -> inbox
+    # (mint + in-app link, no egress). Passing the mode explicitly keeps this HR path aligned with
+    # the employee-create path, where inbox is the default.
+    mode = "email" if payload.send_email else "inbox"
     results.extend(
-        dispatch_supplier_links(rfq_id=rfq_id, targets=targets, send_email=payload.send_email)
+        dispatch_supplier_links(
+            rfq_id=rfq_id,
+            targets=targets,
+            dispatch_mode=mode,
+            send_email=payload.send_email,
+        )
     )
     return {"ok": True, "rfq_ref": rfq.get("rfq_ref"), "results": results}

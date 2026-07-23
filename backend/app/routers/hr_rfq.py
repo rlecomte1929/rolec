@@ -339,39 +339,79 @@ async def list_rfqs(
     case_id: Optional[str] = None,
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    """Return RFQs for a case (HR use, for AIQ-40-D pending list)."""
+    """Return the RFQs the EMPLOYEE raised, for HR to follow up on.
+
+    [feat/rfq-hr-loop-inbox] Repointed from the dead `rfq_requests` table (which does not exist in
+    prod — this endpoint 500'd on every call) to the CANONICAL `rfqs` / `rfq_recipients` model that
+    `POST /api/rfqs` actually writes. Each RFQ now carries the recipients the employee picked, with
+    their live status, so HR finally sees the vendors on the real case. Scoped to the HR's company
+    via `relocation_cases.company_id` (rfqs has no org column of its own).
+
+    The supplier magic link is intentionally NOT returned here — only its hash is stored on the
+    recipient row. The working link is surfaced in the in-app inbox (quote thread) on dispatch.
+    """
     company_id, _, _ = _require_hr(user)
 
     from sqlalchemy import text as sql_text
-    conditions = ["r.org_id = :org_id"]
-    params: Dict[str, Any] = {"org_id": company_id}
-
+    conditions = ["rc.company_id = :company_id"]
+    params: Dict[str, Any] = {"company_id": company_id}
     if case_id:
         conditions.append("r.case_id = :case_id")
         params["case_id"] = case_id
-
     where = " AND ".join(conditions)
-    sql = f"""
-        SELECT r.id, r.case_id, r.vendor_id, r.service_category,
-               r.move_date, r.budget_range, r.special_requirements,
-               r.hr_email, r.hr_name, r.status, r.created_at, r.updated_at,
-               v.name AS vendor_name, v.email AS vendor_email
-        FROM rfq_requests r
-        LEFT JOIN vendors_legacy v ON v.id = r.vendor_id  -- [AIQ-1638] vendors → vendors_legacy (renamed on prod)
+
+    # CAST(... AS TEXT) rather than the PG-only `::text` so the same query runs under the sqlite
+    # test mirror. rfq_recipients.rfq_id joins are done per-RFQ below to keep the shape flat.
+    rfq_sql = f"""
+        SELECT r.id, r.case_id, r.rfq_ref, r.created_at
+        FROM rfqs r
+        JOIN relocation_cases rc ON CAST(rc.id AS TEXT) = r.case_id
         WHERE {where}
         ORDER BY r.created_at DESC
     """
-    with db.engine.begin() as conn:
-        rows = conn.execute(sql_text(sql), params).mappings().all()
+    recipients_sql = """
+        SELECT rec.id AS recipient_id, rec.vendor_id, rec.status,
+               rec.quote_submitted_at, rec.first_viewed_at,
+               s.name AS supplier_name
+        FROM rfq_recipients rec
+        LEFT JOIN suppliers s ON s.id = rec.vendor_id
+        WHERE rec.rfq_id = :rfq_id
+        ORDER BY rec.id
+    """
 
-    rfqs = []
-    for row in rows:
-        d = dict(row)
-        for ts in ("created_at", "updated_at", "move_date"):
-            v = d.get(ts)
-            if hasattr(v, "isoformat"):
-                d[ts] = v.isoformat()
-        rfqs.append(d)
+    rfqs: List[Dict[str, Any]] = []
+    with db.engine.begin() as conn:
+        rfq_rows = conn.execute(sql_text(rfq_sql), params).mappings().all()
+        for row in rfq_rows:
+            rfq = dict(row)
+            created = rfq.get("created_at")
+            if hasattr(created, "isoformat"):
+                rfq["created_at"] = created.isoformat()
+
+            rec_rows = conn.execute(
+                sql_text(recipients_sql), {"rfq_id": rfq["id"]}
+            ).mappings().all()
+            recipients = []
+            replied = 0
+            for rec in rec_rows:
+                d = dict(rec)
+                submitted = d.get("quote_submitted_at")
+                if hasattr(submitted, "isoformat"):
+                    d["quote_submitted_at"] = submitted.isoformat()
+                viewed = d.get("first_viewed_at")
+                if hasattr(viewed, "isoformat"):
+                    d["first_viewed_at"] = viewed.isoformat()
+                d["has_quote"] = bool(d.get("quote_submitted_at"))
+                if d["has_quote"]:
+                    replied += 1
+                recipients.append(d)
+
+            rfq["recipients"] = recipients
+            rfq["recipient_count"] = len(recipients)
+            rfq["quote_count"] = replied
+            # A one-word rollup for the HR list: any quote back -> quotes_in, otherwise still out.
+            rfq["status"] = "quotes_in" if replied else "sent"
+            rfqs.append(rfq)
 
     return {"rfqs": rfqs, "total": len(rfqs)}
 

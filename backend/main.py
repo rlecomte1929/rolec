@@ -9295,31 +9295,39 @@ def create_rfq(
     # picks the suppliers (from HR's approved list) and reaches them directly; HR stays the payer
     # who validates the winning quote at the end.
     #
-    # Flag-gated OFF by default. Emailing a real company that has never heard of us must be a
-    # decision, never a side-effect of someone clicking a button in a dev environment.
+    # Dispatch runs in INBOX mode by default: it mints a magic link per recipient and surfaces it
+    # in the in-app inbox, sending NO email. Inbox mode is safe to always run — nothing leaves the
+    # building — so the loop is live from the inbox without touching the Resend quota. Going live on
+    # email is a single config flip: set SUPPLIER_RFQ_EMAIL_ENABLED, which selects "email" mode
+    # (the address/verified guards + Resend). Emailing a company that has never heard of us stays a
+    # deliberate decision, never a side-effect of a button click.
     contacted: List[str] = []
     not_contacted: List[Dict[str, str]] = []
     try:
         from .app.services.feature_flags import resolve_flag_safe
+        from .app.services.supplier_link_dispatch import (
+            dispatch_supplier_links,
+            resolve_rfq_targets,
+        )
 
-        if resolve_flag_safe("SUPPLIER_RFQ_DISPATCH_ENABLED", env_default=False):
-            from .app.services.supplier_link_dispatch import (
-                dispatch_supplier_links,
-                resolve_rfq_targets,
-            )
-
-            targets = resolve_rfq_targets(str(result.get("id")))
-            for r in dispatch_supplier_links(
-                rfq_id=str(result.get("id")),
-                targets=targets,
-                send_email=True,
-                request_id=req_id,
-            ):
-                name = r.get("supplier_name") or r.get("recipient_id") or "A supplier"
-                if r.get("sent"):
-                    contacted.append(name)
-                else:
-                    not_contacted.append({"supplier": name, "reason": r.get("error") or "not sent"})
+        email_mode = resolve_flag_safe("SUPPLIER_RFQ_EMAIL_ENABLED", env_default=False)
+        mode = "email" if email_mode else "inbox"
+        targets = resolve_rfq_targets(str(result.get("id")))
+        for r in dispatch_supplier_links(
+            rfq_id=str(result.get("id")),
+            targets=targets,
+            dispatch_mode=mode,
+            send_email=email_mode,
+            request_id=req_id,
+        ):
+            name = r.get("supplier_name") or r.get("recipient_id") or "A supplier"
+            if r.get("sent"):
+                # An email actually reached this supplier (email mode only).
+                contacted.append(name)
+            elif not r.get("ok"):
+                # A genuine failure — no address in email mode, or a mint error. Report it.
+                not_contacted.append({"supplier": name, "reason": r.get("error") or "not sent"})
+            # else: inbox-queued (ok, not emailed) — reached via the in-app inbox, neither list.
     except Exception:
         # The RFQ exists and is valid. A dispatch failure must never turn that into a 500 — the
         # employee would retry and create a duplicate. Report it instead.

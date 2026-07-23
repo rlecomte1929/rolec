@@ -46,6 +46,10 @@ def _target(email=None, name="Santa Fe Relocation", verified=True):
 
 
 class DispatchTests(unittest.TestCase):
+    """EMAIL-mode dispatch. `dispatch_mode="email"` is passed explicitly: the default is now
+    "inbox" (see InboxDispatchTests), and these address/provenance guards are email-mode semantics.
+    """
+
     def setUp(self):
         # db.engine.begin() is a context manager yielding a connection we only ever .execute() on.
         self.engine = MagicMock()
@@ -58,7 +62,8 @@ class DispatchTests(unittest.TestCase):
         become a send to some invented address, and must never be a silent drop either."""
         with patch.object(sld.requests, "post") as post:
             results = sld.dispatch_supplier_links(
-                rfq_id="rfq-1", targets=[_target(email=None)], send_email=True
+                rfq_id="rfq-1", targets=[_target(email=None)],
+                dispatch_mode="email", send_email=True,
             )
 
         self.assertFalse(results[0]["ok"])
@@ -75,7 +80,7 @@ class DispatchTests(unittest.TestCase):
             results = sld.dispatch_supplier_links(
                 rfq_id="rfq-1",
                 targets=[_target(email="ops@santafe.example", verified=False)],
-                send_email=True,
+                dispatch_mode="email", send_email=True,
             )
 
         self.assertFalse(results[0]["ok"])
@@ -89,7 +94,8 @@ class DispatchTests(unittest.TestCase):
         with patch.dict(os.environ, {"RESEND_API_KEY": "re_test"}), \
                 patch.object(sld.requests, "post") as post:
             results = sld.dispatch_supplier_links(
-                rfq_id="rfq-1", targets=[_target(email="ops@santafe.example")], send_email=False
+                rfq_id="rfq-1", targets=[_target(email="ops@santafe.example")],
+                dispatch_mode="email", send_email=False,
             )
 
         self.assertTrue(results[0]["ok"])
@@ -101,7 +107,8 @@ class DispatchTests(unittest.TestCase):
         with patch.dict(os.environ, {"RESEND_API_KEY": "re_test"}), \
                 patch.object(sld.requests, "post", return_value=MagicMock(status_code=200)):
             results = sld.dispatch_supplier_links(
-                rfq_id="rfq-1", targets=[_target(email="ops@santafe.example")], send_email=True
+                rfq_id="rfq-1", targets=[_target(email="ops@santafe.example")],
+                dispatch_mode="email", send_email=True,
             )
 
         token = results[0]["link"].split("token=", 1)[1]
@@ -118,7 +125,8 @@ class DispatchTests(unittest.TestCase):
         with patch.dict(os.environ, {"RESEND_API_KEY": "re_test"}), \
                 patch.object(sld.requests, "post", side_effect=RuntimeError("resend is down")):
             results = sld.dispatch_supplier_links(
-                rfq_id="rfq-1", targets=[_target(email="ops@santafe.example")], send_email=True
+                rfq_id="rfq-1", targets=[_target(email="ops@santafe.example")],
+                dispatch_mode="email", send_email=True,
             )
 
         self.assertTrue(results[0]["ok"])       # the link was minted
@@ -138,7 +146,7 @@ class DispatchTests(unittest.TestCase):
                     {**_target(email=None, name="Santa Fe"), "recipient_id": "rec-b"},
                     {**_target(email="c@x.example", name="Transworld"), "recipient_id": "rec-c"},
                 ],
-                send_email=True,
+                dispatch_mode="email", send_email=True,
             )
 
         self.assertEqual([r["sent"] for r in results], [True, False, True])
@@ -149,12 +157,91 @@ class DispatchTests(unittest.TestCase):
         with patch.dict(os.environ, env, clear=True), \
                 patch.object(sld.requests, "post") as post:
             results = sld.dispatch_supplier_links(
-                rfq_id="rfq-1", targets=[_target(email="ops@santafe.example")], send_email=True
+                rfq_id="rfq-1", targets=[_target(email="ops@santafe.example")],
+                dispatch_mode="email", send_email=True,
             )
 
         self.assertTrue(results[0]["ok"])
         self.assertFalse(results[0]["sent"])
         self.assertIn("RESEND_API_KEY", results[0]["error"])
+        post.assert_not_called()
+
+
+class InboxDispatchTests(unittest.TestCase):
+    """INBOX-mode dispatch (the default). The load-bearing property: it mints a working link for
+    EVERY recipient — including the addressless, unverified catalog rows that make up most of the
+    supplier list — and makes ZERO Resend calls. That is what makes token_hash 6/6 reachable while
+    the email quota is never touched.
+    """
+
+    def setUp(self):
+        self.engine = MagicMock()
+        patcher = patch.object(sld, "db", MagicMock(engine=self.engine))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_inbox_mode_mints_for_an_addressless_unverified_supplier_and_sends_nothing(self):
+        # The exact prod fixture: a school/mover with contact_email=NULL and verified=False. In
+        # EMAIL mode this is NO_ADDRESS and no token; in INBOX mode it must mint and surface a link.
+        with patch.dict(os.environ, {"RESEND_API_KEY": "re_test"}), \
+                patch.object(sld.requests, "post") as post:
+            results = sld.dispatch_supplier_links(
+                rfq_id="rfq-1",
+                targets=[_target(email=None, verified=False)],
+                dispatch_mode="inbox",
+            )
+
+        self.assertTrue(results[0]["ok"])
+        self.assertFalse(results[0]["sent"])            # nothing emailed
+        self.assertEqual(results[0]["mode"], "inbox")
+        self.assertTrue(results[0]["queued_inbox"])
+        self.assertIn("/supplier/quote?token=", results[0]["link"])
+        post.assert_not_called()                        # ZERO Resend calls in inbox mode
+        self.engine.begin.assert_called()               # a token WAS minted
+
+    def test_inbox_mode_is_the_default(self):
+        # No dispatch_mode passed -> inbox. An addressless supplier still mints (would be NO_ADDRESS
+        # under email mode), proving the default is inbox.
+        with patch.object(sld.requests, "post") as post:
+            results = sld.dispatch_supplier_links(
+                rfq_id="rfq-1", targets=[_target(email=None)],
+            )
+        self.assertEqual(results[0]["mode"], "inbox")
+        self.assertTrue(results[0]["ok"])
+        post.assert_not_called()
+
+    def test_inbox_mode_never_emails_even_a_verified_business_address(self):
+        # A real, verified, business address is exactly who we must NOT email in inbox mode.
+        with patch.dict(os.environ, {"RESEND_API_KEY": "re_test"}), \
+                patch.object(sld.requests, "post") as post:
+            results = sld.dispatch_supplier_links(
+                rfq_id="rfq-1",
+                targets=[_target(email="ops@santafe.example", verified=True)],
+                dispatch_mode="inbox", send_email=True,   # send_email ignored in inbox mode
+            )
+        self.assertTrue(results[0]["ok"])
+        self.assertFalse(results[0]["sent"])
+        post.assert_not_called()
+
+    def test_inbox_minted_token_is_valid_and_scoped(self):
+        with patch.object(sld.requests, "post"):
+            results = sld.dispatch_supplier_links(
+                rfq_id="rfq-9", targets=[_target(email=None)], dispatch_mode="inbox",
+            )
+        token = results[0]["link"].split("token=", 1)[1]
+        claims = verify_supplier_token(token)
+        self.assertEqual(claims["rfq_id"], "rfq-9")
+        self.assertEqual(claims["app_role"], "supplier")
+
+    def test_a_broken_inbox_message_never_loses_the_minted_link(self):
+        # If posting the inbox message blows up, the token still stands (best-effort surfacing).
+        with patch.object(sld, "_post_inbox_message", side_effect=RuntimeError("inbox down")), \
+                patch.object(sld.requests, "post") as post:
+            results = sld.dispatch_supplier_links(
+                rfq_id="rfq-1", targets=[_target(email=None)], dispatch_mode="inbox",
+            )
+        self.assertTrue(results[0]["ok"])
+        self.assertIn("/supplier/quote?token=", results[0]["link"])
         post.assert_not_called()
 
 
