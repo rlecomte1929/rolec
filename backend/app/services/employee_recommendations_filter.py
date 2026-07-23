@@ -123,9 +123,17 @@ def apply_hr_curation(
     # the approved set. Items that don't have a master row at all (e.g.
     # legacy datasets that haven't been backfilled) are dropped — HR
     # can't curate what isn't in the master.
+    #
+    # AIQ-1688: resolve the master by external_id OR supplier_id. Registry-backed
+    # items are keyed item_id=supplier UUID, but their masters are often keyed
+    # external_id='m-N' with supplier_id=<that UUID>; matching only external_id
+    # dropped every such HR-approved item (movers rendered empty). Dedup by master
+    # id so a registry item and its legacy static twin (both resolving to the same
+    # approved master) don't both render — keep the first (highest-ranked) one.
     kept: List[Tuple[int, RecommendationItem]] = []
+    seen_master_ids: set = set()
     for rec in items:
-        master = service_catalog.find_master_by_external_id(category, rec.item_id)
+        master = service_catalog.find_master_by_supplier_or_external_id(category, rec.item_id)
         if not master:
             log.debug(
                 "hr_curation_filter dropped item with no master entry: "
@@ -134,7 +142,8 @@ def apply_hr_curation(
                 rec.item_id,
             )
             continue
-        if master["id"] in approved_master_ids:
+        if master["id"] in approved_master_ids and master["id"] not in seen_master_ids:
+            seen_master_ids.add(master["id"])
             kept.append((order_by_master.get(master["id"], 0), rec))
 
     # Order by HR's display_order (stable: engine order breaks ties within the same rank).

@@ -234,6 +234,40 @@ def find_master_by_external_id(category: str, external_id: str) -> Optional[Dict
     return _row_to_item(row) if row else None
 
 
+def find_master_by_supplier_or_external_id(
+    category: str, item_id: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Resolve a master row for a recommendation item that may be keyed EITHER by the
+    JSON dataset's ``external_id`` OR by a supplier-registry UUID.
+
+    AIQ-1550/AIQ-1688: registry-backed items carry ``item_id = supplier.id`` (a UUID),
+    but their master rows are frequently keyed ``external_id = 'm-1'`` (a legacy static
+    dataset id) with ``supplier_id`` pointing at that same UUID. ``find_master_by_external_id``
+    only matched ``external_id``, so those registry items resolved to no master and were
+    dropped by HR curation — HR-approved movers rendered as an empty category even though
+    the supplier, its capability, and HR's approval all existed. Matching on ``supplier_id``
+    as well closes that gap. The approval gate in ``apply_hr_curation`` is unchanged: the
+    resolved master must still be in HR's approved set to be shown.
+    """
+    if not item_id:
+        return None
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT * FROM service_catalog_items "
+                "WHERE category = :cat AND active = true "
+                "  AND (external_id = :id OR CAST(supplier_id AS TEXT) = :id) "
+                # external_id-keyed match wins when both a legacy static row and a
+                # registry row exist, keeping behaviour stable for static datasets.
+                "ORDER BY (external_id = :id) DESC "
+                "LIMIT 1"
+            ),
+            {"cat": category, "id": str(item_id)},
+        ).mappings().first()
+    return _row_to_item(row) if row else None
+
+
 def count_by_category_city(category: str, city: Optional[str] = None) -> int:
     """Coverage count helper used by Phase 1's catalog_coverage."""
     sql = "SELECT COUNT(*) FROM service_catalog_items WHERE category = :cat AND active = true"
