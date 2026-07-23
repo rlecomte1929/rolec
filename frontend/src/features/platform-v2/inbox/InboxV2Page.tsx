@@ -849,8 +849,36 @@ export function InboxV2Page() {
   );
 }
 
+// Split a message body into text + clickable links. Message bodies are plain text (not HTML), so
+// URLs otherwise render as inert text — a problem for the RFQ inbox dispatch note, whose whole
+// point is a supplier link the reader must be able to open. Split on http(s) URLs and wrap each in
+// an anchor; everything else stays literal text (no HTML is interpreted).
+const URL_SPLIT_RE = /(https?:\/\/[^\s]+)/g;
+function renderMessageBody(body: string) {
+  return body.split(URL_SPLIT_RE).map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noreferrer"
+        className="text-accent-700 underline break-all hover:text-accent-800"
+      >
+        {part}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+}
+
 function MessageCard({ message, counterparty }: { message: Message; counterparty: string }) {
-  const isMine = !!message.is_from_me;
+  // The RFQ inbox-dispatch note is stored under the employee's own auth uuid (quote_messages
+  // .sender_user_id FKs auth.users), which would render it as "You" in a blue self-bubble even
+  // though the platform authored it. Detect it by its supplier-quote link and present it neutrally
+  // as an incoming note from the thread's counterparty instead.
+  const isDispatchNote = message.body.includes('/supplier/quote?token=');
+  const isMine = !isDispatchNote && !!message.is_from_me;
   const displayName = isMine ? 'You' : humanizeName(message.sender_name) || counterparty;
   return (
     <div
@@ -876,7 +904,7 @@ function MessageCard({ message, counterparty }: { message: Message; counterparty
         <p className="mb-1 text-[13px] font-medium text-slate-800">{message.subject}</p>
       )}
       <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-slate-800">
-        {message.body}
+        {renderMessageBody(message.body)}
       </p>
       {message.status_delivery === 'sending' && (
         <p className="mt-2 text-[11px] italic text-slate-400">Sending…</p>
