@@ -1072,12 +1072,16 @@ class CasesMixin:
         return self._row_to_dict(row)
 
     def get_assignment_by_case_id(self, case_id: str, request_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Prefer canonical_case_id when resolving, fall back to case_id for legacy."""
+        """Prefer canonical_case_id when resolving, fall back to case_id, then to the
+        assignment's own id for legacy. The `id = :cid` arm matters for callers keyed on
+        the assignment id itself — e.g. the employee roadmap URL and the Stripe checkout
+        success_url both use case_assignments.id, so without it require_case_access 404s
+        those and its callers fail open. Mirrors resolve_case_status' lookup."""
         cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             row = self._exec(
                 conn,
-                "SELECT * FROM case_assignments WHERE (canonical_case_id = :cid OR case_id = :cid)",
+                "SELECT * FROM case_assignments WHERE (canonical_case_id = :cid OR case_id = :cid OR id = :cid)",
                 {"cid": cid},
                 op_name="get_assignment_by_case_id",
                 request_id=request_id,
