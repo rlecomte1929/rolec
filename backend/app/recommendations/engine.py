@@ -153,10 +153,21 @@ def _load_dataset_with_registry(category: str, criteria: Dict[str, Any]) -> List
     if registry_items:
         # Registry is primary: use registry items, optionally merge non-duplicate static items
         existing_ids = {str((r.get("item_id") or "")) for r in registry_items}
+        # AIQ-1690: a registry candidate (item_id = supplier id) and its legacy static
+        # twin (item_id = 'm-N') are the SAME supplier but never collide on item_id, so
+        # both used to be scored — one supplier could occupy two of the top_n slots and
+        # push a different distinct approved supplier below the cut (apply_hr_curation
+        # dedups by master id, but only after the cut). The link is the master's
+        # supplier_id. Best-effort: if the catalog is unreachable, merge as before.
+        try:
+            from ..services.service_catalog import external_ids_for_supplier_ids
+            twin_ids = external_ids_for_supplier_ids(category, sorted(existing_ids))
+        except Exception:
+            twin_ids = set()
         dataset = list(registry_items)
         for d in static_dataset:
             iid = str((d.get("item_id") or ""))
-            if iid and iid not in existing_ids:
+            if iid and iid not in existing_ids and iid not in twin_ids:
                 dataset.append(d)
                 existing_ids.add(iid)
     else:
