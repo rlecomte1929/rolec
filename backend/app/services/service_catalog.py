@@ -21,7 +21,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from ...database import db
 
@@ -266,6 +266,32 @@ def find_master_by_supplier_or_external_id(
             {"cat": category, "id": str(item_id)},
         ).mappings().first()
     return _row_to_item(row) if row else None
+
+
+def external_ids_for_supplier_ids(category: str, supplier_ids: List[str]) -> set:
+    """
+    Return the ``external_id``s of active masters in ``category`` whose ``supplier_id``
+    is one of ``supplier_ids``.
+
+    AIQ-1690: the recommendation dataset can hold two rows for one supplier — the
+    registry candidate (``item_id`` = supplier id) and its legacy static-dataset twin
+    (``item_id`` = the master's ``external_id``, e.g. ``'m-1'``). They never collide on
+    item_id, so both used to be scored and could occupy two ``top_n`` slots. This is the
+    batched form of the ``supplier_id`` link ``find_master_by_supplier_or_external_id``
+    resolves one item at a time, letting the engine drop the twin before scoring.
+    """
+    ids = [str(s) for s in supplier_ids if s]
+    if not ids:
+        return set()
+    stmt = text(
+        "SELECT external_id FROM service_catalog_items "
+        "WHERE category = :cat AND active = true "
+        "  AND external_id IS NOT NULL "
+        "  AND CAST(supplier_id AS TEXT) IN :ids"
+    ).bindparams(bindparam("ids", expanding=True))
+    with db.engine.begin() as conn:
+        rows = conn.execute(stmt, {"cat": category, "ids": ids}).fetchall()
+    return {str(r[0]) for r in rows if r[0]}
 
 
 def count_by_category_city(category: str, city: Optional[str] = None) -> int:
