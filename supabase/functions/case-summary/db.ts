@@ -9,6 +9,7 @@ import {
   buildSummaryInput,
   OPERATIONAL_ASSIGNMENT_FIELDS,
   OPERATIONAL_CASE_FIELDS,
+  OPERATIONAL_IMMIGRATION_FIELDS,
   type Row,
   type SummaryInput,
 } from "./summary.ts";
@@ -50,5 +51,16 @@ export async function fetchAssignmentAndCase(
   // Tenant gate: the case must belong to the caller's company.
   if (String(caseRow.company_id) !== String(companyId)) return null;
 
-  return buildSummaryInput(assignment as Row, caseRow as Row);
+  // AIQ-1698: PII-safe immigration progress. Keyed by relocation_cases.id::text
+  // (same join as case_delay_monitor). Only the four operational columns are selected —
+  // never `notes`/`evidence_url`. A read error degrades to no milestones, never a failed
+  // summary. `caseId` is the resolved relocation_cases id.
+  let milestones: Row[] = [];
+  const { data: mRows } = await supabase
+    .from("immigration_milestones")
+    .select(OPERATIONAL_IMMIGRATION_FIELDS.join(","))
+    .eq("case_id", caseId);
+  if (Array.isArray(mRows)) milestones = mRows as Row[];
+
+  return buildSummaryInput(assignment as Row, caseRow as Row, milestones);
 }
