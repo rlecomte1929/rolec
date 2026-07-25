@@ -23,6 +23,7 @@ import { PetRequirementsSection } from '../components/case/PetRequirementsSectio
 import { CaseAuditTimeline } from '../components/case/CaseAuditTimeline';
 import { CaseNotesPanel } from '../components/case/CaseNotesPanel';
 import { CasePredictionCard } from '../components/case/CasePredictionCard';
+import { CaseSummaryCard } from '../components/case/CaseSummaryCard';
 import { EscalateCaseModal } from '../components/case/EscalateCaseModal';
 import { ReassignCaseModal } from '../components/case/ReassignCaseModal';
 import { AIRecommendationCard } from '../features/ai-oversight/AIRecommendationCard';
@@ -312,6 +313,10 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
           {/* [Parker-A] Predicted time to completion — self-hides until the
               prediction canary + a trained model are available. */}
           <CasePredictionCard caseId={detail.id} />
+
+          {/* AIQ-1697: AI case summary — status / blockers / next actions / cost
+              variance from the case-summary Edge Function (PII-safe). */}
+          <CaseSummaryCard caseId={detail.id} />
 
           {/* Budget */}
           <Card padding="lg">
