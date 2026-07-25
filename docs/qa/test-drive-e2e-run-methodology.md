@@ -53,6 +53,16 @@ POST /api/test-drive/provision-staged  { "first_name": "...", "campaign": "qa-<r
 > the live cohort's metrics, and — for `provision-staged` — because the staged fixture is
 > gated to `qa-*` campaigns. See the campaign-attribution rule in `test_drive.py`.
 
+> **Reaching the RFQ step from a staged session — read before filing a bug (AIQ-1689).**
+> `shortlist_ready` DOES persist the shortlist to `services_state`, so the RFQ page hydrates
+> correctly from a staged session. But the "Request quotations" button
+> (`ServicesEstimate.tsx`) and the ribbon's RFQ tab (`ServicesNavRibbon.tsx`) are both wrapped
+> in `isRfqEnabled()` — i.e. `VITE_ENABLE_RFQ`, a Vite **build-time** flag that is NOT set on
+> the deployed static site. So neither renders, and the step looks unreachable even though the
+> fixture is working. The route itself is not gated: navigate directly to
+> `/employee/case/{caseId}/services/rfq/new`. Symptom to recognise: **no button at all**
+> (a genuinely empty shortlist would render the button *disabled* instead).
+
 Do **not** remove auto-assignment for real testers — the single-link model stays; this
 rule applies only to QA/regression runs, which always pass `?corridor=`.
 
