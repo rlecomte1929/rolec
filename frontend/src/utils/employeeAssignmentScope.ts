@@ -39,6 +39,30 @@ export function caseIdForAssignment(
 }
 
 /**
+ * The case_id to PERSIST case-scoped state against (services-state), or `null`
+ * when it cannot be safely resolved yet.
+ *
+ * AIQ-1691: `caseIdForAssignment` falls back to the raw `id` on a miss. While the
+ * linked summaries are still loading, that raw id is the **assignment_id** — and
+ * `POST /api/cases/{assignmentId}/services-state` 404s ("Case not found"), so
+ * debounced saves that fire in the load window are silently dropped and the
+ * shortlist persists incomplete (only the writes AFTER the summaries load land).
+ * This gate returns `null` until the summaries have loaded, so the caller skips
+ * the save (localStorage still holds the state) and persists once — with the real
+ * case_id — after resolution. Once loaded, a genuine legacy no-match still falls
+ * back to the id, which for a case_id URL is correct.
+ */
+export function persistableCaseId(
+  linkedSummaries: EmployeeLinkedOverviewRow[],
+  id: string | null,
+  summariesLoaded: boolean,
+): string | null {
+  if (!id) return null;
+  if (!summariesLoaded) return null; // don't guess mid-load — a wrong (assignment) id 404s
+  return caseIdForAssignment(linkedSummaries, id);
+}
+
+/**
  * Inverse of {@link caseIdForAssignment}: map a scope id — which may be a
  * **case_id** (the canonical employee URL id, AIQ-1334) or an assignment_id — to
  * its assignment_id. Falls back to the id itself when no linked row matches
