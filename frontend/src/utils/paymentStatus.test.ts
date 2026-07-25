@@ -8,8 +8,8 @@ import { fetchRoadmapUnlocked } from './paymentStatus';
 describe('fetchRoadmapUnlocked (server-backed roadmap gate)', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('returns true without a caseId — nothing to gate, no server call', async () => {
-    expect(await fetchRoadmapUnlocked('')).toBe(true);
+  it('FAILS CLOSED (false) without a caseId — err toward the paywall, no server call', async () => {
+    expect(await fetchRoadmapUnlocked('')).toBe(false);
     expect(getPaymentStatus).not.toHaveBeenCalled();
   });
 
@@ -27,8 +27,13 @@ describe('fetchRoadmapUnlocked (server-backed roadmap gate)', () => {
     expect(await fetchRoadmapUnlocked('c1')).toBe(true);
   });
 
-  it('FAILS OPEN (true) when the status call throws — never wrongly paywall on a transient error', async () => {
+  it('FAILS CLOSED (false) when the status call throws — a free €800 roadmap is worse than a recoverable false lock', async () => {
     vi.mocked(getPaymentStatus).mockRejectedValue(new Error('network'));
-    expect(await fetchRoadmapUnlocked('c1')).toBe(true);
+    expect(await fetchRoadmapUnlocked('c1')).toBe(false);
+  });
+
+  it('FAILS CLOSED (false) on a 404 — the direct-load assignment_id path must not bypass the paywall', async () => {
+    vi.mocked(getPaymentStatus).mockRejectedValue({ response: { status: 404 } });
+    expect(await fetchRoadmapUnlocked('assignment-id')).toBe(false);
   });
 });
