@@ -13,6 +13,7 @@ import { track } from '../analytics';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import {
   caseIdForAssignment,
+  persistableCaseId,
   parseAssignmentSearchParam,
   resolveScopedAssignmentId,
   setPreferredEmployeeAssignmentId,
@@ -182,9 +183,13 @@ export const ProvidersPage: React.FC = () => {
   useEffect(() => {
     // services-state is case-scoped (/api/cases/{caseId}/...); map the resolved
     // assignment_id to its case_id so the GET/PUT don't 404 (AIQ-1320).
-    setActiveCaseId(caseIdForAssignment(linkedSummaries, assignmentId));
+    // AIQ-1691: while the linked summaries are still loading, the resolver falls
+    // back to the raw assignment_id — persisting against that 404s and drops the
+    // save. Gate on `!assignmentLoading` so we don't persist against an
+    // unresolved id; once loaded the accumulated state saves under the real case_id.
+    setActiveCaseId(persistableCaseId(linkedSummaries, assignmentId, !assignmentLoading));
     return () => setActiveCaseId(null);
-  }, [assignmentId, linkedSummaries, setActiveCaseId]);
+  }, [assignmentId, linkedSummaries, assignmentLoading, setActiveCaseId]);
   // AIQ-1276: the estimate currency auto-applies on change — no pending state /
   // Apply button (the select writes straight to displayCurrency).
 

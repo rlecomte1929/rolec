@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   caseIdForAssignment,
+  persistableCaseId,
   assignmentIdForScopeId,
   resolveScopedAssignmentId,
 } from '../employeeAssignmentScope';
@@ -32,6 +33,38 @@ describe('caseIdForAssignment', () => {
 
   it('returns null for a null id', () => {
     expect(caseIdForAssignment(rows, null)).toBeNull();
+  });
+});
+
+/**
+ * AIQ-1691: `caseIdForAssignment` falls back to the raw id on a miss. While the
+ * linked summaries are still loading (empty), that raw id is the ASSIGNMENT id,
+ * and persisting services-state against it 404s — the exact intermittent bug
+ * where early "Add to package" saves are dropped. `persistableCaseId` returns
+ * null until the summaries have loaded so the caller never persists a wrong id.
+ */
+describe('persistableCaseId', () => {
+  it('returns null while summaries are still loading (never the raw assignment id)', () => {
+    // This is the failing case: caseIdForAssignment([], 'assign-1') === 'assign-1'.
+    expect(caseIdForAssignment([], 'assign-1')).toBe('assign-1');
+    expect(persistableCaseId([], 'assign-1', false)).toBeNull();
+    // Even with summaries present, `loaded=false` means don't guess yet.
+    expect(persistableCaseId(rows, 'assign-1', false)).toBeNull();
+  });
+
+  it('resolves to the case_id once summaries have loaded', () => {
+    expect(persistableCaseId(rows, 'assign-2', true)).toBe('case-2');
+    expect(persistableCaseId(rows, 'case-1', true)).toBe('case-1');
+  });
+
+  it('falls back to the id after load only for a genuine legacy no-match', () => {
+    // Loaded + no linked row: a case_id URL still persists correctly against itself.
+    expect(persistableCaseId(rows, 'case-legacy', true)).toBe('case-legacy');
+  });
+
+  it('returns null for a null id regardless of load state', () => {
+    expect(persistableCaseId(rows, null, true)).toBeNull();
+    expect(persistableCaseId(rows, null, false)).toBeNull();
   });
 });
 
