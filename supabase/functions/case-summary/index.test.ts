@@ -148,8 +148,16 @@ Deno.test("parseSummary coerces non-string array items and drops empties", () =>
 
 // ── Tenant scoping (criterion #2) ─────────────────────────────────────────────
 
-/** Minimal fake of the supabase-js query builder: from().select().eq().maybeSingle(). */
-function fakeSupabase(tables: Record<string, Record<string, unknown>>) {
+/**
+ * Minimal fake of the supabase-js query builder.
+ * - `.maybeSingle()` resolves one row from `tables[table][eqValue]` (assignment/case).
+ * - awaiting the builder (list query, e.g. immigration_milestones) resolves
+ *   `lists[table][eqValue]` as `{data: rows[]}` — the builder is thenable.
+ */
+function fakeSupabase(
+  tables: Record<string, Record<string, unknown>>,
+  lists: Record<string, Record<string, unknown[]>> = {},
+) {
   return {
     from(table: string) {
       let lastValue = "";
@@ -164,6 +172,11 @@ function fakeSupabase(tables: Record<string, Record<string, unknown>>) {
         maybeSingle() {
           const row = (tables[table] ?? {})[lastValue] ?? null;
           return Promise.resolve({ data: row, error: null });
+        },
+        // deno-lint-ignore no-explicit-any
+        then(onF: (v: any) => unknown, onR?: (e: unknown) => unknown) {
+          const rows = (lists[table] ?? {})[lastValue] ?? [];
+          return Promise.resolve({ data: rows, error: null }).then(onF, onR);
         },
       };
       return builder;
@@ -203,4 +216,53 @@ Deno.test("tenant: assignment with no resolvable case returns null", async () =>
   };
   const input = await fetchAssignmentAndCase(fakeSupabase(orphan), "assign-x", "acme");
   assertEquals(input, null);
+});
+
+// ── Immigration enrichment (AIQ-1698) ─────────────────────────────────────────
+
+// A milestone row as it comes off immigration_milestones — with PII/free-text traps.
+const MILESTONE_ROW = {
+  milestone_type: "visa_decision",
+  status: "blocked",
+  target_date: "2026-08-10",
+  completed_date: null,
+  sort_order: 3,
+  // PII / free-text — must never reach the prompt:
+  notes: "applicant Amara Okafor, passport N1234567",
+  evidence_url: "https://files.example.com/visa-scan-amara.pdf",
+  book_early_alert: "Book biometrics for Amara NOW",
+};
+
+Deno.test("immigration: milestones present → PII-safe array in the prompt", async () => {
+  const lists = { immigration_milestones: { "case-1": [MILESTONE_ROW] } };
+  const input = await fetchAssignmentAndCase(fakeSupabase(OWNER_TABLES, lists), "assign-1", "acme");
+  assert(input !== null);
+  assert(Array.isArray(input!.immigration) && input!.immigration!.length === 1);
+  const m = input!.immigration![0];
+  assertEquals(m.milestone_type, "visa_decision");
+  assertEquals(m.status, "blocked");
+  assertEquals(m.target_date, "2026-08-10");
+  // Only the four operational keys survive.
+  assertEquals(Object.keys(m).sort(), ["milestone_type", "status", "target_date"].sort());
+
+  // COMPLIANCE: no free-text/PII value from the milestone reaches the prompt.
+  const serialized = buildUserMessage(input!);
+  for (const v of ["Amara", "Okafor", "N1234567", "visa-scan-amara", "Book biometrics", "sort_order"]) {
+    assert(!serialized.includes(v), `immigration leaked into prompt: ${v}`);
+  }
+});
+
+Deno.test("immigration: no milestones → no `immigration` key (parity with pre-1698)", async () => {
+  // No lists passed → the milestone query returns [].
+  const input = await fetchAssignmentAndCase(fakeSupabase(OWNER_TABLES), "assign-1", "acme");
+  assert(input !== null);
+  assert(!("immigration" in input!), "immigration key must be omitted when there are no milestones");
+});
+
+Deno.test("buildSummaryInput drops PII milestone fields even if present", () => {
+  const input = buildSummaryInput(ASSIGNMENT_ROW, CASE_ROW, [MILESTONE_ROW]);
+  const m = input.immigration![0];
+  for (const key of ["notes", "evidence_url", "book_early_alert", "sort_order"]) {
+    assert(!(key in m), `milestone leaked forbidden key: ${key}`);
+  }
 });

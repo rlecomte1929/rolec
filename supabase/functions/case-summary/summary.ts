@@ -58,6 +58,19 @@ export const OPERATIONAL_CASE_FIELDS = [
 ] as const;
 
 /**
+ * The only immigration_milestones columns read and passed to Claude (AIQ-1698).
+ * milestone_type and status are enums; the dates are operational. This is the
+ * whole PII decision for the immigration signal — do NOT add `notes` (free text)
+ * or `evidence_url` (links a visa scan); both are in FORBIDDEN_PII_FIELDS.
+ */
+export const OPERATIONAL_IMMIGRATION_FIELDS = [
+  "milestone_type",
+  "status",
+  "target_date",
+  "completed_date",
+] as const;
+
+/**
  * Columns that must NEVER reach the prompt. Not selected by the query (the
  * whitelist is), but named so the test can assert none leak, and so the intent is
  * auditable.
@@ -73,6 +86,10 @@ export const FORBIDDEN_PII_FIELDS = [
   "decision",
   "intake_draft",
   "profile_json",
+  // immigration_milestones free-text / document fields (AIQ-1698)
+  "notes",
+  "evidence_url",
+  "book_early_alert",
 ] as const;
 
 export type Row = Record<string, unknown>;
@@ -80,6 +97,7 @@ export type Row = Record<string, unknown>;
 export interface SummaryInput {
   assignment: Row; // operational assignment fields only
   case: Row; // operational case fields only
+  immigration?: Row[]; // per-milestone {milestone_type, status, target_date?, completed_date?}; omitted when none
 }
 
 export interface CaseSummary {
@@ -102,12 +120,21 @@ export function pick(row: Row | null | undefined, keys: readonly string[]): Row 
 /**
  * Build the exact object sent to Claude. Only operational fields; no ids, no PII.
  * Guaranteed by construction to exclude everything in FORBIDDEN_PII_FIELDS.
+ *
+ * `milestones` (AIQ-1698) is optional immigration progress; each row is reduced to
+ * OPERATIONAL_IMMIGRATION_FIELDS. When there are none, the `immigration` key is
+ * omitted entirely so the payload is byte-identical to the pre-1698 behaviour.
  */
-export function buildSummaryInput(assignment: Row, caseRow: Row): SummaryInput {
-  return {
+export function buildSummaryInput(assignment: Row, caseRow: Row, milestones?: Row[]): SummaryInput {
+  const input: SummaryInput = {
     assignment: pick(assignment, OPERATIONAL_ASSIGNMENT_FIELDS),
     case: pick(caseRow, OPERATIONAL_CASE_FIELDS),
   };
+  const immigration = (milestones ?? [])
+    .map((m) => pick(m, OPERATIONAL_IMMIGRATION_FIELDS))
+    .filter((m) => Object.keys(m).length > 0);
+  if (immigration.length > 0) input.immigration = immigration;
+  return input;
 }
 
 export const SYSTEM_PROMPT = `
@@ -123,12 +150,17 @@ STRICT GROUNDING RULES — follow exactly:
 - The input intentionally contains NO personal identifiers. Never invent or reference a
   person's name, email, phone, address, or document details. Refer to "the employee".
 - Do not recommend actions that depend on facts you were not given.
+- If an "immigration" array is present, each item is a milestone with a milestone_type
+  (e.g. visa_decision, work_permit_issued), a status (pending | in_progress | completed |
+  blocked | not_applicable), and optional target/completed dates. Use it to ground blockers
+  (a "blocked" milestone) and next_actions (a "pending"/"in_progress" milestone, referencing
+  its target_date only if given). Do not invent milestones or dates that are not listed.
 
 Respond with ONLY valid JSON matching this exact schema (no prose, no markdown fence):
 {
   "status": "1-2 sentences describing the current stage/status of the case, grounded in the fields",
   "blockers": ["each active blocker as a short phrase; [] if none are evidenced in the fields"],
-  "next_actions": ["each recommended next action as a short phrase, derived only from status/stage/dates/progress"],
+  "next_actions": ["each recommended next action as a short phrase, derived only from status/stage/dates/progress/immigration milestones"],
   "cost_variance": "one plain-language sentence comparing budget_limit vs budget_estimated (and paid amount if present); 'not recorded' if the fields are absent"
 }
 `.trim();
