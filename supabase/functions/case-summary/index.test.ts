@@ -121,6 +121,17 @@ Deno.test("SYSTEM_PROMPT enforces grounding + no-PII", () => {
   assert(p.includes("never invent"), "prompt must forbid inventing PII");
 });
 
+Deno.test("SYSTEM_PROMPT forbids inferred currency + derived counts (AIQ-1705)", () => {
+  const p = SYSTEM_PROMPT.toLowerCase();
+  // (a) no currency inferred onto budget figures
+  assert(p.includes("never infer or attach"), "prompt must forbid inferring a currency");
+  assert(p.includes("paid_currency"), "prompt must tie any currency to the paid_currency field");
+  assert(p.includes("budget_limit or budget_estimated"), "prompt must name the currency-less budget fields");
+  // (b) no derived remaining/completed counts
+  assert(p.includes('step x of y'), "prompt must require verbatim 'step X of Y'");
+  assert(p.includes('"remaining"') || p.includes("remaining"), "prompt must forbid a computed remaining count");
+});
+
 Deno.test("parseSummary handles clean JSON", () => {
   const s = parseSummary(
     '{"status":"Immigration stage.","blockers":["awaiting_work_permit"],"next_actions":["chase permit"],"cost_variance":"Under budget by 1,500 EUR."}',
