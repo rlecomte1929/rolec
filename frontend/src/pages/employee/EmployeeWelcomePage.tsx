@@ -5,6 +5,7 @@ import { WelcomeStepCard } from '../../components/WelcomeStepCard';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { markWelcomeSeen } from '../../utils/welcomeSeen';
+import { persistWelcomeSeen } from '../../api/welcome';
 
 /**
  * Employee first-login orientation. Same dismiss/navigate rules as the HR page:
@@ -17,11 +18,13 @@ export function EmployeeWelcomePage() {
 
   const handleSkip = () => {
     markWelcomeSeen(userId);
+    void persistWelcomeSeen().catch(() => {});
     navigate(buildRoute('employeeDashboard'));
   };
 
   const handleStartIntake = () => {
     markWelcomeSeen(userId);
+    void persistWelcomeSeen().catch(() => {});
     navigate(buildRoute('employeeIntake'));
   };
 

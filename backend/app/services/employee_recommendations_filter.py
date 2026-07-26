@@ -130,10 +130,17 @@ def apply_hr_curation(
     # dropped every such HR-approved item (movers rendered empty). Dedup by master
     # id so a registry item and its legacy static twin (both resolving to the same
     # approved master) don't both render — keep the first (highest-ranked) one.
+    # AIQ-1700: one batched lookup instead of one query per item. The engine now hands
+    # us the FULL ranked candidate list (so an approved supplier ranked below top_n is
+    # no longer discarded before we see it), which would otherwise make this loop issue
+    # a query per candidate on the employee hot path.
+    masters_by_item_id = service_catalog.find_masters_by_supplier_or_external_ids(
+        category, [rec.item_id for rec in items]
+    )
     kept: List[Tuple[int, RecommendationItem]] = []
     seen_master_ids: set = set()
     for rec in items:
-        master = service_catalog.find_master_by_supplier_or_external_id(category, rec.item_id)
+        master = masters_by_item_id.get(str(rec.item_id))
         if not master:
             log.debug(
                 "hr_curation_filter dropped item with no master entry: "

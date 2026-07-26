@@ -268,6 +268,50 @@ def find_master_by_supplier_or_external_id(
     return _row_to_item(row) if row else None
 
 
+def find_masters_by_supplier_or_external_ids(
+    category: str, item_ids: List[str]
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Batched ``find_master_by_supplier_or_external_id``: map each id in ``item_ids`` to
+    its master row. Ids that resolve to nothing are simply absent from the result.
+
+    AIQ-1700: curation now runs over the FULL ranked candidate list rather than the
+    ``top_n`` slice, so resolving one id per query turned a ~10-query step into one
+    query per candidate (up to ~80 for registry-heavy categories, multiplied by every
+    category on the batch endpoint). Same matching rule as the single-id resolver,
+    including the ``external_id``-wins tiebreak when a legacy static row and a registry
+    row both answer to the same id.
+    """
+    ids = [str(i) for i in item_ids if i]
+    if not ids:
+        return {}
+    stmt = text(
+        "SELECT * FROM service_catalog_items "
+        "WHERE category = :cat AND active = true "
+        "  AND (external_id IN :ids OR CAST(supplier_id AS TEXT) IN :ids)"
+    ).bindparams(bindparam("ids", expanding=True))
+    with db.engine.begin() as conn:
+        rows = conn.execute(stmt, {"cat": category, "ids": ids}).mappings().all()
+
+    by_external: Dict[str, Any] = {}
+    by_supplier: Dict[str, Any] = {}
+    for row in rows:
+        ext = row.get("external_id")
+        sup = row.get("supplier_id")
+        if ext is not None:
+            by_external.setdefault(str(ext), row)
+        if sup is not None:
+            by_supplier.setdefault(str(sup), row)
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for i in ids:
+        # external_id first — mirrors the single-id resolver's ORDER BY tiebreak.
+        row = by_external.get(i) or by_supplier.get(i)
+        if row is not None:
+            out[i] = _row_to_item(row)
+    return out
+
+
 def external_ids_for_supplier_ids(category: str, supplier_ids: List[str]) -> set:
     """
     Return the ``external_id``s of active masters in ``category`` whose ``supplier_id``

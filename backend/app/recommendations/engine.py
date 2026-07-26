@@ -177,6 +177,22 @@ def _load_dataset_with_registry(category: str, criteria: Dict[str, Any]) -> List
     return dataset
 
 
+def _cap_masters_keep_customs(
+    items: List[RecommendationItem], top_n: int
+) -> List[RecommendationItem]:
+    """Apply ``top_n`` to the curated master picks, never to HR's custom vendors.
+
+    ``apply_hr_curation`` appends HR's custom vendors after the master picks. Before
+    AIQ-1700 the slice ran BEFORE curation, so customs were never subject to it — a
+    company with 10 approved masters and 2 customs legitimately received 12 items. Now
+    that the slice runs after, a plain ``items[:top_n]`` would silently start dropping
+    vendors HR added by hand, so cap the masters and keep every custom.
+    """
+    masters = [r for r in items if not (r.metadata or {}).get("hr_custom")]
+    customs = [r for r in items if (r.metadata or {}).get("hr_custom")]
+    return masters[:top_n] + customs
+
+
 def recommend(
     category: str,
     criteria: Dict[str, Any],
@@ -293,7 +309,14 @@ def recommend(
             str((x.get("item") or {}).get("name") or ""),
         )
     )
-    top = matching[:top_n]
+    # AIQ-1700: when HR curation will run, build items for the FULL ranked list and
+    # slice AFTER curating. Slicing first meant curation only ever saw the top_n, so a
+    # supplier HR approved but that ranked below the cut was discarded before the
+    # allowlist was ever consulted — 74 of 78 companies rendered fewer providers than
+    # they had approved. On the un-curated path (admin debug, advisory categories) the
+    # slice is unchanged and still bounds the work.
+    will_curate = bool(company_id) and not getattr(plugin, "advisory", False)
+    top = matching if will_curate else matching[:top_n]
 
     items: List[RecommendationItem] = []
     for t in top:
@@ -336,7 +359,7 @@ def recommend(
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     hr_curation_status: Optional[str] = None
-    if company_id and not getattr(plugin, "advisory", False):
+    if will_curate:
         # Phase 2c — filter through HR's curation. Advisory categories (neighbourhood
         # overviews) are informational content, not vendors, so they are never gated:
         # gating them dropped every la-* row against the never-seeded catalog masters
@@ -350,6 +373,7 @@ def recommend(
             destination_city=dest_city or None,
             destination_country=dest_country,
         )
+        items = _cap_masters_keep_customs(items, top_n)
         if hr_curation_status:
             criteria_echo["hr_curation_status"] = hr_curation_status
 

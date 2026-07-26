@@ -117,7 +117,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   const [reassignOpen, setReassignOpen] = useState(false);
   const [reassignSuccessMsg, setReassignSuccessMsg] = useState('');
 
-  const budgetStatus =(): 'Within' | 'Approaching' | 'Exceeded' | null => {
+  const budgetStatus = (): 'Within' | 'Approaching' | 'Exceeded' | null => {
     if (!detail?.budgetLimit || detail.budgetEstimated == null) return null;
     const pct = (detail.budgetEstimated / detail.budgetLimit) * 100;
     if (pct > 100) return 'Exceeded';
@@ -392,11 +392,14 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
               Find a vendor
             </Button>
           </div>
-          {/* The RFQ lives in `rfqs`, keyed on the CANONICAL case id — NOT the assignment
-              id in this page's route. Passing `detail.id` here made every case look empty
-              to HR (0 of 22 production RFQs are keyed on an assignment id). `caseId` is
-              `case_assignments.case_id`, the same id the employee's RFQ was written under;
-              null fails closed inside the panel rather than 404-ing on the wrong id. */}
+          {/* [AIQ-1703] The RFQ lives in `rfqs`, keyed on the CANONICAL case id — NOT the
+              assignment PK in this page's route. Passing `detail.id` made every case look
+              empty to HR (0 of 22 production RFQs are keyed on an assignment id). `caseId`
+              is `case_assignments.case_id`, the same id the employee's RFQ was written
+              under. AIQ-1703 fell back to `detail.id` here for "legacy rows"; there are
+              none — all 452 assignments carry a case_id — and that fallback can only ever
+              404-and-render-as-empty, which is the very failure being fixed. Null instead,
+              so the panel fails closed and says so. */}
           <PendingRfqsPanel caseId={detail.caseId ?? null} />
         </Card>
 
