@@ -2,6 +2,11 @@
  * case-summary — pure-logic tests (no network, no DB, no Claude).
  * Run: deno test supabase/functions/case-summary/
  *
+ * CI runs these on every PR that touches supabase/functions/** — the
+ * "Edge Function tests (Deno)" job in .github/workflows/ci.yml (AIQ-1702).
+ * Before that job existed nothing ran this file on a PR, so the compliance
+ * assertion below was enforced only by whoever remembered to run deno locally.
+ *
  * The load-bearing test is `no PII reaches the prompt` — that is the compliance
  * guarantee (AIQ-1693): the summary is built only from a non-PII whitelist even
  * when the source rows contain names, notes, and the raw intake draft.
