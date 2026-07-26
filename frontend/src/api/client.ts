@@ -546,22 +546,6 @@ export interface CommandCenterKPIs {
   completedCount: number;
 }
 
-export interface HrQuoteRequest {
-  id: string;
-  case_id: string;
-  employee_id: string;
-  company_id: string;
-  service_categories: string[];
-  notes: string | null;
-  budget_range: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  // [AIQ-1514/1515] The vendors the employee shortlisted. Absent/empty on requests created
-  // before AIQ-1514 — that choice was never captured and cannot be recovered.
-  vendors?: Array<{ service_category: string; item_id: string; name: string }>;
-}
-
 export interface VendorPerformanceResponse {
   summary: {
     avg_rating: number | null;
@@ -1110,23 +1094,10 @@ export const hrAPI = {
     return response.data;
   },
 
-  getQuoteRequests: async (params?: {
-    status?: string;
-    case_id?: string;
-  }): Promise<{ quote_requests: HrQuoteRequest[] }> => {
-    const response = await api.get<{ quote_requests: HrQuoteRequest[] } | HrQuoteRequest[]>('/api/hr/quote-requests', { params });
-    // backend returns a list directly; normalise to named key
-    const data = response.data;
-    return { quote_requests: Array.isArray(data) ? data : (data.quote_requests ?? []) };
-  },
-
-  updateQuoteRequestStatus: async (
-    requestId: string,
-    status: 'acknowledged' | 'fulfilled'
-  ): Promise<{ id: string; status: string }> => {
-    const response = await api.patch<{ id: string; status: string }>(`/api/hr/quote-requests/${requestId}`, { status });
-    return response.data;
-  },
+  // `getQuoteRequests` / `updateQuoteRequestStatus` (GET+PATCH /api/hr/quote-requests) are
+  // gone: they read the retired `quote_requests` table, whose write path was tombstoned in
+  // AIQ-1525 (newest row 2026-06-29). The HR case detail was their only caller and it now
+  // reads the canonical `rfqs` via getCaseRfqs() in api/hrCoordination.ts.
 
   // ── NAV-SP-2: Vendor performance dashboard ───────────────────────────────
 

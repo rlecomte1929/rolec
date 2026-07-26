@@ -15,17 +15,31 @@ import { Link } from 'react-router-dom';
 import { getCaseRfqs, type CaseRfq } from '../../api/hrCoordination';
 
 interface Props {
-  caseId: string;
+  /** The CANONICAL case id (`case_assignments.case_id`), never an assignment id — `rfqs`
+   *  is keyed on the former. `null` when the caller could not resolve it; we then fail
+   *  closed and query nothing rather than 404 on a wrong id and render that as "none". */
+  caseId: string | null;
 }
 
 export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
   const rfqsQuery = useQuery({
     queryKey: ['case-rfqs', caseId],
-    queryFn: () => getCaseRfqs(caseId),
+    enabled: !!caseId,
+    queryFn: () => getCaseRfqs(caseId as string),
   });
   // Read fails silently (errors → []) — this is a supplementary panel, not a load-bearing view.
   const rfqs: CaseRfq[] = rfqsQuery.data ?? [];
-  const loading = rfqsQuery.isLoading;
+  const loading = !!caseId && rfqsQuery.isLoading;
+
+  // Fail closed: without a canonical case id we cannot tell "no RFQs" from "wrong id",
+  // so say so rather than showing a confident — and possibly false — empty state.
+  if (!caseId) {
+    return (
+      <p className="text-sm text-[#94a3b8]">
+        Quote requests can&apos;t be loaded for this case yet.
+      </p>
+    );
+  }
 
   if (loading) {
     return (
