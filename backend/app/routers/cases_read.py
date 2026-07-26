@@ -1857,6 +1857,9 @@ def list_dossiers(
 ) -> List[DossierPackageDetailResponse]:
     """[P3-6] List all DossierPackage records for a case, with staleness flag."""
     _assert_case_access(user, case_id)
+    # AIQ-1704: dossier_packages.case_id is the canonical case id (sole key);
+    # resolve the (possibly assignment) path id so the list isn't silently empty.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(
@@ -2542,6 +2545,9 @@ def list_case_budget_lines(
     Return budget line items for the case.  Available to HR and ADMIN roles.
     """
     _assert_case_access(user, case_id)
+    # AIQ-1704: case_budget_lines.case_id is the canonical case id (sole key);
+    # resolve the (possibly assignment) path id so the list isn't silently empty.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(
