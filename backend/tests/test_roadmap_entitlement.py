@@ -22,10 +22,18 @@ from backend.app.services import roadmap_entitlement as ent
 
 # ── decision logic ───────────────────────────────────────────────────────────
 
+def _stub_lookup(monkeypatch, row, available=True):
+    """Pin the entitlement lookup. `available=False` = the store was unreachable."""
+    monkeypatch.setattr(
+        ent, "lookup_entitlement",
+        lambda cid: ent.EntitlementLookup(row, available),
+    )
+
+
 def test_paywall_off_is_always_unlocked(monkeypatch):
     monkeypatch.delenv("RELOPASS_ROADMAP_PAYWALL_ENABLED", raising=False)
     # Flag off short-circuits before any DB lookup — a free tier is still unlocked.
-    monkeypatch.setattr(ent, "resolve_entitlement",
+    monkeypatch.setattr(ent, "lookup_entitlement",
                         lambda cid: pytest.fail("must not resolve when flag off"))
     assert ent.is_roadmap_unlocked("c1") is True
     ent.assert_roadmap_access("c1")  # no raise
@@ -33,8 +41,7 @@ def test_paywall_off_is_always_unlocked(monkeypatch):
 
 def test_paywall_on_free_tier_locks(monkeypatch):
     monkeypatch.setenv("RELOPASS_ROADMAP_PAYWALL_ENABLED", "true")
-    monkeypatch.setattr(ent, "resolve_entitlement",
-                        lambda cid: {"access_tier": "free", "payment_status": "unpaid"})
+    _stub_lookup(monkeypatch, {"access_tier": "free", "payment_status": "unpaid"})
     assert ent.is_roadmap_unlocked("c1") is False
     with pytest.raises(HTTPException) as ei:
         ent.assert_roadmap_access("c1")
@@ -45,28 +52,57 @@ def test_paywall_on_free_tier_locks(monkeypatch):
 @pytest.mark.parametrize("tier", ["roadmap", "essentials"])
 def test_paywall_on_paid_tier_unlocks(monkeypatch, tier):
     monkeypatch.setenv("RELOPASS_ROADMAP_PAYWALL_ENABLED", "true")
-    monkeypatch.setattr(ent, "resolve_entitlement", lambda cid: {"access_tier": tier})
+    _stub_lookup(monkeypatch, {"access_tier": tier})
     assert ent.is_roadmap_unlocked("c1") is True
     ent.assert_roadmap_access("c1")  # no raise
 
 
-def test_paywall_on_unresolved_fails_open(monkeypatch):
-    # Unknown case / missing column → None → GRANT (never lock a legit user out).
+def test_paywall_on_store_unreachable_fails_open(monkeypatch):
+    # DB error / un-migrated column → we know NOTHING about this case → GRANT.
+    # Never lock a paying user out because the pooler blipped.
     monkeypatch.setenv("RELOPASS_ROADMAP_PAYWALL_ENABLED", "true")
-    monkeypatch.setattr(ent, "resolve_entitlement", lambda cid: None)
+    _stub_lookup(monkeypatch, None, available=False)
     assert ent.is_roadmap_unlocked("c1") is True
     ent.assert_roadmap_access("c1")  # no raise
+
+
+def test_paywall_on_unknown_case_fails_closed(monkeypatch):
+    # AIQ-1699: the store WAS consulted and no case matches → a resolved "not
+    # entitled", not an outage. This used to grant the €800 roadmap for free.
+    monkeypatch.setenv("RELOPASS_ROADMAP_PAYWALL_ENABLED", "true")
+    _stub_lookup(monkeypatch, None, available=True)
+    assert ent.is_roadmap_unlocked("c1") is False
+    with pytest.raises(HTTPException) as ei:
+        ent.assert_roadmap_access("c1")
+    assert ei.value.status_code == 402
+
+
+def test_blank_case_id_is_resolved_not_an_outage():
+    # An empty id can't be a DB failure — it must not buy a fail-open.
+    assert ent.lookup_entitlement("") == ent.EntitlementLookup(None, True)
+    assert ent.lookup_entitlement("   ") == ent.EntitlementLookup(None, True)
+
+
+def test_resolve_entitlement_still_returns_the_row(monkeypatch):
+    # Back-compat wrapper: callers that only want the row keep working.
+    _stub_lookup(monkeypatch, {"access_tier": "roadmap"})
+    assert ent.resolve_entitlement("c1") == {"access_tier": "roadmap"}
+    _stub_lookup(monkeypatch, None, available=False)
+    assert ent.resolve_entitlement("c1") is None
 
 
 # ── status endpoint ──────────────────────────────────────────────────────────
 
-def _status_client(monkeypatch, ent_row, flag_on):
+def _status_client(monkeypatch, ent_row, flag_on, available=True):
     from backend.app.routers import payment as payment_mod
     from backend.app.auth_deps import require_hr_or_employee
 
     monkeypatch.setattr(payment_mod, "require_case_access", lambda cid, u: {})
-    monkeypatch.setattr(payment_mod, "resolve_entitlement", lambda cid: ent_row)
-    monkeypatch.setattr(payment_mod, "roadmap_paywall_enabled", lambda: flag_on)
+    monkeypatch.setattr(payment_mod, "lookup_entitlement",
+                        lambda cid: ent.EntitlementLookup(ent_row, available))
+    # The decision now lives in the service module, so the flag has to be set for real —
+    # stubbing a `roadmap_paywall_enabled` name on the router would no longer affect it.
+    monkeypatch.setenv("RELOPASS_ROADMAP_PAYWALL_ENABLED", "true" if flag_on else "false")
 
     app = FastAPI()
     app.include_router(payment_mod.router)
@@ -97,8 +133,17 @@ def test_status_flag_on_paid_reports_unlocked(monkeypatch):
     assert body["roadmap_unlocked"] is True
 
 
-def test_status_flag_on_unresolved_fails_open(monkeypatch):
-    c = _status_client(monkeypatch, None, True)  # resolve returns None
+def test_status_flag_on_store_unreachable_fails_open(monkeypatch):
+    c = _status_client(monkeypatch, None, True, available=False)
     body = c.get("/api/payment/status/case-1").json()
     assert body["access_tier"] == "free"
-    assert body["roadmap_unlocked"] is True   # fail-open
+    assert body["roadmap_unlocked"] is True   # outage → fail open, as before
+
+
+def test_status_flag_on_unknown_case_fails_closed(monkeypatch):
+    # AIQ-1699: the status endpoint must agree with assert_roadmap_access. It used to
+    # report unlocked=true here, so the UI showed the roadmap for an id with no case row.
+    c = _status_client(monkeypatch, None, True, available=True)
+    body = c.get("/api/payment/status/case-1").json()
+    assert body["access_tier"] == "free"
+    assert body["roadmap_unlocked"] is False
