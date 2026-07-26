@@ -680,6 +680,38 @@ class UsersMixin:
             ).fetchone()
         return self._row_to_dict(row)
 
+    def mark_welcome_seen(self, user_id: str) -> bool:
+        """[AIQ-1701] Record that this user dismissed their first-login welcome page.
+
+        Idempotent via COALESCE — the first dismissal wins, so a re-post never moves
+        the timestamp. Legacy non-UUID seed ids have no profiles row (same reason
+        get_profile_record returns None for them), so return False instead of raising:
+        the caller degrades to the localStorage-only behaviour rather than failing the
+        user's click.
+        """
+        try:
+            user_uuid = uuid.UUID(user_id)
+        except (ValueError, AttributeError, TypeError):
+            # TypeError covers user_id=None — uuid.UUID(None) raises that, not ValueError.
+            return False
+        try:
+            with self.engine.begin() as conn:
+                result = conn.execute(
+                    text(
+                        "UPDATE profiles SET welcome_seen_at = COALESCE(welcome_seen_at, now()) "
+                        "WHERE id = :id"
+                    ),
+                    {"id": user_uuid},
+                )
+            return bool(result.rowcount)
+        except (ProgrammingError, OperationalError) as exc:
+            # Migrations are applied out-of-band, so this code can be live before the
+            # column exists (ProgrammingError: undefined_column). Degrade to the
+            # localStorage-only behaviour instead of 500-ing every dismissal in the
+            # window between deploy and apply.
+            log.warning("mark_welcome_seen failed user_id=%s error=%s", (user_id or "")[:8], exc)
+            return False
+
     def get_profile_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """Look up a profiles row by email address (case-insensitive).
 

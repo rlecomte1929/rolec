@@ -184,6 +184,11 @@ export interface User {
   primary_role?: string | null;
   name?: string;
   company?: string;
+  // AIQ-1701: has this user already dismissed their role's first-login welcome page?
+  // Server-owned (profiles.welcome_seen_at) and mirrored into localStorage at login,
+  // which keeps the welcome redirect check synchronous. Optional so legacy
+  // callers/tests are unaffected.
+  welcome_seen?: boolean | null;
 }
 
 export interface AnswerRequest {

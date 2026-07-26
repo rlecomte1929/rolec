@@ -583,6 +583,10 @@ def login(body: LoginRequest, request: Request):
             primary_role=_primary,
             name=user.get("name"),
             company=profile.get("company_id") if profile else user.get("company"),
+            # [AIQ-1701] `profile` is already loaded above, so this costs no extra
+            # query. The client mirrors it into localStorage, which is what lets
+            # useWelcomeRedirect stay synchronous instead of awaiting a fetch.
+            welcome_seen=bool(profile.get("welcome_seen_at")) if profile else False,
         ),
         reconciliation=reconciliation_payload,
     )
@@ -606,6 +610,23 @@ def switch_role(
         db.get_user_roles(user["id"]), requested, is_admin=bool(user.get("is_admin"))
     )
     return {"roles": roles, "primary_role": primary}
+
+
+@router.post("/api/auth/welcome-seen")
+def mark_welcome_seen(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """[AIQ-1701] Persist the first-login welcome dismissal for the CALLING user.
+
+    Takes no body — the user id comes from the token, so one account can never dismiss
+    another's welcome. Best-effort by design: the client has already written its
+    localStorage flag before calling, so `persisted: false` (legacy non-UUID id, or no
+    profiles row) just means the dismissal stays browser-local — today's behaviour —
+    rather than failing the user's click.
+
+    Registered on the existing auth router, which is already mounted in BOTH app
+    instances, so this needs no separate dual-registration step.
+    """
+    persisted = db.mark_welcome_seen(user["id"])
+    return {"welcome_seen": True, "persisted": persisted}
 
 
 def _verify_supabase_access_token(token: str) -> Dict[str, Any]:
