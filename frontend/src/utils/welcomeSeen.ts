@@ -27,3 +27,23 @@ export function markWelcomeSeen(userId: string): void {
     // ignore — see module doc
   }
 }
+
+/**
+ * AIQ-1701 — mirror the server's `profiles.welcome_seen_at` into this browser at login.
+ *
+ * The dismissal is owned server-side so it survives a change of browser or device, but
+ * the redirect check (useWelcomeRedirect) must stay SYNCHRONOUS or the role home could
+ * flash the welcome page while an async answer is in flight. Seeding the cache at login
+ * — where the profile row is already loaded — gives durability without that risk.
+ *
+ * Only ever SETS the flag, never clears it. A server that reports false (or a legacy
+ * account with no profiles row) must leave an already-onboarded browser alone: that is
+ * the pre-AIQ-1701 behaviour, and clearing here would re-onboard people on the very
+ * login that was supposed to stop doing that.
+ */
+export function seedWelcomeSeenFromLogin(
+  userId: string,
+  welcomeSeen: boolean | null | undefined,
+): void {
+  if (userId && welcomeSeen) markWelcomeSeen(userId);
+}
