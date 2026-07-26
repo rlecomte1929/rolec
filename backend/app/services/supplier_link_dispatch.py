@@ -256,6 +256,19 @@ def _post_inbox_message(rfq_id: str, supplier_name: str, link: str) -> None:
         )
 
 
+def _supplier_email_live() -> bool:
+    """Supplier magic-link EMAIL egress is OFF until an explicit go-live.
+
+    Only ``RELOPASS_SUPPLIER_EMAIL_LIVE=true`` enables a real email to a supplier. This is a
+    deliberate, standalone switch — separate from a per-request ``send_email``, from
+    ``SUPPLIER_RFQ_DISPATCH_ENABLED``, from the HR "Email suppliers" action, and from whether
+    ``RESEND_API_KEY`` is set. Default OFF means a real supplier is NEVER emailed while testing,
+    regardless of who triggers it or how (the loop still runs fully in inbox mode). Protects real
+    suppliers from test traffic and keeps us inside the free Resend tier until a real go-live.
+    """
+    return (os.getenv("RELOPASS_SUPPLIER_EMAIL_LIVE") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def dispatch_supplier_links(
     *,
     rfq_id: str,
@@ -287,6 +300,17 @@ def dispatch_supplier_links(
     Returns one result per target. Never raises.
     """
     mode = "email" if dispatch_mode == "email" else "inbox"
+    # HARD go-live gate: supplier email egress is off until RELOPASS_SUPPLIER_EMAIL_LIVE=true.
+    # Force inbox so the Resend branch is UNREACHABLE — no supplier is emailed regardless of the
+    # caller's dispatch_mode/send_email, SUPPLIER_RFQ_DISPATCH_ENABLED, the HR "Email suppliers"
+    # action, RESEND_API_KEY, or the actor. Tokens still mint and the in-app link is delivered.
+    if mode == "email" and not _supplier_email_live():
+        log.warning(
+            "supplier-email go-live gate OFF (RELOPASS_SUPPLIER_EMAIL_LIVE) — forcing INBOX for "
+            "rfq=%s: tokens mint + in-app links, zero email egress. request_id=%s",
+            rfq_id, request_id,
+        )
+        mode = "inbox"
     resend_key = os.getenv("RESEND_API_KEY")
     # Guard 3: a test persona can never trigger a real send, even with the flag on and a key set.
     actor_is_test = looks_like_test_email(actor_email)
