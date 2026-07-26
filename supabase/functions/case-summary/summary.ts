@@ -150,6 +150,11 @@ STRICT GROUNDING RULES — follow exactly:
 - The input intentionally contains NO personal identifiers. Never invent or reference a
   person's name, email, phone, address, or document details. Refer to "the employee".
 - Do not recommend actions that depend on facts you were not given.
+- Money: state monetary amounts exactly as provided, as plain numbers. Never infer or attach
+  a currency to budget_limit or budget_estimated — they have no currency. Attach a currency
+  symbol/code ONLY to the paid amount, and ONLY when paid_currency is present.
+- Counts: report intake progress verbatim as "step X of Y" using intake_step and
+  intake_total_steps. Do NOT compute or state a "remaining" or "completed" count.
 - If an "immigration" array is present, each item is a milestone with a milestone_type
   (e.g. visa_decision, work_permit_issued), a status (pending | in_progress | completed |
   blocked | not_applicable), and optional target/completed dates. Use it to ground blockers
