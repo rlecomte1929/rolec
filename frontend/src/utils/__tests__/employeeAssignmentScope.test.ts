@@ -26,9 +26,9 @@ describe('caseIdForAssignment', () => {
     expect(caseIdForAssignment(rows, 'case-1')).toBe('case-1');
   });
 
-  it('falls back to the id itself when no linked row matches', () => {
-    expect(caseIdForAssignment(rows, 'unknown-id')).toBe('unknown-id');
-    expect(caseIdForAssignment([], 'assign-1')).toBe('assign-1');
+  it('returns null when no linked row matches (fail closed, AIQ-1704)', () => {
+    expect(caseIdForAssignment(rows, 'unknown-id')).toBeNull();
+    expect(caseIdForAssignment([], 'assign-1')).toBeNull();
   });
 
   it('returns null for a null id', () => {
@@ -45,8 +45,9 @@ describe('caseIdForAssignment', () => {
  */
 describe('persistableCaseId', () => {
   it('returns null while summaries are still loading (never the raw assignment id)', () => {
-    // This is the failing case: caseIdForAssignment([], 'assign-1') === 'assign-1'.
-    expect(caseIdForAssignment([], 'assign-1')).toBe('assign-1');
+    // AIQ-1704: caseIdForAssignment now returns null on a miss; the mid-load guard
+    // returns null regardless (never guesses while summaries are still loading).
+    expect(caseIdForAssignment([], 'assign-1')).toBeNull();
     expect(persistableCaseId([], 'assign-1', false)).toBeNull();
     // Even with summaries present, `loaded=false` means don't guess yet.
     expect(persistableCaseId(rows, 'assign-1', false)).toBeNull();
@@ -81,8 +82,8 @@ describe('assignmentIdForScopeId', () => {
   it('returns the id unchanged when it is already an assignment_id', () => {
     expect(assignmentIdForScopeId(rows, 'assign-1')).toBe('assign-1');
   });
-  it('falls back to the id itself when no row matches, and null for null', () => {
-    expect(assignmentIdForScopeId(rows, 'unknown')).toBe('unknown');
+  it('returns null when no row matches, and null for null (fail closed, AIQ-1704)', () => {
+    expect(assignmentIdForScopeId(rows, 'unknown')).toBeNull();
     expect(assignmentIdForScopeId(rows, null)).toBeNull();
   });
 });
