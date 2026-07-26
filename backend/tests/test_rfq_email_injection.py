@@ -90,6 +90,14 @@ class EmailInjectionTests(unittest.TestCase):
 class PersonalDomainGuardTests(unittest.TestCase):
     """AIQ-1533 — personal/webmail domains in the catalog must never receive RFQ emails."""
 
+    def setUp(self):
+        # These assert EMAIL-mode address guards; opt into email egress so the go-live gate
+        # (RELOPASS_SUPPLIER_EMAIL_LIVE) doesn't force inbox and skip the guards under test.
+        from unittest.mock import patch as _patch
+        p = _patch.dict(os.environ, {"RELOPASS_SUPPLIER_EMAIL_LIVE": "true"})
+        p.start()
+        self.addCleanup(p.stop)
+
     def _targets(self, email):
         return [{"recipient_id": "r-1", "vendor_id": "v-1", "supplier_name": "Test Mover", "email": email}]
 

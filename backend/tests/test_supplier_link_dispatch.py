@@ -52,9 +52,15 @@ def _target(email=None, name="Santa Fe Relocation", verified=True):
 class DispatchTests(unittest.TestCase):
     """EMAIL-mode dispatch. `dispatch_mode="email"` is passed explicitly: the default is now
     "inbox" (see InboxDispatchTests), and these address/provenance guards are email-mode semantics.
+    Email egress is also gated behind RELOPASS_SUPPLIER_EMAIL_LIVE (see SupplierEmailGoLiveGateTests);
+    these tests opt in so they exercise the email path.
     """
 
     def setUp(self):
+        # Opt into email egress — the go-live gate forces inbox when this is unset.
+        live = patch.dict(os.environ, {"RELOPASS_SUPPLIER_EMAIL_LIVE": "true"})
+        live.start()
+        self.addCleanup(live.stop)
         # db.engine.begin() is a context manager yielding a connection we only ever .execute() on.
         self.engine = MagicMock()
         patcher = patch.object(sld, "db", MagicMock(engine=self.engine))
@@ -276,6 +282,10 @@ class TestPersonaSenderGuardTests(unittest.TestCase):
     test user mailing a real mover."""
 
     def setUp(self):
+        # Opt into email egress — the go-live gate forces inbox when this is unset.
+        live = patch.dict(os.environ, {"RELOPASS_SUPPLIER_EMAIL_LIVE": "true"})
+        live.start()
+        self.addCleanup(live.stop)
         self.engine = MagicMock()
         patcher = patch.object(sld, "db", MagicMock(engine=self.engine))
         patcher.start()
@@ -330,6 +340,50 @@ class TestPersonaSenderGuardTests(unittest.TestCase):
             )
         post.assert_called_once()
         self.assertTrue(results[0]["sent"])
+
+
+class SupplierEmailGoLiveGateTests(unittest.TestCase):
+    """Hard go-live gate: NO supplier is emailed until RELOPASS_SUPPLIER_EMAIL_LIVE=true, even on
+    the fully-armed email path (dispatch_mode='email', send_email=True, RESEND_API_KEY set, a REAL
+    (non-test) actor, a verified business address). Independent of SUPPLIER_RFQ_DISPATCH_ENABLED and
+    the HR 'Email suppliers' action — this is the choke point they all pass through."""
+
+    def setUp(self):
+        self.engine = MagicMock()
+        patcher = patch.object(sld, "db", MagicMock(engine=self.engine))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _armed(self):
+        # The exact conditions under which an email WOULD fire if the gate were off.
+        return dict(
+            rfq_id="rfq-golive",
+            targets=[_target(email="ops@acme-corp.com", verified=True)],
+            dispatch_mode="email",
+            send_email=True,
+            actor_email="real.hr@acme-corp.com",  # a real (non-test) sender
+        )
+
+    def test_gate_off_forces_inbox_no_email_even_fully_armed(self):
+        env = {k: v for k, v in os.environ.items() if k != "RELOPASS_SUPPLIER_EMAIL_LIVE"}
+        with patch.dict(os.environ, {**env, "RESEND_API_KEY": "re_test"}, clear=True), \
+                patch.object(sld.requests, "post", return_value=MagicMock(status_code=200)) as post:
+            results = sld.dispatch_supplier_links(**self._armed())
+
+        post.assert_not_called()                 # NO supplier email left the building
+        self.assertFalse(results[0]["sent"])
+        self.assertEqual(results[0]["mode"], "inbox")   # forced to inbox
+        self.assertTrue(results[0]["ok"])        # token still minted (loop still runs)
+        self.assertIn("/supplier/quote?token=", results[0]["link"])
+
+    def test_gate_on_allows_email(self):
+        with patch.dict(os.environ, {"RESEND_API_KEY": "re_test", "RELOPASS_SUPPLIER_EMAIL_LIVE": "true"}), \
+                patch.object(sld.requests, "post", return_value=MagicMock(status_code=200)) as post:
+            results = sld.dispatch_supplier_links(**self._armed())
+
+        post.assert_called_once()                # go-live on → the email path runs
+        self.assertTrue(results[0]["sent"])
+        self.assertEqual(results[0]["mode"], "email")
 
 
 if __name__ == "__main__":
