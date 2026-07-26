@@ -771,7 +771,13 @@ class CasesMixin:
         self, case_id: str, request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List case_milestones for a case, ordered by sort_order then created_at."""
-        cid = self.coalesce_case_lookup_id(case_id)
+        # AIQ-1704: case_milestones has no assignment column, so an assignment-id
+        # path arg (the form the timeline URL can carry) matched neither arm of the
+        # WHERE below → a silently empty timeline. Resolve the assignment PK to its
+        # canonical case id first. Additive: falls back to the existing 2-form
+        # coalesce when the id resolves to no assignment (degrade, never raise).
+        ids = self.resolve_case_ids(case_id, request_id=request_id)
+        cid = ids.canonical_case_id if ids else self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = self._exec(
                 conn,

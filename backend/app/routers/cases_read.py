@@ -2080,6 +2080,23 @@ _SERVICE_BENEFIT_KEYS: Dict[str, List[str]] = {
 }
 
 
+def _canonical_case_id_or_404(case_id: str) -> str:
+    """Resolve any id form a route may carry — the assignment PK, the case_id, or
+    the canonical_case_id — to the canonical case id that case-keyed tables
+    (services_state, case_vendor_shortlist, case_messages…) actually use.
+
+    AIQ-1704: case-scoped reads used to key their SQL on the RAW path id, so an
+    assignment id (the form the employee roadmap / HR case-detail URLs carry)
+    matched no rows and the endpoint returned an empty list — a silent wrong
+    answer. Resolve once here and 404 on an id that maps to no case (fail
+    closed), never silent-empty.
+    """
+    ids = main_db.resolve_case_ids(case_id)
+    if ids is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return ids.canonical_case_id
+
+
 def _case_service_estimates(case_id: str) -> Dict[str, Dict[str, Any]]:
     """[AIQ-1527] The estimated cost per service, from case_services.
 
@@ -2331,6 +2348,10 @@ def get_budget_summary(
     list_case_forms.
     """
     _assert_case_access(user, case_id)
+    # AIQ-1704: the id may be an assignment id; services_state / case_services are
+    # keyed on the canonical case id, so resolve before reading (else the caps
+    # comparison silently sees an empty selection). Fail closed on an unknown id.
+    case_id = _canonical_case_id_or_404(case_id)
 
     # Resolve company + employee context from the CASE itself — caps belong to the
     # company that owns this case, and the employee's assignment_type / family_status
@@ -2396,6 +2417,10 @@ def list_case_messages(
     """
     Return the full message thread for a case, oldest-first.
     """
+    # AIQ-1704: case_messages.case_id holds the canonical case id; resolve the
+    # (possibly assignment) path id so the thread isn't silently empty. Fail
+    # closed on an unknown id.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(
@@ -2446,6 +2471,10 @@ def list_case_vendors(
     the vendors table.  Available to HR and ADMIN roles.
     """
     _assert_case_access(user, case_id)
+    # AIQ-1704: case_vendor_shortlist.case_id is the canonical case id; resolve the
+    # (possibly assignment) path id so the list isn't silently empty on the HR
+    # case-detail URL. Fail closed on an unknown id.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(
