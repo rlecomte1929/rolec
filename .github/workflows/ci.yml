@@ -33,6 +33,7 @@ jobs:
       hr_dashboard: ${{ steps.filter.outputs.hr_dashboard }}
       migrations: ${{ steps.filter.outputs.migrations }}
       workflows: ${{ steps.filter.outputs.workflows }}
+      edge_functions: ${{ steps.filter.outputs.edge_functions }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -50,6 +51,8 @@ jobs:
               - 'supabase/migrations/**'
             workflows:
               - '.github/workflows/**'
+            edge_functions:
+              - 'supabase/functions/**'
 
   actionlint:
     # Catches workflow YAML errors (bad `uses:` refs, secrets.* in job-level
@@ -370,6 +373,36 @@ jobs:
             backend/tests/test_llm_client_text.py \
             backend/tests/test_policy_propagation.py \
             backend/tests/test_supabase_password_sync.py
+
+  # Supabase Edge Functions are Deno, so neither the Python nor the Node job
+  # covers them: before AIQ-1702 a PR touching ONLY supabase/functions/** ran no
+  # test of its own change (PR #1662 merged exactly that way, with backend-tests
+  # and frontend both "skipping"). That matters most for case-summary, which
+  # builds an LLM prompt from an explicit non-PII whitelist — its
+  # `no PII reaches the prompt` test is the automated half of the GDPR rule in
+  # CLAUDE.md, and until now nothing ran it on a PR.
+  #
+  # `deno test <dir>` discovers every *.test.ts underneath, so a new function's
+  # suite is picked up with no change here. The tests are pure logic (no network,
+  # no DB, no Claude) — remote std imports are fetched by the module loader, so
+  # no --allow-* flags are needed.
+  edge-function-tests:
+    name: Edge Function tests (Deno)
+    needs: changes
+    if: needs.changes.outputs.edge_functions == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          # Pinned, not `latest` — a silent runtime bump must not be able to
+          # change whether the compliance test passes.
+          deno-version: v2.1.4
+
+      - name: Run Edge Function tests
+        run: deno test --no-check=remote supabase/functions/
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
