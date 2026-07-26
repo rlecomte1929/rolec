@@ -42,7 +42,15 @@ vi.mock('../../navigation/safeNavigate', () => ({ safeNavigate: vi.fn() }));
 // the RFQ panel's id resolution.
 vi.mock('../../components/case/ExceptionFlagsPanel', () => ({ ExceptionFlagsPanel: () => null }));
 vi.mock('../../components/case/RoadmapReviewPanel', () => ({ RoadmapReviewPanel: () => null }));
-vi.mock('../../components/case/HrCaseTasksPanel', () => ({ HrCaseTasksPanel: () => null }));
+// HrCaseTasksPanel owns the provider-coordination subtree (providers, rfqs, assign-task and
+// the HR-gated dispatch), which is keyed on the canonical case id via `coordinationCaseId`
+// while its own task reads keep using `caseId`. The stub surfaces both so we can assert the
+// page hands each subtree the id-space it actually queries.
+vi.mock('../../components/case/HrCaseTasksPanel', () => ({
+  HrCaseTasksPanel: ({ caseId, coordinationCaseId }: { caseId: string; coordinationCaseId?: string | null }) => (
+    <div data-testid="tasks-panel" data-case-id={caseId} data-coordination-case-id={coordinationCaseId ?? ''} />
+  ),
+}));
 vi.mock('../../components/case/VendorBrowsePanel', () => ({ VendorBrowsePanel: () => null }));
 vi.mock('../../components/case/ImmigrationStatusPanel', () => ({ ImmigrationStatusPanel: () => null }));
 vi.mock('../../components/case/AdvisorsPanel', () => ({ AdvisorsPanel: () => null }));
@@ -151,6 +159,19 @@ describe('HrCommandCenterCaseDetail — RFQ panel reads the canonical case id', 
     expect(screen.queryByText(/No quote requests from the employee yet/i)).not.toBeInTheDocument();
   });
 
+  it('hands the dispatch surface the CASE id, so the RFQ → supplier-link chain is reachable', async () => {
+    mocks.getCommandCenterCaseDetail.mockResolvedValue(DETAIL);
+    renderPage();
+
+    // Every hr_coordination endpoint behind that subtree (providers, rfqs, assign-task,
+    // dispatch) validates the case id against relocation_cases/cases and 404s on an
+    // assignment id — which is what made the dispatch button unreachable.
+    const panel = await screen.findByTestId('tasks-panel');
+    expect(panel).toHaveAttribute('data-coordination-case-id', CASE_ID);
+    // The task reads keep their own id-space — this fix must not move them.
+    expect(panel).toHaveAttribute('data-case-id', ASSIGNMENT_ID);
+  });
+
   it('fails closed when the case id cannot be resolved — no query with the raw assignment id', async () => {
     mocks.getCommandCenterCaseDetail.mockResolvedValue({ ...DETAIL, caseId: null });
     renderPage();
@@ -159,5 +180,7 @@ describe('HrCommandCenterCaseDetail — RFQ panel reads the canonical case id', 
     expect(await screen.findByText(/can't be loaded for this case yet/i)).toBeInTheDocument();
     // … but the RFQ read never fired with the wrong id.
     expect(mocks.getCaseRfqs).not.toHaveBeenCalled();
+    // …and the dispatch subtree gets no id rather than a wrong one (it renders nothing).
+    expect(screen.getByTestId('tasks-panel')).toHaveAttribute('data-coordination-case-id', '');
   });
 });

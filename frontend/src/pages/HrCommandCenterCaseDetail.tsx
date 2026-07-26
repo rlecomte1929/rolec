@@ -316,7 +316,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         </div>
 
         {/* ── Employee Tasks (AIQ-34-C) — polls every 8s ── */}
-        <HrCaseTasksPanel caseId={detail.id} />
+        <HrCaseTasksPanel caseId={detail.id} coordinationCaseId={detail.caseId ?? null} />
 
         {/* ── GAP 4 / AIQ-1479: Immigration advisors first — the actionable "contacts +
             ratings" section is the most useful thing here, so it leads the immigration
