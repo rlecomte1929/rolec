@@ -33,9 +33,8 @@ from ..auth_deps import require_assignment_visibility, require_case_access, requ
 from ..db import SessionLocal
 from ..services.pii_masker import safe_log_text
 from ..services.roadmap_entitlement import (
-    PAID_TIERS,
-    resolve_entitlement,
-    roadmap_paywall_enabled,
+    lookup_entitlement,
+    unlocked_from_lookup,
 )
 
 logger = logging.getLogger(__name__)
@@ -203,9 +202,14 @@ def payment_status(
     nothing changes for existing users until payments go live.
     """
     require_case_access(case_id, user)
-    ent = resolve_entitlement(case_id)
+    # AIQ-1699: share the decision with the enforcement gate (assert_roadmap_access) so
+    # this endpoint can never report "unlocked" for a case the roadmap route would 402,
+    # or vice versa. It used to unlock on any unresolved id — including a real id with
+    # no case row, which handed out the paid roadmap for free.
+    found = lookup_entitlement(case_id)
+    ent = found.row
     tier = (ent or {}).get("access_tier") or "free"
-    unlocked = (not roadmap_paywall_enabled()) or ent is None or tier in PAID_TIERS
+    unlocked = unlocked_from_lookup(found)
     return JSONResponse(content={
         "case_id": case_id,
         "access_tier": tier,

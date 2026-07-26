@@ -82,9 +82,13 @@ def _client(monkeypatch, real_db, caller_id):
     monkeypatch.setattr(auth_deps, "db", real_db)
     # Paywall ON over an unpaid free case — the exact state where a 404 fail-open leaks
     # the €800 roadmap. Only the entitlement read is stubbed; access control is real.
-    monkeypatch.setattr(payment_mod, "resolve_entitlement",
-                        lambda cid: {"access_tier": "free", "payment_status": "unpaid"})
-    monkeypatch.setattr(payment_mod, "roadmap_paywall_enabled", lambda: True)
+    # `available=True` = the store answered; the row just isn't paid (AIQ-1699 shape).
+    from backend.app.services.roadmap_entitlement import EntitlementLookup
+    monkeypatch.setattr(
+        payment_mod, "lookup_entitlement",
+        lambda cid: EntitlementLookup({"access_tier": "free", "payment_status": "unpaid"}, True),
+    )
+    monkeypatch.setenv("RELOPASS_ROADMAP_PAYWALL_ENABLED", "true")
 
     app = FastAPI()
     app.include_router(payment_mod.router)
