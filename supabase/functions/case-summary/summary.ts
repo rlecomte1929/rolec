@@ -68,7 +68,6 @@ export const OPERATIONAL_IMMIGRATION_FIELDS = [
   "status",
   "target_date",
   "completed_date",
-  "notes",
 ] as const;
 
 /**
