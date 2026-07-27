@@ -120,6 +120,17 @@ class ListCaseVendorsTests(unittest.TestCase):
         self.access_patcher.start()
         self.addCleanup(self.access_patcher.stop)
 
+        # AIQ-1704: the endpoint now resolves the (possibly assignment) path id to
+        # the canonical case id before its query. That resolution is covered by
+        # test_resolve_case_ids / test_case_id_resolution_a2; here we exercise the
+        # vendor query in isolation, so stub it to pass the id through unchanged
+        # (these fixtures seed no case_assignments row).
+        self.resolve_patcher = mock.patch.object(
+            router_module, "_canonical_case_id_or_404", side_effect=lambda cid: cid
+        )
+        self.resolve_patcher.start()
+        self.addCleanup(self.resolve_patcher.stop)
+
     def _seed_supplier(self, name, website="https://vendor.example"):
         """Insert a supplier and return its ``vendor_id`` link (the value the
         shortlist row references — mirrors prod, where cvs.vendor_id and

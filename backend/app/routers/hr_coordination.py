@@ -76,6 +76,15 @@ def get_case_providers(
     Return all providers assigned to a case (scoped to org), each with their
     tasks array and aggregated task_counts.
     """
+    # AIQ-1704: provider_tasks.case_id holds the canonical case id (assign_task
+    # validates it against relocation_cases/cases), so resolve a (possibly
+    # assignment) path id before reading — else the providers list is silently
+    # empty on the HR case-detail URL. Fail closed on an unknown id; org scoping
+    # below is unchanged (a cross-org case still returns no rows).
+    ids = db.resolve_case_ids(case_id)
+    if ids is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    case_id = ids.canonical_case_id
     with db.engine.begin() as conn:
         tasks = conn.execute(
             text(

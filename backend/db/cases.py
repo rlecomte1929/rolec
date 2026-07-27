@@ -20,7 +20,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
@@ -107,6 +107,26 @@ _CASE_PURPOSE_MAP = {
     "remote_work": "remote_work",
     "remote": "remote_work",
 }
+
+
+class CaseIds(NamedTuple):
+    """Resolved id context for a case-scoped request (AIQ-1704).
+
+    The canonical boundary primitive: given ANY of the three id forms a route/URL
+    might carry — the assignment PK (``case_assignments.id``), the ``case_id``, or
+    the ``canonical_case_id`` — :meth:`CasesMixin.resolve_case_ids` returns this
+    context so a handler never has to guess which form it was handed. Handlers pick
+    the field they need: ``canonical_case_id`` for case-keyed tables (services_state,
+    case_vendor_shortlist, case_messages, milestones…), ``assignment_id`` for
+    assignment-keyed state, and ``assignment`` for company/type/status fields.
+    """
+
+    assignment_id: str
+    # The id case-keyed tables actually use: COALESCE(canonical_case_id, case_id).
+    canonical_case_id: str
+    # The raw case_assignments.case_id (may differ from canonical for legacy rows).
+    case_id: Optional[str]
+    assignment: Dict[str, Any]
 
 
 class CasesMixin:
@@ -250,6 +270,37 @@ class CasesMixin:
         """Prefer canonical when resolvable (exists in wizard_cases), else return original."""
         canonical = self.resolve_canonical_case_id(case_id)
         return canonical if canonical is not None else (case_id or "")
+
+    def resolve_case_ids(
+        self, any_id: str, request_id: Optional[str] = None
+    ) -> Optional[CaseIds]:
+        """Canonical fail-closed id resolver for case-scoped requests (AIQ-1704).
+
+        Accepts ANY of the three id forms a route/URL may carry — the assignment PK
+        (``case_assignments.id``), the ``case_id``, or the ``canonical_case_id`` —
+        and returns a :class:`CaseIds` context, or ``None`` when the id resolves to
+        no assignment. Callers key their case-scoped query on the returned
+        ``canonical_case_id`` and 4xx on ``None`` — never silently empty and never
+        fail open. This is the boundary that ends the case-vs-assignment id
+        confusion class: the endpoint stops caring which form it was handed.
+
+        Thin wrapper over :meth:`get_assignment_by_case_id`, which already matches
+        all three forms; this adds the fail-closed contract and the resolved-id
+        context that handlers need (they usually need more than one form).
+        """
+        assignment = self.get_assignment_by_case_id(any_id, request_id=request_id)
+        if not assignment:
+            return None
+        canonical = (str(assignment.get("canonical_case_id") or "").strip()
+                     or str(assignment.get("case_id") or "").strip())
+        if not canonical:
+            return None
+        return CaseIds(
+            assignment_id=str(assignment["id"]),
+            canonical_case_id=canonical,
+            case_id=(assignment.get("case_id") or None),
+            assignment=assignment,
+        )
 
     def update_assignment_intake_progress(
         self,
@@ -720,7 +771,13 @@ class CasesMixin:
         self, case_id: str, request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List case_milestones for a case, ordered by sort_order then created_at."""
-        cid = self.coalesce_case_lookup_id(case_id)
+        # AIQ-1704: case_milestones has no assignment column, so an assignment-id
+        # path arg (the form the timeline URL can carry) matched neither arm of the
+        # WHERE below → a silently empty timeline. Resolve the assignment PK to its
+        # canonical case id first. Additive: falls back to the existing 2-form
+        # coalesce when the id resolves to no assignment (degrade, never raise).
+        ids = self.resolve_case_ids(case_id, request_id=request_id)
+        cid = ids.canonical_case_id if ids else self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = self._exec(
                 conn,
