@@ -2420,6 +2420,11 @@ def list_case_messages(
     """
     Return the full message thread for a case, oldest-first.
     """
+    # SECURITY: authorize before reading — case_messages carry relocation PII and
+    # this endpoint previously had NO access check (only get_current_user), so any
+    # authenticated user could read any case's thread by id (cross-tenant IDOR).
+    # Mirrors every sibling case-scoped read in this module.
+    _assert_case_access(user, case_id)
     # AIQ-1704: case_messages.case_id holds the canonical case id; resolve the
     # (possibly assignment) path id so the thread isn't silently empty. Fail
     # closed on an unknown id.
