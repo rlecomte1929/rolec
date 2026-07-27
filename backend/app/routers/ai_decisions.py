@@ -72,6 +72,12 @@ class AIDecisionRead(BaseModel):
     decision: str
     reason: Optional[str]
     outcome: Optional[str]
+    # AIQ-1694: the production-time audit fields — the PII-masked input that produced the
+    # recommendation, the producing model, and when it was produced. Nullable for legacy
+    # rows written before the audit-hardening migration.
+    input_context: Optional[Dict[str, Any]] = None
+    model_name: Optional[str] = None
+    produced_at: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +225,7 @@ def create_ai_decision(
 def list_ai_decisions(
     user: Dict[str, Any] = Depends(require_admin_or_hr),
     feature: Optional[str] = Query(None, max_length=100),
-    decision: Optional[str] = Query(None, pattern=r"^(accept|override|reject)$"),
+    decision: Optional[str] = Query(None, pattern=r"^(accept|override|reject|produced)$"),
     limit: int = Query(100, ge=1, le=500),
 ) -> List[Dict[str, Any]]:
     """List AI decisions for the caller's company, newest first."""
