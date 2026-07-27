@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, Badge, Button, Alert } from '../../components/antigravity';
 import { formatEstimationFromUsd } from '../services/servicesCurrency';
 import { createAIDecision } from '../../api/aiDecisions';
+import { reportError } from '../../lib/errorTracking';
 import { track } from '../../analytics';
 import type { RecommendationItem, RecommendationResponse } from './types';
 import { rateProvider } from './api';
@@ -534,9 +535,10 @@ export const RecommendationResults: React.FC<Props> = ({
 
   /**
    * Fire-and-forget POST to /api/ai/decisions. Never blocks the selection —
-   * if the log fails, the user's pick still goes through and a non-blocking
-   * error Alert appears at the top of the page. Per AI-002 / Art. 14:
-   * accept = picked the top-ranked item, override = picked a lower rank.
+   * if the log fails, the user's pick still goes through, a non-blocking error
+   * Alert appears at the top of the page, and the failure is written to the
+   * console. Per AI-002 / Art. 14 the decision is supplied by the caller (see
+   * `decision` below), not derived from rank.
    */
   const logDecision = (
     category: string,
@@ -567,6 +569,18 @@ export const RecommendationResults: React.FC<Props> = ({
       reason: reason ?? undefined,
     }).catch((e) => {
       const msg = e instanceof Error ? e.message : 'Failed to log AI decision';
+      // AIQ-1691 follow-up: this write is fire-and-forget and the Alert below
+      // self-dismisses after 8s, so a dropped Art. 14 audit row left no trace once it
+      // faded — which is what made the original 400 so easy to miss. Report every
+      // non-2xx to error tracking so the next drop is diagnosable. `logger.error` is a
+      // no-op in prod builds, which is exactly where a dropped audit row matters, hence
+      // reportError. Context is vendor/decision ids + HTTP status only — no employee PII.
+      const status = (e as { status?: number } | null)?.status;
+      void reportError({
+        message: `[ai-decisions] audit write failed (decision=${decision}, status=${status ?? 'n/a'}, recommendation_id=${item.item_id}): ${msg}`,
+        stack: e instanceof Error ? e.stack ?? null : null,
+        componentName: 'RecommendationResults',
+      });
       setLogError(`${msg} — your selection was saved, but the audit log entry could not be written.`);
       window.setTimeout(() => setLogError(null), 8000);
     });
