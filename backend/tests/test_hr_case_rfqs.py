@@ -45,6 +45,18 @@ class HrCaseRfqsTests(unittest.TestCase):
         self.engine_patcher.start()
         self.addCleanup(self.engine_patcher.stop)
 
+        # [AIQ-1735] The handler now resolves the route id to the canonical case id
+        # before its tenant gate. `db` is a MagicMock under backend/conftest.py, so an
+        # unpatched db.resolve_case_ids returns a truthy Mock whose .canonical_case_id
+        # sqlite refuses to bind. Return None: these tests address the case by its
+        # canonical id already, which is exactly the no-assignment passthrough branch.
+        self.rci_patcher = mock.patch.object(
+            router_module.db, "resolve_case_ids", return_value=None
+        )
+        self.rci_patcher.start()
+        self.addCleanup(self.rci_patcher.stop)
+
+
         self.org_id = str(uuid.uuid4())
         self.case_id = str(uuid.uuid4())
         self.user = {"id": "seed-hr-testingapril", "role": "HR"}
@@ -113,6 +125,38 @@ class HrCaseRfqsTests(unittest.TestCase):
         out = router_module.get_case_rfqs(self.case_id, hr_user=self.user, org_id=self.org_id)
         self.assertEqual(out, {"rfqs": []})
 
+
+    def test_assignment_id_resolves_to_the_case_and_returns_its_rfqs(self):
+        """[AIQ-1735] THE BUG: the HR case-detail route carries the ASSIGNMENT id.
+
+        Before this fix the tenant gate (a UNION over relocation_cases/cases) never
+        consulted case_assignments, so an assignment id 404'd and HR saw no RFQ at all —
+        which is why the dispatch panel rendered empty and its button was unreachable.
+        The handler now resolves any of the three id forms first.
+        """
+        rfq_id = self._seed()
+        assignment_id = str(uuid.uuid4())  # a DIFFERENT id-space from self.case_id
+
+        class _Ids:
+            canonical_case_id = self.case_id
+
+        with mock.patch.object(router_module.db, "resolve_case_ids", return_value=_Ids()):
+            out = router_module.get_case_rfqs(
+                assignment_id, hr_user=self.user, org_id=self.org_id
+            )
+
+        self.assertEqual([r["id"] for r in out["rfqs"]], [rfq_id])
+
+    def test_unresolvable_id_still_404s(self):
+        """Resolution widened, authorization did not. An id that resolves to nothing
+        falls through to the UNION tenant gate and still 404s — no existence leak."""
+        self._seed()
+        with mock.patch.object(router_module.db, "resolve_case_ids", return_value=None):
+            with self.assertRaises(HTTPException) as ctx:
+                router_module.get_case_rfqs(
+                    str(uuid.uuid4()), hr_user=self.user, org_id=self.org_id
+                )
+        self.assertEqual(ctx.exception.status_code, 404)
 
 if __name__ == "__main__":
     unittest.main()
