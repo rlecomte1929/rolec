@@ -220,3 +220,49 @@ def test_uncurated_path_still_slices_to_top_n(wired):
     assert len(_names(resp)) == 3
     assert resp.criteria_echo.get("hr_curation_status") is None
     assert calls["batched"] == 0, "no curation → no master lookup at all"
+
+
+# ── AIQ-1694·4 — production-time audit logging is a side-effect on recommend() ──
+
+def test_recommend_logs_a_deduped_production_audit_record(wired, monkeypatch):
+    """recommend() writes ONE 'produced' audit record (masked input + output), keyed by
+    a stable id, and its OUTPUT is unchanged by the logging."""
+    approve, _ = wired
+    approve([_master_id(1), _master_id(2), _master_id(3)])  # a real (non-empty) recommendation
+    calls = []
+    from backend.app.services import ai_decision_logger as adl
+    monkeypatch.setattr(adl, "record_ai_recommendation",
+                        lambda **kw: calls.append(kw) or "row-1")
+    resp = engine.recommend("movers", _CRITERIA, top_n=10, company_id=_COMPANY)
+
+    assert _names(resp) == ["Mover 01", "Mover 02", "Mover 03"], "output unaffected by logging"
+    assert len(calls) == 1
+    kw = calls[0]
+    assert kw["feature"] == "supplier_reco:movers"
+    assert kw["skip_if_exists"] is True          # dedup on re-compute
+    assert kw["company_id"] == _COMPANY
+    assert kw["recommendation_id"]               # stable id present
+    assert kw["ai_output"]["category"] == "movers"
+
+
+def test_recommend_does_not_log_without_a_company(wired, monkeypatch):
+    calls = []
+    from backend.app.services import ai_decision_logger as adl
+    monkeypatch.setattr(adl, "record_ai_recommendation", lambda **kw: calls.append(kw))
+    # company_id=None → uncurated path returns top_n items, but there is no tenant to audit.
+    resp = engine.recommend("movers", _CRITERIA, top_n=10, company_id=None)
+    assert resp.recommendations                   # non-empty result...
+    assert calls == []                            # ...but no audit write
+
+
+def test_recommend_survives_an_audit_logging_failure(wired, monkeypatch):
+    approve, _ = wired
+    approve([_master_id(1), _master_id(2)])
+    from backend.app.services import ai_decision_logger as adl
+
+    def boom(**kw):
+        raise RuntimeError("audit backend down")
+
+    monkeypatch.setattr(adl, "record_ai_recommendation", boom)
+    resp = engine.recommend("movers", _CRITERIA, top_n=10, company_id=_COMPANY)
+    assert resp.recommendations, "a logging failure must never break the recommendation"
