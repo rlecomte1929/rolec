@@ -38,6 +38,18 @@ class HrRfqDispatchTests(unittest.TestCase):
         self.engine_patcher.start()
         self.addCleanup(self.engine_patcher.stop)
 
+        # [AIQ-1735] The handler now resolves the route id to the canonical case id
+        # before its tenant gate. `db` is a MagicMock under backend/conftest.py, so an
+        # unpatched db.resolve_case_ids returns a truthy Mock whose .canonical_case_id
+        # sqlite refuses to bind. Return None: these tests address the case by its
+        # canonical id already, which is exactly the no-assignment passthrough branch.
+        self.rci_patcher = mock.patch.object(
+            router_module.db, "resolve_case_ids", return_value=None
+        )
+        self.rci_patcher.start()
+        self.addCleanup(self.rci_patcher.stop)
+
+
         # Never touch the real audited dispatch / target resolution in a unit test.
         self.targets = [
             {"recipient_id": "rec-1", "vendor_id": "sup-a", "supplier_name": "Santa Fe", "email": None, "verified": False},

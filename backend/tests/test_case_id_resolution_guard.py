@@ -32,7 +32,28 @@ _ROUTERS = [
     "backend/app/routers/payment.py",
 ]
 _RESOLVERS = ("resolve_case_ids", "_canonical_case_id_or_404", "resolve_case_forms_case_id")
-_CASE_SQL = re.compile(r"case_id\s*=\s*:")
+
+# Matches a case_id SQL predicate in any of the three styles this codebase writes.
+#
+# [AIQ-1735] The original pattern was `case_id\s*=\s*:`, which only saw the bare form.
+# It was blind to `CAST(case_id AS TEXT) = :cid` — the form the codebase actively
+# PREFERS, because `::text` is Postgres-only and breaks the sqlite tests (there is an
+# explicit note saying so at cases_read.py:2455). So the guard could not see the very
+# style it steers authors towards, and `get_case_rfqs` / `dispatch_case_rfq` sat
+# unresolved inside an already-scanned router while the guard stayed green.
+#
+# Anchored on a word boundary so a column merely ENDING in case_id (e.g.
+# canonical_case_id) is not matched by accident.
+_CASE_SQL = re.compile(
+    r"""
+    \bcase_id\b            # the column, not a suffix of a longer name
+    (?:\s*::\s*\w+)?       # optional  case_id::text
+    \s*\)?                 # optional  ) closing a CAST(...)
+    \s*(?:AS\s+\w+\s*\))?  # optional  AS TEXT)   -- CAST(case_id AS TEXT)
+    \s*=\s*:               # = :bind
+    """,
+    re.VERBOSE | re.IGNORECASE,
+)
 
 
 def _resolves(seg: str) -> bool:
@@ -72,6 +93,38 @@ def _flagged() -> set:
                 if _CASE_SQL.search(seg) and not _resolves(seg):
                     flagged.add(node.name)
     return flagged
+
+
+class CaseSqlPatternTests(unittest.TestCase):
+    """[AIQ-1735] Pin the predicate styles the guard must see.
+
+    The guard is only as good as this regex. Its original form matched the bare
+    `case_id = :cid` and silently missed `CAST(case_id AS TEXT) = :cid` — the style the
+    codebase PREFERS, since `::text` is Postgres-only and breaks the sqlite tests. Two
+    unresolved handlers (`get_case_rfqs`, `dispatch_case_rfq`) sat inside a scanned
+    router while the guard stayed green. If this test is ever weakened, that hole
+    reopens.
+    """
+
+    def test_matches_every_predicate_style_the_codebase_writes(self):
+        for sql in (
+            "WHERE case_id = :cid",
+            "WHERE CAST(case_id AS TEXT) = :cid",
+            "WHERE case_id::text = :cid",
+            "WHERE cvs.case_id = :case_id",
+        ):
+            self.assertTrue(_CASE_SQL.search(sql), f"should flag: {sql}")
+
+    def test_does_not_flag_lookalikes(self):
+        # A guard that cries wolf gets deleted. `canonical_case_id` is a DIFFERENT
+        # column and is already the resolved value — flagging it would be a false
+        # positive on correct code.
+        for sql in (
+            "WHERE canonical_case_id = :cid",
+            "WHERE CAST(id AS TEXT) = :cid",
+            "SELECT case_id, name FROM t",
+        ):
+            self.assertFalse(_CASE_SQL.search(sql), f"should NOT flag: {sql}")
 
 
 class CaseIdResolutionGuard(unittest.TestCase):

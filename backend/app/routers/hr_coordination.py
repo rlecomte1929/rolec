@@ -176,6 +176,16 @@ def get_case_rfqs(
     outside the org so we don't leak case existence across tenants. Read-only — dispatch
     and supplier-token minting are AIQ-1670.
     """
+    # [AIQ-1735] Accept any of the three id forms. The HR case-detail route carries the
+    # ASSIGNMENT id, and both the tenant gate below and the `rfqs` read key on the
+    # canonical case id — so an assignment id 404'd here and HR saw no RFQ at all.
+    # Resolve first, then gate: the UNION below is still the real authorization check,
+    # so an id that resolves to nothing simply falls through to it and 404s as before
+    # (a case with no case_assignments row — the HR-wizard shape — is unaffected).
+    ids = db.resolve_case_ids(case_id)
+    if ids:
+        case_id = ids.canonical_case_id
+
     # Tenant scope — same UNION check assign_task uses (a case may live in either table).
     with db.engine.begin() as conn:
         case_ok = conn.execute(
@@ -285,6 +295,14 @@ def dispatch_case_rfq(
     belong to the HR's org AND the RFQ must belong to that case, so an HR from another company
     cannot dispatch someone else's RFQ (404, no existence leak).
     """
+    # [AIQ-1735] Same three-form resolution as get_case_rfqs above — the dispatch button
+    # lives on the HR case-detail page, which carries the ASSIGNMENT id, so without this
+    # the dispatch 404'd on exactly the RFQs HR could see. Resolve first, then gate; the
+    # UNION below remains the authorization check and still 404s an unresolvable id.
+    ids = db.resolve_case_ids(case_id)
+    if ids:
+        case_id = ids.canonical_case_id
+
     # Tenant scope — the case must belong to the HR's org.
     with db.engine.begin() as conn:
         case_ok = conn.execute(
