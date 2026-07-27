@@ -58,6 +58,9 @@ class ResolveCaseIdsTests(unittest.TestCase):
                 "INSERT INTO case_assignments VALUES ('assign-3','raw-3','canon-3','emp-3')"
             ))
             # Legacy row: canonical is NULL, only case_id carries the value.
+            # [AIQ-1737·2] Intentional NULL — asserts the resolver still handles a legacy
+            # NULL-canonical row (defensive fallback that outlives the data cleanup). Isolated
+            # in-memory schema; AIQ-1732's prod NOT NULL(canonical_case_id) does not govern it.
             c.execute(text(
                 "INSERT INTO case_assignments VALUES ('assign-2','legacy-case-2',NULL,'emp-2')"
             ))
