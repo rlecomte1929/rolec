@@ -57,6 +57,30 @@ class ServicesStateRead(BaseModel):
     updated_by_user_id: Optional[str]
 
 
+def _canonical_services_case_id(case_id: str) -> str:
+    """Resolve a route id to the canonical case_id `services_state` is keyed on.
+
+    [AIQ-1704 / AIQ-1717] `require_case_access` authorizes ANY of the three id forms
+    (assignment PK, case_id, canonical_case_id — see `get_assignment_by_case_id`), but
+    every query below binds the RAW path param. So a request that authorized with an
+    ASSIGNMENT id used to read nothing and, worse, INSERT a phantom `services_state`
+    row keyed on that assignment id — a row the read path can never find again.
+    `services_state.case_id` is UNIQUE, so a case can only ever hold one of the two
+    keys. One such phantom row exists in production.
+
+    Resolve when we can; otherwise return the id unchanged. The fallback is NOT the
+    fail-open this epic exists to kill: `resolve_case_ids` goes through
+    `case_assignments`, so it returns None for a case that has no assignment row —
+    the HR-wizard flow `require_case_access` explicitly supports (it returns `{}`
+    there rather than 404ing). Ten such rows are live in production, keyed on a
+    `wizard_cases` id. For those the raw id IS the canonical key, so passing it
+    through is correct; the dangerous case — the raw id being an assignment id — is
+    exactly what the resolve above catches.
+    """
+    ids = db.resolve_case_ids(case_id)
+    return ids.canonical_case_id if ids else case_id
+
+
 def _org_id_for_case(case_id: str, assignment: Dict[str, Any]) -> str:
     """Derive the case's tenant from the case record itself — the canonical
     source of truth — rather than from the caller's profile.
@@ -129,6 +153,7 @@ def get_services_state(
     # company), then derive the tenant from the case record — not the caller's
     # profile (AIQ-1012). require_case_access returns the assignment row.
     assignment = require_case_access(case_id, user)
+    case_id = _canonical_services_case_id(case_id)
     organization_id = _org_id_for_case(case_id, assignment)
     with db.engine.begin() as conn:
         row = conn.execute(
@@ -182,6 +207,7 @@ def put_services_state(
     # company), then derive the tenant from the case record — not the caller's
     # profile (AIQ-1012). require_case_access returns the assignment row.
     assignment = require_case_access(case_id, user)
+    case_id = _canonical_services_case_id(case_id)
     organization_id = _org_id_for_case(case_id, assignment)
     actor_id = user["id"]
     blob = json.dumps(body.state, default=str)

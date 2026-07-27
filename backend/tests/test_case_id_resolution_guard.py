@@ -25,8 +25,27 @@ import unittest
 
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 
-_ROUTERS = ["backend/app/routers/cases_read.py", "backend/app/routers/hr_coordination.py"]
-_RESOLVERS = ("resolve_case_ids", "_canonical_case_id_or_404", "resolve_case_forms_case_id")
+_ROUTERS = [
+    "backend/app/routers/cases_read.py",
+    "backend/app/routers/hr_coordination.py",
+    # [AIQ-1717] services_state was the worst instance of the class and was NOT
+    # scanned by the original guard: both endpoints authorized a three-form id via
+    # require_case_access, then bound the RAW path param — so an assignment id
+    # INSERTed a phantom row the read path could never find (one exists in prod).
+    # Now resolved via _canonical_services_case_id.
+    "backend/app/routers/services_state.py",
+    # [AIQ-1717] payment.py currently has NO inline `case_id = :` SQL — it resolves
+    # through lookup_entitlement — so this entry flags nothing today. It is here so
+    # that a future inline case-keyed query on the payment/entitlement path cannot
+    # ship unresolved; the file is too load-bearing to leave outside the net.
+    "backend/app/routers/payment.py",
+]
+_RESOLVERS = (
+    "resolve_case_ids",
+    "_canonical_case_id_or_404",
+    "resolve_case_forms_case_id",
+    "_canonical_services_case_id",
+)
 _CASE_SQL = re.compile(r"case_id\s*=\s*:")
 
 # Functions with inline case_id SQL that legitimately do NOT resolve, each with the

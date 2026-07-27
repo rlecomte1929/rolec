@@ -125,6 +125,19 @@ class ServicesStateRouterTests(unittest.TestCase):
         self.case_patcher.start()
         self.addCleanup(self.case_patcher.stop)
 
+        # [AIQ-1717] The router now resolves the route id to the canonical case id
+        # before any query (_canonical_services_case_id). `db` is a MagicMock under
+        # backend/conftest.py, so an unpatched db.resolve_case_ids returns a truthy
+        # Mock whose .canonical_case_id is itself a Mock — which sqlite then refuses
+        # to bind. Return None here: these tests already address cases by their
+        # canonical id, which is exactly the no-assignment passthrough branch.
+        # The resolve branch is covered by test_services_state_canonical_id.py.
+        self.resolve_patcher = mock.patch.object(
+            router_module.db, "resolve_case_ids", return_value=None
+        )
+        self.resolve_patcher.start()
+        self.addCleanup(self.resolve_patcher.stop)
+
         # HR-company fallback only fires when the case row has no company_id.
         self.hr_patcher = mock.patch.object(
             router_module.db, "get_hr_company_id", side_effect=lambda hid: None
