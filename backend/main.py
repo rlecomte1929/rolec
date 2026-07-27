@@ -4647,6 +4647,56 @@ def get_case(
     return case
 
 
+def _create_assignment_for_hr(
+    *,
+    case_id: str,
+    hr_company_id: str,
+    effective: Dict[str, Any],
+    employee_identifier_raw: str,
+    employee_first_name: Optional[str],
+    employee_last_name: Optional[str],
+    employee_user: Optional[Dict[str, Any]],
+    request_id: Optional[str],
+):
+    """Mint a new assignment for assign_case. Extracted verbatim (AIQ-1731) so the
+    endpoint can take a reuse-or-create shape without nesting creation inside a branch.
+
+    NOTE the 503 below is a *timeout*, not a rollback: the future is not cancelled and
+    the row still commits. Callers MUST consult
+    db.get_active_assignment_for_case_employee first, or the retry the copy asks for
+    creates a second assignment with a duplicate canonical_case_id.
+    """
+    try:
+        with timed("unified_assignment_creation", request_id):
+            _create_fut = _hr_assign_side_effects_executor.submit(
+                create_assignment_with_contact_and_invites,
+                db,
+                company_id=hr_company_id,
+                hr_user_id=effective["id"],
+                case_id=case_id,
+                employee_identifier_raw=employee_identifier_raw,
+                employee_first_name=employee_first_name,
+                employee_last_name=employee_last_name,
+                employee_user_id=employee_user["id"] if employee_user else None,
+                assignment_status=AssignmentStatus.ASSIGNED.value,
+                request_id=request_id,
+                observability_channel="hr",
+                defer_post_creation_hooks=True,
+            )
+            try:
+                # S5-fix: 8s matches the frontend axios timeout (12s) minus round-trip
+                # overhead, and is below the E2E test FAIL threshold (8s).
+                # The previous 20s value far exceeded both client caps, causing hung UX.
+                return _create_fut.result(timeout=8)
+            except concurrent.futures.TimeoutError:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Assignment creation timed out. Please retry in a moment.",
+                )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve)) from ve
+
+
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
 def assign_case(
     case_id: str,
@@ -4818,38 +4868,59 @@ def assign_case(
 
         # New assignments created by HR are immediately in the 'assigned' state.
         assert_canonical_status(AssignmentStatus.ASSIGNED.value)
+
+        # AIQ-1731: idempotency guard on (case, employee). Creation is dispatched to a
+        # thread pool and abandoned after 8s with a 503 that tells the user to "retry in
+        # a moment" — but the future is never cancelled, so the row still commits.
+        # Without this guard that retry mints a SECOND assignment carrying an identical
+        # canonical_case_id (the `7181b3a4…` group in
+        # docs/architecture/CASE_ID_UNIFICATION_AUDIT.md). Reuse the row instead, then
+        # fall through to the normal side-effect dispatch — the timed-out call raised
+        # before dispatching, so the retry is what actually completes the assignment.
+        # Fail-open: the guard must never be the reason an assignment can't be created.
+        _existing_assignment = None
         try:
-            with timed("unified_assignment_creation", request_id):
-                _create_fut = _hr_assign_side_effects_executor.submit(
-                    create_assignment_with_contact_and_invites,
-                    db,
-                    company_id=hr_company_id,
-                    hr_user_id=effective["id"],
-                    case_id=case_id,
-                    employee_identifier_raw=employee_identifier_raw,
-                    employee_first_name=employee_first_name,
-                    employee_last_name=employee_last_name,
-                    employee_user_id=employee_user["id"] if employee_user else None,
-                    assignment_status=AssignmentStatus.ASSIGNED.value,
-                    request_id=request_id,
-                    observability_channel="hr",
-                    defer_post_creation_hooks=True,
-                )
-                try:
-                    # S5-fix: 8s matches the frontend axios timeout (12s) minus round-trip
-                    # overhead, and is below the E2E test FAIL threshold (8s).
-                    # The previous 20s value far exceeded both client caps, causing hung UX.
-                    uar = _create_fut.result(timeout=8)
-                except concurrent.futures.TimeoutError:
-                    raise HTTPException(
-                        status_code=503,
-                        detail="Assignment creation timed out. Please retry in a moment.",
-                    )
-        except ValueError as ve:
-            raise HTTPException(status_code=400, detail=str(ve)) from ve
-        assignment_id = uar.assignment_id
-        invite_token = uar.invite_token
-        stored_identifier = uar.stored_identifier
+            _existing_assignment = db.get_active_assignment_for_case_employee(
+                case_id, employee_identifier_raw, request_id=request_id
+            )
+        except Exception:
+            log.warning(
+                "assign_case: idempotency lookup failed case=%s — proceeding with create",
+                case_id,
+                exc_info=True,
+            )
+
+        if _existing_assignment:
+            assignment_id = str(_existing_assignment.get("id"))
+            stored_identifier = (
+                _existing_assignment.get("employee_identifier")
+                or employee_identifier_raw.strip().lower()
+            )
+            try:
+                invite_token = db.get_pending_claim_invite_token_for_assignment(assignment_id)
+            except Exception:
+                invite_token = None
+            log.info(
+                "assign_case: reusing existing assignment=%s for case=%s (duplicate submit); "
+                "no new row created request_id=%s",
+                assignment_id,
+                case_id,
+                request_id,
+            )
+        else:
+            uar = _create_assignment_for_hr(
+                case_id=case_id,
+                hr_company_id=hr_company_id,
+                effective=effective,
+                employee_identifier_raw=employee_identifier_raw,
+                employee_first_name=employee_first_name,
+                employee_last_name=employee_last_name,
+                employee_user=employee_user,
+                request_id=request_id,
+            )
+            assignment_id = uar.assignment_id
+            invite_token = uar.invite_token
+            stored_identifier = uar.stored_identifier
 
         # Defer mobility/case-person/passport sync, case participant, case
         # event, the invitation-message draft, and (B3-perf) the employee
