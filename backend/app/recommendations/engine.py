@@ -177,22 +177,6 @@ def _load_dataset_with_registry(category: str, criteria: Dict[str, Any]) -> List
     return dataset
 
 
-def _cap_masters_keep_customs(
-    items: List[RecommendationItem], top_n: int
-) -> List[RecommendationItem]:
-    """Apply ``top_n`` to the curated master picks, never to HR's custom vendors.
-
-    ``apply_hr_curation`` appends HR's custom vendors after the master picks. Before
-    AIQ-1700 the slice ran BEFORE curation, so customs were never subject to it — a
-    company with 10 approved masters and 2 customs legitimately received 12 items. Now
-    that the slice runs after, a plain ``items[:top_n]`` would silently start dropping
-    vendors HR added by hand, so cap the masters and keep every custom.
-    """
-    masters = [r for r in items if not (r.metadata or {}).get("hr_custom")]
-    customs = [r for r in items if (r.metadata or {}).get("hr_custom")]
-    return masters[:top_n] + customs
-
-
 def recommend(
     category: str,
     criteria: Dict[str, Any],
@@ -373,21 +357,22 @@ def recommend(
             destination_city=dest_city or None,
             destination_country=dest_country,
         )
-        # AIQ-1722: the top_n cap (AIQ-1700, unchanged) can hide vetted masters HR
-        # approved. Count them BEFORE the slice so the cut is an explicit, logged
-        # exclusion reason rather than a silent drop — the employee can be told
-        # "N more vetted providers hidden by the display limit".
+        # Show-all-vetted (2026-07-27, product decision): the employee must be able to
+        # REACH every vetted provider, so we no longer drop masters beyond top_n. Return
+        # the FULL curated set (ranked); `display_cap` + `masters_capped_by_display_limit`
+        # tell the client to default to the top `top_n` and reveal the rest via a
+        # "Show N more" control. top_n is a DISPLAY default here, not a hard cut — the
+        # vetting/eligibility gate (apply_hr_curation) is untouched, and the top-`top_n`
+        # ranking order is unchanged (AIQ-1700/1722 lineage; superseded cap-as-drop).
         _curated_masters = sum(1 for it in items if not (it.metadata or {}).get("hr_custom"))
-        items = _cap_masters_keep_customs(items, top_n)
-        _rendered_masters = sum(1 for it in items if not (it.metadata or {}).get("hr_custom"))
-        _capped = _curated_masters - _rendered_masters
-        if _capped > 0:
-            criteria_echo["masters_capped_by_display_limit"] = _capped
+        _beyond_cap = max(0, _curated_masters - top_n)
+        if _beyond_cap > 0:
+            criteria_echo["masters_capped_by_display_limit"] = _beyond_cap
             criteria_echo["display_cap"] = top_n
             logger.info(
-                "recommendations display_cap hid %d vetted %s master(s) for company=%s "
-                "(curated=%d cap=%d)",
-                _capped, category, company_id, _curated_masters, top_n,
+                "recommendations: %d vetted %s master(s) beyond display_cap %d are "
+                "reachable via expand for company=%s (curated=%d)",
+                _beyond_cap, category, top_n, company_id, _curated_masters,
             )
         if hr_curation_status:
             criteria_echo["hr_curation_status"] = hr_curation_status
