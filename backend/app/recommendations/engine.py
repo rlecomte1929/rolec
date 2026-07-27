@@ -373,7 +373,22 @@ def recommend(
             destination_city=dest_city or None,
             destination_country=dest_country,
         )
+        # AIQ-1722: the top_n cap (AIQ-1700, unchanged) can hide vetted masters HR
+        # approved. Count them BEFORE the slice so the cut is an explicit, logged
+        # exclusion reason rather than a silent drop — the employee can be told
+        # "N more vetted providers hidden by the display limit".
+        _curated_masters = sum(1 for it in items if not (it.metadata or {}).get("hr_custom"))
         items = _cap_masters_keep_customs(items, top_n)
+        _rendered_masters = sum(1 for it in items if not (it.metadata or {}).get("hr_custom"))
+        _capped = _curated_masters - _rendered_masters
+        if _capped > 0:
+            criteria_echo["masters_capped_by_display_limit"] = _capped
+            criteria_echo["display_cap"] = top_n
+            logger.info(
+                "recommendations display_cap hid %d vetted %s master(s) for company=%s "
+                "(curated=%d cap=%d)",
+                _capped, category, company_id, _curated_masters, top_n,
+            )
         if hr_curation_status:
             criteria_echo["hr_curation_status"] = hr_curation_status
 

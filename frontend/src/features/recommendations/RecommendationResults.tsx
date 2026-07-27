@@ -729,6 +729,19 @@ export const RecommendationResults: React.FC<Props> = ({
                 })}
               </div>
             )}
+            {(() => {
+              // AIQ-1722: HR approved more vetted providers than the display cap shows.
+              // Surface the count so the cut is explicit, not a silent drop.
+              const echo = res.criteria_echo as Record<string, unknown> | undefined;
+              const capped = Number(echo?.masters_capped_by_display_limit ?? 0);
+              const cap = Number(echo?.display_cap ?? 0);
+              return capped > 0 ? (
+                <p className="mt-3 text-sm text-[#64748b]">
+                  {capped} more vetted {capped === 1 ? 'provider is' : 'providers are'} available for this
+                  category but not shown here — the list is capped at the top {cap} matches.
+                </p>
+              ) : null;
+            })()}
           </div>
         ) : null
       )}

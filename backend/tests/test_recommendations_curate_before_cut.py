@@ -147,6 +147,35 @@ def test_top_n_still_caps_the_master_picks(wired):
     assert _names(resp)[0] == "Mover 01"
 
 
+def test_display_cap_surfaces_hidden_master_count(wired):
+    """AIQ-1722 — the top_n cap is unchanged, but when it hides vetted masters the
+    response now reports how many, so seeded-vs-rendered parity is explicit rather than
+    a silent drop. 12 approved, top_n 10 → 10 render + 2 reported hidden."""
+    approve, _ = wired
+    approve([_master_id(i) for i in range(1, _N + 1)])  # all 12 approved & vetted
+
+    resp = engine.recommend("movers", _CRITERIA, top_n=10, company_id=_COMPANY)
+
+    rendered = len(_names(resp))
+    capped = resp.criteria_echo.get("masters_capped_by_display_limit")
+    assert rendered == 10
+    assert capped == 2  # 12 approved − 10 rendered
+    assert rendered + capped == _N  # parity: every seeded/vetted master is accounted for
+    assert resp.criteria_echo.get("display_cap") == 10
+
+
+def test_display_cap_signal_absent_when_nothing_hidden(wired):
+    """No masters beyond the cap → no display-cap keys (clean payload for the common case)."""
+    approve, _ = wired
+    approve([_master_id(i) for i in range(1, 5)])  # 4 approved, well under top_n
+
+    resp = engine.recommend("movers", _CRITERIA, top_n=10, company_id=_COMPANY)
+
+    assert len(_names(resp)) == 4
+    assert "masters_capped_by_display_limit" not in resp.criteria_echo
+    assert "display_cap" not in resp.criteria_echo
+
+
 def test_hr_pending_still_fires_on_zero_approvals(wired, monkeypatch):
     """Criterion 3 — the empty-state contract, including the record_demand side effect."""
     approve, _ = wired
