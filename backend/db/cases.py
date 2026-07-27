@@ -3277,6 +3277,54 @@ class CasesMixin:
                 request_id=request_id,
             )
 
+    def get_active_assignment_for_case_employee(
+        self,
+        case_id: str,
+        employee_identifier: str,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """AIQ-1731: the idempotency key for HR case assignment — (case, employee).
+
+        POST /api/hr/cases/{case_id}/assign dispatches creation to a thread pool and
+        raises 503 "Please retry in a moment" if it hasn't finished in 8s. The future is
+        never cancelled, so the row still commits — and the retry the copy asks for used
+        to mint a SECOND row carrying an identical canonical_case_id. That is one of the
+        duplicate groups inventoried in docs/architecture/CASE_ID_UNIFICATION_AUDIT.md
+        (`7181b3a4…`: the same employee twice, <70s apart). Callers use this to reuse the
+        existing assignment instead of creating a duplicate.
+
+        Matches the way create_assignment writes the row: canonical_case_id and case_id
+        both get the case key, and employee_identifier is stored via normalize_invite_key
+        (lower-cased) — so compare case-insensitively for older rows written before that.
+        Deliberately does NOT match on `id` (unlike get_assignment_by_case_id): this is a
+        creation guard keyed on a case, not a general-purpose id resolver.
+
+        Terminal assignments (rejected/closed) are excluded so a case can legitimately be
+        re-assigned to the same person after one is closed out. Returns the most recent
+        match; CAST(... AS TEXT) rather than ::text so it runs on SQLite too.
+        """
+        ck = (case_id or "").strip()
+        ident = (employee_identifier or "").strip().lower()
+        if not ck or not ident:
+            return None
+        # The admin placeholder sentinel is shared by every admin-created assignment;
+        # collapsing on it would make the admin path unable to create more than one.
+        if ident == "admin-created":
+            return None
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM case_assignments "
+                "WHERE (CAST(canonical_case_id AS TEXT) = :ck OR CAST(case_id AS TEXT) = :ck) "
+                "  AND LOWER(employee_identifier) = :ident "
+                "  AND COALESCE(status, '') NOT IN ('rejected', 'closed') "
+                "ORDER BY created_at DESC LIMIT 1",
+                {"ck": ck, "ident": ident},
+                op_name="get_active_assignment_for_case_employee",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row)
+
     def update_assignment_status(self, assignment_id: str, status: str, request_id: Optional[str] = None) -> None:
         with self.engine.begin() as conn:
             self._exec(
