@@ -84,19 +84,19 @@ def test_cleaned_up_row_is_reported_stale_not_failed():
 # the committed baseline + query
 # --------------------------------------------------------------------------
 
-def test_repo_baseline_is_non_empty_and_parses():
-    """SELF-GUARD: the whole gate would 'pass' vacuously if the baseline failed to
-    parse (empty set) — every live bad row would then read as a NEW violation and
-    CI would be permanently red, or, with an empty live set, permanently green for
-    the wrong reason. Pin that the committed file really parses to the audited stock."""
-    baseline = ccd.load_baseline(ccd.BASELINE_FILE)
+def test_repo_baseline_is_empty_after_the_pre_launch_reset():
+    """AIQ-1737·3 executed the pre-launch canonical_case_id repair — prod is now 0 null /
+    0 dangling / 0 duplicate — so the deferral baseline is EMPTY (regenerated via
+    --update-baseline). SELF-GUARD: a truncated/missing file would ALSO parse to an empty
+    set, so assert the header is intact (real regenerated file) AND that it holds zero ids.
+    Any future NEW bad row is caught by the live-vs-baseline check, not by this file."""
     assert ccd.BASELINE_FILE.exists(), "baseline file is missing"
-    assert len(baseline) == 51, f"expected the 2026-07-27 audited stock, got {len(baseline)}"
-    # ids the audit doc names explicitly — if these fall out, the file was regenerated
-    # against different data and the doc no longer describes it.
-    assert "demo-ca-001" in baseline
-    assert "af4bbb3f-eb0c-49cb-a8f6-3bb0fbd90c8a" in baseline
-    assert "rlst_531bf32490-asg-b" in baseline
+    text = ccd.BASELINE_FILE.read_text()
+    assert "one assignment id per line" in text, "baseline header missing — file may be truncated"
+    assert ccd.load_baseline(ccd.BASELINE_FILE) == set(), (
+        "baseline should be empty after the AIQ-1737·3 repair; a non-empty file means "
+        "either the repair regressed or the file was hand-edited"
+    )
 
 
 def test_audit_sql_covers_all_three_buckets():
