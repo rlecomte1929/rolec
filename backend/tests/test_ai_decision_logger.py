@@ -90,6 +90,80 @@ def test_writes_produced_row_with_masked_input(monkeypatch):
         assert raw not in p["input_context"], f"raw PII in input_context: {raw}"
 
 
+def test_stable_recommendation_id_is_deterministic_and_result_sensitive():
+    from backend.app.services.ai_decision_logger import stable_recommendation_id
+    a = stable_recommendation_id("co-a", "movers", "m1", "m2")
+    b = stable_recommendation_id("co-a", "movers", "m1", "m2")
+    c = stable_recommendation_id("co-a", "movers", "m1", "m3")  # different picks
+    assert a == b            # same inputs → same id (re-computes dedup)
+    assert a != c            # changed result → new id (logged fresh)
+    assert len(a) == 40 and all(ch in "0123456789abcdef" for ch in a)
+
+
+class _DedupConn:
+    """execute() returns a result whose .first() reflects whether a row 'exists'."""
+    def __init__(self, cap, exists):
+        self._cap = cap
+        self._exists = exists
+
+    def execute(self, sql, params=None):
+        s = str(sql)
+        self._cap.setdefault("sqls", []).append(s)
+        if s.strip().upper().startswith("SELECT"):
+            class _R:
+                def __init__(self, hit):
+                    self._hit = hit
+                def first(self):
+                    return (1,) if self._hit else None
+            return _R(self._exists)
+        self._cap["insert_params"] = params  # the INSERT
+        return None
+
+
+class _DedupDB:
+    def __init__(self, cap, exists):
+        self._cap, self._exists = cap, exists
+
+    class _Engine:
+        def __init__(self, outer): self._o = outer
+        def begin(self):
+            outer = self._o
+            class _Ctx:
+                def __enter__(_s): return _DedupConn(outer._cap, outer._exists)
+                def __exit__(_s, *a): return False
+            return _Ctx()
+
+    @property
+    def engine(self):
+        return _DedupDB._Engine(self)
+
+
+def test_skip_if_exists_dedups_a_repeat_produced_row(monkeypatch):
+    import backend.database as bdb
+    cap: dict = {}
+    monkeypatch.setattr(bdb, "db", _DedupDB(cap, exists=True), raising=False)
+    rid = record_ai_recommendation(
+        feature="supplier_reco:movers", recommendation_id="stable-1",
+        input_context={"a": "x"}, ai_output={}, company_id="co-a", skip_if_exists=True,
+    )
+    assert rid is None                         # a 'produced' row already exists → skip
+    assert "insert_params" not in cap          # and NO insert was issued
+
+
+def test_skip_if_exists_inserts_when_absent(monkeypatch):
+    import backend.database as bdb
+    cap: dict = {}
+    monkeypatch.setattr(bdb, "db", _DedupDB(cap, exists=False), raising=False)
+    rid = record_ai_recommendation(
+        feature="supplier_reco:movers", recommendation_id="stable-1",
+        input_context={"phone": "+33612345678"}, ai_output={"picks": ["m1"]},
+        company_id="co-a", skip_if_exists=True,
+    )
+    assert rid                                 # no existing row → inserted
+    assert cap["insert_params"]["decision"] == "produced"
+    assert "+33612345678" not in cap["insert_params"]["input_context"]  # still masked
+
+
 def test_fail_open_returns_none_and_does_not_raise(monkeypatch):
     class _Boom:
         @property

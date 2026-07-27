@@ -21,6 +21,7 @@ human decision is application-level (out of scope here).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import uuid
@@ -34,6 +35,15 @@ log = logging.getLogger(__name__)
 # decision sentinel for a production-time record (before any human acts).
 # Allowed by ai_decisions_decision_check as of migration 20261007000000.
 PRODUCED = "produced"
+
+
+def stable_recommendation_id(*parts: Any) -> str:
+    """A deterministic id for a recommendation, so identical re-computes dedup to
+    ONE 'produced' row instead of a new row per page-view. Hash the ordered parts
+    (e.g. company_id, category, the ranked item_ids) — same result → same id, a
+    changed result → a new id (a genuinely new recommendation, logged fresh)."""
+    joined = "\x1f".join("" if p is None else str(p) for p in parts)
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:40]
 
 
 def mask_input_context(value: Any) -> Any:
@@ -72,15 +82,33 @@ def record_ai_recommendation(
     company_id: Optional[str],
     actor_id: Optional[str] = None,
     model_name: Optional[str] = None,
+    skip_if_exists: bool = False,
 ) -> Optional[str]:
     """Write a production-time `ai_decisions` row (decision='produced') linking the
     PII-masked input, the model output, and provenance. Best-effort — never raises
-    into the caller. Returns the new row id, or None on any failure."""
+    into the caller. Returns the new row id, or None on any failure.
+
+    `skip_if_exists` (used with a stable_recommendation_id): if a 'produced' row for
+    this (feature, recommendation_id) already exists, do NOT insert a duplicate and
+    return None. `ai_decisions` has no unique constraint on that pair (AIQ-1694·2), so
+    the dedup is a cheap SELECT here rather than a DB upsert."""
     try:
         masked_input = mask_input_context(input_context)
         # Lazy import to avoid a circular import at module load (mirrors ai_trace_logger).
         from ...database import db
         from sqlalchemy import text
+
+        if skip_if_exists:
+            with db.engine.begin() as conn:
+                existing = conn.execute(
+                    text(
+                        "SELECT 1 FROM ai_decisions "
+                        "WHERE feature = :f AND recommendation_id = :r AND decision = :d LIMIT 1"
+                    ),
+                    {"f": feature, "r": recommendation_id, "d": PRODUCED},
+                ).first()
+            if existing:
+                return None  # already logged this exact recommendation — dedup
 
         new_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()

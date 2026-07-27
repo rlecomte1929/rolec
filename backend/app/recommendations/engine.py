@@ -377,12 +377,41 @@ def recommend(
         if hr_curation_status:
             criteria_echo["hr_curation_status"] = hr_curation_status
 
-    return RecommendationResponse(
+    response = RecommendationResponse(
         category=category,
         generated_at=generated_at,
         criteria_echo=criteria_echo,
         recommendations=items,
     )
+
+    # AIQ-1694: production-time AI-decision audit record (PII-masked input + the model
+    # output), so an overseer's later accept/override/reject links back to what was shown.
+    # Deduped by a stable id (same picks → one 'produced' row, not one per page-view) and
+    # company-scoped (no company → no tenant to audit). Only logs a NON-EMPTY result — an
+    # empty/hr_pending response is not a recommendation to audit. Side-effect only +
+    # best-effort: never alters or blocks the recommendation.
+    if company_id and items:
+        try:
+            from ..services.ai_decision_logger import (
+                record_ai_recommendation,
+                stable_recommendation_id,
+            )
+            rec_id = stable_recommendation_id(
+                company_id, category, *[it.item_id for it in items]
+            )
+            record_ai_recommendation(
+                feature=f"supplier_reco:{category}",
+                recommendation_id=rec_id,
+                input_context=criteria_echo,
+                ai_output=response.model_dump(mode="json"),
+                company_id=company_id,
+                model_name="rule-based",
+                skip_if_exists=True,
+            )
+        except Exception:  # audit logging must never affect the recommendation
+            pass
+
+    return response
 
 
 def recommend_debug(
