@@ -497,6 +497,7 @@ def _load_form_with_template(
     form_id: str,
 ) -> Optional[Dict[str, Any]]:
     """Return the case_form row joined with its template fields, or None if not found."""
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     row = conn.execute(
         _sql_text(
             f"""
@@ -1337,6 +1338,7 @@ def list_form_documents(
     unavailable, e.g. dev/test).
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
 
     with main_db.engine.connect() as conn:
         rows = conn.execute(
@@ -1469,6 +1471,7 @@ def list_form_comments(
 ) -> List[CommentItem]:
     """List all comments on a CaseForm, newest first."""
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.connect() as conn:
             # Verify the form belongs to this case
@@ -1522,6 +1525,7 @@ def list_form_events(
 ) -> List[EventItem]:
     """Return the history log for a CaseForm, newest first."""
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.connect() as conn:
             exists = conn.execute(
@@ -1590,6 +1594,7 @@ def get_form_original(
     - Returns 404 when no original PDF has been attached to the template yet.
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
 
     with main_db.engine.connect() as conn:
         row = conn.execute(
@@ -1789,6 +1794,7 @@ def get_dossier_zip(
     Returns as application/zip download.
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
 
     try:
         with main_db.engine.begin() as conn:
@@ -1911,6 +1917,7 @@ def get_dossier(
 ) -> DossierPackageDetailResponse:
     """[P3-6] Get a single DossierPackage with staleness flag."""
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.begin() as conn:
             row = conn.execute(
@@ -1962,6 +1969,7 @@ def get_dossier_pdf(
     If pdf_url is set, redirect/stream it; otherwise regenerate on-the-fly.
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.begin() as conn:
             row = conn.execute(

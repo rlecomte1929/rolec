@@ -51,17 +51,10 @@ _ALLOWLIST = {
     # Internal helpers — get_budget_summary resolves the case_id before calling them.
     "_case_service_estimates": "helper; get_budget_summary resolves case_id before calling it",
     "_selected_services_for_case": "helper; get_budget_summary resolves case_id before calling it",
-    # Forms/dossier reads where case_id is a SECONDARY tenant filter behind the
-    # form_id/dossier_id PK (WHERE <pk> = :id AND case_id = :cid) — the PK identifies
-    # the row. Lower risk; resolving these is a tracked AIQ-1704 forms/dossier follow-up.
-    "_load_form_with_template": "case_id is a secondary filter behind cf.id (form PK)",
-    "list_form_documents": "case_id is a secondary filter behind case_form_id",
-    "list_form_comments": "case_id is a secondary filter behind case_form_id",
-    "list_form_events": "case_id is a secondary filter behind case_form_id",
-    "get_form_original": "case_id is a secondary filter behind the form PK",
-    "get_dossier_zip": "case_id is a secondary filter behind the dossier id",
-    "get_dossier": "case_id is a secondary filter behind the dossier id",
-    "get_dossier_pdf": "case_id is a secondary filter behind the dossier id",
+    # NOTE: the 8 forms/dossier reads (list_form_documents/comments/events,
+    # get_form_original, get_dossier[_zip/_pdf], _load_form_with_template) were
+    # allowlisted here as secondary-filter reads; AIQ-1719 resolved them all via
+    # resolve_case_forms_case_id, so they no longer need the allowlist.
 }
 
 
