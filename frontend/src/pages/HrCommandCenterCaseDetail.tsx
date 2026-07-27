@@ -316,7 +316,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         </div>
 
         {/* ── Employee Tasks (AIQ-34-C) — polls every 8s ── */}
-        <HrCaseTasksPanel caseId={detail.id} />
+        <HrCaseTasksPanel caseId={detail.id} coordinationCaseId={detail.caseId ?? null} />
 
         {/* ── GAP 4 / AIQ-1479: Immigration advisors first — the actionable "contacts +
             ratings" section is the most useful thing here, so it leads the immigration
@@ -370,12 +370,16 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         {/* ── NAV-HR-3: chronological HR-action audit trail (from audit_logs) ── */}
         <CaseAuditTimeline caseId={detail.id} />
 
-        {/* ── AIQ-40-D: Vendor RFQs (sent by HR, tracked here) ── */}
+        {/* ── The employee's quote requests, read from the canonical `rfqs` tables ── */}
         <Card padding="lg" className="border border-[#e2e8f0]">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-sm font-semibold text-[#0b2b43]">Vendor quote requests</div>
-              <p className="text-xs text-[#94a3b8] mt-0.5">RFQs you&apos;ve sent to vendors for this case</p>
+              <div className="text-sm font-semibold text-[#0b2b43]">Employee quote requests</div>
+              {/* Since AIQ-1681 HR no longer runs procurement: the employee picks the
+                  providers and submits the RFQ, and HR reviews it here as the payer. */}
+              <p className="text-xs text-[#94a3b8] mt-0.5">
+                Providers the employee asked to quote for this case
+              </p>
             </div>
             <Button unstyled
               type="button"
@@ -388,11 +392,15 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
               Find a vendor
             </Button>
           </div>
-          {/* [AIQ-1703] The employee's canonical RFQs (rfqs) are keyed on the CASE id, not the
-              assignment PK. `detail.id` is the assignment PK; `detail.caseId` is the relocation
-              case id (same id-space the RFQ carries). Passing detail.id read nothing → HR saw no
-              RFQ. Fall back to detail.id for legacy rows that pre-date the split. */}
-          <PendingRfqsPanel caseId={detail.caseId ?? detail.id} />
+          {/* [AIQ-1703] The RFQ lives in `rfqs`, keyed on the CANONICAL case id — NOT the
+              assignment PK in this page's route. Passing `detail.id` made every case look
+              empty to HR (0 of 22 production RFQs are keyed on an assignment id). `caseId`
+              is `case_assignments.case_id`, the same id the employee's RFQ was written
+              under. AIQ-1703 fell back to `detail.id` here for "legacy rows"; there are
+              none — all 452 assignments carry a case_id — and that fallback can only ever
+              404-and-render-as-empty, which is the very failure being fixed. Null instead,
+              so the panel fails closed and says so. */}
+          <PendingRfqsPanel caseId={detail.caseId ?? null} />
         </Card>
 
         <Button variant="outline" onClick={() => navigate(buildRoute('hrCommandCenter'))}>
