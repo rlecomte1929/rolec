@@ -107,6 +107,22 @@ export interface DispatchRfqTargetResult {
   ok: boolean
   sent: boolean
   error?: string | null
+  /**
+   * [AIQ-1743] The supplier's magic link. The backend has always returned this
+   * (`supplier_link_dispatch` appends it to every result and `dispatch_case_rfq` passes
+   * `results` through verbatim) — it was simply absent from this type, so HR's own client
+   * received it and threw it away. Declaring it is what lets HR see and relay it.
+   *
+   * ⚠️ BEARER CREDENTIAL. Whoever holds this URL is that supplier for that one RFQ: it
+   * authorises reading that brief and submitting exactly ONE quote. It is scoped to a single
+   * (rfq, recipient) pair and cannot be replayed against another RFQ.
+   *
+   * Only ever present on a dispatch RESPONSE. `rfq_recipients` persists just `sha256(token)`
+   * ("The raw token is never stored" — 20260921000000_supplier_magic_link.sql), so a link
+   * CANNOT be read back later, and re-minting issues a different JWT that invalidates the one
+   * already delivered. Treat it as session-scoped: never persist it client-side.
+   */
+  link?: string | null
 }
 
 /** [AIQ-1670] Result of an HR-gated RFQ dispatch. */

@@ -11,6 +11,7 @@ import {
   updateTask,
   type CaseProvider,
   type CaseRfq,
+  type DispatchRfqTargetResult,
   type ProviderTask,
 } from "../api/hrCoordination"
 import { Input } from './antigravity/Input';
@@ -495,6 +496,67 @@ function ProviderRowSkeleton() {
 // here; dispatch to suppliers is AIQ-1670.
 // ---------------------------------------------------------------------------
 
+/**
+ * [AIQ-1743] The supplier magic links produced by the dispatch that just ran.
+ *
+ * Why a separate block instead of a "copy" cell on each recipient row: the dispatch results
+ * are keyed by `recipient_id`, but `rfq.recipients` rows carry only `supplier_id` — the sole
+ * overlapping field is the display name. Joining on a name would, for two suppliers sharing
+ * one, show A's credential on B's row. A wrong bearer token on the wrong supplier is not a
+ * cosmetic bug, so this renders the dispatch's own list and joins nothing.
+ *
+ * These links exist ONLY in this response — `rfq_recipients` stores just a hash — so they are
+ * held in component state and vanish on reload. Deliberately not persisted anywhere.
+ */
+function DispatchedSupplierLinks({ results }: { results: DispatchRfqTargetResult[] }) {
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+  const withLinks = results.filter((r) => r.link)
+
+  if (withLinks.length === 0) return null
+
+  const copy = async (link: string, idx: number) => {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopiedIdx(idx)
+      window.setTimeout(() => setCopiedIdx((c) => (c === idx ? null : c)), 2000)
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+      <div className="text-xs font-medium text-navy-800 mb-2">
+        Supplier links from this dispatch
+      </div>
+      <ul className="flex flex-col gap-1.5">
+        {withLinks.map((r, i) => (
+          <li
+            key={r.recipient_id ?? i}
+            className="flex items-center justify-between gap-2 text-sm"
+          >
+            <span className="text-gray-800 truncate">
+              {r.supplier_name ?? "Provider"}
+            </span>
+            <Button unstyled
+              type="button"
+              onClick={() => copy(r.link as string, i)}
+              className="shrink-0 px-2 py-1 text-xs font-medium rounded-md border border-[#cbd5e1] bg-white hover:bg-[#f1f5f9] text-navy-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              {copiedIdx === i ? "Copied" : "Copy link"}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-gray-500">
+        Shown only right after dispatching — these links are not stored, so they disappear when
+        you reload. Dispatching again issues fresh links and invalidates these. Anyone with a
+        link can submit that supplier&rsquo;s quote, so share it only with that supplier.
+      </p>
+    </div>
+  )
+}
+
 function RfqCard({
   caseId,
   rfq,
@@ -507,6 +569,9 @@ function RfqCard({
   const [dispatching, setDispatching] = useState(false)
   const [dispatchError, setDispatchError] = useState<string | null>(null)
   const [dispatchedCount, setDispatchedCount] = useState<number | null>(null)
+  // [AIQ-1743] Per-recipient results of the dispatch that just ran, carrying the magic links.
+  // Session-only by necessity: the raw token is never persisted server-side.
+  const [dispatchResults, setDispatchResults] = useState<DispatchRfqTargetResult[] | null>(null)
 
   // [AIQ-1673] The email-suppliers flow is a SEPARATE, explicitly-confirmed action — it emails
   // real companies, so it must never fire by accident. Inline two-click confirm (no modal).
@@ -526,6 +591,9 @@ function RfqCard({
     try {
       const res = await dispatchCaseRfq(caseId, rfq.id)
       setDispatchedCount(res.dispatched)
+      // [AIQ-1743] Keep the per-recipient results so HR can see and copy each supplier link.
+      // Before this, the response was read for `dispatched` only and the links were discarded.
+      setDispatchResults(res.results ?? null)
       onDispatched()
     } catch (err) {
       setDispatchError(err instanceof Error ? err.message : "Dispatch failed.")
@@ -550,6 +618,10 @@ function RfqCard({
       setEmailedCount(sent)
       setEmailedTotal(total)
       setEmailSkipReason(sent < total ? firstSkip : null)
+      // [AIQ-1743] The email path mints links too — and when a send is SKIPPED (unverified
+      // address, no RESEND key) the copyable link is the only way HR can still reach that
+      // supplier. Surface them here as well.
+      setDispatchResults(results.length > 0 ? results : null)
       setEmailConfirming(false)
       onDispatched()
     } catch (err) {
@@ -666,6 +738,11 @@ function RfqCard({
           {emailError && <span className="text-xs text-red-600">{emailError}</span>}
         </div>
       </div>
+      {/* [AIQ-1743] HR dispatches, so HR must be able to see and relay the link. Before this it
+          surfaced only in the EMPLOYEE's inbox thread (supplier_link_dispatch posts it to
+          quote_messages under the employee's auth id), leaving HR blind to the artifact they
+          are responsible for. */}
+      {dispatchResults && <DispatchedSupplierLinks results={dispatchResults} />}
     </div>
   )
 }
