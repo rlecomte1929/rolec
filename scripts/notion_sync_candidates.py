@@ -67,22 +67,33 @@ def _status_of(page):
     return s.get("name") if s else None
 
 
-def terminal_action(cur_status, health_band):
-    """Decide what to do with an EXISTING matched task, given the run's health band.
+def terminal_action(cur_status, health_band, confirmed=True):
+    """Decide what to do with an EXISTING matched task, given the run's health band
+    and whether the failure is CONFIRMED (it also failed the previous campaign run).
 
     Returns one of:
       - "skip"      terminal (human-closed) task on a GREEN/passing run → do nothing.
                     A healthy run has no real regression to justify resurrecting a
                     human's Done/Rejected/Archived decision (the AIQ-1377 re-open loop).
       - "reopen"    terminal task on a non-passing run (AMBER/RED/INCONCLUSIVE/unknown)
-                    → a genuine regression; flip Status back to "Ready for AI" + note.
+                    whose failure is CONFIRMED → a genuine regression; flip Status back
+                    to "Ready for AI" + note.
+      - "hold"      terminal task on a non-passing run whose failure is NOT confirmed
+                    (first-seen, or no baseline to compare against) → do NOT resurrect a
+                    human's Done decision on a single unverifiable flap. Reopening is
+                    fail-CLOSED (AIQ-1738: the AIQ-1375 deploy-window recurrence); it
+                    reopens next run only if the failure recurs. New-task *filing* stays
+                    fail-open — that policy lives in the caller, not here.
       - "note-only" already-open task → just append the run note, leave Status alone.
 
-    Unknown/missing band is treated conservatively as non-passing (reopen) so a real
-    regression is never silently dropped when the band can't be read.
+    ``confirmed`` defaults True so callers that don't use the confirm-twice gate (legacy /
+    manual runs) keep the prior reopen-on-any-non-GREEN behaviour. Unknown/missing band is
+    still treated as non-passing so a *confirmed* regression is never silently dropped.
     """
     if cur_status in TERMINAL:
-        return "skip" if health_band == "GREEN" else "reopen"
+        if health_band == "GREEN":
+            return "skip"
+        return "reopen" if confirmed else "hold"
     return "note-only"
 
 
@@ -157,15 +168,22 @@ def main():
     if args.state_out:
         write_state(args.state_out, candidates)
 
-    # Phase 2: confirm-twice — only file candidates that also failed the previous run.
-    if args.confirm_twice:
+    # Phase 2: confirm-twice — only ACT on candidates that also failed the previous run.
+    # CREATE (a new task) fails OPEN: file a first-seen failure when there's no baseline,
+    # so broken plumbing never masks a real new bug. REOPEN (resurrecting a human-closed
+    # task) fails CLOSED — an unconfirmed flap must not reopen a Done task (see
+    # terminal_action). prev_ids/have_prev are kept in scope for that per-candidate gate.
+    confirm_twice_active = bool(args.confirm_twice)
+    prev_ids, have_prev = set(), False
+    if confirm_twice_active:
         prev_ids, have_prev = load_prev_ids(args.confirm_twice)
         candidates, held = filter_confirmed(candidates, prev_ids, have_prev)
         if held:
             print(f"⏳ holding {len(held)} first-seen failure(s) for confirm-twice "
                   f"(will file if they recur): {', '.join(sorted(c.get('test_id', '?') for c in held))}")
         elif not have_prev:
-            print("ℹ  no previous run state — confirm-twice fails open (filing normally)")
+            print("ℹ  no previous run state — confirm-twice fails OPEN for new tasks; "
+                  "reopens of human-closed tasks stay HELD (fail-closed) until confirmed")
 
     if not candidates:
         print("✔ no notion_candidates to sync (clean run, or all held for confirm-twice)")
@@ -178,7 +196,7 @@ def main():
     has_notes = db.get("properties", {}).get("Execution Notes", {}).get("type") == "rich_text"
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    created = updated = skipped = 0
+    created = updated = skipped = reopen_held = 0
 
     for c in candidates:
         tid, title = c.get("test_id"), c.get("title", "")
@@ -193,13 +211,25 @@ def main():
 
         if match:
             cur = _status_of(match)
-            action = terminal_action(cur, health_band)
+            # A failure is "confirmed" when the confirm-twice gate is inactive (legacy /
+            # manual runs keep the prior behaviour) or the id also failed the previous run.
+            confirmed = (not confirm_twice_active) or (tid in prev_ids)
+            action = terminal_action(cur, health_band, confirmed=confirmed)
             if action == "skip":
                 # Passing (GREEN) run: don't resurrect or even annotate a human-closed
                 # task on a transient flap — this is the AIQ-1377 re-open loop.
                 print(f"  SKIP(passing)  [{tid}] (status={cur}, band={health_band}) → "
                       f"{_title_text(match, title_prop)[:50]}")
                 skipped += 1
+                continue
+            if action == "hold":
+                # Terminal task on a non-GREEN band, but the failure is unconfirmed
+                # (first-seen this campaign, or no baseline). Do NOT resurrect a human's
+                # Done decision on a single unverifiable flap — the AIQ-1375 deploy-window
+                # recurrence (AIQ-1738). It reopens next run only if it recurs.
+                print(f"  HOLD(unconfirmed) [{tid}] (status={cur}, band={health_band}) → "
+                      f"not resurrecting a terminal task on a first-seen failure")
+                reopen_held += 1
                 continue
             props = {}
             if has_notes:
@@ -227,8 +257,9 @@ def main():
             created += 1
 
     mode = "APPLIED" if args.apply else "DRY-RUN (use --apply to write)"
-    print(f"\n{mode}: {created} create, {updated} update, {skipped} skip "
-          f"(of {len(candidates)} candidates) → title property '{title_prop}'")
+    print(f"\n{mode}: {created} create, {updated} update, {skipped} skip, "
+          f"{reopen_held} held-reopen (of {len(candidates)} candidates) → "
+          f"title property '{title_prop}'")
 
 
 if __name__ == "__main__":
