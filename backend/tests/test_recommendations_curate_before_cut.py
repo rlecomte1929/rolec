@@ -136,31 +136,32 @@ def test_approved_supplier_ranked_below_top_n_still_renders(wired):
     assert resp.criteria_echo.get("hr_curation_status") is None
 
 
-def test_top_n_still_caps_the_master_picks(wired):
-    """Criterion 2 — curating first must not blow past top_n."""
+def test_all_vetted_masters_are_reachable(wired):
+    """Show-all-vetted (2026-07-27): top_n is now a DISPLAY default, not a hard cut, so
+    the response returns EVERY vetted master (the employee can reach all of them) with the
+    top-`top_n` ranking order preserved. Supersedes the old cap-as-drop assertion."""
     approve, _ = wired
     approve([_master_id(i) for i in range(1, _N + 1)])
 
     resp = engine.recommend("movers", _CRITERIA, top_n=10, company_id=_COMPANY)
 
-    assert len(_names(resp)) == 10
-    assert _names(resp)[0] == "Mover 01"
+    assert len(_names(resp)) == _N  # all 12 vetted reachable (was truncated to 10)
+    assert _names(resp)[0] == "Mover 01"  # ranking of the top matches unchanged
+    assert resp.criteria_echo.get("display_cap") == 10  # client defaults to the top 10
 
 
-def test_display_cap_surfaces_hidden_master_count(wired):
-    """AIQ-1722 — the top_n cap is unchanged, but when it hides vetted masters the
-    response now reports how many, so seeded-vs-rendered parity is explicit rather than
-    a silent drop. 12 approved, top_n 10 → 10 render + 2 reported hidden."""
+def test_display_cap_reports_the_expandable_overflow(wired):
+    """AIQ-1722 → show-all: when the vetted set exceeds the display default, the response
+    reports how many are BEYOND the default view so the client can render a
+    "Show N more vetted providers" control. All are returned (reachable) — the signal is
+    for the default-collapsed view, not a drop. 12 vetted, display default 10 → 2 more."""
     approve, _ = wired
     approve([_master_id(i) for i in range(1, _N + 1)])  # all 12 approved & vetted
 
     resp = engine.recommend("movers", _CRITERIA, top_n=10, company_id=_COMPANY)
 
-    rendered = len(_names(resp))
-    capped = resp.criteria_echo.get("masters_capped_by_display_limit")
-    assert rendered == 10
-    assert capped == 2  # 12 approved − 10 rendered
-    assert rendered + capped == _N  # parity: every seeded/vetted master is accounted for
+    assert len(_names(resp)) == _N  # all 12 returned — every vetted master reachable
+    assert resp.criteria_echo.get("masters_capped_by_display_limit") == 2  # 2 beyond the default view
     assert resp.criteria_echo.get("display_cap") == 10
 
 
@@ -205,12 +206,10 @@ def test_display_order_still_wins_over_engine_rank(wired):
     assert _names(resp) == ["Mover 03", "Mover 02", "Mover 01"]
 
 
-def test_custom_vendors_are_not_truncated_by_the_slice(wired):
-    """Criterion 5 — the regression a naive `items[:top_n]` would have introduced.
-
-    Customs are appended after the masters. Before AIQ-1700 the slice ran first, so a
-    company with 10 approved masters + 2 customs legitimately received 12 items; that
-    must still hold now the slice runs last.
+def test_custom_vendors_and_all_masters_are_returned(wired):
+    """Customs are appended after the masters and are never truncated; with show-all,
+    every vetted master is also returned (top_n is a display default, not a drop).
+    12 vetted masters + 2 HR customs → all 14 returned, customs last.
     """
     approve, _ = wired
     approve([_master_id(i) for i in range(1, _N + 1)],
@@ -219,7 +218,7 @@ def test_custom_vendors_are_not_truncated_by_the_slice(wired):
     resp = engine.recommend("movers", _CRITERIA, top_n=10, company_id=_COMPANY)
 
     names = _names(resp)
-    assert len(names) == 12, "10 masters capped by top_n + 2 customs never truncated"
+    assert len(names) == _N + 2, "all 12 vetted masters + 2 customs, none truncated"
     assert names[-2:] == ["Bob's Removals", "Acme Moving"]
 
 

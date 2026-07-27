@@ -512,6 +512,17 @@ export const RecommendationResults: React.FC<Props> = ({
   } | null>(null);
   const [pendingSubmitting, setPendingSubmitting] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
+  // Show-all-vetted: the backend returns EVERY vetted provider; the default view shows
+  // the top `display_cap` and "Show N more" reveals the rest per category, so no vetted
+  // provider is unreachable while the top-matches-first signal is preserved.
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const toggleExpanded = (category: string) =>
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
+      return next;
+    });
 
   if (entries.length === 0) return null;
 
@@ -716,6 +727,16 @@ export const RecommendationResults: React.FC<Props> = ({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {res.recommendations.map((item, idx) => {
+                  // Show-all default view: the top `display_cap` matches + every HR custom
+                  // vendor (customs are appended after the masters and are always shown);
+                  // the rest of the vetted set is revealed by "Show N more". idx is kept
+                  // intact so rank / override logic is unchanged.
+                  const displayCap = Number(
+                    (res.criteria_echo as Record<string, unknown> | undefined)?.display_cap ?? 0,
+                  );
+                  const isCustom = !!(item.metadata as Record<string, unknown> | undefined)?.hr_custom;
+                  const withinDefaultView = displayCap <= 0 || idx < displayCap || isCustom;
+                  if (!expandedCategories.has(category) && !withinDefaultView) return null;
                   const isPendingThisCard =
                     pendingPick?.category === category && pendingPick.item.item_id === item.item_id;
                   return (
@@ -740,17 +761,22 @@ export const RecommendationResults: React.FC<Props> = ({
               </div>
             )}
             {(() => {
-              // AIQ-1722: HR approved more vetted providers than the display cap shows.
-              // Surface the count so the cut is explicit, not a silent drop.
+              // Show-all-vetted (2026-07-27): every vetted provider is reachable. The
+              // default view shows the top matches; this control reveals the rest so no
+              // vetted provider is unreachable. (Replaces the AIQ-1722 disclosure banner.)
               const echo = res.criteria_echo as Record<string, unknown> | undefined;
               const capped = Number(echo?.masters_capped_by_display_limit ?? 0);
-              const cap = Number(echo?.display_cap ?? 0);
-              return capped > 0 ? (
-                <p className="mt-3 text-sm text-[#64748b]">
-                  {capped} more vetted {capped === 1 ? 'provider is' : 'providers are'} available for this
-                  category but not shown here — the list is capped at the top {cap} matches.
-                </p>
-              ) : null;
+              if (capped <= 0) return null;
+              const isExpanded = expandedCategories.has(category);
+              return (
+                <div className="mt-4 flex justify-center">
+                  <Button variant="outline" size="sm" onClick={() => toggleExpanded(category)}>
+                    {isExpanded
+                      ? 'Show fewer'
+                      : `Show ${capped} more vetted ${capped === 1 ? 'provider' : 'providers'}`}
+                  </Button>
+                </div>
+              );
             })()}
           </div>
         ) : null
