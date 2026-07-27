@@ -58,6 +58,9 @@ INSERT INTO companies (id, name) VALUES ('c1', 'Acme'), ('c2', 'Globex'), ('c3',
 INSERT INTO hr_users (company_id, profile_id, created_at) VALUES ('c1', 'p1', '2026-01-01');
 INSERT INTO employees (company_id) VALUES ('c1'), ('c1');
 INSERT INTO relocation_cases (id, company_id) VALUES ('case1', 'c1');
+-- [AIQ-1737·2] Intentional NULL canonical: 'a1' is the orphan fixture the
+-- orphan-diagnostics regression tests below depend on. Isolated in-memory schema —
+-- AIQ-1732's prod NOT NULL(canonical_case_id) does not govern it.
 INSERT INTO case_assignments (id, case_id, canonical_case_id, hr_user_id) VALUES ('a1', 'case1', NULL, 'p1');
 INSERT INTO profiles (id, full_name, email) VALUES ('p1', 'Boss', 'boss@acme.test');
 """

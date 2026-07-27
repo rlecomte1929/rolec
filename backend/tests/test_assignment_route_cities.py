@@ -29,7 +29,10 @@ def _engine():
     with e.begin() as c:
         c.execute(text("CREATE TABLE case_assignments (id TEXT, canonical_case_id TEXT, case_id TEXT)"))
         c.execute(text("CREATE TABLE wizard_cases (id TEXT, origin_city TEXT, dest_city TEXT)"))
-        # assignment 'a1' points at wizard case 'w1' via case_id (canonical null)
+        # assignment 'a1' points at wizard case 'w1' via case_id (canonical null).
+        # [AIQ-1737·2] Intentional NULL: this exercises the resolver's legacy fallback
+        # (canonical NULL → resolve via case_id), still-valid defensive behaviour. Isolated
+        # in-memory schema — AIQ-1732's prod NOT NULL(canonical_case_id) does not apply here.
         c.execute(text("INSERT INTO case_assignments (id, canonical_case_id, case_id) VALUES ('a1', NULL, 'w1')"))
         # assignment 'a2' points via canonical_case_id (takes precedence)
         c.execute(text("INSERT INTO case_assignments (id, canonical_case_id, case_id) VALUES ('a2', 'w1', 'other')"))
