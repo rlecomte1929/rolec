@@ -542,9 +542,16 @@ export const RecommendationResults: React.FC<Props> = ({
     category: string,
     item: RecommendationItem,
     rank: number,
+    decision: 'accept' | 'override',
     reason: string | null
   ): void => {
-    const decision = rank === 0 ? 'accept' : 'override';
+    // AIQ-1691: the caller decides accept-vs-override — the decision is NOT derivable
+    // from rank alone. Adding a comparison vendor AFTER the top match is already picked
+    // is an 'accept' (see handleCardToggle), even though its rank > 0. Deriving
+    // 'override' from rank here sent `override` with a null reason, which
+    // /api/ai/decisions rejects with 400 (reason required) — the spurious 400 on every
+    // 2nd+ pick per category. The genuine-override path (confirmPendingPick) always
+    // supplies a captured reason.
     createAIDecision({
       feature: `service_recommendation_${category}`,
       recommendation_id: item.item_id,
@@ -591,7 +598,10 @@ export const RecommendationResults: React.FC<Props> = ({
     const topMatchAlreadyPicked = !!topItemId && inCategory.includes(topItemId);
     if (rank === 0 || topMatchAlreadyPicked) {
       togglePackage(category, item.item_id);
-      logDecision(category, item, rank, null);
+      // 'accept': the top match itself (rank 0), OR a comparison vendor added after the
+      // top match is already shortlisted — not an override, so no reason is required
+      // and no spurious 400 (AIQ-1691 / AIQ-1520).
+      logDecision(category, item, rank, 'accept', null);
       // AIQ-1436: supplier_selected on committing the pick.
       track('supplier_selected', { supplier_id: item.item_id, service_category: category, case_id: caseId });
       return;
@@ -606,7 +616,7 @@ export const RecommendationResults: React.FC<Props> = ({
       // Commit the selection first (local + debounced server sync) so the user's
       // intent is reflected immediately even if the audit log POST is slow.
       togglePackage(pendingPick.category, pendingPick.item.item_id);
-      logDecision(pendingPick.category, pendingPick.item, pendingPick.rank, reason);
+      logDecision(pendingPick.category, pendingPick.item, pendingPick.rank, 'override', reason);
       // AIQ-1436: supplier_selected on confirming a lower-ranked (override) pick.
       track('supplier_selected', { supplier_id: pendingPick.item.item_id, service_category: pendingPick.category, case_id: caseId });
       setPendingPick(null);
