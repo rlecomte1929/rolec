@@ -25,9 +25,24 @@ import unittest
 
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 
-_ROUTERS = ["backend/app/routers/cases_read.py", "backend/app/routers/hr_coordination.py"]
+_ROUTERS = [
+    "backend/app/routers/cases_read.py",
+    "backend/app/routers/hr_coordination.py",
+    "backend/app/routers/services_state.py",
+    "backend/app/routers/payment.py",
+]
 _RESOLVERS = ("resolve_case_ids", "_canonical_case_id_or_404", "resolve_case_forms_case_id")
 _CASE_SQL = re.compile(r"case_id\s*=\s*:")
+
+
+def _resolves(seg: str) -> bool:
+    """A function resolves the id if it calls a named resolver, OR derives the
+    canonical case id from the assignment that require_case_access returned
+    (the services_state pattern: authorize a 3-form id, then key on the
+    canonical case id it maps to — reusing the fetch rather than re-querying)."""
+    if any(r in seg for r in _RESOLVERS):
+        return True
+    return "require_case_access" in seg and "canonical_case_id" in seg
 
 # Functions with inline case_id SQL that legitimately do NOT resolve, each with the
 # reason it is safe. Keep this SMALL and justified — every entry is a place the
@@ -61,7 +76,7 @@ def _flagged() -> set:
                 a.arg == "case_id" for a in node.args.args
             ):
                 seg = ast.get_source_segment(src, node) or ""
-                if _CASE_SQL.search(seg) and not any(r in seg for r in _RESOLVERS):
+                if _CASE_SQL.search(seg) and not _resolves(seg):
                     flagged.add(node.name)
     return flagged
 
