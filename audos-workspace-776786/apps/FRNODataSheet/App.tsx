@@ -2,9 +2,10 @@
 // Design-validation only: hardcoded mock data, zero API calls, no backend wiring.
 // Validates the 'Personal Relocation Data Sheet' concept for the France→Norway EEA corridor.
 import React, { useState } from 'react';
-import { Pencil, Info, AlertTriangle, Printer } from 'lucide-react';
+import { Pencil, Info, AlertTriangle, Printer, Link2 } from 'lucide-react';
 
 type Lang = 'en' | 'no';
+type DataMode = 'full' | 'sparse';
 type BadgeKind = 'intake' | 'ocr' | 'prior' | 'input' | 'consult';
 
 interface FieldDef {
@@ -20,6 +21,7 @@ interface SectionDef {
   title: string;
   subtitle: string;
   tooltip: string;
+  sessionGroup?: boolean; // part of the shared single Skatteetaten portal session
   infoTop?: string;
   infoBottom?: string;
   fields: FieldDef[];
@@ -31,6 +33,7 @@ const SECTIONS: SectionDef[] = [
     title: '1 · D-Number Application',
     subtitle: 'Skatteetaten · skatteetaten.no/en/forms/d-number',
     tooltip: 'Apply at least 4 weeks before first paycheck · skatteetaten.no',
+    sessionGroup: true,
     fields: [
       { id: 'd-name', label: { en: 'Full legal name', no: 'Fullt juridisk navn' }, value: 'Sophie Leblanc', badge: 'ocr' },
       { id: 'd-dob', label: { en: 'Date of birth', no: 'Fødselsdato' }, value: '22 July 1990', badge: 'ocr' },
@@ -67,7 +70,8 @@ const SECTIONS: SectionDef[] = [
     id: 'skattekort',
     title: '3 · Tax Card (Skattekort)',
     subtitle: 'Skatteetaten portal · Must be in place before first paycheck',
-    tooltip: 'Apply as soon as D-number is confirmed · skatteetaten.no · Must be active before first paycheck',
+    tooltip: 'Requested in the same Skatteetaten portal session as the D-number application · skatteetaten.no · Must be active before first paycheck',
+    sessionGroup: true,
     fields: [
       { id: 's-name', label: { en: 'Full legal name', no: 'Fullt juridisk navn' }, value: 'Sophie Leblanc', badge: 'ocr' },
       { id: 's-dob', label: { en: 'Date of birth', no: 'Fødselsdato' }, value: '22 July 1990', badge: 'ocr' },
@@ -112,6 +116,25 @@ const SECTIONS: SectionDef[] = [
     ],
   },
 ];
+
+// ── Sparse data mode ────────────────────────────────────────────────
+// Simulates a case where intake + document OCR captured almost nothing.
+// Only two data points are known: the employee's full name and the move
+// (start) date. Every other non-consult field falls back to the NEEDS
+// INPUT empty state — a missing value is NEVER guessed or prefilled.
+const SPARSE_KNOWN_FIELD_IDS = new Set([
+  'd-name', 'e-name', 's-name', 'f-name', 'a-name', // full name (one data point, repeated per section)
+  'd-firstday', 's-start', // move / first work day date
+]);
+
+const SPARSE_SECTIONS: SectionDef[] = SECTIONS.map((section) => ({
+  ...section,
+  fields: section.fields.map((f) => {
+    if (f.badge === 'consult') return f; // consult fields carry no value in either mode
+    if (SPARSE_KNOWN_FIELD_IDS.has(f.id)) return f;
+    return { ...f, value: undefined, badge: 'input' as BadgeKind };
+  }),
+}));
 
 const PROGRESS_LABELS: Record<string, string> = {
   dnumber: 'D-number',
@@ -173,10 +196,19 @@ function InfoBox({ children }: { children: React.ReactNode }) {
 
 export default function FRNODataSheetPrototype() {
   const [lang, setLang] = useState<Lang>('en');
+  const [dataMode, setDataMode] = useState<DataMode>('full');
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<string | null>(null);
   const [openTooltip, setOpenTooltip] = useState<string | null>(null);
   const [toast, setToast] = useState(false);
+
+  const sections = dataMode === 'full' ? SECTIONS : SPARSE_SECTIONS;
+
+  const switchDataMode = (m: DataMode) => {
+    setDataMode(m);
+    setInputs({});
+    setEditing(null);
+  };
 
   const sectionComplete = (section: SectionDef) =>
     section.fields.filter((f) => f.badge === 'input').every((f) => (inputs[f.id] || '').trim().length > 0);
@@ -247,7 +279,27 @@ export default function FRNODataSheetPrototype() {
           <div style={{ fontSize: 12, color: '#6B7280', textAlign: 'center', flex: '1 1 auto' }}>
             Case FR-NO-2026-0081 · France → Norway · Generated 29 Jul 2026
           </div>
-          <div className="frno-no-print" style={{ display: 'flex', gap: 0, border: '1px solid #E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
+          <div className="frno-no-print" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 0, border: '1px solid #E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
+              {(['full', 'sparse'] as DataMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => switchDataMode(m)}
+                  style={{
+                    padding: '6px 14px',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: dataMode === m ? '#111827' : '#FFFFFF',
+                    color: dataMode === m ? '#FFFFFF' : '#6B7280',
+                  }}
+                >
+                  {m === 'full' ? 'Full data' : 'Sparse data'}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 0, border: '1px solid #E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
             {(['en', 'no'] as Lang[]).map((l) => (
               <button
                 key={l}
@@ -265,6 +317,7 @@ export default function FRNODataSheetPrototype() {
                 {l.toUpperCase()}
               </button>
             ))}
+            </div>
           </div>
         </div>
 
@@ -276,9 +329,16 @@ export default function FRNODataSheetPrototype() {
           </span>
         </div>
 
+        {/* ── Sparse mode explainer ──────────────────────────── */}
+        {dataMode === 'sparse' && (
+          <div className="frno-no-print" style={{ marginTop: 14, background: '#F9FAFB', border: '1px dashed #D1D5DB', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: '#6B7280', lineHeight: 1.5 }}>
+            <strong style={{ color: '#374151' }}>Sparse data mode</strong> — simulating a case where intake and document OCR captured almost nothing. Only the full name and move date are known; every other field shows its empty state. Missing values are never guessed or prefilled.
+          </div>
+        )}
+
         {/* ── Progress indicator ─────────────────────────────── */}
         <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 18px', fontSize: 12, color: '#6B7280' }}>
-          {SECTIONS.map((s) => {
+          {sections.map((s) => {
             const done = sectionComplete(s);
             return (
               <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -290,12 +350,17 @@ export default function FRNODataSheetPrototype() {
         </div>
 
         {/* ── Sections ───────────────────────────────────────── */}
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.id} style={{ marginTop: 20, background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 8, padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
                   <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{section.title}</h2>
+                  {section.sessionGroup && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 999, background: '#E0F2FE', color: '#075985', border: '1px solid #BAE6FD', whiteSpace: 'nowrap' }}>
+                      <Link2 size={11} strokeWidth={2.5} /> Skatteetaten session
+                    </span>
+                  )}
                   <span
                     className="frno-no-print"
                     style={{ position: 'relative', display: 'inline-flex' }}
@@ -319,6 +384,15 @@ export default function FRNODataSheetPrototype() {
                 <div style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>{section.subtitle}</div>
               </div>
             </div>
+
+            {section.sessionGroup && (
+              <div style={{ marginTop: 12, display: 'flex', gap: 10, background: '#F0F9FF', border: '1px solid #7DD3FC', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#075985', lineHeight: 1.5 }}>
+                <Link2 size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+                <span>
+                  These two steps can be completed in <strong>one Skatteetaten portal session</strong>. Start the D-number application first; the skattekort request follows in the same session. Portal: skatteetaten.no
+                </span>
+              </div>
+            )}
 
             {section.infoTop && (
               <div style={{ marginTop: 12 }}>
