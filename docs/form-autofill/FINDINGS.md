@@ -100,3 +100,30 @@ Record pass/fail + the route-list output at the top of Phase B; a red suite here
 ---
 
 *Prepared by Claude (Cowork) — static analysis pass. Hand to Romain for the §6 decisions, then proceed to Phase B.*
+
+---
+
+## Appendix A — UX prototype validation (Audos / Otto, 30 Jul 2026)
+
+> The Phase-A findings were shared with Otto in the Audos workspace (ReloPass 776786) as a **planning/prototyping** hand-off — no production code, per the two-system rule. Otto built a throwaway UX prototype and gave an explicit verdict on the open §6 decisions. This appendix records that so the data-sheet model is validated before Phase B, and so we can give Audos structured feedback. **Nothing here is production wiring** — the build lands in `rolec`.
+
+**Prototype:** `frno-data-sheet-prototype` (Audos mini-app, `apps/FRNODataSheet/App.tsx`), a "Personal Relocation Data Sheet" for **Case FR-NO-2026-0081 · France → Norway**. Zero API calls, no backend, no DB — design validation only. Verified rendering live (screenshots on file).
+
+### A.1 Decision on §6.1 (data-sheet vs. submit-ready PDF): **DATA-SHEET, unambiguously.**
+Otto's verdict, independently reasoned against the FINDINGS: *there is no AcroForm/fillable-PDF path for the primary EEA corridor steps.* The one candidate that looked like a "PDF moment" — the **EEA registration certificate** — is an **output the police issue, not an input form**. What can actually be pre-filled is the **UDI online application** the employee completes *before* booking the in-person police appointment. Conclusion: the prefilled **data-sheet** is the correct production model for FR→NO; restrict any AcroForm-PDF prefill to corridors that genuinely use fillable paper forms (DE/FR). This **confirms F1 and F2.**
+
+### A.2 Decision on §6.2/§6.3 (route-to-professional + verbatim identifiers): confirmed, and expanded.
+- **Five** determinations are flagged **CONSULT PROFESSIONAL** (amber badge, *never* pre-populated), routed to a regulated advisor: (1) tax-residency status, (2) A1 / totalization determination, (3) contract classification (secondment vs. local hire), (4) shadow-payroll requirement, (5) permanent-establishment (PE) risk. That is the two we specified plus three Otto judged necessary — accept all five for the production spec.
+- **Verbatim identifiers verified in the running prototype:** the EN⇄NO toggle switches **labels only** — "Full legal name" → "Fullt juridisk navn" — while the **value stays verbatim** ("Sophie Leblanc" unchanged) and the source badge (`passport-OCR`) persists. This is exactly the FINDINGS rule that names, passport numbers, D-number, and dates are never translated.
+
+### A.3 New refinement to fold into the Phase-B spec
+Otto surfaced a correctness point not in the original FINDINGS: **the D-number and skattekort (tax card) applications on Skatteetaten can be completed in a single session.** The prototype shows them as separate sections for clarity, but the **production build should present them as one portal visit when timed together** — it saves the employee a second in-person appointment. Add this to §5 (Phase-B) as a UX/sequencing requirement.
+
+### A.4 Prototype UX inventory (as built, for Audos feedback)
+Source-badge system (intake / passport-OCR / prior-form / **NEEDS INPUT** inline click-to-edit / **CONSULT PROFESSIONAL**), amber regulatory banner, EN/NO label toggle (labels switch, values don't), per-section progress dots that green as required inputs are filled, per-authority timing tooltips with portal URLs (e.g. `skatteetaten.no/en/forms/d-number`), footer badge legend, and a floating **Print / Export** button (shows a "PDF export available in the production build" toast + triggers the browser print dialog with print CSS that hides interactive chrome).
+
+### A.5 Housekeeping flagged during the session (not part of this feature)
+- Otto kicked off a second prototype build (Job #91031) after the first — two prototype iterations now exist in the Audos "ReloPass Norway Data-Sheet Prototype" thread; reconcile/keep one.
+- Otto noted two unrelated Cursor jobs (#86257, #86205) on a `feat/housing-…-neighborhood-p01` branch are sitting as **unpublished drafts** in the Audos space — worth clearing before the next Publish.
+
+*Appendix prepared by Claude (Cowork) — Audos prototype validation, 30 Jul 2026. Prototype is UX-only; production implementation remains a `rolec` Phase-B task.*
