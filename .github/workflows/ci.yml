@@ -33,6 +33,8 @@ jobs:
       hr_dashboard: ${{ steps.filter.outputs.hr_dashboard }}
       migrations: ${{ steps.filter.outputs.migrations }}
       workflows: ${{ steps.filter.outputs.workflows }}
+      edge_functions: ${{ steps.filter.outputs.edge_functions }}
+      case_id_writers: ${{ steps.filter.outputs.case_id_writers }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -48,8 +50,22 @@ jobs:
               - 'apps/hr-dashboard/**'
             migrations:
               - 'supabase/migrations/**'
+            # AIQ-1731: everything that can WRITE (or orphan) a
+            # case_assignments.canonical_case_id, plus the drift gate's own files.
+            case_id_writers:
+              - 'supabase/migrations/**'
+              - 'supabase/canonical_case_id_baseline.txt'
+              - 'scripts/check_canonical_case_id_drift.py'
+              - 'scripts/seed_demo.sql'
+              - 'scripts/reset_demo.sh'
+              - 'scripts/e2e_purge.py'
+              - 'scripts/fresh_onboarding_teardown.sql'
+              - 'backend/db/cases.py'
+              - 'backend/app/services/unified_assignment_creation.py'
             workflows:
               - '.github/workflows/**'
+            edge_functions:
+              - 'supabase/functions/**'
 
   actionlint:
     # Catches workflow YAML errors (bad `uses:` refs, secrets.* in job-level
@@ -371,6 +387,36 @@ jobs:
             backend/tests/test_policy_propagation.py \
             backend/tests/test_supabase_password_sync.py
 
+  # Supabase Edge Functions are Deno, so neither the Python nor the Node job
+  # covers them: before AIQ-1702 a PR touching ONLY supabase/functions/** ran no
+  # test of its own change (PR #1662 merged exactly that way, with backend-tests
+  # and frontend both "skipping"). That matters most for case-summary, which
+  # builds an LLM prompt from an explicit non-PII whitelist — its
+  # `no PII reaches the prompt` test is the automated half of the GDPR rule in
+  # CLAUDE.md, and until now nothing ran it on a PR.
+  #
+  # `deno test <dir>` discovers every *.test.ts underneath, so a new function's
+  # suite is picked up with no change here. The tests are pure logic (no network,
+  # no DB, no Claude) — remote std imports are fetched by the module loader, so
+  # no --allow-* flags are needed.
+  edge-function-tests:
+    name: Edge Function tests (Deno)
+    needs: changes
+    if: needs.changes.outputs.edge_functions == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          # Pinned, not `latest` — a silent runtime bump must not be able to
+          # change whether the compliance test passes.
+          deno-version: v2.1.4
+
+      - name: Run Edge Function tests
+        run: deno test --no-check=remote supabase/functions/
+
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
     # in the FastAPI apps (via AST, no DB required) and assert each one uses an
@@ -500,6 +546,43 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
         run: python scripts/check_migration_drift.py
+
+  canonical-case-id-drift:
+    # AIQ-1731: fail when prod grows a NEW bad case_assignments.canonical_case_id
+    # (NULL/blank, dangling, or duplicate). The column is nullable with no FK and
+    # no UNIQUE, so all three shapes are permitted by the schema.
+    #
+    # AIQ-1730's audit found 51 such rows and returned the verdict "the model is
+    # 1:1, UNIQUE is correct". Cleaning them (AIQ-1731) and enforcing the
+    # constraint (AIQ-1732) are deliberately DEFERRED to the pre-launch data
+    # reset — the cleanup means ~38 cascading deletes of throwaway pre-launch data
+    # for a constraint the resolve_case_ids bridge already substitutes for.
+    #
+    # That deferral is only safe while the stock stays frozen, and nothing was
+    # watching. This is that tripwire: the 51 known-bad ids are baselined in
+    # supabase/canonical_case_id_baseline.txt and only NEW offenders fail.
+    # The diff logic is unit-tested on every PR via
+    # scripts/tests/test_check_canonical_case_id_drift.py, so the fail path is
+    # covered even where the DB secret is unset.
+    #
+    # Mirrors rls-coverage / migration-drift: read-only DATABASE_URL secret, gated
+    # on a repo variable because secrets.* is not allowed in a job-level if:.
+    name: canonical_case_id drift check
+    needs: changes
+    runs-on: ubuntu-latest
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.case_id_writers == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Run canonical_case_id drift check
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/check_canonical_case_id_drift.py
 
   deliverable-integrity:
     # HYGIENE-1: assert that "Done" AI Work Queue tasks' claimed deliverable

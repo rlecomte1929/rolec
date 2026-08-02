@@ -24,6 +24,7 @@ If no assignment row exists, create one. Replace UUIDs with real Supabase auth u
 INSERT INTO public.case_assignments (
   id,
   case_id,
+  canonical_case_id,
   hr_user_id,
   employee_user_id,
   employee_identifier,
@@ -33,6 +34,7 @@ INSERT INTO public.case_assignments (
 ) VALUES (
   '284a54cb-f6ca-4154-beac-09f014618000',  -- assignment id
   '284a54cb-f6ca-4154-beac-09f014618000',  -- case_id (can match)
+  '284a54cb-f6ca-4154-beac-09f014618000',  -- canonical_case_id — ALWAYS set it, = case_id
   'e9901a18-47e3-4e4b-86ed-d58719277f17',  -- hr_user_id (HR auth.users.id)
   'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',   -- employee_user_id (Employee auth.users.id)
   'employee@example.com',
@@ -41,6 +43,10 @@ INSERT INTO public.case_assignments (
   now()::text
 );
 ```
+
+> **Do not omit `canonical_case_id`.** The column is nullable with no default, so leaving it out
+> silently writes NULL — and case-scoped reads resolve through it. Rows seeded that way are the
+> "real-shaped" NULL rows inventoried in `docs/architecture/CASE_ID_UNIFICATION_AUDIT.md`.
 
 Use the Supabase Dashboard or `service_role` to run this (RLS may block regular users).
 

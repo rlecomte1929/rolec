@@ -21,7 +21,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from ...database import db
 
@@ -232,6 +232,110 @@ def find_master_by_external_id(category: str, external_id: str) -> Optional[Dict
             {"cat": category, "eid": external_id},
         ).mappings().first()
     return _row_to_item(row) if row else None
+
+
+def find_master_by_supplier_or_external_id(
+    category: str, item_id: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Resolve a master row for a recommendation item that may be keyed EITHER by the
+    JSON dataset's ``external_id`` OR by a supplier-registry UUID.
+
+    AIQ-1550/AIQ-1688: registry-backed items carry ``item_id = supplier.id`` (a UUID),
+    but their master rows are frequently keyed ``external_id = 'm-1'`` (a legacy static
+    dataset id) with ``supplier_id`` pointing at that same UUID. ``find_master_by_external_id``
+    only matched ``external_id``, so those registry items resolved to no master and were
+    dropped by HR curation — HR-approved movers rendered as an empty category even though
+    the supplier, its capability, and HR's approval all existed. Matching on ``supplier_id``
+    as well closes that gap. The approval gate in ``apply_hr_curation`` is unchanged: the
+    resolved master must still be in HR's approved set to be shown.
+    """
+    if not item_id:
+        return None
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT * FROM service_catalog_items "
+                "WHERE category = :cat AND active = true "
+                "  AND (external_id = :id OR CAST(supplier_id AS TEXT) = :id) "
+                # external_id-keyed match wins when both a legacy static row and a
+                # registry row exist, keeping behaviour stable for static datasets.
+                "ORDER BY (external_id = :id) DESC "
+                "LIMIT 1"
+            ),
+            {"cat": category, "id": str(item_id)},
+        ).mappings().first()
+    return _row_to_item(row) if row else None
+
+
+def find_masters_by_supplier_or_external_ids(
+    category: str, item_ids: List[str]
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Batched ``find_master_by_supplier_or_external_id``: map each id in ``item_ids`` to
+    its master row. Ids that resolve to nothing are simply absent from the result.
+
+    AIQ-1700: curation now runs over the FULL ranked candidate list rather than the
+    ``top_n`` slice, so resolving one id per query turned a ~10-query step into one
+    query per candidate (up to ~80 for registry-heavy categories, multiplied by every
+    category on the batch endpoint). Same matching rule as the single-id resolver,
+    including the ``external_id``-wins tiebreak when a legacy static row and a registry
+    row both answer to the same id.
+    """
+    ids = [str(i) for i in item_ids if i]
+    if not ids:
+        return {}
+    stmt = text(
+        "SELECT * FROM service_catalog_items "
+        "WHERE category = :cat AND active = true "
+        "  AND (external_id IN :ids OR CAST(supplier_id AS TEXT) IN :ids)"
+    ).bindparams(bindparam("ids", expanding=True))
+    with db.engine.begin() as conn:
+        rows = conn.execute(stmt, {"cat": category, "ids": ids}).mappings().all()
+
+    by_external: Dict[str, Any] = {}
+    by_supplier: Dict[str, Any] = {}
+    for row in rows:
+        ext = row.get("external_id")
+        sup = row.get("supplier_id")
+        if ext is not None:
+            by_external.setdefault(str(ext), row)
+        if sup is not None:
+            by_supplier.setdefault(str(sup), row)
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for i in ids:
+        # external_id first — mirrors the single-id resolver's ORDER BY tiebreak.
+        row = by_external.get(i) or by_supplier.get(i)
+        if row is not None:
+            out[i] = _row_to_item(row)
+    return out
+
+
+def external_ids_for_supplier_ids(category: str, supplier_ids: List[str]) -> set:
+    """
+    Return the ``external_id``s of active masters in ``category`` whose ``supplier_id``
+    is one of ``supplier_ids``.
+
+    AIQ-1690: the recommendation dataset can hold two rows for one supplier — the
+    registry candidate (``item_id`` = supplier id) and its legacy static-dataset twin
+    (``item_id`` = the master's ``external_id``, e.g. ``'m-1'``). They never collide on
+    item_id, so both used to be scored and could occupy two ``top_n`` slots. This is the
+    batched form of the ``supplier_id`` link ``find_master_by_supplier_or_external_id``
+    resolves one item at a time, letting the engine drop the twin before scoring.
+    """
+    ids = [str(s) for s in supplier_ids if s]
+    if not ids:
+        return set()
+    stmt = text(
+        "SELECT external_id FROM service_catalog_items "
+        "WHERE category = :cat AND active = true "
+        "  AND external_id IS NOT NULL "
+        "  AND CAST(supplier_id AS TEXT) IN :ids"
+    ).bindparams(bindparam("ids", expanding=True))
+    with db.engine.begin() as conn:
+        rows = conn.execute(stmt, {"cat": category, "ids": ids}).fetchall()
+    return {str(r[0]) for r in rows if r[0]}
 
 
 def count_by_category_city(category: str, city: Optional[str] = None) -> int:

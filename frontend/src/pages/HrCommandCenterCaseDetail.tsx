@@ -14,7 +14,6 @@ import { RoadmapReviewPanel } from '../components/case/RoadmapReviewPanel';
 import { statusLabel } from '../lib/statusLabel';
 import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
 import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
-import { RfqModal } from '../components/case/RfqModal';
 import type { ImmigrationContext } from '../components/case/immigrationContext';
 import { PendingRfqsPanel } from '../components/case/PendingRfqsPanel';
 import { ImmigrationStatusPanel } from '../components/case/ImmigrationStatusPanel';
@@ -24,35 +23,12 @@ import { PetRequirementsSection } from '../components/case/PetRequirementsSectio
 import { CaseAuditTimeline } from '../components/case/CaseAuditTimeline';
 import { CaseNotesPanel } from '../components/case/CaseNotesPanel';
 import { CasePredictionCard } from '../components/case/CasePredictionCard';
+import { CaseSummaryCard } from '../components/case/CaseSummaryCard';
 import { EscalateCaseModal } from '../components/case/EscalateCaseModal';
 import { ReassignCaseModal } from '../components/case/ReassignCaseModal';
 import { AIRecommendationCard } from '../features/ai-oversight/AIRecommendationCard';
 import { CoordinatorChatPanel } from '../features/coordinator/CoordinatorChatPanel';
 import { isCoordinatorEnabled } from '../featureFlags';
-
-/** [AIQ-1514] One vendor the employee shortlisted. `item_id` is a recommendation-engine
- *  id, meaningful only alongside its service_category — not a foreign key. */
-type QuoteRequestVendor = {
-  service_category: string;
-  item_id: string;
-  name: string;
-};
-
-type QuoteRequest = {
-  id: string;
-  case_id: string;
-  employee_id: string;
-  company_id: string;
-  service_categories: string[];
-  notes: string | null;
-  budget_range: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  // [AIQ-1515] Empty for the 51 rows created before AIQ-1514 — their choice was never
-  // captured and is unrecoverable. Render that honestly; never infer a vendor.
-  vendors?: QuoteRequestVendor[];
-};
 
 /**
  * Corridor label for the case-identity header (BRAND-4). The command-center
@@ -115,15 +91,6 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
     if (detailQuery.isError && status === 401) safeNavigate(navigate, 'landing');
   }, [detailQuery.isError, detailQuery.error, navigate]);
 
-  // Quote requests for this case
-  const quoteRequestsQuery = useQuery({
-    queryKey: ['hr', 'cc-quote-requests', id],
-    enabled: !!id,
-    queryFn: () => hrAPI.getQuoteRequests({ case_id: id as string }).then((res) => res.quote_requests),
-  });
-  const quoteRequests: QuoteRequest[] = quoteRequestsQuery.data ?? [];
-  const [updatingQrId, setUpdatingQrId] = useState<string | null>(null);
-
   // Vendor browse panel + RFQ modal
   const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
   const [vendorPanelInitialCategory, setVendorPanelInitialCategory] = useState('');
@@ -142,8 +109,6 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
-  const [rfqVendor, setRfqVendor] = useState<{ id: string; name: string; service_categories: string[]; contact_email: string } | null>(null);
-  const [rfqSuccessMsg, setRfqSuccessMsg] = useState('');
   // NAV-HR-2: case-level escalate — the one case action missing from this view
   // (approve/reject already live in the exception panels below).
   const [escalateOpen, setEscalateOpen] = useState(false);
@@ -151,22 +116,6 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   // AIQ-1136: case-level reassign — HR hands a case to another HR in the company.
   const [reassignOpen, setReassignOpen] = useState(false);
   const [reassignSuccessMsg, setReassignSuccessMsg] = useState('');
-  const [rfqListKey, setRfqListKey] = useState(0);
-
-  const handleQuoteStatusUpdate = async (
-    qrId: string,
-    status: 'acknowledged' | 'fulfilled'
-  ) => {
-    setUpdatingQrId(qrId);
-    try {
-      await hrAPI.updateQuoteRequestStatus(qrId, status);
-      await quoteRequestsQuery.refetch();
-    } catch {
-      // silently fail — HR can retry
-    } finally {
-      setUpdatingQrId(null);
-    }
-  };
 
   const budgetStatus = (): 'Within' | 'Approaching' | 'Exceeded' | null => {
     if (!detail?.budgetLimit || detail.budgetEstimated == null) return null;
@@ -317,6 +266,10 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
               prediction canary + a trained model are available. */}
           <CasePredictionCard caseId={detail.id} />
 
+          {/* AIQ-1697: AI case summary — status / blockers / next actions / cost
+              variance from the case-summary Edge Function (PII-safe). */}
+          <CaseSummaryCard caseId={detail.id} />
+
           {/* Budget */}
           <Card padding="lg">
             <div className="text-sm font-semibold text-[#0b2b43] mb-3">Budget overview</div>
@@ -363,7 +316,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         </div>
 
         {/* ── Employee Tasks (AIQ-34-C) — polls every 8s ── */}
-        <HrCaseTasksPanel caseId={detail.id} />
+        <HrCaseTasksPanel caseId={detail.id} coordinationCaseId={detail.caseId ?? null} />
 
         {/* ── GAP 4 / AIQ-1479: Immigration advisors first — the actionable "contacts +
             ratings" section is the most useful thing here, so it leads the immigration
@@ -417,12 +370,16 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         {/* ── NAV-HR-3: chronological HR-action audit trail (from audit_logs) ── */}
         <CaseAuditTimeline caseId={detail.id} />
 
-        {/* ── AIQ-40-D: Vendor RFQs (sent by HR, tracked here) ── */}
+        {/* ── The employee's quote requests, read from the canonical `rfqs` tables ── */}
         <Card padding="lg" className="border border-[#e2e8f0]">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-sm font-semibold text-[#0b2b43]">Vendor quote requests</div>
-              <p className="text-xs text-[#94a3b8] mt-0.5">RFQs you&apos;ve sent to vendors for this case</p>
+              <div className="text-sm font-semibold text-[#0b2b43]">Employee quote requests</div>
+              {/* Since AIQ-1681 HR no longer runs procurement: the employee picks the
+                  providers and submits the RFQ, and HR reviews it here as the payer. */}
+              <p className="text-xs text-[#94a3b8] mt-0.5">
+                Providers the employee asked to quote for this case
+              </p>
             </div>
             <Button unstyled
               type="button"
@@ -435,115 +392,15 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
               Find a vendor
             </Button>
           </div>
-          <PendingRfqsPanel key={rfqListKey} caseId={detail.id} />
-        </Card>
-
-        {/* ── Quote Requests from employee (Step 4) ── */}
-        <Card padding="lg" className="border border-[#e2e8f0]">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold text-[#0b2b43]">
-              Employee quote requests
-              {quoteRequests.filter((q) => q.status === 'pending').length > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-[#fef3c7] border border-[#fbbf24] px-2 py-0.5 text-xs font-medium text-[#92400e]">
-                  {quoteRequests.filter((q) => q.status === 'pending').length} pending
-                </span>
-              )}
-            </div>
-          </div>
-          {quoteRequests.length === 0 ? (
-            <p className="text-sm text-[#94a3b8]">No quote requests from the employee yet.</p>
-          ) : (
-            <ul className="space-y-3">
-              {quoteRequests.map((qr) => (
-                <li
-                  key={qr.id}
-                  className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3 text-sm"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap gap-1 mb-1">
-                        {qr.service_categories.map((cat) => (
-                          <span
-                            key={cat}
-                            className="rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2 py-0.5 text-xs text-[#1d4ed8]"
-                          >
-                            {cat}
-                          </span>
-                        ))}
-                      </div>
-                      {/* [AIQ-1515] The vendors the employee actually chose. Until AIQ-1514
-                          these were discarded at the API boundary, so HR saw only the
-                          categories above and a free-text notes blob — and could not act on
-                          the employee's choice at all. */}
-                      {qr.vendors && qr.vendors.length > 0 ? (
-                        <div className="mt-1.5 space-y-0.5">
-                          <p className="text-[#64748b] text-xs">Vendors the employee chose:</p>
-                          <ul className="space-y-0.5">
-                            {qr.vendors.map((v) => (
-                              <li key={`${v.service_category}:${v.item_id}`} className="text-xs text-[#0b2b43]">
-                                <span className="font-medium">{v.name}</span>
-                                <span className="text-[#94a3b8]"> · {v.service_category}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : (
-                        // Honest empty state. A pre-AIQ-1514 request genuinely has no vendor
-                        // on record — do not guess one from the notes.
-                        <p className="text-[#94a3b8] text-xs mt-1.5 italic">
-                          No vendor choice recorded on this request.
-                        </p>
-                      )}
-                      {qr.notes && (
-                        <p className="text-[#374151] text-xs mt-1 leading-relaxed">{qr.notes}</p>
-                      )}
-                      {qr.budget_range && (
-                        <p className="text-[#64748b] text-xs mt-1">Budget: {qr.budget_range}</p>
-                      )}
-                      <p className="text-[#94a3b8] text-xs mt-1">
-                        {new Date(qr.created_at).toLocaleDateString()} ·{' '}
-                        <span
-                          className={
-                            qr.status === 'fulfilled'
-                              ? 'text-[#16a34a]'
-                              : qr.status === 'acknowledged'
-                              ? 'text-[#2563eb]'
-                              : 'text-[#d97706]'
-                          }
-                        >
-                          {statusLabel(qr.status)}
-                        </span>
-                      </p>
-                    </div>
-                    {qr.status === 'pending' && (
-                      <Button unstyled
-                        type="button"
-                        disabled={updatingQrId === qr.id}
-                        onClick={() => handleQuoteStatusUpdate(qr.id, 'acknowledged')}
-                        // A11Y-8: composed aria-label so screen readers can
-                        // distinguish one quote-request button from the next.
-                        aria-label={`Acknowledge quote request for ${qr.service_categories.join(', ') || 'services'}, requested ${new Date(qr.created_at).toLocaleDateString()}`}
-                        className="shrink-0 rounded-lg border border-[#2563eb] bg-white px-3 py-1.5 text-xs font-medium text-[#2563eb] hover:bg-[#eff6ff] disabled:opacity-50 transition-colors"
-                      >
-                        {updatingQrId === qr.id ? '…' : 'Acknowledge'}
-                      </Button>
-                    )}
-                    {qr.status === 'acknowledged' && (
-                      <Button unstyled
-                        type="button"
-                        disabled={updatingQrId === qr.id}
-                        onClick={() => handleQuoteStatusUpdate(qr.id, 'fulfilled')}
-                        aria-label={`Mark quote request as fulfilled for ${qr.service_categories.join(', ') || 'services'}, requested ${new Date(qr.created_at).toLocaleDateString()}`}
-                        className="shrink-0 rounded-lg border border-[#16a34a] bg-white px-3 py-1.5 text-xs font-medium text-[#16a34a] hover:bg-[#f0fdf4] disabled:opacity-50 transition-colors"
-                      >
-                        {updatingQrId === qr.id ? '…' : 'Mark fulfilled'}
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          {/* [AIQ-1703] The RFQ lives in `rfqs`, keyed on the CANONICAL case id — NOT the
+              assignment PK in this page's route. Passing `detail.id` made every case look
+              empty to HR (0 of 22 production RFQs are keyed on an assignment id). `caseId`
+              is `case_assignments.case_id`, the same id the employee's RFQ was written
+              under. AIQ-1703 fell back to `detail.id` here for "legacy rows"; there are
+              none — all 452 assignments carry a case_id — and that fallback can only ever
+              404-and-render-as-empty, which is the very failure being fixed. Null instead,
+              so the panel fails closed and says so. */}
+          <PendingRfqsPanel caseId={detail.caseId ?? null} />
         </Card>
 
         <Button variant="outline" onClick={() => navigate(buildRoute('hrCommandCenter'))}>
@@ -558,31 +415,6 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         destCountry={detail.destCountry}
         initialCategory={vendorPanelInitialCategory}
         immigrationContext={vendorImmigrationContext}
-        onRequestQuote={(vendor) => {
-          setVendorPanelOpen(false);
-          setVendorPanelInitialCategory('');
-          setRfqVendor(vendor);
-        }}
-      />
-
-      {/* ── AIQ-40-C: RFQ modal ── */}
-      {rfqSuccessMsg && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-5 py-3 shadow-lg text-sm text-[#166534] font-medium">
-          ✓ {rfqSuccessMsg}
-          <Button unstyled type="button" aria-label="Dismiss notification" onClick={() => setRfqSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</Button>
-        </div>
-      )}
-      <RfqModal
-        vendor={rfqVendor}
-        caseId={detail.id}
-        immigrationContext={vendorImmigrationContext}
-        onClose={() => { setRfqVendor(null); setVendorImmigrationContext(null); }}
-        onSent={(vendorName) => {
-          setRfqVendor(null);
-          setVendorImmigrationContext(null);
-          setRfqSuccessMsg(`Quote request sent to ${vendorName}`);
-          setRfqListKey((k) => k + 1);
-        }}
       />
 
       {/* ── NAV-HR-2: case-level escalate ── */}

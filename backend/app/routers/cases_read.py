@@ -38,6 +38,7 @@ from sqlalchemy import text as _sql_text
 from .. import crud, schemas
 from ..auth_deps import get_current_user, require_case_access
 from ..db import SessionLocal
+from ..services.roadmap_entitlement import assert_roadmap_access
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.roadmap_projection import project_tracks, track_label_for_form
@@ -496,6 +497,7 @@ def _load_form_with_template(
     form_id: str,
 ) -> Optional[Dict[str, Any]]:
     """Return the case_form row joined with its template fields, or None if not found."""
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     row = conn.execute(
         _sql_text(
             f"""
@@ -970,6 +972,7 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
     Tracks: Visa & Permit | Civil Documents | Family (conditional) | Settlement.
     """
     _assert_case_access(user, case_id)
+    assert_roadmap_access(case_id)  # server-side paywall (no-op while flag off — default)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
@@ -1034,6 +1037,7 @@ def get_case_roadmap_tracks(
     no longer read. Used by the employee RoadmapScreen.
     """
     _assert_case_access(user, case_id)
+    assert_roadmap_access(case_id)  # server-side paywall (no-op while flag off — default)
 
     # [AIQ-800] Option B — project the roadmap from the case's real forms instead
     # of reading the (never-written) roadmap_tracks/roadmap_steps tables. Reuses
@@ -1334,6 +1338,7 @@ def list_form_documents(
     unavailable, e.g. dev/test).
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
 
     with main_db.engine.connect() as conn:
         rows = conn.execute(
@@ -1466,6 +1471,7 @@ def list_form_comments(
 ) -> List[CommentItem]:
     """List all comments on a CaseForm, newest first."""
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.connect() as conn:
             # Verify the form belongs to this case
@@ -1519,6 +1525,7 @@ def list_form_events(
 ) -> List[EventItem]:
     """Return the history log for a CaseForm, newest first."""
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.connect() as conn:
             exists = conn.execute(
@@ -1587,6 +1594,7 @@ def get_form_original(
     - Returns 404 when no original PDF has been attached to the template yet.
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
 
     with main_db.engine.connect() as conn:
         row = conn.execute(
@@ -1786,6 +1794,7 @@ def get_dossier_zip(
     Returns as application/zip download.
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
 
     try:
         with main_db.engine.begin() as conn:
@@ -1854,6 +1863,9 @@ def list_dossiers(
 ) -> List[DossierPackageDetailResponse]:
     """[P3-6] List all DossierPackage records for a case, with staleness flag."""
     _assert_case_access(user, case_id)
+    # AIQ-1704: dossier_packages.case_id is the canonical case id (sole key);
+    # resolve the (possibly assignment) path id so the list isn't silently empty.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(
@@ -1905,6 +1917,7 @@ def get_dossier(
 ) -> DossierPackageDetailResponse:
     """[P3-6] Get a single DossierPackage with staleness flag."""
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.begin() as conn:
             row = conn.execute(
@@ -1956,6 +1969,7 @@ def get_dossier_pdf(
     If pdf_url is set, redirect/stream it; otherwise regenerate on-the-fly.
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.begin() as conn:
             row = conn.execute(
@@ -2077,6 +2091,23 @@ _SERVICE_BENEFIT_KEYS: Dict[str, List[str]] = {
 }
 
 
+def _canonical_case_id_or_404(case_id: str) -> str:
+    """Resolve any id form a route may carry — the assignment PK, the case_id, or
+    the canonical_case_id — to the canonical case id that case-keyed tables
+    (services_state, case_vendor_shortlist, case_messages…) actually use.
+
+    AIQ-1704: case-scoped reads used to key their SQL on the RAW path id, so an
+    assignment id (the form the employee roadmap / HR case-detail URLs carry)
+    matched no rows and the endpoint returned an empty list — a silent wrong
+    answer. Resolve once here and 404 on an id that maps to no case (fail
+    closed), never silent-empty.
+    """
+    ids = main_db.resolve_case_ids(case_id)
+    if ids is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return ids.canonical_case_id
+
+
 def _case_service_estimates(case_id: str) -> Dict[str, Dict[str, Any]]:
     """[AIQ-1527] The estimated cost per service, from case_services.
 
@@ -2150,6 +2181,33 @@ def _selected_services_for_case(case_id: str) -> List[str]:
     return []
 
 
+def _budget_status(
+    cap_amount: Optional[float],
+    cap_currency: Optional[str],
+    estimated_amount: Optional[float],
+    estimated_currency: Optional[str],
+) -> str:
+    """[AIQ-1527] The honest per-service budget decision — never claim within_budget
+    having compared nothing. Extracted from ``_budget_categories_from_policy_config`` so
+    the decision is unit-testable in isolation (tests/test_budget_summary_honest.py).
+
+    - no cap                        -> ``no_cap``
+    - cap but no estimate           -> ``no_estimate`` (the common case; a fake tick is worse)
+    - cap + estimate, diff currency -> ``not_comparable`` (refuse to invent an FX rate)
+    - estimate <= cap               -> ``within_budget`` (== cap; a zero estimate is an answer)
+    - estimate  > cap               -> ``over_budget``
+    """
+    if cap_amount is None:
+        return "no_cap"
+    if estimated_amount is None:
+        return "no_estimate"
+    if estimated_currency and cap_currency and estimated_currency != cap_currency:
+        return "not_comparable"
+    if float(estimated_amount) <= float(cap_amount):
+        return "within_budget"
+    return "over_budget"
+
+
 def _budget_categories_from_policy_config(
     company_id: str,
     selected_services: List[str],
@@ -2209,20 +2267,10 @@ def _budget_categories_from_policy_config(
         estimated_amount: Optional[float] = est.get("amount")
         estimated_currency: Optional[str] = est.get("currency")
 
-        if total is None:
-            status = "no_cap"
-        elif estimated_amount is None:
-            # Still the common case — only 3 of 31 case_services rows carry an estimated_cost in
-            # prod. "We don't know yet" is fine. A fake green tick is not.
-            status = "no_estimate"
-        elif estimated_currency and currency and estimated_currency != currency:
-            # Refuse to rank rather than invent an FX rate — the same refusal
-            # policy_config_cap_compare already makes on a currency mismatch.
-            status = "not_comparable"
-        elif float(estimated_amount) <= float(total):
-            status = "within_budget"
-        else:
-            status = "over_budget"
+        # Honest decision (extracted to _budget_status for unit-testability). Only 3 of 31
+        # case_services rows carry an estimated_cost in prod, so "no_estimate" is the common,
+        # correct answer — a fake green tick is not.
+        status = _budget_status(total, currency, estimated_amount, estimated_currency)
         categories.append({
             "name": svc_name,
             "cap_amount": total,
@@ -2311,6 +2359,10 @@ def get_budget_summary(
     list_case_forms.
     """
     _assert_case_access(user, case_id)
+    # AIQ-1704: the id may be an assignment id; services_state / case_services are
+    # keyed on the canonical case id, so resolve before reading (else the caps
+    # comparison silently sees an empty selection). Fail closed on an unknown id.
+    case_id = _canonical_case_id_or_404(case_id)
 
     # Resolve company + employee context from the CASE itself — caps belong to the
     # company that owns this case, and the employee's assignment_type / family_status
@@ -2376,6 +2428,15 @@ def list_case_messages(
     """
     Return the full message thread for a case, oldest-first.
     """
+    # SECURITY: authorize before reading — case_messages carry relocation PII and
+    # this endpoint previously had NO access check (only get_current_user), so any
+    # authenticated user could read any case's thread by id (cross-tenant IDOR).
+    # Mirrors every sibling case-scoped read in this module.
+    _assert_case_access(user, case_id)
+    # AIQ-1704: case_messages.case_id holds the canonical case id; resolve the
+    # (possibly assignment) path id so the thread isn't silently empty. Fail
+    # closed on an unknown id.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(
@@ -2426,6 +2487,10 @@ def list_case_vendors(
     the vendors table.  Available to HR and ADMIN roles.
     """
     _assert_case_access(user, case_id)
+    # AIQ-1704: case_vendor_shortlist.case_id is the canonical case id; resolve the
+    # (possibly assignment) path id so the list isn't silently empty on the HR
+    # case-detail URL. Fail closed on an unknown id.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(
@@ -2493,6 +2558,9 @@ def list_case_budget_lines(
     Return budget line items for the case.  Available to HR and ADMIN roles.
     """
     _assert_case_access(user, case_id)
+    # AIQ-1704: case_budget_lines.case_id is the canonical case id (sole key);
+    # resolve the (possibly assignment) path id so the list isn't silently empty.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(

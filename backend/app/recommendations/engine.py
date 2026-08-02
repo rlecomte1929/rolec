@@ -153,10 +153,21 @@ def _load_dataset_with_registry(category: str, criteria: Dict[str, Any]) -> List
     if registry_items:
         # Registry is primary: use registry items, optionally merge non-duplicate static items
         existing_ids = {str((r.get("item_id") or "")) for r in registry_items}
+        # AIQ-1690: a registry candidate (item_id = supplier id) and its legacy static
+        # twin (item_id = 'm-N') are the SAME supplier but never collide on item_id, so
+        # both used to be scored — one supplier could occupy two of the top_n slots and
+        # push a different distinct approved supplier below the cut (apply_hr_curation
+        # dedups by master id, but only after the cut). The link is the master's
+        # supplier_id. Best-effort: if the catalog is unreachable, merge as before.
+        try:
+            from ..services.service_catalog import external_ids_for_supplier_ids
+            twin_ids = external_ids_for_supplier_ids(category, sorted(existing_ids))
+        except Exception:
+            twin_ids = set()
         dataset = list(registry_items)
         for d in static_dataset:
             iid = str((d.get("item_id") or ""))
-            if iid and iid not in existing_ids:
+            if iid and iid not in existing_ids and iid not in twin_ids:
                 dataset.append(d)
                 existing_ids.add(iid)
     else:
@@ -282,7 +293,14 @@ def recommend(
             str((x.get("item") or {}).get("name") or ""),
         )
     )
-    top = matching[:top_n]
+    # AIQ-1700: when HR curation will run, build items for the FULL ranked list and
+    # slice AFTER curating. Slicing first meant curation only ever saw the top_n, so a
+    # supplier HR approved but that ranked below the cut was discarded before the
+    # allowlist was ever consulted — 74 of 78 companies rendered fewer providers than
+    # they had approved. On the un-curated path (admin debug, advisory categories) the
+    # slice is unchanged and still bounds the work.
+    will_curate = bool(company_id) and not getattr(plugin, "advisory", False)
+    top = matching if will_curate else matching[:top_n]
 
     items: List[RecommendationItem] = []
     for t in top:
@@ -325,7 +343,7 @@ def recommend(
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     hr_curation_status: Optional[str] = None
-    if company_id and not getattr(plugin, "advisory", False):
+    if will_curate:
         # Phase 2c — filter through HR's curation. Advisory categories (neighbourhood
         # overviews) are informational content, not vendors, so they are never gated:
         # gating them dropped every la-* row against the never-seeded catalog masters
@@ -339,15 +357,61 @@ def recommend(
             destination_city=dest_city or None,
             destination_country=dest_country,
         )
+        # Show-all-vetted (2026-07-27, product decision): the employee must be able to
+        # REACH every vetted provider, so we no longer drop masters beyond top_n. Return
+        # the FULL curated set (ranked); `display_cap` + `masters_capped_by_display_limit`
+        # tell the client to default to the top `top_n` and reveal the rest via a
+        # "Show N more" control. top_n is a DISPLAY default here, not a hard cut — the
+        # vetting/eligibility gate (apply_hr_curation) is untouched, and the top-`top_n`
+        # ranking order is unchanged (AIQ-1700/1722 lineage; superseded cap-as-drop).
+        _curated_masters = sum(1 for it in items if not (it.metadata or {}).get("hr_custom"))
+        _beyond_cap = max(0, _curated_masters - top_n)
+        if _beyond_cap > 0:
+            criteria_echo["masters_capped_by_display_limit"] = _beyond_cap
+            criteria_echo["display_cap"] = top_n
+            logger.info(
+                "recommendations: %d vetted %s master(s) beyond display_cap %d are "
+                "reachable via expand for company=%s (curated=%d)",
+                _beyond_cap, category, top_n, company_id, _curated_masters,
+            )
         if hr_curation_status:
             criteria_echo["hr_curation_status"] = hr_curation_status
 
-    return RecommendationResponse(
+    response = RecommendationResponse(
         category=category,
         generated_at=generated_at,
         criteria_echo=criteria_echo,
         recommendations=items,
     )
+
+    # AIQ-1694: production-time AI-decision audit record (PII-masked input + the model
+    # output), so an overseer's later accept/override/reject links back to what was shown.
+    # Deduped by a stable id (same picks → one 'produced' row, not one per page-view) and
+    # company-scoped (no company → no tenant to audit). Only logs a NON-EMPTY result — an
+    # empty/hr_pending response is not a recommendation to audit. Side-effect only +
+    # best-effort: never alters or blocks the recommendation.
+    if company_id and items:
+        try:
+            from ..services.ai_decision_logger import (
+                record_ai_recommendation,
+                stable_recommendation_id,
+            )
+            rec_id = stable_recommendation_id(
+                company_id, category, *[it.item_id for it in items]
+            )
+            record_ai_recommendation(
+                feature=f"supplier_reco:{category}",
+                recommendation_id=rec_id,
+                input_context=criteria_echo,
+                ai_output=response.model_dump(mode="json"),
+                company_id=company_id,
+                model_name="rule-based",
+                skip_if_exists=True,
+            )
+        except Exception:  # audit logging must never affect the recommendation
+            pass
+
+    return response
 
 
 def recommend_debug(

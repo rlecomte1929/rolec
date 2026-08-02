@@ -61,9 +61,99 @@ export interface CaseProvider {
   }
 }
 
+/** [AIQ-1671] One recipient (supplier) on a canonical employee-submitted RFQ. */
+export interface CaseRfqRecipient {
+  supplier_id: string | null
+  supplier_name: string | null
+  status: string | null
+  last_activity_at: string | null
+}
+
+/** [AIQ-1671] A canonical RFQ the EMPLOYEE submitted (from `rfqs`), read by HR. */
+export interface CaseRfq {
+  id: string
+  rfq_ref: string | null
+  case_id: string | null
+  status: string | null
+  created_at: string | null
+  service_keys: string[]
+  recipients: CaseRfqRecipient[]
+}
+
 // ---------------------------------------------------------------------------
 // API functions
 // ---------------------------------------------------------------------------
+
+/**
+ * [AIQ-1671] The canonical RFQs an employee submitted for this case, read from the
+ * `rfqs` table via GET /api/hr/cases/{caseId}/rfqs (AIQ-1669). This is what makes the
+ * employee's "your HR team can see the providers you picked" true — HR now sees them.
+ */
+export async function getCaseRfqs(caseId: string): Promise<CaseRfq[]> {
+  const res = await fetch(`${BASE}/api/hr/cases/${encodeURIComponent(caseId)}/rfqs`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+  })
+  const data = await handleResponse<{ rfqs: CaseRfq[] }>(res)
+  return data.rfqs
+}
+
+/** [AIQ-1677] Per-recipient outcome of a dispatch (from supplier_link_dispatch). `sent` is
+ * true only when an email actually went out; `error` explains a skip (no verified address,
+ * placeholder domain, RESEND not configured, …). */
+export interface DispatchRfqTargetResult {
+  recipient_id: string | null
+  supplier_name: string | null
+  ok: boolean
+  sent: boolean
+  error?: string | null
+  /**
+   * [AIQ-1743] The supplier's magic link. The backend has always returned this
+   * (`supplier_link_dispatch` appends it to every result and `dispatch_case_rfq` passes
+   * `results` through verbatim) — it was simply absent from this type, so HR's own client
+   * received it and threw it away. Declaring it is what lets HR see and relay it.
+   *
+   * ⚠️ BEARER CREDENTIAL. Whoever holds this URL is that supplier for that one RFQ: it
+   * authorises reading that brief and submitting exactly ONE quote. It is scoped to a single
+   * (rfq, recipient) pair and cannot be replayed against another RFQ.
+   *
+   * Only ever present on a dispatch RESPONSE. `rfq_recipients` persists just `sha256(token)`
+   * ("The raw token is never stored" — 20260921000000_supplier_magic_link.sql), so a link
+   * CANNOT be read back later, and re-minting issues a different JWT that invalidates the one
+   * already delivered. Treat it as session-scoped: never persist it client-side.
+   */
+  link?: string | null
+}
+
+/** [AIQ-1670] Result of an HR-gated RFQ dispatch. */
+export interface DispatchRfqResult {
+  ok: boolean
+  rfq_id: string
+  dispatched: number
+  /** [AIQ-1677] Per-recipient results — count `sent === true` for the honest emailed-count. */
+  results?: DispatchRfqTargetResult[]
+}
+
+/**
+ * [AIQ-1670] HR-gated dispatch: mint a supplier token for every recipient of this RFQ
+ * (reusing the audited supplier magic-link path). `sendEmail` defaults OFF — minting a link
+ * is harmless, but emailing a real supplier is opt-in and only fires with RESEND configured.
+ */
+export async function dispatchCaseRfq(
+  caseId: string,
+  rfqId: string,
+  sendEmail = false
+): Promise<DispatchRfqResult> {
+  const res = await fetch(
+    `${BASE}/api/hr/cases/${encodeURIComponent(caseId)}/rfqs/${encodeURIComponent(rfqId)}/dispatch`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ send_email: sendEmail }),
+    }
+  )
+  return handleResponse<DispatchRfqResult>(res)
+}
 
 export async function getCaseProviders(caseId: string): Promise<CaseProvider[]> {
   const res = await fetch(`${BASE}/api/hr/cases/${encodeURIComponent(caseId)}/providers`, {

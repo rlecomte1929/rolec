@@ -32,6 +32,11 @@ jobs:
       E2E_APP_URL: ${{ vars.E2E_APP_URL || 'https://relopass.com' }}
       RELOPASS_E2E_PASSWORD: ${{ secrets.RELOPASS_E2E_PASSWORD }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # [AIQ-1685] Lets the deep journey complete a test-mode roadmap payment (locally-signed
+      # checkout.session.completed) so [DEEP-ROADMAP-API] validates generation for a PAID case
+      # while the paywall (RELOPASS_ROADMAP_PAYWALL_ENABLED) is on. Must equal the value the
+      # backend verifies against; if unset, that check skips cleanly (no false P0).
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
     steps:
       - uses: actions/checkout@v4
 
@@ -196,17 +201,23 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           mkdir -p results
-          prev=$(gh run list --workflow=e2e-campaign.yml --branch=main --limit=10 \
-            --json databaseId --jq "[.[]|select((.databaseId|tostring) != env.RUN_ID)][0].databaseId" 2>/dev/null || true)
-          if [ -n "$prev" ] && [ "$prev" != "null" ]; then
+          # AIQ-1738: only COMPLETED runs have uploaded their sentinel-state artifact, and
+          # the most-recent one may not have it yet (near-simultaneous runs race). So walk
+          # the recent completed runs and take the FIRST that actually yields the artifact,
+          # rather than blindly resolving [0] and giving up. A missing baseline still fails
+          # open for new-task filing, but reopening a Done task stays fail-closed downstream.
+          loaded=""
+          for prev in $(gh run list --workflow=e2e-campaign.yml --branch=main --status=completed --limit=15 \
+              --json databaseId --jq ".[] | .databaseId | tostring" 2>/dev/null | grep -v "^${RUN_ID}$" || true); do
             if gh run download "$prev" -n sentinel-state -D results/ 2>/dev/null && [ -f results/last_failures.json ]; then
               mv results/last_failures.json results/prev_failures.json
               echo "loaded prev sentinel state from run $prev"
-            else
-              echo "no sentinel-state artifact on run $prev — confirm-twice fails open"
+              loaded=1
+              break
             fi
-          else
-            echo "no previous run found — confirm-twice fails open"
+          done
+          if [ -z "$loaded" ]; then
+            echo "no prior sentinel-state found in recent completed runs — confirm-twice fails open for new tasks (reopens stay held)"
           fi
 
       # Optional: sync P0/P1 failures + regressions into the Notion Work Queue (gated).

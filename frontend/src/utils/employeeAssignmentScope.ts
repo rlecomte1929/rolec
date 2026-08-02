@@ -26,8 +26,13 @@ export function parseAssignmentSearchParam(search: string): string | null {
  * endpoints — e.g. `GET/PUT /api/cases/{caseId}/services-state`. The services
  * pages resolve an `assignment_id` (via resolveScopedAssignmentId) but the
  * services-state route is keyed by case_id; passing the assignment_id 404s
- * ("Case not found"). Resolve via linkedSummaries; fall back to the id itself
- * when no linked row matches (HR/legacy). (AIQ-1320)
+ * ("Case not found"). Resolve via linkedSummaries.
+ *
+ * AIQ-1704: returns `null` on a miss (was: the raw id). The raw-id fallback was
+ * the documented "fallback hole" — on a miss the id is often the *assignment* id,
+ * which a case-keyed endpoint reads as the wrong case. Callers that still want the
+ * raw id as a last resort do so explicitly (`?? pathCaseId`, `?? id`); a bare miss
+ * now fails closed instead of silently returning an assignment id. (AIQ-1320)
  */
 export function caseIdForAssignment(
   linkedSummaries: EmployeeLinkedOverviewRow[],
@@ -35,15 +40,47 @@ export function caseIdForAssignment(
 ): string | null {
   if (!id) return null;
   const row = linkedSummaries.find((r) => r.assignment_id === id || r.case_id === id);
-  return row?.case_id ?? id;
+  return row?.case_id ?? null;
+}
+
+/**
+ * The case_id to PERSIST case-scoped state against (services-state), or `null`
+ * when it cannot be safely resolved yet.
+ *
+ * AIQ-1691: `caseIdForAssignment` falls back to the raw `id` on a miss. While the
+ * linked summaries are still loading, that raw id is the **assignment_id** — and
+ * `POST /api/cases/{assignmentId}/services-state` 404s ("Case not found"), so
+ * debounced saves that fire in the load window are silently dropped and the
+ * shortlist persists incomplete (only the writes AFTER the summaries load land).
+ * This gate returns `null` until the summaries have loaded, so the caller skips
+ * the save (localStorage still holds the state) and persists once — with the real
+ * case_id — after resolution. Once loaded, a genuine legacy no-match still falls
+ * back to the id, which for a case_id URL is correct.
+ *
+ * AIQ-1704: `caseIdForAssignment` now returns `null` on a miss (fail closed), so
+ * this gate re-adds the post-load raw-id fallback explicitly to preserve the
+ * documented legacy-case_id-URL behaviour above — the mid-load guard (the actual
+ * AIQ-1691 fix) is unchanged.
+ */
+export function persistableCaseId(
+  linkedSummaries: EmployeeLinkedOverviewRow[],
+  id: string | null,
+  summariesLoaded: boolean,
+): string | null {
+  if (!id) return null;
+  if (!summariesLoaded) return null; // don't guess mid-load — a wrong (assignment) id 404s
+  return caseIdForAssignment(linkedSummaries, id) ?? id;
 }
 
 /**
  * Inverse of {@link caseIdForAssignment}: map a scope id — which may be a
  * **case_id** (the canonical employee URL id, AIQ-1334) or an assignment_id — to
- * its assignment_id. Falls back to the id itself when no linked row matches
- * (HR/legacy). Lets the services pages accept a case_id in the URL while still
- * resolving the assignment_id their APIs key on.
+ * its assignment_id. Lets the services pages accept a case_id in the URL while
+ * still resolving the assignment_id their APIs key on.
+ *
+ * AIQ-1704: returns `null` on a miss (was: the raw id) — fail closed. The sole
+ * consumer, resolveScopedAssignmentId, guards its result with `allowed.has(...)`,
+ * which already excludes any un-matched id, so this is behaviour-preserving there.
  */
 export function assignmentIdForScopeId(
   linkedSummaries: EmployeeLinkedOverviewRow[],
@@ -51,7 +88,7 @@ export function assignmentIdForScopeId(
 ): string | null {
   if (!id) return null;
   const row = linkedSummaries.find((r) => r.assignment_id === id || r.case_id === id);
-  return row?.assignment_id ?? id;
+  return row?.assignment_id ?? null;
 }
 
 /** Collapse duplicate overview rows (same assignment_id) so UI / picker logic stay consistent. */

@@ -234,6 +234,29 @@ def _attach_precedent_insight(conn, row: Dict[str, Any]) -> Dict[str, Any]:
         )
         insight["recommendation_id"] = insight_recommendation_id(str(row["id"]))
         row["precedent_insight"] = insight
+        # AIQ-1694·4b — record the surfaced precedent insight to the human-oversight
+        # audit trail so the production event (not just the eventual human decision) is
+        # logged. Best-effort and deduped per request via the stable recommendation_id,
+        # so re-rendering the inbox writes at most one row per exception request.
+        _org = str(row.get("organization_id") or "")
+        if _org:
+            try:
+                from ..services.ai_decision_logger import record_ai_recommendation
+                record_ai_recommendation(
+                    feature="precedent_insight",
+                    recommendation_id=str(insight["recommendation_id"]),
+                    input_context={
+                        "exception_request_id": str(row.get("id") or ""),
+                        "category": str(row.get("category") or ""),
+                        "benefit_key": row.get("benefit_key"),
+                    },
+                    ai_output=insight,
+                    company_id=_org,
+                    model_name="rule-based",
+                    skip_if_exists=True,
+                )
+            except Exception:
+                logger.exception("precedent_insight audit-log failed for id=%s", row.get("id"))
     except Exception:
         logger.exception("precedent_insight compute failed for id=%s", row.get("id"))
     return row

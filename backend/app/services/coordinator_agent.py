@@ -232,6 +232,28 @@ def respond(
             answer = (answer + ("\n\n" if answer else "") + confirmation).strip()
 
     _persist_turn(case_id, session, masked_user, answer, ctx, model=effective_model, db=db)
+
+    # AIQ-1694·4b — record this coordinator turn to the human-oversight audit trail
+    # (best-effort). Unlike the recs engine's structured vendor output, a coordinator
+    # answer is free text that may echo case PII, so we mask the answer before storing
+    # it; the helper masks input_context on its own.
+    if company_id and answer:
+        try:
+            from .ai_decision_logger import record_ai_recommendation, stable_recommendation_id
+            _model = result.get("model", effective_model)
+            record_ai_recommendation(
+                feature="ai_coordinator",
+                recommendation_id=stable_recommendation_id(company_id, "ai_coordinator", str(case_id), answer),
+                input_context={"case_id": str(case_id), "user_message": masked_user},
+                ai_output={"answer": mask_pii(answer), "model": _model},
+                company_id=company_id,
+                actor_id=employee_id,
+                model_name=_model,
+                skip_if_exists=True,
+            )
+        except Exception:  # noqa: BLE001 — audit is best-effort, never breaks the turn
+            pass
+
     return {"answer": answer, "case_id": str(case_id), "model": result.get("model", effective_model)}
 
 

@@ -23,6 +23,8 @@ from .routers import (
     advisors,
     ai_decisions,
     ai_feedback,
+    payment,
+    stripe_webhook,
     resources_activities,
     auth_page_config,
     assistant_router,
@@ -46,6 +48,7 @@ from .routers import (
     hr_vendor_performance,
     exception_requests,
     hr_analytics,
+    hr_case_summary,
     hr_onboarding,
     hr_export,
     hr_case_audit,
@@ -165,6 +168,7 @@ def create_app() -> FastAPI:
     app.include_router(research_requests.router)  # [AIQ-1349 P2] research-request intake
     app.include_router(hr_coordination.router)
     app.include_router(hr_analytics.router)
+    app.include_router(hr_case_summary.router)  # AIQ-1697 — AI case summary proxy
     app.include_router(hr_onboarding.router)  # AIQ-1223c — deterministic onboarding inference
     app.include_router(hr_export.router)
     # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.
@@ -211,6 +215,8 @@ def create_app() -> FastAPI:
     app.include_router(geocoding.router)   # [AIQ-1607] GET /api/employee/geocode/autocomplete
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
+    app.include_router(payment.router)  # Stripe roadmap paywall (TEST MODE) — POST /api/payment/checkout
+    app.include_router(stripe_webhook.router)  # Stripe webhook Path A — POST /api/stripe/webhook
     # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
     app.include_router(auth_page_config.router)
     app.include_router(assistant_router.router)  # policy-bridge domain routing — POST /api/assistant/route

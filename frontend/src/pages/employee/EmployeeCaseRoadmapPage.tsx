@@ -15,6 +15,9 @@ import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
 import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
 import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import { RoadmapBeingBuilt } from '../../features/employee-journey/RoadmapBeingBuilt';
+import { RoadmapPaywallGate } from '../../features/employee-journey/RoadmapPaywallGate';
+import { fetchRoadmapUnlocked } from '../../utils/paymentStatus';
+import { isRoadmapPaywallEnabled } from '../../featureFlags';
 import { RuleUpdateBanner } from '../../features/platform-v2/roadmap/RuleUpdateBanner';
 import { useEmployeeRelocationPlanPageData } from '../../features/relocation-plan-employee/useEmployeeRelocationPlanPageData';
 import { useRelocationPlanCtaHandler } from '../../features/relocation-plan-employee/relocationPlanCtaNavigate';
@@ -153,6 +156,58 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   const [windowElapsed, setWindowElapsed] = useState(false);
   const [genStarted, setGenStarted] = useState(false);
   const attemptsRef = useRef(0);
+
+  // ── Roadmap paywall (Phase 4a is the server-side enforcement; this is the UX) ──
+  // Flag-gated (default off). We resolve the unlock from the SERVER (not localStorage)
+  // and gate the render BEFORE the roadmap fetch below: the roadmap endpoints 402 when
+  // locked, so a locked case must reach the paywall, not the "being built" fallback.
+  const paywallOn = isRoadmapPaywallEnabled();
+  const [roadmapUnlocked, setRoadmapUnlocked] = useState<boolean | null>(paywallOn ? null : true);
+  // [AIQ-1723] Did the user arrive straight from Stripe checkout? Captured once, from the
+  // URL at mount, because the grace-window poll below strips nothing and a re-render must
+  // not change the answer. Drives the payment-aware copy in the two gates further down.
+  const justPaidRef = useRef(
+    new URLSearchParams(window.location.search).get('payment') === 'success',
+  );
+  // True once the just-paid grace window has elapsed WITHOUT entitlement landing. Terminal:
+  // it stops the spinner and swaps the buy-CTA paywall for an honest "still confirming"
+  // state. It never unlocks anything — the gate stays fail-CLOSED.
+  const [paymentUnconfirmed, setPaymentUnconfirmed] = useState(false);
+  useEffect(() => {
+    if (!paywallOn || !caseId) {
+      setRoadmapUnlocked(true);
+      return;
+    }
+    let alive = true;
+    setRoadmapUnlocked(null);
+    setPaymentUnconfirmed(false);
+    // Returning from Stripe checkout (?payment=success) the webhook that flips access_tier
+    // can lag the browser redirect by a beat. Poll the server status briefly so a just-paid
+    // user lands on their roadmap, not the paywall again. Normal loads check once.
+    const justPaid = justPaidRef.current;
+    const maxAttempts = justPaid ? 6 : 1; // ~6 × 2.5s ≈ 15s grace for the webhook
+    let attempt = 0;
+    const check = () => {
+      void fetchRoadmapUnlocked(caseId).then((unlocked) => {
+        if (!alive) return;
+        attempt += 1;
+        if (unlocked || attempt >= maxAttempts) {
+          // [AIQ-1723] The webhook outlived the grace window. Remember that, so the render
+          // below can say "we're still confirming your payment" instead of showing someone
+          // who just paid the €800 buy button again — which reads as "my money vanished".
+          if (!unlocked && justPaid) setPaymentUnconfirmed(true);
+          setRoadmapUnlocked(unlocked);
+        } else {
+          window.setTimeout(check, 2500);
+        }
+      });
+    };
+    check();
+    return () => {
+      alive = false;
+    };
+  }, [paywallOn, caseId]);
+
   const planEmpty = !!data && data.summary.total_tasks === 0;
   const planReady = !!data && data.summary.total_tasks > 0 && data.phases.length > 0;
   // "not ready" = a transient error OR an empty plan still generating. Both retried.
@@ -191,6 +246,67 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     resetWindow();
     void refetch();
   }, [resetWindow, refetch]);
+
+  // Paywall gate — runs BEFORE the loading/build-state returns so a locked case reaches
+  // the paywall rather than the "being built" fallback (the roadmap fetch 402s when locked).
+  if (paywallOn && roadmapUnlocked === null) {
+    // [AIQ-1723] Same bounded wait either way, but say WHY we're waiting when the user
+    // just came back from checkout. "Loading roadmap…" at the highest-anxiety moment in
+    // the funnel reads as a hang; naming the payment makes the same seconds tolerable.
+    return (
+      <AppShell>
+        <div style={{ padding: '24px', color: 'var(--text-muted)' }}>
+          {justPaidRef.current ? 'Confirming your payment…' : 'Loading roadmap…'}
+        </div>
+      </AppShell>
+    );
+  }
+  // [AIQ-1723] Paid, but the webhook hasn't landed within the grace window. Terminal and
+  // fail-CLOSED — the roadmap stays locked — but showing the €800 buy CTA to someone who
+  // has already paid is the worst copy in the product. Tell them the truth and give them
+  // a way forward instead.
+  if (paywallOn && roadmapUnlocked === false && paymentUnconfirmed) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-5xl px-6 py-6">
+          <div className="rounded-lg border border-[#e2e8f0] bg-white p-6">
+            <div className="text-base font-semibold text-navy-800">
+              Payment received — we&apos;re still confirming it
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              Your payment went through. Our provider hasn&apos;t confirmed it back to us yet,
+              which usually takes a few seconds. Your roadmap unlocks automatically as soon as
+              it does — nothing else is needed from you.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 rounded-md bg-navy-800 px-4 py-2 text-sm font-medium text-white"
+            >
+              Check again
+            </button>
+            <p className="mt-3 text-xs text-slate-500">
+              Still waiting after a minute or two? Contact support and we&apos;ll sort it out —
+              you will not be charged twice.
+            </p>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+  if (paywallOn && roadmapUnlocked === false) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-5xl px-6 py-6">
+          <RoadmapPaywallGate
+            assignmentId={data?.assignment_id || caseId || ''}
+            destCity={header?.destCity}
+            destCountry={header?.destCountry}
+          />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (loading && !data && !genStarted) {
     return (

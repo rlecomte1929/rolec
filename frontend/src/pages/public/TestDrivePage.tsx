@@ -438,6 +438,24 @@ export const TestDrivePage: React.FC = () => {
         </FadeIn>
       </Section>
 
+      {/* Unlocking the roadmap — test payment with EXACT card details (no surprises) */}
+      <Section spacing="lg" background="muted">
+        <FadeIn>
+          <div className="mx-auto max-w-2xl">
+            <SectionHeader title={c.paymentTest.header} align="center" narrow />
+            <p className="mt-6 text-marketing-body text-marketing-text leading-relaxed text-center">
+              {c.paymentTest.intro}
+            </p>
+            <div className="mt-6 mx-auto max-w-md space-y-2 rounded-xl border border-marketing-border bg-white p-4">
+              {c.paymentTest.card.map((row) => (
+                <CopyRow key={row.label} label={row.label} value={row.value} />
+              ))}
+            </div>
+            <p className="mt-4 text-center text-sm text-marketing-text-muted">{c.paymentTest.note}</p>
+          </div>
+        </FadeIn>
+      </Section>
+
       {/* Before you start — video placeholders (real embeds land in TD-11) */}
       <Section spacing="lg" background="muted">
         <FadeIn>
@@ -642,6 +660,16 @@ const CredentialResult: React.FC<{
         caption={c.credentials.employee.caption}
         credential={result.employee}
       />
+    </div>
+    {/* Test card, right where the logins are — the tester needs it at the roadmap unlock. */}
+    <div className="mt-6 mx-auto max-w-md rounded-xl border border-marketing-border bg-marketing-surface-muted p-4">
+      <p className="text-sm font-semibold text-marketing-primary">{c.paymentTest.reminderHeader}</p>
+      <p className="mt-1 text-xs text-marketing-text-muted leading-relaxed">{c.paymentTest.reminderIntro}</p>
+      <div className="mt-3 space-y-2">
+        {c.paymentTest.card.map((row) => (
+          <CopyRow key={row.label} label={row.label} value={row.value} />
+        ))}
+      </div>
     </div>
     {/* AIQ-1539: plain line — where the test ends, and that the survey is required. */}
     <p className="mt-8 text-center text-marketing-body text-marketing-text leading-relaxed">

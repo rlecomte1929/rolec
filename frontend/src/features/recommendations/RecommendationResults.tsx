@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, Badge, Button, Alert } from '../../components/antigravity';
 import { formatEstimationFromUsd } from '../services/servicesCurrency';
 import { createAIDecision } from '../../api/aiDecisions';
+import { reportError } from '../../lib/errorTracking';
 import { track } from '../../analytics';
 import type { RecommendationItem, RecommendationResponse } from './types';
 import { rateProvider } from './api';
@@ -512,6 +513,17 @@ export const RecommendationResults: React.FC<Props> = ({
   } | null>(null);
   const [pendingSubmitting, setPendingSubmitting] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
+  // Show-all-vetted: the backend returns EVERY vetted provider; the default view shows
+  // the top `display_cap` and "Show N more" reveals the rest per category, so no vetted
+  // provider is unreachable while the top-matches-first signal is preserved.
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const toggleExpanded = (category: string) =>
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
+      return next;
+    });
 
   if (entries.length === 0) return null;
 
@@ -534,17 +546,25 @@ export const RecommendationResults: React.FC<Props> = ({
 
   /**
    * Fire-and-forget POST to /api/ai/decisions. Never blocks the selection —
-   * if the log fails, the user's pick still goes through and a non-blocking
-   * error Alert appears at the top of the page. Per AI-002 / Art. 14:
-   * accept = picked the top-ranked item, override = picked a lower rank.
+   * if the log fails, the user's pick still goes through, a non-blocking error
+   * Alert appears at the top of the page, and the failure is written to the
+   * console. Per AI-002 / Art. 14 the decision is supplied by the caller (see
+   * `decision` below), not derived from rank.
    */
   const logDecision = (
     category: string,
     item: RecommendationItem,
     rank: number,
+    decision: 'accept' | 'override',
     reason: string | null
   ): void => {
-    const decision = rank === 0 ? 'accept' : 'override';
+    // AIQ-1691: the caller decides accept-vs-override — the decision is NOT derivable
+    // from rank alone. Adding a comparison vendor AFTER the top match is already picked
+    // is an 'accept' (see handleCardToggle), even though its rank > 0. Deriving
+    // 'override' from rank here sent `override` with a null reason, which
+    // /api/ai/decisions rejects with 400 (reason required) — the spurious 400 on every
+    // 2nd+ pick per category. The genuine-override path (confirmPendingPick) always
+    // supplies a captured reason.
     createAIDecision({
       feature: `service_recommendation_${category}`,
       recommendation_id: item.item_id,
@@ -560,6 +580,18 @@ export const RecommendationResults: React.FC<Props> = ({
       reason: reason ?? undefined,
     }).catch((e) => {
       const msg = e instanceof Error ? e.message : 'Failed to log AI decision';
+      // AIQ-1691 follow-up: this write is fire-and-forget and the Alert below
+      // self-dismisses after 8s, so a dropped Art. 14 audit row left no trace once it
+      // faded — which is what made the original 400 so easy to miss. Report every
+      // non-2xx to error tracking so the next drop is diagnosable. `logger.error` is a
+      // no-op in prod builds, which is exactly where a dropped audit row matters, hence
+      // reportError. Context is vendor/decision ids + HTTP status only — no employee PII.
+      const status = (e as { status?: number } | null)?.status;
+      void reportError({
+        message: `[ai-decisions] audit write failed (decision=${decision}, status=${status ?? 'n/a'}, recommendation_id=${item.item_id}): ${msg}`,
+        stack: e instanceof Error ? e.stack ?? null : null,
+        componentName: 'RecommendationResults',
+      });
       setLogError(`${msg} — your selection was saved, but the audit log entry could not be written.`);
       window.setTimeout(() => setLogError(null), 8000);
     });
@@ -591,7 +623,10 @@ export const RecommendationResults: React.FC<Props> = ({
     const topMatchAlreadyPicked = !!topItemId && inCategory.includes(topItemId);
     if (rank === 0 || topMatchAlreadyPicked) {
       togglePackage(category, item.item_id);
-      logDecision(category, item, rank, null);
+      // 'accept': the top match itself (rank 0), OR a comparison vendor added after the
+      // top match is already shortlisted — not an override, so no reason is required
+      // and no spurious 400 (AIQ-1691 / AIQ-1520).
+      logDecision(category, item, rank, 'accept', null);
       // AIQ-1436: supplier_selected on committing the pick.
       track('supplier_selected', { supplier_id: item.item_id, service_category: category, case_id: caseId });
       return;
@@ -606,7 +641,7 @@ export const RecommendationResults: React.FC<Props> = ({
       // Commit the selection first (local + debounced server sync) so the user's
       // intent is reflected immediately even if the audit log POST is slow.
       togglePackage(pendingPick.category, pendingPick.item.item_id);
-      logDecision(pendingPick.category, pendingPick.item, pendingPick.rank, reason);
+      logDecision(pendingPick.category, pendingPick.item, pendingPick.rank, 'override', reason);
       // AIQ-1436: supplier_selected on confirming a lower-ranked (override) pick.
       track('supplier_selected', { supplier_id: pendingPick.item.item_id, service_category: pendingPick.category, case_id: caseId });
       setPendingPick(null);
@@ -706,6 +741,16 @@ export const RecommendationResults: React.FC<Props> = ({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {res.recommendations.map((item, idx) => {
+                  // Show-all default view: the top `display_cap` matches + every HR custom
+                  // vendor (customs are appended after the masters and are always shown);
+                  // the rest of the vetted set is revealed by "Show N more". idx is kept
+                  // intact so rank / override logic is unchanged.
+                  const displayCap = Number(
+                    (res.criteria_echo as Record<string, unknown> | undefined)?.display_cap ?? 0,
+                  );
+                  const isCustom = !!(item.metadata as Record<string, unknown> | undefined)?.hr_custom;
+                  const withinDefaultView = displayCap <= 0 || idx < displayCap || isCustom;
+                  if (!expandedCategories.has(category) && !withinDefaultView) return null;
                   const isPendingThisCard =
                     pendingPick?.category === category && pendingPick.item.item_id === item.item_id;
                   return (
@@ -729,6 +774,24 @@ export const RecommendationResults: React.FC<Props> = ({
                 })}
               </div>
             )}
+            {(() => {
+              // Show-all-vetted (2026-07-27): every vetted provider is reachable. The
+              // default view shows the top matches; this control reveals the rest so no
+              // vetted provider is unreachable. (Replaces the AIQ-1722 disclosure banner.)
+              const echo = res.criteria_echo as Record<string, unknown> | undefined;
+              const capped = Number(echo?.masters_capped_by_display_limit ?? 0);
+              if (capped <= 0) return null;
+              const isExpanded = expandedCategories.has(category);
+              return (
+                <div className="mt-4 flex justify-center">
+                  <Button variant="outline" size="sm" onClick={() => toggleExpanded(category)}>
+                    {isExpanded
+                      ? 'Show fewer'
+                      : `Show ${capped} more vetted ${capped === 1 ? 'provider' : 'providers'}`}
+                  </Button>
+                </div>
+              );
+            })()}
           </div>
         ) : null
       )}

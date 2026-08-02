@@ -4,6 +4,7 @@ import { signInSupabase } from '../api/supabaseAuth';
 import { supabase } from '../api/supabase';
 import type { LoginRequest, RegisterRequest, UserRole } from '../types';
 import { normalizeStoredRole, setAuthItem, setStoredRoles, setActiveRole } from '../utils/demo';
+import { seedWelcomeSeenFromLogin } from '../utils/welcomeSeen';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { homeRouteKeyForRole, type RouteKey } from '../navigation/routes';
 import { trackAuthPerf } from '../perf/authPerf';
@@ -25,9 +26,16 @@ function shouldPersistReconciliation(rec: PostSignupReconciliation | null | unde
 export const useAuth = () => {
   const navigate = useNavigate();
 
-  const setSession = (token: string, user: { id: string; role: UserRole; email?: string | null; username?: string | null; name?: string | null; roles?: string[] | null; primary_role?: string | null }) => {
+  const setSession = (token: string, user: { id: string; role: UserRole; email?: string | null; username?: string | null; name?: string | null; roles?: string[] | null; primary_role?: string | null; welcome_seen?: boolean | null }) => {
     setAuthItem('relopass_token', token);
     setAuthItem('relopass_user_id', user.id);
+    // AIQ-1701: the welcome dismissal is stored server-side on the profile; mirror it
+    // into localStorage here, at login, so useWelcomeRedirect's mount check stays
+    // SYNCHRONOUS. Making that check async would risk the role home flashing the
+    // welcome page before the answer arrived. Only ever sets the flag — never clears
+    // it — so a user already onboarded in this browser is unaffected if the server
+    // says nothing (which is also the pre-AIQ-1701 behaviour).
+    seedWelcomeSeenFromLogin(user.id, user.welcome_seen);
     if (user.email) setAuthItem('relopass_email', user.email);
     if (user.username) setAuthItem('relopass_username', user.username);
     if (user.name) setAuthItem('relopass_name', user.name);

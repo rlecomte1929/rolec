@@ -42,6 +42,12 @@
       "name": "New App",
       "icon": "NotebookPen",
       "component": "apps/NewApp/App.tsx"
+    },
+    {
+      "id": "frno-data-sheet-prototype",
+      "name": "FR-NO Data Sheet Prototype",
+      "icon": "FileText",
+      "component": "apps/FRNODataSheet/App.tsx"
     }
   ],
   "terminology": {

@@ -142,6 +142,8 @@ from .app.routers import cases_admin as cases_admin_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import case_forms_adhoc as case_forms_adhoc_router  # [P4-3]
 from .app.routers import ai_decisions as ai_decisions_router  # [AI-002] EU AI Act Art. 14 human oversight log
+from .app.routers import payment as payment_router  # Stripe roadmap paywall (TEST MODE) — POST /api/payment/checkout
+from .app.routers import stripe_webhook as stripe_webhook_router  # Stripe webhook Path A — POST /api/stripe/webhook
 from .app.routers import auth_page_config as auth_page_config_router  # GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 from .app.routers import requirement_facts as requirement_facts_router  # [AIQ-1091] P4-02 requirement-facts extract
 from .app.routers import nlg as nlg_router  # [Parker-J] dual-layer registration (PR #207 §9)
@@ -225,7 +227,6 @@ from .app.routers import provider_ratings as provider_ratings_router
 from .app.routers import hr_vendor_performance as hr_vendor_performance_router
 from .app.routers import employee_steps as employee_steps_router
 from .app.routers import hr_vendors as hr_vendors_router
-from .app.routers import hr_rfq as hr_rfq_router
 from .app.routers import immigration_intake_consent as immigration_intake_consent_router
 from .app.routers import immigration_intake_profile as immigration_intake_profile_router
 from .app.routers import immigration_intake_interview as immigration_intake_interview_router
@@ -247,6 +248,7 @@ from .app.routers import relocation_profile as relocation_profile_router
 from .app.routers import rules as rules_router
 from .app.routers import marketplace as marketplace_router
 from .app.routers import hr_analytics as hr_analytics_router
+from .app.routers import hr_case_summary as hr_case_summary_router  # AIQ-1697 — AI case summary proxy (dual-layer per CLAUDE.md)
 from .app.routers import hr_onboarding as hr_onboarding_router  # AIQ-1223c — onboarding inference (dual-layer per CLAUDE.md)
 from .app.routers import setup_assistant as setup_assistant_router  # Setup & Help Assistant — read-only setup-status (dual-layer per CLAUDE.md)
 from .app.routers import hr_export as hr_export_router
@@ -564,6 +566,9 @@ _RATE_LIMIT_EXEMPT_ENDPOINTS = (
     # Service-role / external-webhook routes live in the support router:
     "backend.app.routers.support.inbound_email_webhook",  # POST /webhooks/support-email (Postmark)
     "backend.app.routers.support.triage_ticket",          # POST /api/support/triage (Supabase trigger)
+    # Stripe webhook (Path A): Stripe bursts + retries must never be throttled, or a
+    # 429 becomes a dropped payment event. It verifies its own signature (spec §4).
+    "backend.app.routers.stripe_webhook.stripe_webhook",  # POST /api/stripe/webhook
 )
 for _exempt_name in _RATE_LIMIT_EXEMPT_ENDPOINTS:
     limiter._exempt_routes.add(_exempt_name)
@@ -820,6 +825,8 @@ app.include_router(cases_admin_router.router)  # [AUDIT-B9-cases-6] split 3/3 �
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(case_forms_adhoc_router.router)  # [P4-3] ad-hoc "Add document"
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
+app.include_router(payment_router.router)  # Stripe roadmap paywall (TEST MODE) — POST /api/payment/checkout
+app.include_router(stripe_webhook_router.router)  # Stripe webhook Path A — POST /api/stripe/webhook
 app.include_router(auth_page_config_router.router)  # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 app.include_router(requirement_facts_router.router)  # [AIQ-1091] P4-02 — POST /api/admin/requirement-facts/extract
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
@@ -879,7 +886,6 @@ app.include_router(provider_ratings_router.router)  # CATALOG-3 employee provide
 app.include_router(hr_vendor_performance_router.router)  # NAV-SP-2 HR vendor performance dashboard
 app.include_router(employee_steps_router.router)  # [B11/AIQ-421] /api/employee/steps/4
 app.include_router(hr_vendors_router.router)
-app.include_router(hr_rfq_router.router)
 app.include_router(immigration_intake_consent_router.router)  # [AUDIT-B9-imm-6] 1/5 — consent + immigration-requirements (3 handlers)
 app.include_router(immigration_intake_profile_router.router)  # [AUDIT-B9-imm-6] 2/5 — HR/employee profile + OCR passport (5 handlers)
 app.include_router(immigration_intake_interview_router.router)  # [AUDIT-B9-imm-6] 3/5 — interview next/answer (2 handlers)
@@ -4641,6 +4647,56 @@ def get_case(
     return case
 
 
+def _create_assignment_for_hr(
+    *,
+    case_id: str,
+    hr_company_id: str,
+    effective: Dict[str, Any],
+    employee_identifier_raw: str,
+    employee_first_name: Optional[str],
+    employee_last_name: Optional[str],
+    employee_user: Optional[Dict[str, Any]],
+    request_id: Optional[str],
+):
+    """Mint a new assignment for assign_case. Extracted verbatim (AIQ-1731) so the
+    endpoint can take a reuse-or-create shape without nesting creation inside a branch.
+
+    NOTE the 503 below is a *timeout*, not a rollback: the future is not cancelled and
+    the row still commits. Callers MUST consult
+    db.get_active_assignment_for_case_employee first, or the retry the copy asks for
+    creates a second assignment with a duplicate canonical_case_id.
+    """
+    try:
+        with timed("unified_assignment_creation", request_id):
+            _create_fut = _hr_assign_side_effects_executor.submit(
+                create_assignment_with_contact_and_invites,
+                db,
+                company_id=hr_company_id,
+                hr_user_id=effective["id"],
+                case_id=case_id,
+                employee_identifier_raw=employee_identifier_raw,
+                employee_first_name=employee_first_name,
+                employee_last_name=employee_last_name,
+                employee_user_id=employee_user["id"] if employee_user else None,
+                assignment_status=AssignmentStatus.ASSIGNED.value,
+                request_id=request_id,
+                observability_channel="hr",
+                defer_post_creation_hooks=True,
+            )
+            try:
+                # S5-fix: 8s matches the frontend axios timeout (12s) minus round-trip
+                # overhead, and is below the E2E test FAIL threshold (8s).
+                # The previous 20s value far exceeded both client caps, causing hung UX.
+                return _create_fut.result(timeout=8)
+            except concurrent.futures.TimeoutError:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Assignment creation timed out. Please retry in a moment.",
+                )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve)) from ve
+
+
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
 def assign_case(
     case_id: str,
@@ -4812,38 +4868,59 @@ def assign_case(
 
         # New assignments created by HR are immediately in the 'assigned' state.
         assert_canonical_status(AssignmentStatus.ASSIGNED.value)
+
+        # AIQ-1731: idempotency guard on (case, employee). Creation is dispatched to a
+        # thread pool and abandoned after 8s with a 503 that tells the user to "retry in
+        # a moment" — but the future is never cancelled, so the row still commits.
+        # Without this guard that retry mints a SECOND assignment carrying an identical
+        # canonical_case_id (the `7181b3a4…` group in
+        # docs/architecture/CASE_ID_UNIFICATION_AUDIT.md). Reuse the row instead, then
+        # fall through to the normal side-effect dispatch — the timed-out call raised
+        # before dispatching, so the retry is what actually completes the assignment.
+        # Fail-open: the guard must never be the reason an assignment can't be created.
+        _existing_assignment = None
         try:
-            with timed("unified_assignment_creation", request_id):
-                _create_fut = _hr_assign_side_effects_executor.submit(
-                    create_assignment_with_contact_and_invites,
-                    db,
-                    company_id=hr_company_id,
-                    hr_user_id=effective["id"],
-                    case_id=case_id,
-                    employee_identifier_raw=employee_identifier_raw,
-                    employee_first_name=employee_first_name,
-                    employee_last_name=employee_last_name,
-                    employee_user_id=employee_user["id"] if employee_user else None,
-                    assignment_status=AssignmentStatus.ASSIGNED.value,
-                    request_id=request_id,
-                    observability_channel="hr",
-                    defer_post_creation_hooks=True,
-                )
-                try:
-                    # S5-fix: 8s matches the frontend axios timeout (12s) minus round-trip
-                    # overhead, and is below the E2E test FAIL threshold (8s).
-                    # The previous 20s value far exceeded both client caps, causing hung UX.
-                    uar = _create_fut.result(timeout=8)
-                except concurrent.futures.TimeoutError:
-                    raise HTTPException(
-                        status_code=503,
-                        detail="Assignment creation timed out. Please retry in a moment.",
-                    )
-        except ValueError as ve:
-            raise HTTPException(status_code=400, detail=str(ve)) from ve
-        assignment_id = uar.assignment_id
-        invite_token = uar.invite_token
-        stored_identifier = uar.stored_identifier
+            _existing_assignment = db.get_active_assignment_for_case_employee(
+                case_id, employee_identifier_raw, request_id=request_id
+            )
+        except Exception:
+            log.warning(
+                "assign_case: idempotency lookup failed case=%s — proceeding with create",
+                case_id,
+                exc_info=True,
+            )
+
+        if _existing_assignment:
+            assignment_id = str(_existing_assignment.get("id"))
+            stored_identifier = (
+                _existing_assignment.get("employee_identifier")
+                or employee_identifier_raw.strip().lower()
+            )
+            try:
+                invite_token = db.get_pending_claim_invite_token_for_assignment(assignment_id)
+            except Exception:
+                invite_token = None
+            log.info(
+                "assign_case: reusing existing assignment=%s for case=%s (duplicate submit); "
+                "no new row created request_id=%s",
+                assignment_id,
+                case_id,
+                request_id,
+            )
+        else:
+            uar = _create_assignment_for_hr(
+                case_id=case_id,
+                hr_company_id=hr_company_id,
+                effective=effective,
+                employee_identifier_raw=employee_identifier_raw,
+                employee_first_name=employee_first_name,
+                employee_last_name=employee_last_name,
+                employee_user=employee_user,
+                request_id=request_id,
+            )
+            assignment_id = uar.assignment_id
+            invite_token = uar.invite_token
+            stored_identifier = uar.stored_identifier
 
         # Defer mobility/case-person/passport sync, case participant, case
         # event, the invitation-message draft, and (B3-perf) the employee
@@ -9295,31 +9372,40 @@ def create_rfq(
     # picks the suppliers (from HR's approved list) and reaches them directly; HR stays the payer
     # who validates the winning quote at the end.
     #
-    # Flag-gated OFF by default. Emailing a real company that has never heard of us must be a
-    # decision, never a side-effect of someone clicking a button in a dev environment.
+    # Dispatch runs in INBOX mode by default: it mints a magic link per recipient and surfaces it
+    # in the in-app inbox (a quote_messages row on the RFQ's thread), sending NO email. Inbox mode
+    # is safe to always run — nothing leaves the building — so the loop is live from the inbox
+    # without touching the Resend quota. Going live on email is a single config flip: set
+    # SUPPLIER_RFQ_EMAIL_ENABLED, which selects "email" mode (the address/verified/test-persona
+    # guards + Resend). Emailing a company that has never heard of us stays a deliberate decision.
     contacted: List[str] = []
     not_contacted: List[Dict[str, str]] = []
     try:
         from .app.services.feature_flags import resolve_flag_safe
+        from .app.services.supplier_link_dispatch import (
+            dispatch_supplier_links,
+            resolve_rfq_targets,
+        )
 
-        if resolve_flag_safe("SUPPLIER_RFQ_DISPATCH_ENABLED", env_default=False):
-            from .app.services.supplier_link_dispatch import (
-                dispatch_supplier_links,
-                resolve_rfq_targets,
-            )
-
-            targets = resolve_rfq_targets(str(result.get("id")))
-            for r in dispatch_supplier_links(
-                rfq_id=str(result.get("id")),
-                targets=targets,
-                send_email=True,
-                request_id=req_id,
-            ):
-                name = r.get("supplier_name") or r.get("recipient_id") or "A supplier"
-                if r.get("sent"):
-                    contacted.append(name)
-                else:
-                    not_contacted.append({"supplier": name, "reason": r.get("error") or "not sent"})
+        email_mode = resolve_flag_safe("SUPPLIER_RFQ_EMAIL_ENABLED", env_default=False)
+        mode = "email" if email_mode else "inbox"
+        targets = resolve_rfq_targets(str(result.get("id")))
+        for r in dispatch_supplier_links(
+            rfq_id=str(result.get("id")),
+            targets=targets,
+            dispatch_mode=mode,
+            send_email=email_mode,
+            actor_email=user.get("email"),
+            request_id=req_id,
+        ):
+            name = r.get("supplier_name") or r.get("recipient_id") or "A supplier"
+            if r.get("sent"):
+                # An email actually reached this supplier (email mode only).
+                contacted.append(name)
+            elif not r.get("ok"):
+                # A genuine failure — no address in email mode, or a mint error. Report it.
+                not_contacted.append({"supplier": name, "reason": r.get("error") or "not sent"})
+            # else: inbox-queued (ok, not emailed) — reached via the in-app inbox, neither list.
     except Exception:
         # The RFQ exists and is valid. A dispatch failure must never turn that into a 500 — the
         # employee would retry and create a duplicate. Report it instead.
@@ -15521,6 +15607,7 @@ app.include_router(rules_router.router)
 app.include_router(marketplace_router.router)  # [AUDIT-C2.3 restore]
 # GAP 3: HR policy compliance matrix (cross-case heatmap for S5c)
 app.include_router(hr_analytics_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(hr_case_summary_router.router)  # AIQ-1697 — AI case summary proxy
 app.include_router(hr_onboarding_router.router)  # AIQ-1223c — deterministic onboarding inference
 app.include_router(hr_export_router.router)  # W2-4 HR compliance export
 # GAP 4: Immigration advisor matching

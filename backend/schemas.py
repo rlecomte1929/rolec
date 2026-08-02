@@ -226,6 +226,12 @@ class UserResponse(BaseModel):
     primary_role: Optional[str] = None
     name: Optional[str] = None
     company: Optional[str] = None
+    # [AIQ-1701] Whether this user has already dismissed their role's first-login
+    # welcome page. Carried on the login response (the profile row is already loaded
+    # there, so it costs no extra query) and mirrored into localStorage by the client,
+    # which keeps the redirect check synchronous — no async gate on the role home.
+    # Defaults False so legacy callers and existing tests are unaffected.
+    welcome_seen: bool = False
 
 
 class PostSignupReconciliation(BaseModel):

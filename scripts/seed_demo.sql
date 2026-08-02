@@ -227,15 +227,20 @@ ON CONFLICT (id) DO UPDATE SET
 -- =============================================================================
 -- 6. CASE ASSIGNMENTS (links HR user to case for the HR views)
 -- Note: employee_identifier is NOT NULL — use the employee's email as identifier
+-- Note: canonical_case_id MUST be set (= case_id).  Omitting it writes NULL, and because
+--       the ON CONFLICT branch below also updates it, re-seeding repairs any pre-existing
+--       NULL rather than leaving it forever (see docs/architecture/CASE_ID_UNIFICATION_AUDIT.md
+--       — demo-ca-001/002/003 are 3 of the 6 NULL-canonical rows in prod).
 -- =============================================================================
-INSERT INTO public.case_assignments (id, case_id, hr_user_id, employee_identifier, status, created_at, updated_at)
+INSERT INTO public.case_assignments (id, case_id, canonical_case_id, hr_user_id, employee_identifier, status, created_at, updated_at)
 VALUES
-  ('demo-ca-001', '5b16522e-e899-4db2-bc8d-95af00af8c79', 'd0e00010-0000-4000-8000-000000000010', 'adrien.martin@globaltech-demo.com', 'approved',  NOW(), NOW()),
-  ('demo-ca-002', '1cbc563e-b984-44b5-adb3-74912d79a84d', 'd0e00020-0000-4000-8000-000000000020', 'celine.dupont@meridian-demo.com',   'submitted', NOW(), NOW()),
-  ('demo-ca-003', '65d7aea8-bc11-413a-8d28-8b9818190a2a', 'd0e00030-0000-4000-8000-000000000030', 'carlos.rivera@nexora-demo.com',     'assigned',  NOW(), NOW())
+  ('demo-ca-001', '5b16522e-e899-4db2-bc8d-95af00af8c79', '5b16522e-e899-4db2-bc8d-95af00af8c79', 'd0e00010-0000-4000-8000-000000000010', 'adrien.martin@globaltech-demo.com', 'approved',  NOW(), NOW()),
+  ('demo-ca-002', '1cbc563e-b984-44b5-adb3-74912d79a84d', '1cbc563e-b984-44b5-adb3-74912d79a84d', 'd0e00020-0000-4000-8000-000000000020', 'celine.dupont@meridian-demo.com',   'submitted', NOW(), NOW()),
+  ('demo-ca-003', '65d7aea8-bc11-413a-8d28-8b9818190a2a', '65d7aea8-bc11-413a-8d28-8b9818190a2a', 'd0e00030-0000-4000-8000-000000000030', 'carlos.rivera@nexora-demo.com',     'assigned',  NOW(), NOW())
 ON CONFLICT (id) DO UPDATE SET
-  status     = EXCLUDED.status,
-  updated_at = NOW();
+  canonical_case_id = EXCLUDED.canonical_case_id,
+  status            = EXCLUDED.status,
+  updated_at        = NOW();
 
 
 -- =============================================================================

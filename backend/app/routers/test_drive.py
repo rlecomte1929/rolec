@@ -590,10 +590,17 @@ def _build_shortlist_state(case_id: str, emp_user: Dict[str, Any], corridor: str
     """Run the REAL recommendations batch for the working city-scoped categories
     (movers + schools — living_areas/housing is handled separately) and persist the
     exact services-state blob the frontend reads: `recommendations` (non-null) plus a
-    non-empty `shortlist`, which together enable the "Request quotes" button on the
+    non-empty `shortlist`, which together satisfy the `hasShortlist` gate on the
     Review & budget page. Reuses post_recommendations_batch + put_services_state so the
     shortlist carries real service_catalog_items.external_id item_ids the RFQ endpoint
-    can resolve to suppliers."""
+    can resolve to suppliers.
+
+    NOTE (AIQ-1689): satisfying `hasShortlist` is necessary but NOT sufficient for the
+    "Request quotations" button to appear. That button is additionally wrapped in
+    `isRfqEnabled()` (`VITE_ENABLE_RFQ`, a Vite build-time flag) which is not set on the
+    deployed static site, so it renders for nobody — staged or hand-walked. QA reaches the
+    step directly at `/employee/case/{caseId}/services/rfq/new` (the route is not gated).
+    Do not "fix" this function for a missing button: verify the services_state row first."""
     from types import SimpleNamespace
 
     from ..recommendations.router import post_recommendations_batch as _post_batch
