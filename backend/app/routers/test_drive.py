@@ -61,7 +61,7 @@ _IS_SQLITE = (db_config.DATABASE_URL or "").startswith("sqlite")
 # TD-FIX-7 (AIQ-1510): the locked set is defined once, alongside the concrete route each
 # id pins a case to, so the provisioner's whitelist and the corridor guard cannot drift.
 _LOCKED_CORRIDORS = LOCKED_CORRIDORS
-_CORRIDOR_WEIGHTS = {"FR_NO": 0.35, "IN_DE": 0.35, "GB_US": 0.10, "NL_SG": 0.10, "ES_AE": 0.10}
+_CORRIDOR_WEIGHTS = {"FR_NO": 0.30, "IN_DE": 0.30, "GB_US": 0.10, "NL_SG": 0.10, "ES_AE": 0.10, "ES_IE": 0.10}
 
 
 def _test_drive_enabled() -> bool:

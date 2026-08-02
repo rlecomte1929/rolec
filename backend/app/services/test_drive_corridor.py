@@ -1,6 +1,6 @@
 """TD-FIX-7 (AIQ-1510): corridor lock for test-drive sessions.
 
-The beta campaign measures the platform per corridor across five locked routes. The
+The beta campaign measures the platform per corridor across six locked routes. The
 corridor is *assigned* at provisioning (``test_sessions.corridor_id``) but was never
 *enforced*: a tester could put their case on any route, breaking the corridor ↔ case
 correspondence the whole analysis rests on.
@@ -35,7 +35,7 @@ TEST_DRIVE_EMAIL_DOMAIN = "@probe.test"
 # corridor_id → the concrete route a test-drive case is pinned to.
 # Keys are the ISO-2 origin_destination pair and are the canonical list of locked
 # corridors (see LOCKED_CORRIDORS below) — the provisioner whitelists against the same
-# set, so a test-drive case can never land on a corridor outside these five.
+# set, so a test-drive case can never land on a corridor outside these six.
 # Cities mirror the tester-facing labels in frontend/src/pages/public/testDriveContent.ts.
 # IN_DE is the one that differs: the page shows "India" (a country) as the origin label,
 # so the case carries Mumbai as the concrete origin city the intake form needs.
@@ -45,6 +45,7 @@ TEST_DRIVE_CORRIDOR_ROUTES: Dict[str, Dict[str, str]] = {
     "GB_US": {"home_country": "GB", "home_city": "London",    "host_country": "US", "host_city": "New York"},
     "NL_SG": {"home_country": "NL", "home_city": "Amsterdam", "host_country": "SG", "host_city": "Singapore"},
     "ES_AE": {"home_country": "ES", "home_city": "Madrid",    "host_country": "AE", "host_city": "Dubai"},
+    "ES_IE": {"home_country": "ES", "home_city": "Madrid",    "host_country": "IE", "host_city": "Dublin"},
 }
 
 LOCKED_CORRIDORS = list(TEST_DRIVE_CORRIDOR_ROUTES)

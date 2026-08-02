@@ -1,0 +1,45 @@
+# Corridor registry profile — Spain → Ireland (Critical Skills employment permit).
+#
+# REPRESENTATIVE / AUTHORING — indicative content, NOT SME-verified. Unlike the
+# EU/EEA free-movement siblings (ES_NL, FR_ES, FR_NO…), THIS corridor models a
+# NON-EEA third-country national moving on an Irish employment permit. Grounded in
+# the Employment Permits Act 2024 and Irish immigration practice (ISD). Every
+# figure below (2026 salary floors, fees, windows) must be confirmed against the
+# Department of Enterprise, Trade & Employment (DETE), Immigration Service Delivery
+# (ISD) and Revenue before any authoritative use. Matches the platform
+# content-provenance model.
+#
+# Canonical id ES_IE mirrors immigration_corpus_chunks.corridor ('ES_IE'). NOTE:
+# no ES_IE corpus chunks exist yet, so the immigration answer engine will fall
+# back to its global retrieval until Tier-1 ES_IE sources are ingested — a known
+# gap, flagged in the Audos loading brief.
+
+corridor:
+  id: "ES_IE"
+  origin_iso: "ES"
+  destination_iso: "IE"
+  display_name: "Spain → Ireland"
+  aliases: ["ES→IE", "ES-IE", "Madrid→Dublin"]
+
+  retrieval:
+    # Mirror the retriever defaults so wiring the seam changes no rankings.
+    trust_tiers: [1, 2, 3]
+    min_similarity: 0.25
+
+  prompt:
+    task_key: "immigration_answer"
+
+  sla:
+    # Permit-based corridors run longer than free-movement ones (permit decision +
+    # visa + in-person registration). Kept at the module defaults for now; widen
+    # the at-risk window once real ES_IE timelines are measured in the campaign.
+    at_risk_window_days: 30
+    at_risk_pct: 80
+
+  # Eligibility Corridor Agent pathways (REPRESENTATIVE content).
+  # Primary pathway = Critical Skills Employment Permit. The General Employment
+  # Permit surfaces as an ALTERNATE_PATHWAY inside the pathway file, not as a
+  # separate corridor.
+  pathways:
+    - id: "CSEP_2026"
+      file: "pathways/CSEP_2026/v1.yaml"

@@ -46,13 +46,14 @@ def _db_returning_corridor(corridor_id):
 
 class ResolveTestDriveRouteTests(unittest.TestCase):
     def test_resolves_every_locked_corridor(self):
-        # All five corridors must resolve to their own route — no FR_NO fallback.
+        # All six corridors must resolve to their own route — no FR_NO fallback.
         expected = {
             "FR_NO": ("FR", "Paris", "NO", "Oslo"),
             "IN_DE": ("IN", "Mumbai", "DE", "Munich"),
             "GB_US": ("GB", "London", "US", "New York"),
             "NL_SG": ("NL", "Amsterdam", "SG", "Singapore"),
             "ES_AE": ("ES", "Madrid", "AE", "Dubai"),
+            "ES_IE": ("ES", "Madrid", "IE", "Dublin"),
         }
         self.assertEqual(set(expected), set(tdc.LOCKED_CORRIDORS))
         for corridor_id, (home_c, home_city, host_c, host_city) in expected.items():
