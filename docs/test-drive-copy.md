@@ -4,7 +4,7 @@
 **Voice:** ReloPass brand voice (infrastructure register; calm, precise, structured). Avoids "journey" per brand rules.
 **Status:** Draft v1 · 2026-07-04 — ready to drop into a `testDriveContent.ts` file (mirrors the `GetStartedPage` pattern).
 
-Copy uses tokens `{origin}`, `{destination}`, `{corridor}` so one page serves all five corridors. Tier-B corridors also render the early-coverage note (§ "Corridor label").
+Copy uses tokens `{origin}`, `{destination}`, `{corridor}` so one page serves all six corridors. Tier-B corridors also render the early-coverage note (§ "Corridor label").
 
 ---
 

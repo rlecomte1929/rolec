@@ -4,8 +4,8 @@
  * Copy ported verbatim from docs/test-drive-copy.md (brand voice: no "journey").
  * Corridor model from docs/beta-test-campaign-spec.md §2 — canonical underscore ids
  * (matches backend corridor_registry.normalize_corridor_id + test_sessions.corridor_id).
- * One page serves all five corridors via the `?corridor=` token; the Tier-B
- * early-coverage note renders only for the three Tier-B ids.
+ * One page serves all six corridors via the `?corridor=` token; the Tier-B
+ * early-coverage note renders only for the four Tier-B ids.
  */
 
 export type CorridorTier = 'A' | 'B';
@@ -24,6 +24,7 @@ export const TEST_DRIVE_CORRIDORS: Record<string, CorridorMeta> = {
   GB_US: { origin: 'London', destination: 'New York', tier: 'B' },
   NL_SG: { origin: 'Amsterdam', destination: 'Singapore', tier: 'B' },
   ES_AE: { origin: 'Madrid', destination: 'Dubai', tier: 'B' },
+  ES_IE: { origin: 'Madrid', destination: 'Dublin', tier: 'B' },
 };
 
 export const DEFAULT_CORRIDOR_ID = 'FR_NO';
