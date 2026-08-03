@@ -24,6 +24,12 @@ const ALLOWED = new Set([
   '(MPL-2.0 OR Apache-2.0)',
   '(MIT OR WTFPL)',
   '(BSD-2-Clause OR MIT OR Apache-2.0)',
+  // AND-combo, not OR: the package is licensed under BOTH simultaneously, so we
+  // must satisfy both sets of terms. Allowed because each half is already on this
+  // list, so complying with both is strictly a superset of what we already accept.
+  // posthog-js declared this explicitly from 1.408.0; before that license-checker
+  // inferred it from package contents and reported the 'MIT*' entry above.
+  '(Apache-2.0 AND MIT)',
 ]);
 
 // Reviewed, accepted exceptions (pinned to version — a bump re-triggers review).
