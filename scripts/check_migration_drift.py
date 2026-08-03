@@ -27,6 +27,11 @@ The dead-version case is #1708: the ES_IE corpus seed merged at 20261004000000 w
 prod's max was 20261009000000 — dead on arrival, yet every CI check went green because
 this direction was only ever a warning. Restamped in #1709; the guard closes the hole.
 
+`db push` is referenced below only to explain the ordering semantics the ledger inherits —
+it must NEVER be run against prod (it would apply all ~147 pending migrations, including
+known-destructive ones). Applies are operator-run and out-of-band; record them with
+`supabase migration repair --status applied <version>`. See CLAUDE.md 'Migration discipline'.
+
 Scoping — the dead and duplicate failures apply ONLY to migrations a change ADDS, passed
 via `--added`. As of 2026-08 the repo has 426 ledger rows against 573 migration files, so
 146 files already sit below the ledger max and 5 versions are already duplicated. That is
@@ -354,14 +359,17 @@ def main() -> int:
     # `db push` will skip it forever, so it can never apply and never record a row.
     if dead_fail and not args.json:
         print(f"\n❌  Migration-drift check FAILED — {len(dead_fail)} NEW migration(s) can NEVER apply:")
-        print(f"    (prod ledger max is {ledger_max}; `db push` skips any version at or below it)\n")
+        print(f"    (the ledger is keyed by version and prod's max is {ledger_max}; a version at")
+        print("     or below it can never be recorded for this file)\n")
         for d in dead_fail:
             print(f"  • {d['version']}_{d['name']}.sql  ≤  {ledger_max}")
         print("\n  Fix: restamp the file above the ledger max, e.g.")
         print("    git mv supabase/migrations/<old>_<name>.sql supabase/migrations/<new>_<name>.sql")
-        print("  and update the header comment. If the SQL was already applied out-of-band, an")
-        print("  idempotent migration re-applies as a no-op and writes the missing ledger row —")
-        print("  do NOT hand-insert into schema_migrations (see CLAUDE.md 'Ledger reconciliation').")
+        print("  and update the header comment.")
+        print("  Then apply it out-of-band (operator-run MCP apply_migration/execute_sql) and record")
+        print("  it with:  supabase migration repair --status applied <version> --db-url \"$DATABASE_URL\"")
+        print("  NEVER `supabase db push` against prod — it applies every pending migration, and")
+        print("  never hand-insert into schema_migrations. See CLAUDE.md 'Migration discipline'.")
     elif dead and not args.json:
         print(f"\n⚠  WARN (pre-existing) — {len(dead)} repo migration(s) sit at or below the")
         print(f"    ledger max ({ledger_max}) with no prod row, so `db push` would skip them.")
