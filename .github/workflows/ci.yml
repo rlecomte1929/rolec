@@ -553,7 +553,10 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$BASE_SHA" ]; then
-            files=$(git diff --diff-filter=A --name-only "$BASE_SHA...HEAD" -- supabase/migrations || true)
+            # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
+            # version is exactly the mistake this guard exists to catch. For a rename
+            # --name-only prints the destination path, which is the version we check.
+            files=$(git diff --diff-filter=AR --name-only "$BASE_SHA...HEAD" -- supabase/migrations || true)
           else
             files=""
           fi
@@ -595,7 +598,10 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$BASE_SHA" ]; then
-            files=$(git diff --diff-filter=A --name-only "$BASE_SHA...HEAD" -- supabase/migrations || true)
+            # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
+            # version is exactly the mistake this guard exists to catch. For a rename
+            # --name-only prints the destination path, which is the version we check.
+            files=$(git diff --diff-filter=AR --name-only "$BASE_SHA...HEAD" -- supabase/migrations || true)
           else
             files=""
           fi
