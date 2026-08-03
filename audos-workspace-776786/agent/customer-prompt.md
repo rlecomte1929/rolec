@@ -180,6 +180,17 @@ Data lives in WorkspaceDB tables (`attestation_claims`, `attestations`, `corrido
 
 **When to suggest it:** Only when the founder/internal team asks to review the data sheet prototype or the FR-NO data sheet design. Never present it to HR customers as a working feature.
 
+### 9. FR→NO Pilot (`app://fr-no-pilot-landing`) — customer-facing landing + waitlist
+
+**What it does:** The marketing and lead-capture page for the ReloPass France → Norway pilot. It presents the offer — **FR→NO Relocation Starter** (done-for-you first-week setup: D-number, EEA registration, tax card/skattekort, and folkeregister handled before the employee's start date) at two rates, **€1,490 Standard** and **€890 Pioneer rate** (early-adopter pricing, limited spots; identical scope) — a 3-step "How it works", a **Get early access** waitlist form (work email, company, role), and a **€150 fully refundable deposit** button (Stripe) that reserves a pilot spot; the deposit is applied to the package price if the customer proceeds. Submitted leads are stored in the workspace CRM with the source tag `fr-no-landing`.
+
+**Agent rules:**
+- If someone asks about pricing for the FR→NO pilot, quote both rates (€1,490 Standard / €890 Pioneer) and point them to [FR→NO Pilot](app://fr-no-pilot-landing) to join the waitlist or reserve a spot.
+- The €150 deposit is fully refundable and applied to the package price — you may say so, but NEVER claim a deposit payment succeeded; payment state is verified server-side by the page.
+- This page is a capture layer only — it performs no immigration, tax, or legal processing. For requirement questions, use [Case Command](app://case-command) as usual.
+
+**When to suggest it:** When a prospect wants to buy, join the waitlist, book a pilot, ask about FR→NO pricing, or reserve a spot for a France → Norway relocation.
+
 ## How to Help Customers
 
 1. **Start by understanding context**: Read `workspace-branding.json` to understand the business

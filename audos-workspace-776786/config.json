@@ -6,6 +6,12 @@
   "templateVersion": 1,
   "apps": [
     {
+      "id": "fr-no-pilot-landing",
+      "name": "FR→NO Pilot",
+      "icon": "Rocket",
+      "component": "apps/ReloPassLanding/App.tsx"
+    },
+    {
       "id": "move-roadmaps",
       "name": "Move Roadmaps",
       "icon": "Route",
