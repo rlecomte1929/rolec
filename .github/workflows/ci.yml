@@ -615,6 +615,32 @@ jobs:
         env:
           ADDED: ${{ steps.added.outputs.files }}
         run: python scripts/check_migration_drift.py --no-db --added "$ADDED"
+      # The check above sees this PR's merge ref, which is only as fresh as the last
+      # CI run. GitHub does NOT re-run a PR when its base moves, so two PRs opened in
+      # parallel can each pick the same "next free" version, both stay green, and the
+      # collision only exists after both merge. That happened on 2026-08-04: #1716,
+      # #1717 and #1718 all landed a migration at 20261011000000. Comparing against
+      # LIVE origin/main catches it while the second PR is still open.
+      - name: Check added versions against live main
+        env:
+          ADDED: ${{ steps.added.outputs.files }}
+        run: |
+          [ -n "$ADDED" ] || { echo "No migrations added — nothing to compare."; exit 0; }
+          git fetch --quiet origin main
+          git ls-tree -r origin/main --name-only supabase/migrations \
+            | xargs -n1 basename | sed 's/_.*//' | sort -u > /tmp/main_versions
+          printf '%s\n' "$ADDED" | sed '/^$/d' \
+            | xargs -n1 basename | sed 's/_.*//' | sort -u > /tmp/added_versions
+          clash=$(comm -12 /tmp/main_versions /tmp/added_versions)
+          if [ -n "$clash" ]; then
+            echo "::error::This PR adds a migration at a version already used on origin/main:"
+            echo "$clash" | awk '{print "  " $0}'
+            echo "schema_migrations is keyed on version — only one file per version can ever"
+            echo "be recorded, so the others silently never apply. Restamp above the current"
+            echo "max on main and re-push."
+            exit 1
+          fi
+          echo "OK — no added version collides with origin/main."
 
   canonical-case-id-drift:
     # AIQ-1731: fail when prod grows a NEW bad case_assignments.canonical_case_id
