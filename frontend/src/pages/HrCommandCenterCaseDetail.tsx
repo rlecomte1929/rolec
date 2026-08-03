@@ -11,6 +11,7 @@ import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
 import { RoadmapReviewPanel } from '../components/case/RoadmapReviewPanel';
+import { CaseFeasibilityPanel } from '../components/case/CaseFeasibilityPanel';
 import { statusLabel } from '../lib/statusLabel';
 import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
 import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
@@ -174,6 +175,15 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {/* ── AIQ-1751: permit-corridor feasibility. Mounted ABOVE the roadmap review
+             because an unachievable start date outranks a sign-off request — approving a
+             roadmap that cannot be delivered is worse than not approving one. Renders
+             nothing for free-movement corridors and for any case with enough runway.
+             Keyed STRICTLY on detail.caseId (the relocation_cases UUID): NO fallback to
+             detail.id, which is the assignment PK and would 404 — and a 404 here renders
+             identically to "no warning", so the fallback would hide the failure. ── */}
+        <CaseFeasibilityPanel caseId={detail.caseId} />
 
         {/* ── AIQ-1605: roadmap validation surface on the page HR actually reaches from
              the command center. The approve / request-changes panel previously lived only
