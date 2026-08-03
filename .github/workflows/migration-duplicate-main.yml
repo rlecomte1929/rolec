@@ -1,0 +1,41 @@
+name: Migration duplicate check (main)
+
+# Backstop for the ONE collision case the PR-time guards cannot see.
+#
+# ci.yml's `migration-duplicate-versions` job compares a PR's added versions against
+# LIVE origin/main, which catches two parallel PRs picking the same version — provided
+# CI actually re-runs after the first one merges. GitHub does not re-run a PR when its
+# base moves, so **batch-merging several already-green PRs** slips through: each was
+# green before any of them landed. That is exactly how #1716/#1717/#1718 put three
+# migrations on 20261011000000 on 2026-08-04.
+#
+# This job re-checks the WHOLE tree after the merge, so a collision is caught in minutes
+# rather than at the next rebuild. It is deliberately narrow: migrations-only path
+# filter, no database, no secret, one step. ci.yml stays `pull_request`-only — the
+# ~164 runs/week of post-merge duplication it removed is not being reinstated.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/check_migration_drift.py'
+
+concurrency:
+  group: migration-dup-main
+  cancel-in-progress: true
+
+jobs:
+  duplicate-versions:
+    name: Duplicate migration versions on main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Check for duplicate migration versions across the whole tree
+        # --no-db: duplicate detection only, no DATABASE_URL and no secret needed.
+        # No --added here: on main we want every version compared, not just a diff.
+        run: python scripts/check_migration_drift.py --no-db

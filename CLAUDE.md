@@ -255,8 +255,36 @@ Two gotchas, both hit on AIQ-1744:
   `prepared statement "lrupsc_1_0" already exists`. Use session mode — swap the port to 5432.
 
 If several files share one timestamp, the ledger (keyed by `version`) can track only **one** of
-them, and `repair` records whichever sorts first alphabetically. Give every migration a unique
-timestamp greater than the current prod ledger max.
+them, and `repair` records whichever sorts first alphabetically.
+
+### Choosing a migration timestamp
+
+Stamp every migration above **BOTH** the highest repo file version **and** the prod ledger max:
+
+```bash
+# the number to beat — take the max of these two, then go above it
+git ls-tree origin/main --name-only supabase/migrations/ | sed 's|.*/||' | cut -c1-14 | sort | tail -1
+psql "$DATABASE_URL" -tAc "SELECT max(version) FROM supabase_migrations.schema_migrations"
+```
+
+**"Above the ledger max" alone is not enough.** The repo max routinely exceeds the ledger max —
+that is the normal state whenever migrations are merged but not yet applied, which is most of
+the time here. On 2026-08-04 the ledger max was `20261010000000` while the repo max was already
+`20261014000000`; three PRs each followed the ledger-only rule, all picked `20261011000000`, and
+landed **three files on one version** — below the repo max and colliding with each other. Each
+PR was individually valid, which is exactly why the rule has to be the max of both.
+
+Three guards cover this, in order of when they fire:
+
+| guard | catches | blind to |
+|---|---|---|
+| `migration-duplicate-versions` (ci.yml, PR) | a version already used elsewhere in the PR's own tree | versions added by *other* open PRs |
+| its "check added versions against live main" step | a parallel PR that merged first — compares against live `origin/main` | PRs merged without CI re-running in between |
+| `migration-duplicate-main.yml` (push to `main`) | anything the above two missed, whole-tree | nothing — it is the backstop |
+
+**Do not batch-merge two migration PRs back to back.** GitHub does not re-run a PR when its base
+moves, so both stay green from before either landed, and the live-main comparison never sees the
+first merge. Merge one, let the second's CI re-run, then merge it.
 
 Legitimate use of `execute_sql` (MCP): read-only queries and one-time data
 backfills that carry no schema change. If you run a hotfix DDL via `execute_sql`,
