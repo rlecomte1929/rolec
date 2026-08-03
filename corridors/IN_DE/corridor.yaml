@@ -6,14 +6,33 @@
 # pathway's file is. The pathway file's internal corridor_id stays
 # "IN_DE_BLUECARD_2026" (it keys rce.* rows) — only its location moved.
 #
-# Cross-cutting blocks (retrieval / prompt / intake / sla) are omitted here →
-# IN_DE falls back to the module defaults, exactly like an unconfigured corridor.
+# Cross-cutting blocks (retrieval / prompt / intake) are omitted here → IN_DE falls
+# back to the module defaults, exactly like an unconfigured corridor. AIQ-1753 added
+# the `sla` block: falling back was correct for a free-movement corridor but wrong
+# for an employment-permit one — see the comment on that block below.
 
 corridor:
   id: "IN_DE"
   origin_iso: "IN"
   destination_iso: "DE"
   display_name: "India → Germany"
+
+  sla:
+    # AIQ-1753 — IN_DE previously declared no `sla` block at all, so the Blue Card
+    # corridor ran on the 30-day free-movement default. Its PRE-ARRIVAL runway,
+    # measured from the BLUECARD_2026 step graph, is the LONGEST of any corridor:
+    #   ZAB_STATEMENT 60 → VISA_APPLICATION 90 → VISA_GRANTED 7 → TRAVEL_TO_DE 1
+    #   = 158 days   (vs ES_IE's 104)
+    # (Reproduce with relopass.corridors.feasibility.required_lead_time_days.)
+    #
+    # A 30-day window on a corridor with 158 days of runway cannot fire until the
+    # case is already unrecoverable — the cockpit reports "on track" right up to
+    # the point where the ZAB statement and D-visa can no longer complete in time.
+    #
+    # DERIVED, not hand-picked: re-derive if the step durations change rather than
+    # editing this number directly. Sibling precedent: ES_IE (AIQ-1750, PR #1712).
+    at_risk_window_days: 158
+    at_risk_pct: 80
 
   # I-3 Stage 5: eligibility Corridor Agent pathways. Each entry maps a pathway id
   # to its spec file (resolved relative to this corridor directory). Loaded by the
