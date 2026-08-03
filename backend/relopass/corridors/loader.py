@@ -105,6 +105,13 @@ class CorridorStep:
     # 'HARD' (the engine asserts this) or 'PENDING' (an open counsel question —
     # surface as pending_verification, NEVER as asserted fact).
     assertion: str = "HARD"
+    # Marks where the PRE-arrival runway ends: the step at which the mover is in
+    # the destination and in-country obligations begin. Everything upstream of it
+    # must complete before the start date, which is what makes an employment-permit
+    # corridor infeasible at short notice while a free-movement one never is.
+    # Declared rather than inferred: step-id spelling is not a safe proxy (NO_FR's
+    # is A0_DEPART_NO, IN_DE's graph roots elsewhere entirely).
+    arrival_anchor: bool = False
 
 
 @dataclass(frozen=True)
@@ -518,6 +525,7 @@ def _build_corridor(parsed: Mapping[str, Any]) -> CorridorAgent:
             non_obvious=bool(s.get("non_obvious", False)) if isinstance(s, Mapping) else False,
             advice_boundary=_enum(s, "advice_boundary", _ADVICE_BOUNDARIES, "information_only"),
             assertion=_enum(s, "assertion", _ASSERTIONS, "HARD"),
+            arrival_anchor=bool(s.get("arrival_anchor", False)) if isinstance(s, Mapping) else False,
         )
         for s in _as_tuple(cfg.get("step_graph"))
     )

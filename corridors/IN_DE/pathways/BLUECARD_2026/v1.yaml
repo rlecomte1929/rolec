@@ -210,6 +210,8 @@ corridor_agent:
 
     - step_id: TRAVEL_TO_DE
       name: "Travel to Germany on D-visa"
+      # ZAB statement + D-visa must complete before travel — the pre-arrival runway.
+      arrival_anchor: true
       responsible_party: EMPLOYEE
       expected_duration_days: 1
       prerequisite_step_ids: [VISA_GRANTED]
