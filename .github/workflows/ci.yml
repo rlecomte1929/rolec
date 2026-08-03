@@ -634,7 +634,7 @@ jobs:
           clash=$(comm -12 /tmp/main_versions /tmp/added_versions)
           if [ -n "$clash" ]; then
             echo "::error::This PR adds a migration at a version already used on origin/main:"
-            echo "$clash" | sed 's/^/  /'
+            echo "$clash" | awk '{print "  " $0}'
             echo "schema_migrations is keyed on version — only one file per version can ever"
             echo "be recorded, so the others silently never apply. Restamp above the current"
             echo "max on main and re-push."
