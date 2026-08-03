@@ -16,7 +16,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from backend.main import app, UserRole
-from backend.app.auth_deps import get_current_user
+from backend.app.auth_deps import get_current_user, get_org_id_for_hr_user
 
 _HR: Dict[str, Any] = {
     "id": "user-hr-a",
@@ -65,6 +65,11 @@ class _Base(unittest.TestCase):
 
     def _overview(self, case: Optional[Dict[str, Any]]) -> Any:
         app.dependency_overrides[get_current_user] = _make_dependency_override(_HR)
+        # Override the org resolver directly rather than patching the db calls behind
+        # it: get_org_id_for_hr_user resolves via db.get_hr_company_id FIRST (AIQ-862),
+        # falling back to user["company"], so patching get_profile_record alone leaves
+        # org_id="" and every request 404s on a tenant mismatch that isn't real.
+        app.dependency_overrides[get_org_id_for_hr_user] = lambda: "company-a"
         client = TestClient(app, raise_server_exceptions=False)
         patches = [
             patch(
@@ -76,10 +81,6 @@ class _Base(unittest.TestCase):
                 side_effect=lambda uid: {"id": uid, "name": "E", "email": "e@x.test"},
             ),
             patch(
-                "backend.app.auth_deps.db.get_profile_record",
-                side_effect=lambda uid: {"id": uid, "company_id": "company-a"},
-            ),
-            patch(
                 "backend.app.routers.hr_case_detail.db.engine",
                 new=_make_failing_engine(),
             ),
@@ -87,7 +88,10 @@ class _Base(unittest.TestCase):
         for p in patches:
             p.start()
             self.addCleanup(p.stop)
-        return client.get("/api/hr/cases/case-a/overview")
+        return client.get(
+            "/api/hr/cases/case-a/overview",
+            headers={"Authorization": "Bearer hr-a-token"},
+        )
 
 
 class FeasibilityOnOverviewTests(_Base):
