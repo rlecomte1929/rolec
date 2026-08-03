@@ -271,16 +271,27 @@ class FieldValueItem(BaseModel):
     """A single field value as returned by the GET endpoint."""
     field_id: str
     label: str
+    # Optional Norwegian (or other-language) label for the EN/NO dossier toggle.
+    # Labels are translated for comprehension; identifier VALUES never are.
+    label_nb: Optional[str] = None
     field_type: str           # text | date | select | boolean | …
     required: bool
     position: int
     prefill_source: Optional[str]
     requires_original: bool
+    # A determination that must be made by a regulated professional and is NEVER
+    # pre-filled (tax residency, A1, contract classification, shadow payroll, PE).
+    consult_professional: bool = False
+    # Optional grouping section from the template field definition.
+    section: Optional[str] = None
     options: Optional[List[str]]   # only for select fields
     # Stored value metadata (None if no value has been saved yet)
     value: Optional[str]
     filled_by: Optional[str]       # ai | system | employee | specialist | hr
     ai_confidence: Optional[float]
+    # Data origin of the value (case_form_field_values.source): intake_profile |
+    # contract | banking | passport_ocr | prior_form | ... — drives the UI source badge.
+    source: Optional[str] = None
     reviewed: bool
     overridden: bool
 
@@ -1416,7 +1427,7 @@ def get_form_fields(
             fv_rows = conn.execute(
                 _sql_text(
                     f"""
-                    SELECT field_id, value, filled_by, ai_confidence, reviewed, overridden
+                    SELECT field_id, value, filled_by, ai_confidence, source, reviewed, overridden
                     FROM {_pg_table('case_form_field_values')}
                     WHERE case_form_id = :form_id
                     """
@@ -1447,15 +1458,19 @@ def get_form_fields(
         items.append(FieldValueItem(
             field_id=fid,
             label=fd.get("label", fid),
+            label_nb=fd.get("label_nb"),
             field_type=fd.get("type", "text"),
             required=bool(fd.get("required", False)),
             position=int(fd.get("position", 0)),
             prefill_source=fd.get("prefill_source"),
             requires_original=bool(fd.get("requires_original", False)),
+            consult_professional=bool(fd.get("consult_professional", False)),
+            section=fd.get("section"),
             options=fd.get("options"),
             value=sv["value"] if sv else None,
             filled_by=sv["filled_by"] if sv else None,
             ai_confidence=sv["ai_confidence"] if sv else None,
+            source=sv.get("source") if sv else None,
             reviewed=bool(sv["reviewed"]) if sv else False,
             overridden=bool(sv["overridden"]) if sv else False,
         ))

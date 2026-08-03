@@ -40,6 +40,7 @@ import type { FieldValueItem } from '../../api/formEditor';
 import type { CaseFormSummary } from '../../api/dossier';
 import { PdfPanel } from '../../features/platform-v2/form-editor/PdfPanel';
 import { FieldRow } from '../../features/platform-v2/form-editor/FieldRow';
+import type { FieldLang } from '../../features/platform-v2/form-editor/FieldRow';
 import { ActionBar } from '../../features/platform-v2/form-editor/ActionBar';
 import { PrefillConfirmation } from '../../features/platform-v2/form-editor/PrefillConfirmation';
 import { OriginalPdfDrawer } from '../../features/platform-v2/dossier/OriginalPdfDrawer';
@@ -102,6 +103,11 @@ export const FormEditorPage: React.FC = () => {
   const [formSummary, setFormSummary] = useState<CaseFormSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // ── Label language (EN/NO toggle) ─────────────────────────────────────────
+  // Switches LABELS only for comprehension; identifier VALUES stay verbatim.
+  const [lang, setLang] = useState<FieldLang>('en');
+  const hasNbLabels = fields.some((f) => !!f.label_nb);
 
   // ── Live edit state ──────────────────────────────────────────────────────
   /** A map of field_id → current string value displayed in the form. */
@@ -495,6 +501,25 @@ export const FormEditorPage: React.FC = () => {
           {/* Content-honesty disclaimer — this is the submission surface and the
               form template is representative, not legally verified, so remind the
               employee to confirm with the issuing authority before submitting. */}
+          {/* EN/NO label toggle — labels only; identifier values stay verbatim. */}
+          {hasNbLabels && (
+            <div className="mb-4 flex items-center justify-end gap-2">
+              <span className="text-xs font-medium text-slate-500">Labels:</span>
+              <div className="inline-flex rounded-md border border-slate-300 overflow-hidden" role="group" aria-label="Label language">
+                {(['en', 'nb'] as const).map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => setLang(code)}
+                    aria-pressed={lang === code}
+                    className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === code ? 'bg-[#0b2b43] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    {code === 'en' ? 'English' : 'Norsk'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <Alert variant="warning" className="mb-4">
             Indicative — always confirm details with the issuing authority before you submit.
             This form is representative and may differ from the latest official version.
@@ -507,6 +532,9 @@ export const FormEditorPage: React.FC = () => {
             sections.map(({ section, fields: sectionFields }) => {
               const aiFieldsInSection = sectionFields.filter(
                 (f) => f.filled_by === 'ai' && !f.reviewed,
+              );
+              const hasConsultFields = sectionFields.some(
+                (f) => f.consult_professional === true,
               );
               return (
                 <div key={section} className="mb-8">
@@ -526,6 +554,16 @@ export const FormEditorPage: React.FC = () => {
                     )}
                   </div>
 
+                  {/* Regulatory banner — these determinations are routed to a
+                      regulated professional and are never pre-filled. */}
+                  {hasConsultFields && (
+                    <Alert variant="warning" className="mb-3">
+                      These determinations must be made by a qualified advisor. ReloPass
+                      will not pre-fill them — your mobility team will route you to a
+                      regulated professional.
+                    </Alert>
+                  )}
+
                   {/* Fields */}
                   <div className="grid gap-3">
                     {sectionFields.map((field) => (
@@ -535,6 +573,7 @@ export const FormEditorPage: React.FC = () => {
                         liveValue={liveValues[field.field_id] ?? ''}
                         onValueChange={handleValueChange}
                         showMissing={showMissing}
+                        lang={lang}
                       />
                     ))}
                   </div>

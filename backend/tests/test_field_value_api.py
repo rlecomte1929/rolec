@@ -138,6 +138,7 @@ CREATE TABLE case_form_field_values (
     value         TEXT,
     filled_by     TEXT NOT NULL DEFAULT 'ai',
     ai_confidence REAL,
+    source        TEXT,
     reviewed      INTEGER NOT NULL DEFAULT 0,
     overridden    INTEGER NOT NULL DEFAULT 0,
     updated_at    TEXT DEFAULT (datetime('now')),

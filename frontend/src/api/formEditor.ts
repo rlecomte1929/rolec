@@ -23,17 +23,25 @@ import type { CaseFormSummary } from './dossier';
 export interface FieldValueItem {
   field_id: string;
   label: string;
+  /** Optional Norwegian (or other-language) label for the EN/NO toggle.
+   *  Labels translate for comprehension; identifier VALUES never do. */
+  label_nb?: string | null;
   field_type: string;         // text | date | select | boolean | number | ...
   required: boolean;
   position: number;
   prefill_source: string | null;
   requires_original: boolean;
+  /** A determination a regulated professional must make — never pre-filled. */
+  consult_professional?: boolean;
   options: string[] | null;   // only for select fields
   /** Current stored value — null if no value has been saved yet */
   value: string | null;
   /** Who last wrote this value: ai | system | employee | specialist | hr */
   filled_by: string | null;
   ai_confidence: number | null;
+  /** Data origin of the value: intake_profile | contract | banking |
+   *  passport_ocr | prior_form | ... — drives the source badge. */
+  source?: string | null;
   reviewed: boolean;
   overridden: boolean;
   /** Optional section label — not present in all form templates */
