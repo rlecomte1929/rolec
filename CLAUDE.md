@@ -28,8 +28,11 @@ cd backend && pytest path/to/test.py::test_function   # Single test
 RELOPASS_DISABLE_RATE_LIMITS=1 pytest  # Bypass slowapi limits in tests
 
 # Supabase (run from repo root)
-supabase db push                     # Apply pending migrations to remote
 supabase migration new <name>        # Create a new migration file
+supabase migration list --db-url "$DATABASE_URL"   # Compare repo files vs prod ledger
+
+# ⛔ NEVER run `supabase db push` against prod — see "Migration discipline" below.
+#    It applies ALL pending migrations: 147 of them as of 2026-08-03, back to April.
 ```
 
 ## Repo Layout
@@ -138,7 +141,7 @@ Backend:
 
 - **Frontend**: Render Static Site. Build: `npm --prefix frontend ci && npm --prefix frontend run build`. Publish dir: `frontend/dist`.
 - **Backend**: Render Web Service. Start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 4 --proxy-headers`. Python 3.11.
-- **Database changes**: Commit a migration file for every schema change. **There is no automated apply-on-merge** — migrations are applied to production manually/out-of-band (operator-run: MCP `apply_migration`/`execute_sql` DDL or `supabase db push`), and the ledger is then reconciled by committing the matching file at the applied version. The PR CI only *validates* ledger consistency (the read-only `migration-drift` check); it never applies. See **Migration discipline (MANDATORY)** and **Ledger reconciliation** below.
+- **Database changes**: Commit a migration file for every schema change. **There is no automated apply-on-merge** — migrations are applied to production manually/out-of-band (operator-run: MCP `apply_migration`/`execute_sql` DDL — **not** `supabase db push`, see the hazard note in *Migration discipline* below), and the ledger is then reconciled by committing the matching file at the applied version. The PR CI only *validates* ledger consistency (the read-only `migration-drift` check); it never applies. See **Migration discipline (MANDATORY)** and **Ledger reconciliation** below.
 - **Deploy trigger**: Push to `main` on GitHub → Render auto-deploys both services. Health check endpoint: `GET /health`.
 
 ## Database Migrations — Security Rules (Hard Gates)
@@ -217,8 +220,43 @@ The ONLY permitted workflow for schema changes:
   3. Open a PR. CI's read-only `migration-drift` check validates ledger
      consistency — it does NOT apply the migration. Applying to production is a
      manual/out-of-band step (operator-run; MCP `apply_migration`/`execute_sql`
-     DDL or `supabase db push`), after which the ledger is reconciled by recording
+     DDL), after which the ledger is reconciled by recording
      the repo file's timestamp as the applied version (see **Ledger reconciliation**).
+
+### ⛔ Never run `supabase db push` against prod
+
+`db push` applies **every** pending migration, and the repo/prod ledgers have drifted far
+apart. Measured 2026-08-03: 572 distinct repo versions vs 425 in the prod ledger —
+**147 pending versions (153 files), reaching back to 2026-04-27**. Two confirmed landmines
+in that set:
+
+- `20261004000000_cleanup_living_areas_supplier_shells.sql` — destructive `DELETE`s against
+  `company_vendor_selections` and `service_catalog_items`.
+- `20260605950000_rfq_requests.sql` — creates `public.rfq_requests`, a **superseded** design.
+  Prod renamed that table to `rfq_requests_legacy`; the live RFQ system is `rfqs` /
+  `rfq_items` / `rfq_recipients`. Applying it resurrects dead schema beside the live tables.
+
+Most of the drift is bookkeeping (the migration was applied out-of-band and the ledger never
+recorded it), but it is **not uniformly so**, which is why there is no safe bulk action.
+A full triage — classify each pending migration as applied / superseded / genuinely-missing —
+is parked until the pre-launch data reset, when migrations must become authoritative.
+
+**To record an out-of-band apply, reconcile the ledger instead:**
+
+```bash
+supabase migration repair --status applied <version> --db-url "$DATABASE_URL"
+```
+
+Two gotchas, both hit on AIQ-1744:
+- Run it from a checkout that **actually contains the file** — `repair` globs
+  `supabase/migrations/<version>_*.sql` and fails with "file does not exist" otherwise. A stale
+  local `main` is the usual cause; use a worktree at `origin/main`.
+- `supabase migration list` fails against the transaction pooler (port 6543) with
+  `prepared statement "lrupsc_1_0" already exists`. Use session mode — swap the port to 5432.
+
+If several files share one timestamp, the ledger (keyed by `version`) can track only **one** of
+them, and `repair` records whichever sorts first alphabetically. Give every migration a unique
+timestamp greater than the current prod ledger max.
 
 Legitimate use of `execute_sql` (MCP): read-only queries and one-time data
 backfills that carry no schema change. If you run a hotfix DDL via `execute_sql`,
