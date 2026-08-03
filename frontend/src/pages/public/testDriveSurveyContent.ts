@@ -90,7 +90,9 @@ export const testDriveSurveyContent = {
     whyLabel: 'What would it take?',
   },
 
-  highValueIntro: 'The next three are the ones that make this worth running. Kept last, on purpose.',
+  // The pilot + intro questions moved above the free-text block, so this now introduces the
+  // testimonial alone — it can no longer say "the next three".
+  highValueIntro: 'One last thing — and it travels the furthest. Kept for the end, on purpose.',
 
   q5: {
     label: 'In one sentence, how would you describe ReloPass to someone in your field?',
@@ -109,12 +111,15 @@ export const testDriveSurveyContent = {
   },
   q7: {
     label: 'Who else runs or oversees relocations that I should speak with?',
+    itemLabel: (n: number) => `Person ${n}`,
     name: 'Name',
     companyRole: 'Company / role',
     contact: 'How to reach them (email or LinkedIn)',
     consent: 'You can mention I referred them.',
+    addAnother: '+ Add another person',
+    remove: (n: number) => `Remove person ${n}`,
     helper:
-      'A pilot starts with one conversation. An intro to the right person is the most useful thing you can leave me with.',
+      'A pilot starts with one conversation. An intro to the right person is the most useful thing you can leave me with — add as many as come to mind.',
   },
 
   submit: 'Submit',
