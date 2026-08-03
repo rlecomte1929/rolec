@@ -38,7 +38,7 @@ import os
 import re
 import secrets
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -785,6 +785,10 @@ def provision_staged(body: ProvisionStagedRequest, request: Request):
 # tester_name/email + testimonial/referral are the only real PII captured — each
 # carries its own consent flag and is stored only in the admin-read RLS table (never
 # sent to an LLM, so no masking needed). Nothing here is logged.
+#
+# NOTE: `referrals` (jsonb, the multi-referral list) is NOT in this tuple — it needs a
+# ``CAST(:referrals AS jsonb)`` on Postgres, so survey() binds it explicitly. The legacy
+# scalar referral_* columns stay here and keep receiving referrals[0] (see _mirror_*).
 _SURVEY_COLUMNS = (
     "session_id campaign corridor_id tester_segment tester_name tester_email "
     "tester_company_role tester_sector q1_overall q2_friction q3_problem_fit q3_why "
@@ -817,6 +821,22 @@ def _clean_optional_uuid(v: Optional[str]) -> Optional[str]:
     return s
 
 
+# Multi-referral: a respondent can leave 1..N warm intros. The form caps at 5; the API
+# accepts a few more and TRUNCATES rather than 422s — a survey must never fail on an
+# optional field, and losing referral #11 beats losing the whole submission.
+_MAX_REFERRALS = 10
+
+
+class ReferralItem(BaseModel):
+    """One warm intro. Every field is optional; entries with neither a name nor a contact
+    are dropped by _normalize_referrals (a company/role alone isn't a reachable person, and
+    the admin 'intro' count keys on name-or-contact — see admin_test_drive._REFERRAL_PRESENT)."""
+    name: Optional[str] = Field(None, max_length=200)
+    company_role: Optional[str] = Field(None, max_length=200)
+    contact: Optional[str] = Field(None, max_length=300)
+    consent: bool = False
+
+
 class SurveyRequest(BaseModel):
     session_id: Optional[str] = Field(None, max_length=64)
     campaign: Optional[str] = Field(None, max_length=64)
@@ -841,10 +861,22 @@ class SurveyRequest(BaseModel):
     testimonial_consent: bool = False
     pilot_interest: Optional[str] = Field(None, pattern="^(yes|maybe|no)$")
     pilot_note: Optional[str] = None
+    # Legacy single-referral fields. KEPT — they are the mirror of referrals[0] and two live
+    # readers still consume them (the admin 'intro' count + the daily Cowork warm-lead alert).
     referral_name: Optional[str] = Field(None, max_length=200)
     referral_company_role: Optional[str] = Field(None, max_length=200)
     referral_contact: Optional[str] = Field(None, max_length=300)
     referral_consent: bool = False
+    # The multi-referral list. Absent on old clients — _normalize_referrals then wraps the
+    # legacy scalars above into a 1-element list, so both shapes land in `referrals`.
+    referrals: Optional[List[ReferralItem]] = None
+
+    @field_validator("referrals")
+    @classmethod
+    def _cap_referrals(cls, v: Optional[List[ReferralItem]]) -> Optional[List[ReferralItem]]:
+        # Truncate, never reject: an over-long list is a UI bug or a bored tester, not a
+        # reason to lose the survey.
+        return v[:_MAX_REFERRALS] if v else v
 
     @field_validator("tester_email")
     @classmethod
@@ -865,6 +897,42 @@ class SurveyRequest(BaseModel):
     @classmethod
     def _validate_session_id(cls, v: Optional[str]) -> Optional[str]:
         return _clean_optional_uuid(v)
+
+
+def _normalize_referrals(body: SurveyRequest) -> List[Dict[str, Any]]:
+    """The survey's referrals as one canonical list, whichever shape the client sent.
+
+    New clients post ``referrals: [{name, company_role, contact, consent}, ...]``; old ones
+    post only the legacy scalars, which are wrapped into a 1-element list. Entries with
+    neither a name nor a contact are dropped — a company/role alone is not a reachable
+    person, and dropping them keeps `referrals` consistent with the admin panel's
+    "intro" predicate (referral_name OR referral_contact present).
+
+    Blank strings are normalised to None so the mirrored legacy columns store a true NULL,
+    which is what the admin count and the daily warm-lead alert filter on.
+    """
+    def _entry(name: Any, role: Any, contact: Any, consent: Any) -> Optional[Dict[str, Any]]:
+        n, r, c = (str(name or "").strip(), str(role or "").strip(), str(contact or "").strip())
+        if not (n or c):
+            return None
+        return {
+            "name": n or None,
+            "company_role": r or None,
+            "contact": c or None,
+            "consent": bool(consent),
+        }
+
+    items = [
+        e for e in (
+            _entry(r.name, r.company_role, r.contact, r.consent) for r in (body.referrals or [])
+        ) if e is not None
+    ]
+    if items:
+        return items
+    legacy = _entry(
+        body.referral_name, body.referral_company_role, body.referral_contact, body.referral_consent,
+    )
+    return [legacy] if legacy else []
 
 
 def _propagate_tester_segment(session_id: Optional[str], tester_segment: Optional[str]) -> None:
@@ -974,15 +1042,31 @@ def survey(body: SurveyRequest, request: Request):
     id_expr = ":id" if _IS_SQLITE else "CAST(:id AS uuid)"
     session_expr = ":session_id" if _IS_SQLITE else "CAST(:session_id AS uuid)"
 
+    referrals_expr = ":referrals" if _IS_SQLITE else "CAST(:referrals AS jsonb)"
+
     params = {c: getattr(body, c) for c in _SURVEY_COLUMNS}
     params["id"] = response_id
     params["campaign"] = campaign
     params["corridor_id"] = corridor_id
     params["session_id"] = sid
 
-    col_sql = ", ".join(["id", "session_id"] + [c for c in _SURVEY_COLUMNS if c != "session_id"])
+    # Multi-referral: the full list goes to the `referrals` jsonb column, and referrals[0] is
+    # MIRRORED back onto the legacy scalar columns. The mirror is load-bearing, not vestigial —
+    # the admin panel's "intro" count and the daily Cowork warm-lead alert both read the scalars.
+    referrals = _normalize_referrals(body)
+    first = referrals[0] if referrals else None
+    params["referrals"] = json.dumps(referrals)
+    params["referral_name"] = first["name"] if first else None
+    params["referral_company_role"] = first["company_role"] if first else None
+    params["referral_contact"] = first["contact"] if first else None
+    params["referral_consent"] = bool(first["consent"]) if first else False
+
+    col_sql = ", ".join(
+        ["id", "session_id", "referrals"] + [c for c in _SURVEY_COLUMNS if c != "session_id"]
+    )
     val_sql = ", ".join(
-        [id_expr, session_expr] + [f":{c}" for c in _SURVEY_COLUMNS if c != "session_id"]
+        [id_expr, session_expr, referrals_expr]
+        + [f":{c}" for c in _SURVEY_COLUMNS if c != "session_id"]
     )
     with db.engine.begin() as conn:
         # AIQ-1542: one survey per session (latest wins). survey_responses had only a
@@ -1021,7 +1105,7 @@ def survey(body: SurveyRequest, request: Request):
             corridor_id=corridor_id, tester_segment=body.tester_segment,
         )
         # TD-7: turn survey answers into pipeline (best-effort; never breaks the survey write).
-        _process_survey_pipeline(body, campaign, corridor_id)
+        _process_survey_pipeline(body, campaign, corridor_id, referrals)
         # AIQ-1547: notify the admin of the completion IN-APP (admin Inbox / NotificationsBell)
         # by default — a Resend email per completion won't survive a cohort on the free tier.
         # Channel is gated by RELOPASS_TEST_DRIVE_NOTIFY_CHANNEL (default 'inapp' → zero email).
@@ -1034,9 +1118,13 @@ def survey(body: SurveyRequest, request: Request):
                 company_role=body.tester_company_role, sector=body.tester_sector,
                 q1_overall=body.q1_overall, q2_friction=body.q2_friction, q3_problem_fit=body.q3_problem_fit,
                 q4_change=body.q4_change, pilot_interest=body.pilot_interest, pilot_note=body.pilot_note,
-                testimonial=body.testimonial, referral_name=body.referral_name,
-                referral_company_role=body.referral_company_role, referral_contact=body.referral_contact,
-                referral_consent=body.referral_consent,
+                testimonial=body.testimonial,
+                # The mirrored first referral, NOT the raw body fields — a client that posts
+                # only the `referrals` array would otherwise notify with an empty referral.
+                referral_name=params["referral_name"],
+                referral_company_role=params["referral_company_role"],
+                referral_contact=params["referral_contact"],
+                referral_consent=params["referral_consent"],
             )
         except Exception:  # noqa: BLE001
             logger.warning("test_drive completion notify failed (suppressed)")
@@ -1049,8 +1137,17 @@ def survey(body: SurveyRequest, request: Request):
 
 
 # ── TD-7 (AIQ-1425): survey answers → pipeline ────────────────────────────────
-def _process_survey_pipeline(body: SurveyRequest, campaign: str, corridor_id: Optional[str]) -> None:
-    """Q7 intro → a prospect_candidates row; Q6 pilot Yes/Maybe → a warm-lead funnel event.
+def _process_survey_pipeline(
+    body: SurveyRequest,
+    campaign: str,
+    corridor_id: Optional[str],
+    referrals: List[Dict[str, Any]],
+) -> None:
+    """Q7 intros → one prospect_candidates row EACH; Q6 pilot Yes/Maybe → a warm-lead funnel event.
+
+    ``referrals`` is the normalised list from _normalize_referrals — already covering both the
+    array shape and the legacy single-referral shape, so this function no longer reads the
+    scalar referral_* fields itself.
 
     Best-effort — never raises into the survey write. Design note: prospect_candidates
     is company-centric (company_name NOT NULL) and its enrichment path sends
@@ -1069,44 +1166,52 @@ def _process_survey_pipeline(body: SurveyRequest, campaign: str, corridor_id: Op
             metadata={"pilot_interest": body.pilot_interest},
         )
 
-    # Q7 — a referral becomes a prospect_candidates row.
-    has_referral = bool((body.referral_name or "").strip() or (body.referral_contact or "").strip())
-    if not has_referral:
+    # Q7 — every referral becomes its own prospect_candidates row.
+    if not referrals:
         return
 
+    # ONE 'intro' event per survey (not per referral): the admin panel counts intros as
+    # survey rows carrying a referral, so a per-referral event would desync the two views.
+    # `count` carries the real number for anyone who wants it.
     _emit_funnel_event(
         event_type="intro", session_id=(body.session_id or None), campaign=campaign,
         corridor_id=corridor_id, tester_segment=body.tester_segment,
-        metadata={"has_contact": bool((body.referral_contact or "").strip())},
+        metadata={
+            "has_contact": bool(referrals[0].get("contact")),
+            "count": len(referrals),
+        },
     )
     try:
         from ..db import SessionLocal
         from ..models import ProspectCandidate
 
         referred_by = (body.tester_name or body.tester_email or "").strip() or None
-        company_name = (body.referral_company_role or "").strip() or "Test-drive referral"
-        raw = json.dumps(
-            {
-                "source": "test_drive_referral",
-                "referred_by": referred_by,  # NOT 'notes' — 'notes' is fed to the enrichment LLM.
-                "referral_name": (body.referral_name or "").strip() or None,
-                "referral_company_role": (body.referral_company_role or "").strip() or None,
-                "referral_contact": (body.referral_contact or "").strip() or None,
-                "corridor_id": corridor_id,
-                "campaign": campaign,
-            },
-            ensure_ascii=False,
-        )
         with SessionLocal() as s:
-            s.add(
-                ProspectCandidate(
-                    id=str(uuid.uuid4()),
-                    company_name=company_name[:255],
-                    raw_input_json=raw,
-                    status="maybe",  # a valid triage status; enrichment is NOT queued.
-                    web_search_used=False,
+            for ref in referrals:
+                company_name = ref.get("company_role") or "Test-drive referral"
+                raw = json.dumps(
+                    {
+                        "source": "test_drive_referral",
+                        # NOT 'notes' — 'notes' is fed to the enrichment LLM.
+                        "referred_by": referred_by,
+                        "referral_name": ref.get("name"),
+                        "referral_company_role": ref.get("company_role"),
+                        "referral_contact": ref.get("contact"),
+                        "referral_consent": bool(ref.get("consent")),
+                        "corridor_id": corridor_id,
+                        "campaign": campaign,
+                    },
+                    ensure_ascii=False,
                 )
-            )
+                s.add(
+                    ProspectCandidate(
+                        id=str(uuid.uuid4()),
+                        company_name=company_name[:255],
+                        raw_input_json=raw,
+                        status="maybe",  # a valid triage status; enrichment is NOT queued.
+                        web_search_used=False,
+                    )
+                )
             s.commit()
     except Exception:  # noqa: BLE001
         logger.warning("test_drive referral → prospect_candidates failed (suppressed)")

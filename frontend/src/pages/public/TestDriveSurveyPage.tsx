@@ -4,7 +4,7 @@ import { PublicLayout } from '../../components/public';
 import { Section, FadeIn } from '../../components/marketing';
 import { Button, Alert } from '../../components/antigravity';
 import { usePageMeta } from '../../hooks/usePageMeta';
-import { submitSurvey, type SurveyInput } from '../../api/testDrive';
+import { submitSurvey, type SurveyInput, type SurveyReferral } from '../../api/testDrive';
 import { testDriveSurveyContent as c } from './testDriveSurveyContent';
 
 // Q1 rating scale — a deliberate red→green semantic diverging palette (rough → smooth).
@@ -14,6 +14,24 @@ const RATING_COLORS = ['#bf4a42', '#cf7d38', '#be8f2f', '#6f9e56', '#3f9b6a'];
 type ProblemFit = '' | 'yes' | 'somewhat' | 'no';
 type PilotInterest = '' | 'yes' | 'maybe' | 'no';
 type TesterSegment = '' | 'prospect' | 'internal';
+
+/** One referral row in the repeatable block. Kept as plain strings so an untouched row is
+ *  trivially "empty" and gets dropped at submit. */
+interface ReferralRow {
+  name: string;
+  company_role: string;
+  contact: string;
+  consent: boolean;
+}
+
+/** Cap on "Add another". Generous enough that nobody hits it in practice; the backend
+ *  truncates rather than rejecting, so exceeding it could never cost a submission. */
+const MAX_REFERRALS = 5;
+
+const EMPTY_REFERRAL: ReferralRow = { name: '', company_role: '', contact: '', consent: false };
+
+const isReferralFilled = (r: ReferralRow): boolean =>
+  Boolean(r.name.trim() || r.contact.trim());
 
 interface SurveyForm {
   tester_segment: TesterSegment;
@@ -32,10 +50,7 @@ interface SurveyForm {
   testimonial_consent: boolean;
   pilot_interest: PilotInterest;
   pilot_note: string;
-  referral_name: string;
-  referral_company_role: string;
-  referral_contact: string;
-  referral_consent: boolean;
+  referrals: ReferralRow[];
 }
 
 const EMPTY: SurveyForm = {
@@ -55,10 +70,7 @@ const EMPTY: SurveyForm = {
   testimonial_consent: false,
   pilot_interest: '',
   pilot_note: '',
-  referral_name: '',
-  referral_company_role: '',
-  referral_contact: '',
-  referral_consent: false,
+  referrals: [EMPTY_REFERRAL],
 };
 
 const clean = (s: string): string | undefined => (s.trim() ? s.trim() : undefined);
@@ -115,6 +127,29 @@ export const TestDriveSurveyPage: React.FC = () => {
   const set = <K extends keyof SurveyForm>(key: K, value: SurveyForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  const setReferral = <K extends keyof ReferralRow>(i: number, key: K, value: ReferralRow[K]) =>
+    setForm((prev) => ({
+      ...prev,
+      referrals: prev.referrals.map((r, idx) => (idx === i ? { ...r, [key]: value } : r)),
+    }));
+
+  const addReferral = () =>
+    setForm((prev) =>
+      prev.referrals.length >= MAX_REFERRALS
+        ? prev
+        : { ...prev, referrals: [...prev.referrals, { ...EMPTY_REFERRAL }] },
+    );
+
+  const removeReferral = (i: number) =>
+    setForm((prev) => ({
+      ...prev,
+      // Never leave zero rows — the question must stay answerable after a remove.
+      referrals:
+        prev.referrals.length <= 1
+          ? [{ ...EMPTY_REFERRAL }]
+          : prev.referrals.filter((_, idx) => idx !== i),
+    }));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (state !== 'idle') return;
@@ -137,6 +172,16 @@ export const TestDriveSurveyPage: React.FC = () => {
     }
     setState('submitting');
     setError(null);
+    // Drop untouched rows (a referral needs at least a name or a way to reach them), then
+    // send BOTH shapes: the full list, and referrals[0] in the legacy scalar fields so a
+    // backend that predates the array still captures the first intro.
+    const referrals: SurveyReferral[] = form.referrals.filter(isReferralFilled).map((r) => ({
+      name: clean(r.name),
+      company_role: clean(r.company_role),
+      contact: clean(r.contact),
+      consent: r.consent,
+    }));
+    const firstReferral = referrals[0];
     const payload: SurveyInput = {
       session_id: sessionId || undefined,
       corridor_id: corridorId || undefined,
@@ -156,10 +201,11 @@ export const TestDriveSurveyPage: React.FC = () => {
       testimonial_consent: form.testimonial_consent,
       pilot_interest: form.pilot_interest || undefined,
       pilot_note: clean(form.pilot_note),
-      referral_name: clean(form.referral_name),
-      referral_company_role: clean(form.referral_company_role),
-      referral_contact: clean(form.referral_contact),
-      referral_consent: form.referral_consent,
+      referrals,
+      referral_name: firstReferral?.name,
+      referral_company_role: firstReferral?.company_role,
+      referral_contact: firstReferral?.contact,
+      referral_consent: firstReferral?.consent ?? false,
     };
     const res = await submitSurvey(payload);
     if (res.ok) {
@@ -342,6 +388,86 @@ export const TestDriveSurveyPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Q6 — pilot interest. Moved up (was second-to-last): the buy signal and the
+                referral ask below it are the two answers worth the most, so they must survive
+                a tester who abandons the form partway through the free-text questions. */}
+            <div>
+              <p className="text-sm font-medium text-marketing-primary">{c.q6.label}</p>
+              <TapGroup
+                options={c.q6.options}
+                value={form.pilot_interest}
+                onSelect={(v) => set('pilot_interest', v as PilotInterest)}
+              />
+              <div className="mt-3">
+                <TextField
+                  id="s-pilot-note"
+                  label={c.q6.noteLabel}
+                  helper={c.q6.helper}
+                  value={form.pilot_note}
+                  onChange={(v) => set('pilot_note', v)}
+                />
+              </div>
+            </div>
+
+            {/* Q7 — intros. Repeatable: a tester who knows three people can leave three.
+                Starts with one empty row; "Add another" appends up to MAX_REFERRALS. */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-marketing-primary">{c.q7.label}</p>
+              {form.referrals.map((ref, i) => (
+                <fieldset
+                  key={i}
+                  className="space-y-3 rounded-lg border border-marketing-border p-4"
+                >
+                  <legend className="px-1 text-xs font-medium text-marketing-text-muted">
+                    {c.q7.itemLabel(i + 1)}
+                  </legend>
+                  <TextField
+                    id={`s-ref-name-${i}`}
+                    label={c.q7.name}
+                    value={ref.name}
+                    onChange={(v) => setReferral(i, 'name', v)}
+                  />
+                  <TextField
+                    id={`s-ref-role-${i}`}
+                    label={c.q7.companyRole}
+                    value={ref.company_role}
+                    onChange={(v) => setReferral(i, 'company_role', v)}
+                  />
+                  <TextField
+                    id={`s-ref-contact-${i}`}
+                    label={c.q7.contact}
+                    value={ref.contact}
+                    onChange={(v) => setReferral(i, 'contact', v)}
+                  />
+                  <Consent
+                    id={`s-ref-consent-${i}`}
+                    label={c.q7.consent}
+                    checked={ref.consent}
+                    onChange={(v) => setReferral(i, 'consent', v)}
+                  />
+                  {form.referrals.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeReferral(i)}
+                      className="text-xs font-medium text-marketing-text-muted underline underline-offset-2 hover:text-marketing-primary"
+                    >
+                      {c.q7.remove(i + 1)}
+                    </button>
+                  )}
+                </fieldset>
+              ))}
+              {form.referrals.length < MAX_REFERRALS && (
+                <button
+                  type="button"
+                  onClick={addReferral}
+                  className="rounded-lg border border-marketing-border px-3 py-2 text-sm font-medium text-marketing-primary transition-colors hover:bg-marketing-surface-muted focus:outline-none focus:ring-2 focus:ring-marketing-accent/40"
+                >
+                  {c.q7.addAnother}
+                </button>
+              )}
+              <p className="text-[11px] text-marketing-text-muted">{c.q7.helper}</p>
+            </div>
+
             {/* Q2 — friction */}
             <TextArea
               id="s-friction"
@@ -413,55 +539,6 @@ export const TestDriveSurveyPage: React.FC = () => {
                 onChange={(v) => set('testimonial_consent', v)}
               />
             </div>
-
-            {/* Q6 — pilot interest */}
-            <div>
-              <p className="text-sm font-medium text-marketing-primary">{c.q6.label}</p>
-              <TapGroup
-                options={c.q6.options}
-                value={form.pilot_interest}
-                onSelect={(v) => set('pilot_interest', v as PilotInterest)}
-              />
-              <div className="mt-3">
-                <TextField
-                  id="s-pilot-note"
-                  label={c.q6.noteLabel}
-                  helper={c.q6.helper}
-                  value={form.pilot_note}
-                  onChange={(v) => set('pilot_note', v)}
-                />
-              </div>
-            </div>
-
-            {/* Q7 — intro + consent */}
-            <fieldset className="space-y-3">
-              <legend className="text-sm font-medium text-marketing-primary">{c.q7.label}</legend>
-              <TextField
-                id="s-ref-name"
-                label={c.q7.name}
-                value={form.referral_name}
-                onChange={(v) => set('referral_name', v)}
-              />
-              <TextField
-                id="s-ref-role"
-                label={c.q7.companyRole}
-                value={form.referral_company_role}
-                onChange={(v) => set('referral_company_role', v)}
-              />
-              <TextField
-                id="s-ref-contact"
-                label={c.q7.contact}
-                value={form.referral_contact}
-                onChange={(v) => set('referral_contact', v)}
-              />
-              <Consent
-                id="s-ref-consent"
-                label={c.q7.consent}
-                checked={form.referral_consent}
-                onChange={(v) => set('referral_consent', v)}
-              />
-              <p className="text-[11px] text-marketing-text-muted">{c.q7.helper}</p>
-            </fieldset>
 
             {error && <Alert variant="error">{error}</Alert>}
 
