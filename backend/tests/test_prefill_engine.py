@@ -69,10 +69,23 @@ CREATE TABLE case_form_field_values (
     value         TEXT,
     filled_by     TEXT NOT NULL,
     ai_confidence REAL,
+    source        TEXT,
     reviewed      INTEGER NOT NULL DEFAULT 0,
     overridden    INTEGER NOT NULL DEFAULT 0,
     updated_at    TEXT DEFAULT (datetime('now')),
     UNIQUE (case_form_id, field_id)
+);
+CREATE TABLE imm_employee_profiles (
+    id                 TEXT PRIMARY KEY,
+    case_id            TEXT NOT NULL,
+    employee_id        TEXT NOT NULL,
+    legal_first_name   TEXT,
+    legal_last_name    TEXT,
+    date_of_birth      TEXT,
+    nationality        TEXT,
+    passport_expiry    TEXT,
+    passport_number    TEXT,
+    field_sources      TEXT DEFAULT '{}'
 );
 CREATE TABLE case_dependents (
     id            TEXT PRIMARY KEY,
@@ -131,13 +144,37 @@ def _insert_template(conn, template_id, code, fields):
 
 
 def _insert_case_form(conn, cf_id, case_id, template_id,
-                      person_id=None, dependent_id=None):
+                      person_id=None, dependent_id=None, status="not_started"):
     conn.execute(text(
         "INSERT INTO case_forms "
-        "(id, case_id, form_template_id, person_id, dependent_id) "
-        "VALUES (:id, :cid, :tid, :pid, :did)"
+        "(id, case_id, form_template_id, person_id, dependent_id, status) "
+        "VALUES (:id, :cid, :tid, :pid, :did, :st)"
     ), {"id": cf_id, "cid": case_id, "tid": template_id,
-        "pid": person_id, "did": dependent_id})
+        "pid": person_id, "did": dependent_id, "st": status})
+
+
+def _insert_vault(conn, case_id, employee_id, ocr_fields, field_sources=None):
+    """Insert an imm_employee_profiles row. `ocr_fields` maps vault column →
+    value; `field_sources` marks per-column origin (defaults every supplied
+    column to 'ocr')."""
+    cols = {"id": _uuid(), "case_id": case_id, "employee_id": employee_id, **ocr_fields}
+    sources = field_sources or {k: "ocr" for k in ocr_fields}
+    cols["field_sources"] = json.dumps(sources)
+    keys = ", ".join(cols.keys())
+    binds = ", ".join(f":{k}" for k in cols.keys())
+    conn.execute(text(
+        f"INSERT INTO imm_employee_profiles ({keys}) VALUES ({binds})"
+    ), cols)
+
+
+def _insert_field_value(conn, cf_id, field_id, value, filled_by="employee",
+                        reviewed=1, overridden=0):
+    conn.execute(text(
+        "INSERT INTO case_form_field_values "
+        "(id, case_form_id, field_id, value, filled_by, reviewed, overridden) "
+        "VALUES (:id, :cfid, :fid, :val, :by, :rev, :ovr)"
+    ), {"id": _uuid(), "cfid": cf_id, "fid": field_id, "val": value,
+        "by": filled_by, "rev": reviewed, "ovr": overridden})
 
 
 # ---------------------------------------------------------------------------
@@ -719,6 +756,243 @@ class PreFillEngineTests(unittest.TestCase):
                 "SELECT value FROM case_form_field_values WHERE case_form_id = :id"
             ), {"id": blocked_id}).scalar()
         self.assertEqual(val, "X111")
+
+
+class PreFillSourceProvenanceTests(unittest.TestCase):
+    """[AIQ-1755] passport-OCR + prior-approved-form sources, with provenance."""
+
+    def setUp(self):
+        self.engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+        )
+        with self.engine.begin() as conn:
+            for stmt in SCHEMA.split(";"):
+                s = stmt.strip()
+                if s:
+                    conn.execute(text(s))
+        self.patcher = mock.patch.object(prefill_engine.db, "engine", self.engine)
+        self.patcher.start()
+
+    def tearDown(self):
+        self.patcher.stop()
+        self.engine.dispose()
+
+    def _row(self, cf_id, field_id):
+        with self.engine.connect() as conn:
+            return conn.execute(text(
+                "SELECT value, source, ai_confidence FROM case_form_field_values "
+                "WHERE case_form_id = :id AND field_id = :fid"
+            ), {"id": cf_id, "fid": field_id}).mappings().first()
+
+    # ── (a) passport-OCR vault source ────────────────────────────────────────
+
+    def test_ocr_vault_fills_field_with_passport_ocr_source(self):
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields = [
+            {"id": "nationality",  "prefill_source": "profile.nationality"},
+            {"id": "dob",          "prefill_source": "profile.date_of_birth"},
+        ]
+        # intake has NOTHING — the values must come from the OCR vault.
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, {})
+            _insert_profile(conn, emp_id)
+            _insert_vault(conn, case_id, emp_id,
+                          {"nationality": "FRA", "date_of_birth": "1985-04-12"})
+            _insert_template(conn, tmpl, "D-NUMBER", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+
+        self.assertEqual(run_prefill(cf_id, case_id), 2)
+
+        nat = self._row(cf_id, "nationality")
+        self.assertEqual(nat["value"], "FRA")
+        self.assertEqual(nat["source"], "passport_ocr")
+        self.assertAlmostEqual(nat["ai_confidence"], 0.9, places=2)
+        self.assertEqual(self._row(cf_id, "dob")["source"], "passport_ocr")
+
+    def test_ocr_vault_composes_legal_full_name(self):
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields = [{"id": "full_name", "prefill_source": "profile.legal_full_name"}]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, {})
+            _insert_profile(conn, emp_id, full_name=None)
+            _insert_vault(conn, case_id, emp_id,
+                          {"legal_first_name": "Sophie", "legal_last_name": "Leblanc"})
+            _insert_template(conn, tmpl, "D-NUMBER", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+
+        self.assertEqual(run_prefill(cf_id, case_id), 1)
+        row = self._row(cf_id, "full_name")
+        self.assertEqual(row["value"], "Sophie Leblanc")
+        self.assertEqual(row["source"], "passport_ocr")
+
+    def test_non_ocr_vault_fields_are_not_used(self):
+        # A vault field whose field_sources says 'hr_provided' (not 'ocr') is
+        # NOT a passport-OCR source and must not be pulled in by this path.
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields = [{"id": "nationality", "prefill_source": "profile.nationality"}]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, {})
+            _insert_profile(conn, emp_id)
+            _insert_vault(conn, case_id, emp_id, {"nationality": "FRA"},
+                          field_sources={"nationality": "hr_provided"})
+            _insert_template(conn, tmpl, "D-NUMBER", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+
+        self.assertEqual(run_prefill(cf_id, case_id), 0)  # not invented, stays blank
+
+    # ── (b) prior approved form donation ─────────────────────────────────────
+
+    def test_prior_approved_form_donates_value_with_source(self):
+        case_id = _uuid();  emp_id = _uuid()
+        prior_cf = _uuid();  new_cf = _uuid()
+        prior_tmpl = _uuid();  new_tmpl = _uuid()
+        # Both templates map a field to profile.passport_number.
+        prior_fields = [{"id": "pp", "prefill_source": "profile.passport_number"}]
+        new_fields   = [{"id": "passport_no", "prefill_source": "profile.passport_number"}]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, {})          # no intake passport
+            _insert_profile(conn, emp_id)
+            _insert_template(conn, prior_tmpl, "GP-7-04", prior_fields)
+            _insert_template(conn, new_tmpl, "POLICE-REG", new_fields)
+            # An APPROVED prior form holding a reviewed passport value.
+            _insert_case_form(conn, prior_cf, case_id, prior_tmpl,
+                              person_id=emp_id, status="approved")
+            _insert_field_value(conn, prior_cf, "pp", "X99887766")
+            _insert_case_form(conn, new_cf, case_id, new_tmpl, person_id=emp_id)
+
+        self.assertEqual(run_prefill(new_cf, case_id), 1)
+        row = self._row(new_cf, "passport_no")
+        self.assertEqual(row["value"], "X99887766")
+        self.assertEqual(row["source"], "prior_form")
+        self.assertAlmostEqual(row["ai_confidence"], 0.95, places=2)
+
+    def test_unapproved_prior_form_does_not_donate(self):
+        case_id = _uuid();  emp_id = _uuid()
+        prior_cf = _uuid();  new_cf = _uuid()
+        prior_tmpl = _uuid();  new_tmpl = _uuid()
+        prior_fields = [{"id": "pp", "prefill_source": "profile.passport_number"}]
+        new_fields   = [{"id": "passport_no", "prefill_source": "profile.passport_number"}]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, {})
+            _insert_profile(conn, emp_id)
+            _insert_template(conn, prior_tmpl, "GP-7-04", prior_fields)
+            _insert_template(conn, new_tmpl, "POLICE-REG", new_fields)
+            # status is 'submitted', NOT approved → must not donate.
+            _insert_case_form(conn, prior_cf, case_id, prior_tmpl,
+                              person_id=emp_id, status="submitted")
+            _insert_field_value(conn, prior_cf, "pp", "X99887766")
+            _insert_case_form(conn, new_cf, case_id, new_tmpl, person_id=emp_id)
+
+        self.assertEqual(run_prefill(new_cf, case_id), 0)  # no invented value
+
+    # ── no-overwrite + no-invent + precedence ────────────────────────────────
+
+    def test_ocr_never_overwrites_overridden_value(self):
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields = [{"id": "nationality", "prefill_source": "profile.nationality"}]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, {})
+            _insert_profile(conn, emp_id)
+            _insert_vault(conn, case_id, emp_id, {"nationality": "FRA"})
+            _insert_template(conn, tmpl, "D-NUMBER", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+            # User already overrode this field.
+            _insert_field_value(conn, cf_id, "nationality", "NOR",
+                                filled_by="employee", overridden=1)
+
+        run_prefill(cf_id, case_id)
+        self.assertEqual(self._row(cf_id, "nationality")["value"], "NOR")
+
+    def test_unsourced_field_stays_blank_no_invention(self):
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields = [{"id": "passport_no", "prefill_source": "profile.passport_number"}]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, {})           # no intake
+            _insert_profile(conn, emp_id)
+            _insert_vault(conn, case_id, emp_id, {"nationality": "FRA"})  # no passport
+            _insert_template(conn, tmpl, "D-NUMBER", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+
+        self.assertEqual(run_prefill(cf_id, case_id), 0)
+        self.assertIsNone(self._row(cf_id, "passport_no"))
+
+    def test_intake_beats_ocr_beats_prior_form(self):
+        # profile.nationality: intake supplies it → source must be intake_profile
+        # even though the OCR vault also has a (different) value.
+        case_id = _uuid();  emp_id = _uuid()
+        prior_cf = _uuid();  new_cf = _uuid()
+        prior_tmpl = _uuid();  new_tmpl = _uuid()
+        new_fields = [{"id": "nat", "prefill_source": "profile.nationality"}]
+        prior_fields = [{"id": "nat", "prefill_source": "profile.nationality"}]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id,
+                         {"profile": {"nationality": "FR_INTAKE"}})
+            _insert_profile(conn, emp_id)
+            _insert_vault(conn, case_id, emp_id, {"nationality": "FR_OCR"})
+            _insert_template(conn, prior_tmpl, "GP-7-04", prior_fields)
+            _insert_template(conn, new_tmpl, "POLICE-REG", new_fields)
+            _insert_case_form(conn, prior_cf, case_id, prior_tmpl,
+                              person_id=emp_id, status="approved")
+            _insert_field_value(conn, prior_cf, "nat", "FR_PRIOR")
+            _insert_case_form(conn, new_cf, case_id, new_tmpl, person_id=emp_id)
+
+        run_prefill(new_cf, case_id)
+        row = self._row(new_cf, "nat")
+        self.assertEqual(row["value"], "FR_INTAKE")
+        self.assertEqual(row["source"], "intake_profile")
+
+    def test_ocr_beats_prior_form_when_intake_absent(self):
+        case_id = _uuid();  emp_id = _uuid()
+        prior_cf = _uuid();  new_cf = _uuid()
+        prior_tmpl = _uuid();  new_tmpl = _uuid()
+        new_fields = [{"id": "nat", "prefill_source": "profile.nationality"}]
+        prior_fields = [{"id": "nat", "prefill_source": "profile.nationality"}]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, {})            # no intake
+            _insert_profile(conn, emp_id)
+            _insert_vault(conn, case_id, emp_id, {"nationality": "FR_OCR"})
+            _insert_template(conn, prior_tmpl, "GP-7-04", prior_fields)
+            _insert_template(conn, new_tmpl, "POLICE-REG", new_fields)
+            _insert_case_form(conn, prior_cf, case_id, prior_tmpl,
+                              person_id=emp_id, status="approved")
+            _insert_field_value(conn, prior_cf, "nat", "FR_PRIOR")
+            _insert_case_form(conn, new_cf, case_id, new_tmpl, person_id=emp_id)
+
+        run_prefill(new_cf, case_id)
+        row = self._row(new_cf, "nat")
+        self.assertEqual(row["value"], "FR_OCR")
+        self.assertEqual(row["source"], "passport_ocr")
+
+    def test_intake_value_carries_intake_profile_source(self):
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields = [{"id": "pp", "prefill_source": "profile.passport_number"}]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id,
+                         {"profile": {"passport_number": "INTAKE123"}})
+            _insert_profile(conn, emp_id)
+            _insert_template(conn, tmpl, "D-NUMBER", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+
+        run_prefill(cf_id, case_id)
+        row = self._row(cf_id, "pp")
+        self.assertEqual(row["value"], "INTAKE123")
+        self.assertEqual(row["source"], "intake_profile")
+
+    def test_source_paths_are_fail_soft(self):
+        # Drop the vault table entirely → the OCR source read raises internally
+        # but run_prefill must still succeed on intake, never propagate.
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields = [{"id": "nat", "prefill_source": "profile.nationality"}]
+        with self.engine.begin() as conn:
+            conn.execute(text("DROP TABLE imm_employee_profiles"))
+            _insert_case(conn, case_id, emp_id, {"profile": {"nationality": "FR"}})
+            _insert_profile(conn, emp_id)
+            _insert_template(conn, tmpl, "D-NUMBER", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+
+        self.assertEqual(run_prefill(cf_id, case_id), 1)
+        self.assertEqual(self._row(cf_id, "nat")["value"], "FR")
 
 
 if __name__ == "__main__":
