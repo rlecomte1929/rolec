@@ -43,7 +43,11 @@ test.describe('test-drive survey — consent + pilot reach the payload (AIQ-1650
     // Q6 — pilot interest (custom tap group). 'let's talk' uniquely identifies the Yes option.
     await page.getByRole('button', { name: /let's talk/i }).click();
 
-    // Referral consent — same custom checkbox control.
+    // Q7 — the referral block is repeatable, so consent now belongs to a specific person.
+    // An unfilled row is dropped at submit (a consent with nobody to refer is meaningless),
+    // so name the person before ticking their consent checkbox.
+    await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Jordan Peer');
+    await page.getByRole('textbox', { name: /How to reach them/i }).fill('jordan@globex.test');
     await page.getByRole('checkbox', { name: /You can mention I referred them/i }).check();
 
     // Capture the outgoing request body and assert the three high-value fields carried.
@@ -53,7 +57,15 @@ test.describe('test-drive survey — consent + pilot reach the payload (AIQ-1650
 
     expect(body.testimonial_consent, 'testimonial_consent must reach the payload').toBe(true);
     expect(body.pilot_interest, 'pilot_interest must reach the payload').toBe('yes');
+    // The legacy scalar (mirrored from referrals[0]) — still read by the admin "intro" count
+    // and the daily warm-lead alert, so it must keep carrying.
     expect(body.referral_consent, 'referral_consent must reach the payload').toBe(true);
+    expect(body.referral_name, 'referral_name must mirror referrals[0]').toBe('Jordan Peer');
+    // …and the new array shape carries the same click.
+    const referrals = body.referrals as Array<Record<string, unknown>>;
+    expect(referrals, 'referrals array must reach the payload').toHaveLength(1);
+    expect(referrals[0].name).toBe('Jordan Peer');
+    expect(referrals[0].consent, 'per-referral consent must reach the payload').toBe(true);
     // Sanity: the required segment self-ID mapped 'Yes' → 'prospect'.
     expect(body.tester_segment).toBe('prospect');
   });
