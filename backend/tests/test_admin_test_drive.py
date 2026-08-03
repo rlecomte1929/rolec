@@ -278,6 +278,126 @@ class TestAdminTestDrive(unittest.TestCase):
         self.assertEqual(resp.status_code, 200, resp.text)
         self.assertEqual(resp.json()["referrals"], [])
 
+    # ── multi-referral read-out ────────────────────────────────────────────────
+    # A survey row carries its full list in `survey_responses.referrals` (jsonb) and mirrors
+    # referrals[0] into the legacy scalars, so reading only the scalars showed ONE intro per
+    # survey however many the tester left.
+
+    def _multi_row(self, referrals, **overrides):
+        """One survey row whose legacy scalars mirror referrals[0], as the writer stores it."""
+        first = referrals[0] if referrals else {}
+        row = {
+            "referral_name": first.get("name"),
+            "referral_contact": first.get("contact"),
+            "referral_company_role": first.get("company_role"),
+            "referral_consent": first.get("consent", False),
+            "referrals": referrals,
+            "corridor_id": "FR_NO",
+            "tester_name": "Alex",
+            "created_at": "2026-07-16",
+        }
+        row.update(overrides)
+        return row
+
+    def test_referrals_expands_one_entry_per_person(self):
+        """Three intros on one survey → three entries, each with its OWN consent flag."""
+        self._as(True)
+        referrals = [
+            {"name": "Marie Dupont", "company_role": "Head of Mobility", "contact": "marie@x.test",
+             "consent": True},
+            {"name": "Jan Novak", "company_role": "HRBP", "contact": "+420 555 111", "consent": False},
+            {"name": "Robin Three", "company_role": "People Ops", "contact": "robin@x.test",
+             "consent": True},
+        ]
+        with patch("backend.app.routers.admin_test_drive._rows",
+                   return_value=[self._multi_row(referrals)]):
+            resp = self.client.get("/api/admin/test-drive/referrals?corridor=FR_NO")
+
+        self.assertEqual(resp.status_code, 200, resp.text)
+        rows = resp.json()["referrals"]
+        self.assertEqual(len(rows), 3, "one entry per referred person, not per survey")
+        self.assertEqual([r["referral_name"] for r in rows],
+                         ["Marie Dupont", "Jan Novak", "Robin Three"])
+        # Consent is per person — #2 declined while #1 and #3 agreed.
+        self.assertEqual([r["referral_consent"] for r in rows], [True, False, True])
+        # Survey-level context is carried onto every entry.
+        self.assertTrue(all(r["referred_by"] == "Alex" for r in rows))
+        self.assertTrue(all(r["corridor_id"] == "FR_NO" for r in rows))
+
+    def test_referrals_json_string_column_is_parsed(self):
+        """SQLite hands jsonb back as text where psycopg2 gives a list — both must expand."""
+        self._as(True)
+        referrals = [{"name": "Marie", "contact": "marie@x.test", "consent": True},
+                     {"name": "Jan", "contact": "jan@x.test", "consent": True}]
+        row = self._multi_row(referrals)
+        row["referrals"] = json.dumps(referrals)
+        with patch("backend.app.routers.admin_test_drive._rows", return_value=[row]):
+            resp = self.client.get("/api/admin/test-drive/referrals")
+        self.assertEqual([r["referral_name"] for r in resp.json()["referrals"]], ["Marie", "Jan"])
+
+    def test_referrals_historical_row_uses_legacy_scalars_once(self):
+        """A row written before multi-referral has `referrals` empty — fall back to the
+        legacy scalars and emit exactly ONE entry (never a duplicate of referrals[0])."""
+        self._as(True)
+        row = self._multi_row([])
+        row.update({"referral_name": "Old Referral", "referral_contact": "old@x.test",
+                    "referral_company_role": "HRD", "referral_consent": True, "referrals": []})
+        with patch("backend.app.routers.admin_test_drive._rows", return_value=[row]):
+            resp = self.client.get("/api/admin/test-drive/referrals")
+        rows = resp.json()["referrals"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["referral_name"], "Old Referral")
+        self.assertTrue(rows[0]["referral_consent"])
+
+    def test_referrals_falls_back_when_column_missing(self):
+        """Before the migration is applied prod has no `referrals` column — the panel must
+        degrade to the old one-per-survey view, NOT to empty."""
+        self._as(True)
+        seen = []
+
+        def fake_rows(sql, params):
+            seen.append(sql)
+            if "referrals," in sql:
+                raise RuntimeError('column "referrals" does not exist')
+            return [{"referral_name": "Marie", "referral_contact": "marie@x.test",
+                     "referral_company_role": "Head of Mobility", "referral_consent": True,
+                     "corridor_id": "FR_NO", "tester_name": "Alex", "created_at": "2026-07-16"}]
+
+        with patch("backend.app.routers.admin_test_drive._rows", side_effect=fake_rows):
+            resp = self.client.get("/api/admin/test-drive/referrals")
+
+        self.assertEqual(resp.status_code, 200, resp.text)
+        rows = resp.json()["referrals"]
+        self.assertEqual(len(rows), 1, "degrades to the legacy view rather than going empty")
+        self.assertEqual(rows[0]["referral_name"], "Marie")
+        self.assertEqual(len(seen), 2, "tries the referrals column, then falls back")
+
+    def test_contacts_csv_lists_every_consented_person(self):
+        """The outreach CSV must carry each consented person — including #2 on a survey whose
+        first referral was NOT consented, which a row-level SQL consent filter would drop."""
+        self._as(True)
+        referrals = [
+            {"name": "Unconsented First", "company_role": "HRBP", "contact": "no@x.test",
+             "consent": False},
+            {"name": "Consented Second", "company_role": "Head of Mobility",
+             "contact": "yes@x.test", "consent": True},
+        ]
+        row = self._multi_row(referrals)
+
+        # The CSV builds three sections off _rows; only feed the referral one.
+        def fake_rows(sql, params):
+            return [row] if "referral_name" in sql else []
+
+        with patch("backend.app.routers.admin_test_drive._rows", side_effect=fake_rows):
+            resp = self.client.get("/api/admin/test-drive/contacts.csv")
+
+        self.assertEqual(resp.status_code, 200, resp.text)
+        body = resp.text
+        referral_lines = [ln for ln in body.splitlines() if ln.startswith("referral,")]
+        self.assertEqual(len(referral_lines), 1, "only the consented person is exported")
+        self.assertIn("Consented Second", referral_lines[0])
+        self.assertNotIn("Unconsented First", body, "consent gates outreach, per person")
+
 
 if __name__ == "__main__":
     unittest.main()
