@@ -257,6 +257,9 @@ corridor_agent:
 
     - step_id: TRAVEL_TO_IE
       name: "Travel to Ireland"
+      # Everything above this point (permit + visa) must complete before the start
+      # date — the pre-arrival runway that makes a short-notice CSEP move infeasible.
+      arrival_anchor: true
       responsible_party: EMPLOYEE
       expected_duration_days: 1
       prerequisite_step_ids: [D_VISA_GRANTED]

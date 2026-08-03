@@ -60,6 +60,8 @@ corridor_agent:
   step_graph:
     - step_id: TRAVEL_TO_NL
       name: "Travel to the Netherlands (no visa for EU nationals)"
+      # Free movement: the graph roots at arrival, so pre-arrival runway is ~0.
+      arrival_anchor: true
       responsible_party: EMPLOYEE
       expected_duration_days: 1
       prerequisite_step_ids: []

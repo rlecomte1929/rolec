@@ -92,5 +92,71 @@ class PathwayParsingTests(unittest.TestCase):
         self.assertIsNone(reg.get_pathway_file("XX_YY", "P1"))  # declared but no file on disk
 
 
+# AIQ-1747 — the arrival anchor marks where the PRE-arrival runway ends. Downstream
+# feasibility work measures the longest path to it, so exactly one step per pathway
+# must carry it, and it must be the SEMANTICALLY right step: step-id spelling is not
+# a safe proxy (NO_FR anchors on A0_DEPART_NO, and IN_DE's graph roots at
+# ZAB_STATEMENT, so a TRAVEL_TO_* prefix match would mis-anchor both).
+_EXPECTED_ARRIVAL_ANCHOR = {
+    "DE_NO": "TRAVEL_TO_NO",
+    "ES_IE": "TRAVEL_TO_IE",
+    "ES_NL": "TRAVEL_TO_NL",
+    "FR_CH": "TRAVEL_TO_CH",
+    "FR_DE": "TRAVEL_TO_DE",
+    "FR_ES": "TRAVEL_TO_ES",
+    "FR_NL": "TRAVEL_TO_NL",
+    "FR_NO": "TRAVEL_TO_NO",
+    "IN_DE": "TRAVEL_TO_DE",
+    # No "arrive in France" step exists: a returning citizen needs no visa, permit
+    # or registration, so departure IS the move and the runway is legitimately zero.
+    "NO_FR": "A0_DEPART_NO",
+}
+
+
+class ArrivalAnchorTests(unittest.TestCase):
+    """Every committed pathway declares exactly one arrival_anchor step."""
+
+    def setUp(self):
+        reg._reset_cache_for_tests()
+        self.addCleanup(reg._reset_cache_for_tests)
+
+    def _load_all(self):
+        for corridor_id in _EXPECTED_ARRIVAL_ANCHOR:
+            pathways = reg.get_pathways(corridor_id)
+            self.assertTrue(pathways, f"{corridor_id} declares no pathways")
+            for pathway in pathways:
+                path = reg.get_pathway_file(corridor_id, pathway.id)
+                self.assertIsNotNone(path, f"{corridor_id}/{pathway.id} did not resolve")
+                yield corridor_id, load_corridor(path)
+
+    def test_every_pathway_declares_exactly_one_anchor(self):
+        seen = set()
+        for corridor_id, corridor in self._load_all():
+            anchors = [s.step_id for s in corridor.step_graph if s.arrival_anchor]
+            self.assertEqual(
+                len(anchors), 1,
+                f"{corridor_id} declares {len(anchors)} arrival_anchor steps: {anchors}",
+            )
+            seen.add(corridor_id)
+        self.assertEqual(seen, set(_EXPECTED_ARRIVAL_ANCHOR), "a corridor was not covered")
+
+    def test_anchor_is_the_semantically_correct_step(self):
+        for corridor_id, corridor in self._load_all():
+            anchor = next(s for s in corridor.step_graph if s.arrival_anchor)
+            self.assertEqual(
+                anchor.step_id, _EXPECTED_ARRIVAL_ANCHOR[corridor_id],
+                f"{corridor_id} anchored on {anchor.step_id}",
+            )
+
+    def test_unmarked_steps_default_to_false(self):
+        for corridor_id, corridor in self._load_all():
+            for step in corridor.step_graph:
+                if step.step_id != _EXPECTED_ARRIVAL_ANCHOR[corridor_id]:
+                    self.assertIs(
+                        step.arrival_anchor, False,
+                        f"{corridor_id}.{step.step_id} should default to False",
+                    )
+
+
 if __name__ == "__main__":
     unittest.main()
