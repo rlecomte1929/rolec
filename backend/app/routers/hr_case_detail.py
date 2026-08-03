@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ..auth_deps import get_org_id_for_hr_user, require_admin_or_hr
+from ..services.case_feasibility import feasibility_for_case
 from ..services.contradiction_store_pg import run_contradiction_detection_for_case
 from ...database import db
 
@@ -60,6 +61,20 @@ class EmployeeDTO(BaseModel):
     nationality: Optional[str] = None
 
 
+class CaseFeasibilityDTO(BaseModel):
+    """Does the target start date leave room for the corridor to run? (AIQ-1749)
+
+    Null on the overview when there is no opinion to give — an unresolvable
+    corridor, no declared arrival anchor, or no target start date. Absent must
+    render as nothing, never as reassurance.
+    """
+
+    verdict: str  # 'critical' | 'tight' | 'ok'
+    required_days: int
+    available_days: int
+    derivation: str
+
+
 class CaseOverviewDTO(BaseModel):
     case_id: str
     employee: EmployeeDTO
@@ -72,6 +87,7 @@ class CaseOverviewDTO(BaseModel):
     actual_start_date: Optional[str] = None
     target_close_date: Optional[str] = None
     family_members: List[FamilyMemberDTO] = Field(default_factory=list)
+    feasibility: Optional[CaseFeasibilityDTO] = None
 
 
 class OverviewResponse(BaseModel):
@@ -254,6 +270,25 @@ def get_case_overview(
         # rce.family_members may not be populated yet for legacy cases — non-fatal.
         family_members = []
 
+    # Permit corridors need ~15 weeks of runway before the employee can even travel,
+    # so a start date inside that window is unrecoverable however diligent the case
+    # is. Resolution is fallback-safe: None when there is no opinion to give.
+    assessment = feasibility_for_case(
+        case.get("origin_country_code"),
+        case.get("dest_country_code"),
+        case.get("target_start_date"),
+    )
+    feasibility = (
+        CaseFeasibilityDTO(
+            verdict=assessment.verdict,
+            required_days=assessment.required_days,
+            available_days=assessment.available_days,
+            derivation=assessment.derivation,
+        )
+        if assessment is not None
+        else None
+    )
+
     overview = CaseOverviewDTO(
         case_id=case_id,
         employee=EmployeeDTO(
@@ -271,6 +306,7 @@ def get_case_overview(
         actual_start_date=str(case["actual_start_date"]) if case.get("actual_start_date") else None,
         target_close_date=str(case["target_close_date"]) if case.get("target_close_date") else None,
         family_members=family_members,
+        feasibility=feasibility,
     )
     return OverviewResponse(overview=overview)
 
