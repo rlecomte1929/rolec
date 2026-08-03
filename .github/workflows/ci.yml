@@ -536,16 +536,79 @@ jobs:
     if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Need the PR base to work out which migrations this PR ADDS.
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install psycopg2
         run: pip install psycopg2-binary==2.9.9
+      - name: Collect migrations added by this PR
+        id: added
+        env:
+          # Never interpolate ${{ }} straight into run: — filenames come from the PR
+          # author and would be shell-injected. Pass through env and quote.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            files=$(git diff --diff-filter=A --name-only "$BASE_SHA...HEAD" -- supabase/migrations || true)
+          else
+            files=""
+          fi
+          {
+            echo "files<<__EOF__"
+            echo "$files"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+          echo "Added migrations:"; echo "${files:-(none)}"
       - name: Run migration-drift check
         env:
           DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
-        run: python scripts/check_migration_drift.py
+          ADDED: ${{ steps.added.outputs.files }}
+        run: python scripts/check_migration_drift.py --added "$ADDED"
+
+  migration-duplicate-versions:
+    # Two migration files sharing a 14-digit version: schema_migrations is keyed on
+    # version, so only one can ever be recorded and the other silently never applies
+    # (this is how source_change_reviews lost its slot and left tables missing in
+    # prod). Needs NO database, so unlike the ledger check above it is deliberately
+    # NOT gated on vars.RLS_COVERAGE_DATABASE_URL_SET — it must run everywhere.
+    name: Migration duplicate-version check
+    needs: changes
+    runs-on: ubuntu-latest
+    if: ${{ needs.changes.outputs.migrations == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Collect migrations added by this PR
+        id: added
+        env:
+          # Never interpolate ${{ }} straight into run: — filenames come from the PR
+          # author and would be shell-injected. Pass through env and quote.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            files=$(git diff --diff-filter=A --name-only "$BASE_SHA...HEAD" -- supabase/migrations || true)
+          else
+            files=""
+          fi
+          {
+            echo "files<<__EOF__"
+            echo "$files"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+          echo "Added migrations:"; echo "${files:-(none)}"
+      - name: Check for duplicate migration versions
+        env:
+          ADDED: ${{ steps.added.outputs.files }}
+        run: python scripts/check_migration_drift.py --no-db --added "$ADDED"
 
   canonical-case-id-drift:
     # AIQ-1731: fail when prod grows a NEW bad case_assignments.canonical_case_id
