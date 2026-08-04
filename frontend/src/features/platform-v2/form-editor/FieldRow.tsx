@@ -325,6 +325,39 @@ export const FieldRow: React.FC<FieldRowProps> = ({
           )}
         </>
       )}
+
+      {/* Guidance seeded on the template field. Rendered for consult fields too — a
+          determination the employee can't fill still has a portal and a deadline. */}
+      {field.note && (
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{field.note}</p>
+      )}
+      {field.portal_url && (
+        <a
+          href={field.portal_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-accent-600 hover:text-accent-700 hover:underline focus:outline-none focus:ring-2 focus:ring-accent-500/40 rounded"
+        >
+          {portalLinkLabel(field.portal_url)}
+          <span aria-hidden="true">→</span>
+        </a>
+      )}
     </div>
   );
 };
+
+/**
+ * "https://www.skatteetaten.no/en/forms/d-number" → "Open in Skatteetaten".
+ * Falls back to a generic label when the host can't be parsed, so a malformed
+ * seeded URL degrades to a working link rather than throwing.
+ */
+function portalLinkLabel(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const name = host.split('.')[0] || '';
+    if (!name) return 'Open the official portal';
+    return `Open in ${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+  } catch {
+    return 'Open the official portal';
+  }
+}

@@ -147,5 +147,73 @@ class TestGeneratePrefilledPdf(unittest.TestCase):
                 fps.generate_prefilled_pdf("nope", "case-1", {})
 
 
+class TestFillReportTellsTheTruth(unittest.TestCase):
+    """AIQ-1759. The report used to be derived from the VAULT before the PDF was opened, and
+    unmatched field names are dropped silently by pypdf — so a mapping whose names don't match
+    the template produced a blank PDF with an all-filled report and a working download link.
+    On a government form carried to an appointment that is the worst failure available."""
+
+    def test_flattened_template_raises_instead_of_returning_a_blank(self):
+        from reportlab.pdfgen import canvas as rl_canvas
+        from reportlab.lib.pagesizes import A4
+        import io as _io
+
+        buf = _io.BytesIO()
+        c = rl_canvas.Canvas(buf, pagesize=A4)   # a print form: no AcroForm at all
+        c.drawString(50, 750, "DEMANDE DE VISA POUR UN LONG SEJOUR")
+        c.save()
+
+        with self.assertRaises(fps.TemplateNotFillableError):
+            fps.fill_acroform(buf.getvalue(), {"nom": "LEBLANC"})
+
+    def test_name_mismatch_is_reported_not_counted_as_filled(self):
+        """The real CERFA calls it `applicantSurname`; our mapping says `nom`. Zero overlap."""
+        template = fps.build_synthetic_acroform(["applicantSurname", "applicantFirstname"])
+        # Deliberately write names the template does not have.
+        filled = fps.fill_acroform(template, {"nom": "LEBLANC", "prenoms": "SOPHIE"})
+
+        report = [
+            fps.FieldFillStatus("nom", "legal_last_name", "Nom", fps.STATUS_FILLED, "LEBLANC"),
+            fps.FieldFillStatus("prenoms", "legal_first_name", "Prenoms", fps.STATUS_FILLED, "SOPHIE"),
+        ]
+        report, pdf_count, unmapped = fps.reconcile_report_against_pdf(filled, report)
+
+        self.assertTrue(all(f.status == fps.STATUS_NOT_IN_PDF for f in report))
+        self.assertTrue(all(f.warning for f in report), "each must say why it didn't land")
+        self.assertEqual(pdf_count, 2)
+        self.assertEqual(unmapped, 2, "neither template field was addressed by the mapping")
+
+        result = fps.PrefilledPdfResult(
+            form_id="FR_cerfa_14571_v2024", case_id="c1", storage_path="p",
+            download_url=None, field_fill_report=report,
+        )
+        self.assertEqual(result.filled_count, 0, "nothing reached the PDF")
+        self.assertEqual(result.not_in_pdf_count, 2)
+        self.assertEqual(result.to_dict()["not_in_pdf_count"], 2)
+
+    def test_matching_names_still_report_filled(self):
+        template = fps.build_synthetic_acroform(["family_name", "given_names"])
+        filled = fps.fill_acroform(template, {"family_name": "OBRIEN", "given_names": "SEAN"})
+        report = [
+            fps.FieldFillStatus("family_name", "legal_last_name", "Family name",
+                                fps.STATUS_FILLED, "OBRIEN"),
+            fps.FieldFillStatus("given_names", "legal_first_name", "Given names",
+                                fps.STATUS_WARNING, "SEAN", warning="exact-match check"),
+        ]
+        report, pdf_count, unmapped = fps.reconcile_report_against_pdf(filled, report)
+
+        self.assertEqual(report[0].status, fps.STATUS_FILLED)
+        self.assertEqual(report[1].status, fps.STATUS_WARNING, "a pre-existing warning survives")
+        self.assertEqual(pdf_count, 2)
+        self.assertEqual(unmapped, 0)
+
+    def test_verification_failure_leaves_the_report_alone(self):
+        """A corrupt output must not silently mark every field as missing."""
+        report = [fps.FieldFillStatus("a", "a", "A", fps.STATUS_FILLED, "x")]
+        out, pdf_count, unmapped = fps.reconcile_report_against_pdf(b"not a pdf", report)
+        self.assertEqual(out[0].status, fps.STATUS_FILLED)
+        self.assertEqual((pdf_count, unmapped), (0, 0))
+
+
 if __name__ == "__main__":
     unittest.main()

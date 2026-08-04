@@ -288,6 +288,13 @@ class FieldValueItem(BaseModel):
     consult_professional: bool = False
     # Optional grouping section from the template field definition.
     section: Optional[str] = None
+    # Short guidance seeded on the template field ("bring the original", deadlines, the
+    # OUTPUT-vs-INPUT warnings). Present on 10 of the 18 RP-NO-DATASHEET fields and, until
+    # AIQ-1759, dropped here — so it sat in the database invisible to the employee.
+    note: Optional[str] = None
+    # The authority portal the employee actually completes this step in (Skatteetaten, UDI,
+    # politiet). Seeded on 5 fields; same story as `note`.
+    portal_url: Optional[str] = None
     options: Optional[List[str]]   # only for select fields
     # Stored value metadata (None if no value has been saved yet)
     value: Optional[str]
@@ -1472,6 +1479,8 @@ def get_form_fields(
             requires_original=bool(fd.get("requires_original", False)),
             consult_professional=bool(fd.get("consult_professional", False)),
             section=fd.get("section"),
+            note=fd.get("note"),
+            portal_url=fd.get("portal_url"),
             options=fd.get("options"),
             value=sv["value"] if sv else None,
             filled_by=sv["filled_by"] if sv else None,
@@ -1694,13 +1703,18 @@ def get_form_pdf(
             # Fetch all current field values
             fv_rows = conn.execute(
                 _sql_text(
-                    f"SELECT field_id, value FROM {_pg_table('case_form_field_values')} "
+                    f"SELECT field_id, value, source FROM {_pg_table('case_form_field_values')} "
                     f"WHERE case_form_id = :form_id AND value IS NOT NULL AND value != ''"
                 ),
                 {"form_id": form_id},
             ).mappings().all()
             field_values: Dict[str, str] = {
                 str(r["field_id"]): str(r["value"]) for r in fv_rows
+            }
+            # Data origin per field — drives the "From your passport scan" line on the data
+            # sheet, so the employee can see which values came from where.
+            field_sources: Dict[str, str] = {
+                str(r["field_id"]): str(r["source"]) for r in fv_rows if r.get("source")
             }
 
             # Parse template fields JSON
@@ -1768,16 +1782,37 @@ def get_form_pdf(
                         status_code=500, detail="PDF generation failed"
                     )
             else:
-                # No original PDF — generate a placeholder
+                # No original PDF. For corridors with no fillable government form (FR→NO, and
+                # DE — see docs/form-autofill/ACROFORM-FEASIBILITY-DE-FR.md) the deliverable is
+                # a personal data sheet, not a stand-in for an official form. This used to emit
+                # two lines of Helvetica with a comma-joined dump of ten raw field ids.
                 form_name = form_row.get("template_name") or form_code
-                pdf_bytes = _make_blank_pdf(
-                    title=form_name,
-                    message=(
-                        "This form has not been uploaded yet. "
-                        "Field values captured so far: "
-                        + ", ".join(f"{k}: {v}" for k, v in list(field_values.items())[:10])
-                    ),
-                )
+                pdf_bytes = None
+                if template_fields:
+                    try:
+                        from ..services.data_sheet_pdf import render_data_sheet
+
+                        pdf_bytes = render_data_sheet(
+                            title=form_name,
+                            subtitle=form_row.get("template_authority_name") or None,
+                            fields=template_fields,
+                            values=field_values,
+                            sources=field_sources,
+                        )
+                    except Exception:  # noqa: BLE001 — never turn a download into a 500
+                        logger.exception(
+                            "data sheet render failed form_id=%s, using placeholder", form_id
+                        )
+                if pdf_bytes is None:
+                    # Genuinely nothing to lay out (no template fields, or reportlab absent).
+                    pdf_bytes = _make_blank_pdf(
+                        title=form_name,
+                        message=(
+                            "This form has not been uploaded yet. "
+                            "Field values captured so far: "
+                            + ", ".join(f"{k}: {v}" for k, v in list(field_values.items())[:10])
+                        ),
+                    )
 
             # Async-friendly: try to cache to storage (non-blocking failure)
             _try_store_draft_pdf(form_id, pdf_bytes, conn)
