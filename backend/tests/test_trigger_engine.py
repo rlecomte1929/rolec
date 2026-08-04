@@ -44,10 +44,11 @@ from backend.app.services.trigger_engine import (  # noqa: E402
 #   over COALESCE(person_id, '_'), COALESCE(dependent_id, '_').
 SCHEMA = """
 CREATE TABLE cases (
-  id                 TEXT PRIMARY KEY,
-  employee_id        TEXT,
-  dest_country_code  TEXT,
-  purpose            TEXT
+  id                  TEXT PRIMARY KEY,
+  employee_id         TEXT,
+  origin_country_code TEXT,
+  dest_country_code   TEXT,
+  purpose             TEXT
 );
 CREATE TABLE case_dependents (
   id            TEXT PRIMARY KEY,
@@ -259,12 +260,15 @@ class TriggerEngineIntegrationTests(unittest.TestCase):
 
     # ── helpers ────────────────────────────────────────────────────────────
     def _insert_case(self, *, case_id: str, employee_id: str,
-                     dest_country_code: str, purpose: str) -> None:
+                     dest_country_code: str, purpose: str,
+                     origin_country_code: str = None) -> None:
         with self.engine.begin() as conn:
             conn.execute(
-                text("INSERT INTO cases (id, employee_id, dest_country_code, purpose) "
-                     "VALUES (:id, :eid, :dest, :purpose)"),
-                {"id": case_id, "eid": employee_id, "dest": dest_country_code, "purpose": purpose},
+                text("INSERT INTO cases "
+                     "(id, employee_id, origin_country_code, dest_country_code, purpose) "
+                     "VALUES (:id, :eid, :origin, :dest, :purpose)"),
+                {"id": case_id, "eid": employee_id, "origin": origin_country_code,
+                 "dest": dest_country_code, "purpose": purpose},
             )
 
     def _insert_template(self, *, code: str, rules: list) -> None:
@@ -305,6 +309,47 @@ class TriggerEngineIntegrationTests(unittest.TestCase):
             )).mappings().all()]
 
     # ── tests ──────────────────────────────────────────────────────────────
+    def test_origin_country_falls_back_to_the_db_column(self) -> None:
+        """
+        A case at rest — no wizard PATCH in flight, no intake_data — must still
+        resolve origin_country from cases.origin_country_code.
+
+        Regression guard: _build_context selected dest_country_code but not
+        origin_country_code, so origin_country came only from the transient
+        in-flight draft. For every persisted case it was therefore None, which
+        also collapsed visa_type to _purpose_to_visa_type('work') =
+        'skilled_worker'. Any rule gated on origin_country or on
+        visa_type=eea_registration could never fire outside a live wizard
+        session. Measured in production 2026-08-04: 70 FR-NO cases, 0 attached.
+        """
+        fr_case = _uuid()
+        self._insert_case(
+            case_id=fr_case,
+            employee_id=_uuid(),
+            origin_country_code="FR",
+            dest_country_code="NO",
+            purpose="work",
+        )
+        self._insert_template(
+            code="RP-NO-DATASHEET",
+            rules=[{
+                "event": "roadmap.destination_confirmed",
+                "conditions": {
+                    "origin_country": "FR",
+                    "destination_country": "NO",
+                    "visa_type": "eea_registration",
+                },
+                "for_persons": ["employee"],
+                "blocked_by_template_code": None,
+            }],
+        )
+
+        # Empty draft and empty derived == the state of every persisted case.
+        fire_roadmap_events(case_id=fr_case, draft={}, derived={})
+
+        codes = [f["code"] for f in self._case_forms() if f["case_id"] == fr_case]
+        self.assertIn("RP-NO-DATASHEET", codes)
+
     def test_invalid_case_id_is_noop(self) -> None:
         n = fire_roadmap_events(case_id="not-a-uuid", draft={}, derived={})
         self.assertEqual(n, 0)

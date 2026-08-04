@@ -189,7 +189,8 @@ def _build_context(
         with db.engine.connect() as conn:
             row = conn.execute(
                 text(
-                    "SELECT id, employee_id, dest_country_code, purpose "
+                    "SELECT id, employee_id, origin_country_code, "
+                    "dest_country_code, purpose "
                     f"FROM {_t('cases')} WHERE id = :id"
                 ),
                 {"id": case_uuid},
@@ -210,10 +211,15 @@ def _build_context(
     ).upper() or None
 
     basics = draft.get("relocationBasics") or {}
-    # Origin: derived (in-flight PATCH) wins over the wizard draft basics.
+    # Origin: derived (in-flight PATCH) wins over the wizard draft basics, which
+    # in turn wins over the persisted column. The DB fallback matters because the
+    # draft only exists mid-wizard: without it a case at rest resolves to None,
+    # which silently collapses visa_type below and makes any rule gated on
+    # origin_country unfireable outside a live wizard session.
     origin_country = (
         (derived.get("origin_country") or "").strip()
         or (basics.get("originCountry") or "").strip()
+        or (row["origin_country_code"] or "").strip()
     ).upper() or None
 
     # visa_type: [P1-04] an EEA national relocating to another EEA country uses
