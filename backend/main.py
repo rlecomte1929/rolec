@@ -141,6 +141,7 @@ from .app.routers import case_documents as case_documents_router
 from .app.routers import cases_admin as cases_admin_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import case_forms_adhoc as case_forms_adhoc_router  # [P4-3]
+from .app.routers import case_form_register as case_form_register_router  # [AIQ-1758]
 from .app.routers import ai_decisions as ai_decisions_router  # [AI-002] EU AI Act Art. 14 human oversight log
 from .app.routers import payment as payment_router  # Stripe roadmap paywall (TEST MODE) — POST /api/payment/checkout
 from .app.routers import stripe_webhook as stripe_webhook_router  # Stripe webhook Path A — POST /api/stripe/webhook
@@ -824,6 +825,7 @@ app.include_router(case_documents_router.router)  # [DOCFLOW P1] case-scoped doc
 app.include_router(cases_admin_router.router)  # [AUDIT-B9-cases-6] split 3/3 — 1 DELETE (delete_dossier) — re-scoped from empty admin bucket
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(case_forms_adhoc_router.router)  # [P4-3] ad-hoc "Add document"
+app.include_router(case_form_register_router.router)  # [AIQ-1758] register prefilled data-sheet
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
 app.include_router(payment_router.router)  # Stripe roadmap paywall (TEST MODE) — POST /api/payment/checkout
 app.include_router(stripe_webhook_router.router)  # Stripe webhook Path A — POST /api/stripe/webhook

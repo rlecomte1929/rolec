@@ -259,6 +259,9 @@ class FormDocumentItem(BaseModel):
     created_at: str
     # [P1-05 checklist] the required-document item this upload satisfies, if any.
     doc_key: Optional[str] = None
+    # [AIQ-1758] kind of stored document, e.g. 'prefilled' (a registered
+    # pre-filled data-sheet), 'uploaded', 'adhoc'. Null for legacy rows.
+    doc_kind: Optional[str] = None
     # 1-hour signed Storage URL; None when storage is unavailable (dev/test).
     download_url: Optional[str] = None
 
@@ -1356,7 +1359,7 @@ def list_form_documents(
             _sql_text(
                 f"""
                 SELECT id, case_form_id, case_id, file_name, storage_path,
-                       content_type, size_bytes, uploaded_by, doc_key, created_at
+                       content_type, size_bytes, uploaded_by, doc_key, doc_kind, created_at
                 FROM {_pg_table('case_form_documents')}
                 WHERE case_form_id = :form_id AND case_id = :case_id
                 ORDER BY created_at DESC
@@ -1394,6 +1397,7 @@ def list_form_documents(
                 size_bytes=(int(r["size_bytes"]) if r.get("size_bytes") is not None else None),
                 uploaded_by=(str(r["uploaded_by"]) if r.get("uploaded_by") else None),
                 doc_key=(str(r["doc_key"]) if r.get("doc_key") else None),
+                doc_kind=(str(r["doc_kind"]) if r.get("doc_kind") else None),
                 created_at=str(r["created_at"]),
                 download_url=download_url,
             )

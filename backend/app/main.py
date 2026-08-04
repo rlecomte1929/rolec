@@ -33,6 +33,7 @@ from .routers import (
     requirement_facts,
     benefit_optimizer,
     case_forms_adhoc,
+    case_form_register,
     cases,
     cases_admin,
     case_integrations,
@@ -142,6 +143,7 @@ def create_app() -> FastAPI:
     app.include_router(case_documents.router)  # [DOCFLOW P1] case-scoped document upload/status
     app.include_router(cases_admin.router)
     app.include_router(case_forms_adhoc.router)  # [P4-3] ad-hoc "Add document"
+    app.include_router(case_form_register.router)  # [AIQ-1758] register prefilled data-sheet
     app.include_router(admin.router)
     app.include_router(admin_source_change_review.router)  # P2-02d material-change review queue
     app.include_router(ocr.router)  # [AIQ-1148] /api/ocr/process — general document OCR
