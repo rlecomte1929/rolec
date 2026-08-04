@@ -107,7 +107,8 @@ CREATE TABLE form_templates (
     category         TEXT,
     original_pdf_url TEXT,
     created_at       TEXT DEFAULT (datetime('now')),
-    updated_at       TEXT DEFAULT (datetime('now'))
+    updated_at       TEXT DEFAULT (datetime('now')),
+    source_language TEXT NOT NULL DEFAULT 'en'
 );
 CREATE TABLE case_forms (
     id               TEXT PRIMARY KEY,

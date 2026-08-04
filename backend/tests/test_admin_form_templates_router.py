@@ -55,6 +55,7 @@ CREATE TABLE form_templates (
   -- isoformat string we used to pass — see admin_form_templates.create_form_template).
   created_at       TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  source_language  TEXT NOT NULL DEFAULT 'en',
   UNIQUE (code, version)
 );
 """

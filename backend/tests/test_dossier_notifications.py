@@ -85,7 +85,8 @@ CREATE TABLE IF NOT EXISTS form_templates (
     version TEXT DEFAULT '1.0.0',
     country_code TEXT DEFAULT 'NO',
     created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT (datetime('now')),
+    source_language TEXT NOT NULL DEFAULT 'en'
 );
 CREATE TABLE IF NOT EXISTS case_forms (
     id TEXT PRIMARY KEY,

@@ -10,14 +10,25 @@
  * FieldRow is a leaf UI component (antigravity primitives + a type-only import),
  * so no api-client mock is required.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi, type Mock } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import React from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import type { FieldValueItem } from '../../../../api/formEditor';
 import { FieldRow, type FieldLang } from '../../form-editor/FieldRow';
 
+// [AIQ-1757] FieldRow translates LABELS (only) via the translation service when a
+// non-English label has no static label_nb. Mock it so tests are deterministic and
+// no real /api/translate call is made. Default: reject (503) → degrade to original.
+vi.mock('../../../../api/translation', () => ({ translateText: vi.fn() }));
+import { translateText } from '../../../../api/translation';
+const mockTranslate = translateText as unknown as Mock;
+
 expect.extend(matchers);
+beforeEach(() => {
+  mockTranslate.mockReset();
+  mockTranslate.mockRejectedValue(new Error('503'));
+});
 afterEach(cleanup);
 
 function field(o: Partial<FieldValueItem> = {}): FieldValueItem {
@@ -211,9 +222,57 @@ describe('EN/NO label toggle', () => {
     expect(inputValue(container)).toBe('Sophie Leblanc');
   });
 
-  it('falls back to the English label when label_nb is absent', () => {
-    const noNb = field({ label: 'Job title', label_nb: null, value: 'Ingénieur', source: 'contract' });
-    renderField(noNb, 'nb');
+  it('uses the static Norwegian label without calling the translation service', () => {
+    renderField(f, 'nb');
+    expect(screen.getByText('Fullt juridisk navn')).toBeInTheDocument();
+    // label_nb is authoritative — the service is never hit for it.
+    expect(mockTranslate).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [AIQ-1757] Label translation service — labels only, values verbatim
+// ---------------------------------------------------------------------------
+
+describe('AIQ-1757 — label translation via /api/translate', () => {
+  const noNb = field({
+    field_id: 'job_title', label: 'Job title', label_nb: null,
+    value: 'Ingénieur', source: 'contract', filled_by: 'system',
+  });
+
+  it('translates a label without label_nb via the service (labels only)', async () => {
+    mockTranslate.mockResolvedValue({
+      text: 'Stillingstittel', provider: 'deepl', model_version: 'v1', cost_usd: 0, cache_hit: false,
+    });
+    const { container } = renderField(noNb, 'nb');
+
+    // Translated label appears; the identifier value is untouched.
+    expect(await screen.findByText('Stillingstittel')).toBeInTheDocument();
+    expect(inputValue(container)).toBe('Ingénieur');
+
+    // Only the LABEL string was sent — never the value, in the 'ui' domain.
+    expect(mockTranslate).toHaveBeenCalledTimes(1);
+    const arg = mockTranslate.mock.calls[0][0];
+    expect(arg.text).toBe('Job title');
+    expect(arg.domain).toBe('ui');
+    expect(mockTranslate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'Ingénieur' }),
+    );
+  });
+
+  it('degrades to the original label on a 503 (service rejects)', async () => {
+    mockTranslate.mockRejectedValue(new Error('503'));
+    const { container } = renderField(noNb, 'nb');
+    // Original English label stays; nothing throws; value unchanged.
+    expect(screen.getByText('Job title')).toBeInTheDocument();
+    await waitFor(() => expect(mockTranslate).toHaveBeenCalled());
+    expect(screen.getByText('Job title')).toBeInTheDocument();
+    expect(inputValue(container)).toBe('Ingénieur');
+  });
+
+  it('never calls the translation service in English mode', () => {
+    renderField(noNb, 'en');
+    expect(mockTranslate).not.toHaveBeenCalled();
     expect(screen.getByText('Job title')).toBeInTheDocument();
   });
 });

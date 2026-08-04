@@ -107,7 +107,11 @@ export const FormEditorPage: React.FC = () => {
   // ── Label language (EN/NO toggle) ─────────────────────────────────────────
   // Switches LABELS only for comprehension; identifier VALUES stay verbatim.
   const [lang, setLang] = useState<FieldLang>('en');
-  const hasNbLabels = fields.some((f) => !!f.label_nb);
+  // [AIQ-1757] Offer the toggle when the form's official language isn't English.
+  // Static label_nb (if any) renders instantly; labels without one translate via
+  // /api/translate (handled in FieldRow), degrading to the original on 503.
+  const sourceLanguage = formSummary?.template.source_language ?? 'en';
+  const showLangToggle = sourceLanguage !== 'en';
 
   // ── Live edit state ──────────────────────────────────────────────────────
   /** A map of field_id → current string value displayed in the form. */
@@ -502,7 +506,7 @@ export const FormEditorPage: React.FC = () => {
               form template is representative, not legally verified, so remind the
               employee to confirm with the issuing authority before submitting. */}
           {/* EN/NO label toggle — labels only; identifier values stay verbatim. */}
-          {hasNbLabels && (
+          {showLangToggle && (
             <div className="mb-4 flex items-center justify-end gap-2">
               <span className="text-xs font-medium text-slate-500">Labels:</span>
               <div className="inline-flex rounded-md border border-slate-300 overflow-hidden" role="group" aria-label="Label language">

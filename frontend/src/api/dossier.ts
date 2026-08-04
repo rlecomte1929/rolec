@@ -40,6 +40,10 @@ export interface DossierFormTemplate {
    * content is authoritative.
    */
   verification_status: 'verified' | 'draft' | 'representative' | null;
+  /** [AIQ-1757] Official language of the form's labels (ISO 639-1, default 'en').
+   *  When != 'en' the dossier offers a label-only translation toggle. Identifier
+   *  VALUES are never translated. */
+  source_language?: string | null;
 }
 
 export type DossierPersonKind = 'employee' | 'spouse' | 'child' | 'other';

@@ -59,7 +59,8 @@ CREATE TABLE form_templates (
     code              TEXT NOT NULL,
     name              TEXT NOT NULL,
     version           TEXT NOT NULL DEFAULT '1.0.0',
-    original_pdf_url  TEXT
+    original_pdf_url  TEXT,
+    source_language TEXT NOT NULL DEFAULT 'en'
 );
 CREATE TABLE case_forms (
     id               TEXT PRIMARY KEY,

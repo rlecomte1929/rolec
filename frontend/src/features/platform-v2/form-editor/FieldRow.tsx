@@ -8,11 +8,12 @@
  * - Supports field types: text, date, select, boolean, number, and a fallback
  *   textarea for everything else.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { Badge } from '../../../components/antigravity/Badge';
+import { translateText } from '../../../api/translation';
 import type { FieldValueItem } from '../../../api/formEditor';
 
 /** Display language for LABELS only. Field values are always rendered verbatim
@@ -52,6 +53,40 @@ function SourceBadge({ source }: { source: string }) {
       {meta.label}
     </Badge>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Translatable label (AIQ-1757) — LABELS ONLY, never values.
+//
+// Renders a field label in the form's official language. A statically-seeded
+// translation (label_nb) is authoritative and shown instantly; only labels
+// WITHOUT one fall through to the /api/translate service (domain='ui', cached),
+// degrading to the original English label on any error (503). A field VALUE is
+// never passed here — only the label string, which carries no PII.
+// ---------------------------------------------------------------------------
+
+function TranslatableLabel({ text, tgt }: { text: string; tgt: string }) {
+  const [translated, setTranslated] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!text || !tgt || tgt === 'en') {
+      setTranslated(null);
+      return;
+    }
+    translateText({ text, src: 'en', tgt, domain: 'ui' })
+      .then((r) => {
+        if (!cancelled) setTranslated(r.text);
+      })
+      .catch(() => {
+        if (!cancelled) setTranslated(null); // degrade to the original label
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [text, tgt]);
+
+  return <>{translated ?? text}</>;
 }
 
 // ---------------------------------------------------------------------------
@@ -220,14 +255,19 @@ export const FieldRow: React.FC<FieldRowProps> = ({
     !isConsult && showMissing && field.required && !hasValue;
 
   // Labels translate for comprehension; VALUES never do (verbatim identifiers).
-  const displayLabel = lang === 'nb' ? (field.label_nb || field.label) : field.label;
+  // Static label_nb wins (authoritative, instant); labels without one fall
+  // through to the translation service via TranslatableLabel.
+  const labelNode: React.ReactNode =
+    lang === 'nb'
+      ? (field.label_nb ? field.label_nb : <TranslatableLabel text={field.label} tgt="nb" />)
+      : field.label;
 
   return (
     <div className={`rounded-lg border px-4 py-3 transition-colors ${isConsult ? 'border-amber-200 bg-amber-50/40' : isMissing ? 'border-rose-300 bg-rose-50/40' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
       {/* Label row */}
       <div className="flex items-center gap-2 mb-1.5">
         <label className="text-sm font-medium text-slate-800 flex-1 leading-snug">
-          {displayLabel}
+          {labelNode}
           {field.required && !isConsult && (
             <span className="ml-0.5 text-rose-500" aria-label="required">*</span>
           )}

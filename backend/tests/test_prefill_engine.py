@@ -55,7 +55,8 @@ CREATE TABLE profiles (
 CREATE TABLE form_templates (
     id     TEXT PRIMARY KEY,
     code   TEXT NOT NULL,
-    fields TEXT NOT NULL DEFAULT '[]'
+    fields TEXT NOT NULL DEFAULT '[]',
+    source_language TEXT NOT NULL DEFAULT 'en'
 );
 CREATE TABLE case_forms (
     id               TEXT PRIMARY KEY,
