@@ -72,6 +72,61 @@ class TestTestDriveCompletionNotify(unittest.TestCase):
         self.assertEqual(out["channel"], "inapp")
         email.assert_not_called()
 
+    # ── multi-referral ────────────────────────────────────────────────────────
+    # A tester can leave several intros. The notification used to name only referrals[0],
+    # because it was fed the legacy mirrored scalars.
+
+    def test_every_consented_referral_reaches_the_notification(self):
+        _out, write, _email = self._run(channel=None, referrals=[
+            {"name": "Marie", "company_role": "Head of Mobility", "contact": "marie@x.test",
+             "consent": True},
+            {"name": "Jan", "company_role": "HRBP", "contact": "jan@x.test", "consent": True},
+        ])
+        _uid, _title, _body, metadata = write.call_args.args
+        self.assertEqual([r["name"] for r in metadata["referrals"]], ["Marie", "Jan"])
+        self.assertEqual(metadata["referral_count"], 2)
+        self.assertEqual(metadata["referral_consented_count"], 2)
+        # The flat legacy keys still carry the first consented person for existing readers.
+        self.assertEqual(metadata["referral_name"], "Marie")
+        self.assertEqual(metadata["referral_contact"], "marie@x.test")
+
+    def test_consent_is_per_person_not_per_survey(self):
+        """The load-bearing case: an unconsented person must NOT ride along on a consented
+        one, and a consented person must NOT be hidden behind an unconsented one."""
+        _out, write, _email = self._run(channel=None, referrals=[
+            {"name": "NoConsent", "contact": "no@x.test", "consent": False},
+            {"name": "YesConsent", "contact": "yes@x.test", "consent": True},
+        ])
+        _uid, _title, _body, metadata = write.call_args.args
+        names = [r["name"] for r in metadata["referrals"]]
+        self.assertEqual(names, ["YesConsent"])
+        self.assertNotIn("no@x.test", str(metadata))
+        # Counts stay honest about the person who was withheld — they name nobody.
+        self.assertEqual(metadata["referral_count"], 2)
+        self.assertEqual(metadata["referral_consented_count"], 1)
+        # Legacy keys follow the first CONSENTED person, not merely the first.
+        self.assertEqual(metadata["referral_name"], "YesConsent")
+
+    def test_all_unconsented_withholds_every_name(self):
+        _out, write, _email = self._run(channel=None, referrals=[
+            {"name": "A", "contact": "a@x.test", "consent": False},
+            {"name": "B", "contact": "b@x.test", "consent": False},
+        ])
+        _uid, _title, _body, metadata = write.call_args.args
+        self.assertNotIn("referrals", metadata)
+        self.assertNotIn("referral_name", metadata)
+        self.assertFalse(metadata["referral_consent"])
+        self.assertEqual(metadata["referral_count"], 2)
+        self.assertEqual(metadata["referral_consented_count"], 0)
+
+    def test_legacy_scalars_only_still_work(self):
+        """An old caller passing no `referrals` list is wrapped into a 1-element list."""
+        _out, write, _email = self._run(channel=None)  # base call has the legacy scalars
+        _uid, _title, _body, metadata = write.call_args.args
+        self.assertEqual([r["name"] for r in metadata["referrals"]], ["Ref"])
+        self.assertEqual(metadata["referral_name"], "Ref")
+        self.assertEqual(metadata["referral_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

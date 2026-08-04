@@ -1125,6 +1125,9 @@ def survey(body: SurveyRequest, request: Request):
                 referral_company_role=params["referral_company_role"],
                 referral_contact=params["referral_contact"],
                 referral_consent=params["referral_consent"],
+                # The FULL list, so the notification names everyone the tester referred —
+                # the legacy scalars above are only referrals[0].
+                referrals=referrals,
             )
         except Exception:  # noqa: BLE001
             logger.warning("test_drive completion notify failed (suppressed)")

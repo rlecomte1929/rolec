@@ -86,6 +86,7 @@ def _build(
     referral_company_role: Optional[str],
     referral_contact: Optional[str],
     referral_consent: bool,
+    referrals: Optional[List[Dict[str, Any]]] = None,
 ) -> "tuple[str, str, Dict[str, Any]]":
     """Return (title, body, metadata) for the completion notification. Plain text, brand voice."""
     who = (tester_name or "").strip() or "A tester"
@@ -105,8 +106,18 @@ def _build(
         parts.append(sector)
     body = " · ".join(parts) if parts else "Survey submitted."
 
-    # From test_drive_emails — the single source of truth for the one-click thank-you prefill.
-    from .test_drive_emails import _thank_you_mailto
+    # From test_drive_emails — the single source of truth for the one-click thank-you prefill
+    # and for how a survey's referrals are expanded (shared so the in-app notification and the
+    # notify email can never disagree about who was referred).
+    from .test_drive_emails import _thank_you_mailto, normalize_referrals
+
+    all_referrals = normalize_referrals(
+        referrals, referral_name=referral_name, referral_company_role=referral_company_role,
+        referral_contact=referral_contact, referral_consent=referral_consent,
+    )
+    # Consent is per PERSON, not per survey — a row-level gate would leak an unconsented #2
+    # behind a consented #1 (and hide a consented #2 behind an unconsented #1).
+    consented = [r for r in all_referrals if r.get("consent")]
 
     metadata: Dict[str, Any] = {
         "tester_name": tester_name,
@@ -121,15 +132,29 @@ def _build(
         "pilot_interest": pilot_interest,
         "pilot_note": pilot_note,
         "testimonial": testimonial,
-        "referral_consent": bool(referral_consent),
+        "referral_consent": bool(consented),
+        # Counts are safe to show regardless of consent — they name nobody.
+        "referral_count": len(all_referrals),
+        "referral_consented_count": len(consented),
         "link": _ADMIN_LINK,
         "thank_you_mailto": _thank_you_mailto(tester_email, tester_name),
     }
-    # Referral PII only when the tester consented (mirrors the email notify).
-    if referral_consent:
-        metadata["referral_name"] = referral_name
-        metadata["referral_company_role"] = referral_company_role
-        metadata["referral_contact"] = referral_contact
+    # Referral PII only for the people who consented (mirrors the email notify).
+    if consented:
+        metadata["referrals"] = [
+            {
+                "name": r.get("name"),
+                "company_role": r.get("company_role"),
+                "contact": r.get("contact"),
+            }
+            for r in consented
+        ]
+        # The first CONSENTED person also lands on the flat legacy keys, which existing
+        # readers of this notification's metadata still use.
+        first = consented[0]
+        metadata["referral_name"] = first.get("name")
+        metadata["referral_company_role"] = first.get("company_role")
+        metadata["referral_contact"] = first.get("contact")
 
     return title, body, metadata
 
@@ -182,6 +207,9 @@ def notify_test_drive_completion(
     referral_company_role: Optional[str] = None,
     referral_contact: Optional[str] = None,
     referral_consent: bool = False,
+    # Every referral the tester left. The legacy scalars above stay for backward
+    # compatibility and are used only when this is absent/empty (they mirror referrals[0]).
+    referrals: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Notify the admin of a completed test-drive on the configured channel(s).
 
@@ -201,6 +229,7 @@ def notify_test_drive_completion(
                 pilot_interest=pilot_interest, pilot_note=pilot_note, testimonial=testimonial,
                 referral_name=referral_name, referral_company_role=referral_company_role,
                 referral_contact=referral_contact, referral_consent=referral_consent,
+                referrals=referrals,
             )
             written = 0
             for uid in _resolve_admin_user_ids():
@@ -222,7 +251,7 @@ def notify_test_drive_completion(
                 q3_problem_fit=q3_problem_fit, q4_change=q4_change, pilot_interest=pilot_interest,
                 pilot_note=pilot_note, testimonial=testimonial, referral_name=referral_name,
                 referral_company_role=referral_company_role, referral_contact=referral_contact,
-                referral_consent=referral_consent,
+                referral_consent=referral_consent, referrals=referrals,
             )
             out["email"] = res.get("notify", "error")
         except Exception:  # noqa: BLE001
