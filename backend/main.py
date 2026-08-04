@@ -2552,6 +2552,97 @@ def onboard_prospect(
             "hr_email": hr_email, "invite_sent": invite_sent}
 
 
+class OutreachConvertRequest(BaseModel):
+    hr_email: str
+    hr_name: Optional[str] = None
+    send_welcome: bool = True
+    reason: Optional[str] = None
+
+
+@app.post("/api/admin/outreach/prospects/{prospect_id}/convert")
+def convert_outreach_prospect(
+    prospect_id: str,
+    body: OutreachConvertRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Track A close-the-loop: turn a CONVERTED LinkedIn outreach contact into a live
+    tenant. Mirrors onboard_prospect (Track B) but keyed off public.linkedin_prospects —
+    creates the company, seats the primary HR contact (Supabase invite = the welcome),
+    and links the contact back via linkedin_prospects.company_id. Idempotent: a contact
+    already converted returns its existing company rather than creating a second one."""
+    hr_email = (body.hr_email or "").strip().lower()
+    if not hr_email or "@" not in hr_email:
+        raise HTTPException(status_code=400, detail="A valid HR contact email is required")
+    # linkedin_prospects is a Supabase-managed table; read/link it via raw SQL next to
+    # the legacy create_company/create_profile helpers, exactly as onboard_prospect does.
+    try:
+        with db.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT company_name, status, company_id "
+                    "FROM public.linkedin_prospects WHERE id = :id"
+                ),
+                {"id": prospect_id},
+            ).mappings().first()
+    except SQLAlchemyError as exc:
+        blob = str(getattr(exc, "orig", exc)).lower()
+        # company_id column pending the 20261016000000 migration → degrade to 503 (not 500)
+        # so the button fails cleanly until the schema is applied out-of-band.
+        if "company_id" in blob or "42703" in blob or "no such column" in blob:
+            raise HTTPException(status_code=503, detail="Conversion is not available yet (pending a schema migration).")
+        raise
+    if not row:
+        raise HTTPException(status_code=404, detail="Outreach contact not found")
+    if row["company_id"]:
+        return {"ok": True, "already_converted": True,
+                "company_id": row["company_id"], "company_name": row["company_name"]}
+
+    company_id = str(uuid.uuid4())
+    db.create_company(
+        company_id=company_id,
+        name=row["company_name"],
+        website=None,
+        hr_contact=hr_email,
+    )
+    # Seat the primary HR contact for the new tenant.
+    person_id = str(uuid.uuid4())
+    full_name = (body.hr_name or "").strip() or hr_email.split("@")[0]
+    try:
+        db.create_profile(person_id=person_id, email=hr_email, full_name=full_name, role="HR", company_id=company_id)
+        db.ensure_hr_user_for_profile(person_id, company_id)
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="An account with that HR email already exists")
+
+    # Welcome: Supabase Auth invite (best-effort, never raises, no-ops when unconfigured).
+    invite_sent = False
+    if body.send_welcome:
+        try:
+            from .app.services.supabase_auth_sync import invite_admin_created_user as _invite
+            _app_url = os.environ.get("APP_URL", "https://relopass.com")
+            invite_sent = bool(
+                _invite(hr_email, full_name=full_name, role="HR", redirect_to=f"{_app_url}/auth?mode=login").sent
+            )
+        except Exception:
+            log.exception("convert_outreach_prospect: welcome invite failed prospect=%s", prospect_id)
+
+    # Link the outreach contact → the company it became. updated_at is maintained by the
+    # linkedin_prospects BEFORE UPDATE trigger, so it is not set here.
+    now = datetime.utcnow().isoformat()
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE public.linkedin_prospects SET status = 'converted', company_id = :cid, "
+                "converted_at = :now WHERE id = :id"
+            ),
+            {"cid": company_id, "now": now, "id": prospect_id},
+        )
+    db.log_audit(user["id"], "UPDATE", "linkedin_prospect", prospect_id, body.reason, {
+        "event": "outreach_converted", "company_id": company_id, "hr_email": hr_email, "invite_sent": invite_sent,
+    })
+    return {"ok": True, "company_id": company_id, "company_name": row["company_name"],
+            "hr_email": hr_email, "invite_sent": invite_sent}
+
+
 def _retry_on_operational_error(fn, max_attempts: int = 3):
     """
     Call fn() up to max_attempts times, retrying on SQLAlchemy OperationalError
