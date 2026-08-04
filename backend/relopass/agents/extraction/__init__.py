@@ -10,6 +10,7 @@ from typing import Callable, Dict
 
 from .diploma import (
     DIPLOMA_AGENT_NAME,
+    DIPLOMA_DOCUMENT_TYPE,
     DiplomaAgent,
     DiplomaResult,
     infer_isced_level_from_title,
@@ -31,16 +32,22 @@ from .passport_td3 import (
 )
 from .tax_cert_de import (
     TAX_CERT_DE_AGENT_NAME,
+    TAX_CERT_DE_DOCUMENT_TYPE,
+    TAX_CERT_DE_ISSUING_COUNTRY,
     TaxCertDeAgent,
     load_tax_cert_de_prompt,
 )
 from .tax_cert_fr import (
     TAX_CERT_FR_AGENT_NAME,
+    TAX_CERT_FR_DOCUMENT_TYPE,
+    TAX_CERT_FR_ISSUING_COUNTRY,
     TaxCertFrAgent,
     load_tax_cert_fr_prompt,
 )
 from .tax_cert_no import (
     TAX_CERT_NO_AGENT_NAME,
+    TAX_CERT_NO_DOCUMENT_TYPE,
+    TAX_CERT_NO_ISSUING_COUNTRY,
     TaxCertNoAgent,
     load_tax_cert_no_prompt,
 )
@@ -98,7 +105,29 @@ EXTRACTION_AGENT_REGISTRY: Dict[str, Callable[..., object]] = {
     FOSTER_CARE_ORDER_DOCUMENT_TYPE: FosterCareOrderAgent,
     ID_CARD_DOCUMENT_TYPE: IdCardAgent,
     VISA_PERMIT_DOCUMENT_TYPE: VisaPermitAgent,
+    DIPLOMA_DOCUMENT_TYPE: DiplomaAgent,
 }
+
+# TAX_CERT is the one document type this flat map cannot express: rce.document_types
+# carries a SINGLE 'TAX_CERT' code while three locale agents implement it (a German
+# Lohnsteuerbescheinigung, a French avis d'imposition and a Norwegian skattemelding are
+# different documents). The issuing country is the discriminator — NOT the case corridor,
+# which cannot separate them: an FR→NO case legitimately receives both an FR and an NO
+# certificate (see the residency cross-checks in tax_cert_fr.py / tax_cert_no.py).
+#
+# NOTE — not yet reachable in production. Nothing captures a document's issuing country
+# today: rce.documents has no country column, and its `language` column is never written
+# (rce_document_ingest.py omits it from the INSERT). Until ingest records one of the two,
+# _agent_class('TAX_CERT') resolves to None and the orchestrator reports skipped_no_agent —
+# the same outcome as before this map existed, but now for a stated reason rather than an
+# oversight. Wiring the signal at ingest is the follow-up; the routing below is ready for it.
+TAX_CERT_AGENTS_BY_ISSUING_COUNTRY: Dict[str, Callable[..., object]] = {
+    TAX_CERT_DE_ISSUING_COUNTRY: TaxCertDeAgent,
+    TAX_CERT_FR_ISSUING_COUNTRY: TaxCertFrAgent,
+    TAX_CERT_NO_ISSUING_COUNTRY: TaxCertNoAgent,
+}
+# The single code all three answer to (they agree; asserted in the wiring guard test).
+TAX_CERT_DOCUMENT_TYPE = TAX_CERT_DE_DOCUMENT_TYPE
 
 
 def get_extraction_agent_class(document_type_code: str) -> Callable[..., object]:
