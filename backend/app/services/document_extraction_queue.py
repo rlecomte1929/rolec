@@ -26,6 +26,10 @@ from typing import Any, Dict, Optional
 from sqlalchemy import text
 
 from ...database import db
+# [AIQ-1764] classify_document lives in its own module: it decides which agent
+# runs, so it belongs to neither extraction path. This module is a CONSUMER of it,
+# not its owner — import it, do not re-export it.
+from .document_classifier import classify_document
 from .supabase_client import get_supabase_admin_client
 
 log = logging.getLogger(__name__)
@@ -39,21 +43,6 @@ _PASSPORT_FIELDS = (
     "nationality", "issuing_country", "passport_number", "issue_date",
     "expiry_date", "mrz_line1", "mrz_line2", "low_quality", "low_quality_reason",
 )
-
-
-def classify_document(file_name: Optional[str], mime_type: Optional[str]) -> str:
-    """MVP heuristic classifier (the C1-05 classifier isn't on main yet).
-
-    Returns PASSPORT | CONTRACT | PAYSLIP | OTHER from filename keywords.
-    """
-    name = (file_name or "").lower()
-    if "passport" in name:
-        return "PASSPORT"
-    if "contract" in name:
-        return "CONTRACT"
-    if "payslip" in name or "pay_slip" in name or "salary" in name:
-        return "PAYSLIP"
-    return "OTHER"
 
 
 def _update_status(

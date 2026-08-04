@@ -180,8 +180,13 @@ async def parse_stored_document(
 
 
 def _classify(file_name: Optional[str], mime_type: Optional[str]) -> str:
-    # Reuse the existing intake heuristic so passport routing matches the queue.
-    from .document_extraction_queue import classify_document
+    # Reuse the shared heuristic so routing matches the ingest path.
+    #
+    # [AIQ-1764] Previously imported from `document_extraction_queue`. That made
+    # the rce pipeline depend on the module the ownership ruling narrows to OCR
+    # ingest — the reason that module is narrowed rather than deleted. Now both
+    # paths depend on the neutral classifier module instead of on each other.
+    from .document_classifier import classify_document
 
     return classify_document(file_name, mime_type)
 
