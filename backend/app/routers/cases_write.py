@@ -523,8 +523,13 @@ def bulk_update_form_fields(
             for item in payload.fields:
                 fid = item.field_id
                 prev = existing_by_field.get(fid) or {}
-                was_ai = prev.get("filled_by") == "ai"
-                overridden = was_ai
+                # A machine-filled value is one the prefill engine wrote. The
+                # engine tags provenance via filled_by='system' (and legacy 'ai'),
+                # so both count — otherwise an employee edit to a system-prefilled
+                # value would leave overridden=false and a later prefill re-run
+                # could clobber it (AIQ-1756: keep provenance coherent).
+                was_machine = prev.get("filled_by") in ("ai", "system")
+                overridden = was_machine
 
                 cf_tbl = _pg_table('case_form_field_values')
                 conn.execute(
@@ -535,15 +540,15 @@ def bulk_update_form_fields(
                         f"'employee', TRUE, :overridden, {_sql_now()}) "
                         f"ON CONFLICT (case_form_id, field_id) DO UPDATE "
                         f"SET value=EXCLUDED.value, filled_by='employee', reviewed=TRUE, "
-                        f"overridden=CASE WHEN {cf_tbl}.filled_by='ai' THEN TRUE "
+                        f"overridden=CASE WHEN {cf_tbl}.filled_by IN ('ai','system') THEN TRUE "
                         f"ELSE {cf_tbl}.overridden END, updated_at={_sql_now()}"
                     ),
                     {"form_id": form_id, "field_id": fid, "value": item.value,
                      "overridden": overridden},
                 )
 
-                # [P4-6] Capture override audit record when replacing an AI value
-                if was_ai and _form_template_id:
+                # [P4-6] Capture override audit record when replacing a machine value
+                if was_machine and _form_template_id:
                     try:
                         conn.execute(
                             _sql_text(
