@@ -193,6 +193,10 @@ class _DossierFormTemplate(BaseModel):
     # Drives the "indicative guidance — confirm with the authority" notice so the
     # dossier never implies unverified immigration content is authoritative.
     verification_status: Optional[str] = None
+    # [AIQ-1757] Official language of the form's labels (ISO 639-1, default 'en').
+    # When != 'en' the dossier offers a label-only translation toggle; identifier
+    # VALUES are never translated.
+    source_language: Optional[str] = "en"
     # [P1-05 checklist] Required supporting documents, derived from the template
     # fields that carry requires_original=true. Each item: {"key","label","format"}
     # where format (from the field's optional doc_format) may be None. [AIQ-1257a]
@@ -454,6 +458,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             source_last_verified=_iso(row.get("source_last_verified")),  # [P1-05d]
             source_tier=(str(row["source_tier"]) if row.get("source_tier") is not None else None),  # [P3-04e-FU]
             verification_status=(row.get("template_verification_status") or "representative"),  # [WS1]
+            source_language=(row.get("template_source_language") or "en"),  # [AIQ-1757]
             required_documents=required_documents,  # [P1-05 checklist]
         )
 
@@ -1276,6 +1281,7 @@ def _load_case_form_summaries(
           ft.fields  AS template_fields,
           ft.source_url AS template_source_url,
           ft.verification_status AS template_verification_status,
+          ft.source_language AS template_source_language,
           sp.last_fetched_at AS source_last_verified,
           sp.tier AS source_tier,
           rs.title AS roadmap_step_title,
