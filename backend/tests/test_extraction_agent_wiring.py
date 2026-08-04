@@ -19,11 +19,7 @@ import unittest
 
 from backend.app.services.rce_extraction_orchestrator import _agent_class
 from backend.relopass.agents import extraction as extraction_pkg
-from backend.relopass.agents.extraction import (
-    EXTRACTION_AGENT_REGISTRY,
-    TAX_CERT_AGENTS_BY_ISSUING_COUNTRY,
-    TAX_CERT_DOCUMENT_TYPE,
-)
+from backend.relopass.agents.extraction import EXTRACTION_AGENT_REGISTRY
 
 # Reachable without a code in the registry, and why.
 _SPECIAL_CASES = {
@@ -52,9 +48,7 @@ def _discover_agent_classes():
 class TestExtractionAgentWiring(unittest.TestCase):
     def test_every_agent_class_has_a_route(self):
         """The guard. Comment out a registry line and this fails, naming the agent."""
-        routed = set(EXTRACTION_AGENT_REGISTRY.values()) | set(
-            TAX_CERT_AGENTS_BY_ISSUING_COUNTRY.values()
-        )
+        routed = set(EXTRACTION_AGENT_REGISTRY.values())
         unreachable = [
             f"{name} ({module}.py)"
             for name, (cls, module) in sorted(_discover_agent_classes().items())
@@ -63,9 +57,8 @@ class TestExtractionAgentWiring(unittest.TestCase):
         self.assertEqual(
             unreachable, [],
             "Extraction agents exist with no route from _agent_class — they will record "
-            "skipped_no_agent forever. Register each in EXTRACTION_AGENT_REGISTRY (or "
-            "TAX_CERT_AGENTS_BY_ISSUING_COUNTRY), or add an explicit entry to _SPECIAL_CASES "
-            f"with the reason: {unreachable}",
+            "skipped_no_agent forever. Register each in EXTRACTION_AGENT_REGISTRY, or add "
+            f"an explicit entry to _SPECIAL_CASES with the reason: {unreachable}",
         )
 
     def test_discovery_actually_finds_agents(self):
@@ -80,33 +73,43 @@ class TestExtractionAgentWiring(unittest.TestCase):
     def test_diploma_is_routable(self):
         self.assertIsNotNone(_agent_class("DIPLOMA"))
 
-    def test_tax_cert_routes_by_issuing_country(self):
+    def test_each_tax_cert_routes_by_its_own_code(self):
+        """[AIQ-1774] One code per locale, resolved by the flat registry.
+
+        Previously all three shared a bare ``TAX_CERT`` code and were discriminated
+        by an ``issuing_country`` argument nothing ever supplied, so all three were
+        inert. These three assertions are what "the split landed" means.
+        """
         from backend.relopass.agents.extraction import (
             TaxCertDeAgent, TaxCertFrAgent, TaxCertNoAgent,
         )
-        self.assertIs(_agent_class("TAX_CERT", issuing_country="DEU"), TaxCertDeAgent)
-        self.assertIs(_agent_class("TAX_CERT", issuing_country="FRA"), TaxCertFrAgent)
-        self.assertIs(_agent_class("TAX_CERT", issuing_country="NOR"), TaxCertNoAgent)
-        # Case/whitespace tolerant — the country may arrive from a DB column.
-        self.assertIs(_agent_class("TAX_CERT", issuing_country=" fra "), TaxCertFrAgent)
+        self.assertIs(_agent_class("TAX_CERT_DE"), TaxCertDeAgent)
+        self.assertIs(_agent_class("TAX_CERT_FR"), TaxCertFrAgent)
+        self.assertIs(_agent_class("TAX_CERT_NO"), TaxCertNoAgent)
 
-    def test_tax_cert_without_a_country_refuses_to_guess(self):
-        """Three genuinely different documents share one code. Picking one blind would
-        emit confidently wrong fields, so an unknown country must return None."""
+    def test_bare_tax_cert_still_refuses_to_guess(self):
+        """The old shared code must not silently resolve to one of the three.
+
+        It is retired, but an old row or a stale caller can still present it. Three
+        genuinely different documents mean picking one blind would emit confidently
+        wrong fields — so it stays unrouted, and the orchestrator records
+        skipped_no_agent rather than guessing.
+        """
         self.assertIsNone(_agent_class("TAX_CERT"))
-        self.assertIsNone(_agent_class("TAX_CERT", issuing_country=""))
-        self.assertIsNone(_agent_class("TAX_CERT", issuing_country="ESP"))
 
-    def test_all_three_tax_agents_answer_to_one_code(self):
+    def test_the_three_tax_codes_are_distinct(self):
+        """Guard against a copy-paste that gives two locales the same code — which
+        would make the registry silently drop one agent (dict key collision)."""
         from backend.relopass.agents.extraction import (
             TAX_CERT_DE_DOCUMENT_TYPE,
             TAX_CERT_FR_DOCUMENT_TYPE,
             TAX_CERT_NO_DOCUMENT_TYPE,
         )
-        self.assertEqual(
-            {TAX_CERT_DE_DOCUMENT_TYPE, TAX_CERT_FR_DOCUMENT_TYPE, TAX_CERT_NO_DOCUMENT_TYPE},
-            {TAX_CERT_DOCUMENT_TYPE},
-        )
+        codes = [TAX_CERT_DE_DOCUMENT_TYPE, TAX_CERT_FR_DOCUMENT_TYPE,
+                 TAX_CERT_NO_DOCUMENT_TYPE]
+        self.assertEqual(len(set(codes)), 3, f"tax-cert codes collide: {codes}")
+        for code in codes:
+            self.assertIn(code, EXTRACTION_AGENT_REGISTRY)
 
     def test_existing_registrations_unchanged(self):
         """The 5 agents registered before this change must keep working untouched."""

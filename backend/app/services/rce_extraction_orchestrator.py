@@ -26,11 +26,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 from backend.relopass.agents import AgentRegistry
-from backend.relopass.agents.extraction import (
-    EXTRACTION_AGENT_REGISTRY,
-    TAX_CERT_AGENTS_BY_ISSUING_COUNTRY,
-    TAX_CERT_DOCUMENT_TYPE,
-)
+from backend.relopass.agents.extraction import EXTRACTION_AGENT_REGISTRY
 from backend.relopass.agents.extraction.passport_td3 import PassportTd3Agent
 
 from .rce_ocr_parser import OcrParseResult
@@ -54,28 +50,29 @@ class ExtractionOutcome:
     detail: str = ""
 
 
-def _agent_class(
-    document_type_code: str, *, issuing_country: Optional[str] = None
-) -> Optional[type]:
+def _agent_class(document_type_code: str) -> Optional[type]:
     """The extraction agent for one document type, or None when nothing handles it.
 
-    Three routes, in order of specificity:
+    Two routes:
       1. PASSPORT_TD3 / PASSPORT — one agent, two codes, so a special case.
-      2. TAX_CERT — one code, THREE locale agents (DE/FR/NO); the issuing country picks.
-         Returns None when the country is unknown rather than guessing, because the three
-         documents are genuinely different and a wrong agent would emit confidently wrong
-         fields. Nothing captures the country yet — see TAX_CERT_AGENTS_BY_ISSUING_COUNTRY.
-      3. Everything else — the flat code→agent registry.
+      2. Everything else — the flat code→agent registry.
 
-    Every agent module must be reachable through one of these; test_extraction_agent_wiring
-    fails if a new one is added without a route.
+    [AIQ-1774] TAX_CERT used to be a third route: one code, three locale agents,
+    discriminated at runtime by an `issuing_country` argument. That route was
+    correct in principle and dead in practice — nothing ever supplied a country, so
+    it always returned None and three built agents never ran. Splitting the code
+    into TAX_CERT_DE / TAX_CERT_FR / TAX_CERT_NO removed the need for it entirely:
+    they are ordinary registry entries now, and the country is decided at
+    classification time where the document's own text is the evidence.
+
+    Returning None is the fail-soft contract and must stay: the orchestrator
+    records skipped_no_agent rather than guessing a nearest agent, because a wrong
+    agent emits confidently wrong fields. Every agent module must be reachable
+    through one of these two routes; test_extraction_agent_wiring fails if a new
+    one is added without one.
     """
     if document_type_code in ("PASSPORT_TD3", "PASSPORT"):
         return PassportTd3Agent
-    if document_type_code == TAX_CERT_DOCUMENT_TYPE:
-        if not issuing_country:
-            return None
-        return TAX_CERT_AGENTS_BY_ISSUING_COUNTRY.get(issuing_country.strip().upper())
     return EXTRACTION_AGENT_REGISTRY.get(document_type_code)
 
 
@@ -86,7 +83,6 @@ async def dispatch_and_run(
     sink: Any,
     agent_storage: Any,
     resolver: Any = None,
-    issuing_country: Optional[str] = None,
 ) -> ExtractionOutcome:
     """Route → construct → register → run → persist (via the given sink/storage).
 
@@ -98,7 +94,7 @@ async def dispatch_and_run(
     doc_id = document.document_id
     code = (document_type_code or "").upper()
 
-    agent_cls = _agent_class(code, issuing_country=issuing_country)
+    agent_cls = _agent_class(code)
     if agent_cls is None:
         log.info("rce_extraction: no agent for document_type=%s (doc=%s)", code, doc_id)
         return ExtractionOutcome(doc_id, code, "skipped_no_agent", 0, "no registered agent")
@@ -136,14 +132,10 @@ async def run_extraction_for_document(
     document_type_code: str,
     resolver: Any = None,
     engine: Any = None,
-    issuing_country: Optional[str] = None,
 ) -> ExtractionOutcome:
     """Production entry: open one transaction, build the Supabase storage + sink,
     and dispatch. Commit on success; the whole agent run (version register +
     extracted fields + agent_run) is one transaction.
-
-    ``issuing_country`` (ISO-3166-1 alpha-3) only affects TAX_CERT, whose single
-    document-type code maps to three locale agents. Every other type ignores it.
     """
     if engine is None:
         from backend.database import db  # lazy
@@ -157,6 +149,5 @@ async def run_extraction_for_document(
             document_type_code=document_type_code,
             sink=SupabaseExtractionSink(conn),
             agent_storage=SupabaseAgentStorage(conn),
-            issuing_country=issuing_country,
             resolver=resolver,
         )

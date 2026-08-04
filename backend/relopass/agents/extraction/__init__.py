@@ -106,28 +106,37 @@ EXTRACTION_AGENT_REGISTRY: Dict[str, Callable[..., object]] = {
     ID_CARD_DOCUMENT_TYPE: IdCardAgent,
     VISA_PERMIT_DOCUMENT_TYPE: VisaPermitAgent,
     DIPLOMA_DOCUMENT_TYPE: DiplomaAgent,
+    # [AIQ-1774] The three tax certificates are ordinary registry entries now.
+    TAX_CERT_DE_DOCUMENT_TYPE: TaxCertDeAgent,
+    TAX_CERT_FR_DOCUMENT_TYPE: TaxCertFrAgent,
+    TAX_CERT_NO_DOCUMENT_TYPE: TaxCertNoAgent,
 }
 
-# TAX_CERT is the one document type this flat map cannot express: rce.document_types
-# carries a SINGLE 'TAX_CERT' code while three locale agents implement it (a German
-# Lohnsteuerbescheinigung, a French avis d'imposition and a Norwegian skattemelding are
-# different documents). The issuing country is the discriminator — NOT the case corridor,
-# which cannot separate them: an FR→NO case legitimately receives both an FR and an NO
-# certificate (see the residency cross-checks in tax_cert_fr.py / tax_cert_no.py).
+# ─────────────────────────────────────────────────────────────────────────────
+# Why TAX_CERT stopped being a special case
+# ─────────────────────────────────────────────────────────────────────────────
 #
-# NOTE — not yet reachable in production. Nothing captures a document's issuing country
-# today: rce.documents has no country column, and its `language` column is never written
-# (rce_document_ingest.py omits it from the INSERT). Until ingest records one of the two,
-# _agent_class('TAX_CERT') resolves to None and the orchestrator reports skipped_no_agent —
-# the same outcome as before this map existed, but now for a stated reason rather than an
-# oversight. Wiring the signal at ingest is the follow-up; the routing below is ready for it.
-TAX_CERT_AGENTS_BY_ISSUING_COUNTRY: Dict[str, Callable[..., object]] = {
-    TAX_CERT_DE_ISSUING_COUNTRY: TaxCertDeAgent,
-    TAX_CERT_FR_ISSUING_COUNTRY: TaxCertFrAgent,
-    TAX_CERT_NO_ISSUING_COUNTRY: TaxCertNoAgent,
-}
-# The single code all three answer to (they agree; asserted in the wiring guard test).
-TAX_CERT_DOCUMENT_TYPE = TAX_CERT_DE_DOCUMENT_TYPE
+# Previously ONE `TAX_CERT` code was shared by three locale agents, resolved at
+# runtime by an `issuing_country` discriminator. That map was correct in principle
+# and unreachable in practice: nothing captures a document's issuing country —
+# rce.documents has no country column and its `language` column is never written —
+# so `_agent_class('TAX_CERT')` always returned None and the orchestrator always
+# reported skipped_no_agent. Three built, tested agents sat inert.
+#
+# The fix is to change the CODE rather than build a selector. A German
+# Lohnsteuerbescheinigung, a French avis d'imposition and a Norwegian skattemelding
+# are genuinely different documents, so they get different codes and the flat
+# registry routes them like every other agent — no selector, no new signal, nothing
+# extra to thread through the orchestrator.
+#
+# This also handles the case the old comment correctly flagged as fatal to
+# corridor-based routing: an FR→NO case legitimately receives BOTH an FR and an NO
+# certificate. Per-document codes handle that naturally — each document is typed on
+# its own evidence — whereas one code plus a per-case country never could.
+#
+# The country determination moves to classification time, where the document's own
+# text is the evidence. `TAX_CERT_*_ISSUING_COUNTRY` remain on the agent modules as
+# the assertion each agent makes about its own output.
 
 
 def get_extraction_agent_class(document_type_code: str) -> Callable[..., object]:
