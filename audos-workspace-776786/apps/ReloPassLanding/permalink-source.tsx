@@ -468,32 +468,6 @@ function App() {
               By submitting, you agree to be contacted about ReloPass services. We never sell your data.
             </p>
           </div>
-
-          {/* Deposit block — Stripe button intentionally unchanged */}
-          <div className="mt-6 rounded-2xl border p-5" style={{ borderColor: C.border, backgroundColor: C.card }}>
-            {depositError && (
-              <div className="mb-3 px-3.5 py-2.5 rounded-xl border border-red-500/40 bg-red-500/10 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-red-300">{depositError}</p>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={handleDeposit}
-              disabled={depositLoading}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all disabled:opacity-60 hover:brightness-110"
-              style={{ borderColor: C.borderStrong, color: C.textPrimary }}
-            >
-              {depositLoading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Opening secure checkout…</>
-              ) : (
-                <><Lock className="w-3.5 h-3.5" /> Reserve your spot — €150 refundable deposit</>
-              )}
-            </button>
-            <p className="text-[11px] text-center mt-2.5" style={{ color: C.textMuted }}>
-              Fully refundable design-partner deposit — applied to your package price if you proceed.
-            </p>
-          </div>
         </div>
       </main>
 
