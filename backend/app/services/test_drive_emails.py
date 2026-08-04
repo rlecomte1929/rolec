@@ -47,6 +47,42 @@ def _pilot_line(pilot_interest: Optional[str], pilot_note: Optional[str]) -> str
     return f"Pilot interest: {pilot_interest.upper()}{note}"
 
 
+def normalize_referrals(
+    referrals: Optional[List[Dict[str, Any]]] = None,
+    *,
+    referral_name: Optional[str] = None,
+    referral_company_role: Optional[str] = None,
+    referral_contact: Optional[str] = None,
+    referral_consent: bool = False,
+) -> List[Dict[str, Any]]:
+    """Every referral on one survey, whichever shape the caller passed.
+
+    A survey stores its full list in ``survey_responses.referrals`` and mirrors ``referrals[0]``
+    into the legacy scalar columns, so a caller may supply either. When the list is absent or
+    empty the legacy scalars are wrapped into a 1-element list — the mirror guarantees this
+    never double-counts. Entries with neither a name nor a contact are dropped (a company/role
+    alone is not a reachable person), matching the survey writer and the admin panel.
+
+    Shared by the in-app notification and the notify email so the two can never disagree about
+    who was referred. Consent is per entry and is NOT filtered here — the caller decides, since
+    the admin list shows unconsented people (flagged) while the outreach paths must not.
+    """
+    items = [
+        r for r in (referrals or [])
+        if isinstance(r, dict) and ((r.get("name") or "").strip() or (r.get("contact") or "").strip())
+    ]
+    if items:
+        return items
+    if (referral_name or "").strip() or (referral_contact or "").strip():
+        return [{
+            "name": referral_name,
+            "company_role": referral_company_role,
+            "contact": referral_contact,
+            "consent": bool(referral_consent),
+        }]
+    return []
+
+
 def render_notify_email(
     *,
     tester_name: Optional[str] = None,
@@ -67,6 +103,7 @@ def render_notify_email(
     referral_company_role: Optional[str] = None,
     referral_contact: Optional[str] = None,
     referral_consent: bool = False,
+    referrals: Optional[List[Dict[str, Any]]] = None,
 ) -> "tuple[str, str, str]":
     who = tester_name or "A tester"
     pilot_flag = " · PILOT" if pilot_interest in ("yes", "maybe") else ""
@@ -93,17 +130,30 @@ def render_notify_email(
         f"Testimonial: {testimonial or '—'}",
     ]
 
-    if referral_name or referral_contact:
-        if referral_consent:
-            lines += [
-                "",
-                "── Referral (consented) ──",
-                f"Name: {referral_name or '—'}",
-                f"Company / role: {referral_company_role or '—'}",
-                f"Contact: {referral_contact or '—'}",
-            ]
-        else:
-            lines += ["", "── Referral ──", "Referral given, consent not granted — do not contact."]
+    # A tester can leave several intros, each with its own consent. Consent is checked PER
+    # PERSON — a row-level check would leak an unconsented #2 riding on a consented #1.
+    all_referrals = normalize_referrals(
+        referrals, referral_name=referral_name, referral_company_role=referral_company_role,
+        referral_contact=referral_contact, referral_consent=referral_consent,
+    )
+    consented = [r for r in all_referrals if r.get("consent")]
+    if all_referrals:
+        if consented:
+            header = "── Referral (consented) ──" if len(consented) == 1 else \
+                f"── Referrals (consented: {len(consented)}) ──"
+            lines += ["", header]
+            for ref in consented:
+                lines += [
+                    f"Name: {ref.get('name') or '—'}",
+                    f"Company / role: {ref.get('company_role') or '—'}",
+                    f"Contact: {ref.get('contact') or '—'}",
+                    "",
+                ]
+            lines.pop()  # trailing spacer from the last entry
+        withheld = len(all_referrals) - len(consented)
+        if withheld:
+            lines += ["", "── Referral ──"] if not consented else [""]
+            lines.append(f"{withheld} referral(s) given, consent not granted — do not contact.")
 
     # TD-12: one-click thank-you from Romain's own mailbox (client-side mailto, no Resend send).
     mailto = _thank_you_mailto(tester_email, tester_name)
@@ -177,6 +227,7 @@ def send_test_drive_survey_emails(
     referral_company_role: Optional[str] = None,
     referral_contact: Optional[str] = None,
     referral_consent: bool = False,
+    referrals: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, str]:
     """Send the single notify email best-effort. Returns {notify, thank_you} statuses.
     Never raises. TD-12: the tester thank-you is no longer a Resend send — it's a
@@ -193,6 +244,7 @@ def send_test_drive_survey_emails(
             pilot_interest=pilot_interest, pilot_note=pilot_note, testimonial=testimonial,
             referral_name=referral_name, referral_company_role=referral_company_role,
             referral_contact=referral_contact, referral_consent=referral_consent,
+            referrals=referrals,
         )
         res = _resend_send(
             to_email=_notify_email(), subject=subject, plain=plain, html=html,

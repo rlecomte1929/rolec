@@ -306,6 +306,33 @@ class TestTestDriveReferral(unittest.TestCase):
         self.assertEqual(resp.status_code, 200, resp.text)
         self.assertEqual(len(json.loads(_insert_params(db)["referrals"])), 10)
 
+    def test_survey_hands_the_full_referral_list_to_the_notifier(self):
+        """End-to-end wiring: the completion notification must receive EVERY referral, not
+        just the legacy mirrored first one — otherwise the admin alert names one person."""
+        db = _fresh_db()
+        session = MagicMock()
+        session_local = MagicMock()
+        session_local.return_value.__enter__.return_value = session
+        with patch.dict(os.environ, _ENABLED, clear=False), \
+                patch("backend.app.routers.test_drive.db", db), \
+                patch("backend.app.routers.test_drive._session_context", return_value=(None, None)), \
+                patch("backend.app.routers.test_drive._emit_funnel_event"), \
+                patch("backend.app.db.SessionLocal", session_local), \
+                patch("backend.app.services.test_drive_notifications."
+                      "notify_test_drive_completion") as notify:
+            resp = self.client.post("/api/test-drive/survey", json=_survey_body(referrals=[
+                {"name": "Marie", "contact": "marie@x.test", "consent": True},
+                {"name": "Jan", "contact": "jan@x.test", "consent": False},
+                {"name": "Robin", "contact": "robin@x.test", "consent": True},
+            ]))
+        self.assertEqual(resp.status_code, 200, resp.text)
+        notify.assert_called_once()
+        passed = notify.call_args.kwargs["referrals"]
+        self.assertEqual([r["name"] for r in passed], ["Marie", "Jan", "Robin"])
+        self.assertEqual([r["consent"] for r in passed], [True, False, True])
+        # The legacy scalars are still sent alongside, mirroring referrals[0].
+        self.assertEqual(notify.call_args.kwargs["referral_name"], "Marie")
+
     def test_invalid_lead_in_email_rejected(self):
         """AIQ-1543: a non-empty but malformed lead-in email is rejected server-side (422)."""
         with patch.dict(os.environ, _ENABLED, clear=False):
