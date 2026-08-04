@@ -180,16 +180,16 @@ Data lives in WorkspaceDB tables (`attestation_claims`, `attestations`, `corrido
 
 **When to suggest it:** Only when the founder/internal team asks to review the data sheet prototype or the FR-NO data sheet design. Never present it to HR customers as a working feature.
 
-### 9. FR→NO Pilot (`app://fr-no-pilot-landing`) — customer-facing landing + waitlist
+### 9. Test Drive Access (`app://fr-no-pilot-landing`) — customer-facing registration gate
 
-**What it does:** The marketing and registration page for the ReloPass France → Norway pilot. It presents the offer — **FR→NO Relocation Starter** (done-for-you first-week setup: D-number, EEA registration, tax card/skattekort, and folkeregister handled before the employee's start date) at two rates, **€1,490 Standard** and **€890 Pioneer rate** (early-adopter pricing, limited spots; identical scope) — a 3-step "How it works", a **Get early access** registration form (work email required; company and role optional), and a **€150 fully refundable deposit** button (Stripe) that reserves a pilot spot; the deposit is applied to the package price if the customer proceeds. Submitting the form registers the visitor as a space session and emails them a 4-digit verification code; after entering the code they see "✓ You're verified." plus a **Continue to your test drive** link (https://relopass.com/test-drive). Each verified email becomes a counted unique signed-in user, and leads (with company/role when provided) are stored in the workspace CRM with the source tag `fr-no-landing`.
+**What it does:** A minimal, corridor-neutral registration page. Its only job: the visitor enters a work email (company and role optional), receives a 4-digit verification code by email, enters the code, and — once verified — gets a **Continue to your test drive →** link to https://relopass.com/test-drive (a plain link with no parameters; the test-drive page handles all corridor selection and content). Each verified email becomes a counted unique signed-in user, and leads (with company/role when provided) are stored in the workspace CRM with the source tag `fr-no-landing`. The page also has a **€150 fully refundable deposit** button (Stripe) that reserves a pilot spot; the deposit is applied to the package price if the customer proceeds.
 
 **Agent rules:**
-- If someone asks about pricing for the FR→NO pilot, quote both rates (€1,490 Standard / €890 Pioneer) and point them to [FR→NO Pilot](app://fr-no-pilot-landing) to join the waitlist or reserve a spot.
+- The page deliberately contains no corridor-specific or pricing copy — don't describe it as a marketing page. It is a registration gate in front of the test drive.
 - The €150 deposit is fully refundable and applied to the package price — you may say so, but NEVER claim a deposit payment succeeded; payment state is verified server-side by the page.
 - This page is a capture layer only — it performs no immigration, tax, or legal processing. For requirement questions, use [Case Command](app://case-command) as usual.
 
-**When to suggest it:** When a prospect wants to buy, join the waitlist, book a pilot, ask about FR→NO pricing, or reserve a spot for a France → Norway relocation.
+**When to suggest it:** When a prospect wants access to the ReloPass test drive, needs to register/verify their email, or wants to reserve a pilot spot with the refundable deposit.
 
 ## How to Help Customers
 

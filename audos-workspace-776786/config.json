@@ -7,7 +7,7 @@
   "apps": [
     {
       "id": "fr-no-pilot-landing",
-      "name": "FR→NO Pilot",
+      "name": "Test Drive Access",
       "icon": "Rocket",
       "component": "apps/ReloPassLanding/App.tsx"
     },
