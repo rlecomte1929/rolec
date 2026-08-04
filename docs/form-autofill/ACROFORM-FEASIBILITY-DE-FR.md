@@ -1,87 +1,101 @@
 # AcroForm prefill for DE/FR — feasibility check
 
-**Date:** 2026-08-04 · **Task:** AIQ-1769 (subtask 1 of AIQ-1759) · **Outcome:** premise refuted, no code shipped
+**Date:** 2026-08-04 · **Task:** AIQ-1769 (subtask 1 of AIQ-1759)
 
 ## Summary
 
-`FINDINGS.md` Appendix A.1 concludes: *"restrict any AcroForm-PDF prefill to corridors that
-genuinely use fillable paper forms (DE/FR)."* The parenthetical `(DE/FR)` was an **assumption**
-— nobody had checked whether the DE and FR forms are actually fillable AcroForms.
+`FINDINGS.md` Appendix A.1 concluded: *"restrict any AcroForm-PDF prefill to corridors that
+genuinely use fillable paper forms (DE/FR)."* The parenthetical `(DE/FR)` was never verified.
+Field-testing every published candidate gives a **split** answer:
 
-They are not. **Neither corridor publishes a blank fillable AcroForm.** The AcroForm-prefill
-branch of AIQ-1759 rests on a premise that does not hold.
+| corridor | verdict | file |
+|---|---|---|
+| **FR** | ✅ **viable** | `ls_14571-05_fr_09` on France-Visas — a genuine **172-field** AcroForm |
+| **DE** | ❌ **not viable** | no blank PDF is published at all; VIDEX is an online app |
 
-## Evidence
+So A.1 is half right. FR can use AcroForm prefill. DE cannot, and belongs with NO on the
+prefilled data-sheet model.
 
-### France — CERFA 14571*06: authentic, but flattened
+## France — one fillable file exists, and it is not the obvious one
 
-Source supplied by Romain, the official government forms portal:
-`https://www.formulaires.service-public.gouv.fr/gf/cerfa_14571.do`
+Four candidates were field-tested with the task's own Test Command (`pypdf.get_fields()`):
 
-Verified it is genuinely the long-stay visa application — page 1 carries the photo box,
-"Je sollicite un visa pour le motif suivant", "DÉCISION DU POSTE", and the numbered items
-17–23. The version marker in the document text is **`N°14571*06`**.
+| file | source | bytes | fields | verdict |
+|---|---|---|---|---|
+| `cerfa_14571.do` (**`*06`**) | service-public | 429,654 | **0** | flattened — *Print To PDF* from `LS_FR_v1.8.odt` |
+| `cerfa_14571-05-long-sejour` | France-Visas | 248,160 | **0** | flattened |
+| `cerfa_14571-05_long_sejour_en` | France-Visas | 34,164 | **0** | flattened |
+| `cerfa_14571-05_long_sejour_es` | France-Visas | 65,147 | **0** | flattened |
+| **`ls_14571-05_fr_09`** | France-Visas | 151,743 | **172** | ✅ genuine AcroForm |
 
-Ran the task's own Test Command:
+`ls_14571-05_fr_09` metadata: `/Creator Writer`, `/Producer LibreOffice 7.1`,
+created 2021-08-06, **modified 2024-03-26**. 3 pages. 134 text fields (`/Tx`) +
+38 buttons (`/Btn`).
 
-```
-pages: 3   size: 429,654 bytes
-ACROFORM FIELD COUNT: 0
-/Producer:     Microsoft: Print To PDF
-/Title:        LS_FR_v1.8.odt
-/CreationDate: D:20251211174832+01'00'
-```
+Field-name prefixes: `companion` (36), `applicant` (32), `resident` (17), `parental` (12),
+`travel` (11), `purpose` (11), `previous` (11), `host` (9), `other` (9), `study` (7).
 
-Zero form fields. The metadata explains why: it was **printed to PDF from an ODT**, which
-flattens any interactive fields. Per the task's own Technical Constraints — *"a flattened or
-scanned form cannot be prefilled and silently produces an empty fill report... Verify by
-enumerating fields before accepting"* — this file must be **rejected**.
+Full dump committed at `docs/form-autofill/fields_FR_cerfa_14571-05.txt` — this is the input
+artifact AIQ-1759 subtask 2 needs.
 
-France-Visas corroborates: its forms are described as print-and-complete, and the applicant is
-told to "print and come with your CERFA in final paper version".
+### ⚠️ Provenance tension for Romain to resolve
 
-### Germany — no blank PDF exists at all
+The **fillable** file is edition **`*05`** (modified 2024-03-26). The edition currently published
+on service-public is **`*06`** (created 2025-12-11) and is **flattened**. So prefilling means
+filling a form one edition behind the current published one. That trade-off is a provenance
+judgement, not an engineering one — per this task's human gate.
 
-Source supplied by Romain: `https://videx.diplo.de/videx/visum-erfassung/de/videx-langfristiger-aufenthalt`
+Note also that the task's "`*09`" was never a CERFA edition: it is the `_09` suffix in the
+France-Visas **filename** `ls_14571-05_fr_09`, which is the `*05` form.
 
-This is **VIDEX**, an interactive web application (the page is a JS shell — "Daten werden
-laden ..."), not a form download. VIDEX is the Federal Foreign Office's online capture tool: the
-applicant enters data online and VIDEX **generates** a completed PDF at the end. There is no
-blank fillable AcroForm to prefill. `digital.diplo.de/Blaue-Karte` is likewise an online
-application path.
+## Germany — no blank PDF exists
+
+`videx.diplo.de/videx/visum-erfassung/de/videx-langfristiger-aufenthalt` is **VIDEX**, an
+interactive web application (the page is a JS shell). VIDEX **generates** a completed PDF from
+online entry — there is no blank fillable form to prefill. `digital.diplo.de/Blaue-Karte` is
+likewise an online path.
 
 The PDF is an **output** of the German process, not an input to it — structurally the same
-mistake Appendix A.1 itself identified for Norway, where the EEA registration certificate turned
-out to be "an output the police issue, not an input form".
+mistake Appendix A.1 itself caught for Norway, where the EEA registration certificate turned out
+to be "an output the police issue, not an input form".
 
-## Consequence
+## The seed script's core assumption is false
 
-- Validation criterion 1 of AIQ-1769 ("Both templates resolve to a downloadable PDF whose
-  AcroForm field names can be enumerated") is **unsatisfiable** with the official sources.
-- The synthetic stand-ins in `backend/scripts/seed_immigration_form_templates.py` cannot be
-  replaced by real fillable equivalents, because none are published.
-- AIQ-1759 subtasks 2 and 5 (field mappings, golden cases) are blocked on an artifact that does
-  not exist — not on effort.
+`backend/scripts/seed_immigration_form_templates.py` says the stand-ins are safe because
+*"the AcroForm field NAMES match form_field_mappings.form_field_id, so swapping in the real
+templates requires no code change."*
 
-By Appendix A.1's own logic, DE and FR belong in the same bucket as NO: the correct production
-model is the **prefilled data-sheet** (the `NO_datasheet_v2026` pattern already shipped), not
-AcroForm PDF prefill.
+**There is zero overlap.** The real form uses English camelCase; the mappings use French
+snake_case:
 
-## Two further corrections to the task record
+| real PDF (172) | DB mapping (12) |
+|---|---|
+| `applicantSurname` | `nom` |
+| `applicantFirstname` | `prenoms` |
+| `applicantDateOfBirth` | `date_naissance` |
+| `applicantPlaceOfBirth` | `lieu_naissance` |
+| `applicantNationality` | `nationalite` |
+| `applicantOccupation` | `profession` |
 
-1. **The FR version is `*06`, not `*09`.** The `*09` in the task most likely came from the
-   France-Visas filename `ls_14571-05_fr_09`, where `09` is a filename suffix on a `*05` form,
-   not a CERFA edition.
-2. **`form_templates.original_pdf_url` is the wrong target.** The prefill pipeline never reads
-   `form_templates`; it reads `form_field_mappings` keyed by `form_id`
-   (`DE_blue_card_v2024` 15 fields, `FR_cerfa_14571_v2024` 12 fields, `NO_datasheet_v2026`
-   9 fields), and storage objects of the same name in the `form-templates` bucket. Both DE and FR
-   have `form_url` NULL. There is also **no FR row in `form_templates` at all** — only
-   `APOSTILLE-FR` — which is why the task's verification query left `<fr code>` unfilled.
+Swapping in the real template therefore **does** require work. Worse, it is not a rename: the DB
+models `sexe` and `situation_familiale` as single text fields, but the real form uses **checkbox
+buttons** — `applicantGenderM` / `applicantGenderF`, and `applicantMaritalCEL` / `MAR` / `SEP` /
+`DIV` / `VEU` / `AUT`. Subtask 2 needs a value→checkbox mapping layer, not a lookup table.
 
-## Not verified
+## Also corrected
 
-France-Visas hosts other variants (`cerfa_14571-05` in FR/EN/ES). These were **not** downloaded
-or field-tested — only the service-public `*06` was. If one of them is a genuine AcroForm the
-FR half becomes viable, so that is worth one check before the branch is abandoned. Deciding
-which file is the authentic current edition remains Romain's call, per AIQ-1769.
+`form_templates.original_pdf_url` is the **wrong target**. The prefill pipeline never reads
+`form_templates`; it reads `form_field_mappings` keyed by `form_id` (`DE_blue_card_v2024`
+15 fields, `FR_cerfa_14571_v2024` 12, `NO_datasheet_v2026` 9) plus bucket objects of the same
+name. DE and FR both have `form_url` NULL, and there is **no FR row in `form_templates` at all**
+(only `APOSTILLE-FR`) — which is why the task's verification query left `<fr code>` unfilled.
+Prod also drifted from the task snapshot: 84 templates / 36 mappings, not 83 / 27.
+
+## What remains
+
+1. **Romain:** confirm the `*05` fillable file is acceptable given the `*06` is the current
+   published edition (the provenance tension above).
+2. Upload `ls_14571-05_fr_09.pdf` to the `form-templates` bucket as `FR_cerfa_14571_v2024.pdf`,
+   set `form_field_mappings.form_url` + provenance.
+3. Re-map the 12 FR mappings onto the real field names, including the checkbox layer (subtask 2).
+4. Drop DE from the AcroForm branch; move it to the data-sheet model.
