@@ -14,11 +14,12 @@ import logging
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import desc
+from sqlalchemy import desc, text
 
 from ..auth_deps import require_admin
 from ..db import SessionLocal
@@ -46,6 +47,7 @@ VALID_STATUSES = {
     "approved",
     "maybe",
     "rejected",
+    "promoted",
 }
 TRIAGE_DECISIONS = {"approved", "maybe", "rejected"}
 
@@ -498,3 +500,131 @@ def export_approved_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+@router.post("/{prospect_id}/promote")
+def promote_prospect(
+    prospect_id: str,
+    user: dict = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Promote an approved prospect into the LinkedIn Outreach CRM.
+
+    Bridges the two halves of the funnel that were previously joined only by a
+    CSV export + manual re-entry: creates a ``linkedin_prospects`` row seeded
+    with the company, the suggested contact title, and — as the initial draft —
+    the enrichment hook, so nothing the pipeline produced is thrown away.
+
+    The contact is a shell: the admin still fills in the real person's name and
+    LinkedIn URL. Because ``linkedin_prospects.linkedin_url`` is UNIQUE NOT NULL
+    and a company-level candidate has no person yet, we seed the URL with a
+    LinkedIn people-search for the suggested title at the company (a useful
+    starting point for finding the human) made unique per candidate.
+
+    The candidate moves to ``promoted`` so it leaves the approved queue and
+    can't be double-promoted. ``linkedin_prospects`` is written via the
+    service-role session (same pattern as admin_outreach), so RLS is bypassed
+    intentionally for this admin-gated action.
+    """
+    with SessionLocal() as db:
+        row = db.get(ProspectCandidate, prospect_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="prospect not found")
+        if row.status == "promoted":
+            raise HTTPException(
+                status_code=409, detail="prospect already promoted to outreach"
+            )
+        if row.status != "approved":
+            raise HTTPException(
+                status_code=409,
+                detail="approve the prospect before promoting it to outreach",
+            )
+
+        try:
+            enriched = json.loads(row.enriched_json or "{}") or {}
+        except (TypeError, ValueError):
+            enriched = {}
+        profile = enriched.get("company_profile") or {}
+
+        title = (row.suggested_contact_title or "HR / Mobility lead").strip()
+        company = row.company_name
+        hook = (row.suggested_hook or "").strip()
+
+        search = quote(f"{title} {company}".strip())
+        linkedin_url = (
+            "https://www.linkedin.com/search/results/people/"
+            f"?keywords={search}#rp-{row.id[:8]}"
+        )
+
+        note_bits = [f"Promoted from HR Prospect Pipeline (candidate {row.id})."]
+        if row.icp_score is not None:
+            note_bits.append(
+                f"ICP score {row.icp_score}, band {row.qualification_band or '—'}."
+            )
+        if row.company_domain:
+            note_bits.append(f"Domain: {row.company_domain}.")
+        rationale = (enriched.get("icp_rationale") or "").strip()
+        if rationale:
+            note_bits.append(f"Rationale: {rationale}")
+        note_bits.append(
+            "Replace the placeholder name + LinkedIn URL with the real contact."
+        )
+        notes = " ".join(note_bits)
+
+        seed_status = "message_drafted" if hook else "flagged"
+        new_row = (
+            db.execute(
+                text(
+                    """
+                    INSERT INTO public.linkedin_prospects
+                        (full_name, linkedin_url, company_name, company_size,
+                         job_title, corridor_relevance, notes, source, status)
+                    VALUES
+                        (:full_name, :linkedin_url, :company_name, :company_size,
+                         :job_title, :corridor_relevance, :notes, :source, :status)
+                    RETURNING id
+                    """
+                ),
+                {
+                    "full_name": f"[Contact — {title}]",
+                    "linkedin_url": linkedin_url,
+                    "company_name": company,
+                    "company_size": profile.get("size_band"),
+                    "job_title": title,
+                    "corridor_relevance": None,
+                    "notes": notes,
+                    "source": "prospect_pipeline",
+                    "status": seed_status,
+                },
+            )
+            .mappings()
+            .first()
+        )
+        new_prospect_id = str(new_row["id"])
+
+        if hook:
+            db.execute(
+                text(
+                    """
+                    INSERT INTO public.outreach_messages
+                        (prospect_id, message_type, body, status, personalisation_notes)
+                    VALUES
+                        (:prospect_id, 'initial', :body, 'draft', :notes)
+                    """
+                ),
+                {
+                    "prospect_id": new_prospect_id,
+                    "body": hook,
+                    "notes": "Seeded from HR Prospect Pipeline enrichment.",
+                },
+            )
+
+        row.status = "promoted"
+        row.reviewed_at = datetime.utcnow()
+        row.reviewed_by = user.get("email") or user.get("id")
+        db.commit()
+
+    return {
+        "promoted_prospect_id": new_prospect_id,
+        "outreach_status": seed_status,
+        "created_initial_draft": bool(hook),
+    }

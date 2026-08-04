@@ -62,6 +62,8 @@ function statusBadge(status: string): React.ReactElement {
   if (status === 'maybe') return <Badge variant="info">maybe</Badge>;
   if (status === 'rejected') return <Badge variant="error">rejected</Badge>;
   if (status === 'enrichment_failed') return <Badge variant="error">failed</Badge>;
+  if (status === 'promoted') return <Badge variant="info">promoted → outreach</Badge>;
+  if (status === 'onboarded') return <Badge variant="success">onboarded</Badge>;
   return <Badge variant="info">{status}</Badge>;
 }
 
@@ -209,6 +211,25 @@ export const AdminProspects: React.FC = () => {
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : (err as Error)?.message;
       setError(String(msg || 'Triage failed'));
+    } finally {
+      setDetailBusy(false);
+    }
+  };
+
+  const promote = async () => {
+    if (!selected) return;
+    setDetailBusy(true);
+    try {
+      await adminProspectsAPI.promote(selected.id);
+      const full = await adminProspectsAPI.get(selected.id);
+      setSelected(full);
+      await load();
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : (err as Error)?.message;
+      setError(String(msg || 'Promote failed'));
     } finally {
       setDetailBusy(false);
     }
@@ -598,9 +619,17 @@ export const AdminProspects: React.FC = () => {
                 Reject
               </Button>
               {selected.status === 'approved' && (
+                <Button variant="secondary" disabled={detailBusy} onClick={promote}>
+                  Promote to Outreach →
+                </Button>
+              )}
+              {selected.status === 'approved' && (
                 <Button variant="primary" disabled={detailBusy} onClick={openOnboard}>
                   Onboard as company →
                 </Button>
+              )}
+              {selected.status === 'promoted' && (
+                <Badge variant="info">promoted → outreach</Badge>
               )}
               {selected.status === 'onboarded' && (
                 <Badge variant="success">onboarded</Badge>

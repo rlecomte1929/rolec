@@ -2028,6 +2028,19 @@ export const adminProspectsAPI = {
     api
       .post(`/api/admin/prospects/${prospectId}/triage`, { decision })
       .then((r) => r.data as ProspectRow),
+  // Track A: promote an approved prospect into the LinkedIn Outreach CRM
+  // (creates a linkedin_prospects contact seeded with the enrichment hook).
+  promote: async (prospectId: string) =>
+    api
+      .post(`/api/admin/prospects/${prospectId}/promote`)
+      .then(
+        (r) =>
+          r.data as {
+            promoted_prospect_id: string;
+            outreach_status: string;
+            created_initial_draft: boolean;
+          },
+      ),
   // Track B: convert an approved prospect into a live tenant (company + HR seat + welcome).
   onboard: async (
     prospectId: string,
