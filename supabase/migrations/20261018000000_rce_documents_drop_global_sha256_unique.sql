@@ -1,0 +1,26 @@
+-- rce.documents: drop the GLOBAL unique on sha256, keep the per-case one.
+--
+-- The original case-engine DDL (20260528020000) declared `sha256 TEXT NOT NULL UNIQUE`,
+-- which is a unique constraint across the WHOLE table. A later migration
+-- (20260610130000) added the intended per-case index:
+--     CREATE UNIQUE INDEX uq_rce_documents_case_sha256 ON rce.documents (case_id, sha256)
+-- but nothing ever dropped the global one, so prod carries both. Verified 2026-08-04:
+--     documents_sha256_key        UNIQUE (sha256)
+--     uq_rce_documents_case_sha256 UNIQUE (case_id, sha256)
+--
+-- Why this is a live defect: rce_document_ingest.ingest_rce_document inserts with
+--     ON CONFLICT (case_id, sha256) DO NOTHING
+-- which can only absorb a conflict on THAT index. A second case uploading the same bytes
+-- (a blank government form, a shared employer letter, the same passport scan re-used)
+-- violates documents_sha256_key instead, raises IntegrityError, and is swallowed by the
+-- fail-soft `except` in bridge_case_document_to_rce — so the document is silently never
+-- extracted, with only a warning line to show for it.
+--
+-- Documents are per-case by design (rce.documents.case_id is NOT NULL and every read is
+-- case-scoped), so global sha256 uniqueness was never the intent — it would forbid two
+-- employees from ever uploading the same form. Dropping it leaves the per-case index as
+-- the sole, correct guarantee.
+--
+-- Safe to run repeatedly. No data change; prod currently holds 0 rce.documents rows, so
+-- there is nothing to de-duplicate first.
+ALTER TABLE rce.documents DROP CONSTRAINT IF EXISTS documents_sha256_key;
