@@ -166,12 +166,22 @@ class TriggerEngineHelperTests(unittest.TestCase):
         self.assertNotIn("roadmap.profile_completed", events)
 
     def test_derive_events_with_origin_adds_profile_completed(self) -> None:
-        ctx = {"destination_country": "NO"}
+        # ctx carries origin_country because _build_context always resolves it
+        # (derived → draft basics → cases.origin_country_code) before calling
+        # this. A ctx without it, paired with a draft that has originCountry,
+        # is not a state the real caller can produce.
+        ctx = {"destination_country": "NO", "origin_country": "FR"}
         events = _derive_events(
             ctx,
             draft={"relocationBasics": {"originCountry": "FR"}},
             derived={},
         )
+        self.assertIn("roadmap.profile_completed", events)
+
+    def test_derive_events_origin_comes_from_context_not_the_draft(self) -> None:
+        """profile_completed must fire when only the context knows the origin."""
+        ctx = {"destination_country": "NO", "origin_country": "FR"}
+        events = _derive_events(ctx, draft={}, derived={})
         self.assertIn("roadmap.profile_completed", events)
 
     def test_derive_events_arrival_confirmed(self) -> None:
@@ -349,6 +359,37 @@ class TriggerEngineIntegrationTests(unittest.TestCase):
 
         codes = [f["code"] for f in self._case_forms() if f["case_id"] == fr_case]
         self.assertIn("RP-NO-DATASHEET", codes)
+
+    def test_profile_completed_fires_on_a_patch_that_omits_relocation_basics(self) -> None:
+        """
+        The wizard does not persist relocationBasics into cases.intake_data, so a
+        *second* PATCH (a later wizard step, an HR edit) arrives with a draft that
+        carries no originCountry. After the _build_context fix, context resolves
+        origin from cases.origin_country_code — but _derive_events recomputed it
+        from derived/basics and saw an empty string.
+
+        Result: on that second PATCH, roadmap.destination_confirmed fires (dest
+        comes from the DB) while roadmap.profile_completed does not. A dependent
+        added between the two PATCHes never gets its form.
+
+        This is the narrow, real defect. Note the broader claim — that
+        profile_completed never fires for a case at rest — is FALSE: measured in
+        production 2026-08-04, 141 at-rest cases have a spouse and 139 already
+        carry the spouse form, because the first PATCH does carry the basics.
+        """
+        self._insert_dependent(case_id=self.case_id, relationship="spouse",
+                               full_name="Spouse Example")
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE cases SET origin_country_code = 'FR' WHERE id = :id"),
+                {"id": self.case_id},
+            )
+
+        # A later PATCH: no relocationBasics in the draft, nothing in derived.
+        fire_roadmap_events(case_id=self.case_id, draft={}, derived={})
+
+        codes = [f["code"] for f in self._case_forms()]
+        self.assertIn("UTL-2011F", codes)
 
     def test_invalid_case_id_is_noop(self) -> None:
         n = fire_roadmap_events(case_id="not-a-uuid", draft={}, derived={})

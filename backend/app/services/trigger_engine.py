@@ -278,18 +278,20 @@ def _derive_events(
     """
     events: set = set()
     dest = context.get("destination_country")
-    basics = draft.get("relocationBasics") or {}
 
     # roadmap.destination_confirmed — destination country is known
     if dest:
         events.add("roadmap.destination_confirmed")
 
     # roadmap.profile_completed — origin + destination + at least one
-    # other meaningful field is present
-    origin = (
-        (derived.get("origin_country") or "").strip()
-        or (basics.get("originCountry") or "").strip()
-    )
+    # other meaningful field is present.
+    # Read origin from the context rather than recomputing it from the draft:
+    # context already applied the derived → draft → cases.origin_country_code
+    # precedence. Recomputing here saw only the first two, so a later PATCH that
+    # omits relocationBasics fired destination_confirmed (dest resolves from the
+    # DB) but not profile_completed — an inconsistency between the two, not a
+    # deliberate narrowing.
+    origin = context.get("origin_country")
     if dest and origin:
         events.add("roadmap.profile_completed")
 
