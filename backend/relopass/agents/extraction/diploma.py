@@ -45,6 +45,12 @@ logger = logging.getLogger(__name__)
 
 DIPLOMA_AGENT_NAME = "diploma"
 
+# Keyed to rce.document_types.code. Its absence is why this agent shipped
+# unreachable: EXTRACTION_AGENT_REGISTRY is keyed by document-type code, and
+# every registered agent declares one — this module did not, so there was
+# nothing to register it under. See test_extraction_agent_wiring.py.
+DIPLOMA_DOCUMENT_TYPE = "DIPLOMA"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ISCED inference fallback

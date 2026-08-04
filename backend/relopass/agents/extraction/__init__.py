@@ -10,6 +10,7 @@ from typing import Callable, Dict
 
 from .diploma import (
     DIPLOMA_AGENT_NAME,
+    DIPLOMA_DOCUMENT_TYPE,
     DiplomaAgent,
     DiplomaResult,
     infer_isced_level_from_title,
@@ -98,6 +99,33 @@ EXTRACTION_AGENT_REGISTRY: Dict[str, Callable[..., object]] = {
     FOSTER_CARE_ORDER_DOCUMENT_TYPE: FosterCareOrderAgent,
     ID_CARD_DOCUMENT_TYPE: IdCardAgent,
     VISA_PERMIT_DOCUMENT_TYPE: VisaPermitAgent,
+    DIPLOMA_DOCUMENT_TYPE: DiplomaAgent,
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Agents that exist but are deliberately NOT reachable yet, each with the reason.
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# The registry is keyed by document-type code, and the orchestrator selects with
+# `_agent_class(document_type_code)` — the code is the ONLY input it receives.
+#
+# TaxCertDeAgent / TaxCertFrAgent / TaxCertNoAgent are three country-specific
+# agents (each pins its own `_COUNTRY_ISO3`, e.g. "DEU") behind ONE prod
+# document-type code, `TAX_CERT`. Selecting between them needs the issuing
+# country, which is not available at the selection point: `dispatch_and_run`
+# receives only `ocr_result`, `document_type_code`, `sink`, `agent_storage` and
+# `resolver`. `document_subtype` cannot serve either — the agent EMITS it, so
+# using it to choose the agent is circular.
+#
+# Registering an arbitrary one (e.g. DE) would silently run a German-specific
+# prompt over a French tax certificate and emit confident, wrong fields. That is
+# worse than the current skip, so TAX_CERT stays unreachable until a selector is
+# designed. Tracked by test_extraction_agent_wiring.py, which fails if this entry
+# is removed without the agents becoming reachable.
+UNREACHABLE_AGENTS: Dict[str, str] = {
+    "TaxCertDeAgent": "TAX_CERT selector undesigned — 3 country agents, 1 code, no country at the selection point",
+    "TaxCertFrAgent": "TAX_CERT selector undesigned — see TaxCertDeAgent",
+    "TaxCertNoAgent": "TAX_CERT selector undesigned — see TaxCertDeAgent",
 }
 
 
