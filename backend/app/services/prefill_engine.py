@@ -73,6 +73,11 @@ _KEY_SOURCE = {
     "family": SOURCE_INTAKE_PROFILE,
     "contract": SOURCE_CONTRACT,
     "banking": SOURCE_BANKING,
+    # `case` was missing here, so every case.* leaf resolved with source = NULL and
+    # lost its provenance badge in the dossier. Case-level facts (move date, stay
+    # length, corridor) originate from the intake the employee/HR completed, so they
+    # carry the same origin as the profile leaves.
+    "case": SOURCE_INTAKE_PROFILE,
 }
 
 
@@ -295,7 +300,9 @@ def _build_context(
             case_row = conn.execute(
                 text(
                     f"SELECT dest_country_code, origin_country_code, "
-                    f"       employee_id, intake_data "
+                    f"       employee_id, intake_data, "
+                    f"       target_move_date, actual_move_date, "
+                    f"       expected_duration_months "
                     f"FROM {_t('cases')} WHERE id = :id"
                 ),
                 {"id": case_uuid},
@@ -309,6 +316,18 @@ def _build_context(
             # ── case-level ───────────────────────────────────────────────────
             ctx["case"]["dest_country_code"] = case_row.get("dest_country_code")
             ctx["case"]["origin_country_code"] = case_row.get("origin_country_code")
+
+            # Arrival / stay length live on the case, not on intake_data. Exposed so
+            # corridor data-sheets can pre-fill "date of arrival" and "intended length
+            # of stay" instead of leaving them blank for the employee to re-key
+            # (AIQ-1754: the FR->NO sheet needs both). actual_move_date wins over
+            # target_move_date once the move has happened — same coalesce-the-aliases
+            # shape used for the profile/contract leaves below.
+            _arrival = case_row.get("actual_move_date") or case_row.get("target_move_date")
+            if hasattr(_arrival, "isoformat"):
+                _arrival = _arrival.isoformat()
+            ctx["case"]["arrival_date"] = _arrival
+            ctx["case"]["intended_stay_months"] = case_row.get("expected_duration_months")
 
             # ── profile — try multiple intake_data sub-keys ──────────────────
             profile_raw = (

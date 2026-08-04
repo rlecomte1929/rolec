@@ -35,11 +35,17 @@ from backend.app.services.prefill_engine import (  # noqa: E402
 
 SCHEMA = """
 CREATE TABLE cases (
-    id                  TEXT PRIMARY KEY,
-    employee_id         TEXT,
-    dest_country_code   TEXT,
-    origin_country_code TEXT,
-    intake_data         TEXT DEFAULT '{}'
+    id                      TEXT PRIMARY KEY,
+    employee_id             TEXT,
+    dest_country_code       TEXT,
+    origin_country_code     TEXT,
+    intake_data             TEXT DEFAULT '{}',
+    -- Mirrors prod: the engine reads these for case.arrival_date /
+    -- case.intended_stay_months. Kept in sync with public.cases or the SELECT in
+    -- _build_context fails here with "no such column".
+    target_move_date        TEXT,
+    actual_move_date        TEXT,
+    expected_duration_months INTEGER
 );
 CREATE TABLE profiles (
     id        TEXT PRIMARY KEY,
@@ -119,14 +125,18 @@ def _uuid() -> str:
 # ---------------------------------------------------------------------------
 
 def _insert_case(conn, case_id, employee_id, intake_data=None,
-                 dest="NO", origin="FR"):
+                 dest="NO", origin="FR", target_move_date=None,
+                 actual_move_date=None, expected_duration_months=None):
     conn.execute(text(
         "INSERT INTO cases (id, employee_id, dest_country_code, "
-        "origin_country_code, intake_data) "
-        "VALUES (:id, :emp, :dest, :origin, :intake)"
+        "origin_country_code, intake_data, target_move_date, "
+        "actual_move_date, expected_duration_months) "
+        "VALUES (:id, :emp, :dest, :origin, :intake, :tmd, :amd, :edm)"
     ), {"id": case_id, "emp": employee_id,
         "dest": dest, "origin": origin,
-        "intake": json.dumps(intake_data or {})})
+        "intake": json.dumps(intake_data or {}),
+        "tmd": target_move_date, "amd": actual_move_date,
+        "edm": expected_duration_months})
 
 
 def _insert_profile(conn, profile_id, full_name="Test Employee",
@@ -997,3 +1007,77 @@ class PreFillSourceProvenanceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCaseLevelPrefillSources(unittest.TestCase):
+    """AIQ-1754: `case.arrival_date` and `case.intended_stay_months`.
+
+    The FR->NO data-sheet needs a date of arrival and an intended length of stay.
+    Both live on the `cases` row, not in `intake_data`, so before this the fields
+    were left blank for the employee to re-key. These also cover the provenance
+    bug: `case` was absent from _KEY_SOURCE, so every case.* leaf resolved with
+    source = NULL.
+    """
+
+    def setUp(self):
+        self.engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+        )
+        with self.engine.begin() as conn:
+            for stmt in SCHEMA.split(";"):
+                s = stmt.strip()
+                if s:
+                    conn.execute(text(s))
+        self.patcher = mock.patch.object(prefill_engine.db, "engine", self.engine)
+        self.patcher.start()
+
+    def tearDown(self):
+        self.patcher.stop()
+        self.engine.dispose()
+
+    def _row(self, case_form_id, field_id):
+        with self.engine.begin() as conn:
+            return conn.execute(text(
+                "SELECT value, source FROM case_form_field_values "
+                "WHERE case_form_id = :cf AND field_id = :f"
+            ), {"cf": case_form_id, "f": field_id}).mappings().first()
+
+    def _run(self, fields, **case_kw):
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, **case_kw)
+            _insert_profile(conn, emp_id)
+            _insert_template(conn, tmpl, "RP-NO-DATASHEET", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+        run_prefill(cf_id, case_id)
+        return cf_id
+
+    def test_arrival_date_prefills_from_target_move_date(self):
+        cf = self._run([{"id": "arrival_date", "prefill_source": "case.arrival_date"}],
+                       target_move_date="2026-09-01")
+        self.assertEqual(self._row(cf, "arrival_date")["value"], "2026-09-01")
+
+    def test_actual_move_date_wins_over_target(self):
+        # Once the move has happened the actual date is the truthful arrival.
+        cf = self._run([{"id": "arrival_date", "prefill_source": "case.arrival_date"}],
+                       target_move_date="2026-09-01", actual_move_date="2026-09-14")
+        self.assertEqual(self._row(cf, "arrival_date")["value"], "2026-09-14")
+
+    def test_intended_stay_months_prefills_from_expected_duration(self):
+        cf = self._run([{"id": "stay", "prefill_source": "case.intended_stay_months"}],
+                       expected_duration_months=18)
+        self.assertEqual(self._row(cf, "stay")["value"], "18")
+
+    def test_case_leaf_carries_provenance_not_null(self):
+        # Regression: `case` missing from _KEY_SOURCE left source NULL, so the
+        # dossier rendered no provenance badge for these values.
+        cf = self._run([{"id": "arrival_date", "prefill_source": "case.arrival_date"}],
+                       target_move_date="2026-09-01")
+        self.assertEqual(self._row(cf, "arrival_date")["source"], "intake_profile")
+
+    def test_absent_case_dates_leave_field_blank_not_filled(self):
+        # No move date on the case → the field must stay empty rather than be
+        # filled with a wrong or placeholder value on an accuracy-critical sheet.
+        cf = self._run([{"id": "arrival_date", "prefill_source": "case.arrival_date"}])
+        self.assertIsNone(self._row(cf, "arrival_date"))
