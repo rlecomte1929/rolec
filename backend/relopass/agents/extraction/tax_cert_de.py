@@ -38,10 +38,11 @@ logger = logging.getLogger(__name__)
 
 
 TAX_CERT_DE_AGENT_NAME = "tax_cert_de"
-# rce.document_types has ONE 'TAX_CERT' code for all three locale agents, so the code
-# alone cannot pick between DE/FR/NO — the issuing country does. See
-# TAX_CERT_AGENTS_BY_ISSUING_COUNTRY in extraction/__init__.py.
-TAX_CERT_DE_DOCUMENT_TYPE = "TAX_CERT"
+# [AIQ-1774] Its own document-type code, not a shared "TAX_CERT". A German
+# Lohnsteuerbescheinigung, a French avis d'imposition and a Norwegian
+# skattemelding are genuinely different documents, so they get different codes and
+# the flat registry routes them — no runtime selector, no country signal needed.
+TAX_CERT_DE_DOCUMENT_TYPE = "TAX_CERT_DE"
 TAX_CERT_DE_ISSUING_COUNTRY = "DEU"  # ISO-3166-1 alpha-3
 _COUNTRY_ISO3 = "DEU"
 

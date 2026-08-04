@@ -19,7 +19,9 @@ const SOURCE_LABEL_FALLBACK: Record<string, string> = {
   DIPLOMA_MASTER: 'Diploma (Master)',
   MARRIAGE_CERT: 'Marriage certificate',
   BIRTH_CERT: 'Birth certificate',
-  TAX_CERT: 'Tax certificate',
+  TAX_CERT_DE: 'Tax certificate (DE)',
+  TAX_CERT_FR: 'Tax certificate (FR)',
+  TAX_CERT_NO: 'Tax certificate (NO)',
   HOUSING_LEASE: 'Lease',
 };
 

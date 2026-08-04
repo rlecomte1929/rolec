@@ -75,7 +75,10 @@ def test_classify_maps_known_filenames():
         "geburtsurkunde.pdf": "BIRTH_CERT",
         "foster_care_order.pdf": "FOSTER_CARE_ORDER",
         "masters_diploma.pdf": "DIPLOMA",
-        "avis_imposition_2024.pdf": "TAX_CERT",
+        # [AIQ-1774] One code per locale — each routes to its own agent.
+        "avis_imposition_2024.pdf": "TAX_CERT_FR",
+        "lohnsteuerbescheinigung_2024.pdf": "TAX_CERT_DE",
+        "skattemelding_2024.pdf": "TAX_CERT_NO",
     }
     for name, expected in cases.items():
         assert classify_rce_document_type(name) == expected, name
@@ -84,6 +87,19 @@ def test_classify_maps_known_filenames():
 def test_classify_unknown_returns_none():
     assert classify_rce_document_type("random_scan_0042.pdf") is None
     assert classify_rce_document_type(None) is None
+
+
+def test_classify_ambiguous_tax_filename_refuses_to_guess():
+    """[AIQ-1774] A bare "tax" filename names no locale, and DE/FR/NO tax
+    certificates are genuinely different documents with different agents. Guessing
+    one would emit confidently wrong fields, so it stays unclassified (NULL
+    document_type_id) and the document goes to human review.
+
+    This is not a regression: "tax.pdf" previously classified as the bare TAX_CERT
+    code, which routed to no agent, so extraction was skipped then too.
+    """
+    assert classify_rce_document_type("tax_document_2024.pdf") is None
+    assert classify_rce_document_type("my_taxes.pdf") is None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

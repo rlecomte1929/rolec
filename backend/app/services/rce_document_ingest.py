@@ -59,8 +59,18 @@ def classify_rce_document_type(file_name: Optional[str]) -> Optional[str]:
         return "FOSTER_CARE_ORDER"
     if "diploma" in name or "degree" in name or "diplom" in name:
         return "DIPLOMA"
-    if "tax" in name or "avis" in name or "lohnsteuer" in name or "skatte" in name:
-        return "TAX_CERT"
+    # [AIQ-1774] One code per locale. The three tax certificates are genuinely
+    # different documents with different agents, so the locale-specific tokens route
+    # to their own code and the bare, ambiguous "tax" routes nowhere — a wrong agent
+    # emits confidently wrong fields, which is worse than not extracting.
+    # ("tax" alone did previously return TAX_CERT, but that code resolved to no agent,
+    #  so extraction was skipped then too. No extraction is lost by returning None.)
+    if "lohnsteuer" in name or "steuerbescheid" in name:
+        return "TAX_CERT_DE"
+    if "avis" in name or "imposition" in name:
+        return "TAX_CERT_FR"
+    if "skatte" in name:
+        return "TAX_CERT_NO"
     if (
         "visa" in name
         or "permit" in name

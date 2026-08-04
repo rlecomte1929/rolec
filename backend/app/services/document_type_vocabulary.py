@@ -80,18 +80,30 @@ RUNTIME_WITHOUT_CLASSIFIER: Dict[str, str] = {
     "BIRTH_CERT": "outside the classifier's Cohort-1 subset; family documents are a later cohort.",
     "MARRIAGE_CERT": "outside Cohort-1 — see BIRTH_CERT.",
     "FOSTER_CARE_ORDER": "outside Cohort-1 — see BIRTH_CERT.",
-    # This is the AIQ-1774 blocker, recorded where it is discoverable.
-    "TAX_CERT": (
-        "outside Cohort-1, AND unresolved even if added: three country-specific agents "
-        "(TaxCertDe/Fr/No) sit behind this one code and no country signal reaches the "
-        "selection point. Recommended fix is to split this into TAX_CERT_DE/FR/NO so the "
-        "flat registry handles them with no selector — see AIQ-1774."
-    ),
+    # [AIQ-1774] The second half of this entry is now resolved; the first half is not.
+    # The split shipped: each locale has its own code and its own registry entry, so
+    # the selector problem is gone and all three agents are reachable. What remains is
+    # purely the Cohort-1 scope boundary — the classifier prompt declares tax
+    # certificates out of scope and its eval (prompts/docs/classifier/v1.eval.md, F10)
+    # asserts a DE Lohnsteuerbescheinigung must return UNKNOWN. Expanding it is a
+    # Cohort-2 scope change with its own eval, not part of the split.
+    #
+    # These are NOT unreachable in production: rce_document_ingest's filename
+    # heuristic produces all three today (lohnsteuer→DE, avis→FR, skatte→NO).
+    "TAX_CERT_DE": "outside Cohort-1; produced by the ingest filename heuristic (lohnsteuer/steuerbescheid), not the C1-04a classifier.",
+    "TAX_CERT_FR": "outside Cohort-1; produced by the ingest filename heuristic (avis/imposition), not the C1-04a classifier.",
+    "TAX_CERT_NO": "outside Cohort-1; produced by the ingest filename heuristic (skatte), not the C1-04a classifier.",
 }
 
-# The runtime codes seeded in rce.document_types (prod, 2026-08-04). Kept here so
-# the guard can compare without a live DB, and so drift in either direction shows
-# up as a test failure rather than a silent skip in production.
+# The runtime codes rce.document_types is seeded with by the repo's migrations. Kept
+# here so the guard can compare without a live DB, and so drift in either direction
+# shows up as a test failure rather than a silent skip in production.
+#
+# This is the REPO's declared state, which prod reaches only after the out-of-band
+# apply (CLAUDE.md — merging a migration PR does not create the rows). The three
+# TAX_CERT_* codes come from 20261019000000_rce_tax_cert_split_by_locale.sql and are
+# pending in prod until an operator applies it; the bare TAX_CERT they replace is
+# deleted by that same migration.
 RUNTIME_DOCUMENT_TYPES = frozenset(
     {
         "BIRTH_CERT",
@@ -100,7 +112,10 @@ RUNTIME_DOCUMENT_TYPES = frozenset(
         "ID_CARD",
         "MARRIAGE_CERT",
         "PASSPORT_TD3",
-        "TAX_CERT",
+        # [AIQ-1774] Replaced the bare TAX_CERT code, which routed to no agent.
+        "TAX_CERT_DE",
+        "TAX_CERT_FR",
+        "TAX_CERT_NO",
         "VISA_PERMIT",
     }
 )
