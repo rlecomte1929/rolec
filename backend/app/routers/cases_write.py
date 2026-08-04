@@ -69,6 +69,7 @@ from .cases import (
     FormFlagResponse,
     FormStatusPatchPayload,
     HouseholdPayload,
+    RegisterPrefilledPayload,
     _MessageBody,
     _QuoteRequestBody,
     _build_cover_page,
@@ -1044,6 +1045,151 @@ async def upload_form_document(
     except Exception:
         logger.exception("form_doc upload: db insert failed form_id=%s", form_id)
         raise HTTPException(status_code=500, detail="Failed to record uploaded document")
+
+    return FormDocumentItem(
+        id=str(row["id"]),
+        case_form_id=str(row["case_form_id"]),
+        case_id=str(row["case_id"]),
+        file_name=str(row["file_name"]),
+        content_type=row.get("content_type"),
+        size_bytes=(int(row["size_bytes"]) if row.get("size_bytes") is not None else None),
+        uploaded_by=(str(row["uploaded_by"]) if row.get("uploaded_by") else None),
+        doc_key=(str(row["doc_key"]) if row.get("doc_key") else None),
+        created_at=str(row["created_at"]),
+        download_url=None,
+    )
+
+
+@router.post(
+    "/{case_id}/forms/{form_id}/register-prefilled",
+    response_model=FormDocumentItem,
+    status_code=201,
+)
+def register_prefilled_document(
+    case_id: str,
+    form_id: str,
+    payload: RegisterPrefilledPayload,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> FormDocumentItem:
+    """
+    [AIQ-1758] Register a reviewed prefilled data-sheet as a durable case artifact.
+
+    Closes the auto-fill loop: once the employee/HR has reviewed what the prefill
+    engine produced, the result stops being transient field values and becomes a
+    versioned document on the case, with an audit trail and a lifecycle advance.
+
+    Three effects, in one transaction where it matters:
+      1. a ``case_form_documents`` row with ``doc_kind='prefilled'`` and the
+         ``fill_report`` snapshot,
+      2. an ``audit_logs`` entry using the established prefill convention
+         (``entity_type='case_form'``, semantic event in ``new_value``) — see
+         ``prefill_engine._insert_prefill_audit``,
+      3. the form advances to ``ready`` via the SAME required-field validation the
+         status endpoint applies, so this cannot be used to bypass it.
+
+    Storage note: unlike the upload endpoint there is no client file — the
+    artifact is the reviewed field set. We record a deterministic
+    ``storage_path`` for the rendered PDF; rendering it is the PDF-generation
+    path's job (``TODO [AIQ-1759]``), so the row is the durable record and the
+    binary can be produced later without changing this contract.
+    """
+    _assert_case_access(user, case_id)
+
+    actor_id = user.get("id") or user.get("sub")
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+    file_name = _safe_filename(payload.file_name or f"prefilled-data-sheet-{ts}.pdf")
+    # Versioned by timestamp so re-registering never overwrites the prior artifact.
+    storage_path = f"case-forms/{form_id}/prefilled/{ts}_{file_name}"
+
+    try:
+        with main_db.engine.begin() as conn:
+            form_row = _load_form_with_template(conn, case_id, form_id)
+            if not form_row:
+                raise HTTPException(status_code=404, detail="Form not found")
+
+            if payload.advance_status:
+                raw_fields = form_row.get("template_fields") or []
+                if isinstance(raw_fields, str):
+                    try:
+                        raw_fields = json.loads(raw_fields)
+                    except (json.JSONDecodeError, TypeError):
+                        raw_fields = []
+
+                # Same gate as PATCH /status {status:'ready'} — registering a
+                # reviewed sheet must not be a back door around required fields.
+                required_ids = [f["id"] for f in raw_fields if f.get("required")]
+                if required_ids:
+                    in_placeholders = ", ".join(f":fid{i}" for i in range(len(required_ids)))
+                    ready_params: Dict[str, Any] = {"form_id": form_id}
+                    ready_params.update({f"fid{i}": fid for i, fid in enumerate(required_ids)})
+                    filled_rows = conn.execute(
+                        _sql_text(
+                            f"SELECT field_id FROM {_pg_table('case_form_field_values')} "
+                            f"WHERE case_form_id=:form_id AND field_id IN ({in_placeholders}) "
+                            f"AND value IS NOT NULL AND value <> ''"
+                        ),
+                        ready_params,
+                    ).mappings().all()
+                    filled_ids = {str(r["field_id"]) for r in filled_rows}
+                    missing = [fid for fid in required_ids if fid not in filled_ids]
+                    if missing:
+                        raise HTTPException(
+                            status_code=422,
+                            detail={"error": "Missing required fields", "missing_fields": missing},
+                        )
+
+                conn.execute(
+                    _sql_text(
+                        f"UPDATE {_pg_table('case_forms')} SET status='ready', "
+                        f"updated_at={_sql_now()} WHERE id=:form_id"
+                    ),
+                    {"form_id": form_id},
+                )
+
+            row = conn.execute(
+                _sql_text(
+                    f"INSERT INTO {_pg_table('case_form_documents')} "
+                    f"(case_form_id, case_id, file_name, storage_path, content_type, "
+                    f" uploaded_by, doc_kind, fill_report) "
+                    f"VALUES (:fid, :cid, :name, :path, :ctype, :uid, 'prefilled', :report) "
+                    f"RETURNING id, case_form_id, case_id, file_name, content_type, "
+                    f"          size_bytes, uploaded_by, doc_key, created_at"
+                ),
+                {
+                    "fid": form_id, "cid": case_id, "name": file_name,
+                    "path": storage_path, "ctype": "application/pdf",
+                    "uid": actor_id,
+                    "report": json.dumps(payload.fill_report or {}),
+                },
+            ).mappings().first()
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("register_prefilled: failed case_id=%s form_id=%s", case_id, form_id)
+        raise HTTPException(status_code=500, detail="Failed to register prefilled document")
+
+    # Audit is best-effort and OUTSIDE the transaction, matching
+    # prefill_engine._insert_prefill_audit: an audit failure must never roll back
+    # or 500 the registration it is describing.
+    try:
+        with main_db.engine.begin() as conn:
+            insert_audit_log(
+                conn,
+                entity_type="case_form",
+                entity_id=form_id,
+                action_type=ACTION_INSERT,
+                actor_type=ACTOR_HUMAN,
+                new_value={
+                    "event": "prefill",
+                    "form_id": form_id,
+                    "document_id": str(row["id"]),
+                    "doc_kind": "prefilled",
+                    "storage_path": storage_path,
+                    "status_advanced": bool(payload.advance_status),
+                },
+            )
+    except Exception:
+        logger.exception("register_prefilled: audit write failed form_id=%s", form_id)
 
     return FormDocumentItem(
         id=str(row["id"]),
