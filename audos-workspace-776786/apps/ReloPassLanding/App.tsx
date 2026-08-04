@@ -1,11 +1,17 @@
 /**
  * ReloPass FR→NO Landing + Waitlist
  * ---------------------------------
- * Standalone marketing + lead-capture page for the France → Norway corridor.
+ * Standalone marketing + registration page for the France → Norway corridor.
  * THIN CAPTURE LAYER ONLY:
- *   - Leads are stored ONLY in the Audos workspace contacts (CRM) via the
- *     platform contact endpoint (POST /api/space/{spaceId}/register), tagged
- *     with source "fr-no-landing".
+ *   - The form performs a real Audos space registration + email OTP
+ *     verification so each verified email becomes a counted unique signed-in
+ *     user on the platform:
+ *       1. POST /api/space/{spaceId}/register  → workspaceSessionId
+ *       2. POST /api/auth/otp/space/send       (transactional OTP email only)
+ *       3. POST /api/auth/otp/space/verify
+ *     Company/role are OPTIONAL and stored on the CRM contact when provided,
+ *     tagged with source "fr-no-landing". After verification the visitor gets
+ *     a plain link to https://relopass.com/test-drive — no PII in the URL.
  *   - The €150 refundable deposit uses the built-in Audos Stripe integration
  *     (POST /api/payments/checkout).
  *   - NO external/production database connections. NO Supabase. NO
@@ -126,13 +132,17 @@ function redirectToCheckout(checkoutUrl: string) {
 export default function ReloPassLanding() {
   const formRef = useRef<HTMLDivElement>(null);
 
-  // Lead form state
+  // Lead form / OTP verification state
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
   const [role, setRole] = useState('');
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [gateStep, setGateStep] = useState<'email' | 'code' | 'verified'>('email');
+  const [workspaceSessionId, setWorkspaceSessionId] = useState<string | null>(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [verifying, setVerifying] = useState(false);
 
   // Deposit state
   const [depositLoading, setDepositLoading] = useState<OfferVariant | null>(null);
@@ -172,6 +182,8 @@ export default function ReloPassLanding() {
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // Step 1 — register a real Audos space session (stores the CRM contact,
+  // with company/role when provided), then send the transactional OTP code.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
@@ -184,43 +196,96 @@ export default function ReloPassLanding() {
       setFormError('Please enter a valid work email address.');
       return;
     }
-    if (!trimmedCompany) {
-      setFormError('Please enter your company name.');
-      return;
-    }
-    if (!trimmedRole) {
-      setFormError('Please enter your role.');
-      return;
-    }
 
     setSubmitting(true);
     try {
-      // Store the lead ONLY in Audos workspace contacts (built-in CRM).
       const res = await fetch(`/api/space/${SPACE_ID}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: trimmedEmail,
           workspaceId: WORKSPACE_ID,
+          visitorId: crypto.randomUUID(),
           attribution: { source: SOURCE_TAG },
           metadata: {
-            company: trimmedCompany,
-            role: trimmedRole,
             source: SOURCE_TAG, // hidden tracking field
+            ...(trimmedCompany ? { company: trimmedCompany } : {}),
+            ...(trimmedRole ? { role: trimmedRole } : {}),
           },
         }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) {
+      if (!res.ok || !data?.success || !data?.workspaceSessionId) {
         throw new Error(data?.error || 'Something went wrong. Please try again.');
       }
       if (data.contactId) void tagContact(data.contactId);
       track('lead_captured', { company: trimmedCompany });
-      setSubmitted(true);
+      setWorkspaceSessionId(data.workspaceSessionId);
+
+      // The ONLY outbound email in this flow: the transactional OTP code.
+      const otpRes = await fetch('/api/auth/otp/space/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: trimmedEmail,
+          workspaceId: WORKSPACE_ID,
+          sessionUuid: data.workspaceSessionId,
+        }),
+      });
+      const otpData = await otpRes.json().catch(() => null);
+      if (!otpRes.ok || otpData?.success === false) {
+        throw new Error(otpData?.error || 'Could not send the verification code. Please try again.');
+      }
+
+      setOtpCode('');
+      setOtpError('');
+      setGateStep('code');
     } catch (err: any) {
       setFormError(err?.message || 'Something went wrong. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Step 2 — verify the 4-digit code against the registered session.
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOtpError('');
+
+    const trimmedCode = otpCode.trim();
+    if (!/^\d{4}$/.test(trimmedCode)) {
+      setOtpError('Please enter the 4-digit code from your inbox.');
+      return;
+    }
+    if (!workspaceSessionId) {
+      setOtpError('Your session expired — please re-enter your email.');
+      setGateStep('email');
+      return;
+    }
+
+    setVerifying(true);
+    try {
+      const res = await fetch('/api/auth/otp/space/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          code: trimmedCode,
+          workspaceId: WORKSPACE_ID,
+          sessionUuid: workspaceSessionId,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.verified) {
+        track('email_verified');
+        setGateStep('verified');
+      } else {
+        setOtpError("That code didn't match — please try again.");
+      }
+    } catch {
+      setOtpError("That code didn't match — please try again.");
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -425,14 +490,74 @@ export default function ReloPassLanding() {
             Tell us who you are — we'll reach out to set up your FR→NO pilot.
           </p>
 
-          {submitted ? (
+          {gateStep === 'verified' ? (
+            /* ── Step 3: verified ───────────────────────────────── */
             <div className="px-5 py-6 rounded-2xl border border-green-500/40 bg-green-500/10 text-center">
               <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
-              <p className="text-sm font-semibold text-green-300">
-                Thanks — we'll be in touch within 24 hours.
-              </p>
+              <p className="text-sm font-semibold text-green-300 mb-4">✓ You're verified.</p>
+              <a
+                href="https://relopass.com/test-drive"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[var(--space-brand-primary)] text-[var(--space-text-on-primary)] text-sm font-semibold hover:brightness-110 transition-all"
+              >
+                Continue to your test drive <ArrowRight className="w-4 h-4" />
+              </a>
             </div>
+          ) : gateStep === 'code' ? (
+            /* ── Step 2: OTP entry ──────────────────────────────── */
+            <form onSubmit={handleVerifyOtp} className="space-y-4" noValidate>
+              <div className="px-4 py-3 rounded-xl border border-[var(--space-border-strong)] bg-[var(--space-surface-panel)]">
+                <p className="text-xs text-[var(--space-text-secondary)]">
+                  We've emailed you a 4-digit code — check your inbox.
+                </p>
+                <p className="text-[11px] text-[var(--space-text-muted)] mt-1">
+                  Sent to {email.trim().toLowerCase()}
+                </p>
+              </div>
+              <div>
+                <label htmlFor="frno-otp" className="block text-xs font-semibold text-[var(--space-text-secondary)] mb-1.5">
+                  4-digit code <span className="text-red-400">*</span>
+                </label>
+                <input
+                  id="frno-otp"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  autoComplete="one-time-code"
+                  required
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="••••"
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--space-border-default)] bg-[var(--space-surface-card)] text-base tracking-[0.5em] text-center text-[var(--space-text-primary)] placeholder:text-[var(--space-text-muted)] outline-none focus:ring-2 focus:ring-[var(--space-brand-primary)] focus:border-transparent transition-all"
+                />
+              </div>
+
+              {otpError && (
+                <div className="px-3.5 py-2.5 rounded-xl border border-red-500/40 bg-red-500/10 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-300">{otpError}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={verifying}
+                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-[var(--space-brand-primary)] text-[var(--space-text-on-primary)] text-sm font-semibold hover:brightness-110 transition-all disabled:opacity-60"
+              >
+                {verifying ? 'Verifying…' : (<>Verify <ArrowRight className="w-4 h-4" /></>)}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setGateStep('email'); setOtpCode(''); setOtpError(''); }}
+                className="w-full text-[11px] text-[var(--space-text-muted)] hover:text-[var(--space-text-secondary)] transition-colors"
+              >
+                Use a different email
+              </button>
+            </form>
           ) : (
+            /* ── Step 1: email entry ────────────────────────────── */
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div>
                 <label htmlFor="frno-email" className="block text-xs font-semibold text-[var(--space-text-secondary)] mb-1.5">
@@ -450,12 +575,11 @@ export default function ReloPassLanding() {
               </div>
               <div>
                 <label htmlFor="frno-company" className="block text-xs font-semibold text-[var(--space-text-secondary)] mb-1.5">
-                  Company name <span className="text-red-400">*</span>
+                  Company name <span className="text-[var(--space-text-muted)] font-normal">(optional)</span>
                 </label>
                 <input
                   id="frno-company"
                   type="text"
-                  required
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                   placeholder="Your company"
@@ -464,12 +588,11 @@ export default function ReloPassLanding() {
               </div>
               <div>
                 <label htmlFor="frno-role" className="block text-xs font-semibold text-[var(--space-text-secondary)] mb-1.5">
-                  Your role <span className="text-red-400">*</span>
+                  Your role <span className="text-[var(--space-text-muted)] font-normal">(optional)</span>
                 </label>
                 <input
                   id="frno-role"
                   type="text"
-                  required
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   placeholder="e.g. HR Manager, Office Manager"
