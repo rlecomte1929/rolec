@@ -49,7 +49,8 @@ CREATE TABLE form_templates (
   authority_code TEXT, authority_name TEXT, category TEXT,
   version TEXT NOT NULL DEFAULT '1.0.0', fields TEXT NOT NULL DEFAULT '[]',
   trigger_rules TEXT NOT NULL DEFAULT '[]', source_url TEXT,
-  verification_status TEXT DEFAULT 'representative'
+  verification_status TEXT DEFAULT 'representative',
+  source_language TEXT NOT NULL DEFAULT 'en'
 );
 CREATE TABLE roadmap_steps (id TEXT PRIMARY KEY, case_id TEXT, title TEXT, track_id TEXT);
 CREATE TABLE source_pages (url TEXT PRIMARY KEY, last_fetched_at TEXT, tier TEXT);

@@ -59,7 +59,8 @@ CREATE TABLE form_templates (
   id             TEXT PRIMARY KEY,
   code           TEXT NOT NULL,
   trigger_rules  TEXT NOT NULL DEFAULT '[]',
-  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  source_language TEXT NOT NULL DEFAULT 'en'
 );
 CREATE TABLE case_forms (
   id                TEXT PRIMARY KEY,

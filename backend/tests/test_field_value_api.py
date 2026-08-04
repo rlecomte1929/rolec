@@ -109,7 +109,8 @@ CREATE TABLE form_templates (
     country        TEXT NOT NULL DEFAULT 'NO',
     category       TEXT,
     version        TEXT NOT NULL DEFAULT '1.0.0',
-    fields         TEXT NOT NULL DEFAULT '[]'
+    fields         TEXT NOT NULL DEFAULT '[]',
+    source_language TEXT NOT NULL DEFAULT 'en'
 );
 CREATE TABLE case_forms (
     id               TEXT PRIMARY KEY,
