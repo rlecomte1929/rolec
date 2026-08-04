@@ -46,6 +46,11 @@ CREATE TABLE case_form_documents (
   case_form_id TEXT NOT NULL, case_id TEXT NOT NULL,
   file_name TEXT NOT NULL, storage_path TEXT NOT NULL,
   content_type TEXT, size_bytes INTEGER, uploaded_by TEXT, doc_key TEXT,
+  -- [AIQ-1758] doc_kind is SELECTed by cases_read.list_form_documents. Real
+  -- migration: 20261017000000 (with fill_report). Mirrored here because this
+  -- fixture hand-rolls the schema — omitting it fails with
+  -- "no such column: doc_kind" against the real handler.
+  doc_kind TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
