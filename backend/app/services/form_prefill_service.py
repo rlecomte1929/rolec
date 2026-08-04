@@ -46,6 +46,10 @@ SIGNED_URL_TTL_SECONDS = 3600
 STATUS_FILLED = "filled"
 STATUS_BLANK = "blank_missing_data"
 STATUS_WARNING = "warning"
+# The vault had a value but it did NOT land in the PDF — almost always because the mapping's
+# form_field_id doesn't match any AcroForm field name in the template. Reported honestly rather
+# than counted as filled; see reconcile_report_against_pdf.
+STATUS_NOT_IN_PDF = "not_in_pdf"
 
 
 @dataclass
@@ -99,7 +103,16 @@ class PrefilledPdfResult:
 
     @property
     def filled_count(self) -> int:
-        return sum(1 for f in self.field_fill_report if f.status != STATUS_BLANK)
+        # Only what genuinely reached the PDF. Was `!= STATUS_BLANK`, which counted a field
+        # whose name doesn't exist in the template as a success.
+        return sum(
+            1 for f in self.field_fill_report
+            if f.status in (STATUS_FILLED, STATUS_WARNING)
+        )
+
+    @property
+    def not_in_pdf_count(self) -> int:
+        return sum(1 for f in self.field_fill_report if f.status == STATUS_NOT_IN_PDF)
 
     @property
     def blank_count(self) -> int:
@@ -118,6 +131,8 @@ class PrefilledPdfResult:
             "filled_count": self.filled_count,
             "blank_count": self.blank_count,
             "warning_count": self.warning_count,
+            # Mapped fields whose name doesn't exist in the template, so nothing was written.
+            "not_in_pdf_count": self.not_in_pdf_count,
             "fields": [f.to_dict() for f in self.field_fill_report],
         }
 
@@ -245,11 +260,39 @@ def build_fill_plan(
 # AcroForm filling (pypdf)
 # ---------------------------------------------------------------------------
 
+class TemplateNotFillableError(RuntimeError):
+    """The template has no AcroForm, so nothing can be pre-filled into it.
+
+    Raised instead of returning the blank template. Previously a flattened or scanned PDF made
+    ``update_page_form_field_values`` raise per page into a bare ``except``, and the caller
+    received a byte-identical copy of the blank form together with a report claiming every field
+    was filled — an empty PDF served as a successful fill, with a working download link.
+    """
+
+
 def fill_acroform(template_bytes: bytes, field_values: Dict[str, str]) -> bytes:
-    """Fill the AcroForm fields of a PDF template and return the new PDF bytes."""
+    """Fill the AcroForm fields of a PDF template and return the new PDF bytes.
+
+    Raises TemplateNotFillableError when the template carries no AcroForm fields — see
+    docs/form-autofill/ACROFORM-FEASIBILITY-DE-FR.md, where 4 of 5 official French candidates
+    turned out to be flattened print forms.
+    """
     from pypdf import PdfReader, PdfWriter
 
     reader = PdfReader(io.BytesIO(template_bytes))
+
+    # Fail closed BEFORE writing anything: a template with no fields can never be filled, and
+    # silently returning it looks identical to success.
+    try:
+        template_fields = reader.get_fields() or {}
+    except Exception as exc:  # noqa: BLE001 — a malformed AcroForm is also "not fillable"
+        raise TemplateNotFillableError(f"template AcroForm unreadable: {exc}") from exc
+    if not template_fields:
+        raise TemplateNotFillableError(
+            "template has no AcroForm fields (flattened or scanned PDF) — it cannot be "
+            "pre-filled; nothing was written"
+        )
+
     writer = PdfWriter()
     writer.append(reader)
 
@@ -271,6 +314,58 @@ def fill_acroform(template_bytes: bytes, field_values: Dict[str, str]) -> bytes:
     out = io.BytesIO()
     writer.write(out)
     return out.getvalue()
+
+
+def reconcile_report_against_pdf(
+    pdf_bytes: bytes,
+    report: List["FieldFillStatus"],
+) -> "tuple[List[FieldFillStatus], int, int]":
+    """Re-read the written PDF and downgrade any field that didn't actually land.
+
+    ``build_fill_plan`` decides ``filled`` from the VAULT, before the PDF is opened, and
+    ``update_page_form_field_values`` drops unmatched field names without raising. So a mapping
+    whose ``form_field_id`` doesn't match the template produced a confident ``filled`` for a
+    field that is blank in the delivered document. This is the check that makes the report mean
+    what it says.
+
+    Returns (report, pdf_field_count, unmapped_pdf_field_count). Never raises: if the PDF can't
+    be re-read the report is returned untouched — a verification failure must not lose the fill.
+    """
+    from pypdf import PdfReader
+
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        pdf_fields = reader.get_fields() or {}
+    except Exception as exc:  # noqa: BLE001
+        log.warning("fill verification skipped — could not re-read output PDF: %s", exc)
+        return report, 0, 0
+
+    def _written(name: str) -> bool:
+        entry = pdf_fields.get(name)
+        if entry is None:
+            return False
+        v = entry.get("/V")
+        return v is not None and str(v).strip() != ""
+
+    mapped = set()
+    for item in report:
+        if item.status in (STATUS_FILLED, STATUS_WARNING):
+            mapped.add(item.form_field_id)
+            if not _written(item.form_field_id):
+                item.status = STATUS_NOT_IN_PDF
+                item.warning = (
+                    (item.warning + " | " if item.warning else "")
+                    + f"'{item.form_field_id}' is not a field in this template — value not written"
+                )
+
+    unmapped = len([n for n in pdf_fields if n not in mapped])
+    if any(i.status == STATUS_NOT_IN_PDF for i in report):
+        log.error(
+            "prefill: %d mapped field(s) did not land in the PDF — mapping names likely do not "
+            "match the template (%d of %d template fields unmapped)",
+            sum(1 for i in report if i.status == STATUS_NOT_IN_PDF), unmapped, len(pdf_fields),
+        )
+    return report, len(pdf_fields), unmapped
 
 
 # ---------------------------------------------------------------------------
@@ -401,6 +496,10 @@ def generate_prefilled_pdf(
 
     template_bytes = _download_template(form_id)
     pdf_bytes = fill_acroform(template_bytes, field_values)
+
+    # Verify against the DELIVERED document, not the plan. Without this the report reflects
+    # only what the vault held, so a name mismatch reads as a complete fill.
+    report, _pdf_field_count, _unmapped = reconcile_report_against_pdf(pdf_bytes, report)
 
     storage_path = _upload_output(case_id, form_id, pdf_bytes)
     download_url = _signed_url(storage_path)

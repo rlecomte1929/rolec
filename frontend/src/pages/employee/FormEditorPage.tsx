@@ -49,18 +49,45 @@ import { OriginalPdfDrawer } from '../../features/platform-v2/dossier/OriginalPd
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Template `section` values are machine keys (`d_number`, `skattekort`), which were being
+ *  rendered to the employee verbatim as headings. Named ones get the authority that issues
+ *  them, so the sheet reads as the sequence of appointments it actually is. */
+const SECTION_LABELS: Record<string, string> = {
+  d_number: 'D-number (Skatteetaten)',
+  skattekort: 'Tax card / skattekort (Skatteetaten)',
+  eea_registration: 'EEA registration (Politiet)',
+  folkeregister: 'National registry / folkeregister (Skatteetaten)',
+  a1: 'A1 social-security certificate',
+};
+
+/** `eea_registration` → `Eea registration`. The fallback for any section key we haven't
+ *  named, so a newly seeded corridor degrades to something readable instead of a raw key. */
+function humaniseSection(key: string): string {
+  const spaced = key.replace(/[_-]+/g, ' ').trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+export function sectionLabel(key: string): string {
+  if (key === 'Form fields') return key;
+  return SECTION_LABELS[key] ?? humaniseSection(key);
+}
+
 /** Group fields by their optional `section` property.
  *  Fields with no section fall into a single "Form fields" bucket. */
 function groupBySection(
   fields: FieldValueItem[],
-): Array<{ section: string; fields: FieldValueItem[] }> {
+): Array<{ section: string; label: string; fields: FieldValueItem[] }> {
   const map = new Map<string, FieldValueItem[]>();
   for (const f of fields) {
     const key = f.section?.trim() || 'Form fields';
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(f);
   }
-  return Array.from(map.entries()).map(([section, fields]) => ({ section, fields }));
+  return Array.from(map.entries()).map(([section, fields]) => ({
+    section,
+    label: sectionLabel(section),
+    fields,
+  }));
 }
 
 /** Compute local completion % from live values and field definitions. */
@@ -524,16 +551,21 @@ export const FormEditorPage: React.FC = () => {
               </div>
             </div>
           )}
-          <Alert variant="warning" className="mb-4">
-            Indicative — always confirm details with the issuing authority before you submit.
-            This form is representative and may differ from the latest official version.
-          </Alert>
+          {/* Driven by the template's content-maturity flag, like CaseFormCard. This used to
+              be hardcoded, so it kept asserting "representative" even for a form ops had
+              verified — which quietly drains the badge of meaning. */}
+          {formSummary?.template?.verification_status !== 'verified' && (
+            <Alert variant="warning" className="mb-4">
+              Indicative — always confirm details with the issuing authority before you submit.
+              This form is representative and may differ from the latest official version.
+            </Alert>
+          )}
           {sections.length === 0 ? (
             <div className="py-12 text-center text-slate-500 text-sm">
               No fields defined for this form yet.
             </div>
           ) : (
-            sections.map(({ section, fields: sectionFields }) => {
+            sections.map(({ section, label: sectionHeading, fields: sectionFields }) => {
               const aiFieldsInSection = sectionFields.filter(
                 (f) => f.filled_by === 'ai' && !f.reviewed,
               );
@@ -545,7 +577,7 @@ export const FormEditorPage: React.FC = () => {
                   {/* Section header */}
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase">
-                      {section}
+                      {sectionHeading}
                     </h2>
                     {aiFieldsInSection.length > 0 && (
                       <Button unstyled

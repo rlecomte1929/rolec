@@ -46,6 +46,12 @@ export interface FieldValueItem {
   overridden: boolean;
   /** Optional section label — not present in all form templates */
   section?: string | null;
+  /** Short guidance seeded on the template field — deadlines, "bring the original",
+   *  and the output-vs-input warnings. Rendered under the input. */
+  note?: string | null;
+  /** The authority portal this step is actually completed in (Skatteetaten, UDI,
+   *  politiet). Rendered as a link so the employee can go straight there. */
+  portal_url?: string | null;
 }
 
 export interface FieldUpsertInput {
