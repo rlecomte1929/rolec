@@ -106,9 +106,13 @@ def ingest_rce_document(
 ) -> Optional[str]:
     """Insert one rce.documents row (idempotent on (case_id, sha256)).
 
-    Returns the document_id (existing or new), or None if the row already existed
-    (ON CONFLICT) — callers that need the id can re-select. Caller supplies an open
-    Connection so this can run inside a transaction.
+    Returns the document_id — existing OR new. ``ON CONFLICT DO NOTHING`` returns no row,
+    so a re-upload of identical bytes used to yield None even though a perfectly good
+    rce.documents row existed; the caller then read that as "not bridged" and never kicked
+    the extraction pipeline, making re-upload a silent no-op. We re-select on conflict so
+    the contract in this docstring is actually true.
+
+    Caller supplies an open Connection so this can run inside a transaction.
     """
     document_type_id = _document_type_id(conn, document_type_code)
     row = conn.execute(
@@ -134,7 +138,18 @@ def ingest_rce_document(
             "uploaded_by": _as_uuid_or_none(uploaded_by),
         },
     ).first()
-    return str(row[0]) if row else None
+    if row:
+        return str(row[0])
+    # Conflict → the row already exists for this (case_id, sha256). Return the existing id
+    # so a re-upload still reaches the extraction pipeline instead of silently doing nothing.
+    existing = conn.execute(
+        text(
+            "SELECT document_id FROM rce.documents "
+            "WHERE case_id = CAST(:case_id AS UUID) AND sha256 = :sha256"
+        ),
+        {"case_id": case_id, "sha256": sha256},
+    ).first()
+    return str(existing[0]) if existing else None
 
 
 def bridge_case_document_to_rce(
