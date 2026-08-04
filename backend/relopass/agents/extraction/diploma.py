@@ -44,6 +44,9 @@ logger = logging.getLogger(__name__)
 
 
 DIPLOMA_AGENT_NAME = "diploma"
+# Matches rce.document_types.code. Its absence is why this agent was built but never
+# routed — see EXTRACTION_AGENT_REGISTRY and test_extraction_agent_wiring.py.
+DIPLOMA_DOCUMENT_TYPE = "DIPLOMA"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

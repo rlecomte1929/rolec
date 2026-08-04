@@ -44,6 +44,10 @@ logger = logging.getLogger(__name__)
 
 
 TAX_CERT_NO_AGENT_NAME = "tax_cert_no"
+# One 'TAX_CERT' code, three locale agents — the issuing country discriminates.
+# See TAX_CERT_AGENTS_BY_ISSUING_COUNTRY in extraction/__init__.py.
+TAX_CERT_NO_DOCUMENT_TYPE = "TAX_CERT"
+TAX_CERT_NO_ISSUING_COUNTRY = "NOR"  # ISO-3166-1 alpha-3
 _COUNTRY_ISO3 = "NOR"
 
 
