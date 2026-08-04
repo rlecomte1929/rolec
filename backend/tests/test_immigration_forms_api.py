@@ -78,23 +78,39 @@ class AvailableFormsTest(unittest.TestCase):
         mock_forms.assert_called_once_with("DE", "blue_card")
 
     def test_corridor_derived_from_case_when_omitted(self) -> None:
-        """No corridor_to → derive dest_country from the case details."""
+        """No corridor_to → derive dest_country from the case details.
+
+        [AIQ-1771] Updated: NO has no mapped forms, so the router now short-circuits
+        to an empty list WITHOUT calling get_available_forms. Previously it queried
+        NO+blue_card — a combination that cannot exist — and got an empty result by
+        accident rather than by design. Norway is a portal/data-sheet corridor
+        (FINDINGS.md Appendix A.1); no fillable form is the correct answer.
+        """
         with patch(f"{_FORMS_MOD}.get_available_forms", return_value=[]) as mock_forms, \
+                patch(f"{_FORMS_MOD}.visa_types_for_corridor", return_value=[]), \
                 patch(f"{_FORMS_MOD}._get_case_details",
                       return_value={"dest_country": "NO"}) as mock_case:
             resp = self.client.get("/api/hr/cases/case-a/immigration/available-forms")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["corridor_to"], "NO")
+        self.assertEqual(resp.json()["forms"], [])
         mock_case.assert_called_once()
-        mock_forms.assert_called_once_with("NO", "blue_card")
+        mock_forms.assert_not_called()
 
-    def test_corridor_falls_back_to_DE_when_case_missing(self) -> None:
-        """No corridor_to and no case → safe DE default (matches router contract)."""
-        with patch(f"{_FORMS_MOD}.get_available_forms", return_value=[]), \
+    def test_missing_case_422s_instead_of_defaulting_to_DE(self) -> None:
+        """[AIQ-1771] REPLACES test_corridor_falls_back_to_DE_when_case_missing.
+
+        That test asserted `corridor_to == "DE"` and called it a "safe DE default".
+        It was not safe: a case with no resolvable destination was offered the
+        GERMAN Blue Card form, presented as the right one. Silently answering a
+        question you cannot answer is the defect, so the contract is now fail-closed.
+        """
+        with patch(f"{_FORMS_MOD}.get_available_forms", return_value=[]) as mock_forms, \
                 patch(f"{_FORMS_MOD}._get_case_details", return_value=None):
             resp = self.client.get("/api/hr/cases/case-a/immigration/available-forms")
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["corridor_to"], "DE")
+        self.assertEqual(resp.status_code, 422)
+        self.assertIn("destination corridor", resp.json()["detail"])
+        mock_forms.assert_not_called()
 
 
 class EmployeeInterviewStatusTest(unittest.TestCase):

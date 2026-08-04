@@ -24,6 +24,7 @@ from ...database import db
 from ..services.form_prefill_service import (
     generate_prefilled_pdf,
     get_available_forms,
+    visa_types_for_corridor,
 )
 from ..services.immigration_service import (
     _get_case_details,
@@ -63,15 +64,59 @@ def _decrypt_passport(profile: Dict[str, Any]) -> Dict[str, Any]:
 @router.get("/hr/cases/{case_id}/immigration/available-forms")
 def list_available_forms(
     case_id: str,
-    visa_type: str = "blue_card",
+    visa_type: Optional[str] = None,
     corridor_to: Optional[str] = None,
     hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
     org_id: str = Depends(get_org_id_for_hr_user),
 ) -> Dict[str, Any]:
-    """Forms available for pre-fill for this case's corridor/visa combination."""
+    """Forms available for pre-fill for this case's corridor/visa combination.
+
+    [AIQ-1771] Both inputs are resolved from the case, never defaulted. The
+    previous signature defaulted `visa_type="blue_card"` and fell back to
+    `corridor_to="DE"`, which produced two distinct wrong answers:
+
+      * a FR case queried FR+blue_card, matched nothing, and showed NO forms —
+        the feature simply looked absent;
+      * a case with no `dest_country` became a German case and was offered the
+        Blue Card — a wrong form presented as correct.
+
+    Now: no corridor -> 422 rather than a guess; visa type derived from what the
+    corridor actually has. A corridor with no fillable forms returns an empty
+    list, which is the right answer for portal/data-sheet corridors like Norway
+    (FINDINGS.md Appendix A.1) rather than an error.
+    """
     if not corridor_to:
         case = _get_case_details(case_id, org_id)
-        corridor_to = (case.get("dest_country") if case else None) or "DE"
+        corridor_to = (case.get("dest_country") if case else None) or None
+
+    if not corridor_to:
+        # Fail closed. Guessing here is what offered a German form to a case with
+        # no destination at all.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Cannot determine the destination corridor for this case. "
+                "Set the case's destination country, or pass ?corridor_to=XX."
+            ),
+        )
+
+    if not visa_type:
+        candidates = visa_types_for_corridor(corridor_to)
+        if len(candidates) == 1:
+            visa_type = candidates[0]
+        elif len(candidates) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Corridor {corridor_to} has more than one visa type with "
+                    f"mapped forms ({', '.join(candidates)}); pass ?visa_type= "
+                    "to choose."
+                ),
+            )
+        else:
+            # No fillable forms for this corridor — correct for data-sheet
+            # corridors. Echo the corridor so the caller can say so plainly.
+            return {"corridor_to": corridor_to, "visa_type": None, "forms": []}
 
     forms = get_available_forms(corridor_to, visa_type)
     return {

@@ -277,6 +277,35 @@ def fill_acroform(template_bytes: bytes, field_values: Dict[str, str]) -> bytes:
 # DB access
 # ---------------------------------------------------------------------------
 
+def visa_types_for_corridor(corridor_to: str) -> List[str]:
+    """Visa types that actually have mapped forms for this corridor.
+
+    [AIQ-1771] The catalogue is data, not a constant: prod carries
+    ``DE/blue_card`` and ``FR/long_stay``, so the visa type is corridor-specific
+    and cannot be defaulted. Callers use this to resolve the visa type instead of
+    assuming one:
+
+      * exactly one  -> use it
+      * none         -> this corridor has no fillable form (e.g. Norway, which is
+                        a portal/data-sheet corridor) — an empty form list is the
+                        correct answer, not an error
+      * more than one -> genuinely ambiguous; the caller must specify
+
+    Sorted for deterministic behaviour when a corridor grows a second type.
+    """
+    with db.engine.begin() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT DISTINCT visa_type
+                FROM public.form_field_mappings
+                WHERE corridor_to = :corridor_to
+                ORDER BY visa_type
+            """),
+            {"corridor_to": corridor_to},
+        ).mappings().all()
+    return [r["visa_type"] for r in rows]
+
+
 def get_available_forms(corridor_to: str, visa_type: str) -> List[FormDefinition]:
     """Forms with at least one field mapping for this corridor/visa combination."""
     with db.engine.begin() as conn:
