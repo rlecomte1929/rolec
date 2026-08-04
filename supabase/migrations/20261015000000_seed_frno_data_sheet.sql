@@ -75,11 +75,36 @@ VALUES (
     {"id":"a1_determination","section":"a1","label":"A1 / social-security coordination determination (A1 issued by France, URSSAF)","label_nb":"A1-/trygdekoordinering (A1 utstedes av Frankrike, URSSAF)","type":"text","required":false,"consult_professional":true,"requires_original":false,"position":17,"portal_url":"https://www.cleiss.fr/particuliers/venir/travailler/detachement/ue883.html","note":"The A1 is issued by FRANCE (URSSAF), not by Norway. EU coordination rules apply to Norway via the EEA Agreement, so a genuinely posted French worker can remain in the French system and be exempt from Norwegian contributions. Standard posting limit is 24 months (Art. 12, Reg. 883/2004); an Art. 16 exception agreement between France and Norway can extend it — confirm the exact ceiling with URSSAF/CLEISS before relying on a figure. Without a posting, an EU/EEA citizen working in Norway joins the Norwegian National Insurance Scheme from the first day of work."},
     {"id":"contract_classification","section":"a1","label":"Contract classification (posting/secondment vs local hire)","label_nb":"Kontraktsklassifisering (utsending vs lokal ansettelse)","type":"text","required":false,"consult_professional":true,"requires_original":false,"position":18,"note":"This determination gates the A1: it covers only a GENUINE posting, where the French employer sends the worker abroad to keep working for them. A French national hired locally in Norway is not posted and pays folketrygden."}
   ]'::jsonb,
+  -- Condition keys MUST exist in the dict trigger_engine._build_context returns:
+  --   case_uuid, employee_id, destination_country, origin_country, visa_type,
+  --   has_spouse, has_children
+  -- _matches_conditions fails CLOSED on anything else (`context.get(key) is None
+  -- -> return False`), so an invented key silently makes the template
+  -- unattachable rather than raising. This rule originally required
+  -- `movement_basis: eea_free_movement`, which is not a context key — the
+  -- data-sheet could never reach a case. `visa_type` is the real key, and
+  -- _build_context sets it to 'eea_registration' exactly when origin and
+  -- destination are both EEA, which is the FR->NO case. Same vocabulary the
+  -- already-firing POL-EEA-REG rule uses; origin_country narrows it to FR.
   '[
-    {"event":"roadmap.destination_confirmed","conditions":{"destination_country":"NO","origin_country":"FR","movement_basis":"eea_free_movement"},"for_persons":["employee"],"blocked_by_template_code":null,"priority":100}
+    {"event":"roadmap.destination_confirmed","conditions":{"destination_country":"NO","origin_country":"FR","visa_type":"eea_registration"},"for_persons":["employee"],"blocked_by_template_code":null,"priority":100}
   ]'::jsonb
 )
 ON CONFLICT (code, version) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- Re-runs: ON CONFLICT DO NOTHING above leaves an already-seeded row untouched,
+-- so a corrected trigger rule would never reach a database that has the old one.
+-- Set it explicitly. Idempotent, and a no-op on a fresh insert.
+-- ---------------------------------------------------------------------------
+UPDATE public.form_templates
+   SET trigger_rules = '[
+    {"event":"roadmap.destination_confirmed","conditions":{"destination_country":"NO","origin_country":"FR","visa_type":"eea_registration"},"for_persons":["employee"],"blocked_by_template_code":null,"priority":100}
+  ]'::jsonb
+ WHERE code = 'RP-NO-DATASHEET' AND version = '1.0.0'
+   AND trigger_rules::text <> '[
+    {"event":"roadmap.destination_confirmed","conditions":{"destination_country":"NO","origin_country":"FR","visa_type":"eea_registration"},"for_persons":["employee"],"blocked_by_template_code":null,"priority":100}
+  ]'::jsonb::text;
 
 -- ---------------------------------------------------------------------------
 -- Set the template language to Norwegian so the dossier EN/NO toggle appears.
