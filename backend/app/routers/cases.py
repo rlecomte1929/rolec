@@ -983,6 +983,19 @@ class FormStatusPatchPayload(BaseModel):
     rejection_reason: Optional[str] = None  # [P4-5] stored on case_forms when status='rejected'
 
 
+class RegisterPrefilledPayload(BaseModel):
+    """[AIQ-1758] Body for registering a reviewed prefilled data-sheet."""
+
+    # Snapshot of what the prefill engine produced and what the human changed.
+    # Stored verbatim on the document row so the artifact stays self-describing
+    # even if the underlying field values are edited afterwards.
+    fill_report: Optional[Dict[str, Any]] = None
+    file_name: Optional[str] = None
+    # False registers the artifact without moving the form's lifecycle — e.g.
+    # re-registering a corrected version of an already-'ready' form.
+    advance_status: bool = True
+
+
 def _load_form_with_template(
     conn: Any,
     case_id: str,
