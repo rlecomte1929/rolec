@@ -147,11 +147,13 @@ def list_pets(
     case_id: str,
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> List[PetDTO]:
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] pets.case_id holds the canonical case id; this route's {case_id}
+    # may be an assignment id. Key on the resolved value, not the path param.
+    resolved_case_id = _assert_case_access(user, case_id)
     sql = f"SELECT {_PET_COLUMNS} FROM {_pg_table('pets')} WHERE case_id = :case_id ORDER BY created_at ASC"
     try:
         with main_db.engine.connect() as conn:
-            rows = conn.execute(_sql_text(sql), {"case_id": case_id}).mappings().all()
+            rows = conn.execute(_sql_text(sql), {"case_id": resolved_case_id}).mappings().all()
     except Exception:
         logger.exception("pets: list failed case_id=%s", case_id)
         raise HTTPException(status_code=500, detail="Failed to list pets")
@@ -164,7 +166,11 @@ def create_pet(
     payload: PetCreate,
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> PetDTO:
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] Must resolve on the WRITE path too. The guard's regex only sees
+    # `case_id = :bind` predicates, so this INSERT was never flagged — but storing
+    # the raw assignment id here would make the row invisible to list_pets, which
+    # now reads by the canonical id.
+    resolved_case_id = _assert_case_access(user, case_id)
     if not payload.species or not payload.species.strip():
         raise HTTPException(status_code=400, detail="species is required")
 
@@ -180,7 +186,7 @@ def create_pet(
         f") RETURNING {_PET_COLUMNS}"
     )
     params = {
-        "case_id": case_id,
+        "case_id": resolved_case_id,
         "name": payload.name,
         "species": payload.species,
         "breed": payload.breed,
@@ -224,14 +230,15 @@ def update_pet(
     payload: PetPatch,
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> PetDTO:
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] see list_pets — key on the resolved canonical case id.
+    resolved_case_id = _assert_case_access(user, case_id)
     fields = payload.model_dump(exclude_unset=True)
     if not fields:
         # Nothing to update — return current row instead of running an empty UPDATE
-        return _fetch_pet_or_404(case_id, pet_id)
+        return _fetch_pet_or_404(resolved_case_id, pet_id)
 
     set_parts: List[str] = []
-    params: Dict[str, Any] = {"case_id": case_id, "pet_id": pet_id}
+    params: Dict[str, Any] = {"case_id": resolved_case_id, "pet_id": pet_id}
     for key, value in fields.items():
         if key == "vaccinations":
             set_parts.append("vaccinations = :vaccinations")
@@ -279,11 +286,12 @@ def delete_pet(
     pet_id: str,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] see list_pets — key on the resolved canonical case id.
+    resolved_case_id = _assert_case_access(user, case_id)
     sql = f"DELETE FROM {_pg_table('pets')} WHERE id = :pet_id AND case_id = :case_id"
     try:
         with main_db.engine.begin() as conn:
-            result = conn.execute(_sql_text(sql), {"pet_id": pet_id, "case_id": case_id})
+            result = conn.execute(_sql_text(sql), {"pet_id": pet_id, "case_id": resolved_case_id})
             rowcount = result.rowcount or 0
             if rowcount:
                 try:

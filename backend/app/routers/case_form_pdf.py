@@ -35,6 +35,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from ..auth_deps import get_current_user
+from ..services.case_service import _assert_case_access
 from ...database import db
 
 
@@ -55,54 +56,20 @@ def _t(name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Access check — mirrors cases.py::_assert_case_access logic
+# Access check
 # ---------------------------------------------------------------------------
-
-def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
-    """Ensure the current user can read this case.
-
-    Admin users always pass. Otherwise we require either:
-      - the user is the case's employee (cases.employee_id matches user.id), or
-      - the user is the HR owner of the case (cases.hr_owner_id matches), or
-      - the user belongs to the same company as the case.
-
-    Raises HTTPException(403) on denial, HTTPException(404) if the case
-    doesn't exist.
-    """
-    if user.get("is_admin") or user.get("role") in ("ADMIN", "admin"):
-        return
-
-    user_id = user.get("id") or user.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Missing user id")
-
-    try:
-        with db.engine.connect() as conn:
-            row = conn.execute(
-                text(
-                    f"SELECT employee_id, hr_owner_id, company_id "
-                    f"FROM {_t('cases')} WHERE id = :id"
-                ),
-                {"id": case_id},
-            ).mappings().first()
-    except Exception:
-        logger.exception("case access query failed case_id=%s", case_id)
-        raise HTTPException(status_code=500, detail="Failed to verify access")
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Case not found")
-
-    if str(row.get("employee_id") or "") == str(user_id):
-        return
-    if str(row.get("hr_owner_id") or "") == str(user_id):
-        return
-
-    case_company_id = row.get("company_id")
-    user_company_id = user.get("company_id")
-    if case_company_id and user_company_id and str(case_company_id) == str(user_company_id):
-        return
-
-    raise HTTPException(status_code=403, detail="Forbidden")
+# [AIQ-1776] This module used to define its OWN _assert_case_access, described in
+# a comment as mirroring cases.py. It had drifted from the canonical helper in
+# three ways that mattered:
+#   1. it queried public.cases ONLY, with no case_assignments resolution, so an
+#      assignment id — one of the three forms every other case-scoped route
+#      accepts — 404'd here instead of resolving;
+#   2. it raised 500 on a DB error, violating the B24-REGRESSION fail-safe that
+#      requires lookup failures to degrade to 404;
+#   3. it compared against the token's user["company_id"] rather than looking the
+#      company up in profiles.
+# Duplicating an auth boundary means it drifts. There is now one implementation,
+# imported above from ..services.case_service.
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +99,9 @@ def get_form_original_pdf(
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> OriginalPdfResponse:
     """Return a 1-hour signed Supabase Storage URL for the blank template PDF."""
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] case_forms.case_id holds the CANONICAL case id, while this route's
+    # {case_id} may be an assignment id. Key the query on the resolved value.
+    resolved_case_id = _assert_case_access(user, case_id)
 
     try:
         with db.engine.connect() as conn:
@@ -146,7 +115,7 @@ def get_form_original_pdf(
                     WHERE cf.id = :form_id AND cf.case_id = :case_id
                     """
                 ),
-                {"form_id": form_id, "case_id": case_id},
+                {"form_id": form_id, "case_id": resolved_case_id},
             ).mappings().first()
     except Exception:
         logger.exception("forms.original: query failed form_id=%s", form_id)

@@ -842,7 +842,9 @@ def create_form_comment(
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> CommentItem:
     """Post a comment on a CaseForm."""
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] case_forms.case_id holds the canonical case id; this route's
+    # {case_id} may be an assignment id. Key on the resolved value.
+    resolved_case_id = _assert_case_access(user, case_id)
 
     if not payload.content or not payload.content.strip():
         raise HTTPException(status_code=422, detail="Comment content cannot be empty")
@@ -856,7 +858,7 @@ def create_form_comment(
             exists = conn.execute(
                 _sql_text(f"SELECT id FROM {_pg_table('case_forms')} "
                           f"WHERE id=:form_id AND case_id=:case_id"),
-                {"form_id": form_id, "case_id": case_id},
+                {"form_id": form_id, "case_id": resolved_case_id},
             ).first()
             if not exists:
                 raise HTTPException(status_code=404, detail="Form not found")
@@ -969,7 +971,11 @@ async def upload_form_document(
     stored in the private `case-documents` bucket; a metadata row is written to
     case_form_documents scoped to (case_id, case_form_id).
     """
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] case_forms.case_id / case_form_documents.case_id hold the canonical
+    # case id; this route's {case_id} may be an assignment id. Both the ownership
+    # check and the INSERT take the resolved value — storing the raw id here would
+    # make the row invisible to every reader that resolves.
+    resolved_case_id = _assert_case_access(user, case_id)
 
     contents = await file.read()
     if not contents:
@@ -1000,7 +1006,7 @@ async def upload_form_document(
                 f"SELECT id FROM {_pg_table('case_forms')} "
                 f"WHERE id = :form_id AND case_id = :case_id"
             ),
-            {"form_id": form_id, "case_id": case_id},
+            {"form_id": form_id, "case_id": resolved_case_id},
         ).first()
     if not exists:
         raise HTTPException(status_code=404, detail="Form not found")
@@ -1036,7 +1042,7 @@ async def upload_form_document(
                     f"RETURNING id, case_form_id, case_id, file_name, content_type, size_bytes, uploaded_by, doc_key, created_at"
                 ),
                 {
-                    "fid": form_id, "cid": case_id, "name": file_name,
+                    "fid": form_id, "cid": resolved_case_id, "name": file_name,
                     "path": storage_path, "ctype": content_type,
                     "size": len(contents), "uid": uploaded_by,
                     "dkey": (doc_key or None),
@@ -1213,7 +1219,9 @@ def delete_form_document(
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> Response:
     """[P1-05c] Delete a per-form supporting document (row + storage object)."""
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] case_form_documents.case_id holds the canonical case id; this
+    # route's {case_id} may be an assignment id. Key on the resolved value.
+    resolved_case_id = _assert_case_access(user, case_id)
 
     with main_db.engine.begin() as conn:
         row = conn.execute(
@@ -1221,7 +1229,7 @@ def delete_form_document(
                 f"SELECT storage_path FROM {_pg_table('case_form_documents')} "
                 f"WHERE id = :id AND case_form_id = :fid AND case_id = :cid"
             ),
-            {"id": document_id, "fid": form_id, "cid": case_id},
+            {"id": document_id, "fid": form_id, "cid": resolved_case_id},
         ).mappings().first()
         if not row:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -1252,7 +1260,9 @@ def patch_form_flag(
     Set or clear the flag on a CaseForm.
     flag_note='…' sets the flag; None/'' clears it. HR/ADMIN only.
     """
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] case_forms.case_id holds the canonical case id; this route's
+    # {case_id} may be an assignment id. Key on the resolved value.
+    resolved_case_id = _assert_case_access(user, case_id)
 
     user_role = str(user.get("role") or "").upper()
     if user_role not in ("HR", "ADMIN"):
@@ -1266,7 +1276,7 @@ def patch_form_flag(
             exists = conn.execute(
                 _sql_text(f"SELECT id FROM {_pg_table('case_forms')} "
                           f"WHERE id=:form_id AND case_id=:case_id"),
-                {"form_id": form_id, "case_id": case_id},
+                {"form_id": form_id, "case_id": resolved_case_id},
             ).first()
             if not exists:
                 raise HTTPException(status_code=404, detail="Form not found")
@@ -1344,7 +1354,10 @@ def create_dossier(
     optional cover + divider pages, merges with pypdf, stores to Supabase,
     persists a dossier_packages row, and returns the record.
     """
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] case_forms.case_id / dossier_packages.case_id hold the canonical
+    # case id; this route's {case_id} may be an assignment id. Every statement and
+    # helper below takes the resolved value.
+    resolved_case_id = _assert_case_access(user, case_id)
 
     if not payload.form_ids:
         raise HTTPException(status_code=422, detail="form_ids must not be empty")
@@ -1355,7 +1368,7 @@ def create_dossier(
     try:
         with main_db.engine.begin() as conn:
             placeholders = ", ".join(f":fid{i}" for i in range(len(payload.form_ids)))
-            params: Dict[str, Any] = {"case_id": case_id}
+            params: Dict[str, Any] = {"case_id": resolved_case_id}
             params.update({f"fid{i}": fid for i, fid in enumerate(payload.form_ids)})
             valid_rows = conn.execute(
                 _sql_text(
@@ -1386,7 +1399,7 @@ def create_dossier(
             if payload.cover_page:
                 cover_bytes = _build_cover_page(
                     package_name=payload.name,
-                    case_id=case_id,
+                    case_id=resolved_case_id,
                     forms_meta=ordered_meta,
                 )
                 pdf_parts.append(cover_bytes)
@@ -1398,7 +1411,7 @@ def create_dossier(
                     authority_name=meta.get("authority_name"),
                 )
                 pdf_parts.append(divider)
-                form_pdf = _fetch_form_pdf_bytes(conn, case_id, form_id)
+                form_pdf = _fetch_form_pdf_bytes(conn, resolved_case_id, form_id)
                 pdf_parts.append(form_pdf)
 
             try:
@@ -1414,7 +1427,7 @@ def create_dossier(
                     f"(id, case_id, name, form_ids, cover_page, created_by, created_at) "
                     f"VALUES (:id, :case_id, :name, :form_ids, :cover_page, :created_by, {_sql_now()})"
                 ),
-                {"id": dossier_id, "case_id": case_id, "name": payload.name,
+                {"id": dossier_id, "case_id": resolved_case_id, "name": payload.name,
                  "form_ids": form_ids_json, "cover_page": payload.cover_page, "created_by": user_id},
             )
 
@@ -1436,7 +1449,7 @@ def create_dossier(
                     action_type=ACTION_INSERT,
                     actor_type=ACTOR_HUMAN,
                     actor_id=user_id,
-                    new_value={"case_id": case_id, "form_count": len(payload.form_ids)},
+                    new_value={"case_id": resolved_case_id, "form_count": len(payload.form_ids)},
                 )
             except Exception:
                 logger.exception("audit: create_dossier dossier_id=%s", dossier_id)
@@ -1475,13 +1488,16 @@ def regenerate_dossier(
     [P3-6] Rebuild the merged PDF for an existing DossierPackage using the
     latest FieldValues, then update generated_at and pdf_url.
     """
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] dossier_packages.case_id / case_forms.case_id hold the canonical
+    # case id; this route's {case_id} may be an assignment id. The lookup and every
+    # helper below take the resolved value.
+    resolved_case_id = _assert_case_access(user, case_id)
     try:
         with main_db.engine.begin() as conn:
             row = conn.execute(
                 _sql_text(f"SELECT id, case_id, name, form_ids, cover_page "
                           f"FROM {_pg_table('dossier_packages')} WHERE id=:did AND case_id=:cid"),
-                {"did": dossier_id, "cid": case_id},
+                {"did": dossier_id, "cid": resolved_case_id},
             ).mappings().first()
             if not row:
                 raise HTTPException(status_code=404, detail="Dossier package not found")
@@ -1496,17 +1512,17 @@ def regenerate_dossier(
             if row["cover_page"]:
                 cover_meta: List[Dict[str, Any]] = []
                 for fid in form_ids:
-                    fr = _load_form_with_template(conn, case_id, fid)
+                    fr = _load_form_with_template(conn, resolved_case_id, fid)
                     if fr:
                         cover_meta.append({
                             "code": fr.get("template_code"),
                             "name": fr.get("template_name"),
                             "authority_code": fr.get("authority_code"),
                         })
-                pdf_parts.append(_build_cover_page(str(row["name"]), case_id, cover_meta))
+                pdf_parts.append(_build_cover_page(str(row["name"]), resolved_case_id, cover_meta))
 
             for fid in form_ids:
-                fr = _load_form_with_template(conn, case_id, fid)
+                fr = _load_form_with_template(conn, resolved_case_id, fid)
                 if fr:
                     pdf_parts.append(
                         _build_divider_page(
@@ -1515,7 +1531,7 @@ def regenerate_dossier(
                             fr.get("authority_name"),
                         )
                     )
-                pdf_parts.append(_fetch_form_pdf_bytes(conn, case_id, fid))
+                pdf_parts.append(_fetch_form_pdf_bytes(conn, resolved_case_id, fid))
 
             merged_pdf = _merge_pdfs(pdf_parts)
 
