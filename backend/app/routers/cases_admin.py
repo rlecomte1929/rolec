@@ -43,7 +43,9 @@ def delete_dossier(
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> Response:
     """[P3-6] Delete a DossierPackage record (does not remove the stored PDF)."""
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] dossier_packages.case_id holds the canonical case id; this route's
+    # {case_id} may be an assignment id. Key on the resolved value.
+    resolved_case_id = _assert_case_access(user, case_id)
     try:
         with main_db.engine.begin() as conn:
             result = conn.execute(
@@ -53,7 +55,7 @@ def delete_dossier(
                     WHERE id = :did AND case_id = :cid
                     """
                 ),
-                {"did": dossier_id, "cid": case_id},
+                {"did": dossier_id, "cid": resolved_case_id},
             )
             if result.rowcount == 0:
                 raise HTTPException(status_code=404, detail="Dossier package not found")

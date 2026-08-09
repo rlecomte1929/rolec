@@ -185,7 +185,9 @@ async def replace_adhoc_pdf(
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> CaseFormSummary:
     """Replace the uploaded PDF on an ad-hoc form."""
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] case_forms.case_id holds the canonical case id; this route's
+    # {case_id} may be an assignment id. Key both statements on the resolved value.
+    resolved_case_id = _assert_case_access(user, case_id)
 
     with main_db.engine.connect() as conn:
         row = conn.execute(
@@ -193,7 +195,7 @@ async def replace_adhoc_pdf(
                 f"SELECT is_adhoc FROM {_pg_table('case_forms')} "
                 "WHERE id = :form_id AND case_id = :case_id"
             ),
-            {"form_id": form_id, "case_id": case_id},
+            {"form_id": form_id, "case_id": resolved_case_id},
         ).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="Form not found")
@@ -211,7 +213,7 @@ async def replace_adhoc_pdf(
                     f"SET original_file_url=:url, updated_at={_sql_now()} "
                     "WHERE id=:form_id AND case_id=:case_id"
                 ),
-                {"url": original_file_url, "form_id": form_id, "case_id": case_id},
+                {"url": original_file_url, "form_id": form_id, "case_id": resolved_case_id},
             )
             # fix: [ADHOC-FORM] SAVEPOINT-isolate the audit-event insert so a
             # non-uuid actor_id (legacy sessions) can't poison the outer tx.

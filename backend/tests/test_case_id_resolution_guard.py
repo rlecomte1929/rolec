@@ -88,12 +88,23 @@ _CASE_SQL = re.compile(
 )
 
 
+# [AIQ-1776] _assert_case_access now RETURNS the resolved canonical case id.
+# This deliberately requires the return value to be CAPTURED, not merely that the
+# helper was called: a bare `_assert_case_access(user, case_id)` on its own line
+# still counts as unresolved. That distinction is the entire bug — all twelve
+# endpoints called the helper and then keyed their SQL on the raw path param.
+_ASSIGNED_ASSERT = re.compile(r"=\s*_assert_case_access\s*\(")
+
+
 def _resolves(seg: str) -> bool:
     """A function resolves the id if it calls a named resolver, OR derives the
     canonical case id from the assignment that require_case_access returned
     (the services_state pattern: authorize a 3-form id, then key on the
-    canonical case id it maps to — reusing the fetch rather than re-querying)."""
+    canonical case id it maps to — reusing the fetch rather than re-querying),
+    OR captures the resolved id that _assert_case_access returns (AIQ-1776)."""
     if any(r in seg for r in _RESOLVERS):
+        return True
+    if _ASSIGNED_ASSERT.search(seg):
         return True
     return "require_case_access" in seg and "canonical_case_id" in seg
 
@@ -156,19 +167,16 @@ _ALLOWLIST = {
 # Validation Criteria #5) — ~22 endpoints across 9 routers is too large a blast radius
 # for one PR. Tracked as a follow-up.
 _KNOWN_UNRESOLVED = {
-    # _assert_case_access accepts both id forms and returns None (see above).
-    "get_form_original_pdf": "AIQ-1775-FU: _assert_case_access accepts both id forms",
-    "replace_adhoc_pdf": "AIQ-1775-FU: _assert_case_access accepts both id forms",
-    "delete_dossier": "AIQ-1775-FU: _assert_case_access accepts both id forms",
-    "create_form_comment": "AIQ-1775-FU: _assert_case_access accepts both id forms",
-    "upload_form_document": "AIQ-1775-FU: _assert_case_access accepts both id forms",
-    "delete_form_document": "AIQ-1775-FU: _assert_case_access accepts both id forms",
-    "patch_form_flag": "AIQ-1775-FU: _assert_case_access accepts both id forms",
-    "create_dossier": "AIQ-1775-FU: _assert_case_access accepts both id forms",
-    "regenerate_dossier": "AIQ-1775-FU: _assert_case_access accepts both id forms",
-    "list_pets": "AIQ-1775-FU: _assert_case_access accepts both id forms",
-    "update_pet": "AIQ-1775-FU: _assert_case_access accepts both id forms",
-    "delete_pet": "AIQ-1775-FU: _assert_case_access accepts both id forms",
+    # [AIQ-1776] The twelve "_assert_case_access accepts both id forms" entries are
+    # GONE — debt paid, not excused. The helper now returns the resolved canonical
+    # case id and all twelve callers key their SQL on it. Do not re-add them.
+    #
+    # One of the twelve was misattributed: get_form_original_pdf never used the
+    # canonical helper at all. case_form_pdf.py carried its own drifted copy that
+    # queried public.cases only (so an assignment id 404'd rather than resolving)
+    # and raised 500 on a DB error, violating the B24-REGRESSION fail-safe. That
+    # duplicate is deleted; the module imports the canonical helper now.
+    #
     # require_case_access returns the assignment; these do not use its canonical id.
     "list_exception_requests_for_case": "AIQ-1775-FU: has the assignment, keys on raw id",
     "list_case_notes": "AIQ-1775-FU: has the assignment, keys on raw id",

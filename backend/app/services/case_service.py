@@ -144,9 +144,9 @@ def _deep_merge_case_drafts(base: Dict[str, Any], update: Dict[str, Any]) -> Dic
 # Tenant access
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
+def _assert_case_access(user: Dict[str, Any], case_id: str) -> str:
     """
-    Verify the caller can read the given case.
+    Verify the caller can read the given case, and return the id to key SQL on.
 
     The ``case_id`` param may be either:
     - A UUID from ``public.cases`` (legacy seed data), or
@@ -161,6 +161,14 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
     Employees: must own the assignment (employee_user_id == auth uid).
     HR / Admin: sufficient to belong to the same company as the case.
     Raises 404 (case missing) or 403 (no access).
+
+    [AIQ-1776] Returns the RESOLVED canonical case id — the value case-scoped
+    tables are actually keyed by. Because this helper accepts three id forms and
+    used to return ``None``, callers had no choice but to key their SQL on the
+    raw path param: an assignment id then passed the access check and matched no
+    rows, so the endpoint silently returned empty. Twelve endpoints shipped that
+    way (AIQ-1775). Key your SQL on the RETURN VALUE, never on the argument.
+
 
     B24-REGRESSION fail-safe: never returns 500. Malformed case_ids → 404.
     DB exceptions are logged and the affected query is treated as "no match"
@@ -188,6 +196,20 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
     if not case_id or not _UUID_RE.match(case_id):
         raise HTTPException(status_code=404, detail="Case not found")
 
+    # [AIQ-1776] Canonical id captured from the assignment lookup below, when it
+    # runs. It MUST agree with resolve_case_forms_case_id() — same COALESCE, same
+    # precedence — or the two resolvers could disagree about the same case.
+    resolved_id: Optional[str] = None
+
+    def _resolved() -> str:
+        """The canonical case id to key case-scoped SQL on.
+
+        Reuses the row the assignment lookup already fetched when it ran; only on
+        the public.cases-only path does it fall back to resolve_case_forms_case_id,
+        which returns the input unchanged when no assignment resolves.
+        """
+        return resolved_id or resolve_case_forms_case_id(case_id)
+
     row = None
     try:
         with main_db.engine.connect() as conn:
@@ -211,11 +233,18 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
     # AND by assignment id (legacy callers that pass an assignment_id).
     # Returns True (granted), False (assignment found, no access), None (none).
     def _assignment_access() -> Optional[bool]:
+        nonlocal resolved_id
         try:
             with main_db.engine.connect() as conn:
                 a = conn.execute(
                     _sql_text(
-                        f"SELECT ca.employee_user_id, ca.hr_user_id, rc.company_id "
+                        f"SELECT ca.employee_user_id, ca.hr_user_id, rc.company_id, "
+                        # [AIQ-1776] Same COALESCE/precedence as
+                        # resolve_case_forms_case_id, so the two agree by construction.
+                        f"COALESCE("
+                        f"  NULLIF(TRIM(CAST(ca.canonical_case_id AS TEXT)), ''), "
+                        f"  CAST(ca.case_id AS TEXT)"
+                        f") AS resolved_case_id "
                         f"FROM {_pg_table('case_assignments')} ca "
                         f"LEFT JOIN {_pg_table('relocation_cases')} rc "
                         f"  ON CAST(rc.id AS TEXT) = CAST(ca.canonical_case_id AS TEXT) "
@@ -230,6 +259,10 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
             return None
         if a is None:
             return None
+        # Capture regardless of the access verdict: the id is resolved either way,
+        # and a denial raises before any caller can read it.
+        if a.get("resolved_case_id"):
+            resolved_id = str(a["resolved_case_id"])
         if _owns(a.get("employee_user_id")) or _owns(a.get("hr_user_id")) or is_admin:
             return True
         if role == "HR":
@@ -250,18 +283,18 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
     if not row:
         granted = _assignment_access()
         if granted:
-            return
+            return _resolved()
         if granted is False:
             raise HTTPException(status_code=403, detail="Not authorised for this case")
         raise HTTPException(status_code=404, detail="Case not found")
 
     # public.cases row found — direct ownership on the row first…
     if _owns(row.get("employee_id")):
-        return
+        return _resolved()
     if _owns(row.get("hr_owner_id")):
-        return
+        return _resolved()
     if is_admin:
-        return
+        return _resolved()
     if role == "HR":
         try:
             with main_db.engine.connect() as conn:
@@ -273,14 +306,14 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
                     {"id": auth_uuid or user_id},
                 ).mappings().first()
             if prof and str(prof.get("company_id") or "") == str(row.get("company_id") or ""):
-                return
+                return _resolved()
         except Exception:
             logger.exception("dossier: failed to look up HR profile company_id id=%s", user_id)
 
     # …then the authoritative assignment link (handles contact-UUID employee_id
     # and HR-created cases whose public.cases ownership columns differ).
     if _assignment_access():
-        return
+        return _resolved()
     raise HTTPException(status_code=403, detail="Not authorised for this case")
 
 

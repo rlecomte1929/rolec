@@ -48,6 +48,33 @@ tree, not transcribed — see [How this was produced](#how-this-was-produced).
 > Until it is empty, **this class is not closed** — it is measured, bounded and guarded against
 > getting worse.
 
+> ### Progress — AIQ-1776, 2026-08-09
+>
+> The block above is left as written: it is the accurate record of what AIQ-1775 measured on
+> 2026-08-04. What follows is what has changed since.
+>
+> **`_assert_case_access` now returns the resolved canonical case id**, and the twelve callers
+> that keyed on the raw path param key on the return value instead. `_KNOWN_UNRESOLVED` is
+> **29 → 17**. The entries were *removed*, not moved to `_ALLOWLIST` — the debt is paid, not
+> re-justified.
+>
+> Two details worth carrying forward:
+>
+> - The helper resolves with the **same `COALESCE(NULLIF(TRIM(canonical_case_id), ''), case_id)`
+>   precedence as `resolve_case_forms_case_id`**, so the two resolvers agree by construction
+>   rather than by review. A test asserts they never disagree across all four id forms.
+> - `case_form_pdf.py` was carrying its **own drifted copy** of the helper — it queried
+>   `public.cases` only, so an assignment id 404'd instead of resolving, and it raised 500 on a
+>   DB error, violating the B24-REGRESSION fail-safe. One of the twelve was therefore
+>   misattributed. The duplicate is deleted; the module imports the canonical helper.
+>
+> The remaining **17** are a different shape, and are deferred for the same blast-radius reason
+> AIQ-1775 gave: they are mostly `require_case_access` callers that already hold the assignment
+> row and simply do not read `canonical_case_id` off it.
+>
+> **This class is still not closed.** 17 endpoints can still return silent-empty for an
+> assignment id.
+
 ---
 
 ## 1. The defect class
@@ -95,6 +122,12 @@ Two narrower resolvers satisfy the same contract and are equally accepted:
 A fourth pattern is also recognised: authorize with `require_case_access`, then key on the
 `canonical_case_id` that the returned assignment already carries — reusing the fetch instead of
 re-querying. This is the `services_state` shape.
+
+A fifth, since AIQ-1776: **capture what `_assert_case_access` returns.** It accepts all three id
+forms and now returns the resolved canonical id, satisfying the same fail-closed contract (it
+raises 403/404 rather than returning an unresolved value). The guard requires the return value to
+be *assigned* — a bare `_assert_case_access(user, case_id)` on its own line still counts as
+unresolved, because calling it and then keying on the argument is precisely the bug.
 
 ### Frontend — `caseIdForAssignment`
 
@@ -213,9 +246,10 @@ eight forms/dossier reads that were once on it were resolved by AIQ-1719 and rem
 registers, so a known gap can never masquerade as coverage:
 
 - **`_ALLOWLIST`** — 13 entries, each genuinely safe, each with the reason.
-- **`_KNOWN_UNRESOLVED`** — 29 entries, each genuinely unsafe, each carrying a follow-up ref.
-  `test_known_unresolved_register_only_shrinks` fails if an entry is fixed but left behind, and
-  `test_the_two_registers_are_disjoint` stops a function being called both safe and unsafe.
+- **`_KNOWN_UNRESOLVED`** — **17** entries (29 before AIQ-1776), each genuinely unsafe, each
+  carrying a follow-up ref. `test_known_unresolved_register_only_shrinks` fails if an entry is
+  fixed but left behind, and `test_the_two_registers_are_disjoint` stops a function being called
+  both safe and unsafe.
 
 `test_scope_is_derived_not_hardcoded` fails if anyone reverts the router list to a literal —
 which is what allowed the under-coverage in the first place.
