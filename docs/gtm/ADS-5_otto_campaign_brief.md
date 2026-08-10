@@ -3,6 +3,41 @@
 **AIQ-1785 (ADS-5).** Draft for Romain to review and send to Audos.
 **Do not send until the two gates at the bottom are cleared.**
 
+> ## ⚠️ Channel changed: Meta first, ChatGPT second (decided 2026-08-10)
+>
+> This brief was written for ChatGPT ads. The channel decision has since changed, and
+> three things below are now wrong. Fix them before sending.
+>
+> **Why the change.** The live Audos surface is Meta: both existing campaigns in the Ads
+> app are Meta and sit at `PREVIEW_READY`, tonight's workspace agenda is a Meta plan, and
+> Otto's launch path is `delegate_ad_generation` → approve previews →
+> `launch_previewed_campaign`. ChatGPT Ads exists as a provider in the same app and stays
+> as wave two, once Meta gives us a CPC baseline to compare against.
+>
+> **1 — `utm_source=chatgpt` is now wrong.** Every URL in
+> `docs/gtm/ADS-4_destination_urls.md` carries it, and the reconciliation SQL filters on
+> it. Change to `utm_source=meta` in both places, or the first campaign's data files
+> itself under the wrong channel and the wave-two comparison is lost.
+>
+> **2 — the budget maths does not support the stated gates.** The wallet shows **$174** of
+> ad credit. At the $3–4 CPC below that is ~45–58 clicks *total*, across eight angles —
+> roughly six clicks each. That cannot carry a conversion test, and ADS-6's day-3/7/14
+> gates should be re-scoped to a single day-7 qualitative read: which phrasings and problem
+> framings earned clicks. Segment-level engagement is readable at this volume; cost-per-
+> qualified-lead is not. Report it as what it is.
+>
+> **3 — ✅ the geography contradiction is resolved.** This brief used to say *"US and UK
+> only, no EU member state"* while the campaign Otto is primed to run targets **FR→NO** —
+> France being an EU member state. The old rule was asserted in two places and justified
+> in neither.
+>
+> Replaced with a condition that can actually be checked: **US, UK and EU are permitted
+> while no third-party ad pixel is installed** — see the Geography section below, and
+> `scripts/check_ad_pixel_consent.py`, which enforces it. What remains open is only the
+> *capability* half: whether Otto can buy EU/UK inventory at all (ADS-1 item 4).
+
+
+
 ---
 
 ## The trade
@@ -31,7 +66,35 @@ non-buyer traffic into a live target-account list for outbound.
 
 **Budget split: 60% Segment A / 40% Segment B.**
 **Bidding: CPC, $3–4.**
-**Geography: US and UK only.** No EU member state may be targeted.
+
+**Geography: US, UK and EU permitted — for as long as no third-party ad pixel is installed.**
+
+This replaces an earlier blanket *"US and UK only, no EU member state"*, which appeared in this brief and in
+ADS-1 with no stated reason and deadlocked against our own first corridor, FR→NO. The rule it replaces was a
+*platform-capability* note about ChatGPT ads (a US-first product) that hardened into a policy sentence.
+
+The thing that actually differs in the EU is not who you target — it is **what runs on the visitor's device**.
+ePrivacy Art. 5(3) governs storing or accessing information on a device; that is what an ad pixel does, and
+that is what needs consent. Interest-based targeting where we upload no customer data makes the ad platform
+the controller, not us.
+
+So the condition is checkable rather than rhetorical:
+
+- **No ad pixel is installed today** — no `fbq`, no Meta or OpenAI pixel anywhere in the frontend. Verified
+  2026-08-10, and enforced from now on by `scripts/check_ad_pixel_consent.py`.
+- **Attribution does not need one.** ADS-4 is first-party by design: UTMs → `analytics_events`, and the
+  creative angle encoded into `leads.utm_campaign` as `campaign|angle`. Nothing in this test's read-out comes
+  from a pixel.
+- **The cost of going without is ~zero at this budget.** A pixel buys platform-side conversion optimisation,
+  and $174 is ~45–58 clicks. No ad platform learns a conversion model from 50 events. Revisit for a funded
+  campaign, not this one.
+
+**If a pixel is ever added, EU traffic re-gates behind the existing ConsentBanner** (`frontend/src/App.tsx`,
+mounted globally, so it already covers both landing pages). The guard script fails the build if a pixel
+appears without that gate.
+
+Still owed by Audos, and unchanged by any of the above: **can Otto actually buy EU/UK inventory on Meta, or
+is it US-only?** That is a capability question, not a policy one — see ADS-1 item 4.
 
 ---
 
@@ -104,6 +167,26 @@ coordinates the work; it does not determine what an authority decides. The landi
 carry the disclaimer verbatim: *"ReloPass is coordination software. It does not provide
 legal, immigration, or tax advice."*
 
+**No EU AI Act status claim of any kind.** Not "Ready". Not compliant, certified or
+conformant with it. And never describe ReloPass, or our AI, as a high-risk system.
+
+This one is not a matter of register, it is legal exposure. Our own assessment
+(`docs/compliance/AIQ-1487_eu_ai_act_assessment.md`) found the system **limited-risk, not
+high-risk**, and concluded there is no readiness or certification scheme to hold in the
+first place — so the claim would be false as well as premature, and it says plainly that a
+premature compliance claim is itself a liability. We shipped exactly this badge on the
+website once and had to remove it.
+
+**What you may say instead** — these are verifiable product facts, and they are stronger
+copy than a badge: a human reviews every AI recommendation · each decision is logged
+alongside the AI output that informed it · answers are grounded in the customer's own
+policy and cited · personal data is masked before any model call. Describe the controls,
+claim no status.
+
+If a generated variant introduces any of this wording, reject it at preview — do not edit
+it into shape and approve it. CI enforces the same rule over this file
+(`scripts/check_compliance_claims.py`).
+
 ---
 
 ## What counts as a qualified lead
@@ -146,8 +229,14 @@ two independent counts are the only way to know what actually happened.
 - [ ] **ADS-1 answered in writing** — revenue share, account ownership, credit amount and
       window, buyable geographies, and the domain question. Items 1, 4 and 5 are hard
       gates.
-- [ ] **G1: both landing pages confirmed serving prerendered HTML on relopass.com.**
-      Until verified on the live domain, every URL in this brief may point at a page a
-      crawler reads as blank.
+- [x] **G1: both landing pages confirmed serving prerendered HTML on relopass.com.**
+      **Measured 2026-08-10, and it FAILED on first measurement** — the slash-less URLs
+      served a 1,677-byte empty shell to every crawler. Fixed in
+      `docs/gtm/ADS-4_destination_urls.md`; the destination URLs now carry a trailing
+      slash, which is load-bearing. Re-run before every launch:
+      `bash scripts/check_ad_landing_prerender.sh`.
+- [ ] **Channel corrections applied** — `utm_source=meta`, ADS-6 re-scoped to a day-7
+      qualitative read, and the geography contradiction settled in writing. See the
+      box at the top.
 - [ ] Playbook §6 context hints pasted into the section above.
 - [ ] Qualified-lead definition approved by Romain.

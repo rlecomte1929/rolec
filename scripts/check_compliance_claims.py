@@ -45,6 +45,14 @@ SCAN_DIRS = [
     REPO / "frontend" / "public",
     REPO / "docs" / "marketing",
     REPO / "content",
+    # docs/gtm holds the paid-ad copy — the 8 card titles and bodies handed verbatim to
+    # the ad platform. That copy is customer-facing the moment a campaign launches, and
+    # it reaches an audience that never visits the site, but it lived outside this guard
+    # until 2026-08-10. Ad copy was in fact the ONLY customer-facing surface with no
+    # automated check, which is the opposite of what its blast radius deserves: a badge
+    # on a web page can be edited in a minute, a claim inside an approved ad creative is
+    # already impressed on people and may be cached by the platform.
+    REPO / "docs" / "gtm",
 ]
 SCAN_SUFFIXES = {".ts", ".tsx", ".js", ".jsx", ".html", ".md", ".mdx", ".json", ".txt"}
 
