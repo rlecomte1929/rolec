@@ -1,0 +1,97 @@
+{
+  "_meta": {
+    "purpose": "Labelled corpus for the content-honesty guard (scripts/check_form_template_honesty.py). Scores RECALL over defects known to be real and PRECISION over templates known to be correct.",
+    "why_precision_matters": "A checker that flagged every ungated template would score recall 3/3 and be useless — it would condemn ANMELDUNG, whose ungated rule is correct because § 17 BMG applies to everyone, and eight legitimate non-EEA templates. Those clean cases are the reason this is a corpus and not an assertion.",
+    "verification_status": "representative",
+    "created": "2026-08-11",
+    "grows_when": "the next defect of this class is found — each becomes a permanent regression case, which is the mechanism that stops us re-finding the same thing by eye",
+    "cases_are_shapes_not_live_rows": "Each case carries the trigger_rules shape as seeded, so a later forward migration fixing production does not invalidate the corpus."
+  },
+  "cases": [
+    {
+      "code": "RESID-PERMIT-DE",
+      "name": "Residence permit appointment (Auslaenderbehoerde)",
+      "category": "registration",
+      "label": "violation",
+      "reason": "FreizuegG/EU § 2(4) — an EU citizen requires no residence title, and the old Freizuegigkeitsbescheinigung was abolished. Fields demand a biometric photo and the passport original for a document that cannot be issued to them. Fixed by 20261023000000; the pre-fix shape is kept here as a regression case.",
+      "rules": [
+        {"event": "roadmap.arrival_confirmed", "priority": 50,
+         "conditions": {"destination_country": "DE"},
+         "for_persons": ["employee"], "blocked_by_template_code": null}
+      ]
+    },
+    {
+      "code": "FAM-SPOUSE",
+      "name": "Family reunion visa - spouse (Familiennachzug)",
+      "category": "family",
+      "label": "violation",
+      "reason": "Familiennachzug is a third-country-national procedure. A spouse of an EU citizen exercising free movement holds derived rights under FreizuegG/EU § 3 and needs no family reunion visa. Fires on roadmap.profile_completed, earlier in the journey than RESID-PERMIT-DE.",
+      "rules": [
+        {"event": "roadmap.profile_completed", "priority": 85,
+         "conditions": {"destination_country": "DE", "has_spouse": true},
+         "for_persons": ["spouse"], "blocked_by_template_code": null}
+      ]
+    },
+    {
+      "code": "FAM-CHILD",
+      "name": "Family reunion visa - minor child (Familiennachzug)",
+      "category": "family",
+      "label": "violation",
+      "reason": "As FAM-SPOUSE — derived free-movement rights under FreizuegG/EU § 3 cover a minor child, so no family reunion visa exists for them.",
+      "rules": [
+        {"event": "roadmap.profile_completed", "priority": 84,
+         "conditions": {"destination_country": "DE", "has_children": true},
+         "for_persons": ["each_child"], "blocked_by_template_code": null}
+      ]
+    },
+    {
+      "code": "ANMELDUNG",
+      "name": "Address registration (Anmeldung beim Buergeramt)",
+      "category": "registration",
+      "label": "clean",
+      "reason": "§ 17 BMG requires anyone moving into a German dwelling to register within two weeks, regardless of nationality. Ungated is CORRECT — gating it would drop the one real German arrival obligation. This is the case that stops the guard being a blanket ungated-template detector.",
+      "rules": [
+        {"event": "roadmap.arrival_confirmed", "priority": 90,
+         "conditions": {"destination_country": "DE"},
+         "for_persons": ["employee"], "blocked_by_template_code": null}
+      ]
+    },
+    {
+      "code": "BLUE-CARD",
+      "name": "EU Blue Card / residence title (Aufenthaltstitel)",
+      "category": "work_permit",
+      "label": "clean",
+      "reason": "Permit-like AND on an EEA destination, but declares visa_type skilled_worker, which _build_context cannot produce on an EEA corridor. Unsatisfiable by an EEA free-mover by construction — it looks wrong and is right.",
+      "rules": [
+        {"event": "roadmap.destination_confirmed", "priority": 110,
+         "conditions": {"destination_country": "DE", "visa_type": "skilled_worker"},
+         "for_persons": ["employee"], "blocked_by_template_code": null}
+      ]
+    },
+    {
+      "code": "US-DEP-SPOUSE",
+      "name": "Dependent visa - spouse (derivative)",
+      "category": "family",
+      "label": "clean",
+      "reason": "Permit-like and ungated, but the destination is US. visa_type is eea_registration only when BOTH countries are EEA, so this rule is unreachable by an EEA free-mover. One of eight such templates (BRP-COLLECT, DEP-*, JP-*, US-*) that must NOT be 'fixed'.",
+      "rules": [
+        {"event": "roadmap.profile_completed", "priority": 85,
+         "conditions": {"destination_country": "US", "has_spouse": true},
+         "for_persons": ["spouse"], "blocked_by_template_code": null}
+      ]
+    },
+    {
+      "code": "RP-NO-DATASHEET",
+      "name": "Personal Relocation Data Sheet (France to Norway)",
+      "category": "data_sheet",
+      "label": "clean",
+      "reason": "Explicitly gated on visa_type eea_registration — it is FOR EEA free-movers — and it is a data sheet, not a permit. The invariant must not catch the one thing we deliberately built for this corridor.",
+      "rules": [
+        {"event": "roadmap.destination_confirmed", "priority": 100,
+         "conditions": {"destination_country": "NO", "origin_country": "FR",
+                        "visa_type": "eea_registration"},
+         "for_persons": ["employee"], "blocked_by_template_code": null}
+      ]
+    }
+  ]
+}

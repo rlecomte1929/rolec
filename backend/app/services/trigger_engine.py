@@ -247,11 +247,11 @@ def _build_context(
 
 # EU/EEA member states (ISO 3166-1 alpha-2). An EEA national relocating to
 # another EEA country follows the registration scheme rather than a work permit.
-_EEA_COUNTRIES = frozenset({
-    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR",
-    "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK",
-    "SI", "ES", "SE", "IS", "LI", "NO",
-})
+#
+# [AIQ-1795b] Moved to a dependency-free module so a CI guard can import the set without
+# importing this engine (and therefore SQLAlchemy). The alias is kept because several tests
+# and services already read `trigger_engine._EEA_COUNTRIES`; there is still exactly one copy.
+from .eea_countries import EEA_COUNTRIES as _EEA_COUNTRIES  # noqa: E402
 
 
 def _purpose_to_visa_type(purpose: str) -> Optional[str]:
