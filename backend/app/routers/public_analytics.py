@@ -40,9 +40,15 @@ def track_event(body: TrackIn, request: Request) -> Dict[str, Any]:
     # [AIQ-1783] `depth` (scroll %) and `seconds` (dwell) are numeric-only engagement
     # measures; `page` distinguishes the two ad landing pages. Keep this an allow-list —
     # it exists so nothing free-text ever arrives here from an unauthenticated caller.
+    # [AIQ-1784] utm_content carries the creative ANGLE (A1-A6, B1-B2) — the signal that
+    # decides where to concentrate spend at Gate 2. analytics_events stores `extra` as
+    # free-form JSON, so unlike the leads table this needs no schema change.
     safe = {
         k: props.get(k)
-        for k in ("utm_source", "utm_campaign", "cta", "source", "page", "depth", "seconds")
+        for k in (
+            "utm_source", "utm_campaign", "utm_medium", "utm_content",
+            "cta", "source", "page", "depth", "seconds",
+        )
     }
     emit_event(body.event, extra=safe)
     return {"ok": True}

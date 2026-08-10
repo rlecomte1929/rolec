@@ -31,6 +31,11 @@ export function useAdEngagementTracking(page: string): void {
     const utm = {
       utm_source: params.get('utm_source') || undefined,
       utm_campaign: params.get('utm_campaign') || undefined,
+      utm_medium: params.get('utm_medium') || undefined,
+      // [AIQ-1784] The creative angle (A1-A6 / B1-B2). Engagement per angle is the only
+      // readable signal early in a campaign, before conversions are dense enough to
+      // compare — so it has to be on these events, not just on conversions.
+      utm_content: params.get('utm_content') || undefined,
     };
 
     // emitMarketingEvent already fans out to PostHog AND the server-side

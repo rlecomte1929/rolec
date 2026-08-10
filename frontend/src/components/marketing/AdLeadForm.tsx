@@ -15,6 +15,29 @@ import { emitMarketingEvent } from '../../analytics';
  * matters is already derived server-side from the work-email domain.
  */
 
+/** Delimiter joining campaign and creative angle inside the single utm_campaign slot. */
+export const ANGLE_DELIMITER = '|';
+
+/**
+ * [AIQ-1784] Compose the value stored in `leads.utm_campaign`.
+ *
+ * Ad URLs carry the angle separately (`utm_content=A3`), exactly as the campaign spec
+ * requires — nothing changes on Otto's side. But `LeadCaptureIn` and the `leads` table
+ * have no `utm_content` column, and adding one means a migration; migrations here are
+ * applied out-of-band with no automated apply, so a merged-but-unapplied column would
+ * not DELAY angle attribution, it would silently LOSE it — during the exact two weeks
+ * the data decides where spend goes. So the angle rides in the existing slot as
+ * `campaign|angle`. Readers split on ANGLE_DELIMITER.
+ *
+ * Falls back to `ads-<page>` for untagged visits, and emits no stray delimiter when
+ * there is no angle.
+ */
+export function campaignWithAngle(params: URLSearchParams, page: string): string {
+  const campaign = params.get('utm_campaign') || `ads-${page}`;
+  const angle = params.get('utm_content');
+  return angle ? `${campaign}${ANGLE_DELIMITER}${angle}` : campaign;
+}
+
 export interface AdLeadFormProps {
   /** Distinguishes the two pages in analytics and in utm_campaign fallback. */
   page: 'mobility-teams' | 'relocation-checklist';
@@ -68,9 +91,16 @@ export const AdLeadForm: React.FC<AdLeadFormProps> = ({
         // knows what was asked, not just what was answered.
         message: question && answer ? `${question} ${answer}` : undefined,
         utm_source: params.get('utm_source') || undefined,
-        utm_campaign: params.get('utm_campaign') || `ads-${page}`,
+        utm_campaign: campaignWithAngle(params, page),
       });
-      emitMarketingEvent('landing_cta_click', { page, cta: submitLabel });
+      emitMarketingEvent('landing_cta_click', {
+        page,
+        cta: submitLabel,
+        // Analytics keeps the angle as its own field — analytics_events stores extras as
+        // JSON, so it needs none of the encoding the leads table does.
+        utm_content: params.get('utm_content') || undefined,
+        utm_medium: params.get('utm_medium') || undefined,
+      });
       setStatus('done');
     } catch {
       // Never dead-end a click we paid for: tell them how to reach us anyway.
