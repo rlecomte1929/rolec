@@ -120,6 +120,13 @@ def create_app() -> FastAPI:
     # audit patterns out of every record before any handler emits it.
     install_pii_log_filter()
 
+    # [AIQ-1780] Vendor completers for the relopass LLM router. Registered here AND
+    # in backend/main.py's lifespan — prod boots that app, this one backs the tests
+    # and the modular cutover, and the registry is a process-global dict, so an
+    # entry point that skips it silently reproduces the "zero extracted fields" bug.
+    from .services.llm_router_clients import install_router_completers
+    install_router_completers()
+
     init_db()
     seed_demo_cases()
 

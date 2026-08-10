@@ -88,6 +88,14 @@ _ALLOWLIST = {
     "backend/app/services/city_activities_service.py": (
         "EXEMPT", "prompt = destination city + country only (non-personal); no user "
                   "free-text; fail-soft returns [] (AIQ-1581)."),
+    "backend/app/services/llm_router_clients.py": (
+        "EXEMPT", "transport-only completers for the relopass LLM router (AIQ-1780); it "
+                  "forwards a prompt it did not build. Payloads are document-extraction "
+                  "prompts whose purpose is reading the document's own text, so masking "
+                  "would redact the very names/IDs/dates the agents exist to extract — "
+                  "same grounding argument as policy_canonical_extraction and "
+                  "ocr_passport_extractor. Decided with Romain 2026-08-10; re-review "
+                  "when MISTRAL_API_KEY lands and non-passport OCR yields real text."),
 }
 
 
