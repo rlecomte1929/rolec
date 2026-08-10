@@ -194,6 +194,91 @@ class TestInvariantEdges(unittest.TestCase):
         self.assertTrue(is_permit_like("Anything", "work_permit"))
 
 
+class TestClassifierDoesNotDependOnEnglishNaming(unittest.TestCase):
+    """AIQ-1795c. The guard shipped in 1795b passed while six live defects sat in the tree.
+
+    It classified permit-like templates by a name regex plus category 'work_permit'. The
+    German templates matched only by coincidence — "Family reunion VISA - spouse
+    (FAMILIENNACHZUG)" happens to contain two listed tokens. Their Spanish, Dutch and
+    Norwegian equivalents contain none, so ES/NL/NO family reunification was invisible.
+    """
+
+    def test_family_reunification_is_permit_like_in_any_language(self):
+        for name in ("Family reunification - spouse (Reagrupacion)",
+                     "Family reunification - partner",
+                     "Family reunification - child",
+                     "Soknad om familieinnvandring (ektefelle)",
+                     "Søknad om familieinnvandring (mindreårig barn)"):
+            self.assertTrue(is_permit_like(name, "family"), name)
+
+    def test_the_german_templates_would_still_be_caught_if_renamed(self):
+        """The regression that started this: catching them must not depend on the words
+        'visa' and 'Familiennachzug' happening to be in their names."""
+        self.assertTrue(is_permit_like("Family reunification - spouse", "family"))
+        self.assertTrue(is_permit_like("", "family"))
+
+    def test_widening_to_family_did_not_drag_in_the_other_categories(self):
+        """17 of the 23 ungated EEA-destination templates in production are CORRECT —
+        everyone registers an address and pays tax regardless of visa route. Flagging them
+        is the false-positive noise that gets a guard switched off."""
+        for category in ("registration", "tax", "banking", "health",
+                         "civil_documents", "data_sheet"):
+            self.assertFalse(is_permit_like("Some ordinary step", category), category)
+
+    def test_a_family_template_outside_the_eea_is_still_clean(self):
+        """Widening the classifier must not widen the invariant. US-DEP-SPOUSE is
+        category 'family' and must stay clean — rule_is_eea_reachable is what gates it."""
+        rows = [{"code": "US-DEP-SPOUSE", "name": "Dependent visa - spouse (derivative)",
+                 "category": "family", "file": "corpus",
+                 "rules": [{"event": "roadmap.profile_completed",
+                            "conditions": {"destination_country": "US", "has_spouse": True}}]}]
+        violations, _ = find_violations(rows, {})
+        self.assertEqual(violations, [])
+
+
+class TestSupersededDetectionIsNotSyntaxBound(unittest.TestCase):
+    """A batched rewrite must be recognised as a fix.
+
+    `superseded_codes` matched only `WHERE code = 'X'`. 20261025000000 fixes six templates
+    in one statement with `WHERE code IN (...)`; unmatched, all six would be reported as
+    unfixed violations forever — a false positive that never clears. Same class of mistake
+    as the name-regex classifier: keyed on incidental syntax, not on meaning.
+    """
+
+    def _codes(self, sql: str):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "20991231000000_x.sql"), "w", encoding="utf-8") as fh:
+                fh.write(sql)
+            return superseded_codes(d)
+
+    def test_detects_a_batched_in_list_rewrite(self):
+        got = self._codes(
+            "UPDATE public.form_templates t SET trigger_rules = jsonb_agg(x), "
+            "updated_at = now() WHERE t.code IN ('A-ONE', 'B-TWO', 'C-THREE');")
+        self.assertEqual(sorted(got), ["A-ONE", "B-TWO", "C-THREE"])
+
+    def test_still_detects_the_single_equality_form(self):
+        got = self._codes(
+            "UPDATE public.form_templates SET trigger_rules = jsonb_build_array() "
+            "WHERE code = 'SOLO';")
+        self.assertEqual(sorted(got), ["SOLO"])
+
+    def test_an_update_that_does_not_touch_trigger_rules_is_not_a_supersede(self):
+        """Over-deferring is the dangerous direction — it silences a real violation."""
+        got = self._codes(
+            "UPDATE public.form_templates SET name = 'x' WHERE code IN ('A-ONE');")
+        self.assertEqual(got, {})
+
+    def test_the_six_aiq_1795c_templates_are_recognised_as_superseded(self):
+        """Against the real migration tree, not a synthetic one."""
+        superseded = superseded_codes()
+        for code in ("ES-FAM-SPOUSE", "ES-FAM-CHILD", "NL-FAM-SPOUSE",
+                     "NL-FAM-CHILD", "UTL-2011F", "UTL-2011B"):
+            self.assertIn(code, superseded, f"{code} is not recognised as fixed")
+            self.assertIn("20261025000000", superseded[code])
+
+
 class TestNoPrivateEeaCopy(unittest.TestCase):
     def test_the_checker_imports_the_eea_set_rather_than_restating_it(self):
         """A second copy is how these bugs start — AIQ-1778 was 'FRANCE' failing to match a
