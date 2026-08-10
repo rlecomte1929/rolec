@@ -38,6 +38,9 @@ from ..readiness_service import (
 )
 from ..sla_rules import compute_sla_status
 from ..intake_route_fields import wizard_basics_to_route
+# [AIQ-1778] Country codes are stored as ISO alpha-2. requirements_country_key is the
+# declared owner of that mapping; it imports only `typing`, so there is no import cycle.
+from ..app.services.requirements_country_key import to_iso_alpha2
 
 log = logging.getLogger(__name__)
 
@@ -3071,7 +3074,28 @@ class CasesMixin:
         a partial/invalid row. Caller (apply_wizard_patch_side_effects) is itself
         wrapped in try/except by the PATCH handler, so a failure can't break intake.
         """
-        dest = (derived.get("dest_country") or "").strip()
+        # [AIQ-1778] Both country columns are stored as canonical ISO 3166-1 alpha-2.
+        #
+        # They used to be written with a bare .strip() — not even .upper() — while their
+        # neighbours in the same parameter block were normalised (`purpose` through
+        # _CASE_PURPOSE_MAP because a CHECK rejected bad values, `assignment_type` via
+        # .upper()). Countries were simply missed, and prod accumulated 22 rows of
+        # 'France' plus 'Germany', 'India' and one empty string.
+        #
+        # Why a name is not a harmless variant: trigger_engine's EEA gate is exact
+        # membership of a pure ISO-2 frozenset, and it upper-cases without shortening.
+        # 'France' becomes 'FRANCE', misses the set, and visa_type falls through to
+        # 'skilled_worker' instead of 'eea_registration' — so the employee is handed EU
+        # Blue Card and national work-visa paperwork they are not subject to, while the
+        # corridor data sheet never attaches. immigration_requirement_service then
+        # matches no corridor and returns zero requirements, which reads as "nothing
+        # required". Both failures are silent.
+        #
+        # Fail closed, per this method's own docstring above: an unresolvable country
+        # skips the upsert rather than storing a value the readers cannot use. Note the
+        # docstring already promised this for "every NOT NULL column" while only `dest`
+        # was ever checked — origin never was.
+        dest = to_iso_alpha2(derived.get("dest_country"))
         employee_uuid = self._resolve_employee_profile_id(assignment)
         if not dest or not employee_uuid:
             return  # trigger needs a destination; public.cases needs a profile employee_id
@@ -3079,7 +3103,18 @@ class CasesMixin:
         company_id = self._resolve_canonical_case_company(canonical, assignment, employee_uuid)
         if not company_id:
             return
-        origin = (derived.get("origin_country") or "").strip()
+        origin = to_iso_alpha2(derived.get("origin_country"))
+        if not origin:
+            # origin_country_code is NOT NULL and every corridor rule keys on it, so a
+            # row without a usable origin is worse than no row: it renders in HR as a
+            # real case and silently matches nothing.
+            log.warning(
+                "cases bridge: skipping canonical upsert for case=%s — origin country "
+                "%r is not resolvable to ISO alpha-2",
+                case_id,
+                derived.get("origin_country"),
+            )
+            return
         # public.cases.purpose has a CHECK constraint
         # (work | intra_company_transfer | family_join | remote_work). The wizard
         # emits free-er values (and the old default 'relocation' is invalid), which
