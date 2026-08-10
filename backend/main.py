@@ -484,6 +484,14 @@ def _run_runtime_startup_initialization() -> None:
 async def lifespan(app: FastAPI):
     from .app.posthog_client import init_posthog, shutdown_posthog
     init_posthog()
+    # [AIQ-1780] Install the vendor completers the relopass LLM router dispatches
+    # to. Without this every LLM-based extraction agent runs against an empty
+    # payload and emits zero fields, silently — the router raises LLMRoutingError
+    # for an unregistered model and call_llm_with_retry degrades to empty. Cheap,
+    # idempotent, no network, so it needs no startup-timeout wrapper. Registered
+    # per process, which is what --workers 4 requires.
+    from .app.services.llm_router_clients import install_router_completers
+    install_router_completers()
     await asyncio.to_thread(_run_runtime_startup_initialization)
     if not DISABLE_STARTUP_SEED:
         asyncio.create_task(_background_seed_task())
