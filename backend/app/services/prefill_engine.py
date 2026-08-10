@@ -621,7 +621,7 @@ def _decrypt_vault_passport(enc: Any) -> Optional[str]:
             return None
         with db.engine.connect() as conn:
             row = conn.execute(
-                text("SELECT pgp_sym_decrypt(:enc::bytea, :key) AS d"),
+                text("SELECT pgp_sym_decrypt(CAST(:enc AS bytea), :key) AS d"),
                 {"enc": enc, "key": key},
             ).mappings().first()
         return row["d"] if row and row.get("d") else None

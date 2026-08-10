@@ -1725,7 +1725,7 @@ class PoliciesMixin:
                         """
                         INSERT INTO company_policy_assistant_bindings
                         (company_id, active_snapshot_id, policy_document_id, updated_at)
-                        VALUES (:cid, :sid, :doc, :now::timestamptz)
+                        VALUES (:cid, :sid, :doc, CAST(:now AS timestamptz))
                         ON CONFLICT (company_id) DO UPDATE SET
                           active_snapshot_id = EXCLUDED.active_snapshot_id,
                           policy_document_id = EXCLUDED.policy_document_id,
