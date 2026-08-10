@@ -13,15 +13,19 @@
 # static site `headers` field. The CSP value matches the (now self-hosted, Google-Fonts-
 # free) policy on `main`.
 #
-# !! THIS FILE IS INERT UNTIL YOU ADOPT IT IN RENDER !!
-# A render.yaml committed to the repo does nothing to an existing dashboard-created
-# service on its own. To enforce these headers you must, in the Render dashboard, EITHER:
-#   (A) Create a Blueprint instance from this file and point it at the existing static
-#       site — confirm `name` below matches the live service so it UPDATES (not
-#       duplicates) it; OR
-#   (B) Skip the Blueprint and paste the 6 headers below into the static site's
-#       Settings -> Headers UI (zero-risk, no Blueprint adoption needed). Recommended
-#       if you don't want to convert the service to IaC.
+# !! THIS FILE IS LIVE — IT GOVERNS PRODUCTION FRONTEND ROUTING !!
+# (It was inert when first written. The Blueprint was adopted and verified in #518,
+# 45f6feb9 — "deep paths now 200 natively; all 6 headers served from render.yaml" —
+# and `frontend/public/_redirects` was deleted in the same commit because Render
+# ignores it once Blueprint/dashboard rules exist. The old "inert" warning survived
+# here for months and is why the ADS-3 shell defect was mis-diagnosed as a missing
+# `_redirects` file. Corrected 2026-08-10.)
+#
+# Practical consequences:
+#   - `routes:` below is the ONLY place the SPA fallback and any per-path rewrite can
+#     be changed. Adding `frontend/public/_redirects` will do nothing.
+#   - Changes here take effect on the next Blueprint sync, not on plain `git push`.
+#     Confirm in the Render dashboard that the sync ran before trusting a routing fix.
 #
 # CAUTION on Blueprint adoption: a Blueprint becomes the source of truth for the
 # services it defines. Verify the service `name`, build command, publish path, and
@@ -45,7 +49,29 @@ services:
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
     routes:
-      # SPA fallback — mirrors frontend/public/_redirects (/* -> /index.html 200).
+      # ── Prerendered ad landing pages — MUST stay above the SPA catch-all ──
+      #
+      # [AIQ-1783 / ADS-3] `npm run build` prerenders these to
+      # dist/<route>/index.html. Render resolves that file as a directory index only
+      # when the request carries a trailing slash. `/mobility-teams` (no slash) matches
+      # no file, falls through to the `/*` rewrite below, and returns index.html — whose
+      # <div id="root"> is empty until JS runs.
+      #
+      # Measured on prod 2026-08-10: `/mobility-teams` = 1,677 bytes (shell),
+      # `/mobility-teams/` = 12,049 bytes (prerendered). Identical for OAI-AdsBot and
+      # facebookexternalhit. Every ad crawler would have validated a blank page.
+      #
+      # Routes are first-match-wins, so these two must precede `/*`. The ad URLs in
+      # docs/gtm/ADS-4_destination_urls.md carry the slash and do not depend on these
+      # rules — these exist so the bare URL a human types or links to also works.
+      # Gate: `bash scripts/check_ad_landing_prerender.sh`.
+      - type: rewrite
+        source: /mobility-teams
+        destination: /mobility-teams/index.html
+      - type: rewrite
+        source: /relocation-checklist
+        destination: /relocation-checklist/index.html
+      # SPA fallback — every other path renders client-side.
       - type: rewrite
         source: /*
         destination: /index.html
