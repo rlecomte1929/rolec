@@ -8,6 +8,10 @@ export const ROUTE_DEFS = {
   why: { path: '/why', roles: ['PUBLIC'] as RouteRole[] },
   howItWorks: { path: '/how-it-works', roles: ['PUBLIC'] as RouteRole[] },
   getStarted: { path: '/get-started', roles: ['PUBLIC'] as RouteRole[] },
+  // [AIQ-1783] Paid-ad landing pages (ADS-3). Prerendered to static HTML at build
+  // time — see frontend/scripts/prerender.mjs and PRERENDER_ROUTES there.
+  mobilityTeams: { path: '/mobility-teams', roles: ['PUBLIC'] as RouteRole[] },
+  relocationChecklist: { path: '/relocation-checklist', roles: ['PUBLIC'] as RouteRole[] },
   testDrive: { path: '/test-drive', roles: ['PUBLIC'] as RouteRole[] },
   testDriveSurvey: { path: '/test-drive/survey', roles: ['PUBLIC'] as RouteRole[] },
   security: { path: '/security', roles: ['PUBLIC'] as RouteRole[] },

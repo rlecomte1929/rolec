@@ -4,3 +4,26 @@
 # TODO [FRIDAY-004d §11 follow-up]: add a Sitemap: line once sitemap.xml ships.
 User-agent: *
 Allow: /
+
+# ── [AIQ-1782 / ADS-2] OpenAI crawlers — explicit, not merely covered by `*` ──
+#
+# OAI-AdsBot validates ad landing pages. If it cannot fetch them, ads fail approval
+# with no actionable error — they just underdeliver. OAI-SearchBot is the organic
+# side: being citable in ChatGPT answers keeps compounding after the paid test ends.
+#
+# The wildcard above already permits both. These blocks exist so that intent is
+# RECORDED — the next person tightening this file for scrapers needs to see that
+# these two are deliberate, not collateral.
+#
+# ⚠️ robots.txt is only half the story. The usual silent killer is edge/CDN bot
+# management (Cloudflare sits in front of this origin), which is invisible here and
+# returns a challenge or 403 regardless of what this file says. Verify with:
+#     curl -A "OAI-AdsBot"    -I https://relopass.com/mobility-teams
+#     curl -A "OAI-SearchBot" -I https://relopass.com
+# Both must be 200 with full HTML — not a challenge page.
+
+User-agent: OAI-AdsBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /

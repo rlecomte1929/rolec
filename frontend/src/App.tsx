@@ -41,6 +41,10 @@ const CompliancePage = lazy(() => import('./pages/public/CompliancePage').then((
 const WhyReloPassPage = lazy(() => import('./pages/public/WhyReloPassPage').then((m) => ({ default: m.WhyReloPassPage })));
 const AccessPage = lazy(() => import('./pages/public/AccessPage').then((m) => ({ default: m.AccessPage })));
 const SecurityPage = lazy(() => import('./pages/public/SecurityPage').then((m) => ({ default: m.SecurityPage })));
+// [AIQ-1783] Paid-ad landing pages. Lazy like every other public page — they must not
+// land in the entry chunk, which is under a size-limit budget in CI.
+const MobilityTeamsPage = lazy(() => import('./pages/public/MobilityTeamsPage').then((m) => ({ default: m.MobilityTeamsPage })));
+const RelocationChecklistPage = lazy(() => import('./pages/public/RelocationChecklistPage').then((m) => ({ default: m.RelocationChecklistPage })));
 const PrivacyPage = lazy(() => import('./pages/public/PrivacyPage').then((m) => ({ default: m.PrivacyPage })));
 const Auth = lazy(() => import('./pages/Auth').then((m) => ({ default: m.Auth })));
 const NavigationAudit = lazy(() => import('./pages/NavigationAudit').then((m) => ({ default: m.NavigationAudit })));
@@ -291,6 +295,8 @@ function App() {
         <Route path="/why-relopass" element={<WhyReloPassPage />} />
         <Route path={ROUTE_DEFS.howItWorks.path} element={<HowItWorksPage />} />
         <Route path={ROUTE_DEFS.getStarted.path} element={<GetStartedPage />} />
+        <Route path={ROUTE_DEFS.mobilityTeams.path} element={<MobilityTeamsPage />} />
+        <Route path={ROUTE_DEFS.relocationChecklist.path} element={<RelocationChecklistPage />} />
         <Route path={ROUTE_DEFS.testDrive.path} element={<TestDrivePage />} />
         <Route path={ROUTE_DEFS.testDriveSurvey.path} element={<TestDriveSurveyPage />} />
         <Route path={ROUTE_DEFS.security.path} element={<SecurityPage />} />

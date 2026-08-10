@@ -123,6 +123,43 @@ def notify_admins_supplier_submission(
     return _send_to_admins(recipients, subject, plain, context="admin_supplier_submission")
 
 
+def notify_admins_new_lead(
+    *,
+    company_domain: Optional[str],
+    source: Optional[str] = None,
+    utm_campaign: Optional[str] = None,
+    matched_prospect: bool = False,
+) -> Dict[str, str]:
+    """Email admins that a lead arrived from the public marketing forms (AIQ-1783).
+
+    ADS-3 requires captured leads to reach a *monitored* destination within the hour.
+    Before this, they only landed in the ``leads`` table behind Admin → Leads, which
+    nobody is paged about — a page someone must remember to open is not monitoring.
+
+    Deliberately NON-PII, per this module's contract: the company domain (business
+    data), the campaign, and whether the domain matches an existing outbound prospect.
+    The lead's name, email address and free-text message stay in the admin UI — the
+    email carries the signal, not the record. Fail-soft: never breaks lead capture.
+    """
+    recipients = resolve_admin_emails()
+    if not recipients:
+        return {}
+
+    domain = (company_domain or "").strip() or "—"
+    match_label = "YES — already in the outbound pipeline" if matched_prospect else "no"
+    subject = f"[ReloPass] New lead: {domain}"
+    plain = (
+        "A lead was captured from the public marketing site.\n\n"
+        f"Company domain: {domain}\n"
+        f"Source:         {source or '—'}\n"
+        f"Campaign:       {utm_campaign or '—'}\n"
+        f"Known prospect: {match_label}\n\n"
+        "Contact details are in Admin → Leads. This email deliberately carries no "
+        "personal data."
+    )
+    return _send_to_admins(recipients, subject, plain, context="admin_new_lead")
+
+
 def _send_to_admins(
     recipients: List[str], subject: str, plain: str, *, context: str
 ) -> Dict[str, str]:
