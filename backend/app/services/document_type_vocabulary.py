@@ -48,6 +48,14 @@ CLASSIFIER_TO_RUNTIME: Dict[str, str] = {
     # it — collapsing here loses no information the agent uses.
     "DIPLOMA_BACHELOR": "DIPLOMA",
     "DIPLOMA_MASTER": "DIPLOMA",
+    # [AIQ-1766] ONE code for all three locales, unlike the TAX_CERT split above.
+    # The classifier emits exactly this one code and lists FR CDI/CDD, DE
+    # Arbeitsvertrag and NO arbeidskontrakt as its variants; the three prompts
+    # share an identical output schema, so the locales differ in language, not in
+    # what they carry. EmploymentContractAgent reads the locale from the
+    # document's own text, so no runtime selector has to be threaded through the
+    # orchestrator — which is what made the old TAX_CERT arrangement unreachable.
+    "EMPLOYMENT_CONTRACT": "EMPLOYMENT_CONTRACT",
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -61,7 +69,8 @@ CLASSIFIER_TO_RUNTIME: Dict[str, str] = {
 # nothing and imply support that does not exist.
 
 CLASSIFIER_PENDING_RUNTIME: Dict[str, str] = {
-    "EMPLOYMENT_CONTRACT": "agent not built — AIQ-1766. Prompt exists (prompts/extraction/employment_contract_{de,fr,no}_v1.txt); only the agent is missing.",
+    # EMPLOYMENT_CONTRACT graduated to CLASSIFIER_TO_RUNTIME in AIQ-1766 — the
+    # agent now exists and is registered.
     "PAYSLIP": "agent not built — AIQ-1767. Neither agent nor prompt exists; the payslip prompt was never merged.",
     "ANABIN_EVIDENCE": "DE credential-recognition printout. No agent, no extraction need identified yet.",
     "ZAB_STATEMENT_OF_COMPARABILITY": "DE Zeugnisbewertung. Feeds the IN_DE Blue Card runway as a milestone, not as extracted fields.",
@@ -108,6 +117,8 @@ RUNTIME_DOCUMENT_TYPES = frozenset(
     {
         "BIRTH_CERT",
         "DIPLOMA",
+        # [AIQ-1766] Seeded by 20261020000000_rce_employment_contract_document_type.sql.
+        "EMPLOYMENT_CONTRACT",
         "FOSTER_CARE_ORDER",
         "ID_CARD",
         "MARRIAGE_CERT",

@@ -81,6 +81,21 @@ def classify_rce_document_type(file_name: Optional[str]) -> Optional[str]:
         or "brp" in name
     ):
         return "VISA_PERMIT"
+    # [AIQ-1766] Last, because it is the broadest token here: "contract" appears in
+    # plenty of filenames that name a more specific type ("tax_contract_2026.pdf"),
+    # and those branches above should win. Unlike TAX_CERT there is no per-locale
+    # code to pick — EmploymentContractAgent reads the locale from the document
+    # text, so a filename that names no language costs nothing.
+    if (
+        "contract" in name
+        or "contrat" in name
+        or "arbeitsvertrag" in name
+        or "arbeidsavtale" in name
+        or "arbeidskontrakt" in name
+        or "cdi" in name
+        or "cdd" in name
+    ):
+        return "EMPLOYMENT_CONTRACT"
     return None
 
 
