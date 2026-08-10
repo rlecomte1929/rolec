@@ -11,7 +11,7 @@ on:
       projects:
         description: "Playwright projects to run"
         type: string
-        default: "--project=provision --project=readiness --project=core --project=write-flow --project=deep"
+        default: "--project=public --project=provision --project=readiness --project=core --project=write-flow --project=deep"
 
 concurrency:
   group: e2e-sentinel-campaign
@@ -79,7 +79,7 @@ jobs:
         env:
           # via env (not inline ${{ }}) to avoid run-command injection from the dispatch input;
           # falls back to the default project set on a push (no dispatch input present)
-          PROJECTS: ${{ github.event.inputs.projects || '--project=provision --project=readiness --project=core --project=write-flow --project=deep' }}
+          PROJECTS: ${{ github.event.inputs.projects || '--project=public --project=provision --project=readiness --project=core --project=write-flow --project=deep' }}
         run: |
           # shellcheck disable=SC2086  # PROJECTS is several flags; word-splitting is intended
           npx playwright test $PROJECTS
