@@ -38,6 +38,22 @@ from backend.app.services.trigger_engine import (  # noqa: E402
 )
 
 
+# [AIQ-1795] The post-fix RESID-PERMIT-DE conditions — one rule per NON-EEA visa_type, because
+# _matches_conditions compares scalars and has no list support. Must stay in step with both
+# _purpose_to_visa_type and the migration; TriggerRuleVocabularyDriftTests enforces that.
+_RESID_PERMIT_DE_GATED_CONDITIONS = [
+    {"destination_country": "DE", "visa_type": "skilled_worker"},
+    {"destination_country": "DE", "visa_type": "intra_company_transfer"},
+    {"destination_country": "DE", "visa_type": "family_join"},
+    {"destination_country": "DE", "visa_type": "remote_work"},
+]
+
+_RESID_PERMIT_MIGRATION = os.path.join(
+    _REPO_ROOT, "supabase", "migrations",
+    "20261023000000_resid_permit_de_gate_non_eea.sql",
+)
+
+
 # SQLite schema mirroring just the tables trigger_engine reads/writes.
 # - jsonb columns become TEXT (we json.dumps on insert / json.loads on read).
 # - The UNIQUE NULLS NOT DISTINCT constraint is emulated by a unique index
@@ -195,6 +211,83 @@ class TriggerEngineHelperTests(unittest.TestCase):
             ctx, draft={"contract": {"employerName": "Equinor"}}, derived={}
         )
         self.assertIn("roadmap.contract_details_saved", events)
+
+
+class TriggerRuleVocabularyDriftTests(unittest.TestCase):
+    """[AIQ-1795] Nothing but these tests stops the gate rotting.
+
+    Gating RESID-PERMIT-DE on an enumerated list of visa_types trades one silent failure for a
+    quieter one: add a fifth purpose to _purpose_to_visa_type and the template simply stops
+    covering it, with no error anywhere. These pin the three places the list appears — the
+    engine, the test constant, and the shipped migration — to each other.
+    """
+
+    def _non_eea_visa_types(self) -> set:
+        """Every visa_type an EEA→EEA case can never produce, i.e. everything
+        _purpose_to_visa_type can return. Derived from the engine, not restated."""
+        purposes = ("work", "intra_company_transfer", "family_join", "remote_work")
+        return {_purpose_to_visa_type(p) for p in purposes} - {None}
+
+    def test_the_gated_conditions_cover_every_purpose_the_engine_can_map(self):
+        gated = {c["visa_type"] for c in _RESID_PERMIT_DE_GATED_CONDITIONS}
+        missing = sorted(self._non_eea_visa_types() - gated)
+        self.assertEqual(
+            missing, [],
+            f"_purpose_to_visa_type can produce {missing}, which RESID-PERMIT-DE's rules do not "
+            f"cover — a third-country national with that purpose would silently lose the "
+            f"eAT-collection step. Add a rule to the migration and to "
+            f"_RESID_PERMIT_DE_GATED_CONDITIONS.",
+        )
+
+    def test_the_gated_conditions_claim_nothing_the_engine_cannot_produce(self):
+        """The reverse: a rule for a visa_type the engine never emits is dead weight that
+        reads as coverage."""
+        gated = {c["visa_type"] for c in _RESID_PERMIT_DE_GATED_CONDITIONS}
+        unreachable = sorted(gated - self._non_eea_visa_types())
+        self.assertEqual(unreachable, [], f"unreachable visa_type rules: {unreachable}")
+
+    def test_never_gated_on_eea_registration(self):
+        """The whole point. eea_registration is what _build_context emits for FR→DE."""
+        gated = {c["visa_type"] for c in _RESID_PERMIT_DE_GATED_CONDITIONS}
+        self.assertNotIn("eea_registration", gated)
+
+    def test_every_condition_key_is_in_the_build_context_vocabulary(self):
+        """_matches_conditions fails closed on an unknown key, so a typo would make the
+        template unattachable for EVERYONE rather than erroring."""
+        allowed = {
+            "case_uuid", "employee_id", "destination_country", "origin_country",
+            "visa_type", "has_spouse", "has_children",
+        }
+        for c in _RESID_PERMIT_DE_GATED_CONDITIONS:
+            self.assertEqual(set(c) - allowed, set(), f"unknown condition key in {c}")
+
+    def test_the_shipped_migration_matches_this_constant(self):
+        """The constant and the migration are two hand-written copies of one list. If they
+        drift, the tests pass while production behaves differently."""
+        if not os.path.exists(_RESID_PERMIT_MIGRATION):
+            self.skipTest("migration not present in this checkout")
+        sql = open(_RESID_PERMIT_MIGRATION, encoding="utf-8").read()
+        import re
+        in_sql = set(re.findall(r"'visa_type',\s*'(\w+)'", sql))
+        expected = {c["visa_type"] for c in _RESID_PERMIT_DE_GATED_CONDITIONS}
+        self.assertEqual(
+            in_sql, expected,
+            f"migration declares {sorted(in_sql)}, test constant has {sorted(expected)}",
+        )
+
+    def test_the_migration_does_not_touch_the_templates_that_are_already_correct(self):
+        """BLUE-CARD and WORK-VISA-DE are correctly gated; ANMELDUNG is correctly ungated.
+        A migration that 'tidied' them would break real coverage."""
+        if not os.path.exists(_RESID_PERMIT_MIGRATION):
+            self.skipTest("migration not present in this checkout")
+        sql = open(_RESID_PERMIT_MIGRATION, encoding="utf-8").read()
+        # Named in comments is fine; being the target of a write is not.
+        writes = sql.split("UPDATE public.form_templates", 1)[-1]
+        for code in ("ANMELDUNG", "BLUE-CARD", "WORK-VISA-DE"):
+            self.assertNotIn(
+                f"'{code}'", writes,
+                f"{code} appears in the migration's write body — it must not be modified",
+            )
 
 
 class TriggerEngineIntegrationTests(unittest.TestCase):
@@ -499,6 +592,119 @@ class TriggerEngineIntegrationTests(unittest.TestCase):
         # GP-7-04 (dest=NO, no visa_type) + the two EEA-pathway forms.
         self.assertEqual(codes, ["APOSTILLE-FR", "GP-7-04", "POL-EEA-REG"])
         self.assertNotIn("UTL-2011", codes)
+
+    # ── [AIQ-1795] Germany: an EEA free-mover must not be sent for a residence permit ──
+    #
+    # The rule shapes below are the ones PROD actually carries, copied from
+    # supabase/migrations/20260610010000_seed_de_form_templates.sql and re-verified against
+    # public.form_templates on 2026-08-10. They are inlined rather than imported so the test
+    # states the contract it is defending, and fails if the migration changes them.
+
+    _DE_ARRIVAL_TEMPLATES = {
+        # Correct as-is: § 17 BMG applies to everyone moving into a German dwelling, so this
+        # one SHOULD be ungated. It is the control in these tests.
+        "ANMELDUNG": {"destination_country": "DE"},
+        # The defect: no visa_type key, so _matches_conditions never checks one and the rule
+        # matches every DE-destination case — including EEA free-movers, who per
+        # FreizügG/EU § 2(4) "shall not require ... a residence title in order to stay in the
+        # federal territory". There is no such document for them to collect.
+        "RESID-PERMIT-DE": {"destination_country": "DE"},
+    }
+
+    def _seed_de_arrival_templates(self, *, resid_permit_conditions=None) -> None:
+        """Insert the two DE arrival templates. Pass a list of condition dicts to model the
+        post-fix RESID-PERMIT-DE, which carries one rule per non-EEA visa_type."""
+        self._insert_template(code="ANMELDUNG", rules=[{
+            "event": "roadmap.arrival_confirmed",
+            "conditions": self._DE_ARRIVAL_TEMPLATES["ANMELDUNG"],
+            "for_persons": ["employee"],
+            "blocked_by_template_code": None,
+        }])
+        conds = resid_permit_conditions or [self._DE_ARRIVAL_TEMPLATES["RESID-PERMIT-DE"]]
+        self._insert_template(code="RESID-PERMIT-DE", rules=[
+            {
+                "event": "roadmap.arrival_confirmed",
+                "conditions": c,
+                "for_persons": ["employee"],
+                "blocked_by_template_code": None,
+            }
+            for c in conds
+        ])
+
+    def _fire_de_arrival(self, *, origin: str, purpose: str = "work") -> list:
+        case_id = _uuid()
+        self._insert_case(
+            case_id=case_id, employee_id=_uuid(),
+            dest_country_code="DE", purpose=purpose, origin_country_code=origin,
+        )
+        fire_roadmap_events(
+            case_id=case_id,
+            draft={"arrival": {"confirmed": True}},
+            derived={"dest_country": "DE", "origin_country": origin},
+        )
+        return sorted(
+            cf["code"] for cf in self._case_forms() if cf["case_id"] == case_id
+        )
+
+    def test_an_ungated_permit_rule_attaches_on_an_eea_corridor_which_is_the_defect(self) -> None:
+        """The defect, pinned as a positive assertion so it stays green.
+
+        Seeded with the PRE-fix rule — conditions {"destination_country": "DE"} and no
+        visa_type — RESID-PERMIT-DE attaches to an FR→DE case. FR→DE is EEA→EEA, so
+        _build_context resolves visa_type 'eea_registration', and German law issues no
+        residence title to such a person (FreizügG/EU § 2(4)). Its 5 fields are a full
+        Ausländerbehörde package — passport original, biometric photo, Anmeldung reference —
+        so attaching it tells an EU citizen to collect a document that does not exist.
+
+        Paired with test_the_gated_rules_close_the_eea_hole_they_were_written_for: this one
+        shows the old shape matching, that one shows the new shape not matching. Together they
+        prove the trigger_rules change is what alters the behaviour, and neither has to sit red
+        in CI waiting on a production apply.
+        """
+        self._seed_de_arrival_templates()   # pre-fix: ungated
+        codes = self._fire_de_arrival(origin="FR")
+        self.assertIn(
+            "RESID-PERMIT-DE", codes,
+            "if this stops attaching, the omitted-visa_type over-match is gone by some other "
+            "route — check whether 20261023000000 is still the mechanism",
+        )
+
+    def test_anmeldung_still_attaches_on_an_eea_corridor(self) -> None:
+        """The control: gating the wrong template would silently drop the one real German
+        arrival obligation. § 17 BMG applies regardless of nationality."""
+        self._seed_de_arrival_templates()
+        codes = self._fire_de_arrival(origin="FR")
+        self.assertIn("ANMELDUNG", codes)
+
+    def test_resid_permit_de_still_attaches_for_a_non_eea_origin(self) -> None:
+        """No silent coverage loss. For a third-country national the eAT-collection
+        appointment is a real obligation, and this is the only template covering it — so the
+        fix must gate, not delete. IN→DE resolves visa_type 'skilled_worker'.
+        """
+        self._seed_de_arrival_templates(
+            resid_permit_conditions=_RESID_PERMIT_DE_GATED_CONDITIONS
+        )
+        codes = self._fire_de_arrival(origin="IN", purpose="work")
+        self.assertIn("RESID-PERMIT-DE", codes)
+
+    def test_the_gated_rules_close_the_eea_hole_they_were_written_for(self) -> None:
+        """The post-fix shape, against the corridor that exposed the bug."""
+        self._seed_de_arrival_templates(
+            resid_permit_conditions=_RESID_PERMIT_DE_GATED_CONDITIONS
+        )
+        codes = self._fire_de_arrival(origin="FR")
+        self.assertNotIn("RESID-PERMIT-DE", codes)
+        self.assertIn("ANMELDUNG", codes)   # and did not over-correct
+
+    def test_an_unknown_purpose_fails_closed(self) -> None:
+        """visa_type is None when the purpose is unrecognised, and _matches_conditions
+        returns False on a None actual — so the gated template stays shut rather than
+        defaulting open."""
+        self._seed_de_arrival_templates(
+            resid_permit_conditions=_RESID_PERMIT_DE_GATED_CONDITIONS
+        )
+        codes = self._fire_de_arrival(origin="IN", purpose="sabbatical")
+        self.assertNotIn("RESID-PERMIT-DE", codes)
 
     def test_arrival_confirmed_creates_helfo1_and_resolves_blocker(self) -> None:
         # Fire destination first so GP-7-04 exists to serve as a blocker
