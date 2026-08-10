@@ -1,6 +1,14 @@
 import React from 'react';
 import { PublicLayout } from '../../components/public';
-import { Section, HeroSurface, FadeIn, CTAButton } from '../../components/marketing';
+// Direct imports, NOT the components/marketing barrel. The barrel re-exports
+// InlineDemoForm, which statically imports api/client -> supabaseAuth ->
+// @supabase/supabase-js, whose realtime client throws on Node 20 (.nvmrc, what CI runs)
+// and fails the prerender build. Importing one component through a barrel drags the
+// whole barrel's graph in.
+import { Section } from '../../components/marketing/Section';
+import { HeroSurface } from '../../components/marketing/HeroSurface';
+import { FadeIn } from '../../components/marketing/FadeIn';
+import { CTAButton } from '../../components/marketing/CTAButton';
 import { AdLeadForm } from '../../components/marketing/AdLeadForm';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { usePageMeta } from '../../hooks/usePageMeta';

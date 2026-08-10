@@ -143,7 +143,12 @@ async function main() {
     console.log(`prerender: wrote ${path.relative(ROOT, path.join(outDir, 'index.html'))} (${markup.length} bytes of markup)`);
   }
 
-  await rm(SSR_OUT, { recursive: true, force: true });
+  // KEEP_PRERENDER_SSR=1 leaves the intermediate bundle for inspection. Useful for
+  // answering "what did the SSR graph actually pull in?" — which is how the
+  // @supabase/supabase-js WebSocket failure on Node 20 was tracked down.
+  if (!process.env.KEEP_PRERENDER_SSR) {
+    await rm(SSR_OUT, { recursive: true, force: true });
+  }
 }
 
 main().catch((err) => {

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { leadCaptureAPI } from '../../api/client';
 import { emitMarketingEvent } from '../../analytics';
 
 /**
@@ -54,6 +53,14 @@ export const AdLeadForm: React.FC<AdLeadFormProps> = ({
     const question = textQuestion?.label ?? selectQuestion?.label;
 
     try {
+      // Imported lazily, and that is load-bearing — not a micro-optimisation.
+      // api/client.ts pulls in ./supabaseAuth -> @supabase/supabase-js, whose realtime
+      // client throws "Node.js detected but native WebSocket not found" on Node 20
+      // (.nvmrc), which is what CI runs. A top-level import puts that in the PRERENDER
+      // module graph and fails the build — it passed locally only because Node 26 has a
+      // global WebSocket. Keeping it out of the module graph also keeps Supabase off
+      // these landing pages' critical path, which matters for the CWV budget.
+      const { leadCaptureAPI } = await import('../../api/client');
       await leadCaptureAPI.submit({
         email: email.trim(),
         source: 'marketing_site',

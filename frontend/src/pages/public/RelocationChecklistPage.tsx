@@ -1,6 +1,11 @@
 import React from 'react';
 import { PublicLayout } from '../../components/public';
-import { Section, HeroSurface, FadeIn } from '../../components/marketing';
+// Direct imports, NOT the components/marketing barrel — see MobilityTeamsPage for why
+// (the barrel drags @supabase/supabase-js into the prerender graph and breaks the build
+// on the Node version CI runs).
+import { Section } from '../../components/marketing/Section';
+import { HeroSurface } from '../../components/marketing/HeroSurface';
+import { FadeIn } from '../../components/marketing/FadeIn';
 import { AdLeadForm } from '../../components/marketing/AdLeadForm';
 import { usePageMeta } from '../../hooks/usePageMeta';
 import { useAdEngagementTracking } from '../../hooks/useAdEngagementTracking';
