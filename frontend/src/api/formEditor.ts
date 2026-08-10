@@ -23,8 +23,13 @@ import type { CaseFormSummary } from './dossier';
 export interface FieldValueItem {
   field_id: string;
   label: string;
-  /** Optional Norwegian (or other-language) label for the EN/NO toggle.
+  /** The label in the form's OWN language, resolved server-side from the template's
+   *  source_language (label_nb for a Norwegian sheet, label_de for a German one, …).
+   *  null when the template is English or seeded no translation for this field.
    *  Labels translate for comprehension; identifier VALUES never do. */
+  label_localised?: string | null;
+  /** @deprecated Use label_localised. Populated only for a Norwegian template, which is
+   *  what this field meant before source_language existed. */
   label_nb?: string | null;
   field_type: string;         // text | date | select | boolean | number | ...
   required: boolean;

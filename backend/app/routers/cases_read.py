@@ -43,6 +43,7 @@ from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.roadmap_projection import project_tracks, track_label_for_form
 from ..services.confidence_mapping import tier_to_confidence
+from ..services.localised_labels import localised_label
 from ..services.roadmap_lead_times import lead_time_days_for
 from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
 from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case, gate_ai_roadmap
@@ -275,8 +276,15 @@ class FieldValueItem(BaseModel):
     """A single field value as returned by the GET endpoint."""
     field_id: str
     label: str
-    # Optional Norwegian (or other-language) label for the EN/NO dossier toggle.
+    # The label in the form's OWN language, resolved from the template's source_language
+    # (label_nb for a Norwegian sheet, label_de for a German one, …). Drives the label
+    # toggle. None when the template is English or seeded no translation for the field —
+    # the client then shows `label`, or machine-translates it.
     # Labels are translated for comprehension; identifier VALUES never are.
+    label_localised: Optional[str] = None
+    # Deprecated alias, kept so an older client keeps working. Always equal to
+    # label_localised on a Norwegian template and None on any other, which is exactly what
+    # it meant before source_language existed. New clients read label_localised.
     label_nb: Optional[str] = None
     field_type: str           # text | date | select | boolean | …
     required: bool
@@ -539,6 +547,11 @@ def _load_form_with_template(
                    ft.category AS template_category,
                    ft.version AS template_version,
                    ft.fields  AS template_fields,
+                   -- The authority's own language. get_form_pdf needs it to print the
+                   -- localised label under each English one; without it selected here the
+                   -- lookup would silently find nothing and the sheet would render
+                   -- English-only with no error to notice.
+                   ft.source_language AS template_source_language,
                    cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes
             FROM {_pg_table('case_forms')} cf
             -- [P4-3] LEFT JOIN so ad-hoc forms (form_template_id IS NULL) still appear.
@@ -1464,14 +1477,22 @@ def get_form_fields(
         except (json.JSONDecodeError, TypeError):
             raw_fields = []
 
+    # The label language is the TEMPLATE's, not the viewer's — which authority's form this is.
+    template_language = form_row.get("template_source_language") or "en"
+
     items: List[FieldValueItem] = []
     for fd in sorted(raw_fields, key=lambda f: f.get("position", 0)):
         fid = fd.get("id", "")
         sv = stored.get(fid)
+        localised = localised_label(fd, template_language)
         items.append(FieldValueItem(
             field_id=fid,
             label=fd.get("label", fid),
-            label_nb=fd.get("label_nb"),
+            label_localised=localised,
+            # Deprecated: only ever populated for a Norwegian template, so an older client
+            # sees exactly what it saw before and a German sheet does not surprise it with a
+            # German string in a field named _nb.
+            label_nb=localised if template_language == "nb" else None,
             field_type=fd.get("type", "text"),
             required=bool(fd.get("required", False)),
             position=int(fd.get("position", 0)),
@@ -1798,6 +1819,9 @@ def get_form_pdf(
                             fields=template_fields,
                             values=field_values,
                             sources=field_sources,
+                            # Prints each label in the authority's own language beneath the
+                            # English one, so the employee can match the sheet to the counter.
+                            source_language=form_row.get("template_source_language"),
                         )
                     except Exception:  # noqa: BLE001 — never turn a download into a 500
                         logger.exception(
