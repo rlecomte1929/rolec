@@ -470,6 +470,16 @@ jobs:
       - name: Check for prohibited compliance claims
         run: python scripts/check_compliance_claims.py
 
+      # The ADS geography rule permits EU ad targeting only while no third-party ad
+      # pixel is installed — a pixel is the one thing that makes EU traffic legally
+      # different (ePrivacy Art. 5(3): storing/accessing information on a device).
+      # Runs in this job because it is the same kind of promise: a sentence in a doc
+      # that is worthless unless something measures it. ADS-4's gate G1 sat ticked
+      # while both landing pages served an empty shell to every crawler, precisely
+      # because nobody ran the check.
+      - name: Check no ungated ad pixel on the public surface
+        run: python scripts/check_ad_pixel_consent.py
+
   rls-coverage:
     # AUDIT-A3: lists `public.*` + `rce.*` tables with zero RLS policies and asserts
     # each one is on the supabase/rls_allowlist.txt allowlist. Drains over time.

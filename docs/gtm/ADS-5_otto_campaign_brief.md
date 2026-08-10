@@ -26,19 +26,15 @@
 > framings earned clicks. Segment-level engagement is readable at this volume; cost-per-
 > qualified-lead is not. Report it as what it is.
 >
-> **3 — 🔴 the geography rule and the actual campaign contradict each other, and only
-> Romain can settle it.** This brief says *"US and UK only. No EU member state may be
-> targeted."* The campaign Otto is primed to run targets **FR→NO HR generalists** — France
-> is an EU member state.
+> **3 — ✅ the geography contradiction is resolved.** This brief used to say *"US and UK
+> only, no EU member state"* while the campaign Otto is primed to run targets **FR→NO** —
+> France being an EU member state. The old rule was asserted in two places and justified
+> in neither.
 >
-> The rule's origin is ADS-1 question 4, which asks whether Otto can buy UK inventory *"or
-> is it US-only"*. That reads as a **platform-capability** question about ChatGPT ads,
-> which launched US-first — not as a ReloPass policy. If that is right, the rule does not
-> transfer to Meta, where EU targeting is ordinary and where our actual first corridor
-> lives. If instead it was a deliberate data-protection or ad-policy choice, it stands and
-> the FR→NO campaign cannot run as planned.
->
-> **Do not resolve this by inference.** State which it is, in writing, before spend.
+> Replaced with a condition that can actually be checked: **US, UK and EU are permitted
+> while no third-party ad pixel is installed** — see the Geography section below, and
+> `scripts/check_ad_pixel_consent.py`, which enforces it. What remains open is only the
+> *capability* half: whether Otto can buy EU/UK inventory at all (ADS-1 item 4).
 
 
 
@@ -70,7 +66,35 @@ non-buyer traffic into a live target-account list for outbound.
 
 **Budget split: 60% Segment A / 40% Segment B.**
 **Bidding: CPC, $3–4.**
-**Geography: US and UK only.** No EU member state may be targeted.
+
+**Geography: US, UK and EU permitted — for as long as no third-party ad pixel is installed.**
+
+This replaces an earlier blanket *"US and UK only, no EU member state"*, which appeared in this brief and in
+ADS-1 with no stated reason and deadlocked against our own first corridor, FR→NO. The rule it replaces was a
+*platform-capability* note about ChatGPT ads (a US-first product) that hardened into a policy sentence.
+
+The thing that actually differs in the EU is not who you target — it is **what runs on the visitor's device**.
+ePrivacy Art. 5(3) governs storing or accessing information on a device; that is what an ad pixel does, and
+that is what needs consent. Interest-based targeting where we upload no customer data makes the ad platform
+the controller, not us.
+
+So the condition is checkable rather than rhetorical:
+
+- **No ad pixel is installed today** — no `fbq`, no Meta or OpenAI pixel anywhere in the frontend. Verified
+  2026-08-10, and enforced from now on by `scripts/check_ad_pixel_consent.py`.
+- **Attribution does not need one.** ADS-4 is first-party by design: UTMs → `analytics_events`, and the
+  creative angle encoded into `leads.utm_campaign` as `campaign|angle`. Nothing in this test's read-out comes
+  from a pixel.
+- **The cost of going without is ~zero at this budget.** A pixel buys platform-side conversion optimisation,
+  and $174 is ~45–58 clicks. No ad platform learns a conversion model from 50 events. Revisit for a funded
+  campaign, not this one.
+
+**If a pixel is ever added, EU traffic re-gates behind the existing ConsentBanner** (`frontend/src/App.tsx`,
+mounted globally, so it already covers both landing pages). The guard script fails the build if a pixel
+appears without that gate.
+
+Still owed by Audos, and unchanged by any of the above: **can Otto actually buy EU/UK inventory on Meta, or
+is it US-only?** That is a capability question, not a policy one — see ADS-1 item 4.
 
 ---
 

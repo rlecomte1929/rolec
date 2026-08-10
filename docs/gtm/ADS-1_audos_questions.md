@@ -60,9 +60,25 @@ Audos no work.
 
 3. **What is the actual credit amount, and how long do we have to spend it?**
 
-4. **Which geographies can Otto buy?** Can it buy UK, or is it US-only?
-   No EU member state can be targeted. If Otto is US-only, this test is far narrower than
-   it looks and the budget split should be reconsidered before it runs.
+4. **Which geographies can Otto buy?** Can it buy UK and the EU, or is it US-only?
+   If Otto is US-only, this test is far narrower than it looks and the budget split should
+   be reconsidered before it runs.
+
+   > **Amended 2026-08-10.** This item used to carry a second sentence — *"No EU member
+   > state can be targeted"* — with no reason attached, and it propagated into the ADS-5
+   > brief as policy. It was never policy. It belonged to ChatGPT ads being a US-first
+   > product, i.e. the same capability question this item already asks. Left as written it
+   > blocked FR→NO, our own first corridor, on a rule nobody could justify.
+   >
+   > **Our half is now answered: EU targeting is permitted while no third-party ad pixel is
+   > installed.** The EU-specific obligation is about tags on the visitor's device
+   > (ePrivacy Art. 5(3)), not about who sees an ad; no pixel exists today, ADS-4's
+   > attribution is first-party and does not need one, and
+   > `scripts/check_ad_pixel_consent.py` fails the build if one is added without a consent
+   > gate. Reasoning in full in the ADS-5 Geography section.
+   >
+   > **Audos still owes the capability half** — that is the question above, and it is the
+   > only part of item 4 that is still open.
 
 5. **The domain question above.** Can ads point at relopass.com? If not, can the pixel and
    lead data still sit on our domain?
