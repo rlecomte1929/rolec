@@ -27,7 +27,10 @@ from uuid import UUID
 
 from backend.relopass.agents import AgentRegistry
 from backend.relopass.agents.extraction import EXTRACTION_AGENT_REGISTRY
-from backend.relopass.agents.extraction.passport_td3 import PassportTd3Agent
+from backend.relopass.agents.extraction.passport_td3 import (
+    NullAzureDIProvider,
+    PassportTd3Agent,
+)
 
 from .rce_ocr_parser import OcrParseResult
 
@@ -39,6 +42,8 @@ _MRZ_TYPES = {"ID_CARD", "PASSPORT_TD3", "PASSPORT"}
 _SYNC_TYPES = {"ID_CARD"}
 # Types whose agent takes a case-scoped FamilyEntityResolver.
 _RESOLVER_TYPES = {"BIRTH_CERT", "FOSTER_CARE_ORDER"}
+# Types whose agent takes an Azure Document Intelligence provider.
+_DI_PROVIDER_TYPES = {"PASSPORT_TD3", "PASSPORT"}
 
 
 @dataclass(frozen=True)
@@ -76,6 +81,37 @@ def _agent_class(document_type_code: str) -> Optional[type]:
     return EXTRACTION_AGENT_REGISTRY.get(document_type_code)
 
 
+def agent_kwargs(
+    document_type_code: str,
+    *,
+    registry: Any,
+    sink: Any,
+    resolver: Any = None,
+) -> dict:
+    """The constructor kwargs for one document type's agent.
+
+    Public and factored out of ``dispatch_and_run`` so the wiring guard can build every
+    registered agent EXACTLY the way production does. A test that reimplements this
+    contract can drift from the real one and prove nothing — which is how the passport
+    defect below survived: ``test_extraction_agent_wiring`` asserted ``_agent_class()``
+    returned a class but never instantiated it.
+
+    PassportTd3Agent declares ``di_provider`` with no default, so building it with only
+    (registry, sink) raised TypeError, the fail-soft caught it, and EVERY passport
+    recorded status='failed' — the one document type whose OCR key is actually
+    configured in production. ``NullAzureDIProvider`` returns the document's own text
+    and no bboxes, which is exactly the MRZ-only path that works today; there is no
+    Azure DI adapter or config anywhere in the repo, so Null is the honest production
+    value rather than a placeholder for one.
+    """
+    kwargs: dict = {"registry": registry, "sink": sink}
+    if document_type_code in _RESOLVER_TYPES and resolver is not None:
+        kwargs["resolver"] = resolver
+    if document_type_code in _DI_PROVIDER_TYPES:
+        kwargs["di_provider"] = NullAzureDIProvider()
+    return kwargs
+
+
 async def dispatch_and_run(
     *,
     ocr_result: OcrParseResult,
@@ -105,10 +141,7 @@ async def dispatch_and_run(
 
     try:
         registry = AgentRegistry(agent_storage)
-        kwargs: dict = {"registry": registry, "sink": sink}
-        if code in _RESOLVER_TYPES and resolver is not None:
-            kwargs["resolver"] = resolver
-        agent = agent_cls(**kwargs)
+        agent = agent_cls(**agent_kwargs(code, registry=registry, sink=sink, resolver=resolver))
         agent.register()
 
         if code in _SYNC_TYPES:  # ID_CARD — deterministic, synchronous

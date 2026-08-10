@@ -14,6 +14,7 @@ from uuid import uuid4
 from backend.relopass.agents.models import ParsedDocument
 from backend.app.services.rce_ocr_parser import (
     OcrParseResult,
+    _bucket_for_storage_path,
     mrz_text_from_lines,
     parse_stored_document,
     passport_result_to_parsed_document,
@@ -152,3 +153,38 @@ def test_parse_stored_download_failure_is_failsoft():
         downloader=_boom_dl,
     ))
     assert out.ok is False
+
+
+# ── Storage-bucket resolution ─────────────────────────────────────────────────
+#
+# Every test above injects `downloader=`, which is exactly why the real one went
+# unexercised: `_default_downloader` was hardcoded to the immigration bucket, so
+# every upload from the case_documents path 404'd and was swallowed by the
+# fail-soft above. These assert the pure resolver instead, so no Supabase is needed.
+
+
+def test_case_docs_prefix_resolves_to_the_case_documents_bucket():
+    """The roadmap-CTA upload path: case_documents.py writes
+    case-docs/{case}/{key}/{ts}_{file} into the `case-documents` bucket."""
+    path = "case-docs/356442ac-ea69-490e-995c-6652bec959e2/passport_copy/20260810T101112_passport.pdf"
+    assert _bucket_for_storage_path(path) == "case-documents"
+
+
+def test_immigration_path_still_resolves_to_the_immigration_bucket():
+    """document_upload_service.py writes {case_id}/{doc_id}.{ext} into
+    `immigration-documents`. This is the pre-existing behaviour and must not move."""
+    assert _bucket_for_storage_path("8e1677d3-d30f-470f-a2a4-feb7ebfb9132/9eda25ef.pdf") == (
+        "immigration-documents"
+    )
+
+
+def test_bucket_resolution_defaults_safely_on_empty_input():
+    """storage_uri is nullable in rce.documents — never raise on it."""
+    assert _bucket_for_storage_path("") == "immigration-documents"
+    assert _bucket_for_storage_path(None) == "immigration-documents"
+
+
+def test_case_docs_prefix_must_be_anchored():
+    """A path merely CONTAINING 'case-docs/' is not the case-documents shape —
+    only a prefix is, so this must not over-match."""
+    assert _bucket_for_storage_path("archive/case-docs/x.pdf") == "immigration-documents"

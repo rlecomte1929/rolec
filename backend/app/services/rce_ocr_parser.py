@@ -191,10 +191,41 @@ def _classify(file_name: Optional[str], mime_type: Optional[str]) -> str:
     return classify_document(file_name, mime_type)
 
 
+# Two upload paths write into rce.documents, into DIFFERENT storage buckets:
+#
+#   document_upload_service (immigration)  -> "immigration-documents", uri "{case_id}/{doc_id}.{ext}"
+#   case_documents (the roadmap-CTA path)  -> "case-documents",        uri "case-docs/{case}/{key}/..."
+#
+# rce.documents has no bucket column, but the two prefixes are distinguishable, so the
+# stored storage_uri already carries the discriminator. Before this was resolved the
+# downloader was hardcoded to the immigration bucket, so every case_documents upload
+# 404'd here and was swallowed by parse_stored_document's fail-soft — the document row
+# existed, the extraction silently never ran.
+#
+# Constants are local on purpose: BUCKET_IMMIGRATION_DOCS is already duplicated across
+# two service modules, and the "case-documents" constant (_FORM_DOC_BUCKET) lives in a
+# ROUTER — a service importing a router is the wrong direction. AIQ-1764 also
+# deliberately decoupled this module from document_extraction_queue; importing from it
+# again would undo that.
+_BUCKET_CASE_DOCUMENTS = "case-documents"
+_BUCKET_IMMIGRATION_DOCS = "immigration-documents"
+_CASE_DOCS_PREFIX = "case-docs/"
+
+
+def _bucket_for_storage_path(storage_path: Optional[str]) -> str:
+    """The storage bucket a given rce.documents.storage_uri lives in."""
+    return (
+        _BUCKET_CASE_DOCUMENTS
+        if (storage_path or "").startswith(_CASE_DOCS_PREFIX)
+        else _BUCKET_IMMIGRATION_DOCS
+    )
+
+
 def _default_downloader(storage_path: str) -> bytes:
     from .supabase_client import get_supabase_admin_client
 
-    return get_supabase_admin_client().storage.from_("immigration-documents").download(storage_path)
+    bucket = _bucket_for_storage_path(storage_path)
+    return get_supabase_admin_client().storage.from_(bucket).download(storage_path)
 
 
 async def _default_passport_ocr(content: bytes, mime_type: str) -> Any:
