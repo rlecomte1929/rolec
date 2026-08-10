@@ -307,7 +307,7 @@ def get_profile_employee(
             enc_key = _get_encryption_key()
             with db.engine.begin() as conn:
                 row = conn.execute(
-                    text("SELECT pgp_sym_decrypt(:enc::bytea, :key) AS decrypted"),
+                    text("SELECT pgp_sym_decrypt(CAST(:enc AS bytea), :key) AS decrypted"),
                     {"enc": p["passport_number"], "key": enc_key},
                 ).mappings().first()
             if row:
