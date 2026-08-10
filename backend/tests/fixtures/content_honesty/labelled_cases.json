@@ -15,9 +15,17 @@
       "label": "violation",
       "reason": "FreizuegG/EU § 2(4) — an EU citizen requires no residence title, and the old Freizuegigkeitsbescheinigung was abolished. Fields demand a biometric photo and the passport original for a document that cannot be issued to them. Fixed by 20261023000000; the pre-fix shape is kept here as a regression case.",
       "rules": [
-        {"event": "roadmap.arrival_confirmed", "priority": 50,
-         "conditions": {"destination_country": "DE"},
-         "for_persons": ["employee"], "blocked_by_template_code": null}
+        {
+          "event": "roadmap.arrival_confirmed",
+          "priority": 50,
+          "conditions": {
+            "destination_country": "DE"
+          },
+          "for_persons": [
+            "employee"
+          ],
+          "blocked_by_template_code": null
+        }
       ]
     },
     {
@@ -27,9 +35,18 @@
       "label": "violation",
       "reason": "Familiennachzug is a third-country-national procedure. A spouse of an EU citizen exercising free movement holds derived rights under FreizuegG/EU § 3 and needs no family reunion visa. Fires on roadmap.profile_completed, earlier in the journey than RESID-PERMIT-DE.",
       "rules": [
-        {"event": "roadmap.profile_completed", "priority": 85,
-         "conditions": {"destination_country": "DE", "has_spouse": true},
-         "for_persons": ["spouse"], "blocked_by_template_code": null}
+        {
+          "event": "roadmap.profile_completed",
+          "priority": 85,
+          "conditions": {
+            "destination_country": "DE",
+            "has_spouse": true
+          },
+          "for_persons": [
+            "spouse"
+          ],
+          "blocked_by_template_code": null
+        }
       ]
     },
     {
@@ -39,9 +56,18 @@
       "label": "violation",
       "reason": "As FAM-SPOUSE — derived free-movement rights under FreizuegG/EU § 3 cover a minor child, so no family reunion visa exists for them.",
       "rules": [
-        {"event": "roadmap.profile_completed", "priority": 84,
-         "conditions": {"destination_country": "DE", "has_children": true},
-         "for_persons": ["each_child"], "blocked_by_template_code": null}
+        {
+          "event": "roadmap.profile_completed",
+          "priority": 84,
+          "conditions": {
+            "destination_country": "DE",
+            "has_children": true
+          },
+          "for_persons": [
+            "each_child"
+          ],
+          "blocked_by_template_code": null
+        }
       ]
     },
     {
@@ -51,9 +77,17 @@
       "label": "clean",
       "reason": "§ 17 BMG requires anyone moving into a German dwelling to register within two weeks, regardless of nationality. Ungated is CORRECT — gating it would drop the one real German arrival obligation. This is the case that stops the guard being a blanket ungated-template detector.",
       "rules": [
-        {"event": "roadmap.arrival_confirmed", "priority": 90,
-         "conditions": {"destination_country": "DE"},
-         "for_persons": ["employee"], "blocked_by_template_code": null}
+        {
+          "event": "roadmap.arrival_confirmed",
+          "priority": 90,
+          "conditions": {
+            "destination_country": "DE"
+          },
+          "for_persons": [
+            "employee"
+          ],
+          "blocked_by_template_code": null
+        }
       ]
     },
     {
@@ -63,9 +97,18 @@
       "label": "clean",
       "reason": "Permit-like AND on an EEA destination, but declares visa_type skilled_worker, which _build_context cannot produce on an EEA corridor. Unsatisfiable by an EEA free-mover by construction — it looks wrong and is right.",
       "rules": [
-        {"event": "roadmap.destination_confirmed", "priority": 110,
-         "conditions": {"destination_country": "DE", "visa_type": "skilled_worker"},
-         "for_persons": ["employee"], "blocked_by_template_code": null}
+        {
+          "event": "roadmap.destination_confirmed",
+          "priority": 110,
+          "conditions": {
+            "destination_country": "DE",
+            "visa_type": "skilled_worker"
+          },
+          "for_persons": [
+            "employee"
+          ],
+          "blocked_by_template_code": null
+        }
       ]
     },
     {
@@ -75,9 +118,18 @@
       "label": "clean",
       "reason": "Permit-like and ungated, but the destination is US. visa_type is eea_registration only when BOTH countries are EEA, so this rule is unreachable by an EEA free-mover. One of eight such templates (BRP-COLLECT, DEP-*, JP-*, US-*) that must NOT be 'fixed'.",
       "rules": [
-        {"event": "roadmap.profile_completed", "priority": 85,
-         "conditions": {"destination_country": "US", "has_spouse": true},
-         "for_persons": ["spouse"], "blocked_by_template_code": null}
+        {
+          "event": "roadmap.profile_completed",
+          "priority": 85,
+          "conditions": {
+            "destination_country": "US",
+            "has_spouse": true
+          },
+          "for_persons": [
+            "spouse"
+          ],
+          "blocked_by_template_code": null
+        }
       ]
     },
     {
@@ -87,10 +139,102 @@
       "label": "clean",
       "reason": "Explicitly gated on visa_type eea_registration — it is FOR EEA free-movers — and it is a data sheet, not a permit. The invariant must not catch the one thing we deliberately built for this corridor.",
       "rules": [
-        {"event": "roadmap.destination_confirmed", "priority": 100,
-         "conditions": {"destination_country": "NO", "origin_country": "FR",
-                        "visa_type": "eea_registration"},
-         "for_persons": ["employee"], "blocked_by_template_code": null}
+        {
+          "event": "roadmap.destination_confirmed",
+          "priority": 100,
+          "conditions": {
+            "destination_country": "NO",
+            "origin_country": "FR",
+            "visa_type": "eea_registration"
+          },
+          "for_persons": [
+            "employee"
+          ],
+          "blocked_by_template_code": null
+        }
+      ]
+    },
+    {
+      "code": "ES-FAM-SPOUSE",
+      "name": "Family reunification - spouse (Reagrupacion)",
+      "category": "family",
+      "label": "violation",
+      "reason": "Reagrupacion familiar is the third-country-national route under LO 4/2000. A spouse of an EU citizen exercising free movement is covered by RD 240/2007 (transposing Directive 2004/38/EC) and files no reunification application. Missed by the AIQ-1795b guard because the name carries neither 'visa' nor 'permit' and the category is 'family'.",
+      "rules": [
+        {
+          "event": "roadmap.profile_completed",
+          "priority": 85,
+          "conditions": {
+            "destination_country": "ES",
+            "has_spouse": true
+          },
+          "for_persons": [
+            "spouse"
+          ],
+          "blocked_by_template_code": null
+        }
+      ]
+    },
+    {
+      "code": "NL-FAM-SPOUSE",
+      "name": "Family reunification - partner",
+      "category": "family",
+      "label": "violation",
+      "reason": "The Dutch MVV/TEV reunification route does not apply to a partner of an EU citizen exercising free movement, who is covered by Directive 2004/38/EC as implemented in the Vreemdelingenwet. Name matches no permit token; category is 'family'.",
+      "rules": [
+        {
+          "event": "roadmap.profile_completed",
+          "priority": 85,
+          "conditions": {
+            "destination_country": "NL",
+            "has_spouse": true
+          },
+          "for_persons": [
+            "spouse"
+          ],
+          "blocked_by_template_code": null
+        }
+      ]
+    },
+    {
+      "code": "UTL-2011F",
+      "name": "Soknad om familieinnvandring (ektefelle)",
+      "category": "family",
+      "label": "violation",
+      "reason": "UDI's familieinnvandring application is the third-country route. An EEA national's family member registers under the EEA scheme (utlendingsloven kap. 13) instead. Norwegian-language name matches no English permit token - the exact blind spot that let six templates through.",
+      "rules": [
+        {
+          "event": "roadmap.profile_completed",
+          "priority": 90,
+          "conditions": {
+            "destination_country": "NO",
+            "has_spouse": true
+          },
+          "for_persons": [
+            "spouse"
+          ],
+          "blocked_by_template_code": null
+        }
+      ]
+    },
+    {
+      "code": "NL-BSN",
+      "name": "BSN registration (Basisregistratie Personen)",
+      "category": "registration",
+      "label": "clean",
+      "reason": "Ungated on an EEA destination, and correctly so: everyone residing in NL enrols in the BRP and receives a BSN regardless of nationality or visa route. Pins that widening the classifier to category 'family' did not drag registration steps in with it.",
+      "rules": [
+        {
+          "event": "roadmap.arrival_confirmed",
+          "priority": 70,
+          "conditions": {
+            "destination_country": "NL"
+          },
+          "for_persons": [
+            "employee"
+          ],
+          "blocked_by_template_code": null
+        }
       ]
     }
   ]

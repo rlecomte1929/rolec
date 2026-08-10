@@ -88,7 +88,28 @@ from backend.app.services.eea_countries import EEA_COUNTRIES as _EEA_COUNTRIES  
 # A template is permit-like when its subject is a document granting or evidencing a
 # right to reside or work. Matched on name as well as category because the seeds are
 # inconsistent: RESID-PERMIT-DE is category 'registration', FAM-SPOUSE is 'family'.
-_PERMIT_CATEGORIES = {"work_permit"}
+#
+# [AIQ-1795c] 'family' is here because the name regex alone missed six live defects.
+# The DE templates were caught by coincidence — they are named "Family reunion VISA -
+# spouse (FAMILIENNACHZUG)", two accidental token hits. Their Spanish, Dutch and
+# Norwegian equivalents are "Family reunification - spouse" and "Soeknad om
+# familieinnvandring", which match nothing, so the guard passed while ES-FAM-SPOUSE,
+# ES-FAM-CHILD, NL-FAM-SPOUSE, NL-FAM-CHILD, UTL-2011B and UTL-2011F all attached to
+# EEA free-movers in production.
+#
+# Categorising is what fixes this, not more nouns: a name allowlist fails on the next
+# language added, and there is always a next language. The whole category is safe to
+# include because `rule_is_eea_reachable` gates on an EEA destination anyway — a
+# dependent-visa template for the US stays clean (US-DEP-SPOUSE in the corpus is
+# category 'family' and is correctly NOT flagged).
+#
+# Deliberately NOT widened further. The seeds use exactly eight categories
+# (work_permit, family, registration, tax, health, banking, civil_documents,
+# data_sheet); 'immigration' and 'residence' do not exist, and adding them would be
+# speculative. The other six are legitimately ungated — everyone registers an address
+# and pays tax regardless of visa route — and flagging them is precisely the
+# false-positive noise that gets a guard switched off.
+_PERMIT_CATEGORIES = {"work_permit", "family"}
 _PERMIT_NAME_RE = re.compile(
     r"\b(permit|visa|residence\s+card|aufenthaltstitel|familiennachzug|"
     r"residence\s+permit|zairyu)\b",
@@ -293,17 +314,28 @@ def superseded_codes(migrations_dir: str = _MIGRATIONS) -> Dict[str, str]:
     out: Dict[str, str] = {}
     if not os.path.isdir(migrations_dir):
         return out
-    pat = re.compile(
-        r"UPDATE\s+(?:public\.)?form_templates\s+SET\b[^;]*?\btrigger_rules\s*=[^;]*?"
-        r"WHERE[^;]*?code\s*=\s*'([^']+)'",
-        re.IGNORECASE | re.DOTALL,
-    )
+    _UPDATE_HEAD = (r"UPDATE\s+(?:public\.)?form_templates\s+(?:\w+\s+)?SET\b"
+                    r"[^;]*?\btrigger_rules\s*=[^;]*?WHERE[^;]*?")
+    # `WHERE code = 'X'` — one template per statement.
+    pat_eq = re.compile(_UPDATE_HEAD + r"code\s*=\s*'([^']+)'",
+                        re.IGNORECASE | re.DOTALL)
+    # [AIQ-1795c] `WHERE code IN ('A', 'B', ...)` — one statement fixing several.
+    # Without this, a batched rewrite is invisible and every code it fixes is reported
+    # as an unfixed violation forever, which is the false positive this function exists
+    # to prevent. Matching only `code =` was the same mistake as matching permit-like
+    # templates by name: it keyed on incidental syntax rather than on meaning.
+    pat_in = re.compile(_UPDATE_HEAD + r"code\s+IN\s*\(([^)]*)\)",
+                        re.IGNORECASE | re.DOTALL)
+    _QUOTED = re.compile(r"'([^']+)'")
     for fname in sorted(os.listdir(migrations_dir)):
         if not fname.endswith(".sql"):
             continue
         body = open(os.path.join(migrations_dir, fname), encoding="utf-8").read()
-        for m in pat.finditer(body):
+        for m in pat_eq.finditer(body):
             out[m.group(1)] = fname
+        for m in pat_in.finditer(body):
+            for code in _QUOTED.findall(m.group(1)):
+                out[code] = fname
     return out
 
 
