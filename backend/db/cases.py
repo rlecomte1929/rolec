@@ -3940,7 +3940,7 @@ class CasesMixin:
                     text("""
                         UPDATE employee_tasks
                         SET status       = 'submitted',
-                            submission_data = COALESCE(:sub_data::jsonb, submission_data),
+                            submission_data = COALESCE(CAST(:sub_data AS jsonb), submission_data),
                             file_url     = COALESCE(:file_url, file_url),
                             submitted_at = :now,
                             updated_at   = :now
