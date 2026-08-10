@@ -14,11 +14,18 @@
  */
 
 export type EmployeeType = 'eea' | 'non-eea';
-export type Owner = 'HR' | 'Employee' | 'Both';
-export type Feasibility = 'green' | 'amber' | 'red';
+/**
+ * 'Employer (not engaged)' = employer-owned obligation on an unsupported move —
+ * the employer is absent from the case but the obligation is still theirs, and
+ * it must be SURFACED, never silently dropped or moved onto the employee.
+ * 'None' = no responsible party (confirmed-clear items).
+ */
+export type Owner = 'HR' | 'Employee' | 'Both' | 'Employer (not engaged)' | 'None';
+/** 'confirmed' = evaluated, nothing required — a positive state, never computed red/amber. */
+export type Feasibility = 'green' | 'amber' | 'red' | 'confirmed';
 
 /** Corridors the engine can run. */
-export type CorridorId = 'france-norway' | 'spain-ireland';
+export type CorridorId = 'france-norway' | 'spain-ireland' | 'norway-france';
 
 /**
  * What the requirement offsets are measured FROM.
@@ -45,8 +52,14 @@ export interface RequirementRule {
   criticalLeadTime?: boolean;
   /** Explicit dependency chain note. */
   dependencyNote?: string;
-  /** 'all' applies to every employee type; 'non-eea' only to non-EEA nationals. */
-  appliesTo: 'all' | 'non-eea';
+  /** 'all' applies to every employee type; 'eea' / 'non-eea' restrict to that type. */
+  appliesTo: 'all' | 'eea' | 'non-eea';
+  /**
+   * Positive "evaluated — nothing required" state (e.g. a French citizen's FR
+   * immigration step). Renders as a confirmed-clear item, never red/amber —
+   * the relief moment depends on the user SEEING that it was checked.
+   */
+  confirmedClear?: boolean;
 }
 
 export interface CaseRequirement extends RequirementRule {
@@ -77,7 +90,7 @@ export interface CaseCheckResult {
   /** Anchor date today or within 1 week → overdue/urgent summary. */
   urgentSummary: string | null;
   requirements: CaseRequirement[];
-  counts: { green: number; amber: number; red: number; total: number };
+  counts: { green: number; amber: number; red: number; confirmed: number; total: number };
 }
 
 /** A corridor's authored ruleset plus how its timeline is anchored. */
@@ -85,6 +98,10 @@ export interface CorridorDefinition {
   id: CorridorId;
   label: string;
   anchor: AnchorKind;
+  /** Overrides the anchor's display noun (e.g. 'departure date' for Norway → France). */
+  anchorNoun?: string;
+  /** Overrides the default "date has passed" warning — e.g. retrospective-triage copy. */
+  pastAnchorText?: string;
   requirements: RequirementRule[];
   employeeTypeLabel: (t: EmployeeType) => string;
   /**
@@ -466,6 +483,318 @@ export const SPAIN_IRELAND_REQUIREMENTS: RequirementRule[] = [
   },
 ];
 
+/**
+ * Norway → France (NO_FR) — AUTHORING DRAFT (Gap 1 of the v2 build spec).
+ *
+ * ⚠️ DRAFT / needs-source-verification. Sourced, informational content only —
+ * NOT counsel-assured, and never legal or tax advice in ReloPass's own voice
+ * (France, Loi 71-1130, is the binding jurisdiction). Items that cross into an
+ * individualised legal or tax determination are information-only and route to
+ * a regulated professional.
+ *
+ * Anchor: the DEPARTURE date from Norway (T−0) — past or future. The corridor
+ * was authored against a live validation case whose mover has ALREADY left
+ * Norway, so retrospective anchors are first-class: a wholly elapsed window
+ * renders red ("Window passed") for triage instead of being silently missed.
+ *
+ * The two structural facts this corridor exists to surface:
+ *  1. An unsupported move does NOT transfer employer obligations onto the
+ *     employee. Where the mover keeps their Norwegian employer, Reg. 883/2004
+ *     shifts social security to France — URSSAF registration and PE risk stay
+ *     employer-owned and render 'Employer (not engaged)', never dropped.
+ *  2. Norway is EEA but NOT the EU customs union: household goods and any
+ *     vehicle are a customs IMPORT into France, and the transfer-of-residence
+ *     relief is unlocked by the Norway exit paperwork gathered at departure.
+ */
+export const NORWAY_FRANCE_REQUIREMENTS: RequirementRule[] = [
+  // ── Phase B linchpin (decide before/around departure) ──
+  {
+    id: 'b1-applicable-social-security',
+    title: 'Determine which social-security system applies (EEA Reg. 883/2004)',
+    description:
+      'If you keep your Norwegian employer while living and working in France, the default outcome is FRANCE, not Norway: a permanent relocation falls under the place-of-work rule — it is not a posting, so no A1 exemption applies. This determination drives the employer\u2019s URSSAF obligation and your withholding setup. Verify against nav.no and the EEA coordination rules.',
+    offsetWeeks: -2,
+    owner: 'Both',
+    nonObvious: true,
+    dependencyNote: 'Linchpin — drives URSSAF registration and French withholding setup',
+    appliesTo: 'all',
+  },
+  {
+    id: 'c2b-french-long-stay-visa',
+    title: 'French long-stay visa / residence permit — route to an immigration professional',
+    description:
+      'Non-EEA nationals need a French long-stay visa or residence permit granted BEFORE establishing in France. This corridor draft covers the French/EEA-citizen return profile in depth — for a non-EEA move, have the immigration chain confirmed by a regulated professional before committing to dates.',
+    offsetWeeks: -8,
+    owner: 'Employee',
+    nonObvious: false,
+    criticalLeadTime: true,
+    dependencyNote: 'Information only — must be resolved by an immigration professional',
+    appliesTo: 'non-eea',
+  },
+  // ── Phase A — Norway exit admin ──
+  {
+    id: 'a2-preserve-bankid',
+    title: 'Preserve BankID before deregistering from Norway',
+    description:
+      'Sequencing trap: deregistration from the Folkeregister can disable the BankID you will still need to file the exit-year Norwegian tax return from abroad. Confirm with your bank how to keep BankID working before the move notice takes effect.',
+    offsetWeeks: 0,
+    owner: 'Employee',
+    nonObvious: true,
+    dependencyNote: 'Must be secured BEFORE the Folkeregisteret move notice takes effect',
+    appliesTo: 'all',
+  },
+  {
+    id: 'a4-skattekort-final-settlement',
+    title: 'Cancel / settle the Norwegian tax card (skattekort) and final payroll',
+    description:
+      'Close out the Norwegian tax card and confirm the final salary settlement around departure so the exit-year figures are clean. Source: skatteetaten.no.',
+    offsetWeeks: 0,
+    owner: 'Employee',
+    nonObvious: false,
+    appliesTo: 'all',
+  },
+  {
+    id: 'a5-folketrygden-membership-end',
+    title: 'End folketrygden (Norwegian National Insurance) membership',
+    description:
+      'Membership of the Norwegian scheme must end in step with the social-security determination — a gap leaves you uncovered, an overlap risks double contributions. Needs input from both you and the employer. Source: nav.no / folketrygdloven.',
+    offsetWeeks: 0,
+    owner: 'Both',
+    nonObvious: true,
+    dependencyNote: 'Align with the Reg. 883/2004 determination — avoid a gap or double membership',
+    appliesTo: 'all',
+  },
+  {
+    id: 'a6-helfo-ehic-cover-end',
+    title: 'End HELFO health cover and handle the EHIC',
+    description:
+      'Norwegian health cover ends with departure. The trap is the COVERAGE GAP between HELFO ending and French CPAM cover starting — plan the CPAM registration immediately so the gap is as short as possible. Source: helfo.no.',
+    offsetWeeks: 0,
+    owner: 'Employee',
+    nonObvious: true,
+    dependencyNote: 'Ties to CPAM registration in France — mind the coverage gap',
+    appliesTo: 'all',
+  },
+  {
+    id: 'a8-nav-active-benefits',
+    title: 'Notify NAV of any active benefits (barnetrygd etc.)',
+    description:
+      'Only applies if you receive Norwegian benefits — they must be notified of the move abroad around departure. Source: nav.no.',
+    offsetWeeks: 0,
+    owner: 'Employee',
+    nonObvious: false,
+    appliesTo: 'all',
+  },
+  {
+    id: 'a9-close-norwegian-admin',
+    title: 'Close or transition Norwegian banking, insurance, lease, utilities and mail',
+    description:
+      'Wind down Norwegian contracts and set up mail forwarding — but keep ONE Norwegian bank account open until the exit-year tax refund has cleared.',
+    offsetWeeks: 0,
+    owner: 'Employee',
+    nonObvious: false,
+    appliesTo: 'all',
+  },
+  {
+    id: 'a1-folkeregisteret-move-notice',
+    title: 'Report the move abroad to Folkeregisteret (flyttemelding via Skatteetaten)',
+    description:
+      'The legal move-abroad notice to the Norwegian population register, due within roughly 8 days around departure (verify the current rule at skatteetaten.no). If you have already left Norway and this window has elapsed, it renders red — file it retrospectively now.',
+    offsetWeeks: 1,
+    owner: 'Employee',
+    nonObvious: true,
+    dependencyNote: 'Legal window ~8 days around departure (verify) — retrospective red if elapsed',
+    appliesTo: 'all',
+  },
+  {
+    id: 'a10-customs-export-evidence',
+    title: 'Assemble Norway exit evidence for French customs relief',
+    description:
+      'Gather proof of more than 12 months of Norwegian residence and more than 6 months of ownership of the goods you are bringing. This Phase A paperwork is exactly what unlocks the French transfer-of-residence customs relief later — without it the import relief claim stalls.',
+    offsetWeeks: 1,
+    owner: 'Employee',
+    nonObvious: true,
+    dependencyNote: 'Gates: household-goods customs relief and vehicle import in France',
+    appliesTo: 'all',
+  },
+  // ── Phase C — France establishment ──
+  {
+    id: 'c0-justificatif-de-domicile',
+    title: 'Establish a justificatif de domicile (proof of address) — attestation d\u2019h\u00e9bergement if hosted',
+    description:
+      'Staying temporarily with family? The proof-of-address package is: attestation d\u2019h\u00e9bergement from the host + the host\u2019s own proof of address + proof of relationship/ID. Nearly every French registration hangs off this — do it as early as possible. Source: service-public.fr.',
+    offsetWeeks: 1,
+    owner: 'Employee',
+    nonObvious: true,
+    dependencyNote: 'Gates: CPAM registration, French bank account, vehicle registration',
+    appliesTo: 'all',
+  },
+  {
+    id: 'c2-immigration-right-of-entry',
+    title: 'Immigration / right to enter and reside in France',
+    description:
+      'As a French citizen you have an unconditional right of entry and residence — no visa, permit, or immigration registration is required. Evaluated and confirmed: nothing to do here.',
+    offsetWeeks: 1,
+    owner: 'None',
+    nonObvious: false,
+    confirmedClear: true,
+    appliesTo: 'eea',
+  },
+  {
+    id: 'c3-no-address-registry',
+    title: 'Population / address registration in France',
+    description:
+      'France has no mandatory citizen address registry — there is no French equivalent of the Folkeregister to register with. Evaluated and confirmed: nothing to do here.',
+    offsetWeeks: 1,
+    owner: 'None',
+    nonObvious: false,
+    confirmedClear: true,
+    appliesTo: 'eea',
+  },
+  {
+    id: 'c5-french-bank-account',
+    title: 'Open a French bank account',
+    description:
+      'Needed for salary, CPAM reimbursements and admin. French banks ask for the proof-of-address package first — have the justificatif de domicile ready.',
+    offsetWeeks: 2,
+    owner: 'Employee',
+    nonObvious: false,
+    dependencyNote: 'Requires the justificatif de domicile',
+    appliesTo: 'all',
+  },
+  {
+    id: 'c1-cpam-registration',
+    title: 'Register with CPAM for French health cover (carte vitale)',
+    description:
+      'Register with CPAM (via PUMA or as a worker; ask HELFO about an S1 handoff if applicable) within weeks of arrival. This closes the coverage gap left when HELFO cover ended — until CPAM confirms, you are between systems. Source: ameli.fr.',
+    offsetWeeks: 3,
+    owner: 'Employee',
+    nonObvious: true,
+    dependencyNote: 'Requires proof of address — closes the HELFO\u2192CPAM coverage gap',
+    appliesTo: 'all',
+  },
+  // ── Phase B — cross-border employment & social security ──
+  {
+    id: 'a3-norwegian-tax-exit',
+    title: 'Norwegian tax-residence cessation and exit-year return',
+    description:
+      'Norwegian tax residence ends per the exit rules and the exit-year skattemelding must still be filed — possibly with utflyttingsskatt (exit tax) on latent share gains. Spans departure through the following tax year. Source: skatteetaten.no/utflytting.',
+    offsetWeeks: 4,
+    owner: 'Employee',
+    nonObvious: false,
+    appliesTo: 'all',
+  },
+  {
+    id: 'b2-urssaf-foreign-employer',
+    title: 'Norwegian employer\u2019s French social-contribution registration (URSSAF)',
+    description:
+      'Once French legislation applies, the Norwegian employer must register with URSSAF (service firmes \u00e9trang\u00e8res) — OR use the Art. 21, Reg. 987/2009 arrangement where the employee remits contributions on the employer\u2019s behalf. The employer is almost certainly unaware this obligation exists. It is THEIR obligation — shown here so it is not orphaned. Source: urssaf.fr.',
+    offsetWeeks: 4,
+    owner: 'Employer (not engaged)',
+    nonObvious: true,
+    dependencyNote: 'Employer-owned — you may be able to act on the employer\u2019s behalf (Art. 21, Reg. 987/2009)',
+    appliesTo: 'all',
+  },
+  {
+    id: 'b3-permanent-establishment-risk',
+    title: 'Permanent-establishment (PE) risk for the Norwegian employer',
+    description:
+      'An employee working from France can create a French taxable presence for the Norwegian employer. INFORMATION ONLY — this is the employer\u2019s question for their own tax advisor under the FR\u2013NO treaty; ReloPass does not issue this as advice.',
+    offsetWeeks: 4,
+    owner: 'Employer (not engaged)',
+    nonObvious: true,
+    dependencyNote: 'Information only — route to the employer\u2019s own tax advisor',
+    appliesTo: 'all',
+  },
+  {
+    id: 'b4-governing-labour-law',
+    title: 'Governing labour law for work performed in France under a Norwegian contract',
+    description:
+      'Under Rome I, mandatory French employment provisions can apply to work physically performed in France even on a Norwegian contract. INFORMATION ONLY — route to a regulated professional for the specific contract.',
+    offsetWeeks: 4,
+    owner: 'Both',
+    nonObvious: true,
+    dependencyNote: 'Information only — route to a regulated professional',
+    appliesTo: 'all',
+  },
+  {
+    id: 'd2-vehicle-import',
+    title: 'Vehicle import from Norway (if you own a vehicle)',
+    description:
+      'Only if you bring a vehicle: customs clearance with possible VAT (waivable under the transfer-of-residence relief), the quitus fiscal, certificate of conformity (COC), then the carte grise via ANTS — within the French registration deadline after arrival (verify). Sources: douane.gouv.fr, ants.gouv.fr.',
+    offsetWeeks: 4,
+    owner: 'Employee',
+    nonObvious: true,
+    dependencyNote: 'Requires proof of address + the Norway exit evidence',
+    appliesTo: 'all',
+  },
+  {
+    id: 'b6-prelevement-a-la-source',
+    title: 'Set up French withholding (pr\u00e9l\u00e8vement \u00e0 la source)',
+    description:
+      'Once the social-security and URSSAF questions are resolved, set up French income-tax withholding so pay is taxed correctly from the start. Source: impots.gouv.fr.',
+    offsetWeeks: 6,
+    owner: 'Both',
+    nonObvious: false,
+    dependencyNote: 'Requires the URSSAF / Art. 21 arrangement to be resolved first',
+    appliesTo: 'all',
+  },
+  {
+    id: 'a7-pension-rights-preservation',
+    title: 'Preserve accrued Norwegian pension rights',
+    description:
+      'Folketrygd entitlements are preserved via the EEA coordination rules; private and occupational pensions are handled separately with each provider. No hard deadline — but confirm the paperwork rather than assume it. Source: nav.no.',
+    offsetWeeks: 8,
+    owner: 'Employee',
+    nonObvious: false,
+    appliesTo: 'all',
+  },
+  {
+    id: 'c4-french-tax-registration',
+    title: 'French tax registration — declare arrival, obtain a num\u00e9ro fiscal',
+    description:
+      'Declare your arrival to the French tax administration and obtain a num\u00e9ro fiscal ahead of your first French declaration window. Source: impots.gouv.fr.',
+    offsetWeeks: 8,
+    owner: 'Employee',
+    nonObvious: false,
+    appliesTo: 'all',
+  },
+  {
+    id: 'd1-household-goods-customs-relief',
+    title: 'Household-goods import with transfer-of-residence relief (franchise de d\u00e9m\u00e9nagement)',
+    description:
+      'Norway is EEA but NOT the EU customs union — your household goods are a customs IMPORT into France, not free circulation. The relief requires proof of >12 months prior Norwegian residence and >6 months ownership, and is generally claimed within 12 months of establishing French residence (verify). The Norway exit paperwork is the evidence that unlocks it. Source: douane.gouv.fr.',
+    offsetWeeks: 8,
+    owner: 'Employee',
+    nonObvious: true,
+    dependencyNote: 'Requires the Norway exit evidence — relief window ~12 months (verify)',
+    appliesTo: 'all',
+  },
+  {
+    id: 'b5-income-tax-split-year',
+    title: 'Income-tax split year and FR\u2013NO treaty relief',
+    description:
+      'French-resident income for work performed in France is taxable in France; the FR\u2013NO treaty prevents double taxation in the split year. Handle it in your first French declaration cycle. Sources: FR\u2013NO tax treaty, impots.gouv.fr.',
+    offsetWeeks: 12,
+    owner: 'Employee',
+    nonObvious: false,
+    appliesTo: 'all',
+  },
+];
+
+export const NORWAY_FRANCE_EMPLOYEE_TYPE_OPTIONS: { id: EmployeeType; label: string; description: string }[] = [
+  {
+    id: 'eea',
+    label: 'French / EEA national',
+    description: 'Right of entry to France (e.g. French citizen returning) — immigration is confirmed-clear, but exit, social security, tax and customs steps all still apply',
+  },
+  {
+    id: 'non-eea',
+    label: 'Non-EEA national',
+    description: 'Needs a French long-stay visa / residence permit before establishing in France — immigration routes to a regulated professional',
+  },
+];
+
 // ─── Deterministic date helpers (UTC-day arithmetic, no timezones) ───────────
 
 /** Parse 'YYYY-MM-DD' into an integer count of days since the Unix epoch. */
@@ -488,10 +817,12 @@ export function localTodayIso(): string {
   return `${y}-${m}-${d}`;
 }
 
-function offsetLabel(offsetWeeks: number, anchor: AnchorKind): string {
-  const zeroLabel = anchor === 'contract-signed'
-    ? 'T\u22120 (contract signed)'
-    : 'T\u22120 (move date)';
+function offsetLabel(offsetWeeks: number, anchor: AnchorKind, anchorNoun?: string): string {
+  const zeroLabel = anchorNoun
+    ? `T\u22120 (${anchorNoun})`
+    : anchor === 'contract-signed'
+      ? 'T\u22120 (contract signed)'
+      : 'T\u22120 (move date)';
   if (offsetWeeks === 0) return zeroLabel;
   if (offsetWeeks < 0) return `T\u2212${Math.abs(offsetWeeks)} weeks`;
   return `T+${offsetWeeks} weeks`;
@@ -562,6 +893,24 @@ export const CORRIDORS: Record<CorridorId, CorridorDefinition> = {
     criticalBannerText:
       'A Critical Skills Employment Permit plus the long-stay \u2018D\u2019 visa typically take around 15 weeks before the employee can travel. This start date may not be achievable. Confirm with the immigration adviser handling this case before committing to it.',
   },
+  'norway-france': {
+    id: 'norway-france',
+    label: 'Norway \u2192 France',
+    anchor: 'move-date',
+    anchorNoun: 'departure date',
+    pastAnchorText:
+      'This departure date is in the past — the check runs retrospectively. Items marked \u201cWindow passed\u201d are not lost causes: they are your triage list, most now need filing after the fact.',
+    requirements: NORWAY_FRANCE_REQUIREMENTS,
+    employeeTypeLabel: (t) =>
+      t === 'eea' ? 'French / EEA national (right of return)' : 'Non-EEA national',
+    // Derived from this corridor's own offsets: the earliest item is the non-EEA
+    // French long-stay visa at T\u22128 weeks. For the EEA/return profile there is no
+    // permit chain, so the banner only applies to non-EEA movers.
+    criticalRunwayDays: derivedRunwayDays(NORWAY_FRANCE_REQUIREMENTS, 'move-date'),
+    criticalBannerApplies: (t) => t === 'non-eea',
+    criticalBannerText:
+      'A French long-stay visa / residence permit must be granted before establishing in France, and lead times commonly run 6\u201312 weeks. This timeline may not be achievable. Consult an immigration professional before proceeding.',
+  },
 };
 
 // ─── The engine ──────────────────────────────────────────────────────────────
@@ -597,8 +946,10 @@ export function runCaseCheck(
       return {
         ...rule,
         actionByDate: epochDaysToIso(actionByDays),
-        offsetLabel: offsetLabel(rule.offsetWeeks, corridor.anchor),
-        feasibility: feasibilityFor(actionByDays, todayDays),
+        offsetLabel: offsetLabel(rule.offsetWeeks, corridor.anchor, corridor.anchorNoun),
+        feasibility: rule.confirmedClear
+          ? ('confirmed' as Feasibility)
+          : feasibilityFor(actionByDays, todayDays),
         _sortDays: actionByDays,
         _authoredIndex: authoredIndex,
       };
@@ -612,7 +963,7 @@ export function runCaseCheck(
       acc.total += 1;
       return acc;
     },
-    { green: 0, amber: 0, red: 0, total: 0 },
+    { green: 0, amber: 0, red: 0, confirmed: 0, total: 0 },
   );
 
   const daysToAnchor = anchorDays - todayDays;
@@ -638,10 +989,10 @@ export function runCaseCheck(
       ? corridor.criticalBannerText
       : null;
 
-  const anchorNoun = corridor.anchor === 'contract-signed' ? 'contract date' : 'move date';
+  const anchorNoun = corridor.anchorNoun ?? (corridor.anchor === 'contract-signed' ? 'contract date' : 'move date');
   const moveDatePassedWarning =
     daysToAnchor < 0
-      ? `This ${anchorNoun} has passed. Showing requirements as of ${anchorDate} for reference.`
+      ? (corridor.pastAnchorText ?? `This ${anchorNoun} has passed. Showing requirements as of ${anchorDate} for reference.`)
       : null;
 
   const overdueOrUrgent = counts.red + counts.amber;
