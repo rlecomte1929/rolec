@@ -22,6 +22,13 @@ from __future__ import annotations
 
 import os
 
+# Order-dependent, and therefore NOT a guarantee — read the note before trusting it.
+# db_config.py calls load_dotenv(override=False), so this setdefault only wins when this
+# module is imported before anything has triggered db_config. In a full-suite run the
+# tests/ SUBDIRECTORIES (crawler, eval, fixtures, integration, routers, services) collect
+# first, .env has already set DATABASE_URL, and this line is a no-op that reads like
+# protection. It does work for a single-file run, which is why it stays. The session-level
+# DATABASE_URL guard in backend/conftest.py is what actually makes this safe.
 os.environ.setdefault("DATABASE_URL", "sqlite:///./ci_test_aiq1776.db")
 
 import importlib
@@ -144,8 +151,9 @@ def _build_engine():
     return engine
 
 
-# Every module under test binds the ``backend.database`` singleton at import time,
-# each under its own name: ``main_db`` in most, plain ``db`` in case_form_pdf.
+# Each module under test binds whatever ``sys.modules["backend.database"].db`` was AT ITS
+# OWN IMPORT TIME — see _EngineFixture: there is no single shared object to rely on. The
+# binding is named ``main_db`` in most modules, plain ``db`` in case_form_pdf.
 _DB_BINDINGS = (
     ("backend.app.services.case_service", "main_db"),
     ("backend.app.routers.pets", "main_db"),
@@ -159,17 +167,28 @@ _DB_BINDINGS = (
 class _EngineFixture(unittest.TestCase):
     """Points every module under test at one in-memory SQLite engine.
 
-    Patching ``case_service.main_db.engine`` alone is NOT enough, and the failure
-    is silent. Under full-suite collection some test modules put the repo root and
-    ``backend/`` both on ``sys.path``, so ``backend/database.py`` gets imported
-    twice under two module names — and the routers end up holding *different* ``db``
-    singletons. Patching one leaves the others on whatever ``DATABASE_URL`` resolves
-    to, which on a developer machine with a local ``.env`` is the production pooler:
-    ``list_pets`` then SELECTed against prod, matched nothing, and returned 0 rows
-    that read exactly like the bug this file is asserting is fixed.
+    Patching ``case_service.main_db.engine`` alone is NOT enough, and the failure is
+    silent. ``backend/conftest.py`` installs a MagicMock at
+    ``sys.modules["backend.database"]`` before any test module is imported, so importing
+    app code never builds a real engine. But several test modules need the REAL module to
+    exercise real SQL and swap it back in — two of them at MODULE IMPORT, i.e. during
+    collection (``test_e1b_extraction_persist``, ``test_policy_config_matrix_propagation``),
+    so their window spans other modules' imports.
 
-    So resolve each module through ``sys.modules`` at setUp time and patch whichever
-    ``db`` object it actually holds.
+    ``from ...database import db`` binds one object, once. Which object you get depends on
+    WHEN your module was first imported: the mock, or the real one — whose engine comes from
+    ``DATABASE_URL``, which on a developer machine with a local ``.env`` is the production
+    pooler. Measured here under full collection:
+
+        case_service.main_db.engine -> <MagicMock name='mock.db.engine'>
+        pets.main_db.engine         -> Engine(postgresql://...pooler.supabase.com:6543/...)
+
+    ``list_pets`` therefore SELECTed against PROD, matched nothing, and returned 0 rows that
+    read exactly like the bug this file asserts is fixed.
+
+    So resolve each module through ``sys.modules`` at setUp time and patch whichever ``db``
+    object it actually holds. This is a workaround for a harness defect, not a pattern to
+    copy — AIQ-1777 fixes the cause; drop ``_DB_BINDINGS`` once it lands.
     """
 
     def setUp(self) -> None:
