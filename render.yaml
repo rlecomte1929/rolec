@@ -71,6 +71,17 @@ services:
       - type: rewrite
         source: /relocation-checklist
         destination: /relocation-checklist/index.html
+      # Published guides — same directory-index trap as the two pages above.
+      # `frontend/scripts/prerender-content.mjs` emits dist/blog/<slug>/index.html for every
+      # file in content/blog. Canonical URLs and sitemap.xml all carry the trailing slash, so
+      # these two rules only cover the bare form a human types or links to; if the `:slug`
+      # placeholder is not honoured, the slash form still resolves and nothing breaks.
+      - type: rewrite
+        source: /blog
+        destination: /blog/index.html
+      - type: rewrite
+        source: /blog/:slug
+        destination: /blog/:slug/index.html
       # SPA fallback — every other path renders client-side.
       - type: rewrite
         source: /*
