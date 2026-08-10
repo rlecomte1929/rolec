@@ -14,100 +14,23 @@ case_documents; it just makes `_case_exists()` miss for every upload, forever, b
 mobility_cases ids have no FK path to public.cases. That failure is invisible from the
 response, which is exactly why it needs a test rather than review attention.
 
-SQLite in-memory, same harness shape as test_case_documents_flow.py.
+This module deliberately has **no import-time side effects**. The SQLite harness is
+reused from ``test_case_documents_flow`` (rather than copied), but imported inside
+``setUp`` rather than at module scope: that module pops ``backend.database`` from
+sys.modules in its body to get the real Database back past the root conftest's
+MagicMock, and pulling it in during collection re-runs that pop at the wrong moment.
+The symptom was four unrelated ``test_catalog_promotion`` tests reading the wrong
+engine in a full-suite run while every isolated and pairwise run stayed green —
+measured by deselecting every test in this file and watching them fail anyway, which
+is what pinned it to import time rather than anything these tests do.
 """
 from __future__ import annotations
 
-import os
-import sys
 import unittest
 import uuid
-from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-os.environ.setdefault("RELOPASS_DISABLE_RATE_LIMITS", "1")
-os.environ.setdefault("RELOPASS_QUERY_COUNTER_OFF", "1")
-
-# ── Restore the REAL backend.database (root conftest installs a MagicMock) ──────
-sys.modules.pop("backend.database", None)
-import backend.database as dbmod  # noqa: E402  (real module)
-from backend.database import Database  # noqa: E402
-
-from sqlalchemy import create_engine, text  # noqa: E402
-from sqlalchemy.pool import StaticPool  # noqa: E402
-
-
-_USER = {"id": "emp-1", "role": "EMPLOYEE", "email": "bridge@example.com"}
-
-
-def _fresh_db() -> Database:
-    eng = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    dbmod._engine = eng
-    dbmod._is_sqlite = True
-    db = Database()
-    db.ensure_initialized()
-    return db
-
-
-def _seed_graph(db: Database) -> tuple[str, str, str]:
-    """Minimal graph. Returns (assignment_id, canonical_case_id, mobility_case_id).
-
-    The two ids are deliberately DIFFERENT uuids — that is what lets the tests below
-    tell which one the handler handed to the bridge.
-    """
-    now = datetime.utcnow().isoformat()
-    company_id = str(uuid.uuid4())
-    emp = str(uuid.uuid4())
-    case_id = str(uuid.uuid4())
-    aid = str(uuid.uuid4())
-    mid = str(uuid.uuid4())
-    with db.engine.begin() as conn:
-        conn.execute(
-            text("INSERT INTO companies (id, name, created_at) VALUES (:id, :n, :ca)"),
-            {"id": company_id, "n": "Bridge Co", "ca": now},
-        )
-        conn.execute(
-            text(
-                "INSERT INTO case_assignments "
-                "(id, case_id, canonical_case_id, hr_user_id, employee_user_id, "
-                " employee_identifier, status, created_at, updated_at, intake_step, "
-                " intake_total_steps) "
-                "VALUES (:id, :cid, :cid, :hr, :emp, :ident, 'assigned', :ca, :ca, 0, 1)"
-            ),
-            {
-                "id": aid, "cid": case_id, "hr": str(uuid.uuid4()), "emp": emp,
-                "ident": "bridge@example.com", "ca": now,
-            },
-        )
-        conn.execute(
-            text(
-                "INSERT INTO mobility_cases (id, company_id, employee_user_id, metadata, "
-                "created_at, updated_at) VALUES (:id, :co, :emp, '{}', :ca, :ca)"
-            ),
-            {"id": mid, "co": company_id, "emp": emp, "ca": now},
-        )
-        conn.execute(
-            text(
-                "INSERT INTO assignment_mobility_links "
-                "(id, assignment_id, mobility_case_id, created_at, updated_at) "
-                "VALUES (:id, :aid, :mid, :ca, :ca)"
-            ),
-            {"id": str(uuid.uuid4()), "aid": aid, "mid": mid, "ca": now},
-        )
-    return aid, case_id, mid
-
-
-def _make_app(router_module):
-    from fastapi import FastAPI
-
-    app = FastAPI()
-    app.include_router(router_module.router)
-    app.dependency_overrides[router_module.get_current_user] = lambda: _USER
-    return app
+_USER = {"id": "emp-1", "role": "EMPLOYEE", "email": "docflow@example.com"}
 
 
 class CaseDocumentRceBridgeTests(unittest.TestCase):
@@ -115,18 +38,47 @@ class CaseDocumentRceBridgeTests(unittest.TestCase):
         from fastapi.testclient import TestClient
         import backend.app.routers.case_documents as cdoc
 
+        # Imported HERE, not at module scope. test_case_documents_flow pops
+        # backend.database from sys.modules in its module body to get the real
+        # Database back; pulling it in at collection time re-runs that pop at the
+        # wrong moment and leaves a second backend.database instance behind, which
+        # silently redirected four unrelated test_catalog_promotion tests to the
+        # wrong engine in a full-suite run while every isolated run stayed green.
+        # Deferring to setUp keeps this module free of import-time side effects.
+        from .test_case_documents_flow import (
+            _fresh_db,
+            _make_app,
+            _mobility_case_id,
+            _seed_graph,
+        )
+
+        self._make_app, self._mobility_case_id = _make_app, _mobility_case_id
         self.cdoc = cdoc
+        # _fresh_db reassigns the process-global dbmod._engine / _is_sqlite. Leaving
+        # them pointed at this test's in-memory engine redirects every later module in
+        # a full-suite run to the wrong database.
+        import backend.database as dbmod
+
+        self._dbmod = dbmod
+        self._prev_engine = getattr(dbmod, "_engine", None)
+        self._prev_is_sqlite = getattr(dbmod, "_is_sqlite", None)
         self.db = _fresh_db()
         self._prev_main_db = cdoc.main_db
         cdoc.main_db = self.db
         self._prev_access = cdoc._assert_case_access
         cdoc._assert_case_access = lambda user, case_id: None
-        self.client = TestClient(_make_app(cdoc), raise_server_exceptions=False)
-        self.aid, self.case_id, self.mobility_id = _seed_graph(self.db)
+        self.client = TestClient(self._make_app(cdoc), raise_server_exceptions=False)
+
+        self.aid, self.case_id, _hr, _emp = _seed_graph(self.db)
+        self.mobility_id = self._mobility_case_id(self.db, self.aid)
+        # The whole point of the id assertions below: these must be different values.
+        self.assertNotEqual(self.case_id, self.mobility_id)
 
     def tearDown(self) -> None:
         self.cdoc.main_db = self._prev_main_db
         self.cdoc._assert_case_access = self._prev_access
+        self._dbmod._engine = self._prev_engine
+        self._dbmod._is_sqlite = self._prev_is_sqlite
 
     def _fake_supabase(self):
         sb = MagicMock()
@@ -134,7 +86,7 @@ class CaseDocumentRceBridgeTests(unittest.TestCase):
         return sb
 
     def _upload(self, bridge_mock, pipeline_mock=None):
-        """POST a PDF with the bridge (and optionally the pipeline) patched."""
+        """POST a PDF with the bridge (and the pipeline worker) patched."""
         import backend.app.services.rce_pipeline_worker as worker
 
         stack = [
@@ -214,8 +166,11 @@ class CaseDocumentRceBridgeTests(unittest.TestCase):
 
     def test_bridge_failure_never_breaks_the_upload(self) -> None:
         """bridge_case_document_to_rce swallows its own errors, but if that contract
-        ever regresses the upload must still succeed — extraction is best-effort and
-        must never cost a user their document."""
+        ever regresses the upload must still succeed — by this point the file is in
+        storage and case_evidence is committed, so a 500 would report failure for an
+        upload that worked and invite a duplicate retry."""
+        from sqlalchemy import text
+
         pipeline = MagicMock()
         resp = self._upload(MagicMock(side_effect=RuntimeError("rce down")), pipeline)
 
