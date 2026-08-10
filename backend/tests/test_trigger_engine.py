@@ -706,6 +706,57 @@ class TriggerEngineIntegrationTests(unittest.TestCase):
         codes = self._fire_de_arrival(origin="IN", purpose="sabbatical")
         self.assertNotIn("RESID-PERMIT-DE", codes)
 
+    # ── [AIQ-1795b] The same defect in the two German family-reunion templates ──
+    #
+    # Familiennachzug is a third-country-national procedure; a family member of an EU
+    # citizen exercising free movement holds derived rights under FreizuegG/EU § 3.
+    # These fire on roadmap.profile_completed — earlier than RESID-PERMIT-DE did.
+
+    _FAM_GATED_VISA_TYPES = ("skilled_worker", "intra_company_transfer",
+                             "family_join", "remote_work")
+
+    def _seed_fam_spouse(self, *, gated: bool) -> None:
+        conds = (
+            [{"destination_country": "DE", "visa_type": vt, "has_spouse": True}
+             for vt in self._FAM_GATED_VISA_TYPES]
+            if gated else
+            [{"destination_country": "DE", "has_spouse": True}]   # pre-fix shape
+        )
+        self._insert_template(code="FAM-SPOUSE", rules=[
+            {"event": "roadmap.profile_completed", "conditions": c,
+             "for_persons": ["spouse"], "blocked_by_template_code": None}
+            for c in conds
+        ])
+
+    def _fire_de_profile(self, *, origin: str, purpose: str = "work") -> list:
+        case_id = _uuid()
+        emp_id = _uuid()
+        self._insert_case(case_id=case_id, employee_id=emp_id,
+                          dest_country_code="DE", purpose=purpose,
+                          origin_country_code=origin)
+        self._insert_dependent(case_id=case_id, relationship="spouse", full_name="A B")
+        fire_roadmap_events(
+            case_id=case_id,
+            draft={"relocationBasics": {"originCountry": origin}},
+            derived={"dest_country": "DE", "origin_country": origin},
+        )
+        return sorted(cf["code"] for cf in self._case_forms()
+                      if cf["case_id"] == case_id)
+
+    def test_ungated_fam_spouse_attaches_on_an_eea_corridor_which_is_the_defect(self):
+        """The defect, as a positive assertion so it stays green in CI."""
+        self._seed_fam_spouse(gated=False)
+        self.assertIn("FAM-SPOUSE", self._fire_de_profile(origin="FR"))
+
+    def test_gated_fam_spouse_does_not_attach_on_an_eea_corridor(self):
+        self._seed_fam_spouse(gated=True)
+        self.assertNotIn("FAM-SPOUSE", self._fire_de_profile(origin="FR"))
+
+    def test_gated_fam_spouse_still_attaches_for_a_non_eea_origin(self):
+        """No coverage loss: Familiennachzug is real for a third-country national."""
+        self._seed_fam_spouse(gated=True)
+        self.assertIn("FAM-SPOUSE", self._fire_de_profile(origin="IN"))
+
     def test_arrival_confirmed_creates_helfo1_and_resolves_blocker(self) -> None:
         # Fire destination first so GP-7-04 exists to serve as a blocker
         fire_roadmap_events(case_id=self.case_id, draft={}, derived={"dest_country": "NO"})

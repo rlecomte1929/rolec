@@ -480,6 +480,23 @@ jobs:
       - name: Check no ungated ad pixel on the public surface
         run: python scripts/check_ad_pixel_consent.py
 
+      # [AIQ-1795b] A permit/visa template must not be attachable by someone who needs
+      # no permit. RESID-PERMIT-DE sent EU citizens to an Auslaenderbehoerde for a
+      # residence title FreizuegG/EU s 2(4) says they cannot be issued; fixing it by hand
+      # revealed FAM-SPOUSE and FAM-CHILD doing the same with Familiennachzug. Three
+      # instances of one class, all found by eye.
+      #
+      # In THIS job, not behind the supabase/migrations path filter, for the same reason
+      # the compliance guard is unfiltered: the invariant keys off a template's NAME as
+      # well as its rules, so renaming one in any file can create a violation. It needs
+      # no DB and no secret, so it costs nothing to always run.
+      #
+      # Cannot be replaced by test_trigger_condition_vocabulary.py, which scans the same
+      # corpus and passed on all three: that guard validates the condition keys that are
+      # PRESENT, and an OMITTED visa_type is the entire defect.
+      - name: Check form-template honesty (no permit for free-movers)
+        run: python scripts/check_form_template_honesty.py
+
   rls-coverage:
     # AUDIT-A3: lists `public.*` + `rce.*` tables with zero RLS policies and asserts
     # each one is on the supabase/rls_allowlist.txt allowlist. Drains over time.
