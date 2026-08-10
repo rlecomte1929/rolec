@@ -60,6 +60,16 @@ const SECTION_LABELS: Record<string, string> = {
   a1: 'A1 social-security certificate',
 };
 
+/** Endonyms for the label toggle — a German sheet offers "Deutsch", not "German".
+ *  Keys must match FieldLang; a template whose source_language is absent here gets no toggle
+ *  rather than an unlabelled button. */
+const LANG_LABELS: Record<FieldLang, string> = {
+  en: 'English',
+  nb: 'Norsk',
+  de: 'Deutsch',
+  fr: 'Français',
+};
+
 /** `eea_registration` → `Eea registration`. The fallback for any section key we haven't
  *  named, so a newly seeded corridor degrades to something readable instead of a raw key. */
 function humaniseSection(key: string): string {
@@ -131,14 +141,18 @@ export const FormEditorPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // ── Label language (EN/NO toggle) ─────────────────────────────────────────
+  // ── Label language toggle ─────────────────────────────────────────────────
   // Switches LABELS only for comprehension; identifier VALUES stay verbatim.
   const [lang, setLang] = useState<FieldLang>('en');
   // [AIQ-1757] Offer the toggle when the form's official language isn't English.
-  // Static label_nb (if any) renders instantly; labels without one translate via
-  // /api/translate (handled in FieldRow), degrading to the original on 503.
-  const sourceLanguage = formSummary?.template.source_language ?? 'en';
-  const showLangToggle = sourceLanguage !== 'en';
+  // A seeded label renders instantly; labels without one translate via /api/translate
+  // (handled in FieldRow), degrading to the original on 503.
+  //
+  // [AIQ-1770] The second option is now the template's actual language rather than a
+  // hardcoded 'nb', so a German or French sheet gets its own toggle instead of offering
+  // "Norsk" — or silently offering nothing.
+  const sourceLanguage = (formSummary?.template.source_language ?? 'en') as FieldLang;
+  const showLangToggle = sourceLanguage !== 'en' && sourceLanguage in LANG_LABELS;
 
   // ── Live edit state ──────────────────────────────────────────────────────
   /** A map of field_id → current string value displayed in the form. */
@@ -532,12 +546,12 @@ export const FormEditorPage: React.FC = () => {
           {/* Content-honesty disclaimer — this is the submission surface and the
               form template is representative, not legally verified, so remind the
               employee to confirm with the issuing authority before submitting. */}
-          {/* EN/NO label toggle — labels only; identifier values stay verbatim. */}
+          {/* Label toggle — labels only; identifier values stay verbatim. */}
           {showLangToggle && (
             <div className="mb-4 flex items-center justify-end gap-2">
               <span className="text-xs font-medium text-slate-500">Labels:</span>
               <div className="inline-flex rounded-md border border-slate-300 overflow-hidden" role="group" aria-label="Label language">
-                {(['en', 'nb'] as const).map((code) => (
+                {(['en', sourceLanguage] as FieldLang[]).map((code) => (
                   <button
                     key={code}
                     type="button"
@@ -545,7 +559,7 @@ export const FormEditorPage: React.FC = () => {
                     aria-pressed={lang === code}
                     className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === code ? 'bg-[#0b2b43] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
                   >
-                    {code === 'en' ? 'English' : 'Norsk'}
+                    {LANG_LABELS[code]}
                   </button>
                 ))}
               </div>

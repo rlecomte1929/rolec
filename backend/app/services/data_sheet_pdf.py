@@ -30,6 +30,8 @@ import logging
 from typing import Any, Dict, List, Optional
 from xml.sax.saxutils import escape
 
+from .localised_labels import localised_label
+
 log = logging.getLogger(__name__)
 
 _NAVY = "#0b2b43"
@@ -78,11 +80,18 @@ def render_data_sheet(
     values: Dict[str, str],
     sources: Optional[Dict[str, str]] = None,
     subtitle: Optional[str] = None,
+    source_language: Optional[str] = None,
 ) -> Optional[bytes]:
     """Render the data sheet, or None when reportlab is unavailable.
 
     Returning None rather than raising lets the caller fall back to its existing placeholder —
     a missing optional dependency must not turn a download into a 500.
+
+    `source_language` is the template's own language (`form_templates.source_language`). When it
+    names a language we seed labels for, each field prints its localised label under the English
+    one — so the employee can match what they read here against what the authority's counter
+    actually says. Defaults to None (English only), which is also what an older caller that does
+    not pass it gets.
     """
     try:
         from reportlab.lib import colors as _colors
@@ -109,8 +118,8 @@ def render_data_sheet(
                                textColor=_colors.HexColor(_NAVY), spaceBefore=14, spaceAfter=2)
     s_label = ParagraphStyle("l", fontName="Helvetica-Bold", fontSize=9, leading=12,
                              textColor=_colors.HexColor(_NAVY), spaceBefore=7)
-    s_label_nb = ParagraphStyle("lnb", fontName="Helvetica-Oblique", fontSize=8, leading=11,
-                                textColor=_colors.HexColor(_MUTED))
+    s_label_localised = ParagraphStyle("lloc", fontName="Helvetica-Oblique", fontSize=8, leading=11,
+                                       textColor=_colors.HexColor(_MUTED))
     s_value = ParagraphStyle("v", fontName="Helvetica", fontSize=10.5, leading=14,
                              textColor=_colors.HexColor("#1f2937"), spaceBefore=1)
     s_missing = ParagraphStyle("m", fontName="Helvetica-Oblique", fontSize=10, leading=14,
@@ -157,9 +166,9 @@ def render_data_sheet(
             block: List[Any] = [
                 Paragraph(escape(str(fd.get("label") or fid)), s_label)
             ]
-            label_nb = fd.get("label_nb")
-            if label_nb:
-                block.append(Paragraph(escape(str(label_nb)), s_label_nb))
+            localised = localised_label(fd, source_language)
+            if localised:
+                block.append(Paragraph(escape(localised), s_label_localised))
 
             if fd.get("consult_professional"):
                 block.append(Paragraph(

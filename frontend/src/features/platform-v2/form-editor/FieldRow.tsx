@@ -17,8 +17,12 @@ import { translateText } from '../../../api/translation';
 import type { FieldValueItem } from '../../../api/formEditor';
 
 /** Display language for LABELS only. Field values are always rendered verbatim
- *  (an EN/NO toggle never translates a name, passport number, D-number, or date). */
-export type FieldLang = 'en' | 'nb';
+ *  (the toggle never translates a name, passport number, D-number, or date).
+ *
+ *  Anything other than 'en' is a template's `source_language` — the language the
+ *  authority's own form is in, not a user preference. Adding a language means adding it
+ *  here and to SUPPORTED_LABEL_LANGUAGES in backend/app/services/localised_labels.py. */
+export type FieldLang = 'en' | 'nb' | 'de' | 'fr';
 
 interface FieldRowProps {
   field: FieldValueItem;
@@ -255,12 +259,18 @@ export const FieldRow: React.FC<FieldRowProps> = ({
     !isConsult && showMissing && field.required && !hasValue;
 
   // Labels translate for comprehension; VALUES never do (verbatim identifiers).
-  // Static label_nb wins (authoritative, instant); labels without one fall
-  // through to the translation service via TranslatableLabel.
+  // A seeded label wins (authoritative, instant); labels without one fall through to the
+  // translation service via TranslatableLabel, which degrades to English on a 503.
+  //
+  // `lang` is the template's own language, so the translation target follows it rather than
+  // being hardcoded — that hardcoded 'nb' is why a label_de would have been ignored.
+  // label_nb is read only as a fallback, for a response from a backend predating
+  // label_localised.
+  const seededLabel = field.label_localised ?? (lang === 'nb' ? field.label_nb : null);
   const labelNode: React.ReactNode =
-    lang === 'nb'
-      ? (field.label_nb ? field.label_nb : <TranslatableLabel text={field.label} tgt="nb" />)
-      : field.label;
+    lang === 'en'
+      ? field.label
+      : (seededLabel ? seededLabel : <TranslatableLabel text={field.label} tgt={lang} />);
 
   return (
     <div className={`rounded-lg border px-4 py-3 transition-colors ${isConsult ? 'border-amber-200 bg-amber-50/40' : isMissing ? 'border-rose-300 bg-rose-50/40' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
