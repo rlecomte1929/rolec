@@ -1,5 +1,20 @@
 -- rce.documents: drop the GLOBAL unique on sha256, keep the per-case one.
 --
+-- RESTAMPED 2026-08-10: 20261018000000 -> 20261021000000. Body unchanged.
+--
+-- The original version was merged but never applied, and the ledger then moved past it
+-- (20261019000000 rce_tax_cert_split_by_locale and 20261020000000
+-- rce_employment_contract_document_type were both applied out-of-band). That stranded this file
+-- BELOW the ledger max, which per scripts/check_migration_drift.py is the "dead" case: an
+-- out-of-order version is treated as already-passed and skipped, so it could never apply and
+-- never record a ledger row. Worse, the guard only FAILS on newly-dead versions — this one got
+-- absorbed into the 146 pre-existing dead warnings and became invisible.
+--
+-- Re-verified against prod immediately before restamping (read-only):
+--     documents_sha256_key          UNIQUE (sha256)           <- still live
+--     uq_rce_documents_case_sha256  UNIQUE (case_id, sha256)  <- exists
+-- so the premise below still holds and the per-case index really is there to fall back on.
+--
 -- The original case-engine DDL (20260528020000) declared `sha256 TEXT NOT NULL UNIQUE`,
 -- which is a unique constraint across the WHOLE table. A later migration
 -- (20260610130000) added the intended per-case index:
@@ -21,6 +36,8 @@
 -- employees from ever uploading the same form. Dropping it leaves the per-case index as
 -- the sole, correct guarantee.
 --
--- Safe to run repeatedly. No data change; prod currently holds 0 rce.documents rows, so
--- there is nothing to de-duplicate first.
+-- Safe to run repeatedly. No data change, and nothing to de-duplicate first: prod holds
+-- 1 rce.documents row as of 2026-08-10 (it was 0 when this was first written), and a single
+-- row cannot collide with itself. Dropping a unique constraint never fails on existing data
+-- regardless, so the count is reassurance rather than a precondition.
 ALTER TABLE rce.documents DROP CONSTRAINT IF EXISTS documents_sha256_key;
