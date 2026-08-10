@@ -372,20 +372,33 @@ jobs:
         # pytest.ini) lets async tests collect.
         run: |
           # Call 1 — full-suite discovery. Env-dependent / import-broken files are in
-          # collect_ignore (backend/tests/conftest.py). The 3 --ignore'd files below
+          # collect_ignore (backend/tests/conftest.py). The 4 --ignore'd files below
           # PASS in isolation but leak/collide when run with the whole suite (shared
           # sqlite state); they keep gating via Call 2 (isolation fix is a follow-up).
+          #
+          # [AIQ-1780] test_case_documents_rce_bridge joined this list rather than
+          # being made suite-safe. It needs the real Database (the root conftest
+          # installs a MagicMock), which means reaching for the same
+          # sys.modules.pop + engine-swap dance test_case_documents_flow uses. Two
+          # rounds of narrowing — deferring the harness import to setUp, restoring
+          # dbmod._engine/_is_sqlite in tearDown — each fixed the module it was
+          # breaking and shifted the collision to another (catalog_promotion →
+          # providers_company_resolution), which is the signature of the shared
+          # `db` singleton rather than of anything this file does wrong. Root-causing
+          # that is the same deferred isolation fix the other three are waiting on.
           python -m pytest -q -c backend/pytest.ini --rootdir . \
             backend/tests scripts/tests \
             -m "not integration and not policy_assistant_audit" \
             --ignore=backend/tests/test_llm_client_text.py \
             --ignore=backend/tests/test_policy_propagation.py \
-            --ignore=backend/tests/test_supabase_password_sync.py
+            --ignore=backend/tests/test_supabase_password_sync.py \
+            --ignore=backend/tests/test_case_documents_rce_bridge.py
           # Call 2 — the isolation-sensitive previously-gated files, on their own.
           python -m pytest -q -c backend/pytest.ini --rootdir . \
             backend/tests/test_llm_client_text.py \
             backend/tests/test_policy_propagation.py \
-            backend/tests/test_supabase_password_sync.py
+            backend/tests/test_supabase_password_sync.py \
+            backend/tests/test_case_documents_rce_bridge.py
 
   # Supabase Edge Functions are Deno, so neither the Python nor the Node job
   # covers them: before AIQ-1702 a PR touching ONLY supabase/functions/** ran no

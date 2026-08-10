@@ -19,10 +19,20 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 
 from ..auth_deps import get_current_user
 from ..services.case_service import _assert_case_access
+from ..services.rce_document_ingest import bridge_case_document_to_rce
 from ..services.relocation_plan_view_service import invalidate_relocation_plan_cache
 from ..services.passport_case_document_sync_service import (
     ensure_case_document_for_key,
@@ -146,6 +156,7 @@ def _document_keys_for_case(eff_case_id: str) -> List[Dict[str, str]]:
 async def upload_case_document(
     case_id: str,
     req: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     document_key: str = Form(...),
     requirement_id: Optional[str] = Form(None),
@@ -154,7 +165,8 @@ async def upload_case_document(
     """Upload a file for a single document_key, satisfying its roadmap task.
 
     Stores the file in the private ``case-documents`` bucket, records a case_evidence
-    row (evidence_type=document_key), then syncs the derived case_documents index.
+    row (evidence_type=document_key), then syncs the derived case_documents index,
+    then bridges the upload into the rce case engine so extraction can run.
     """
     _assert_case_access(user, case_id)
 
@@ -244,6 +256,42 @@ async def upload_case_document(
 
     eff_case_id = _effective_case_id(assignment, case_id)
     invalidate_relocation_plan_cache(case_id=eff_case_id, assignment_id=assignment_id)
+
+    # [AIQ-1780] Bridge into the rce case engine so the extraction agents can run.
+    #
+    # This is the upload path users actually reach (roadmap task CTA →
+    # /employee/case/:caseId/documents). Until now only the *immigration* upload
+    # endpoint bridged, and its UI has no inbound nav links — so rce.documents sat at
+    # 0 forever and every registered extraction agent was inert.
+    #
+    # The case_id argument is the entire fix. It MUST be the canonical/relocation case
+    # id, which is what rce.cases is keyed on — NOT `mobility_case_id` resolved two
+    # lines below for the case_documents index. mobility_cases ids are minted per
+    # assignment and have no FK path to public.cases, so passing one would make
+    # _case_exists() fail for every upload, forever, silently.
+    #
+    # Guarded at the call site as well as inside the bridge. By this point the file is
+    # in storage and case_evidence is committed, so letting anything here raise would
+    # 500 an upload that actually succeeded — the user retries and duplicates it.
+    # Extraction is best-effort; the document is not. Same shape as the mobility-graph
+    # linkage block above. Mirrors immigration_documents.py's E-PIPE-1/E-PIPE-7 pairing.
+    try:
+        rce_document_id = bridge_case_document_to_rce(
+            case_id=eff_case_id,
+            content=contents,
+            mime_type=content_type,
+            storage_uri=storage_path,
+            original_filename=file_name,
+            uploaded_by=user.get("id") or user.get("sub"),
+        )
+        if rce_document_id:
+            from ..services.rce_pipeline_worker import process_rce_document  # lazy: heavy deps
+
+            background_tasks.add_task(process_rce_document, rce_document_id)
+    except Exception as exc:  # noqa: BLE001 — extraction must never cost a document
+        logger.warning(
+            "case_doc upload: rce bridge failed case_id=%s key=%s: %s", eff_case_id, dk, exc
+        )
 
     mobility_case_id = main_db.get_mobility_case_id_for_assignment(assignment_id, request_id=request_id)
     docs = _case_documents_by_key(mobility_case_id)
