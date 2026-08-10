@@ -74,10 +74,16 @@ if _REPO_ROOT not in sys.path:
 
 _MIGRATIONS = os.path.join(_REPO_ROOT, "supabase", "migrations")
 
-# Imported, never restated. A second copy of this set is how these bugs start — the
-# whole defect is that 'FRANCE' is not 'FR', and _EEA_COUNTRIES is the authority on
-# which codes count. test_form_template_honesty asserts there is no private copy here.
-from backend.app.services.trigger_engine import _EEA_COUNTRIES  # noqa: E402
+# Imported, never restated. A second copy of this set is how these bugs start — the whole
+# of AIQ-1778 was 'FRANCE' failing to match a pure-ISO-2 set. test_form_template_honesty
+# asserts there is no private copy here.
+#
+# Imported from `eea_countries`, NOT from `trigger_engine`, which owns the set semantically
+# but pulls in SQLAlchemy at module level. This script runs in the always-on compliance job,
+# which installs no backend dependencies, and importing the engine there failed with
+# `ModuleNotFoundError: No module named 'sqlalchemy'`. `eea_countries` is stdlib-only and
+# `trigger_engine` now imports the same module, so there is still one copy.
+from backend.app.services.eea_countries import EEA_COUNTRIES as _EEA_COUNTRIES  # noqa: E402
 
 # A template is permit-like when its subject is a document granting or evidencing a
 # right to reside or work. Matched on name as well as category because the seeds are

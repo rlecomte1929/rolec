@@ -26,14 +26,32 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from scripts.check_form_template_honesty import (  # noqa: E402
-    _EEA_VISA_TYPE,
-    find_violations,
-    is_permit_like,
-    parse_templates,
-    rule_is_eea_reachable,
-    superseded_codes,
-)
+_CHECKER_PATH = os.path.join(_REPO_ROOT, "scripts", "check_form_template_honesty.py")
+
+
+def _load_checker():
+    """Load the checker by file path.
+
+    `scripts/` is not a Python package — no `__init__.py`, and adding one would change how
+    pytest collects `scripts/tests/`. `import scripts.check_form_template_honesty` worked
+    locally and failed in CI with `ModuleNotFoundError`, so load it explicitly instead of
+    relying on namespace-package resolution. Importing the real file (not a copy of its
+    logic) is the point: the guard CI runs and the guard this test scores must be one thing.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_fth_checker", _CHECKER_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_checker = _load_checker()
+_EEA_VISA_TYPE = _checker._EEA_VISA_TYPE
+find_violations = _checker.find_violations
+is_permit_like = _checker.is_permit_like
+parse_templates = _checker.parse_templates
+rule_is_eea_reachable = _checker.rule_is_eea_reachable
+superseded_codes = _checker.superseded_codes
 
 _CORPUS = os.path.join(os.path.dirname(__file__), "fixtures", "content_honesty",
                        "labelled_cases.json")
@@ -177,21 +195,39 @@ class TestInvariantEdges(unittest.TestCase):
 
 
 class TestNoPrivateEeaCopy(unittest.TestCase):
-    def test_the_checker_imports_eea_countries_rather_than_restating_them(self):
-        """A second copy of _EEA_COUNTRIES is how these bugs start — the country-code
-        defect (AIQ-1778) was 'FRANCE' not matching a pure-ISO-2 set."""
-        src = open(os.path.join(_REPO_ROOT, "scripts",
-                                "check_form_template_honesty.py"), encoding="utf-8").read()
-        self.assertIn("from backend.app.services.trigger_engine import _EEA_COUNTRIES", src)
+    def test_the_checker_imports_the_eea_set_rather_than_restating_it(self):
+        """A second copy is how these bugs start — AIQ-1778 was 'FRANCE' failing to match a
+        pure-ISO-2 set."""
+        src = open(_CHECKER_PATH, encoding="utf-8").read()
+        self.assertIn("from backend.app.services.eea_countries import EEA_COUNTRIES", src)
         self.assertNotIn('"AT", "BE"', src)
         self.assertNotIn("'AT', 'BE'", src)
 
-    def test_the_eea_set_is_the_engines_and_is_populated(self):
+    def test_the_engine_and_the_checker_read_the_same_object(self):
+        """Not merely equal — the SAME frozenset. Equality would still pass if someone
+        forked the module and the copies happened to agree today."""
+        from backend.app.services.eea_countries import EEA_COUNTRIES
         from backend.app.services.trigger_engine import _EEA_COUNTRIES
-        self.assertIn("DE", _EEA_COUNTRIES)
-        self.assertIn("FR", _EEA_COUNTRIES)
-        self.assertNotIn("US", _EEA_COUNTRIES)
-        self.assertGreater(len(_EEA_COUNTRIES), 25)
+        self.assertIs(_EEA_COUNTRIES, EEA_COUNTRIES)
+        self.assertIs(_checker._EEA_COUNTRIES, EEA_COUNTRIES)
+
+    def test_the_eea_module_stays_dependency_free(self):
+        """It exists so the always-on CI job — which installs no backend dependencies —
+        can import it. An import here would reintroduce the ModuleNotFoundError."""
+        src = open(os.path.join(_REPO_ROOT, "backend", "app", "services",
+                                "eea_countries.py"), encoding="utf-8").read()
+        import re
+        imports = [l.strip() for l in src.splitlines()
+                   if re.match(r"\s*(import|from)\s", l)]
+        allowed = {"from __future__ import annotations", "from typing import FrozenSet"}
+        self.assertEqual([i for i in imports if i not in allowed], [])
+
+    def test_the_eea_set_is_populated(self):
+        from backend.app.services.eea_countries import EEA_COUNTRIES
+        self.assertIn("DE", EEA_COUNTRIES)
+        self.assertIn("FR", EEA_COUNTRIES)
+        self.assertNotIn("US", EEA_COUNTRIES)
+        self.assertGreater(len(EEA_COUNTRIES), 25)
 
 
 class TestPoisonDetection(unittest.TestCase):
