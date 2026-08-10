@@ -1,9 +1,15 @@
 # ReloPass — allow all crawlers.
 # Added for FRIDAY-004e (AIQ-769): the marketing app shipped without a robots.txt,
 # so /robots.txt fell through to the SPA index.html and failed Lighthouse SEO.
-# TODO [FRIDAY-004d §11 follow-up]: add a Sitemap: line once sitemap.xml ships.
 User-agent: *
 Allow: /
+
+# sitemap.xml is generated at build time by frontend/scripts/prerender-content.mjs.
+# It lists the marketing pages, the two ad landing pages, and every published guide.
+# (Closes the FRIDAY-004d §11 TODO that sat here from AIQ-769: until 2026-08-10 there was
+# no sitemap to point at — /sitemap.xml returned the SPA shell like every other unmatched
+# path.)
+Sitemap: https://relopass.com/sitemap.xml
 
 # ── [AIQ-1782 / ADS-2] OpenAI crawlers — explicit, not merely covered by `*` ──
 #
