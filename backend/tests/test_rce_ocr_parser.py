@@ -14,7 +14,9 @@ from uuid import uuid4
 from backend.relopass.agents.models import ParsedDocument
 from backend.app.services.rce_ocr_parser import (
     OcrParseResult,
+    _bucket_for_storage_path,
     mrz_text_from_lines,
+    normalize_mrz_filler,
     parse_stored_document,
     passport_result_to_parsed_document,
 )
@@ -152,3 +154,102 @@ def test_parse_stored_download_failure_is_failsoft():
         downloader=_boom_dl,
     ))
     assert out.ok is False
+
+
+# ── Storage-bucket resolution ─────────────────────────────────────────────────
+#
+# Every test above injects `downloader=`, which is exactly why the real one went
+# unexercised: `_default_downloader` was hardcoded to the immigration bucket, so
+# every upload from the case_documents path 404'd and was swallowed by the
+# fail-soft above. These assert the pure resolver instead, so no Supabase is needed.
+
+
+def test_case_docs_prefix_resolves_to_the_case_documents_bucket():
+    """The roadmap-CTA upload path: case_documents.py writes
+    case-docs/{case}/{key}/{ts}_{file} into the `case-documents` bucket."""
+    path = "case-docs/356442ac-ea69-490e-995c-6652bec959e2/passport_copy/20260810T101112_passport.pdf"
+    assert _bucket_for_storage_path(path) == "case-documents"
+
+
+def test_immigration_path_still_resolves_to_the_immigration_bucket():
+    """document_upload_service.py writes {case_id}/{doc_id}.{ext} into
+    `immigration-documents`. This is the pre-existing behaviour and must not move."""
+    assert _bucket_for_storage_path("8e1677d3-d30f-470f-a2a4-feb7ebfb9132/9eda25ef.pdf") == (
+        "immigration-documents"
+    )
+
+
+def test_bucket_resolution_defaults_safely_on_empty_input():
+    """storage_uri is nullable in rce.documents — never raise on it."""
+    assert _bucket_for_storage_path("") == "immigration-documents"
+    assert _bucket_for_storage_path(None) == "immigration-documents"
+
+
+def test_case_docs_prefix_must_be_anchored():
+    """A path merely CONTAINING 'case-docs/' is not the case-documents shape —
+    only a prefix is, so this must not over-match."""
+    assert _bucket_for_storage_path("archive/case-docs/x.pdf") == "immigration-documents"
+
+
+# ── MRZ filler normalisation ──────────────────────────────────────────────────
+#
+# Vision OCR reads every MRZ character correctly but miscounts long '<' runs.
+# Measured against gpt-4o on a clean TD3 render, two consecutive runs of the SAME
+# image returned line lengths (42, 45) and (44, 45). parse_mrz decodes by position
+# and rightly rejects those, so the passport agent emitted zero fields despite a
+# perfect read. ICAO pads the name field to 39 and the personal number to 14, so
+# real passports hit this exactly as hard as synthetic ones.
+
+# Exactly what gpt-4o returned, verbatim.
+_OCR_SHORT_L1 = "P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<"        # 42
+_OCR_LONG_L2 = "L898902C36UTO7408122F3204153ZE184226B<<<<<<16"      # 45
+_GOOD_L1 = "P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<"            # 44
+_GOOD_L2 = "L898902C36UTO7408122F3204153ZE184226B<<<<<16"            # 44
+
+
+def test_short_line_is_padded_in_the_filler_run():
+    assert normalize_mrz_filler(_OCR_SHORT_L1) == _GOOD_L1
+
+
+def test_long_line_is_trimmed_in_the_filler_run():
+    assert normalize_mrz_filler(_OCR_LONG_L2) == _GOOD_L2
+
+
+def test_correct_lines_are_left_untouched():
+    """Never rewrite a line that is already valid."""
+    assert normalize_mrz_filler(_GOOD_L1) == _GOOD_L1
+    assert normalize_mrz_filler(_GOOD_L2) == _GOOD_L2
+
+
+def test_normalised_lines_satisfy_the_icao_check_digits():
+    """The real guarantee. Filler carries no data, and the check digits are computed
+    over the data characters — so if this normalisation ever corrupted a line,
+    parse_mrz would report findings instead of a clean parse."""
+    from backend.relopass.docs.mrz import parse_mrz
+
+    text = f"{normalize_mrz_filler(_OCR_SHORT_L1)}\n{normalize_mrz_filler(_OCR_LONG_L2)}"
+    parsed = parse_mrz(text)
+    assert parsed.surname == "Eriksson"
+    assert parsed.given_names == "Anna Maria"
+    assert parsed.document_number == "L898902C3"
+    assert str(parsed.date_of_birth) == "1974-08-12"
+    assert str(parsed.expiry_date) == "2032-04-15"
+    assert parsed.sex == "F"
+    assert not list(parsed.findings), "check digits must validate after normalisation"
+
+
+def test_line_with_no_filler_is_left_for_the_parser_to_reject():
+    """Nothing safe to adjust — don't invent characters, let parse_mrz say no."""
+    garbage = "L898902C36UTO7408122F3204153ZE184226B16"
+    assert normalize_mrz_filler(garbage) == garbage
+
+
+def test_mrz_text_from_lines_normalises_both_lines():
+    """The seam that actually feeds the agents."""
+    out = mrz_text_from_lines(_OCR_SHORT_L1, _OCR_LONG_L2)
+    assert out == f"{_GOOD_L1}\n{_GOOD_L2}"
+
+
+def test_mrz_text_from_lines_still_returns_none_when_a_line_is_missing():
+    assert mrz_text_from_lines(_OCR_SHORT_L1, None) is None
+    assert mrz_text_from_lines(None, None) is None
