@@ -21,6 +21,7 @@ own PII handling (you cannot mask an image you must OCR); this module maps + rou
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Optional, Tuple
 from uuid import UUID
@@ -48,15 +49,52 @@ class OcrParseResult:
 # ── Pure mappers ──────────────────────────────────────────────────────────────
 
 
+_FILLER_RUN = re.compile(r"<+")
+_TD3_LINE_LEN = 44
+
+
+def normalize_mrz_filler(line: str, target: int = _TD3_LINE_LEN) -> str:
+    """Pad or trim the longest ``<`` filler run so ``line`` is exactly ``target``.
+
+    Vision OCR reads every MRZ *character* correctly but miscounts long runs of the
+    ``<`` filler — measured against gpt-4o on a clean TD3 render: line lengths came
+    back (42, 45) and (44, 45) on consecutive runs of the same image. ``parse_mrz``
+    is strict about the 44-char layout (rightly — it decodes by position), so it
+    returned MRZ_FORMAT_UNRECOGNIZED and the passport agent emitted **zero fields**
+    despite the OCR having read the document perfectly. ICAO TD3 pads the name field
+    to 39 chars and the personal number to 14, so this hits real passports exactly as
+    hard as synthetic ones.
+
+    Adjusting filler is information-preserving — ``<`` is padding, not data — and the
+    correction is independently verifiable: the ICAO check digits are computed over
+    the data characters, so ``parse_mrz`` still rejects anything this gets wrong. That
+    is why the fix lives here at the OCR boundary rather than inside ``parse_mrz``:
+    the parser's strictness is a feature for every other caller, and only OCR output
+    carries this particular noise.
+    """
+    if not line or len(line) == target:
+        return line
+    runs = [(m.start(), m.end()) for m in _FILLER_RUN.finditer(line)]
+    if not runs:
+        return line  # nothing safe to adjust — let parse_mrz reject it
+    start, end = max(runs, key=lambda r: r[1] - r[0])
+    delta = target - len(line)
+    if delta > 0:
+        return line[:end] + ("<" * delta) + line[end:]
+    trim = min(-delta, end - start)
+    return line[: end - trim] + line[end:]
+
+
 def mrz_text_from_lines(
     mrz_line1: Optional[str], mrz_line2: Optional[str]
 ) -> Optional[str]:
     """Join the two MRZ lines into the ``mrz_text`` the agents parse, or None if
-    either is missing/blank."""
+    either is missing/blank. Filler runs are length-normalised first — see
+    ``normalize_mrz_filler``."""
     l1 = (mrz_line1 or "").strip()
     l2 = (mrz_line2 or "").strip()
     if l1 and l2:
-        return f"{l1}\n{l2}"
+        return f"{normalize_mrz_filler(l1)}\n{normalize_mrz_filler(l2)}"
     return None
 
 
