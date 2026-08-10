@@ -39,6 +39,13 @@ export default defineConfig({
     // assertLogicalPage B10 cold-start tolerance. Run with --project=selftest.
     { name: 'selftest', testDir: './tests/selftest', use: { ...devices['Desktop Chrome'] } },
 
+    // Unauthenticated, crawler-facing surface. No auth, no fixtures, no DATABASE_URL —
+    // so it needs no dependencies and is safe to run anywhere, including before the
+    // provisioning chain. It exists because every OTHER project here carries a
+    // storageState, which meant 100% of Sentinel coverage sat behind a login while the
+    // ad landing pages served an empty shell to crawlers for hours (#1761).
+    { name: 'public', testDir: './tests/public', use: { ...devices['Desktop Chrome'] } },
+
     // ════ CI / UNATTENDED PATH (headless, self-provisioning) ═══════════════════
     // Register fresh is_test personas via API → playwright/.auth/{hr_a,emp_a,hr_b}.json.
     // No passwords typed; data is purgeable via `is_test=true`.
