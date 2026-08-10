@@ -8,6 +8,17 @@ new document type is wired in by registering its factory in this map.
 
 from typing import Callable, Dict
 
+from .employment_contract import (
+    EMPLOYMENT_CONTRACT_AGENT_NAME,
+    EMPLOYMENT_CONTRACT_DOCUMENT_TYPE,
+    NON_FIXED_TRIGGERS,
+    EmploymentContractAgent,
+    EmploymentContractResult,
+    detect_jurisdiction,
+    is_guaranteed_fixed_only,
+    load_employment_contract_prompt,
+    recover_registry_id,
+)
 from .diploma import (
     DIPLOMA_AGENT_NAME,
     DIPLOMA_DOCUMENT_TYPE,
@@ -110,6 +121,9 @@ EXTRACTION_AGENT_REGISTRY: Dict[str, Callable[..., object]] = {
     TAX_CERT_DE_DOCUMENT_TYPE: TaxCertDeAgent,
     TAX_CERT_FR_DOCUMENT_TYPE: TaxCertFrAgent,
     TAX_CERT_NO_DOCUMENT_TYPE: TaxCertNoAgent,
+    # [AIQ-1766] ONE entry for three locales — deliberately not the TAX_CERT split.
+    # See the note below.
+    EMPLOYMENT_CONTRACT_DOCUMENT_TYPE: EmploymentContractAgent,
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -137,6 +151,33 @@ EXTRACTION_AGENT_REGISTRY: Dict[str, Callable[..., object]] = {
 # The country determination moves to classification time, where the document's own
 # text is the evidence. `TAX_CERT_*_ISSUING_COUNTRY` remain on the agent modules as
 # the assertion each agent makes about its own output.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Why EMPLOYMENT_CONTRACT is ONE code, despite the TAX_CERT precedent above
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# [AIQ-1766] This looks like the situation TAX_CERT was in — three locale prompts,
+# one document type — so the difference is worth stating rather than leaving a
+# reader to assume the split was forgotten.
+#
+# The TAX_CERT lesson is "never require a signal nothing supplies", not "always
+# split the code". There the discriminator was `issuing_country`, which no caller
+# had and no column stored. Here the discriminator is the document's own language,
+# which is present in the text the agent is already reading, so
+# EmploymentContractAgent.run(document) resolves it itself and the orchestrator's
+# calling convention is untouched.
+#
+# Two further reasons a split would be actively wrong here:
+#   * The C1-04a classifier emits exactly one EMPLOYMENT_CONTRACT code and names
+#     FR CDI/CDD, DE Arbeitsvertrag and NO arbeidskontrakt as *variants of it*.
+#     Three runtime codes could not be mapped from that one classifier output.
+#   * The three prompts share an identical output schema. A Lohnsteuerbescheinigung
+#     and an avis d'imposition carry genuinely different fields; three employment
+#     contracts carry the same fields in different languages.
+#
+# The multi-document case that broke corridor-based TAX_CERT routing is handled
+# too: each contract is typed on its own text, so a case holding both an FR and an
+# NO contract gets each read with its own locale prompt.
 
 
 def get_extraction_agent_class(document_type_code: str) -> Callable[..., object]:
@@ -214,6 +255,16 @@ __all__ = [
     "VisaPermitAgent",
     "VisaPermitResult",
     "load_visa_permit_prompt",
+    # employment_contract (C1-05c / AIQ-1766)
+    "EMPLOYMENT_CONTRACT_AGENT_NAME",
+    "EMPLOYMENT_CONTRACT_DOCUMENT_TYPE",
+    "NON_FIXED_TRIGGERS",
+    "EmploymentContractAgent",
+    "EmploymentContractResult",
+    "detect_jurisdiction",
+    "is_guaranteed_fixed_only",
+    "load_employment_contract_prompt",
+    "recover_registry_id",
     # registry wiring (C2-01)
     "EXTRACTION_AGENT_REGISTRY",
     "get_extraction_agent_class",
