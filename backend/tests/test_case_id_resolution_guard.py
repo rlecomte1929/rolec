@@ -146,6 +146,27 @@ _ALLOWLIST = {
     "_post_form_status_notifications": "helper; caller resolved the id before notifying",
     "_resolve_accessible_case": "the resolution helper itself",
     "_fetch_pet_or_404": "helper; pets endpoints assert access before calling it",
+
+    # ---- [AIQ-1790] ----
+    #
+    # Doubly-scoped, and resolving would REGRESS it. The document lookup requires the
+    # row to match BOTH :document_id AND :case_id, and _require_case_access already
+    # proved the caller's org owns that exact relocation_cases row before the query
+    # runs. So a wrong id form 404s (fail-closed) — it cannot surface another tenant's
+    # document, because that would require the same id to key both tenants' rows.
+    #
+    # Measured 2026-08-11, why resolve_case_ids is the WRONG tool here rather than
+    # merely unnecessary: this router's param is `relocation_cases.id`, and
+    # resolve_case_ids resolves through case_assignments. Only 678 of 1057
+    # relocation_cases have any matching assignment row — routing through it would
+    # 404 the documents panel for 379 cases (36%) that work today.
+    #
+    # Inherits the id-space convention of its parent GET /documents
+    # (_KNOWN_UNRESOLVED, "AIQ-1775-FU"); when that entry is fixed, fix this with it.
+    "get_case_document_fields": (
+        "doubly-scoped on document_id AND case_id after _require_case_access; "
+        "resolve_case_ids would 404 36% of relocation_cases (measured 379/1057)"
+    ),
 }
 
 # Functions that genuinely do NOT resolve and are NOT safe. Recorded, not excused.
