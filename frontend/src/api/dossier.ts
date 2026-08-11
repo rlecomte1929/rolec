@@ -44,6 +44,29 @@ export interface DossierFormTemplate {
    *  When != 'en' the dossier offers a label-only translation toggle. Identifier
    *  VALUES are never translated. */
   source_language?: string | null;
+  /** [S1] Ordered section layout. Array order IS display order. Empty means "group by
+   *  fields[].section", which is what every template except RP-NO-DATASHEET does today. */
+  sections?: DossierFormSection[] | null;
+}
+
+/** [S1] A section of a data sheet: one authority, one appointment.
+ *
+ *  `field_ids` reference `FieldValueItem.field_id` and MAY be empty — France's headline fact
+ *  is the ABSENCE of an arrival registration, which is a section that is a statement rather
+ *  than a set of inputs. A field may be referenced by several sections (each appointment needs
+ *  its own packet) and is never duplicated to achieve that. */
+export interface DossierFormSection {
+  id: string;
+  number: number;
+  title: string;
+  authority?: string | null;
+  portal_url?: string | null;
+  deadline_hint?: string | null;
+  /** Sections sharing a key are ONE portal visit — FINDINGS.md Appendix A.3. */
+  session_group?: string | null;
+  callout_top?: string | null;
+  callout_bottom?: string | null;
+  field_ids: string[];
 }
 
 export type DossierPersonKind = 'employee' | 'spouse' | 'child' | 'other';

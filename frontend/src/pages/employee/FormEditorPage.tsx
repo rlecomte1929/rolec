@@ -37,7 +37,7 @@ import { buildRoute } from '../../navigation/routes';
 import { formEditorAPI } from '../../api/formEditor';
 import { dossierAPI } from '../../api/dossier';
 import type { FieldValueItem } from '../../api/formEditor';
-import type { CaseFormSummary } from '../../api/dossier';
+import type { CaseFormSummary, DossierFormSection } from '../../api/dossier';
 import { PdfPanel } from '../../features/platform-v2/form-editor/PdfPanel';
 import { FieldRow } from '../../features/platform-v2/form-editor/FieldRow';
 import type { FieldLang } from '../../features/platform-v2/form-editor/FieldRow';
@@ -70,6 +70,12 @@ const LANG_LABELS: Record<FieldLang, string> = {
   fr: 'Français',
 };
 
+/** [S1] The bucket for fields with no section. Was 'Form fields' here and "Your details" in
+ *  backend/app/services/data_sheet_pdf.py — the same sheet used two different words depending
+ *  on whether you read it on screen or printed it. Reconciled on the PDF's wording, which
+ *  addresses the employee rather than describing the form. Keep the two in step. */
+const UNSECTIONED = 'Your details';
+
 /** `eea_registration` → `Eea registration`. The fallback for any section key we haven't
  *  named, so a newly seeded corridor degrades to something readable instead of a raw key. */
 function humaniseSection(key: string): string {
@@ -78,18 +84,41 @@ function humaniseSection(key: string): string {
 }
 
 export function sectionLabel(key: string): string {
-  if (key === 'Form fields') return key;
+  if (key === UNSECTIONED) return key;
   return SECTION_LABELS[key] ?? humaniseSection(key);
 }
 
-/** Group fields by their optional `section` property.
- *  Fields with no section fall into a single "Form fields" bucket. */
+/** [S1] Group fields by the template's declared `sections` when it has them, else by their
+ *  optional `section` property.
+ *
+ *  When the template declares sections, that array IS the layout: its order is display order,
+ *  each entry supplies its own title, and its `field_ids` select the fields. Two consequences
+ *  the field-grouped path could not express — both needed by the DE/FR corridors:
+ *
+ *    * a section may reference NO fields (France has no arrival registration, and that absence
+ *      has to be stated or the employee assumes we forgot it);
+ *    * a field may appear in several sections, because each authority appointment needs its own
+ *      packet. The field is declared ONCE; duplicating it would write one stored value per copy.
+ *
+ *  Fields with no section fall into a single UNSECTIONED bucket. */
 function groupBySection(
   fields: FieldValueItem[],
-): Array<{ section: string; label: string; fields: FieldValueItem[] }> {
+  sections?: DossierFormSection[] | null,
+): Array<{ section: string; label: string; fields: FieldValueItem[]; meta?: DossierFormSection }> {
+  if (sections && sections.length > 0) {
+    const byId = new Map(fields.map((f) => [f.field_id, f]));
+    return sections.map((s) => ({
+      section: s.id,
+      label: s.title?.trim() || sectionLabel(s.id),
+      // An id with no matching field is skipped rather than crashing the page; the backend
+      // suite (test_data_sheet_sections.py) fails on it so a bad backfill is caught there.
+      fields: (s.field_ids ?? []).map((id) => byId.get(id)).filter((f): f is FieldValueItem => !!f),
+      meta: s,
+    }));
+  }
   const map = new Map<string, FieldValueItem[]>();
   for (const f of fields) {
-    const key = f.section?.trim() || 'Form fields';
+    const key = f.section?.trim() || UNSECTIONED;
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(f);
   }
@@ -369,7 +398,12 @@ export const FormEditorPage: React.FC = () => {
   }, [caseId, formId]);
 
   // ── Derived state ─────────────────────────────────────────────────────────
-  const sections = useMemo(() => groupBySection(fields), [fields]);
+  // [S1] The template's declared sections drive layout when present; otherwise fall back to
+  // grouping by fields[].section.
+  const sections = useMemo(
+    () => groupBySection(fields, formSummary?.template?.sections),
+    [fields, formSummary?.template?.sections],
+  );
   const completionPct = useMemo(
     () => computeCompletion(fields, liveValues),
     [fields, liveValues],
@@ -579,19 +613,30 @@ export const FormEditorPage: React.FC = () => {
               No fields defined for this form yet.
             </div>
           ) : (
-            sections.map(({ section, label: sectionHeading, fields: sectionFields }) => {
+            sections.map(({ section, label: sectionHeading, fields: sectionFields, meta }) => {
               const aiFieldsInSection = sectionFields.filter(
                 (f) => f.filled_by === 'ai' && !f.reviewed,
               );
               const hasConsultFields = sectionFields.some(
                 (f) => f.consult_professional === true,
               );
+              // [S1/E] FINDINGS Appendix A.3 — sections sharing a session_group are ONE portal
+              // visit, so say so instead of implying two separate appointments. Only shown when
+              // another section actually shares the key; a lone group is not a group.
+              const sharesSession = !!meta?.session_group
+                && sections.filter((o) => o.meta?.session_group === meta.session_group).length > 1;
+              const sessionPeers = sharesSession
+                ? sections
+                    .filter((o) => o.meta?.session_group === meta!.session_group
+                      && o.section !== section)
+                    .map((o) => o.label)
+                : [];
               return (
                 <div key={section} className="mb-8">
                   {/* Section header */}
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase">
-                      {sectionHeading}
+                      {meta?.number ? `${meta.number} · ` : ''}{sectionHeading}
                     </h2>
                     {aiFieldsInSection.length > 0 && (
                       <Button unstyled
@@ -603,6 +648,43 @@ export const FormEditorPage: React.FC = () => {
                       </Button>
                     )}
                   </div>
+
+                  {/* [S1/E] Authority + timing, from the section rather than from prose buried
+                      in a field note. */}
+                  {(meta?.authority || meta?.deadline_hint) && (
+                    <p className="mb-2 text-xs text-slate-500">
+                      {meta?.authority}
+                      {meta?.authority && meta?.deadline_hint ? ' · ' : ''}
+                      {meta?.deadline_hint}
+                      {meta?.portal_url && (
+                        <>
+                          {' · '}
+                          <a
+                            href={meta.portal_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#1f8e8b] hover:underline"
+                          >
+                            Open portal
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  )}
+
+                  {/* [S1/E] Appendix A.3: one portal visit, not two appointments. */}
+                  {sharesSession && (
+                    <Alert variant="info" className="mb-3">
+                      This and {sessionPeers.join(', ')} are completed in{' '}
+                      <strong>one {meta!.session_group} session</strong> — you do not need a
+                      second appointment.
+                    </Alert>
+                  )}
+
+                  {/* [S1/E] Section-level guidance, above the fields. */}
+                  {meta?.callout_top && (
+                    <Alert variant="info" className="mb-3">{meta.callout_top}</Alert>
+                  )}
 
                   {/* Regulatory banner — these determinations are routed to a
                       regulated professional and are never pre-filled. */}
@@ -627,6 +709,14 @@ export const FormEditorPage: React.FC = () => {
                       />
                     ))}
                   </div>
+
+                  {/* [S1/E] Guidance that only makes sense AFTER the fields — the
+                      OUTPUT-vs-INPUT warnings especially. The FR→NO sheet used to bury this
+                      inside employer_name's note, where it read as a comment on one field
+                      rather than on the whole appointment. */}
+                  {meta?.callout_bottom && (
+                    <Alert variant="info" className="mt-3">{meta.callout_bottom}</Alert>
+                  )}
                 </div>
               );
             })
