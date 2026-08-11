@@ -119,6 +119,37 @@ async function main() {
     },
   });
 
+  // [AIQ-1797] @supabase/realtime-js throws AT IMPORT TIME on Node < 22:
+  //   "Node.js detected but native WebSocket not found."
+  // Node 22 added a global WebSocket; CI pins 20.18.1 via .nvmrc, so this fails there and
+  // passes on any newer local Node — which is exactly how it reached CI green-on-my-machine.
+  //
+  // Supabase is in the SSR graph because the marketing pages import the
+  // `components/marketing` BARREL, which re-exports InlineDemoForm -> api/client ->
+  // api/supabase. (The ad landing pages import individual files, which is why they never
+  // hit this.) `vite build` even warns about that edge today.
+  //
+  // A stub is the right fix rather than unpicking the barrel: prerendering renders static
+  // marketing copy and never opens a realtime channel, so the module only needs to be
+  // IMPORTABLE. Rewriting eight pages' imports to dodge a build-time-only constraint would
+  // be a bigger, riskier diff than the constraint deserves. Build-time only — this file is
+  // never bundled, so nothing reaches the client.
+  //
+  // If a prerendered page ever genuinely needs realtime, this stub will surface it loudly
+  // as a connection that does nothing, not as a silent wrong render.
+  if (typeof globalThis.WebSocket === 'undefined') {
+    class PrerenderWebSocketStub {
+      constructor() {
+        throw new Error(
+          'prerender: a prerendered route tried to open a realtime WebSocket. Prerendering ' +
+            'renders static markup only — move that call out of the render path.',
+        );
+      }
+    }
+    globalThis.WebSocket = PrerenderWebSocketStub;
+    console.log('prerender: installed a WebSocket stub (Node < 22) so @supabase/realtime-js can import');
+  }
+
   const { ROUTES } = await import(path.join(SSR_OUT, 'prerender-entry.js'));
   const baseHtml = await readFile(template, 'utf8');
 
