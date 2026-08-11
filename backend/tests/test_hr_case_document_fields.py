@@ -230,6 +230,72 @@ class TestGracefulDegrade(_Base):
         self.assertEqual(resp.json()["fields"], [])
 
 
+class TestDegradePathsAreNotSilent(_Base):
+    """AIQ-1790b. The reason this matters, concretely:
+
+    GET /documents carried `dt.label AS document_type_label`, and rce.document_types has
+    no `label` column. Every call raised UndefinedColumn, the bare `except` returned [],
+    and an empty list is indistinguishable from "this case has no documents" — so the
+    endpoint looked healthy for its entire life while never once returning a row. The
+    extraction pipeline produced fields in production for a day before anyone noticed
+    nothing could read them.
+
+    A unit test cannot catch a missing column without a real database. What it CAN
+    guarantee is that the next one is visible instead of silent.
+    """
+
+    def _raising_engine(self):
+        class _Failing:
+            def connect(self):
+                raise RuntimeError("simulated: UndefinedColumn")
+        return _Failing()
+
+    def test_the_documents_degrade_path_logs(self) -> None:
+        from unittest.mock import patch
+        with (
+            patch("backend.app.routers.hr_case_detail.db.get_relocation_case",
+                  side_effect=lambda cid: _CASE if cid == _CASE_ID else None),
+            patch("backend.app.routers.hr_case_detail.db.engine", new=self._raising_engine()),
+            self.assertLogs("backend.app.routers.hr_case_detail", level="ERROR") as logs,
+        ):
+            resp = self.client.get(f"/api/hr/cases/{_CASE_ID}/documents",
+                                   headers={"Authorization": "Bearer t"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {"documents": []})
+        self.assertTrue(any(_CASE_ID in r.getMessage() for r in logs.records),
+                        "the swallowed failure must name the case it happened on")
+
+    def test_the_fields_degrade_path_logs(self) -> None:
+        from unittest.mock import patch
+        with (
+            patch("backend.app.routers.hr_case_detail.db.get_relocation_case",
+                  side_effect=lambda cid: _CASE if cid == _CASE_ID else None),
+            patch("backend.app.routers.hr_case_detail.db.engine", new=self._raising_engine()),
+            self.assertLogs("backend.app.routers.hr_case_detail", level="ERROR") as logs,
+        ):
+            resp = self.client.get(
+                f"/api/hr/cases/{_CASE_ID}/documents/{_DOC_ID}/fields",
+                headers={"Authorization": "Bearer t"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(logs.records)
+
+    def test_document_type_label_is_not_selected_from_a_column_that_does_not_exist(self) -> None:
+        """Pins the actual defect. rce.document_types has exactly: document_type_id,
+        code, expected_fields_json, validator_pack, created_at, updated_at."""
+        import inspect
+
+        from backend.app.routers import hr_case_detail
+
+        # Comment lines are stripped: the handler's own comment explains the defect and
+        # necessarily names it, so asserting on raw source would match the explanation
+        # rather than the SQL.
+        src = inspect.getsource(hr_case_detail.get_case_documents)
+        code = "\n".join(l for l in src.splitlines() if not l.lstrip().startswith("#"))
+        self.assertNotIn("dt.label", code,
+                         "rce.document_types has no `label` column; selecting it makes "
+                         "the whole query raise and the endpoint silently return []")
+
+
 class TestRouteIsReachableInProduction(unittest.TestCase):
     def test_registered_on_the_app_render_actually_boots(self) -> None:
         """Render boots `uvicorn backend.main:app`. A route registered only on the
