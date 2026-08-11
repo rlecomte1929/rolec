@@ -293,7 +293,7 @@ def test_promotion_lands_everything_unvetted(full_engine, candidates):
     with _session(full_engine) as session:
         promoted, _, _ = promote(session, dry_run=False)
 
-    assert promoted == 31
+    assert promoted == 31, "every candidate is accounted for, merged or new"
     with full_engine.begin() as conn:
         pending, approved = conn.execute(
             text(
@@ -308,9 +308,15 @@ def test_promotion_lands_everything_unvetted(full_engine, candidates):
 def test_a_company_in_two_corridors_is_one_supplier_with_two_capabilities(
     full_engine, candidates
 ):
-    """Grospiron serves FR-DE and FR-NO. The name index permits one supplier row, so the
-    second corridor must become a second CAPABILITY — dropping it would silently lose that
-    corridor's coverage, which is what happened before this case was handled."""
+    """Two companies in this harvest serve both corridors, and each must be ONE supplier with
+    TWO capabilities. Dropping the second would silently lose that corridor's coverage.
+
+    - Grospiron International — identical name in both rows.
+    - AGS France — written 'AGS France (SOFDI – Société Française de Déménagement
+      International)' for FR-DE and 'AGS France (SOFDI)' for FR-NO. Same FIDI affiliate, two
+      spellings, which is why `_name_key` drops parenthetical asides.
+
+    So 31 candidates become 29 suppliers and 31 capabilities."""
     from backend.imports.suppliers.executor import promote
 
     _staged(full_engine, candidates)
@@ -330,8 +336,18 @@ def test_a_company_in_two_corridors_is_one_supplier_with_two_capabilities(
             )
         ).scalar_one()
 
-    assert (suppliers, caps) == (30, 31)
+    assert (suppliers, caps) == (29, 31)
     assert grospiron == 2
+
+    with full_engine.begin() as conn:
+        ags = conn.execute(
+            text(
+                "SELECT count(*) FROM supplier_service_capabilities c "
+                "JOIN suppliers s ON s.id = c.supplier_id "
+                "WHERE s.name LIKE 'AGS France%'"
+            )
+        ).scalar_one()
+    assert ags == 2, "the two spellings of AGS France must resolve to one supplier"
 
 
 def test_the_registry_evidence_survives_promotion(full_engine, candidates):
@@ -351,7 +367,9 @@ def test_the_registry_evidence_survives_promotion(full_engine, candidates):
             )
         ).one()
 
-    assert total == 30
+    # 29, not 31: the unique claim index is (supplier_id, body, scheme), so a company in two
+    # corridors evidenced by the same registry holds ONE accreditation, not two.
+    assert total == 29
     assert no_evidence == 0
     assert verified == 0, "a registry listing is 'claimed'; the human who approves verifies it"
 
@@ -367,7 +385,7 @@ def test_promotion_is_idempotent(full_engine, candidates):
 
     assert again == 0
     with full_engine.begin() as conn:
-        assert conn.execute(text("SELECT count(*) FROM suppliers")).scalar_one() == 30
+        assert conn.execute(text("SELECT count(*) FROM suppliers")).scalar_one() == 29
 
 
 def test_every_candidate_is_linked_to_its_supplier(full_engine, candidates):
@@ -381,7 +399,45 @@ def test_every_candidate_is_linked_to_its_supplier(full_engine, candidates):
         unlinked = conn.execute(
             text(
                 "SELECT count(*) FROM vendor_candidates "
-                "WHERE status='pending' AND promoted_supplier_id IS NULL"
+                "WHERE status IN ('pending','duplicate') AND promoted_supplier_id IS NULL"
             )
         ).scalar_one()
     assert unlinked == 0
+
+
+def test_a_harvest_matches_an_existing_supplier_by_LEGAL_name(full_engine, candidates):
+    """The Expat Relocation case, verified against production before it was coded.
+
+    Prod holds supplier `no-leg-1` named "Expat Relocation Norway" with
+    `legal_name = "Expat Relocation AS"`. The harvest sources from the EuRA register, which
+    reports the legal entity — so it found "Expat Relocation AS", character for character.
+
+    Matching only on `name` scores those two at 0.83 similarity and imports a duplicate of a
+    company we already have. Matching on `legal_name` too makes it a capability instead.
+    """
+    from backend.imports.suppliers.executor import promote
+
+    with full_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO suppliers (id, name, legal_name, status) "
+                "VALUES ('no-leg-1', 'Expat Relocation Norway', 'Expat Relocation AS', 'active')"
+            )
+        )
+    _staged(full_engine, candidates)
+    with _session(full_engine) as session:
+        promote(session, dry_run=False)
+
+    with full_engine.begin() as conn:
+        rows = conn.execute(
+            text("SELECT count(*) FROM suppliers WHERE name LIKE 'Expat Relocation%'")
+        ).scalar_one()
+        attached = conn.execute(
+            text(
+                "SELECT count(*) FROM supplier_service_capabilities "
+                "WHERE supplier_id = 'no-leg-1'"
+            )
+        ).scalar_one()
+
+    assert rows == 1, "no second Expat Relocation row may be created"
+    assert attached == 1, "the FR-NO housing capability attaches to the supplier we already had"

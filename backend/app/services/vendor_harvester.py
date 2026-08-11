@@ -100,15 +100,29 @@ _LEGAL_FORMS = (
 
 
 def _name_key(name: Optional[str]) -> Optional[str]:
-    """Lowercased alphanumeric name with legal form and punctuation removed.
+    """Lowercased alphanumeric name with legal form, asides and punctuation removed.
 
     Only used as a dedupe fallback when there is no domain. Accent-folded so
     'Déménagement' and 'Demenagement' agree.
+
+    Parenthetical asides are dropped, which is what makes
+    'AGS France (SOFDI – Société Française de Déménagement International)' and
+    'AGS France (SOFDI)' — the same FIDI affiliate written two ways in one harvest — resolve
+    to one supplier instead of two.
+
+    The consequence is deliberate: 'Crown Relocations (Norway)' also collapses onto 'Crown
+    Relocations'. That matches the data model rather than fighting it — a supplier holds many
+    per-country capabilities, so one Crown with a Norway capability is more correct than two
+    Crown rows. Nothing merges silently; every match is named in the promotion summary.
+
+    Em-dash and comma suffixes are NOT stripped, so 'AGS Global Solutions GmbH — Berlin' and
+    '— Koblenz' stay distinct. Those are genuinely different branches.
     """
     if not name:
         return None
     folded = unicodedata.normalize("NFKD", name)
     folded = "".join(c for c in folded if not unicodedata.combining(c))
+    folded = re.sub(r"\([^)]*\)", " ", folded)          # drop parenthetical asides
     words = re.sub(r"[^a-z0-9]+", " ", folded.lower()).split()
     while words:
         for n in (3, 2, 1):                       # longest legal form first: "gmbh co kg"
@@ -224,7 +238,13 @@ def validate(cand: Candidate) -> None:
 _SQL_SUPPLIER_WEBSITES = text(
     "SELECT website FROM suppliers WHERE website IS NOT NULL AND website <> ''"
 )
-_SQL_SUPPLIER_NAMES = text("SELECT name FROM suppliers WHERE name IS NOT NULL")
+#: BOTH names. `suppliers.legal_name` is where the registered entity lives, and a harvest
+#: sources from a register so it reports the LEGAL name — "Expat Relocation Norway" carries
+#: legal_name "Expat Relocation AS", which is character-for-character what the harvest found.
+#: Matching only on `name` re-imports the company we already have.
+_SQL_SUPPLIER_NAMES = text(
+    "SELECT name, legal_name FROM suppliers WHERE name IS NOT NULL"
+)
 _SQL_CANDIDATE_KEYS = text(
     "SELECT dedupe_key FROM vendor_candidates WHERE dedupe_key IS NOT NULL"
 )
@@ -252,10 +272,11 @@ def existing_dedupe_keys(conn: Any, *, corridor: Optional[str] = None) -> set:
             keys.add(k)
 
     if corridor:
-        for (name,) in conn.execute(_SQL_SUPPLIER_NAMES):
-            slug = _name_key(name)
-            if slug:
-                keys.add(f"name:{slug}@{corridor.strip().lower()}")
+        for name, legal_name in conn.execute(_SQL_SUPPLIER_NAMES):
+            for candidate_name in (name, legal_name):
+                slug = _name_key(candidate_name)
+                if slug:
+                    keys.add(f"name:{slug}@{corridor.strip().lower()}")
 
     for (key,) in conn.execute(_SQL_CANDIDATE_KEYS):
         if key:

@@ -127,13 +127,18 @@ def stage(
     return results, rejections
 
 
-_PENDING_UNPROMOTED = text(
+#: 'duplicate' is included on purpose. A duplicate means "we already hold this company" — it
+#: does NOT mean the row is worthless. It is still evidence that the company serves this
+#: corridor and category, and the right outcome is a new capability on the supplier we have,
+#: not a discarded row. Excluding them silently dropped Expat Relocation's FR-NO housing
+#: coverage, which is exactly the loss the duplicate status was meant to prevent.
+_PROMOTABLE = text(
     """
     SELECT id, name, website_url, corridor, service_category, country_code, city,
            source_url, source_name, accreditation_body, accreditation_number,
            accreditation_expiry, notes
     FROM public.vendor_candidates
-    WHERE status = 'pending' AND promoted_supplier_id IS NULL
+    WHERE status IN ('pending', 'duplicate') AND promoted_supplier_id IS NULL
     ORDER BY created_at
     """
 )
@@ -209,16 +214,24 @@ def promote(session: Any, *, dry_run: bool = True) -> Tuple[int, int, List[str]]
     Returns (promoted, skipped, problems). Idempotent on `promoted_supplier_id`, so a re-run
     promotes nothing.
     """
-    from sqlalchemy import func
-
     from backend.app.models import Supplier
     from backend.app.services import supplier_registry
     from backend.app.services.supplier_registry import DuplicateSupplierError
+    from backend.app.services.vendor_harvester import _name_key
 
-    rows = session.execute(_PENDING_UNPROMOTED).mappings().all()
-    existing = {
-        (n or "").strip().lower() for (n,) in session.query(Supplier.name).all()
-    }
+    rows = session.execute(_PROMOTABLE).mappings().all()
+    # Keyed by _name_key, not raw lowercase: it folds accents, strips legal form and drops
+    # parenthetical asides, so "AGS France (SOFDI)" finds "AGS France (SOFDI – Société ...)".
+    # Both name AND legal_name — a register reports the legal entity, and "Expat Relocation
+    # Norway" is stored with legal_name "Expat Relocation AS", exactly what the harvest found.
+    existing: Dict[str, str] = {}
+    for sid, sname, slegal in session.query(
+        Supplier.id, Supplier.name, Supplier.legal_name
+    ).all():
+        for n in (sname, slegal):
+            k = _name_key(n)
+            if k:
+                existing.setdefault(k, sid)
 
     promoted = 0
     skipped = 0
@@ -226,12 +239,13 @@ def promote(session: Any, *, dry_run: bool = True) -> Tuple[int, int, List[str]]
 
     for row in rows:
         name = (row["name"] or "").strip()
+        key = _name_key(name)
         capability = _capability_for(row)
 
         # A company that serves both corridors — Grospiron and AGS France both do — is ONE
         # supplier with TWO capabilities, not two suppliers and not one dropped row. Skipping
         # the second would silently lose a corridor's coverage.
-        if name.lower() in existing:
+        if key in existing:
             if dry_run:
                 # Counted as PROMOTED, not skipped: a real run adds a capability to the
                 # existing supplier, so counting it as a skip would make the preview
@@ -241,11 +255,7 @@ def promote(session: Any, *, dry_run: bool = True) -> Tuple[int, int, List[str]]
                     f"{name}: already a supplier — would add a capability to it, not a new row"
                 )
                 continue
-            existing_id = (
-                session.query(Supplier.id)
-                .filter(func.lower(func.trim(Supplier.name)) == name.lower())
-                .scalar()
-            )
+            existing_id = existing[key]
             if not existing_id:
                 skipped += 1
                 problems.append(f"{name}: name collides but the supplier could not be found")
@@ -264,7 +274,7 @@ def promote(session: Any, *, dry_run: bool = True) -> Tuple[int, int, List[str]]
 
         if dry_run:
             promoted += 1
-            existing.add(name.lower())
+            existing[key] = "(pending)"
             continue
 
         supplier_id = f"vc-{row['id']}"
@@ -299,7 +309,7 @@ def promote(session: Any, *, dry_run: bool = True) -> Tuple[int, int, List[str]]
         session.execute(_LINK_CANDIDATE, {"sid": supplier_id, "cid": row["id"]})
         session.commit()
 
-        existing.add(name.lower())
+        existing[key] = supplier_id
         promoted += 1
 
     return promoted, skipped, problems
