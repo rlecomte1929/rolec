@@ -22,7 +22,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
 # [AUDIT-C1 fix] These helpers were referenced by the extracted CasesMixin
@@ -43,6 +43,24 @@ from ..intake_route_fields import wizard_basics_to_route
 from ..app.services.requirements_country_key import to_iso_alpha2
 
 log = logging.getLogger(__name__)
+
+
+def _employee_display_name(row: Any) -> Optional[str]:
+    """The employee's name from an assignment row, or None if it cannot be determined.
+
+    [AIQ-1803] The precedence ladder is lifted from `list_hr_conversation_summaries`
+    (backend/db/hr.py) rather than invented, so the HR inbox and the HR case surface can
+    never disagree about what a person is called.
+
+    Returns None instead of a generic fallback: this is used where the caller already
+    has its own placeholder, and two layers each substituting a different stand-in is
+    how "Employee" and "Case 08b7280b" ended up meaning the same thing in two places.
+    """
+    def _s(key: str) -> str:
+        return str(row.get(key) or "").strip()
+
+    composed = (_s("employee_first_name") + " " + _s("employee_last_name")).strip()
+    return _s("employee_full_name") or composed or _s("employee_identifier") or None
 
 # CasesMixin methods branch on `_is_sqlite` for SQLite-vs-Postgres SQL. The C1
 # mixin extraction left these references pointing at a module global that only
@@ -1927,6 +1945,123 @@ class CasesMixin:
                 {"id": case_id},
             ).fetchone()
         return self._row_to_dict(row)
+
+    def resolve_case_identities(
+        self, case_ids: List[str]
+    ) -> Dict[str, Dict[str, Any]]:
+        """case_id → who the case is about, for HR-facing reads.
+
+        [AIQ-1803] `relocation_cases.employee_id` is null for all but 4 of the 1,091 rows
+        in production, so every surface reading it rendered an anonymous placeholder
+        ("Case 08b7280b") in place of the employee's name. The identity is reachable —
+        just not from that table.
+
+        Resolves through `case_assignments`, which is what EVERY endpoint that already
+        shows a real name does (`list_hr_conversation_summaries`,
+        `_risk_flagged_assignments`, the command-center list). Measured 2026-08-11:
+        case_assignments reaches 706 of 1,091 cases; `public.cases` reaches 360 and adds
+        ZERO beyond it — every case with a `public.cases` row also has an assignment. So
+        this is the one source worth joining, not one of two.
+
+        Countries come from `public.cases` as a secondary fill: 26 cases have a blank
+        origin on the legacy row while `cases` has it. Narrow read, mirroring
+        `trigger_engine._build_context`.
+
+        Returns only what it could determine. A case with no assignment is ABSENT from
+        the result rather than present with an invented name — callers keep their own
+        placeholder. 385 cases are reachable by neither table, and inventing an identity
+        for them would be worse than the placeholder they have.
+
+        Batched deliberately: the HR list renders 34+ cases and a per-case lookup would
+        be an N+1.
+        """
+        ids = [str(c).strip() for c in (case_ids or []) if str(c or "").strip()]
+        if not ids:
+            return {}
+
+        out: Dict[str, Dict[str, Any]] = {}
+        wanted = set(ids)
+
+        # ── identity, via case_assignments → profiles ─────────────────────────
+        # Matches all three id forms the way get_assignment_by_case_id does; the row
+        # carries each one back so the match can be attributed to the caller's id.
+        sql = text(
+            """
+            SELECT a.id           AS assignment_id,
+                   a.case_id      AS a_case_id,
+                   a.canonical_case_id AS a_canonical_case_id,
+                   a.employee_user_id,
+                   a.employee_identifier,
+                   a.employee_first_name,
+                   a.employee_last_name,
+                   a.created_at,
+                   p.full_name    AS employee_full_name,
+                   p.email        AS employee_email
+            FROM case_assignments a
+            -- profiles.id is uuid; case_assignments.employee_user_id is text. Without
+            -- the cast Postgres raises `operator does not exist: uuid = text` and the
+            -- whole join fails -- which is how this returned zero names on first run.
+            LEFT JOIN profiles p ON CAST(p.id AS TEXT) = a.employee_user_id
+            WHERE a.canonical_case_id IN :ids
+               OR a.case_id IN :ids
+               OR a.id IN :ids
+            ORDER BY a.created_at ASC
+            """
+        ).bindparams(bindparam("ids", expanding=True))
+
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(sql, {"ids": ids}).mappings().all()
+        except Exception:
+            log.warning("resolve_case_identities: assignment lookup failed", exc_info=True)
+            rows = []
+
+        for r in rows:
+            # ORDER BY created_at ASC means a later row overwrites an earlier one, so the
+            # MOST RECENT assignment wins — the same choice resolve_case_status makes.
+            for key in (r.get("a_canonical_case_id"), r.get("a_case_id"), r.get("assignment_id")):
+                k = str(key).strip() if key else ""
+                if k not in wanted:
+                    continue
+                display = _employee_display_name(r)
+                if not display:
+                    continue
+                out[k] = {
+                    "employee_user_id": (str(r["employee_user_id"])
+                                         if r.get("employee_user_id") else None),
+                    "employee_display_name": display,
+                    "employee_email": r.get("employee_email"),
+                }
+
+        # ── countries, via public.cases ───────────────────────────────────────
+        try:
+            with self.engine.connect() as conn:
+                crows = conn.execute(
+                    text(
+                        # cases.id is uuid. Comparing it as TEXT keeps a single
+                        # non-uuid legacy id in the batch from raising and taking the
+                        # whole country fill down with it.
+                        "SELECT CAST(id AS TEXT) AS id, origin_country_code, "
+                        "       dest_country_code "
+                        "FROM cases WHERE CAST(id AS TEXT) IN :ids"
+                    ).bindparams(bindparam("ids", expanding=True)),
+                    {"ids": ids},
+                ).mappings().all()
+        except Exception:
+            log.warning("resolve_case_identities: cases lookup failed", exc_info=True)
+            crows = []
+
+        for r in crows:
+            k = str(r["id"]).strip()
+            if k not in wanted:
+                continue
+            entry = out.setdefault(k, {})
+            if r.get("origin_country_code"):
+                entry["origin_country_code"] = r["origin_country_code"]
+            if r.get("dest_country_code"):
+                entry["dest_country_code"] = r["dest_country_code"]
+
+        return out
 
     def list_support_cases(
         self,
