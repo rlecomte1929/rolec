@@ -33,6 +33,11 @@ from backend.app.services import immigration_service as imm  # noqa: E402
 
 CIPHERTEXT = "\\x4c383938393032433320656e6372797074656420626c6f62"
 PLAINTEXT = "L898902C3"
+# Distinctive enough that a substring check cannot pass by accident, but made of words
+# so it carries no entropy — a random-looking literal here trips gitleaks'
+# generic-api-key rule, which is the correct behaviour from a secret scanner and not
+# worth an allowlist exemption in a file about not leaking keys.
+KEY = "unit-test-not-a-real-encryption-key"
 
 
 class TestHelperNeverReturnsCiphertext(unittest.TestCase):
@@ -81,6 +86,57 @@ class TestHelperNeverReturnsCiphertext(unittest.TestCase):
             imm.decrypt_passport_for_display(original)
         self.assertEqual(original["passport_number"], CIPHERTEXT,
                          "the caller's dict must be left alone")
+
+
+class TestTheFailureIsNotLoggedWithItsParameters(unittest.TestCase):
+    """Withholding the value from the USER is only half of failing closed.
+
+    SQLAlchemy is constructed without `hide_parameters`, so a DBAPI error stringifies as
+    `[parameters: ('<ciphertext>', '<encryption key>')]`. Logging that traceback would
+    write the key that unlocks EVERY stored passport into the application log — trading a
+    leak to one employee for a leak of the whole vault.
+
+    It is armed by the same event that makes the rest of this fix load-bearing: today
+    `_get_encryption_key()` raises BEFORE the query, so there are no parameters to spill.
+    The moment the key is set and a decrypt fails on bad data, there are.
+    """
+
+    def _capture(self, exc):
+        engine = MagicMock()
+        engine.begin.side_effect = exc
+        with self.assertLogs(imm.log, level="WARNING") as captured, \
+             patch.dict(os.environ, {"IMMIGRATION_ENCRYPTION_KEY": KEY}, clear=False), \
+             patch.object(imm.db, "engine", engine):
+            imm.decrypt_passport_for_display({"passport_number": CIPHERTEXT})
+        return "\n".join(captured.output)
+
+    def test_neither_the_key_nor_the_ciphertext_reaches_the_log(self) -> None:
+        from sqlalchemy import create_engine, text as _text
+
+        # A REAL SQLAlchemy error, not a hand-built one — the leak lives in how
+        # SQLAlchemy formats its own exceptions, so a stand-in would prove nothing.
+        try:
+            with create_engine("sqlite://").begin() as conn:
+                conn.execute(
+                    _text("SELECT pgp_sym_decrypt(CAST(:enc AS bytea), :key)"),
+                    {"enc": CIPHERTEXT, "key": KEY},
+                )
+            self.fail("expected the decrypt call to fail on sqlite")
+        except Exception as real_error:
+            self.assertIn(KEY, str(real_error),
+                          "precondition: SQLAlchemy must be echoing parameters, else "
+                          "this test is guarding nothing")
+            logged = self._capture(real_error)
+
+        self.assertNotIn(KEY, logged, "the encryption key was written to the log")
+        self.assertNotIn(CIPHERTEXT, logged, "the ciphertext was written to the log")
+
+    def test_the_failure_is_still_diagnosable(self) -> None:
+        """Failing closed must not mean failing silently — an operator still has to be
+        able to tell a missing key from a bad ciphertext."""
+        logged = self._capture(RuntimeError("pgcrypto unavailable"))
+        self.assertIn("RuntimeError", logged)
+        self.assertIn("withholding", logged)
 
 
 def _engine_returning(row):
