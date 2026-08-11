@@ -143,12 +143,70 @@ def _id_select() -> str:
     return "id::text AS id" if _dialect() == "postgresql" else "id"
 
 
+# ── Canonical column set (S3) ────────────────────────────────────────────────
+#
+# ONE definition, consumed by both the SELECT and the version-bump INSERT.
+#
+# WHY. The version-bump path used to spell its INSERT column list out by hand, and nobody
+# updated it as columns were added to the table. It therefore silently dropped `sections`,
+# `source_language`, `verification_status` and `source_url` — so bumping a data sheet's
+# version destroyed its section layout AND its localised labels, with no error. The
+# in-place UPDATE was unaffected only by luck: it names the columns it sets, so the
+# unlisted ones were left alone rather than reset.
+#
+# Adding a column to the table now means adding it to ONE tuple here. Enforced by
+# backend/tests/test_admin_template_version_bump.py, which fails if the two statements
+# stop deriving from these.
+
+# Editable through the API (FormTemplateCreate / FormTemplateUpdate).
+_EDITABLE_COLUMNS = (
+    "code", "name", "country", "authority_code", "authority_name",
+    "category", "original_pdf_url", "version",
+)
+_EDITABLE_JSONB = ("fields", "trigger_rules")
+
+# NOT editable through the API, but MUST survive a version bump. Deliberately absent from
+# FormTemplateUpdate: whether an admin may retype a template's provenance or its section
+# layout is a separate decision, and carrying values forward does not require making them
+# writable.
+_CARRIED_COLUMNS = ("source_url", "verification_status", "source_language")
+_CARRIED_JSONB = ("sections",)
+
+_ALL_JSONB = _EDITABLE_JSONB + _CARRIED_JSONB
+# Everything the version bump must copy onto the new row.
+_BUMP_COLUMNS = _EDITABLE_COLUMNS + _EDITABLE_JSONB + _CARRIED_COLUMNS + _CARRIED_JSONB
+
+
 def _select_cols() -> str:
-    return (
-        f"{_id_select()}, code, name, country, authority_code, authority_name, "
-        "category, original_pdf_url, version, fields, trigger_rules, "
-        "created_at, updated_at"
+    cols = _EDITABLE_COLUMNS + _EDITABLE_JSONB + _CARRIED_COLUMNS + _CARRIED_JSONB
+    return f"{_id_select()}, " + ", ".join(cols) + ", created_at, updated_at"
+
+
+def _bump_insert(merged: Dict[str, Any], new_id: str) -> tuple:
+    """Build the version-bump INSERT: (sql, params, columns).
+
+    Extracted so a test can assert on the SQL this ACTUALLY generates rather than grepping
+    the source for an identifier. A source grep is what let the first version of the guard
+    pass while the statement used a stale tuple — the same mistake as keying a check on an
+    incidental token instead of on meaning.
+    """
+    col_sql = ", ".join(_BUMP_COLUMNS)
+    val_sql = ", ".join(
+        _jsonb_expr(c) if c in _ALL_JSONB else f":{c}" for c in _BUMP_COLUMNS
     )
+    params: Dict[str, Any] = {"id": new_id}
+    for c in _BUMP_COLUMNS:
+        if c == "country":
+            params[c] = (merged.get("country") or "").upper()
+        elif c in _ALL_JSONB:
+            value = merged.get(c)
+            if value is None:
+                value = {} if c == "trigger_rules" else []
+            params[c] = _json_dumps(value)
+        else:
+            params[c] = merged.get(c)
+    sql = f"INSERT INTO {_table()} (id, {col_sql}) VALUES (:id, {val_sql})"
+    return sql, params, _BUMP_COLUMNS
 
 
 # ---------------------------------------------------------------------------
@@ -173,16 +231,20 @@ def _row_to_dict(row: Any) -> Dict[str, Any]:
             d[k] = str(v)
             continue
         # jsonb columns arrive as dict/list from Postgres; as str from SQLite.
-        if k in ("fields", "trigger_rules") and isinstance(v, str):
+        # [S3] `sections` belongs here too — left out, it round-trips as a STRING and the
+        # version bump would json-encode it a second time, storing a quoted blob.
+        if k in _ALL_JSONB and isinstance(v, str):
             try:
                 d[k] = json.loads(v)
             except (ValueError, TypeError):
-                d[k] = [] if k == "fields" else {}
+                d[k] = {} if k == "trigger_rules" else []
     # Defensive defaults
     if d.get("fields") is None:
         d["fields"] = []
     if d.get("trigger_rules") is None:
         d["trigger_rules"] = {}
+    if d.get("sections") is None:
+        d["sections"] = []
     return d
 
 
@@ -573,33 +635,10 @@ def update_form_template(
                 )
 
             new_id = str(uuid.uuid4())
-            conn.execute(
-                text(
-                    f"""
-                    INSERT INTO {_table()} (
-                        id, code, name, country, authority_code, authority_name,
-                        category, original_pdf_url, version, fields, trigger_rules
-                    ) VALUES (
-                        :id, :code, :name, :country, :authority_code, :authority_name,
-                        :category, :original_pdf_url, :version,
-                        {fields_expr}, {rules_expr}
-                    )
-                    """
-                ),
-                {
-                    "id": new_id,
-                    "code": merged["code"],
-                    "name": merged["name"],
-                    "country": (merged["country"] or "").upper(),
-                    "authority_code": merged.get("authority_code"),
-                    "authority_name": merged.get("authority_name"),
-                    "category": merged.get("category"),
-                    "original_pdf_url": merged.get("original_pdf_url"),
-                    "version": merged["version"],
-                    "fields": _json_dumps(merged.get("fields") or []),
-                    "trigger_rules": _json_dumps(merged.get("trigger_rules") or {}),
-                },
-            )
+            # [S3] Copies the WHOLE row. Both the column list and the VALUES come from
+            # _BUMP_COLUMNS, so a column added there cannot be omitted from one of them.
+            bump_sql, bump_params, _ = _bump_insert(merged, new_id)
+            conn.execute(text(bump_sql), bump_params)
             try:
                 insert_audit_log(
                     conn,
