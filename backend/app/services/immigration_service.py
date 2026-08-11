@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NamedTuple, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import text
@@ -60,6 +60,68 @@ def _get_encryption_key() -> str:
             detail="IMMIGRATION_ENCRYPTION_KEY environment variable not set.",
         )
     return key
+
+
+class PassportDecryption(NamedTuple):
+    """Result of trying to read the stored passport number back.
+
+    `profile.passport_number` is plaintext or None. It is NEVER the ciphertext —
+    that is the entire contract.
+    """
+    profile: Dict[str, Any]
+    withheld: bool  # a value existed and could not be decrypted
+
+
+def decrypt_passport_for_display(profile: Dict[str, Any]) -> PassportDecryption:
+    """Return a copy of `profile` with passport_number decrypted, or WITHHELD.
+
+    [AIQ-1802] This replaces three near-identical copies that all failed OPEN — on a
+    decryption failure they left the ciphertext in place and handed it onward as though
+    it were the value. It was rendered into the Article 15 subject-access PDF, shown to
+    the employee as their own data, and pre-filled into an immigration form. That last
+    one is the sharp end: an unreadable blob submitted on a government application is a
+    different class of problem from a bad screen.
+
+    All three were the LIVE path, because IMMIGRATION_ENCRYPTION_KEY is unset in
+    production and `_get_encryption_key()` therefore raises on every call.
+
+    Returning ciphertext is not graceful degradation. It presents unreadable data as the
+    subject's real value, and every caller downstream treats it as one. So the failure
+    branch yields None and says so, and the caller decides how to be honest about it —
+    a blank form field, a "withheld" line in the PDF, a fallback to the value the
+    employee typed themselves.
+
+    The try/except stays: removing it would turn a display defect into a 500 on the whole
+    form fill. What changed is what the branch DOES.
+
+    The `CAST(:enc AS bytea)` form is deliberate and must survive edits — `:enc::bytea`
+    makes SQLAlchemy bind a truncated parameter name and leaves a literal `:enc` in the
+    SQL (AIQ-1780); it is guarded by backend/tests/test_jsonb_bind_cast.py.
+    """
+    p = dict(profile)
+    raw = p.get("passport_number")
+    if not raw:
+        return PassportDecryption(profile=p, withheld=False)
+
+    try:
+        enc_key = _get_encryption_key()
+        with db.engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT pgp_sym_decrypt(CAST(:enc AS bytea), :key) AS decrypted"),
+                {"enc": raw, "key": enc_key},
+            ).mappings().first()
+        decrypted = row["decrypted"] if row else None
+        if decrypted:
+            p["passport_number"] = decrypted
+            return PassportDecryption(profile=p, withheld=False)
+        # A NULL/absent result is a failure, not an empty passport number. Falling
+        # through to the input would put the ciphertext back.
+        log.warning("passport decryption returned no value; withholding")
+    except Exception:
+        log.warning("passport decryption failed; withholding the value", exc_info=True)
+
+    p["passport_number"] = None
+    return PassportDecryption(profile=p, withheld=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
