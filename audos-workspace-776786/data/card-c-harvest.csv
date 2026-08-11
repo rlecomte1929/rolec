@@ -16,10 +16,10 @@ FR-DE,legal_admin,Rechtsanwalt Albert Rühling (Ruehling Immigration Law),,Hambu
 FR-DE,tax_finance,Matzenbach & Sternberg Partnerschaft mbB Steuerberatungsgesellschaft (MSP Beratung),,Firm Impressum (StBK Hessen) + Partnerschaftsregister Frankfurt,https://www.msp-beratung.com/about/,Steuerberaterkammer Hessen (BStBK member chamber),PR 1869 Amtsgericht Frankfurt am Main,
 FR-DE,tax_finance,EY Tax GmbH Steuerberatungsgesellschaft,,Company legal imprint + LEI record,https://www.ey.com/de_de/legal-and-privacy/impressum,BStBK (via regional chambers),LEI: 5299006Z5RCK6POJJR69,
 FR-DE,tax_finance,Kanzlei Thalmeir — Julian Thalmeir,,Firm website (StBK München stated),https://www.stb-thalmeir.de/,Steuerberaterkammer München,,
-FR-DE,banks,Deutsche Bank AG,,BaFin institute database / regulatory disclosures,https://www.db.com/legal-resources/information-about-the-firm,BaFin (Federal Financial Supervisory Authority),100003,
-FR-DE,banks,Commerzbank AG,,BaFin institute database / regulatory self-classification,https://www.commerzbank.de/group/who-we-are/compliance/regulatory-self-classification.html,BaFin (Federal Financial Supervisory Authority),100005,
+FR-DE,banks,Deutsche Bank AG,,BaFin Unternehmensdatenbank — institute record,https://portal.mvp.bafin.de/database/InstInfo/institutDetails.do?cmd=loadInstitutAction&institutId=100003,BaFin,10100003,
+FR-DE,banks,Commerzbank AG,,BaFin Unternehmensdatenbank — institute record,https://portal.mvp.bafin.de/database/InstInfo/institutDetails.do?cmd=loadInstitutAction&institutId=100005,BaFin,10100005,
 FR-DE,banks,ING-DiBa AG,,BaFin institute database (kontenvergleich.bafin.de),https://kontenvergleich.bafin.de/en/account/678272c6,BaFin (Federal Financial Supervisory Authority),100088,
-FR-DE,banks,N26 Bank SE,,BaFin institute database / Wikidata cross-reference,https://www.wikidata.org/wiki/Q27479372,BaFin (Federal Financial Supervisory Authority),145827,
+FR-DE,banks,N26 Bank SE,,BaFin Unternehmensdatenbank — institute record,https://portal.mvp.bafin.de/database/InstInfo/institutDetails.do?cmd=loadInstitutAction&institutId=145827,BaFin,10145827,
 FR-NO,movers,AGS France (SOFDI),,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/ags-france,FIDI Global Alliance / FAIM Plus (auditor: EY),,2028
 FR-NO,movers,Grospiron International,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/grospiron-mobility-solutions,FIDI Global Alliance / FAIM Plus (auditor: EY),,2026
 FR-NO,movers,A/S Adams Express,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/s-adams-express,FIDI Global Alliance / FAIM Plus (auditor: EY),,2027

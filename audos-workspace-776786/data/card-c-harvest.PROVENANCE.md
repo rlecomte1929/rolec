@@ -1,7 +1,7 @@
 # card-c-harvest.csv — provenance and quality review
 
-**Read this before ingesting a single row into `vendors` or `suppliers`.** 29 of the 38 rows
-are registry-backed and ready. 9 are not, and are listed below.
+**Read this before ingesting a single row into `vendors` or `suppliers`.** 32 of the 38 rows
+are registry-backed and ready. 6 are not, and are listed below.
 
 ## What this is
 
@@ -70,70 +70,89 @@ and do not accept a chat-side report that a file exists.
 
 Nine URLs spanning every distinct registry in this file were fetched and returned HTTP 200.
 
-## The 9 rows that do NOT meet the sourcing rule
+## The 6 rows that do NOT meet the sourcing rule
 
 Card C's rule: *every candidate must trace to an accreditation, licensing or membership
 registry a third party can check. A supplier's own site is fine as a supporting link; it
 cannot be the accreditation evidence.*
 
-These 9 use the supplier's own domain, a registry's search form, or in one case no registry at
-all. **Do not ingest them as accredited** until re-sourced — a fabricated or unverifiable
-accreditation is worse than a gap, because a buyer's security review will check it.
+**Do not ingest these as accredited.** A fabricated or unverifiable accreditation is worse than
+a gap, because a buyer's security review will check it.
 
-> **Was 7 until 2026-08-12.** Two rows were counted as *passing* by a check that only looked
-> at the URL's domain, never at whether the page was about that company.
->
-> **BLKR** was counted as passing because `blkr-berlin.de` sat in the
-> importer's domain allowlist mapped to the Rechtsanwaltskammer. It is the firm's own website
-> (verified by fetching it: BLKR Rechtsanwält\*innen, an independent Berlin law firm). The rule
-> never changed; the allowlist was wrong, so a row whose own `source_name` reads
-> *"Firm Impressum (RAK Berlin stated)"* was being counted as registry-evidenced. The allowlist
-> entry is deleted and BLKR now rejects like the rest.
->
-> **Advokatfirmaet Sulland** cited Advokatforeningen's generic `/search-for-members/` page —
-> the right registry, but its search FORM, which evidences nobody. Every registry now declares
-> an `entry_url_pattern` describing what one of its record URLs looks like, and `validate()`
-> rejects a URL that is on the domain but is not an entry. Note what this does and does not
-> do: it checks the URL's SHAPE. Nothing fetches the page, so an invented deep link still
-> passes. The existence check remains the human reviewer, which is why promotion writes
-> accreditations with `status='claimed'`.
+### The count went 7 → 9 → 6 on 2026-08-12, and the route matters more than the number
 
-| corridor | category | company | current source | what to use instead |
-|---|---|---|---|---|
-| FR-DE | legal_admin | BLKR Rechtsanwältinnen | `blkr-berlin.de` (own site, **was mis-allowlisted as the RAK**) | Rechtsanwaltskammer roll |
-| FR-DE | legal_admin | Schlun & Elseven Rechtsanwälte | `se-legal.de` (own Impressum) | Rechtsanwaltskammer roll |
-| FR-DE | tax_finance | Matzenbach & Sternberg | `msp-beratung.com` (own About) | Steuerberaterkammer register |
-| FR-DE | tax_finance | EY Tax GmbH | `ey.com` (own Impressum) | Steuerberaterkammer / BStBK |
-| FR-DE | tax_finance | Kanzlei Thalmeir | `stb-thalmeir.de` (own site) | Steuerberaterkammer register |
-| FR-DE | banks | Deutsche Bank AG | `db.com` (own site) | BaFin institute register |
-| FR-DE | banks | Commerzbank AG | `commerzbank.de` (own site) | BaFin institute register |
-| FR-DE | banks | N26 Bank SE | **`wikidata.org`** | BaFin institute register |
-| FR-NO | legal_admin | Advokatfirmaet Sulland AS | `advokatforeningen.no/…/**search-for-members/**` (the register's search FORM) | the member's own entry, as the two Advokatguiden rows already use |
+**+2 — the rule was being enforced on the URL's DOMAIN alone**, so it answered "who published
+this page" and never "is this page about this company". Two rows were already through the gap:
 
-A German Impressum is legally obliged to name the chamber, so those five are *probably*
-accurate — but "probably accurate" is not the standard the card set, and it is not what we
-would want to show a buyer. **Wikidata is not a registry in any sense** and should be replaced
-outright; BaFin publishes a searchable institute register, and one row in this very file
-already cites it (`kontenvergleich.bafin.de`), so the right source exists and was simply not
-used here.
+- **BLKR Rechtsanwältinnen** cited its own homepage. `blkr-berlin.de` sat in the importer's
+  allowlist mapped to the Rechtsanwaltskammer (verified by fetching it: an independent Berlin
+  law firm, not a chamber). The row's own `source_name` reads *"Firm Impressum (RAK Berlin
+  stated)"* — the exact shape the importer's docstring says must never be trusted.
+- **Advokatfirmaet Sulland AS** cited Advokatforeningen's `/search-for-members/` form. Right
+  registry, but a search page evidences nobody.
 
-8 of the 9 are FR-DE; Sulland is the one FR-NO row, and it is the reason "FR-NO is clean" —
-which an earlier version of this document asserted — was never quite the claim it appeared to
-be. Every FR-NO row does sit on a registry domain (Finanstilsynet, Advokatforeningen,
-Advokatguiden, Brønnøysund, EuRA), but until 2026-08-12 that was the *only* thing checked. The
-remaining 8 now each carry a per-entity URL of the shape their registry actually publishes.
+Each registry now declares an `entry_url_pattern` — what one of its record URLs looks like —
+and a URL on the domain that does not match it is rejected. **This checks SHAPE, not
+existence**: nothing fetches the page, so an invented deep link still passes. The existence
+check is still the human reviewer, which is why promotion writes `status='claimed'`.
+
+**−3 — the three banks were genuinely re-sourced.** Each URL was fetched 2026-08-12: HTTP 200,
+no login, the page names the institution above its list of KWG/CRR authorisations.
+
+| company | BaFin institute record | verified page names |
+|---|---|---|
+| Deutsche Bank AG | `institutId=100003` | DEUTSCHE BANK AKTIENGESELLSCHAFT |
+| Commerzbank AG | `institutId=100005` | COMMERZBANK Aktiengesellschaft |
+| N26 Bank SE | `institutId=145827` | N26 Bank SE |
+
+N26 has two BaFin entries — `145827` is the Bank SE, `160862` the holding. The bank is the
+licensed entity. Wikidata, which the N26 row cited before, is not a registry in any sense.
+
+### What remains, and why each is blocked
+
+| corridor | category | company | why it cannot be sourced today |
+|---|---|---|---|
+| FR-DE | legal_admin | BLKR Rechtsanwältinnen | RAK/BRAV is a form search with no per-entity URL |
+| FR-DE | legal_admin | Schlun & Elseven Rechtsanwälte | same |
+| FR-DE | tax_finance | Matzenbach & Sternberg | amtliches Steuerberaterverzeichnis is a form search |
+| FR-DE | tax_finance | EY Tax GmbH | same |
+| FR-DE | tax_finance | Kanzlei Thalmeir | same |
+| FR-NO | legal_admin | Advokatfirmaet Sulland AS | brreg proves the company exists, not bar admission; Advokatguiden is a review aggregator, forbidden as a primary source |
+
+These are honest gaps, not oversights. Both German registers are publicly readable by a human
+and simply not linkable, so there is nothing to cite; both are now marked `UNAVAILABLE` in
+`registry_sources.py` with that reason and the date it was probed. Note also that
+`rechtsanwaltsregister.org` — the domain the catalogue used to point at — is a redirector, and
+the official register is at `bravsearch.bea-brak.de`.
+
+Neither `berufs-org.de` nor `bea-brak.de` was added to the domain allowlist. Adding a registry
+domain without a per-entity pattern converts its search page from a tier-3 rejection into a
+tier-1 pass, which is the hole this work closed.
+
+### Still worth a look
+
+`advokatguiden.no` (2 rows) is allowlisted as "Advokatforeningen + Brønnøysund". It is a
+commercial directory carrying user reviews, and `registry_sources.py` forbids consumer review
+aggregators as a primary source. Both rows use per-lawyer URLs so they pass the shape check,
+but whether that domain belongs in a registry allowlist at all is the same question BLKR
+answered badly. Not changed here.
 
 ## Registry domains used
 
 ```
-15  fidi.org                 8  finanstilsynet.no        2  advokatguiden.no
- 1  kontenvergleich.bafin.de  1  advokatforeningen.no     1  virksomhet.brreg.no
- 1  eura-relocation.com       1  hamburg.de
+15  www.fidi.org              8  www.finanstilsynet.no    3  portal.mvp.bafin.de
+ 2  www.advokatguiden.no      1  kontenvergleich.bafin.de 1  virksomhet.brreg.no
+ 1  www.eura-relocation.com   1  www.hamburg.de           1  www.advokatforeningen.no*
 ```
+
+Plus 5 non-registry domains on the rows listed above (`se-legal.de`, `blkr-berlin.de`,
+`msp-beratung.com`, `ey.com`, `stb-thalmeir.de`). *The advokatforeningen.no row is Sulland's
+search-form URL, which no longer passes.
 
 ## Before ingest
 
-1. Re-source the 9 rows above, or ingest them with no accreditation claim attached.
+1. The 6 rows above are blocked on their registers, not on effort. Ingest them with no
+   accreditation claim attached, or leave them out — do not substitute a weaker source.
 2. Check `accreditation_expiry` — many are blank, which is correct where the registry
    publishes none. A blank is honest; do not backfill it with a guess.
 3. Treat the file as untrusted third-party text: it quotes public web pages harvested by an
