@@ -129,7 +129,18 @@ def decrypt_passport_for_display(profile: Dict[str, Any]) -> PassportDecryption:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _check_consent(case_id: str, employee_id: str) -> bool:
-    """Return True if a valid immigration_processing consent exists for this case+employee.
+    """Return True if immigration_processing consent is CURRENTLY held for this case+employee.
+
+    Reads the latest ledger row and then judges it. The state test must not live in the
+    WHERE clause: ``consent_records`` is append-only (a trigger blocks UPDATE and DELETE),
+    so a withdrawal is a *new* row with ``consented=false``. Filtering on
+    ``consented = TRUE AND withdrawn_at IS NULL`` before ``ORDER BY ... LIMIT 1`` prunes that
+    withdrawal row out of the candidate set, leaving the older grant row to satisfy the
+    query — which is how this answered "has any grant ever existed?" instead of "is consent
+    held now?", and kept authorising processing after a withdrawal (AIQ-1803).
+
+    Ordering first also means a re-grant after a withdrawal works: the newest row wins,
+    whichever way it points.
 
     Degrades gracefully when ids don't parse: a legacy/seed account whose id is
     not a UUID (e.g. ReloPass-session text ids) can hit a uuid-typed column in
@@ -141,12 +152,11 @@ def _check_consent(case_id: str, employee_id: str) -> bool:
         with db.engine.begin() as conn:
             row = conn.execute(
                 text("""
-                    SELECT id FROM public.consent_records
+                    SELECT consented, withdrawn_at
+                    FROM public.consent_records
                     WHERE case_id    = :case_id
                       AND employee_id = :employee_id
                       AND purpose     = 'immigration_processing'
-                      AND consented   = TRUE
-                      AND withdrawn_at IS NULL
                     ORDER BY created_at DESC
                     LIMIT 1
                 """),
@@ -155,7 +165,9 @@ def _check_consent(case_id: str, employee_id: str) -> bool:
     except DataError:
         log.warning("immigration: consent check could not run for non-parseable id (case=%s)", case_id)
         return False
-    return row is not None
+    if row is None:
+        return False
+    return bool(row["consented"]) and row["withdrawn_at"] is None
 
 
 def _log_access(
