@@ -1,0 +1,124 @@
+origin_iso2,origin_name,destination_iso2,persona_id,persona_label,route_key,applies_eu_free_movement,requires_mvv,requires_vvr,requires_recognised_sponsor,notes
+IN,India,NL,1,Student - single,study_permit,false,true,true,true,Educational institution must be IND-recognised sponsor; MVV + VVR via IND; €254 fee; study ≤16 hrs/week or full-time June-Aug
+IN,India,NL,2,Student - couple no kids,study_permit,false,true,true,true,Primary: as single student. Dependent spouse needs separate partner permit (MVV+VVR €254); sponsor income threshold applies
+IN,India,NL,3,Student - couple with kids,study_permit,false,true,true,true,Primary: as student. Spouse: partner permit €254. Child: minor child permit €85. Income threshold applies for sponsor
+IN,India,NL,4,Professional - single,kennismigrant,false,true,true,true,Employer must be IND-recognised sponsor; salary ≥€5942/mo (30+) or ≥€4357/mo (<30); €423 fee; 90-day processing
+IN,India,NL,4,Professional - single,eu_blue_card,false,true,true,false,Higher-ed diploma (3yr+); salary ≥€5942/mo; €423 fee; employer must not have been fined; 30-90 day processing
+IN,India,NL,5,Professional - couple no kids,kennismigrant,false,true,true,true,Primary: as single professional. Dependent spouse: partner permit MVV+VVR €254; IND 90-day decision
+IN,India,NL,5,Professional - couple no kids,kennismigrant_dependent_partner,false,true,true,false,Spouse/partner permit; sponsor income ≥€2337/mo (without holiday allowance); both must be 21+; €254
+IN,India,NL,6,Professional - couple with kids,kennismigrant,false,true,true,true,Primary: as professional. Spouse: partner permit €254. Child: minor child permit €85. Income thresholds apply
+IN,India,NL,6,Professional - couple with kids,kennismigrant_dependent_child,false,true,true,false,Minor child permit; child under 18; parental authority required; €85 fee; 90-day processing
+TR,Turkey,NL,1,Student - single,study_permit,false,true,true,true,As India; Turkey is non-EU; MVV + VVR; €254; institution must be IND-recognised sponsor
+TR,Turkey,NL,2,Student - couple no kids,study_permit,false,true,true,true,Primary: student route. Spouse: partner permit €254; income threshold applies
+TR,Turkey,NL,3,Student - couple with kids,study_permit,false,true,true,true,Primary: student. Spouse: partner permit €254. Child: minor child permit €85
+TR,Turkey,NL,4,Professional - single,kennismigrant,false,true,true,true,As India professional; Turkey non-EU; salary thresholds apply; €423; 90-day
+TR,Turkey,NL,5,Professional - couple no kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse: partner permit €254
+TR,Turkey,NL,6,Professional - couple with kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse: €254. Child: €85
+PL,Poland,NL,1,Student - single,eu_free_movement,true,false,false,false,EU citizen; no IND permit needed; register at gemeente within 4 months; BSN issued automatically
+PL,Poland,NL,2,Student - couple no kids,eu_free_movement,true,false,false,false,Both EU citizens; register at gemeente; no permit required for either
+PL,Poland,NL,3,Student - couple with kids,eu_free_movement,true,false,false,false,EU family; all register at gemeente; children also registered in BRP
+PL,Poland,NL,4,Professional - single,eu_free_movement,true,false,false,false,EU citizen; no work permit needed; register at gemeente; BSN issued
+PL,Poland,NL,5,Professional - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration; no permit required
+PL,Poland,NL,6,Professional - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration for all; children in BRP
+DE,Germany,NL,1,Student - single,eu_free_movement,true,false,false,false,EU citizen; register at gemeente; no IND permit required
+DE,Germany,NL,2,Student - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration only
+DE,Germany,NL,3,Student - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration; children also registered
+DE,Germany,NL,4,Professional - single,eu_free_movement,true,false,false,false,EU citizen; register at gemeente; no work permit needed
+DE,Germany,NL,5,Professional - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+DE,Germany,NL,6,Professional - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration for all
+IT,Italy,NL,1,Student - single,eu_free_movement,true,false,false,false,EU citizen; gemeente registration; no permit
+IT,Italy,NL,2,Student - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+IT,Italy,NL,3,Student - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+IT,Italy,NL,4,Professional - single,eu_free_movement,true,false,false,false,EU citizen; register at gemeente
+IT,Italy,NL,5,Professional - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+IT,Italy,NL,6,Professional - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+ES,Spain,NL,1,Student - single,eu_free_movement,true,false,false,false,EU citizen; gemeente registration; no permit
+ES,Spain,NL,2,Student - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+ES,Spain,NL,3,Student - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+ES,Spain,NL,4,Professional - single,eu_free_movement,true,false,false,false,EU citizen; no work permit; register at gemeente
+ES,Spain,NL,5,Professional - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+ES,Spain,NL,6,Professional - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+RO,Romania,NL,1,Student - single,eu_free_movement,true,false,false,false,EU citizen; gemeente registration; no permit
+RO,Romania,NL,2,Student - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+RO,Romania,NL,3,Student - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+RO,Romania,NL,4,Professional - single,eu_free_movement,true,false,false,false,EU citizen; no work permit; register at gemeente
+RO,Romania,NL,5,Professional - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+RO,Romania,NL,6,Professional - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+BG,Bulgaria,NL,1,Student - single,eu_free_movement,true,false,false,false,EU citizen; gemeente registration; no permit
+BG,Bulgaria,NL,2,Student - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+BG,Bulgaria,NL,3,Student - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+BG,Bulgaria,NL,4,Professional - single,eu_free_movement,true,false,false,false,EU citizen; no work permit; register at gemeente
+BG,Bulgaria,NL,5,Professional - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+BG,Bulgaria,NL,6,Professional - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+FR,France,NL,1,Student - single,eu_free_movement,true,false,false,false,EU citizen; gemeente registration; no permit
+FR,France,NL,2,Student - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+FR,France,NL,3,Student - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+FR,France,NL,4,Professional - single,eu_free_movement,true,false,false,false,EU citizen; no work permit; register at gemeente
+FR,France,NL,5,Professional - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+FR,France,NL,6,Professional - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+BE,Belgium,NL,1,Student - single,eu_free_movement,true,false,false,false,EU citizen; gemeente registration; no permit
+BE,Belgium,NL,2,Student - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+BE,Belgium,NL,3,Student - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+BE,Belgium,NL,4,Professional - single,eu_free_movement,true,false,false,false,EU citizen; no work permit; register at gemeente
+BE,Belgium,NL,5,Professional - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+BE,Belgium,NL,6,Professional - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+PT,Portugal,NL,1,Student - single,eu_free_movement,true,false,false,false,EU citizen; gemeente registration; no permit
+PT,Portugal,NL,2,Student - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+PT,Portugal,NL,3,Student - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+PT,Portugal,NL,4,Professional - single,eu_free_movement,true,false,false,false,EU citizen; no work permit; register at gemeente
+PT,Portugal,NL,5,Professional - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+PT,Portugal,NL,6,Professional - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+GR,Greece,NL,1,Student - single,eu_free_movement,true,false,false,false,EU citizen; gemeente registration; no permit
+GR,Greece,NL,2,Student - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+GR,Greece,NL,3,Student - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+GR,Greece,NL,4,Professional - single,eu_free_movement,true,false,false,false,EU citizen; no work permit; register at gemeente
+GR,Greece,NL,5,Professional - couple no kids,eu_free_movement,true,false,false,false,Both EU; gemeente registration
+GR,Greece,NL,6,Professional - couple with kids,eu_free_movement,true,false,false,false,EU family; gemeente registration
+SY,Syria,NL,1,Student - single,study_permit,false,true,true,true,Non-EU; MVV+VVR via IND; €254; check UNHCR/asylum status first; regular routes available via IND if in regular status
+SY,Syria,NL,2,Student - couple no kids,study_permit,false,true,true,true,As Syrian single student; spouse needs partner permit €254 if in regular status
+SY,Syria,NL,3,Student - couple with kids,study_permit,false,true,true,true,As Syrian student; spouse €254; child €85; if asylum route note Temporary Protection or asylum permit path
+SY,Syria,NL,4,Professional - single,kennismigrant,false,true,true,true,Regular route available if not on asylum track; employer must be IND-recognised sponsor; salary thresholds apply
+SY,Syria,NL,5,Professional - couple no kids,kennismigrant,false,true,true,true,As Syrian professional; spouse partner permit €254
+SY,Syria,NL,6,Professional - couple with kids,kennismigrant,false,true,true,true,As Syrian professional; spouse €254; child €85
+CN,China,NL,1,Student - single,study_permit,false,true,true,true,Non-EU; MVV+VVR; €254; institution must be IND-recognised sponsor; 60-day processing
+CN,China,NL,2,Student - couple no kids,study_permit,false,true,true,true,Primary: student. Spouse: partner permit €254; income threshold applies
+CN,China,NL,3,Student - couple with kids,study_permit,false,true,true,true,Primary: student. Spouse €254. Child €85
+CN,China,NL,4,Professional - single,kennismigrant,false,true,true,true,As India professional; €423; salary thresholds apply; 90-day processing
+CN,China,NL,5,Professional - couple no kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse: partner permit €254
+CN,China,NL,6,Professional - couple with kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse €254. Child €85
+GB,United Kingdom,NL,1,Student - single,study_permit,false,true,true,true,Post-Brexit non-EU; treated as third-country national from Jan 2021; MVV+VVR; €254; IND-recognised sponsor required
+GB,United Kingdom,NL,2,Student - couple no kids,study_permit,false,true,true,true,Both now non-EU; primary student route; spouse: partner permit €254
+GB,United Kingdom,NL,3,Student - couple with kids,study_permit,false,true,true,true,Primary: student. Spouse €254. Child €85
+GB,United Kingdom,NL,4,Professional - single,kennismigrant,false,true,true,true,Post-Brexit; non-EU; employer must be IND-recognised sponsor; salary thresholds apply; €423
+GB,United Kingdom,NL,5,Professional - couple no kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse: partner permit €254
+GB,United Kingdom,NL,6,Professional - couple with kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse €254. Child €85
+US,United States,NL,1,Student - single,study_permit,false,true,true,true,Non-EU; MVV+VVR; €254; 60-day processing; institution must be IND-recognised sponsor
+US,United States,NL,2,Student - couple no kids,study_permit,false,true,true,true,Primary: student. Spouse: partner permit €254
+US,United States,NL,3,Student - couple with kids,study_permit,false,true,true,true,Primary: student. Spouse €254. Child €85
+US,United States,NL,4,Professional - single,kennismigrant,false,true,true,true,Non-EU; IND-recognised sponsor; salary thresholds 2026: ≥€5942 (30+) or ≥€4357 (<30); €423
+US,United States,NL,5,Professional - couple no kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse: partner permit €254; income threshold €2337/mo
+US,United States,NL,6,Professional - couple with kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse €254. Child €85
+MA,Morocco,NL,1,Student - single,study_permit,false,true,true,true,Non-EU; MVV+VVR; €254; IND-recognised sponsor (educational institution)
+MA,Morocco,NL,2,Student - couple no kids,study_permit,false,true,true,true,Primary: student. Spouse: partner permit €254
+MA,Morocco,NL,3,Student - couple with kids,study_permit,false,true,true,true,Primary: student. Spouse €254. Child €85
+MA,Morocco,NL,4,Professional - single,kennismigrant,false,true,true,true,Non-EU; IND-recognised sponsor required; salary thresholds apply; €423
+MA,Morocco,NL,5,Professional - couple no kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse: €254
+MA,Morocco,NL,6,Professional - couple with kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse €254. Child €85
+BR,Brazil,NL,1,Student - single,study_permit,false,true,true,true,Non-EU; MVV+VVR; €254; IND-recognised sponsor required
+BR,Brazil,NL,2,Student - couple no kids,study_permit,false,true,true,true,Primary: student. Spouse: partner permit €254
+BR,Brazil,NL,3,Student - couple with kids,study_permit,false,true,true,true,Primary: student. Spouse €254. Child €85
+BR,Brazil,NL,4,Professional - single,kennismigrant,false,true,true,true,Non-EU; IND-recognised sponsor; salary thresholds apply; €423; 90-day
+BR,Brazil,NL,5,Professional - couple no kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse: €254
+BR,Brazil,NL,6,Professional - couple with kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse €254. Child €85
+UA,Ukraine,NL,1,Student - single,temporary_protection_or_study,false,false,false,false,Temporary Protection Directive currently active for Ukrainians in EU (verify current status at ind.nl/en); regular study route also available if not on TP
+UA,Ukraine,NL,2,Student - couple no kids,temporary_protection_or_study,false,false,false,false,As Ukraine single student; check current TP status; regular routes available
+UA,Ukraine,NL,3,Student - couple with kids,temporary_protection_or_study,false,false,false,false,Check TP status; family included under TP; regular routes also available
+UA,Ukraine,NL,4,Professional - single,temporary_protection_or_kennismigrant,false,false,false,false,TP holders may work without separate permit; regular kennismigrant route also available; check current TP end date
+UA,Ukraine,NL,5,Professional - couple no kids,temporary_protection_or_kennismigrant,false,false,false,false,As Ukraine professional; TP covers spouse; regular route also available
+UA,Ukraine,NL,6,Professional - couple with kids,temporary_protection_or_kennismigrant,false,false,false,false,TP covers family; regular route available; check current TP status at ind.nl
+IR,Iran,NL,1,Student - single,study_permit,false,true,true,true,Non-EU; regular study route available via IND; MVV+VVR; €254; institution must be IND-recognised sponsor
+IR,Iran,NL,2,Student - couple no kids,study_permit,false,true,true,true,Primary: student. Spouse: partner permit €254; income threshold applies
+IR,Iran,NL,3,Student - couple with kids,study_permit,false,true,true,true,Primary: student. Spouse €254. Child €85
+IR,Iran,NL,4,Professional - single,kennismigrant,false,true,true,true,Regular professional route available via IND; employer must be IND-recognised sponsor; salary thresholds apply
+IR,Iran,NL,5,Professional - couple no kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse: €254; income threshold applies
+IR,Iran,NL,6,Professional - couple with kids,kennismigrant,false,true,true,true,Primary: kennismigrant. Spouse €254. Child €85
