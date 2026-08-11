@@ -199,4 +199,73 @@ test.describe('deep — provisioned-case journey (fill → submit → roadmap)',
     await info.attach('services-ux', { body: JSON.stringify({ signals: v.signals, vendorCards }), contentType: 'application/json' });
     expect(v.signals, `services: ${v.signals}`).not.toContain('permanent-spinner(B10)');
   });
+
+  /**
+   * [VND-05] The last step of the employee's journey: having seen the vendor list, ask them
+   * for prices. This is the canonical RFQ creator and until now it had NO end-to-end test —
+   * despite 500ing in production twice on schema drift (rfqs_created_by_user_id_fkey, then
+   * created_by_user_id uuid→text).
+   *
+   * It replaces an HR-side test that POSTed to /api/hr/rfq-requests. That endpoint was deleted
+   * on 2026-07-22 (AIQ-1683) when RFQ creation moved to the employee, so the old test had been
+   * asserting a 405 for three weeks — and its noise was the stated reason the Sentinel scorer
+   * was muzzled. Note POST /api/rfqs still ACCEPTS an HR token (require_hr_or_employee), so
+   * simply repointing the old test would have gone green while testing a flow nobody uses.
+   *
+   * The recipient is resolved from the employee's own recommendations rather than hardcoded.
+   * The previous test carried `VENDOR_ID = 'ed599b41-…'`, a `vendors.id` — and `public.vendors`
+   * was renamed to `vendors_legacy` on 2026-07-19 while `validate_vendor_ids` moved to reading
+   * `suppliers`. A hardcoded id outliving its table is exactly how this rotted; a fresh one
+   * would re-arm the same trap. Resolving live also exercises the real chain, because
+   * `resolve_recipient_ids` maps a catalog external_id onto a supplier.
+   */
+  test('[VND-05] employee requests quotes from a shortlisted vendor', async ({}, info) => {
+    test.skip(!state.caseId || !state.submitted, 'no submitted case');
+
+    const recsRes = await requestWithGatewayRetry(() =>
+      api.get(`${API}/api/employee/recommendations`, { headers: { Authorization: `Bearer ${emp}` } }));
+    const recs = await recsRes.json().catch(() => ({} as Record<string, { item_id?: string }[]>));
+    const movers = Array.isArray(recs.movers) ? recs.movers : [];
+    const supplierId = movers.find((m) => m?.item_id)?.item_id;
+
+    await info.attach('rfq-recipient', {
+      body: JSON.stringify({ recsStatus: recsRes.status(), moversOffered: movers.length, supplierId }),
+      contentType: 'application/json',
+    });
+    // No recommendation is an upstream gap, not an RFQ defect — say so rather than fail here.
+    test.skip(!supplierId, `no mover recommended for this case (movers=${movers.length})`);
+
+    const r = await requestWithGatewayRetry(() => api.post(`${API}/api/rfqs`, {
+      headers: { Authorization: `Bearer ${emp}` },
+      // service_key 'movers' — prod rfq_items holds only 'movers' and 'schools'. The old test
+      // sent service_category:'moving', a field this endpoint does not read.
+      data: {
+        case_id: state.caseId,
+        items: [{ service_key: 'movers', requirements: { note: `deep-e2e ${info.workerIndex}` } }],
+        supplier_ids: [supplierId],
+      },
+    }));
+    const body = await r.text();
+    const j = JSON.parse(body || '{}');
+    await info.attach('rfq-create', {
+      body: JSON.stringify({ status: r.status(), body: body.slice(0, 600) }),
+      contentType: 'application/json',
+    });
+
+    expect([200, 201], `create RFQ: ${body.slice(0, 300)}`).toContain(r.status());
+    const rfqId = j?.rfq?.id;
+    expect(rfqId, 'response carried no rfq id').toBeTruthy();
+    expect(j?.unreachable ?? [], 'the shortlisted supplier was unreachable').toHaveLength(0);
+
+    // ASSERT CONTENT, NEVER STATUS: a 201 only proves the handler returned. Read it back.
+    const got = await requestWithGatewayRetry(() =>
+      api.get(`${API}/api/rfqs/${rfqId}`, { headers: { Authorization: `Bearer ${emp}` } }));
+    const detail = await got.json().catch(() => ({} as { id?: string; case_id?: string }));
+    await info.attach('rfq-readback', {
+      body: JSON.stringify({ status: got.status(), id: detail?.id, case_id: detail?.case_id }),
+      contentType: 'application/json',
+    });
+    expect(got.status(), 'created RFQ is not retrievable').toBe(200);
+    expect(detail?.case_id, 'RFQ came back attached to a different case').toBe(state.caseId);
+  });
 });
