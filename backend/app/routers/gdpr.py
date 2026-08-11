@@ -15,7 +15,7 @@ import decimal
 import logging
 import uuid as _uuid
 from datetime import date, datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
@@ -206,8 +206,60 @@ _ERASURE_ACTIONS: Dict[str, tuple] = {
     "case_forms": ("delete",),
     "case_messages": ("delete_authored",),
     "pets": ("delete",),
-    "exception_requests": ("anon", ["reason", "resolution_notes", "ai_insight"]),
+    # `ai_insight` was listed here and does not exist on the table — see
+    # _erasable_columns. Its presence meant NOTHING on this table was ever erased.
+    "exception_requests": ("anon", ["reason", "resolution_notes"]),
 }
+
+
+def _existing_columns(conn, table: str) -> Optional[set]:
+    """The columns `public.<table>` actually has, or None if that can't be determined.
+
+    Returning None means "don't filter" — callers then build the statement exactly as
+    before. Fail-OPEN is deliberate: erasure must never be weakened by an introspection
+    hiccup, and on SQLite (the test engine) information_schema does not exist at all.
+    """
+    try:
+        rows = conn.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = :t"
+            ),
+            {"t": table},
+        ).fetchall()
+    except Exception:
+        return None
+    cols = {r[0] for r in rows}
+    return cols or None
+
+
+def _erasable_columns(conn, table: str, wanted: List[str], summary) -> List[str]:
+    """Narrow `wanted` to the columns that exist, recording any that do not.
+
+    [AIQ-1801] Why this exists. `_ERASURE_ACTIONS` named `ai_insight` on
+    exception_requests, and that column does not exist. The whole list was rendered
+    into ONE `UPDATE ... SET a = NULL, b = NULL, c = NULL`, so the single bad name made
+    the statement raise, the SAVEPOINT rolled it back, and `reason` and
+    `resolution_notes` — case-linked free text belonging to the data subject — were
+    never erased. An Article 17 obligation silently unfulfilled because a schema drifted.
+
+    One stale name must not cost the whole table. Erase what exists; report what does
+    not, so a partial erasure can never be read as a complete one.
+    """
+    existing = _existing_columns(conn, table)
+    if existing is None:
+        return wanted
+    missing = [c for c in wanted if c not in existing]
+    if missing:
+        log.error(
+            "gdpr erasure: table %s lists column(s) %s that do not exist — "
+            "erasing the remaining %d column(s); FIX THE MAP",
+            table, ", ".join(missing), len(wanted) - len(missing),
+        )
+        summary.setdefault("skipped_columns", []).extend(
+            f"{table}.{c}" for c in missing
+        )
+    return [c for c in wanted if c in existing]
 
 
 def _apply_erasure(conn, table, where, params, summary):
@@ -229,12 +281,24 @@ def _apply_erasure(conn, table, where, params, summary):
                 )
                 summary["erased_tables"].append(table)
             elif kind in ("anon", "retain_null"):
-                sets = ", ".join(f"{c} = NULL" for c in action[1])
+                cols = _erasable_columns(conn, table, list(action[1]), summary)
+                if not cols:
+                    # Every listed column is gone. Erasing nothing while reporting the
+                    # table as anonymised would be the lie this change exists to prevent.
+                    raise RuntimeError(
+                        f"{table}: none of the columns listed for erasure exist"
+                    )
+                sets = ", ".join(f"{c} = NULL" for c in cols)
                 conn.execute(text(f"UPDATE public.{table} SET {sets} WHERE {where}"), params)
                 (summary["anonymised_tables"] if kind == "anon"
                  else summary["retained_tables"]).append(table)
             elif kind == "anon_imm":
-                sets = ", ".join(f"{c} = NULL" for c in _IMM_PII_COLS)
+                cols = _erasable_columns(conn, table, list(_IMM_PII_COLS), summary)
+                if not cols:
+                    raise RuntimeError(
+                        f"{table}: none of the immigration PII columns exist"
+                    )
+                sets = ", ".join(f"{c} = NULL" for c in cols)
                 conn.execute(
                     text(f"UPDATE public.{table} SET {sets}, anonymised_at = now() WHERE {where}"),
                     params,
@@ -282,6 +346,10 @@ def erase_subject_data(user_id: str) -> Dict[str, Any]:
     uid = str(user_id)
     summary: Dict[str, Any] = {
         "erased_tables": [], "anonymised_tables": [], "retained_tables": [], "errors": [],
+        # [AIQ-1801] "table.column" entries the map asked us to erase that do not exist.
+        # A table can appear in anonymised_tables AND contribute here — that is a PARTIAL
+        # erasure, and the whole point is that it is distinguishable from a complete one.
+        "skipped_columns": [],
     }
     with db.engine.begin() as conn:
         case_ids = _resolve_case_ids(conn, uid)
