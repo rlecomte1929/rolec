@@ -463,9 +463,15 @@ def get_case_documents(
 # Mirrors frontend PassportOCRFlow.tsx, which already renders the passport number as
 # '••••••••' even in the employee's own review step.
 #
-# NOT driven by `rce.extracted_fields.phi_class`: every one of the 22 production rows —
-# passport document number included — carries phi_class='NONE'. Trusting that column
-# would leak. Keys are the reliable signal; revisit if the classifier is fixed.
+# NOT driven by `rce.extracted_fields.phi_class`. When this endpoint was written, every
+# one of the 22 production rows — passport document number included — carried
+# phi_class='NONE', so trusting that column would have leaked.
+#
+# [AIQ-1805, 2026-08-11] The classifier is now fixed and those rows are backfilled, but
+# this masking deliberately still keys on field_key. Classify first, prove it, and only
+# then let something depend on it — retrofitting a protection onto a column that was
+# wrong for months is how the wrong thing ships confidently. Switching this to phi_class
+# is a separate, deliberate change.
 _MASKED_FIELD_KEYS = frozenset({"document_number", "personal_number"})
 _MASK = "••••••••"
 

@@ -68,10 +68,60 @@ def test_phi_class_from_value_canonical():
     assert _phi_class(_ef(value_canonical={"phi_class": "BIOMETRIC"})) == "BIOMETRIC"
 
 
-def test_phi_class_defaults_none():
-    assert _phi_class(_ef(value_canonical=None)) == "NONE"
-    assert _phi_class(_ef(value_canonical={"source": "x"})) == "NONE"
-    assert _phi_class(_ef(value_canonical={"phi_class": "BOGUS"})) == "NONE"
+def test_phi_class_defaults_to_pii_not_none():
+    """[AIQ-1805] This test previously asserted the DEFECT.
+
+    It read `== "NONE"` and passed, which is how every passport field in production —
+    the passport number and the national ID included — came to be stamped "not personal
+    data". The old default was NONE and only the photo bbox ever carried a hint, so the
+    column said the opposite of the truth for every row.
+
+    Defaulting to PII makes an unrecognised field over-protected rather than
+    under-protected. A field extracted from someone's identity document relates to an
+    identified person, which is what Art. 4(1) covers.
+    """
+    assert _phi_class(_ef(value_canonical=None)) == "PII"
+    assert _phi_class(_ef(value_canonical={"source": "x"})) == "PII"
+    # A value outside the CHECK set must not be trusted through — it falls back to the
+    # key-based default rather than being written and rejected by Postgres.
+    assert _phi_class(_ef(value_canonical={"phi_class": "BOGUS"})) == "PII"
+
+
+def test_every_passport_field_key_in_production_is_classified():
+    """Pins the ruling of 2026-08-11 against the exact 13 keys production holds.
+
+    A future agent change that renames or drops a key fails here rather than silently
+    reverting a row to NONE.
+    """
+    expected = {
+        "document_number": "PII",     # the passport number
+        "personal_number": "PII",     # national ID / D-number
+        "surname": "PII",
+        "given_names": "PII",
+        "date_of_birth": "PII",
+        "sex": "PII",                 # administrative sex is not Art. 9
+        "nationality_iso3": "PII",    # nationality is not ethnicity under Art. 9
+        "issuing_state_iso3": "PII",
+        "issuing_authority": "PII",
+        "expiry_date": "PII",
+        "endorsements": "PII",
+        "mrz_body_discrepancies": "PII",  # can quote field values back
+        "agent_confidence": "NONE",   # the model's confidence, not the subject's data
+    }
+    for key, want in expected.items():
+        assert _phi_class(_ef(field_key=key)) == want, key
+
+
+def test_an_agent_hint_still_wins_over_the_key_default():
+    """BIOMETRIC on the photo region is more specific than any key rule, and is the one
+    classification the agents got right before this fix."""
+    f = _ef(field_key="portrait_bbox", value_canonical={"phi_class": "BIOMETRIC"})
+    assert _phi_class(f) == "BIOMETRIC"
+
+
+def test_an_unknown_future_field_key_is_pii():
+    """The point of the change: a key nobody has classified yet fails SAFE."""
+    assert _phi_class(_ef(field_key="some_field_invented_next_year")) == "PII"
 
 
 # ── param builders ───────────────────────────────────────────────────────────
@@ -111,7 +161,8 @@ def test_write_extracted_fields_one_insert_per_field():
     conn = _FakeConn()
     SupabaseExtractionSink(conn).write_extracted_fields((_ef(), _ef(field_key="surname", value_raw="X")))
     assert len(conn.calls) == 2
-    assert conn.calls[0][1]["phi_class"] == "NONE"
+    # [AIQ-1805] was "NONE" — nationality_iso3 is personal data.
+    assert conn.calls[0][1]["phi_class"] == "PII"
 
 
 def test_write_extracted_fields_empty_noop():
