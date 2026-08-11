@@ -29,13 +29,33 @@ Nothing here commits. Every test opens a transaction and rolls it back, so the t
 exactly the state it started in. The key used is a local test passphrase; the real key is
 never read, required, or referenced.
 
-RUNNING
--------
-Needs a Postgres `DATABASE_URL` (pgcrypto is not available in the sqlite unit lane), and
-is `integration`-marked so CI's `-m "not integration"` run skips it.
+RUNNING — use a throwaway local Postgres, not production
+--------------------------------------------------------
+Needs a Postgres `DATABASE_URL` (pgcrypto does not exist in the sqlite unit lane), and is
+`integration`-marked so CI's `-m "not integration"` run skips it.
 
-    DATABASE_URL=postgresql://... RELOPASS_ALLOW_REMOTE_DB_IN_TESTS=1 \
+Everything here is designed to run against a disposable database. Point it at production
+only if you have a reason to; the local run is faster (0.5s vs 6.6s) and cannot surprise you.
+
+    docker run -d --name vaultpg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=vaulttest \
+      -p 55433:5432 postgres:15-alpine
+
+    docker exec vaultpg psql -qU postgres -d vaulttest -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+    docker exec vaultpg psql -qU postgres -d vaulttest -c "
+      CREATE TABLE public.imm_employee_profiles (
+        id text PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+        case_id text NOT NULL, employee_id text NOT NULL, org_id text NOT NULL,
+        passport_number text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now());"
+
+    DATABASE_URL=postgresql://postgres:test@127.0.0.1:55433/vaulttest \
       pytest backend/tests/integration/test_vault_passport_roundtrip.py -v
+
+Proven to fail when it should, which is the only reason to trust it passing: inserting a
+row with a plaintext `passport_number` makes
+`test_no_plaintext_passport_numbers_exist_today` fail with the incident message; deleting
+it returns all seven to green.
 """
 from __future__ import annotations
 
