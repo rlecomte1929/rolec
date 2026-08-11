@@ -21,8 +21,25 @@ import { DemoBookingProvider } from './hooks/useDemoBooking';
 import { MobilityTeamsPage } from './pages/public/MobilityTeamsPage';
 import { RelocationChecklistPage } from './pages/public/RelocationChecklistPage';
 import { mobilityTeamsContent, relocationChecklistContent } from './pages/public/adLandingContent';
+// [AIQ-1797] The 8 PUBLIC marketing routes.
+import { Landing } from './pages/Landing';
+import { PlatformPage } from './pages/public/PlatformPage';
+import { WhyReloPassPage } from './pages/public/WhyReloPassPage';
+import { HowItWorksPage } from './pages/public/HowItWorksPage';
+import { GetStartedPage } from './pages/public/GetStartedPage';
+import { SecurityPage } from './pages/public/SecurityPage';
+import { PrivacyPage } from './pages/public/PrivacyPage';
+import { AccessPage } from './pages/public/AccessPage';
 
 export interface PrerenderedRoute {
+  /**
+   * [AIQ-1797] Emit to dist/<outFile> instead of dist/<path>/index.html.
+   *
+   * Needed only by `/`: the default would write dist/index.html, which is the `/*`
+   * catch-all document every authenticated route is served. See the comment at the
+   * write site in scripts/prerender.mjs.
+   */
+  outFile?: string;
   /** URL path, also the output directory: dist/<dir>/index.html */
   path: string;
   title: string;
@@ -50,5 +67,86 @@ export const ROUTES: PrerenderedRoute[] = [
     title: relocationChecklistContent.meta.title,
     description: relocationChecklistContent.meta.description,
     render: () => renderAt('/relocation-checklist', <RelocationChecklistPage />),
+  },
+
+  // ── [AIQ-1797] The 8 PUBLIC marketing routes ───────────────────────────────
+  //
+  // Every one of these served the 1,677-byte SPA shell — ~82 readable characters —
+  // to any client that does not run JavaScript. Measured 2026-08-11 across all 8,
+  // in both bare and trailing-slash form. That is what a search crawler and an AI
+  // answer engine read today, so none of this copy can be ranked or cited.
+  //
+  // WHY THESE 8 AND NOT "EVERY PUBLIC ROUTE". ROUTE_DEFS marks more paths PUBLIC
+  // than belong here, and prerendering some of them would be wrong rather than
+  // merely wasteful:
+  //   /auth, /login                  — credential surfaces, no marketing content
+  //   /provider/portal, /supplier/quote — render per-magic-link content; a static
+  //                                    snapshot would be meaningless at best
+  //   /test-drive, /test-drive/survey — interactive trial, not copy to index
+  //   /compliance                    — deliberately out of scope: its copy is
+  //                                    governed by the EU AI Act hard gate in
+  //                                    CLAUDE.md, so baking it into static HTML is
+  //                                    a content decision, not a build one
+  //   /mobility-teams, /relocation-checklist — already prerendered above
+  //
+  // The meta below is duplicated from each page's usePageMeta call, because that
+  // call passes inline literals rather than exporting them (unlike the ad pages,
+  // which read adLandingContent.ts). scripts/verify-prerender.mjs asserts the two
+  // agree, so drift fails the build instead of silently shipping a wrong <title>.
+  {
+    path: '/',
+    // NOT dist/index.html — that file is the /* catch-all served to every app route.
+    outFile: 'landing.html',
+    title: 'ReloPass — Global mobility infrastructure',
+    description:
+      'Run relocation cases, timelines, documents, providers, and policy controls through one operating layer.',
+    render: () => renderAt('/', <Landing />),
+  },
+  {
+    path: '/platform',
+    title: 'The Platform · ReloPass',
+    description:
+      'Every relocation on one system of record. Cases, documents, providers, and progress in one place.',
+    render: () => renderAt('/platform', <PlatformPage />),
+  },
+  {
+    path: '/why',
+    title: 'Why ReloPass',
+    description:
+      'Relocation fails in the handoffs. ReloPass puts every case, document, and provider update on one record.',
+    render: () => renderAt('/why', <WhyReloPassPage />),
+  },
+  {
+    path: '/how-it-works',
+    title: 'How It Works · ReloPass',
+    description:
+      'From case open to case closed. Four steps, one record. See how a relocation runs inside ReloPass.',
+    render: () => renderAt('/how-it-works', <HowItWorksPage />),
+  },
+  {
+    path: '/get-started',
+    title: 'Get started · ReloPass',
+    description:
+      "Three ways in. Book a demo, sign in, or create an account. Tell us how your relocations run today and we'll show you what changes.",
+    render: () => renderAt('/get-started', <GetStartedPage />),
+  },
+  {
+    path: '/security',
+    title: 'Security · ReloPass',
+    description:
+      'Data hosted in the EU, encrypted in transit and at rest. Role-based access throughout.',
+    render: () => renderAt('/security', <SecurityPage />),
+  },
+  {
+    path: '/privacy',
+    title: 'Privacy Policy · ReloPass',
+    description: 'How ReloPass collects, stores, and protects your data. Hosted in the EU.',
+    render: () => renderAt('/privacy', <PrivacyPage />),
+  },
+  {
+    path: '/access',
+    title: 'Get Started · ReloPass',
+    description: 'Book a demo, sign in, or create an account. 30-minute walkthrough. No commitment.',
+    render: () => renderAt('/access', <AccessPage />),
   },
 ];

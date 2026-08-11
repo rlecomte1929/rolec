@@ -119,6 +119,37 @@ async function main() {
     },
   });
 
+  // [AIQ-1797] @supabase/realtime-js throws AT IMPORT TIME on Node < 22:
+  //   "Node.js detected but native WebSocket not found."
+  // Node 22 added a global WebSocket; CI pins 20.18.1 via .nvmrc, so this fails there and
+  // passes on any newer local Node — which is exactly how it reached CI green-on-my-machine.
+  //
+  // Supabase is in the SSR graph because the marketing pages import the
+  // `components/marketing` BARREL, which re-exports InlineDemoForm -> api/client ->
+  // api/supabase. (The ad landing pages import individual files, which is why they never
+  // hit this.) `vite build` even warns about that edge today.
+  //
+  // A stub is the right fix rather than unpicking the barrel: prerendering renders static
+  // marketing copy and never opens a realtime channel, so the module only needs to be
+  // IMPORTABLE. Rewriting eight pages' imports to dodge a build-time-only constraint would
+  // be a bigger, riskier diff than the constraint deserves. Build-time only — this file is
+  // never bundled, so nothing reaches the client.
+  //
+  // If a prerendered page ever genuinely needs realtime, this stub will surface it loudly
+  // as a connection that does nothing, not as a silent wrong render.
+  if (typeof globalThis.WebSocket === 'undefined') {
+    class PrerenderWebSocketStub {
+      constructor() {
+        throw new Error(
+          'prerender: a prerendered route tried to open a realtime WebSocket. Prerendering ' +
+            'renders static markup only — move that call out of the render path.',
+        );
+      }
+    }
+    globalThis.WebSocket = PrerenderWebSocketStub;
+    console.log('prerender: installed a WebSocket stub (Node < 22) so @supabase/realtime-js can import');
+  }
+
   const { ROUTES } = await import(path.join(SSR_OUT, 'prerender-entry.js'));
   const baseHtml = await readFile(template, 'utf8');
 
@@ -137,10 +168,24 @@ async function main() {
     }
     html = withDescription(withTitle(html, route.title), route.description);
 
-    const outDir = path.join(DIST, route.path.replace(/^\//, ''));
-    await mkdir(outDir, { recursive: true });
-    await writeFile(path.join(outDir, 'index.html'), html, 'utf8');
-    console.log(`prerender: wrote ${path.relative(ROOT, path.join(outDir, 'index.html'))} (${markup.length} bytes of markup)`);
+    // [AIQ-1797] `outFile` exists for exactly one route: `/`.
+    //
+    // The default (dist/<route>/index.html) would put `/` at dist/index.html — which is
+    // also the `/*` catch-all target for EVERY unmatched path, including /auth and every
+    // authenticated route. Prerendering the landing page there means an HR user opening
+    // /hr/dashboard is served the marketing homepage, sees it, and then watches
+    // createRoot wipe and replace it. Measured: dist/index.html went 1,327 -> 21,182
+    // bytes of landing copy.
+    //
+    // So `/` is emitted to dist/landing.html and pointed at by an explicit `source: /`
+    // rewrite in render.yaml. dist/index.html stays the pristine shell, and the flash
+    // never happens.
+    const outPath = route.outFile
+      ? path.join(DIST, route.outFile)
+      : path.join(DIST, route.path.replace(/^\//, ''), 'index.html');
+    await mkdir(path.dirname(outPath), { recursive: true });
+    await writeFile(outPath, html, 'utf8');
+    console.log(`prerender: wrote ${path.relative(ROOT, outPath)} (${markup.length} bytes of markup)`);
   }
 
   // KEEP_PRERENDER_SSR=1 leaves the intermediate bundle for inspection. Useful for
