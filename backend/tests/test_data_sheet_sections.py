@@ -32,7 +32,7 @@ from backend.app.services.data_sheet_pdf import render_data_sheet  # noqa: E402
 _SEED = os.path.join(_REPO_ROOT, "supabase", "migrations",
                      "20261015000000_seed_frno_data_sheet.sql")
 _SECTIONS_MIGRATION = os.path.join(_REPO_ROOT, "supabase", "migrations",
-                                   "20261025000000_form_templates_sections.sql")
+                                   "20261026000000_form_templates_sections.sql")
 
 
 def _text(pdf: bytes) -> str:

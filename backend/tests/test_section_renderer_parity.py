@@ -26,7 +26,7 @@ from backend.app.services.data_sheet_pdf import _SECTION_LABELS  # noqa: E402
 _EDITOR = os.path.join(_REPO_ROOT, "frontend", "src", "pages", "employee", "FormEditorPage.tsx")
 _DOSSIER_TS = os.path.join(_REPO_ROOT, "frontend", "src", "api", "dossier.ts")
 _SECTIONS_MIGRATION = os.path.join(_REPO_ROOT, "supabase", "migrations",
-                                   "20261025000000_form_templates_sections.sql")
+                                   "20261026000000_form_templates_sections.sql")
 
 
 def _tsx() -> str:
