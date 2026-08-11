@@ -17,11 +17,6 @@
       "ticket": "VND-05 (Notion: 'create_rfq 500 - HR->vendor RFQ vendor query uses non-existent columns')",
       "since": "2026-06-29"
     },
-    "AEO-CRAWLER-FETCH": {
-      "reason": "Cloudflare returns 403 to OAI-SearchBot, GPTBot and ChatGPT-User despite robots.txt allowing them. Blocked on a dashboard change, not a code change.",
-      "ticket": "Card E / AIQ-1782 (ADS-2 crawler allowlist)",
-      "since": "2026-08-10"
-    },
     "R4X-B": {
       "reason": "INTERMITTENT, not consistently broken. Failed run 31491543985, PASSED run 31494214298 \u2014 the two runs either side of the gate landing. Kept baselined so a flake cannot turn main red at random; that is the only reason it is here. Flakiness is itself the defect to chase: an audit-row assertion that passes half the time tells you the write races, and 'sometimes logged' is not a control you can describe to a customer. Do NOT delete this entry just because the scorer reports it as now-passing; delete it when the test is reliably green.",
       "ticket": "AIQ-1812 (https://app.notion.com/p/3b9887c64d48819b877df111a8847dba)",
