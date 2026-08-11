@@ -56,6 +56,10 @@
 #
 # check_rls_coverage.py re-checks that grant claim on every run and FAILS if either table
 # is later granted to anon/authenticated, so this exception cannot expire in silence.
-# Still the wrong end state: give them a service-role policy and delete these two lines.
+#
+# TEMPORARY. 20261028000000_ror_tables_rls.sql gives both tables RLS + a service_role
+# policy + REVOKE anon; it is committed and awaiting an out-of-band apply (migrations are
+# not applied on merge here). The moment it lands, check_rls_coverage.py reports these two
+# as stale entries — DELETE both lines then. The floor is still 0.
 ror_cities   # city-ranking catalogue; server-role-only, no anon/authenticated grant
 ror_queue    # rollout work queue; server-role-only, no anon/authenticated grant

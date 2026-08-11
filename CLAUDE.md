@@ -282,6 +282,14 @@ Three guards cover this, in order of when they fire:
 | its "check added versions against live main" step | a parallel PR that merged first — compares against live `origin/main` | PRs merged without CI re-running in between |
 | `migration-duplicate-main.yml` (push to `main`) | anything the above two missed, whole-tree | nothing — it is the backstop |
 
+That last row was **false until 2026-08-11**. The job ran `check_migration_drift.py --no-db`
+with no `--added`, which is the script's audit mode: duplicates print a warning and the
+process exits 0. It was structurally incapable of failing, including for the
+#1716/#1717/#1718 collision it names as its reason to exist. It now passes
+`--strict-duplicates`, which is what makes a whole-tree run able to fail — verified by
+planting a duplicate and watching the old invocation exit 0 and the new one exit 1. If you
+add another whole-tree invocation, it needs that flag or it is decoration.
+
 **Do not batch-merge two migration PRs back to back.** GitHub does not re-run a PR when its base
 moves, so both stay green from before either landed, and the live-main comparison never sees the
 first merge. Merge one, let the second's CI re-run, then merge it.
