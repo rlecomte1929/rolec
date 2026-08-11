@@ -43,6 +43,7 @@ TIER1 = RegistrySource(
     acquisition=Acquisition.MANUAL_EVIDENCED,
     corridors=("FR-DE", "FR-NO"),
     categories=("movers",),
+    entry_url_pattern=r"/find-fidi-affiliate/[^/]",
 )
 
 
@@ -53,7 +54,9 @@ def make(**kw) -> Candidate:
         corridor="FR-DE",
         service_category="movers",
         source=TIER1,
-        source_url="https://www.fidi.org/find-mover/acme",
+        # A real per-affiliate entry, not the /find-mover search page — TIER1 declares an
+        # entry_url_pattern, and the search page is exactly what it exists to reject.
+        source_url="https://www.fidi.org/find-fidi-affiliate/acme",
         accreditation_body="FIDI FAIM",
         accreditation_number="FAIM-12345",
         accreditation_expiry="2027-06-30",

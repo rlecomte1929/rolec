@@ -119,20 +119,21 @@ def test_a_dry_run_writes_nothing(engine, candidates):
     """A preview that took a different code path would not be a preview."""
     with engine.begin() as conn:
         results, rejections = stage(conn, candidates, dry_run=True)
-        assert sum(r.staged for r in results) == 31
-        assert len(rejections) == 7
+        assert sum(r.staged for r in results) == 32
+        assert len(rejections) == 6
         assert _counts(conn) == (0, 0, 0)
 
 
-def test_apply_stages_31_pending_and_rejects_7(engine, candidates):
+def test_apply_stages_32_pending_and_rejects_6(engine, candidates):
     with engine.begin() as conn:
         results, rejections = stage(conn, candidates, dry_run=False)
         pending, dup, runs = _counts(conn)
 
-    assert (pending, dup) == (31, 0)
-    assert len(rejections) == 7
+    assert (pending, dup) == (32, 0)
+    assert len(rejections) == 6
     assert runs == 8, (
-        "one of the nine pairs has every row rejected, so it must open no run at all — "
+        "of the nine covered pairs, FR-DE/tax_finance has every row rejected, so it must open "
+        "no run at all — "
         "an empty run would read as 'searched, found nothing'"
     )
     assert all(r.run_id for r in results if r.staged)
@@ -154,7 +155,7 @@ def test_a_bare_year_expiry_survives_the_date_column(engine, candidates):
 def test_rerunning_stages_nothing_new(engine, candidates):
     """The property that makes this safe to run twice by accident.
 
-    This test used to assert `dup == 31` — it encoded the append-a-duplicate-set behaviour AS
+    This test used to assert `dup == 32` — it encoded the append-a-duplicate-set behaviour AS
     CORRECT, which is why the wart was dismissed as noise instead of fixed. It then happened
     in production. A second pass must now write nothing at all.
     """
@@ -165,7 +166,7 @@ def test_rerunning_stages_nothing_new(engine, candidates):
         pending, dup, _ = _counts(conn)
 
     assert sum(r.staged for r in results) == 0
-    assert pending == 31, "the second run must not add a single new pending candidate"
+    assert pending == 32, "the second run must not add a single new pending candidate"
     assert dup == 0, "nor a single duplicate row — re-staging is a no-op, not an append"
 
 
@@ -286,7 +287,7 @@ def test_promotion_dry_run_writes_no_supplier(full_engine, candidates):
     _staged(full_engine, candidates)
     with _session(full_engine) as session:
         n, _, _ = promote(session, dry_run=True)
-        assert n == 31
+        assert n == 32
     with full_engine.begin() as conn:
         assert conn.execute(text("SELECT count(*) FROM suppliers")).scalar_one() == 0
 
@@ -298,7 +299,7 @@ def test_promotion_lands_everything_unvetted(full_engine, candidates):
     with _session(full_engine) as session:
         promoted, _, _ = promote(session, dry_run=False)
 
-    assert promoted == 31, "every candidate is accounted for, merged or new"
+    assert promoted == 32, "every candidate is accounted for, merged or new"
     with full_engine.begin() as conn:
         pending, approved = conn.execute(
             text(
@@ -307,7 +308,7 @@ def test_promotion_lands_everything_unvetted(full_engine, candidates):
                 "FROM supplier_service_capabilities"
             )
         ).one()
-    assert (pending, approved) == (31, 0), "nothing may arrive pre-approved"
+    assert (pending, approved) == (32, 0), "nothing may arrive pre-approved"
 
 
 def test_a_company_in_two_corridors_is_one_supplier_with_two_capabilities(
@@ -321,7 +322,7 @@ def test_a_company_in_two_corridors_is_one_supplier_with_two_capabilities(
       International)' for FR-DE and 'AGS France (SOFDI)' for FR-NO. Same FIDI affiliate, two
       spellings, which is why `_name_key` drops parenthetical asides.
 
-    So 31 candidates become 29 suppliers and 31 capabilities."""
+    So 32 candidates become 30 suppliers and 32 capabilities."""
     from backend.imports.suppliers.executor import promote
 
     _staged(full_engine, candidates)
@@ -341,7 +342,7 @@ def test_a_company_in_two_corridors_is_one_supplier_with_two_capabilities(
             )
         ).scalar_one()
 
-    assert (suppliers, caps) == (29, 31)
+    assert (suppliers, caps) == (30, 32)
     assert grospiron == 2
 
     with full_engine.begin() as conn:
@@ -372,9 +373,9 @@ def test_the_registry_evidence_survives_promotion(full_engine, candidates):
             )
         ).one()
 
-    # 29, not 31: the unique claim index is (supplier_id, body, scheme), so a company in two
+    # 30, not 32: the unique claim index is (supplier_id, body, scheme), so a company in two
     # corridors evidenced by the same registry holds ONE accreditation, not two.
-    assert total == 29
+    assert total == 30
     assert no_evidence == 0
     assert verified == 0, "a registry listing is 'claimed'; the human who approves verifies it"
 
@@ -390,7 +391,7 @@ def test_promotion_is_idempotent(full_engine, candidates):
 
     assert again == 0
     with full_engine.begin() as conn:
-        assert conn.execute(text("SELECT count(*) FROM suppliers")).scalar_one() == 29
+        assert conn.execute(text("SELECT count(*) FROM suppliers")).scalar_one() == 30
 
 
 def test_every_candidate_is_linked_to_its_supplier(full_engine, candidates):
@@ -453,8 +454,8 @@ def test_staging_twice_writes_nothing_the_second_time(full_engine, candidates):
 
     `--promote` implies `--apply`, so the natural "stage, check the numbers, then promote"
     sequence runs staging twice. Every row matched the first run's dedupe keys, so the second
-    pass re-staged all 31 as 'duplicate' under 8 fresh runs — 62 candidates and 16 runs where
-    there should have been 31 and 8. The directory was unharmed (the supplier name index and
+    pass re-staged all 32 as 'duplicate' under 8 fresh runs — 64 candidates and 16 runs where
+    there should have been 32 and 8. The directory was unharmed (the supplier name index and
     add_capability's duplicate check absorbed it) but the staging tables needed hand cleanup.
 
     Staging must be a no-op on a file it has already ingested.
@@ -473,7 +474,7 @@ def test_staging_twice_writes_nothing_the_second_time(full_engine, candidates):
                  "       (SELECT count(*) FROM vendor_curation_runs)")
         ).one()
 
-    assert first == (31, 8)
+    assert first == (32, 8)
     assert second == first, (
         f"re-staging appended rows: {first} became {second}. A second pass over the same file "
         "must write nothing."
@@ -500,4 +501,4 @@ def test_a_genuinely_new_row_still_stages_after_a_first_run(full_engine, candida
         landed = conn.execute(
             text("SELECT count(*) FROM vendor_candidates WHERE name = 'Brand New Movers GmbH'")
         ).scalar_one()
-    assert (total, landed) == (32, 1)
+    assert (total, landed) == (33, 1)  # the 32 already staged, plus the newcomer
