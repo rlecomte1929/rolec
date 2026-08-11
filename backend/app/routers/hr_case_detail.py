@@ -25,6 +25,7 @@ for engine-derived data.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -37,6 +38,8 @@ from ..services.case_feasibility import feasibility_for_case
 from ..services.contradiction_store_pg import run_contradiction_detection_for_case
 from ...database import db
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/hr/cases", tags=["hr-case-detail"])
 
@@ -359,7 +362,6 @@ def get_case_documents(
                       d.storage_uri,
                       d.created_at,
                       dt.code AS document_type_code,
-                      dt.label AS document_type_label,
                       ef_stats.mean_confidence,
                       ef_stats.min_confidence,
                       ef_stats.field_count
@@ -387,7 +389,9 @@ def get_case_documents(
                 CaseDocumentDTO(
                     document_id=str(r["document_id"]),
                     document_type_code=str(r.get("document_type_code") or "UNKNOWN"),
-                    document_type_label=r.get("document_type_label"),
+                    # rce.document_types has no label column (only code,
+                    # expected_fields_json, validator_pack). Clients fall back to the code.
+                    document_type_label=None,
                     filename=str(r.get("original_filename") or f"document-{str(r['document_id'])[:8]}"),
                     uploaded_at=r["created_at"].isoformat() if r.get("created_at") else "",
                     confidence_mean=r.get("mean_confidence"),
@@ -398,9 +402,16 @@ def get_case_documents(
                 )
             )
     except Exception:
-        # rce.documents table may not exist in legacy environments — degrade
-        # gracefully with an empty list so the frontend renders the empty
-        # state instead of an error banner.
+        # rce.documents may be absent in legacy environments — degrade to an empty list
+        # so the frontend renders the empty state rather than an error banner.
+        #
+        # LOGGED, not swallowed. This block hid a hard `column dt.label does not exist`
+        # for the entire life of the endpoint: every call raised, every call returned
+        # [], and an empty list is indistinguishable from "this case has no documents".
+        # The extraction pipeline had been producing fields in production for a day
+        # before anyone noticed nothing could read them. A degrade path that reports
+        # nothing is a place bugs go to live.
+        logger.exception("hr_case_detail: documents query failed for case %s", case_id)
         documents = []
 
     return DocumentsResponse(documents=documents)
@@ -514,7 +525,12 @@ def get_case_document_fields(
         raise
     except Exception:
         # Matches GET /documents: rce.* may be absent in legacy environments. Degrade to
-        # an empty list so the panel renders "not yet processed" rather than an error.
+        # an empty list so the panel renders "not yet processed" rather than an error —
+        # but log it, for the reason spelled out on that endpoint's handler.
+        logger.exception(
+            "hr_case_detail: extracted-fields query failed for case %s document %s",
+            case_id, document_id,
+        )
         fields = []
 
     return ExtractedFieldsResponse(
