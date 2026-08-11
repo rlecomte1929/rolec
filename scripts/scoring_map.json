@@ -120,7 +120,7 @@
       "domain": "Suppliers & Vendors",
       "priority": "P2",
       "category": "RFQ",
-      "title": "HR sends RFQ (POST /api/hr/rfq-requests)",
+      "title": "Employee requests quotes from a shortlisted vendor (POST /api/rfqs)",
       "notion_worthy": true
     },
     "DEEP-PROVISION-CASE": {
