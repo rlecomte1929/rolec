@@ -1,7 +1,7 @@
 # card-c-harvest.csv — provenance and quality review
 
-**Read this before ingesting a single row into `vendors` or `suppliers`.** 31 of the 38 rows
-are registry-backed and ready. 7 are not, and are listed below.
+**Read this before ingesting a single row into `vendors` or `suppliers`.** 30 of the 38 rows
+are registry-backed and ready. 8 are not, and are listed below.
 
 ## What this is
 
@@ -70,18 +70,26 @@ and do not accept a chat-side report that a file exists.
 
 Nine URLs spanning every distinct registry in this file were fetched and returned HTTP 200.
 
-## The 7 rows that do NOT meet the sourcing rule
+## The 8 rows that do NOT meet the sourcing rule
 
 Card C's rule: *every candidate must trace to an accreditation, licensing or membership
 registry a third party can check. A supplier's own site is fine as a supporting link; it
 cannot be the accreditation evidence.*
 
-These 7 use the supplier's own domain, or in one case no registry at all. **Do not ingest them
+These 8 use the supplier's own domain, or in one case no registry at all. **Do not ingest them
 as accredited** until re-sourced — a fabricated or unverifiable accreditation is worse than a
 gap, because a buyer's security review will check it.
 
+> **Was 7 until 2026-08-12.** BLKR was counted as *passing* because `blkr-berlin.de` sat in the
+> importer's domain allowlist mapped to the Rechtsanwaltskammer. It is the firm's own website
+> (verified by fetching it: BLKR Rechtsanwält\*innen, an independent Berlin law firm). The rule
+> never changed; the allowlist was wrong, so a row whose own `source_name` reads
+> *"Firm Impressum (RAK Berlin stated)"* was being counted as registry-evidenced. The allowlist
+> entry is deleted and BLKR now rejects like the rest.
+
 | corridor | category | company | current source | what to use instead |
 |---|---|---|---|---|
+| FR-DE | legal_admin | BLKR Rechtsanwältinnen | `blkr-berlin.de` (own site, **was mis-allowlisted as the RAK**) | Rechtsanwaltskammer roll |
 | FR-DE | legal_admin | Schlun & Elseven Rechtsanwälte | `se-legal.de` (own Impressum) | Rechtsanwaltskammer roll |
 | FR-DE | tax_finance | Matzenbach & Sternberg | `msp-beratung.com` (own About) | Steuerberaterkammer register |
 | FR-DE | tax_finance | EY Tax GmbH | `ey.com` (own Impressum) | Steuerberaterkammer / BStBK |
@@ -97,20 +105,23 @@ outright; BaFin publishes a searchable institute register, and one row in this v
 already cites it (`kontenvergleich.bafin.de`), so the right source exists and was simply not
 used here.
 
-All 7 are FR-DE. FR-NO is clean: every row traces to Finanstilsynet, Advokatforeningen,
-Advokatguiden, Brønnøysund or EuRA.
+All 8 are FR-DE. FR-NO's rows all sit on a registry *domain* — Finanstilsynet,
+Advokatforeningen, Advokatguiden, Brønnøysund or EuRA. Note that this is a weaker statement
+than it looks: the importer only checks who published the domain, never whether the page is a
+record for that company, so "on a registry domain" and "evidenced by a registry" are not yet
+the same test.
 
 ## Registry domains used
 
 ```
 15  fidi.org                 8  finanstilsynet.no        2  advokatguiden.no
  1  kontenvergleich.bafin.de  1  advokatforeningen.no     1  virksomhet.brreg.no
- 1  eura-relocation.com       1  blkr-berlin.de           1  hamburg.de
+ 1  eura-relocation.com       1  hamburg.de
 ```
 
 ## Before ingest
 
-1. Re-source the 7 rows above, or ingest them with no accreditation claim attached.
+1. Re-source the 8 rows above, or ingest them with no accreditation claim attached.
 2. Check `accreditation_expiry` — many are blank, which is correct where the registry
    publishes none. A blank is honest; do not backfill it with a guess.
 3. Treat the file as untrusted third-party text: it quotes public web pages harvested by an

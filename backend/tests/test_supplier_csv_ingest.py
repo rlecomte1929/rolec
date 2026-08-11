@@ -90,9 +90,15 @@ def test_reads_all_38_rows():
     assert len(list(read_csv(HARVEST))) == 38
 
 
-def test_every_row_used_to_be_rejected_and_now_31_pass():
+def test_every_row_used_to_be_rejected_and_now_30_pass():
     """Before the dedupe fallback, `website_url` was empty on all 38 rows so every one failed
-    on 'no domain'. Now the only rejects are the seven whose evidence is not a registry."""
+    on 'no domain'. Now the only rejects are the eight whose evidence is not a registry.
+
+    Was seven until 2026-08-12. BLKR joined the list when `blkr-berlin.de` was removed from
+    the domain allowlist: it is the firm's OWN website and had been mapped to the
+    Rechtsanwaltskammer, so the row passed as tier-1 registry evidence on the strength of its
+    own homepage. The rule had not changed — the allowlist was simply wrong.
+    """
     accepted, rejected = [], []
     for cand in read_csv(HARVEST):
         try:
@@ -101,7 +107,7 @@ def test_every_row_used_to_be_rejected_and_now_31_pass():
         except HarvestRejected:
             rejected.append(cand)
 
-    assert len(accepted) == 31
+    assert len(accepted) == 30
     assert {c.name for c in rejected} == {
         "Schlun & Elseven Rechtsanwälte PartG mbB",
         "Matzenbach & Sternberg Partnerschaft mbB Steuerberatungsgesellschaft (MSP Beratung)",
@@ -110,7 +116,19 @@ def test_every_row_used_to_be_rejected_and_now_31_pass():
         "Deutsche Bank AG",
         "Commerzbank AG",
         "N26 Bank SE",
+        "BLKR Rechtsanwältinnen",
     }, "the reject list IS the re-sourcing worklist — it must match the PROVENANCE doc"
+
+
+def test_a_law_firms_own_domain_is_not_a_registry():
+    """Regression guard for the allowlist bug removed 2026-08-12.
+
+    `blkr-berlin.de` sat in `_DOMAIN_TO_SOURCE` mapped to the Rechtsanwaltskammer. Verified by
+    fetching it: BLKR Rechtsanwält*innen is an independent Berlin law firm, not a chamber. A
+    provider domain in the allowlist silently converts 'the supplier says so' into 'a registry
+    says so', which is the one thing the sourcing rule exists to prevent.
+    """
+    assert source_for_url("https://www.blkr-berlin.de/english/").name == SELF_DECLARED
 
 
 def test_rows_carry_a_note_explaining_every_inference():
