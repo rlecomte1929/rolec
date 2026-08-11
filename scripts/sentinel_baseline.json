@@ -4,11 +4,12 @@
     "why": "The 'Ingest + score' step carried continue-on-error: true with the comment 'Phase 1: known-open bugs (RFQ 500 etc.) keep it RED; don't fail the job yet'. That mask was the only thing standing between a red test and a red run, so NO test outcome could ever fail the campaign. This file removes the reason for the mask: known-open bugs are named here, and everything else is a real failure.",
     "rules": [
       "This is a RATCHET. Adding an entry needs a ticket and a reason. Removing one is always welcome.",
-      "An entry that starts passing is reported as stale and must be deleted — a stale baseline silently re-opens the hole it documented.",
+      "An entry that starts passing is reported as stale and must be deleted \u2014 a stale baseline silently re-opens the hole it documented.",
       "Do not add a failure here to make CI green. Fix it, or file it and link the ticket."
     ],
     "created": "2026-08-11",
-    "ticket": "AIQ-1804"
+    "ticket": "AIQ-1804",
+    "note_on_commit_labels": "The commit that introduced this file is labelled [AIQ-1804] and the consent fix beside it [AIQ-1803]. Those numbers were written before the Notion pages existed and are NOT real ids. The real ones are AIQ-1812 (R4X-B, below) and AIQ-1811 (consent withdrawal, PR #1790). Trust the PR numbers, which are unambiguous: #1792 shipped this file, #1790 the consent fix."
   },
   "known_failures": {
     "VND-05": {
@@ -23,7 +24,7 @@
     },
     "R4X-B": {
       "reason": "Adding several picks per category does not write every ai_decisions audit row. Genuine defect, made visible by this PR - it was tagged but absent from scoring_map.json, so it had been failing to nobody.",
-      "ticket": "AIQ-1805",
+      "ticket": "AIQ-1812 (https://app.notion.com/p/3b9887c64d48819b877df111a8847dba)",
       "since": "2026-08-11"
     }
   }
