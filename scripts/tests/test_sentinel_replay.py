@@ -31,7 +31,7 @@ def _pipeline(tmp_path, specs, prev_ids=None, have_prev=False):
     """Run PW json -> ingest -> score -> candidates -> confirm-twice; return the ids filed."""
     pw = tmp_path / "_results.json"
     pw.write_text(json.dumps({"suites": [{"specs": specs}]}))
-    rows = ing.parse_playwright(pw)
+    rows = ing.parse_playwright(pw)[0]
     _dom, _overall, per_test = cs.score_results(rows, _MAP)
     regressions, _fixed, new_failures, still_broken = cs.diff_tests(per_test, {})
     candidates = cs.notion_candidates(per_test, regressions, new_failures, still_broken)

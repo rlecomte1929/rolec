@@ -56,6 +56,11 @@ function assertNotTheShell(path: string, body: string) {
   );
 }
 
+// Every test below carries a leading [TAG] and a matching entry in scripts/scoring_map.json.
+// That is not decoration: the ingester drops any spec without a tag, and the scorer only
+// iterates ids present in the map, so an untagged or unmapped spec runs and reports to
+// nobody. This file shipped untagged and spent a day failing on the Cloudflare 403s while
+// the campaign went green — see AIQ-1804. Add both when you add a test here.
 test.describe('public crawler surface', () => {
   // The two paid-ad destinations. Both URL forms: the trailing-slash one is what the ad
   // platform is given, the bare one is what a human types or links to. Before #1761 the
@@ -65,7 +70,7 @@ test.describe('public crawler surface', () => {
     ['/relocation-checklist', 'Relocation checklist'],
   ] as const) {
     for (const variant of [path, `${path}/`]) {
-      test(`ad landing page ${variant} serves prerendered HTML`, async () => {
+      test(`[SEO-LANDING] ad landing page ${variant} serves prerendered HTML`, async () => {
         const { body } = await fetchRaw(variant);
         assertNotTheShell(variant, body);
         expect(body, `${variant} is missing its own <title> — got the generic SPA one`).toContain(
@@ -88,7 +93,7 @@ test.describe('public crawler surface', () => {
   ];
 
   for (const [name, ua] of CRAWLERS) {
-    test(`${name} can actually fetch a published page`, async () => {
+    test(`[AEO-CRAWLER-FETCH] ${name} can actually fetch a published page`, async () => {
       // robots.txt is only half the story, and this is the half that bites: Cloudflare
       // sits in front of this origin and its bot rules are invisible in that file. On
       // 2026-08-10 robots.txt explicitly Allow'd OAI-SearchBot while Cloudflare returned
@@ -107,7 +112,7 @@ test.describe('public crawler surface', () => {
     });
   }
 
-  test('robots.txt still allows the OpenAI crawlers and points at the sitemap', async () => {
+  test('[SEO-ROBOTS] robots.txt still allows the OpenAI crawlers and points at the sitemap', async () => {
     const { body } = await fetchRaw('/robots.txt');
     expect(body, 'robots.txt is returning the SPA shell, not a robots file').not.toContain('<html');
     expect(body).toContain('OAI-AdsBot');
@@ -117,7 +122,7 @@ test.describe('public crawler surface', () => {
     );
   });
 
-  test('the blog index lists posts and each one resolves to its own page', async () => {
+  test('[SEO-BLOG-INDEX] the blog index lists posts and each one resolves to its own page', async () => {
     const { body: index } = await fetchRaw('/blog/');
     assertNotTheShell('/blog/', index);
 
@@ -133,7 +138,7 @@ test.describe('public crawler surface', () => {
     }
   });
 
-  test('sitemap.xml parses as XML and every URL in it resolves to real content', async () => {
+  test('[SEO-SITEMAP] sitemap.xml parses as XML and every URL in it resolves to real content', async () => {
     const { body } = await fetchRaw('/sitemap.xml');
     expect(
       body.trimStart().startsWith('<?xml'),

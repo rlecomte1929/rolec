@@ -1,0 +1,30 @@
+{
+  "_meta": {
+    "purpose": "Known-open E2E failures the campaign is allowed to be red on. Anything failing that is NOT listed here fails the run.",
+    "why": "The 'Ingest + score' step carried continue-on-error: true with the comment 'Phase 1: known-open bugs (RFQ 500 etc.) keep it RED; don't fail the job yet'. That mask was the only thing standing between a red test and a red run, so NO test outcome could ever fail the campaign. This file removes the reason for the mask: known-open bugs are named here, and everything else is a real failure.",
+    "rules": [
+      "This is a RATCHET. Adding an entry needs a ticket and a reason. Removing one is always welcome.",
+      "An entry that starts passing is reported as stale and must be deleted — a stale baseline silently re-opens the hole it documented.",
+      "Do not add a failure here to make CI green. Fix it, or file it and link the ticket."
+    ],
+    "created": "2026-08-11",
+    "ticket": "AIQ-1804"
+  },
+  "known_failures": {
+    "VND-05": {
+      "reason": "HR->vendor RFQ create_rfq returns 500. The bug the continue-on-error comment named.",
+      "ticket": "VND-05 (Notion: 'create_rfq 500 - HR->vendor RFQ vendor query uses non-existent columns')",
+      "since": "2026-06-29"
+    },
+    "AEO-CRAWLER-FETCH": {
+      "reason": "Cloudflare returns 403 to OAI-SearchBot, GPTBot and ChatGPT-User despite robots.txt allowing them. Blocked on a dashboard change, not a code change.",
+      "ticket": "Card E / AIQ-1782 (ADS-2 crawler allowlist)",
+      "since": "2026-08-10"
+    },
+    "R4X-B": {
+      "reason": "Adding several picks per category does not write every ai_decisions audit row. Genuine defect, made visible by this PR - it was tagged but absent from scoring_map.json, so it had been failing to nobody.",
+      "ticket": "AIQ-1805",
+      "since": "2026-08-11"
+    }
+  }
+}

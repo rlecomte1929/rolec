@@ -547,6 +547,87 @@ def print_scenario_breakdown(breakdown):
     print()
 
 # ── Main ───────────────────────────────────────────────────────────────────────
+BASELINE_FILE = Path(__file__).resolve().parent / "sentinel_baseline.json"
+
+
+def load_baseline(path=None):
+    """Known-open failures the campaign is allowed to be red on. Missing file = empty."""
+    p = Path(path) if path else BASELINE_FILE
+    if not p.exists():
+        return {}
+    return json.loads(p.read_text(encoding="utf-8")).get("known_failures", {})
+
+
+def check_against_baseline(results_list, baseline):
+    """Split this run's failures into (unexpected, stale-baseline-entries).
+
+    `unexpected` is what should fail the job: a failure nobody has written down. `stale` is a
+    baseline entry that now passes — reported so the ratchet tightens instead of rotting.
+    """
+    by_id = {r["id"]: r.get("status") for r in results_list
+             if isinstance(r, dict) and r.get("id")}
+    failing = {tid for tid, st in by_id.items() if st in ("FAIL", "BLOCKED")}
+    unexpected = sorted(failing - set(baseline))
+    stale = sorted(tid for tid in baseline if by_id.get(tid) == "PASS")
+    return unexpected, stale
+
+
+def report_baseline(unexpected, stale, baseline):
+    if stale:
+        print(f"  🎉  {len(stale)} baselined failure(s) now PASS — delete them from "
+              f"scripts/sentinel_baseline.json:")
+        for tid in stale:
+            print(f"       {tid}")
+        print()
+    if unexpected:
+        print(f"  ✖  {len(unexpected)} FAILING test(s) are not in the baseline:")
+        for tid in unexpected:
+            print(f"       {tid}")
+        print("     Fix it, or add it to scripts/sentinel_baseline.json with a ticket and a")
+        print("     reason. Do not add it just to make CI green.")
+        print()
+    elif baseline:
+        print(f"  ✔  every failure this run is a known-open one ({len(baseline)} baselined).")
+        print()
+
+
+def report_unmapped(results_list, score_map):
+    """Print result ids that have no scoring_map entry. Return True if any of them FAILED.
+
+    `score_results` iterates the MAP, not the results, so an id the runner produced but the
+    map does not know is scored nowhere, banded nowhere, and filed nowhere. It is the second
+    of the Sentinel's two silent filters — the first is the missing-[TAG] drop in
+    `ingest_playwright_results.py`.
+
+    Both were live on 2026-08-11: `[R4X-A]`/`[R4X-B]` were correctly tagged but absent from
+    the map, so two production assertions merged the day before ran and reported to nobody
+    (AIQ-1804). A passing unmapped id is worth naming; a FAILING one has to break the run,
+    because otherwise the only record of it is a raw artifact nobody opens.
+    """
+    mapped = set(score_map.get("tests", {}))
+    unmapped = [
+        r for r in results_list
+        if isinstance(r, dict) and r.get("id") and r["id"] not in mapped
+    ]
+    if not unmapped:
+        return False
+
+    failing = [r for r in unmapped if r.get("status") in ("FAIL", "BLOCKED")]
+
+    print(f"  ⚠️  {len(unmapped)} test id(s) ran but are not in scoring_map.json:")
+    for r in unmapped:
+        print(f"       {r.get('status', '?'):<5} {r['id']}  {r.get('title', '')}".rstrip())
+    print("       Add them to scripts/scoring_map.json or they are scored and filed nowhere.")
+    print()
+
+    if failing:
+        ids = ", ".join(r["id"] for r in failing)
+        print(f"  ✖  {len(failing)} unmapped id(s) FAILED: {ids}")
+        print("     A failing test outside the map cannot reach the health band or Notion.")
+        print()
+    return bool(failing)
+
+
 def main():
     parser = argparse.ArgumentParser(description="ReloPass Campaign Scorer")
     parser.add_argument("--current",  help="Path to current test_results.json (auto-detects latest if omitted)")
@@ -667,10 +748,22 @@ def main():
     print(f"  📄  Report saved → {out_path}")
     print()
 
-    # Exit code: 1 if RED band or any regressions — but a DEGRADED run is inconclusive
-    # (environmental), never a hard failure and never files, so it exits clean.
-    band = health_band(current_overall)[0]
-    if not degraded and (band == "RED" or regressions):
+    unmapped_failing = report_unmapped(current_results, score_map)
+
+    baseline = load_baseline()
+    unexpected, stale = check_against_baseline(current_results, baseline)
+    report_baseline(unexpected, stale, baseline)
+
+    # Exit code. A DEGRADED run is inconclusive (environmental), never a hard failure and
+    # never files, so it always exits clean.
+    #
+    # The gate is "a failure nobody wrote down", NOT the health band. Banding on RED alone
+    # was unusable — known-open bugs like the RFQ 500 hold the band at RED permanently,
+    # which is exactly why the workflow step wrapped this in continue-on-error and why no
+    # test outcome could fail the campaign for months. Baseline the known ones; fail on the
+    # rest. Regressions are covered: a test that passed before and fails now is unexpected
+    # unless someone has baselined it deliberately.
+    if not degraded and (unexpected or unmapped_failing):
         sys.exit(1)
     sys.exit(0)
 
