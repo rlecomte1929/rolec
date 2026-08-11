@@ -43,7 +43,15 @@ REPO = Path(__file__).resolve().parents[1]
 SCAN_DIRS = [
     REPO / "frontend" / "src",
     REPO / "frontend" / "public",
-    REPO / "docs" / "marketing",
+    # `docs/marketing` was here and did not exist. It held the original "EU AI Act Ready"
+    # page (af591024) and was deleted by af4da247 — the commit that added this guard — so
+    # the entry described a surface it never covered. Removed rather than restored:
+    # nothing lives there now, and the missing-dir check below turns any future absence
+    # into a failure instead of a silent narrowing.
+    #
+    # Not added: docs/copy/. It holds internal style guides and audit inventories, not
+    # shipped copy — same category as docs/compliance. Checked for banned claims when this
+    # was swept: zero.
     REPO / "content",
     # docs/gtm holds the paid-ad copy — the 8 card titles and bodies handed verbatim to
     # the ad platform. That copy is customer-facing the moment a campaign launches, and
@@ -105,6 +113,26 @@ BANNED = [
 _COMMENT_PREFIXES = ("*", "//", "/*", "<!--", "#")
 
 
+def missing_scan_dirs():
+    """Configured surfaces that are not there.
+
+    `iter_files` used to `continue` past a missing directory, so this guard scanned
+    whatever still existed and reported OK regardless. With every SCAN_DIR renamed away
+    it scanned ZERO files and printed "no EU AI Act status claims in shipped copy" —
+    a guard inspecting nothing declaring success.
+
+    That was not hypothetical. `docs/marketing` sat in SCAN_DIRS while not existing:
+    it held the original "EU AI Act Ready" page (af591024) and was deleted by
+    af4da247 — the same commit that added this guard. So the config had been describing
+    a surface it did not cover since the day it was written.
+
+    A silently-narrowing scope is the failure mode that matters for a guard like this.
+    The rule it enforces is a legal-liability rule, and copy moves between directories
+    routinely.
+    """
+    return [d for d in SCAN_DIRS if not d.exists()]
+
+
 def iter_files():
     for base in SCAN_DIRS:
         if not base.exists():
@@ -119,8 +147,23 @@ def iter_files():
 
 
 def main() -> int:
+    # Before trusting a clean result, prove the scan actually looked at something.
+    missing = missing_scan_dirs()
+    if missing:
+        print("[compliance-claims] FAIL — configured surfaces do not exist:\n")
+        for d in missing:
+            print(f"  {d.relative_to(REPO)}")
+        print(
+            "\nThis guard would otherwise scan whatever remains and report OK, which is how\n"
+            "it silently stopped covering docs/marketing. Either restore the path, or delete\n"
+            "the entry from SCAN_DIRS — deliberately, so the config states what it covers."
+        )
+        return 1
+
+    scanned = 0
     violations = []
     for path in iter_files():
+        scanned += 1
         try:
             text = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
@@ -137,8 +180,16 @@ def main() -> int:
                 if pattern.search(line):
                     violations.append((path.relative_to(REPO), lineno, line.strip()[:110], why))
 
+    # A scan that read no files is not a pass. Belt to missing_scan_dirs()'s braces:
+    # that catches a renamed directory, this catches a scope narrowed any other way
+    # (an over-broad EXEMPT_PARTS, a SCAN_SUFFIXES edit, an empty checkout).
+    if scanned == 0:
+        print("[compliance-claims] FAIL — scanned 0 files, so 'no claims found' means nothing.")
+        print("  Check SCAN_DIRS, SCAN_SUFFIXES and EXEMPT_PARTS.")
+        return 1
+
     if not violations:
-        print("[compliance-claims] OK — no EU AI Act status claims in shipped copy.")
+        print(f"[compliance-claims] OK — no EU AI Act status claims in {scanned} shipped files.")
         return 0
 
     print(f"[compliance-claims] FAIL — {len(violations)} prohibited compliance claim(s):\n")
