@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from xml.sax.saxutils import escape
 
 from .localised_labels import localised_label
@@ -81,7 +81,6 @@ def render_data_sheet(
     sources: Optional[Dict[str, str]] = None,
     subtitle: Optional[str] = None,
     source_language: Optional[str] = None,
-    sections: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[bytes]:
     """Render the data sheet, or None when reportlab is unavailable.
 
@@ -93,12 +92,6 @@ def render_data_sheet(
     one — so the employee can match what they read here against what the authority's counter
     actually says. Defaults to None (English only), which is also what an older caller that does
     not pass it gets.
-
-    `sections` is the template's `form_templates.sections` array. When non-empty it IS the
-    layout — its order is display order, each entry supplies its own title, and its `field_ids`
-    select the fields. Omit it (or pass an empty list) and the sheet falls back to grouping by
-    `fields[].section` with the titles in `_SECTION_LABELS`, which is what every template except
-    RP-NO-DATASHEET does today.
     """
     try:
         from reportlab.lib import colors as _colors
@@ -154,47 +147,21 @@ def render_data_sheet(
     story.append(Spacer(1, 4 * mm))
     story.append(HRFlowable(width="100%", thickness=0.6, color=_colors.HexColor(_RULE)))
 
-    # [S1] Two ways to lay this out, and the order matters.
-    #
-    # When the template declares `sections`, that array IS the layout: its order is display
-    # order, each entry carries its own title, and its field_ids say which fields belong to
-    # it. A section may reference a field that another section also references (each authority
-    # appointment needs its own packet) and may reference NONE at all — France's headline fact
-    # is the ABSENCE of an arrival registration, which is a section that is a statement.
-    #
-    # Otherwise fall back to grouping by fields[].section with the titles from _SECTION_LABELS,
-    # which is what every template except RP-NO-DATASHEET still does.
+    # Group in template order so sections appear in the order the employee will meet them.
     ordered = sorted(fields, key=lambda f: int(f.get("position") or 0))
-    layout: List[Tuple[str, List[Dict[str, Any]]]] = []
+    seen: List[str] = []
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for fd in ordered:
+        key = (fd.get("section") or "").strip()
+        if key not in grouped:
+            grouped[key] = []
+            seen.append(key)
+        grouped[key].append(fd)
 
-    if sections:
-        by_id = {str(f.get("id") or ""): f for f in ordered}
-        for sec in sections:
-            if not isinstance(sec, dict):
-                continue
-            title = str(sec.get("title") or "").strip() or _section_label(
-                str(sec.get("id") or "")
-            )
-            # A referenced id that isn't in fields[] is dropped rather than crashing a
-            # download; backend/tests/test_data_sheet_sections.py fails on it instead, and
-            # the employee still gets the rest of their sheet.
-            picked = [by_id[i] for i in (sec.get("field_ids") or []) if i in by_id]
-            layout.append((title, picked))
-    else:
-        seen: List[str] = []
-        grouped: Dict[str, List[Dict[str, Any]]] = {}
-        for fd in ordered:
-            key = (fd.get("section") or "").strip()
-            if key not in grouped:
-                grouped[key] = []
-                seen.append(key)
-            grouped[key].append(fd)
-        layout = [(_section_label(key), grouped[key]) for key in seen]
-
-    for title, section_fields in layout:
-        story.append(Paragraph(escape(title), s_section))
+    for key in seen:
+        story.append(Paragraph(escape(_section_label(key)), s_section))
         story.append(HRFlowable(width="100%", thickness=0.4, color=_colors.HexColor(_RULE)))
-        for fd in section_fields:
+        for fd in grouped[key]:
             fid = str(fd.get("id") or "")
             block: List[Any] = [
                 Paragraph(escape(str(fd.get("label") or fid)), s_label)
