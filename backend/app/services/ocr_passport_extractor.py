@@ -16,6 +16,7 @@ Public API
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import os
 import uuid
@@ -26,6 +27,21 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 
 log = logging.getLogger(__name__)
+
+
+def _jsonb_bind(param: str) -> str:
+    """`CAST(:param AS jsonb)` on Postgres; bare `:param` on SQLite (column is TEXT).
+
+    [AIQ-1800b] Mirrors the helper in immigration_intake_profile. `field_sources` is jsonb
+    and was bound as a raw dict, which psycopg2 cannot adapt — so every write here failed
+    with `ProgrammingError: can't adapt type 'dict'`. `json.dumps()` on the value is the
+    half that fixes it; this cast is the house convention and the SQLite/Postgres split.
+    """
+    try:
+        from ...database import db as _db
+        return f"CAST(:{param} AS jsonb)" if _db.engine.dialect.name == "postgresql" else f":{param}"
+    except Exception:  # engine not configured (unit tests) — bare bind is correct for sqlite
+        return f":{param}"
 
 # ---------------------------------------------------------------------------
 # Result dataclasses
@@ -567,8 +583,8 @@ def save_ocr_to_vault(
         if not set_clauses:
             return profile_id
 
-        params["field_sources"] = existing_sources
-        set_clauses += ["field_sources = :field_sources", "updated_at = :now"]
+        params["field_sources"] = json.dumps(existing_sources)
+        set_clauses += [f"field_sources = {_jsonb_bind('field_sources')}", "updated_at = :now"]
 
         with db.engine.begin() as conn:
             conn.execute(
@@ -594,7 +610,7 @@ def save_ocr_to_vault(
             "case_id": case_id,
             "employee_id": employee_id,
             "org_id": org_id,
-            "field_sources": field_sources,
+            "field_sources": json.dumps(field_sources),
             "created_at": now,
             "updated_at": now,
             **raw_updates,
@@ -604,7 +620,7 @@ def save_ocr_to_vault(
             conn.execute(
                 _text(
                     f"INSERT INTO public.imm_employee_profiles ({', '.join(cols)}) "
-                    f"VALUES ({', '.join(f':{c}' for c in cols)})"
+                    f"VALUES ({', '.join(_jsonb_bind(c) if c == 'field_sources' else f':{c}' for c in cols)})"
                 ),
                 params,
             )
