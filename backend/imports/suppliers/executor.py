@@ -4,13 +4,22 @@
 rejected, and returns them with `run_id=""`. This is the half that opens the run and fills
 that id in. Keeping them apart is why the entire decision surface is testable with no database.
 
-SAFETY — the same one-line model the harvester declares:
+SAFETY — two separate operations, and only one of them touches the directory:
 
-    vendor_curation_runs -> vendor_candidates    (written here, and nowhere else)
-    suppliers, supplier_service_capabilities     (never touched)
+    stage()    vendor_curation_runs -> vendor_candidates      suppliers untouched
+    promote()  + suppliers, supplier_service_capabilities, supplier_accreditations
 
-Everything lands `status='pending'`. Nothing here promotes a candidate into the live
-directory; that is a human decision and lives behind the admin review surface.
+`promote()` is opt-in (`--promote`) and creates suppliers whose one capability is
+`platform_vetting_status='pending'`, so they land in the admin vetting queue at
+/admin/vetting-queue. **Nothing becomes visible to an employee**: `marketplace.py` and
+`test_drive.py` both filter on `'approved'`, and approval stays a human action.
+
+This departs from the harvester docstring's "suppliers READ ONLY", deliberately. That rule
+assumed a dedicated candidates review surface, which does not exist — nothing in the product
+reads `vendor_candidates` at all, so staged rows would have been invisible. Reusing the vetting
+queue keeps ONE human gate instead of adding a third approval surface, and is exactly what
+`admin_catalog.import_discovered` already does for scraper results. `vendor_candidates` remains
+the audit and dedupe record, linked by `promoted_supplier_id`.
 """
 from __future__ import annotations
 
@@ -116,6 +125,184 @@ def stage(
         results.append(result)
 
     return results, rejections
+
+
+_PENDING_UNPROMOTED = text(
+    """
+    SELECT id, name, website_url, corridor, service_category, country_code, city,
+           source_url, source_name, accreditation_body, accreditation_number,
+           accreditation_expiry, notes
+    FROM public.vendor_candidates
+    WHERE status = 'pending' AND promoted_supplier_id IS NULL
+    ORDER BY created_at
+    """
+)
+
+_LINK_CANDIDATE = text(
+    "UPDATE public.vendor_candidates SET promoted_supplier_id = :sid, updated_at = now() "
+    "WHERE id = :cid"
+)
+
+#: status stays 'claimed', not 'verified'. A registry listing is evidence that someone
+#: published the membership, not that WE checked it — and the table's own CHECK requires
+#: `verified_at` for 'verified'. The human who approves the capability is the verification.
+_INSERT_ACCREDITATION = text(
+    """
+    INSERT INTO public.supplier_accreditations
+        (supplier_id, body, membership_number, status, valid_until, evidence_url,
+         verification_method, notes)
+    VALUES
+        (:supplier_id, :body, :membership_number, 'claimed', CAST(:valid_until AS date),
+         :evidence_url, 'public_registry', :notes)
+    ON CONFLICT (supplier_id, body, COALESCE(scheme, '')) DO NOTHING
+    """
+)
+
+
+def _capability_for(row: Any) -> Dict[str, Any]:
+    """One capability per candidate row.
+
+    `service_category` is lowercased here because `create_supplier` stores it RAW — the
+    validator lowercases for its check but not for the value, and a stored 'Movers' would
+    never match `search_by_service_destination`.
+    """
+    return {
+        "service_category": (row["service_category"] or "").strip().lower(),
+        "coverage_scope_type": "country",
+        "country_code": (row["country_code"] or "").strip().upper()[:2],
+        "city_name": row["city"],
+        "platform_vetting_status": "pending",
+        "notes": row["notes"],
+    }
+
+
+def _attach_accreditation(session: Any, supplier_id: str, row: Any) -> None:
+    """Carry the registry evidence across. Dropping it at promotion would leave a supplier
+    indistinguishable from a scrape, which is the whole thing this harvest exists to avoid."""
+    if not row["accreditation_body"]:
+        return
+    session.execute(
+        _INSERT_ACCREDITATION,
+        {
+            "supplier_id": supplier_id,
+            "body": row["accreditation_body"],
+            "membership_number": row["accreditation_number"],
+            "valid_until": row["accreditation_expiry"],
+            "evidence_url": row["source_url"],
+            "notes": row["notes"],
+        },
+    )
+
+
+def promote(session: Any, *, dry_run: bool = True) -> Tuple[int, int, List[str]]:
+    """Promote pending candidates into the live directory as UNVETTED suppliers.
+
+    Each becomes a `suppliers` row with exactly one capability at
+    `platform_vetting_status='pending'`, so it lands in the admin vetting queue that already
+    exists at /admin/vetting-queue. Nothing becomes visible to an employee: `marketplace` and
+    `test_drive` both filter on `'approved'`.
+
+    Chosen over building a third approval surface. `admin_catalog.import_discovered` already
+    does exactly this for scraper results; a second promotion path would be a second thing to
+    keep correct.
+
+    Returns (promoted, skipped, problems). Idempotent on `promoted_supplier_id`, so a re-run
+    promotes nothing.
+    """
+    from sqlalchemy import func
+
+    from backend.app.models import Supplier
+    from backend.app.services import supplier_registry
+    from backend.app.services.supplier_registry import DuplicateSupplierError
+
+    rows = session.execute(_PENDING_UNPROMOTED).mappings().all()
+    existing = {
+        (n or "").strip().lower() for (n,) in session.query(Supplier.name).all()
+    }
+
+    promoted = 0
+    skipped = 0
+    problems: List[str] = []
+
+    for row in rows:
+        name = (row["name"] or "").strip()
+        capability = _capability_for(row)
+
+        # A company that serves both corridors — Grospiron and AGS France both do — is ONE
+        # supplier with TWO capabilities, not two suppliers and not one dropped row. Skipping
+        # the second would silently lose a corridor's coverage.
+        if name.lower() in existing:
+            if dry_run:
+                # Counted as PROMOTED, not skipped: a real run adds a capability to the
+                # existing supplier, so counting it as a skip would make the preview
+                # disagree with the run it is previewing.
+                promoted += 1
+                problems.append(
+                    f"{name}: already a supplier — would add a capability to it, not a new row"
+                )
+                continue
+            existing_id = (
+                session.query(Supplier.id)
+                .filter(func.lower(func.trim(Supplier.name)) == name.lower())
+                .scalar()
+            )
+            if not existing_id:
+                skipped += 1
+                problems.append(f"{name}: name collides but the supplier could not be found")
+                continue
+            try:
+                supplier_registry.add_capability(session, existing_id, capability)
+            except ValueError as exc:
+                skipped += 1
+                problems.append(f"{name}: capability not added — {exc}")
+                continue
+            _attach_accreditation(session, existing_id, row)
+            session.execute(_LINK_CANDIDATE, {"sid": existing_id, "cid": row["id"]})
+            session.commit()
+            promoted += 1
+            continue
+
+        if dry_run:
+            promoted += 1
+            existing.add(name.lower())
+            continue
+
+        supplier_id = f"vc-{row['id']}"
+        try:
+            supplier_registry.create_supplier(
+                session,
+                {
+                    "id": supplier_id,
+                    "name": name,
+                    "website": row["website_url"] or None,
+                    "status": "active",
+                    # CHECK allows admin_manual | customer_upload | scraper_discovery |
+                    # directory_import. There is no 'harvester' value, and inventing one
+                    # needs a migration — 'directory_import' is what the vendors migration
+                    # uses for the same kind of provenance.
+                    "source": "directory_import",
+                    "source_url": row["source_url"],
+                    "source_reference": f"vendor_candidates:{row['id']}",
+                    "capabilities": [capability],
+                },
+            )
+        except DuplicateSupplierError as exc:
+            skipped += 1
+            problems.append(f"{name}: {exc}")
+            continue
+        except ValueError as exc:
+            skipped += 1
+            problems.append(f"{name}: rejected by supplier validation — {exc}")
+            continue
+
+        _attach_accreditation(session, supplier_id, row)
+        session.execute(_LINK_CANDIDATE, {"sid": supplier_id, "cid": row["id"]})
+        session.commit()
+
+        existing.add(name.lower())
+        promoted += 1
+
+    return promoted, skipped, problems
 
 
 def summarise(results: Sequence[PairResult], rejections: Sequence[str]) -> str:
