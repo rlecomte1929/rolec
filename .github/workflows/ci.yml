@@ -612,6 +612,41 @@ jobs:
           ADDED: ${{ steps.added.outputs.files }}
         run: python scripts/check_migration_drift.py --added "$ADDED"
 
+  migration-column-read:
+    # A PR that adds a column AND ships code reading it. Migrations here are applied
+    # OUT OF BAND, so merging the migration does not create the column — Render deploys
+    # the code first and the endpoint 500s. This is not hypothetical: PR #1781 did
+    # exactly that on 2026-08-11 and GET /api/cases/{id}/forms was down for 2h33m
+    # (`column ft.sections does not exist`). CI was green because the backend suite runs
+    # on a SQLite fixture that the same PR edited to add the column.
+    #
+    # Needs no database, so like the duplicate-version check it runs EVERYWHERE and is
+    # deliberately not gated on vars.RLS_COVERAGE_DATABASE_URL_SET. A guard that no-ops
+    # where the secret is missing would have been absent on the PR that caused this.
+    name: Migration column-read check
+    needs: changes
+    runs-on: ubuntu-latest
+    if: ${{ needs.changes.outputs.migrations == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need the PR base to diff against.
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Check for a column read shipped with its own migration
+        env:
+          # Never interpolate ${{ }} straight into run:.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$BASE_SHA" ]; then
+            echo "No PR base SHA (not a pull_request event) — skipping."
+            exit 0
+          fi
+          python scripts/check_column_read_before_apply.py --base "$BASE_SHA"
+
   migration-duplicate-versions:
     # Two migration files sharing a 14-digit version: schema_migrations is keyed on
     # version, so only one can ever be recorded and the other silently never applies
