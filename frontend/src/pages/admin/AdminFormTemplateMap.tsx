@@ -23,6 +23,7 @@ import {
   FieldSelector,
 } from '../../features/platform-v2/admin/form-templates/PdfCoordinateMapper';
 import {
+  normalizeFields,
   withComputedPositions,
   type FieldDefinition,
 } from '../../features/platform-v2/admin/form-templates/FieldDefinitionEditor';
@@ -31,10 +32,6 @@ import { AdminLayout } from './AdminLayout';
 // ─────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────
-
-function asFiniteNumber(v: unknown): number | undefined {
-  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
-}
 
 function errorToString(err: unknown, fallback = 'An error occurred'): string {
   if (!err) return fallback;
@@ -48,22 +45,6 @@ function errorToString(err: unknown, fallback = 'An error occurred'): string {
   return fallback;
 }
 
-function normalizeFields(raw: Array<Record<string, unknown>>): FieldDefinition[] {
-  return (raw || []).map((r, i) => ({
-    id: typeof r.id === 'string' ? r.id : '',
-    label: typeof r.label === 'string' ? r.label : '',
-    type: ((r.type as FieldDefinition['type']) ?? 'text'),
-    required: r.required === true,
-    prefill_source: typeof r.prefill_source === 'string' ? r.prefill_source : undefined,
-    requires_original: r.requires_original === true,
-    position: typeof r.position === 'number' ? r.position : i + 1,
-    options: Array.isArray(r.options) ? (r.options as string[]) : undefined,
-    pdf_x: asFiniteNumber(r.pdf_x),
-    pdf_y: asFiniteNumber(r.pdf_y),
-    pdf_page: asFiniteNumber(r.pdf_page),
-    pdf_font_size: asFiniteNumber(r.pdf_font_size),
-  }));
-}
 
 // ─────────────────────────────────────────────────────────────────────
 // Component

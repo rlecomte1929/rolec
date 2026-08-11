@@ -27,6 +27,7 @@ import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import {
   FieldDefinitionEditor,
+  normalizeFields,
   withComputedPositions,
   validateFieldDefinitions,
   type FieldDefinition,
@@ -122,29 +123,6 @@ function formToCreate(form: EditableForm): FormTemplateCreate {
   };
 }
 
-/**
- * Templates seeded by P1-4 (or edited via earlier passes) may have `fields`
- * jsonb entries that don't conform to the canonical FieldDefinition shape.
- * Coerce gracefully so the editor doesn't error on legacy shapes.
- */
-function normalizeFields(raw: Array<Record<string, unknown>>): FieldDefinition[] {
-  const asFiniteNumber = (v: unknown): number | undefined =>
-    typeof v === 'number' && Number.isFinite(v) ? v : undefined;
-  return (raw || []).map((r, i) => ({
-    id: typeof r.id === 'string' ? r.id : '',
-    label: typeof r.label === 'string' ? r.label : '',
-    type: ((r.type as FieldDefinition['type']) ?? 'text'),
-    required: r.required === true,
-    prefill_source: typeof r.prefill_source === 'string' ? r.prefill_source : undefined,
-    requires_original: r.requires_original === true,
-    position: typeof r.position === 'number' ? r.position : i + 1,
-    options: Array.isArray(r.options) ? (r.options as string[]) : undefined,
-    pdf_x: asFiniteNumber(r.pdf_x),
-    pdf_y: asFiniteNumber(r.pdf_y),
-    pdf_page: asFiniteNumber(r.pdf_page),
-    pdf_font_size: asFiniteNumber(r.pdf_font_size),
-  }));
-}
 
 export const AdminFormTemplateEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
