@@ -202,6 +202,12 @@ class _DossierFormTemplate(BaseModel):
     # fields that carry requires_original=true. Each item: {"key","label","format"}
     # where format (from the field's optional doc_format) may be None. [AIQ-1257a]
     required_documents: List[Dict[str, Optional[str]]] = []
+    # [S1] The section layout: ordered, each entry carrying its own title, authority,
+    # portal, deadline hint, session_group and field_ids. Empty means "group by
+    # fields[].section", which is what every template except RP-NO-DATASHEET does. A
+    # section may reference NO fields — France's absent arrival registration is a section
+    # that is a statement.
+    sections: List[Dict[str, Any]] = []
 
 
 class _DossierFormPerson(BaseModel):
@@ -475,6 +481,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             verification_status=(row.get("template_verification_status") or "representative"),  # [WS1]
             source_language=(row.get("template_source_language") or "en"),  # [AIQ-1757]
             required_documents=required_documents,  # [P1-05 checklist]
+            sections=_parse_sections(row.get("template_sections")),  # [S1]
         )
 
     return CaseFormSummary(
@@ -522,6 +529,24 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
     )
 
 
+def _parse_sections(raw: Any) -> List[Dict[str, Any]]:
+    """`form_templates.sections` as a list, whatever the driver handed back.
+
+    Postgres returns jsonb already decoded; the SQLite schema the tests use stores it as TEXT.
+    Mirrors how `template_fields` is handled a few hundred lines below. A malformed value
+    degrades to `[]`, which means "fall back to grouping by fields[].section" — the sheet still
+    renders rather than 500ing on a bad row.
+    """
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return raw if isinstance(raw, list) else []
+
+
 def _load_form_with_template(
     conn: Any,
     case_id: str,
@@ -547,6 +572,11 @@ def _load_form_with_template(
                    ft.category AS template_category,
                    ft.version AS template_version,
                    ft.fields  AS template_fields,
+                   -- [S1] The section layout. Selected here as well as in the field-values
+                   -- query below: C1 had to add source_language to this loader for exactly
+                   -- this reason — a column the renderer needs but nobody selected resolves
+                   -- to None and the feature silently does nothing.
+                   ft.sections AS template_sections,
                    -- The authority's own language. get_form_pdf needs it to print the
                    -- localised label under each English one; without it selected here the
                    -- lookup would silently find nothing and the sheet would render
@@ -1299,6 +1329,7 @@ def _load_case_form_summaries(
           ft.category AS template_category,
           ft.version AS template_version,
           ft.fields  AS template_fields,
+          ft.sections AS template_sections,
           ft.source_url AS template_source_url,
           ft.verification_status AS template_verification_status,
           ft.source_language AS template_source_language,
@@ -1822,6 +1853,9 @@ def get_form_pdf(
                             # Prints each label in the authority's own language beneath the
                             # English one, so the employee can match the sheet to the counter.
                             source_language=form_row.get("template_source_language"),
+                            # [S1] When the template declares sections, they ARE the layout.
+                            # None/[] falls back to grouping by fields[].section.
+                            sections=_parse_sections(form_row.get("template_sections")),
                         )
                     except Exception:  # noqa: BLE001 — never turn a download into a 500
                         logger.exception(
