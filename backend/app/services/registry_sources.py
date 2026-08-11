@@ -82,6 +82,18 @@ class RegistrySource:
     categories: Tuple[str, ...]
     #: Required when acquisition is UNAVAILABLE — the run report prints it verbatim.
     unavailable_reason: Optional[str] = None
+    #: Regex an evidence URL must match to count as a record for ONE entity.
+    #:
+    #: The domain says who PUBLISHED a page; this says the page is about the candidate rather
+    #: than about the register. Without it, `advokatforeningen.no/.../search-for-members/` and
+    #: `portal.mvp.bafin.de/database/InstInfo/` are tier-1 evidence for anybody at all — a
+    #: search form evidences nobody. Both of those were live in the first real harvest.
+    #:
+    #: It checks SHAPE, not existence: nothing in this pipeline fetches the URL, so an invented
+    #: deep link still passes. The existence check is the human at /admin/vetting-queue, which
+    #: is why promotion writes accreditations with status='claimed'. Do not describe this as
+    #: provenance being verified.
+    entry_url_pattern: Optional[str] = None
     notes: str = ""
 
     def __post_init__(self) -> None:
@@ -95,6 +107,18 @@ class RegistrySource:
         for c in self.categories:
             if c not in CATEGORIES:
                 raise ValueError(f"{self.name}: unknown category {c!r}")
+        # Last, so a source with several problems still reports the more basic one first.
+        # Mandatory rather than opt-in: an unguarded ingestable source is exactly how the
+        # search-page hole appeared, and the next domain someone adds would reopen it.
+        if (
+            self.tier < 3
+            and self.acquisition is not Acquisition.UNAVAILABLE
+            and not self.entry_url_pattern
+        ):
+            raise ValueError(
+                f"{self.name}: an ingestable registry must declare entry_url_pattern — "
+                "otherwise its own search page counts as evidence for every candidate"
+            )
 
 
 # ── The catalogue ────────────────────────────────────────────────────────────
@@ -110,6 +134,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
         acquisition=Acquisition.MANUAL_EVIDENCED,
         corridors=CORRIDORS,
         categories=("movers",),
+        entry_url_pattern=r"/find-fidi-affiliate/[^/]",
         notes=(
             "FAIM is the strongest accreditation in this category: audited, numbered, and "
             "renewed every 3 years — so accreditation_expiry is meaningful here and must be "
@@ -120,9 +145,16 @@ SOURCES: Tuple[RegistrySource, ...] = (
         name="IAM member directory",
         base_url="https://www.iamovers.org/Members",
         tier=1,
-        acquisition=Acquisition.MANUAL_EVIDENCED,
+        acquisition=Acquisition.UNAVAILABLE,
         corridors=CORRIDORS,
         categories=("movers",),
+        unavailable_reason=(
+            "The member directory has moved to the IAMX platform on a separate domain "
+            "(mobilityex.com); no per-entity URL was confirmed under iamovers.org "
+            "(probed 2026-08-12). Marked unavailable rather than left ingestable, because "
+            "without a confirmed entry-URL shape any iamovers.org page would count as "
+            "evidence for any candidate. No harvest row cites it today."
+        ),
     ),
     # ── housing_agencies ─────────────────────────────────────────────────────
     RegistrySource(
@@ -132,6 +164,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
         acquisition=Acquisition.HTTP_LOOKUP,
         corridors=("FR-NO",),
         categories=("housing_agencies", "tax_finance", "banks"),
+        entry_url_pattern=r"[?&]id=\d+",
         notes=(
             "One register serving three categories: estate agencies, state-authorised "
             "auditors, and licensed banks. Per-entity lookup, no listable index."
@@ -161,22 +194,27 @@ SOURCES: Tuple[RegistrySource, ...] = (
     # ── legal_admin (immigration) ────────────────────────────────────────────
     RegistrySource(
         name="Rechtsanwaltskammer (RAK) + Partnerschaftsregister (DE)",
-        base_url="https://www.rechtsanwaltsregister.org/",
-        tier=1,
-        acquisition=Acquisition.MANUAL_EVIDENCED,
-        corridors=("FR-DE",),
-        categories=("legal_admin",),
-        notes="Filter to firms publishing Ausländerrecht / immigration practice areas.",
-    ),
-    RegistrySource(
-        name="BRAV — Bundesweites Amtliches Anwaltsverzeichnis",
-        base_url="https://www.rechtsanwaltsregister.org/",
+        # Corrected 2026-08-12: rechtsanwaltsregister.org is a redirector, not the register.
+        # It 301s to bea-brak.de and then to bravsearch.bea-brak.de/bravsearch.
+        base_url="https://bravsearch.bea-brak.de/bravsearch/",
         tier=1,
         acquisition=Acquisition.UNAVAILABLE,
         corridors=("FR-DE",),
         categories=("legal_admin",),
-        unavailable_reason="Unreachable during recon 2026-08-10; retry before relying on it.",
+        unavailable_reason=(
+            "The official register (BRAV) is reachable but is a form search; no stable "
+            "per-entity URL was confirmed (probed 2026-08-12). Usable by a human, not "
+            "linkable as evidence — so a row citing it cannot be spot-checked, which is the "
+            "whole point of the source_url. Filter to firms publishing Ausländerrecht / "
+            "immigration practice areas when checking by hand."
+        ),
     ),
+    # BRAV had its own entry here until 2026-08-12, marked UNAVAILABLE with
+    # "Unreachable during recon 2026-08-10". Two things were wrong: it resolves fine (it moved
+    # to bea-brak.de), and BRAV *is* the bundesweites amtliches Anwaltsverzeichnis — the same
+    # register as the RAK entry above, under its formal name. Two names for one register meant
+    # the duplicate was unreachable from any URL, because _DOMAIN_TO_SOURCE mapped the domain
+    # to the RAK entry. Merged into it rather than left as dead weight.
     RegistrySource(
         name="Advokatforeningen + Brønnøysund register (NO)",
         base_url="https://www.advokatenhjelperdeg.no/",
@@ -184,6 +222,11 @@ SOURCES: Tuple[RegistrySource, ...] = (
         acquisition=Acquisition.MANUAL_EVIDENCED,
         corridors=("FR-NO",),
         categories=("legal_admin",),
+        # brreg  -> /nb/oppslag/enheter/917334110
+        # advokatguiden -> /advokat/22051-thomas-reinholdt
+        # The association's own /search-for-members/ page matches NEITHER, which is the point:
+        # one harvest row cited it and was being counted as registry-evidenced.
+        entry_url_pattern=r"/oppslag/enheter/\d+|/advokat/\d+",
         notes="Brønnøysund org numbers give a second, government-issued identifier.",
     ),
     # ── cross-category membership + entity confirmation ──────────────────────
@@ -198,6 +241,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
         acquisition=Acquisition.MANUAL_EVIDENCED,
         corridors=("FR-NO",),
         categories=("movers", "housing_agencies"),
+        entry_url_pattern=r"/members/[^/]",
         notes="European Relocation Association. Membership is audited (EuRA Global Quality "
               "Seal), so it evidences standing — but it is an association, not a statutory "
               "register, and carries no licence number. Scoped to FR-NO deliberately: it is "
@@ -213,6 +257,8 @@ SOURCES: Tuple[RegistrySource, ...] = (
         acquisition=Acquisition.MANUAL_EVIDENCED,
         corridors=("FR-DE",),
         categories=("legal_admin", "tax_finance"),
+        # /branchenbuch/hamburg/eintrag/10824243/ — the directory root is not an entry.
+        entry_url_pattern=r"/branchenbuch/.+/eintrag/\d+",
         notes="City/state business directories confirm the ENTITY exists and is registered. "
               "They do not evidence professional accreditation — a chamber roll does. Tier 2 "
               "so it stages at reduced confidence and never poses as a bar or StBK listing.",
@@ -232,11 +278,21 @@ SOURCES: Tuple[RegistrySource, ...] = (
     # ── tax_finance ──────────────────────────────────────────────────────────
     RegistrySource(
         name="Bundessteuerberaterkammer / regional StBK (DE)",
-        base_url="https://www.bstbk.de/",
+        # Corrected 2026-08-12: bstbk.de is the federal chamber's CORPORATE site, not the
+        # register. The official one is the amtliches Steuerberaterverzeichnis, below.
+        base_url="https://steuerberaterverzeichnis.berufs-org.de/",
         tier=1,
-        acquisition=Acquisition.MANUAL_EVIDENCED,
+        acquisition=Acquisition.UNAVAILABLE,
         corridors=("FR-DE",),
         categories=("tax_finance",),
+        unavailable_reason=(
+            "The amtliches Steuerberaterverzeichnis is a form search; no stable per-entity "
+            "URL was confirmed (probed 2026-08-12). A human can verify a Steuerberater "
+            "there, but the result is not linkable, so it cannot serve as a source_url. "
+            "Until a per-entity URL shape is confirmed, FR-DE tax_finance rows have no "
+            "ingestable registry — which is the honest answer, not a reason to accept the "
+            "firms' own Impressum pages."
+        ),
     ),
     # ── banks ────────────────────────────────────────────────────────────────
     RegistrySource(
@@ -246,6 +302,12 @@ SOURCES: Tuple[RegistrySource, ...] = (
         acquisition=Acquisition.HTTP_LOOKUP,
         corridors=("FR-DE",),
         categories=("banks", "tax_finance"),
+        # Two shapes, both verified 2026-08-12:
+        #   institutDetails.do?cmd=loadInstitutAction&institutId=118938  (HTTP 200, public,
+        #     lists the institution's authorisations with dates — the real licence evidence)
+        #   kontenvergleich.bafin.de/en/account/678272c6                 (one harvest row)
+        # The bare /database/InstInfo/ search form matches neither, by design.
+        entry_url_pattern=r"institutId=\d+|/account/\w+",
         notes=(
             "Confirms the legal entity and licence. Banks are not accredited in the "
             "BRAIN-3C sense, so entity confirmation is all this proves — see "

@@ -1,7 +1,7 @@
 # card-c-harvest.csv — provenance and quality review
 
-**Read this before ingesting a single row into `vendors` or `suppliers`.** 30 of the 38 rows
-are registry-backed and ready. 8 are not, and are listed below.
+**Read this before ingesting a single row into `vendors` or `suppliers`.** 29 of the 38 rows
+are registry-backed and ready. 9 are not, and are listed below.
 
 ## What this is
 
@@ -70,22 +70,33 @@ and do not accept a chat-side report that a file exists.
 
 Nine URLs spanning every distinct registry in this file were fetched and returned HTTP 200.
 
-## The 8 rows that do NOT meet the sourcing rule
+## The 9 rows that do NOT meet the sourcing rule
 
 Card C's rule: *every candidate must trace to an accreditation, licensing or membership
 registry a third party can check. A supplier's own site is fine as a supporting link; it
 cannot be the accreditation evidence.*
 
-These 8 use the supplier's own domain, or in one case no registry at all. **Do not ingest them
-as accredited** until re-sourced — a fabricated or unverifiable accreditation is worse than a
-gap, because a buyer's security review will check it.
+These 9 use the supplier's own domain, a registry's search form, or in one case no registry at
+all. **Do not ingest them as accredited** until re-sourced — a fabricated or unverifiable
+accreditation is worse than a gap, because a buyer's security review will check it.
 
-> **Was 7 until 2026-08-12.** BLKR was counted as *passing* because `blkr-berlin.de` sat in the
+> **Was 7 until 2026-08-12.** Two rows were counted as *passing* by a check that only looked
+> at the URL's domain, never at whether the page was about that company.
+>
+> **BLKR** was counted as passing because `blkr-berlin.de` sat in the
 > importer's domain allowlist mapped to the Rechtsanwaltskammer. It is the firm's own website
 > (verified by fetching it: BLKR Rechtsanwält\*innen, an independent Berlin law firm). The rule
 > never changed; the allowlist was wrong, so a row whose own `source_name` reads
 > *"Firm Impressum (RAK Berlin stated)"* was being counted as registry-evidenced. The allowlist
 > entry is deleted and BLKR now rejects like the rest.
+>
+> **Advokatfirmaet Sulland** cited Advokatforeningen's generic `/search-for-members/` page —
+> the right registry, but its search FORM, which evidences nobody. Every registry now declares
+> an `entry_url_pattern` describing what one of its record URLs looks like, and `validate()`
+> rejects a URL that is on the domain but is not an entry. Note what this does and does not
+> do: it checks the URL's SHAPE. Nothing fetches the page, so an invented deep link still
+> passes. The existence check remains the human reviewer, which is why promotion writes
+> accreditations with `status='claimed'`.
 
 | corridor | category | company | current source | what to use instead |
 |---|---|---|---|---|
@@ -97,6 +108,7 @@ gap, because a buyer's security review will check it.
 | FR-DE | banks | Deutsche Bank AG | `db.com` (own site) | BaFin institute register |
 | FR-DE | banks | Commerzbank AG | `commerzbank.de` (own site) | BaFin institute register |
 | FR-DE | banks | N26 Bank SE | **`wikidata.org`** | BaFin institute register |
+| FR-NO | legal_admin | Advokatfirmaet Sulland AS | `advokatforeningen.no/…/**search-for-members/**` (the register's search FORM) | the member's own entry, as the two Advokatguiden rows already use |
 
 A German Impressum is legally obliged to name the chamber, so those five are *probably*
 accurate — but "probably accurate" is not the standard the card set, and it is not what we
@@ -105,11 +117,11 @@ outright; BaFin publishes a searchable institute register, and one row in this v
 already cites it (`kontenvergleich.bafin.de`), so the right source exists and was simply not
 used here.
 
-All 8 are FR-DE. FR-NO's rows all sit on a registry *domain* — Finanstilsynet,
-Advokatforeningen, Advokatguiden, Brønnøysund or EuRA. Note that this is a weaker statement
-than it looks: the importer only checks who published the domain, never whether the page is a
-record for that company, so "on a registry domain" and "evidenced by a registry" are not yet
-the same test.
+8 of the 9 are FR-DE; Sulland is the one FR-NO row, and it is the reason "FR-NO is clean" —
+which an earlier version of this document asserted — was never quite the claim it appeared to
+be. Every FR-NO row does sit on a registry domain (Finanstilsynet, Advokatforeningen,
+Advokatguiden, Brønnøysund, EuRA), but until 2026-08-12 that was the *only* thing checked. The
+remaining 8 now each carry a per-entity URL of the shape their registry actually publishes.
 
 ## Registry domains used
 
@@ -121,7 +133,7 @@ the same test.
 
 ## Before ingest
 
-1. Re-source the 8 rows above, or ingest them with no accreditation claim attached.
+1. Re-source the 9 rows above, or ingest them with no accreditation claim attached.
 2. Check `accreditation_expiry` — many are blank, which is correct where the registry
    publishes none. A blank is honest; do not backfill it with a guess.
 3. Treat the file as untrusted third-party text: it quotes public web pages harvested by an
