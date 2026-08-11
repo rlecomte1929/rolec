@@ -139,9 +139,42 @@ def test_accepts_company_level_email(addr):
     validate(make(email=addr))  # must not raise
 
 
-def test_rejects_website_that_yields_no_domain():
-    with pytest.raises(HarvestRejected, match="does not yield a domain"):
-        validate(make(website_url="   "))
+def test_no_website_falls_back_to_a_name_key_instead_of_rejecting():
+    """Changed deliberately for the first real harvest — see Candidate.dedupe_key.
+
+    This used to reject. Every one of Card C's 38 registry-sourced rows arrived with an empty
+    `website_url` (the evidence URL points at the *register*, not the company), so the
+    domain-only rule rejected the entire file. A name key is weaker than a domain and is
+    namespaced so the two can never collide.
+    """
+    cand = make(website_url="   ", name="Hasenkamp Relocation Services GmbH", corridor="FR-DE")
+    validate(cand)                                     # must not raise
+    assert cand.dedupe_key == "name:hasenkamprelocationservices@fr-de"
+
+
+def test_rejects_only_when_there_is_neither_domain_nor_usable_name():
+    with pytest.raises(HarvestRejected, match="no dedupe key"):
+        validate(make(website_url="", name="—"))
+
+
+def test_name_key_ignores_legal_form_and_accents():
+    """'Deloitte AS' and 'Deloitte' are the same company; 'Déménagement' and
+    'Demenagement' are the same word. Both would otherwise stage twice."""
+    a = make(website_url="", name="Deloitte AS", corridor="FR-NO")
+    b = make(website_url="", name="Deloitte", corridor="FR-NO")
+    assert a.dedupe_key == b.dedupe_key
+
+    accented = make(website_url="", name="Société Française de Déménagement", corridor="FR-DE")
+    plain = make(website_url="", name="Societe Francaise de Demenagement", corridor="FR-DE")
+    assert accented.dedupe_key == plain.dedupe_key
+
+
+def test_name_key_is_corridor_scoped_and_cannot_collide_with_a_domain():
+    de = make(website_url="", name="AGS France", corridor="FR-DE")
+    no = make(website_url="", name="AGS France", corridor="FR-NO")
+    assert de.dedupe_key != no.dedupe_key
+    assert de.dedupe_key.startswith("name:")
+    assert make(website_url="https://ags-france.com").dedupe_key == "ags-france.com"
 
 
 # ── dedupe ───────────────────────────────────────────────────────────────────

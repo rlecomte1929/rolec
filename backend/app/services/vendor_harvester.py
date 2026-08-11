@@ -20,9 +20,12 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from urllib.parse import urlsplit
+
+from sqlalchemy import text
 
 from .registry_sources import (
     Acquisition,
@@ -86,6 +89,37 @@ def normalise_domain(url: Optional[str]) -> Optional[str]:
     return ".".join(parts[-2:])
 
 
+#: Legal-form suffixes stripped before name matching, so "Deloitte AS" and "Deloitte" collide.
+#: Deliberately short — over-stripping merges genuinely different companies, which is the
+#: worse error of the two.
+_LEGAL_FORMS = (
+    "gmbh co kg", "gmbh", "ag", "se", "kg", "ohg", "ug", "mbh", "partg", "partgmbb",
+    "as", "asa", "ans", "da", "nuf", "sarl", "sa", "sas", "eurl", "scp", "snc",
+    "ltd", "limited", "llp", "plc", "bv", "nv",
+)
+
+
+def _name_key(name: Optional[str]) -> Optional[str]:
+    """Lowercased alphanumeric name with legal form and punctuation removed.
+
+    Only used as a dedupe fallback when there is no domain. Accent-folded so
+    'Déménagement' and 'Demenagement' agree.
+    """
+    if not name:
+        return None
+    folded = unicodedata.normalize("NFKD", name)
+    folded = "".join(c for c in folded if not unicodedata.combining(c))
+    words = re.sub(r"[^a-z0-9]+", " ", folded.lower()).split()
+    while words:
+        for n in (3, 2, 1):                       # longest legal form first: "gmbh co kg"
+            if len(words) > n and " ".join(words[-n:]) in _LEGAL_FORMS:
+                del words[-n:]
+                break
+        else:
+            break
+    return "".join(words) or None
+
+
 @dataclass
 class Candidate:
     """One harvested row, before it becomes a vendor_candidates insert."""
@@ -109,7 +143,23 @@ class Candidate:
 
     @property
     def dedupe_key(self) -> Optional[str]:
-        return normalise_domain(self.website_url)
+        """Registrable domain where we have one; a namespaced name key where we do not.
+
+        Domain is the strong key and stays the default. But a registry harvest often yields
+        no supplier domain at all — the evidence URL points at the *register*, not the
+        company. All 38 rows of the first real harvest (Card C) came in that way, and a
+        domain-only key rejected every one of them.
+
+        The fallback is namespaced (`name:…`) so it can never collide with a domain key, and
+        it is deliberately weaker: it will not notice that we already hold this company under
+        a domain. That gap is handled downstream — the review UI must surface near-name
+        matches before anyone approves a candidate.
+        """
+        domain = normalise_domain(self.website_url)
+        if domain:
+            return domain
+        slug = _name_key(self.name)
+        return f"name:{slug}@{self.corridor.strip().lower()}" if slug else None
 
 
 @dataclass
@@ -153,7 +203,10 @@ def validate(cand: Candidate) -> None:
             f"({cand.source.unavailable_reason}) — do not route around it"
         )
     if not cand.dedupe_key:
-        raise HarvestRejected(f"{cand.name}: website_url does not yield a domain")
+        raise HarvestRejected(
+            f"{cand.name}: no dedupe key — website_url yields no domain and the name "
+            "reduces to nothing after stripping punctuation and legal form"
+        )
     # GDPR: company-level contacts only. A named-individual address is a personal-data
     # collection we have no basis for at harvest time.
     if cand.email and not re.match(
@@ -166,27 +219,48 @@ def validate(cand: Candidate) -> None:
         )
 
 
-def existing_dedupe_keys(db_conn: Any) -> set:
-    """Every domain already known, from BOTH the live directory and prior stagings.
+#: Also matches the name-fallback key produced by `Candidate.dedupe_key` when a supplier row
+#: has no website. Kept in SQL so one query covers both key spaces.
+_SQL_SUPPLIER_WEBSITES = text(
+    "SELECT website FROM suppliers WHERE website IS NOT NULL AND website <> ''"
+)
+_SQL_SUPPLIER_NAMES = text("SELECT name FROM suppliers WHERE name IS NOT NULL")
+_SQL_CANDIDATE_KEYS = text(
+    "SELECT dedupe_key FROM vendor_candidates WHERE dedupe_key IS NOT NULL"
+)
+
+
+def existing_dedupe_keys(conn: Any, *, corridor: Optional[str] = None) -> set:
+    """Every key already known, from BOTH the live directory and prior stagings.
 
     Checking only vendor_candidates would re-stage suppliers we already have; checking
     only suppliers would re-stage within a single run.
+
+    Takes a SQLAlchemy `Connection` (or `Session`) — `text()` is mandatory on SQLAlchemy 2,
+    where a bare string raises `ObjectNotExecutableError`. This function had no test and no
+    caller when it was written, so that never surfaced.
+
+    `corridor` mirrors `Candidate.dedupe_key`'s name fallback: a supplier with no website is
+    keyed by name, and the name key is corridor-scoped. Pass the corridor you are staging so
+    those keys line up; omit it and only domain keys are compared.
     """
     keys: set = set()
-    rows = db_conn.execute(
-        "SELECT website FROM suppliers WHERE website IS NOT NULL AND website <> ''"
-    )
-    for r in rows:
-        k = normalise_domain(r[0] if isinstance(r, (tuple, list)) else r["website"])
+
+    for (website,) in conn.execute(_SQL_SUPPLIER_WEBSITES):
+        k = normalise_domain(website)
         if k:
             keys.add(k)
-    rows = db_conn.execute(
-        "SELECT dedupe_key FROM vendor_candidates WHERE dedupe_key IS NOT NULL"
-    )
-    for r in rows:
-        k = r[0] if isinstance(r, (tuple, list)) else r["dedupe_key"]
-        if k:
-            keys.add(k)
+
+    if corridor:
+        for (name,) in conn.execute(_SQL_SUPPLIER_NAMES):
+            slug = _name_key(name)
+            if slug:
+                keys.add(f"name:{slug}@{corridor.strip().lower()}")
+
+    for (key,) in conn.execute(_SQL_CANDIDATE_KEYS):
+        if key:
+            keys.add(key)
+
     return keys
 
 

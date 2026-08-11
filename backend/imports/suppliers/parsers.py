@@ -1,0 +1,175 @@
+"""[AIQ-1788] Read a harvest CSV into `vendor_harvester.Candidate` objects.
+
+The harvester (`backend/app/services/vendor_harvester.py`) validates, dedupes, classifies and
+shapes rows for `vendor_candidates`. It was merged with no way to feed it anything — no reader,
+no caller. This is the reader.
+
+Two decisions live here rather than in the harvester, because both are properties of *this
+file format*, not of the staging model:
+
+**The registry is identified by the evidence URL's domain, not by `source_name`.**
+`source_name` is free text an agent wrote ("BaFin institute database / regulatory
+self-classification", "Firm Impressum (RAK Berlin stated)"), and a row that cites the
+provider's own Impressum can describe itself using a chamber's name. The domain cannot lie
+about who published the page. So `db.com` maps to the tier-3 self-declared source and gets
+rejected, whatever its `source_name` claims.
+
+**A bare-year expiry is coerced to 1 January, never 31 December.**
+Both are guesses. Only one fails safe: December would claim up to twelve months of validity we
+cannot evidence, on precisely the field a buyer's security review checks. See `coerce_expiry`.
+"""
+from __future__ import annotations
+
+import csv
+import re
+from pathlib import Path
+from typing import Dict, Iterator, List, Optional, Tuple
+from urllib.parse import urlsplit
+
+from backend.app.services.registry_sources import SOURCES, RegistrySource
+from backend.app.services.vendor_harvester import Candidate
+
+#: The nine columns Card C's harvest actually produced.
+EXPECTED_HEADER = [
+    "corridor", "service_category", "company_name", "website_url", "source_name",
+    "source_url", "accreditation_body", "accreditation_number", "accreditation_expiry",
+]
+
+_BY_NAME: Dict[str, RegistrySource] = {s.name: s for s in SOURCES}
+
+SELF_DECLARED = "Self-declared (provider site / non-registry reference)"
+
+#: Evidence domain -> registry source name. Suffix-matched, longest first, so a subdomain like
+#: `kontenvergleich.bafin.de` resolves without listing every host.
+_DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
+    ("fidi.org",              "FIDI FAIM member directory"),
+    ("iamovers.org",          "IAM member directory"),
+    ("finanstilsynet.no",     "Finanstilsynet — estate agency register (NO)"),
+    ("bafin.de",              "BaFin institute register (DE)"),
+    ("advokatforeningen.no",  "Advokatforeningen + Brønnøysund register (NO)"),
+    ("advokatguiden.no",      "Advokatforeningen + Brønnøysund register (NO)"),
+    ("brreg.no",              "Advokatforeningen + Brønnøysund register (NO)"),
+    ("eura-relocation.com",   "EuRA member directory"),
+    ("blkr-berlin.de",        "Rechtsanwaltskammer (RAK) + Partnerschaftsregister (DE)"),
+    ("rechtsanwaltsregister.org", "Rechtsanwaltskammer (RAK) + Partnerschaftsregister (DE)"),
+    ("bstbk.de",              "Bundessteuerberaterkammer / regional StBK (DE)"),
+    ("hamburg.de",            "Official public business register (DE)"),
+)
+
+
+class RowError(ValueError):
+    """A row that cannot be turned into a Candidate at all (bad shape, not bad sourcing)."""
+
+
+def _domain(url: str) -> str:
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+    if "//" not in raw:
+        raw = "//" + raw
+    return (urlsplit(raw).hostname or "").lower().lstrip(".")
+
+
+def source_for_url(source_url: str) -> RegistrySource:
+    """Map an evidence URL to the registry that published it.
+
+    Anything unrecognised is SELF_DECLARED (tier 3) rather than a guess. That is the safe
+    default: `validate()` then rejects it and it lands on the re-sourcing worklist, which is
+    strictly better than staging it as though a registry vouched for it.
+    """
+    host = _domain(source_url)
+    best: Optional[Tuple[int, str]] = None
+    for suffix, name in _DOMAIN_TO_SOURCE:
+        if host == suffix or host.endswith("." + suffix):
+            if best is None or len(suffix) > best[0]:
+                best = (len(suffix), name)
+    return _BY_NAME[best[1]] if best else _BY_NAME[SELF_DECLARED]
+
+
+def coerce_expiry(value: Optional[str]) -> Optional[str]:
+    """Normalise an accreditation expiry to an ISO date, or None.
+
+    `vendor_candidates.accreditation_expiry` is typed `date`, but registries commonly publish
+    only a year and that is all the harvest captured ('2028').
+
+    A bare year becomes **YYYY-01-01**, the earliest date consistent with the evidence.
+    YYYY-12-31 would be the natural-looking choice and is the wrong one: it asserts up to
+    twelve months of validity nobody verified, and this is the exact field a customer's
+    procurement review re-checks. Under-claiming is recoverable; over-claiming is a finding.
+
+        >>> coerce_expiry("2028")
+        '2028-01-01'
+        >>> coerce_expiry("2027-06-30")
+        '2027-06-30'
+        >>> coerce_expiry("") is None
+        True
+    """
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    if re.fullmatch(r"\d{4}", raw):
+        return f"{raw}-01-01"
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+        return raw
+    raise RowError(
+        f"accreditation_expiry {raw!r} is neither a bare year nor an ISO date — "
+        "refusing to guess a date for an accreditation claim"
+    )
+
+
+def _note_for(row: Dict[str, str], expiry_raw: str, source: RegistrySource) -> Optional[str]:
+    """Record every inference, so a reviewer can see what was derived rather than read."""
+    notes: List[str] = []
+    if re.fullmatch(r"\d{4}", (expiry_raw or "").strip()):
+        notes.append(
+            f"expiry coerced from bare year {expiry_raw.strip()} to 1 Jan (earliest "
+            "consistent date; the register published no day/month)"
+        )
+    if not (row.get("website_url") or "").strip():
+        notes.append("no supplier domain in the harvest — deduped by name+corridor, so a "
+                     "near-name match must be checked by hand before approval")
+    if source.name == SELF_DECLARED:
+        notes.append(f"evidence URL is not a registry ({_domain(row.get('source_url', ''))})")
+    claimed = (row.get("source_name") or "").strip()
+    if claimed and claimed != source.name:
+        notes.append(f"harvest called this source {claimed!r}")
+    return " · ".join(notes) or None
+
+
+def read_csv(path: Path) -> Iterator[Candidate]:
+    """Yield one Candidate per data row. Raises RowError on a malformed file or row."""
+    with Path(path).open(newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        header = reader.fieldnames or []
+        if header != EXPECTED_HEADER:
+            raise RowError(
+                f"unexpected header.\n  expected: {EXPECTED_HEADER}\n  got:      {header}"
+            )
+        for lineno, row in enumerate(reader, start=2):
+            try:
+                yield _to_candidate(row)
+            except RowError as exc:
+                raise RowError(f"line {lineno}: {exc}") from exc
+
+
+def _to_candidate(row: Dict[str, str]) -> Candidate:
+    def get(k: str) -> str:
+        return (row.get(k) or "").strip()
+
+    source_url = get("source_url")
+    source = source_for_url(source_url)
+    expiry_raw = get("accreditation_expiry")
+
+    return Candidate(
+        name=get("company_name"),
+        website_url=get("website_url"),
+        corridor=get("corridor"),
+        service_category=get("service_category"),
+        source=source,
+        source_url=source_url or None,
+        accreditation_body=get("accreditation_body") or None,
+        accreditation_number=get("accreditation_number") or None,
+        accreditation_expiry=coerce_expiry(expiry_raw),
+        country_code={"FR-DE": "DE", "FR-NO": "NO"}.get(get("corridor")),
+        notes=_note_for(row, expiry_raw, source),
+    )
