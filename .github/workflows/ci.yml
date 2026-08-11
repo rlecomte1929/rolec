@@ -41,13 +41,23 @@ jobs:
         id: filter
         with:
           filters: |
+            # `.nvmrc` is listed under BOTH Node-built apps on purpose. It sets the Node
+            # version for every one of them and for the production Render build, yet it
+            # was in no filter — so a Node bump triggered NOTHING. Changing it to 22.23.2
+            # ran the frontend jobs only by accident, because that commit also touched
+            # frontend/package.json; the HR Dashboard build was skipped, and a Node
+            # upgrade could have shipped without ever building it. Same silent-drift
+            # shape as the four duplicated Node pins this change collapses into one.
+            # Not added to `backend` — that suite is Python and `.nvmrc` cannot affect it.
             frontend:
               - 'frontend/**'
+              - '.nvmrc'
             backend:
               - 'backend/**'
               - 'scripts/**'
             hr_dashboard:
               - 'apps/hr-dashboard/**'
+              - '.nvmrc'
             migrations:
               - 'supabase/migrations/**'
             # AIQ-1731: everything that can WRITE (or orphan) a

@@ -82,6 +82,45 @@ services:
       - type: rewrite
         source: /blog/:slug
         destination: /blog/:slug/index.html
+      # ── [AIQ-1797] Prerendered PUBLIC marketing routes ──────────────────────
+      #
+      # Same directory-index trap as everything above, and the reason this task's
+      # prerendered files alone would have bought nothing: measured on prod
+      # 2026-08-11, `/platform` AND `/platform/` both returned 1,677 bytes — the
+      # shell — because no rule existed for either form. All 8 routes did.
+      #
+      # `/` is served from dist/landing.html, NOT dist/index.html — and that is
+      # load-bearing. dist/index.html is the `/*` catch-all document handed to every
+      # unmatched path, including /auth and every authenticated route. Prerendering the
+      # landing page into it made an HR user opening /hr/dashboard receive the marketing
+      # homepage, see it, then watch createRoot wipe it (measured: 1,327 -> 21,182 bytes).
+      # A `source: /` rule matches the root ONLY, so it does not shadow `/*`.
+      #
+      # Gate: `bash scripts/check_public_prerender.sh` (served-response, no JS).
+      - type: rewrite
+        source: /
+        destination: /landing.html
+      - type: rewrite
+        source: /platform
+        destination: /platform/index.html
+      - type: rewrite
+        source: /why
+        destination: /why/index.html
+      - type: rewrite
+        source: /how-it-works
+        destination: /how-it-works/index.html
+      - type: rewrite
+        source: /get-started
+        destination: /get-started/index.html
+      - type: rewrite
+        source: /security
+        destination: /security/index.html
+      - type: rewrite
+        source: /privacy
+        destination: /privacy/index.html
+      - type: rewrite
+        source: /access
+        destination: /access/index.html
       # SPA fallback — every other path renders client-side.
       - type: rewrite
         source: /*
