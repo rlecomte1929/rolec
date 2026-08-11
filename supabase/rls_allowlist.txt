@@ -1,16 +1,17 @@
 # supabase/rls_allowlist.txt
 # AUDIT-A3 (audit/02-expert-security.md SEC-2)
 #
-# STATUS: FULLY DRAINED (2026-06-03) — 0 entries. Every table that was seeded
-# here (113 policy-less public tables as of 2026-05-25) has since been given an
-# RLS policy via a committed migration. The list is intentionally kept (empty)
-# as the standing safety net: any NEW policy-less table landing in `public`
-# must either get a policy migration or be added here with a justification —
-# otherwise scripts/check_rls_coverage.py fails CI.
+# STATUS: 2 entries (2026-08-11). The list was fully DRAINED on 2026-06-03 — all 113
+# policy-less public tables from the 2026-05-25 seed had been given an RLS policy via a
+# committed migration. It has since regained two entries (ror_cities, ror_queue), which
+# is the safety net doing its job rather than a regression in it: a NEW policy-less
+# table landing in `public` must either get a policy migration or be listed here with a
+# justification, or scripts/check_rls_coverage.py fails CI.
 #
 # Allowlist size on 2026-05-25 (seed):                113
-# Allowlist size after SEC-RLS sprint (this commit):    0
-# Steady-state floor (server-only by design):           0
+# Allowlist size after the SEC-RLS sprint (2026-06-03): 0
+# Allowlist size now (2026-08-11):                      2
+# Steady-state floor (server-only by design):           0  ← still the target
 #
 # SEC-RLSf (AIQ-663): every retained entry MUST carry a justification — an
 # inline `# reason` after the name, or a `#` section header above the block.
@@ -43,3 +44,22 @@
 #
 # Format: one tablename per line. Lines starting with `#` are ignored.
 # Inline comments after a `#` on a name line are also ignored.
+
+# --- Relocation-ranking ops tables (2026-08-11) ---
+# Both landed policy-less and were the first entries since the 2026-06-03 drain, so the
+# claim below was verified rather than assumed, per table:
+#   rls_enabled = false, policies = 0, and NO grant to `anon` or `authenticated`.
+# PostgREST reaches the public schema through exactly those two roles, so neither table
+# is readable with the anon key that ships in the frontend bundle. Contents are also
+# non-personal: ror_cities (700 rows) is a city-ranking catalogue, ror_queue (8,470 rows)
+# is a rollout work queue — no case, employee or HR data in either.
+#
+# check_rls_coverage.py re-checks that grant claim on every run and FAILS if either table
+# is later granted to anon/authenticated, so this exception cannot expire in silence.
+#
+# TEMPORARY. 20261028000000_ror_tables_rls.sql gives both tables RLS + a service_role
+# policy + REVOKE anon; it is committed and awaiting an out-of-band apply (migrations are
+# not applied on merge here). The moment it lands, check_rls_coverage.py reports these two
+# as stale entries — DELETE both lines then. The floor is still 0.
+ror_cities   # city-ranking catalogue; server-role-only, no anon/authenticated grant
+ror_queue    # rollout work queue; server-role-only, no anon/authenticated grant
