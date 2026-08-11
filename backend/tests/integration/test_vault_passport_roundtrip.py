@@ -243,10 +243,23 @@ def test_no_plaintext_passport_numbers_exist_today(conn):
     when read out of a text column. A row failing this is a plaintext leak, and is the
     single highest-severity thing this file can detect.
     """
+    # `left(...) <> '\\x'` and NOT `NOT LIKE '\\x%'`. In LIKE, backslash is the default
+    # ESCAPE character, so the pattern '\\x%' means "a literal x followed by anything" —
+    # it does not match real ciphertext, which starts with a backslash. The LIKE form
+    # therefore flags every genuine pgcrypto value as a plaintext leak.
+    #
+    # Measured against prod 2026-08-11 on a real encrypted row:
+    #     passport_number LIKE '\\x%'   -> false      (the bug)
+    #     passport_number LIKE '\\\\x%'  -> true       (escaped)
+    #     left(passport_number, 2) = '\\x' -> true     (no escaping to get wrong)
+    #
+    # This assertion passed for exactly one reason before that: the table was empty. It
+    # would have started crying wolf on the first real passport, which is the failure this
+    # whole file exists to prevent.
     bad = conn.execute(
         text(
             f"SELECT count(*) FROM {PROFILES} "
-            "WHERE passport_number IS NOT NULL AND passport_number NOT LIKE '\\x%'"
+            "WHERE passport_number IS NOT NULL AND left(passport_number, 2) <> '\\x'"
         )
     ).scalar()
     assert bad == 0, (
