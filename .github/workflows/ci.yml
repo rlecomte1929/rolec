@@ -747,8 +747,14 @@ jobs:
     # for a constraint the resolve_case_ids bridge already substitutes for.
     #
     # That deferral is only safe while the stock stays frozen, and nothing was
-    # watching. This is that tripwire: the 51 known-bad ids are baselined in
+    # watching. This is that tripwire: known-bad ids are baselined in
     # supabase/canonical_case_id_baseline.txt and only NEW offenders fail.
+    #
+    # As of 2026-08-11 that baseline is EMPTY and prod is clean — 818 case_assignments,
+    # all with a non-null canonical, zero null/dangling/duplicate. The 51 rows are gone,
+    # so every violation this job sees is now a new one. It also means an emptied
+    # case_assignments would have read as a clean pass, which e2e_purge.py makes a live
+    # possibility; the script fails on a zero row count for that reason.
     # The diff logic is unit-tested on every PR via
     # scripts/tests/test_check_canonical_case_id_drift.py, so the fail path is
     # covered even where the DB secret is unset.
