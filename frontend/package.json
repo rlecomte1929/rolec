@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && node scripts/prerender.mjs && node scripts/prerender-content.mjs",
+    "build": "tsc && vite build && node scripts/prerender.mjs && node scripts/prerender-content.mjs && node scripts/verify-prerender.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

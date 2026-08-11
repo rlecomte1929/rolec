@@ -137,10 +137,24 @@ async function main() {
     }
     html = withDescription(withTitle(html, route.title), route.description);
 
-    const outDir = path.join(DIST, route.path.replace(/^\//, ''));
-    await mkdir(outDir, { recursive: true });
-    await writeFile(path.join(outDir, 'index.html'), html, 'utf8');
-    console.log(`prerender: wrote ${path.relative(ROOT, path.join(outDir, 'index.html'))} (${markup.length} bytes of markup)`);
+    // [AIQ-1797] `outFile` exists for exactly one route: `/`.
+    //
+    // The default (dist/<route>/index.html) would put `/` at dist/index.html — which is
+    // also the `/*` catch-all target for EVERY unmatched path, including /auth and every
+    // authenticated route. Prerendering the landing page there means an HR user opening
+    // /hr/dashboard is served the marketing homepage, sees it, and then watches
+    // createRoot wipe and replace it. Measured: dist/index.html went 1,327 -> 21,182
+    // bytes of landing copy.
+    //
+    // So `/` is emitted to dist/landing.html and pointed at by an explicit `source: /`
+    // rewrite in render.yaml. dist/index.html stays the pristine shell, and the flash
+    // never happens.
+    const outPath = route.outFile
+      ? path.join(DIST, route.outFile)
+      : path.join(DIST, route.path.replace(/^\//, ''), 'index.html');
+    await mkdir(path.dirname(outPath), { recursive: true });
+    await writeFile(outPath, html, 'utf8');
+    console.log(`prerender: wrote ${path.relative(ROOT, outPath)} (${markup.length} bytes of markup)`);
   }
 
   // KEEP_PRERENDER_SSR=1 leaves the intermediate bundle for inspection. Useful for
