@@ -79,7 +79,7 @@ MIGRATION = (
     pathlib.Path(__file__).resolve().parents[3]
     / "supabase"
     / "migrations"
-    / "20261028000000_rfq_recipients_created_at.sql"
+    / "20261029000000_rfq_recipients_created_at.sql"
 )
 
 # Mirrors production's rfq_recipients as measured 2026-08-11 (information_schema), MINUS
