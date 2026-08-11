@@ -21,12 +21,25 @@ Sitemap: https://relopass.com/sitemap.xml
 # RECORDED — the next person tightening this file for scrapers needs to see that
 # these two are deliberate, not collateral.
 #
-# ⚠️ robots.txt is only half the story. The usual silent killer is edge/CDN bot
-# management (Cloudflare sits in front of this origin), which is invisible here and
-# returns a challenge or 403 regardless of what this file says. Verify with:
-#     curl -A "OAI-AdsBot"    -I https://relopass.com/mobility-teams
-#     curl -A "OAI-SearchBot" -I https://relopass.com
-# Both must be 200 with full HTML — not a challenge page.
+# ⚠️ robots.txt is only half the story. Cloudflare sits in front of this origin and its
+# bot rules are invisible here.
+#
+# BUT DO NOT VERIFY WITH A SPOOFED USER-AGENT. This comment used to say
+#     curl -A "OAI-SearchBot" -I https://relopass.com   # "must be 200"
+# and that advice was wrong. Cloudflare identifies a named bot by cryptographic signature
+# (Web Bot Auth), published IP range, or reverse DNS — never by the UA string. A curl from
+# your laptop claiming to be OAI-SearchBot is an impostor and SHOULD get 403, even when
+# that crawler is set to Allow. Expecting 200 sends you hunting a phantom
+# misconfiguration; it already cost one round of that on 2026-08-11.
+#
+# The real signal is Cloudflare's own per-crawler telemetry:
+#     AI Crawl Control -> Metrics -> Allowed vs Unsuccessful
+# To confirm positively, ask ChatGPT to open a published URL and watch ChatGPT-User's
+# Allowed count increment — a verified request from OpenAI is the only proof.
+#
+# A spoofed UA *is* still a fair test for crawlers Cloudflare does not gate on AI policy
+# (OAI-AdsBot, Googlebot, facebookexternalhit); those are covered in
+# tests/e2e/tests/public/crawler-surface.spec.ts.
 
 User-agent: OAI-AdsBot
 Allow: /
