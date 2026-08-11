@@ -30,7 +30,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from backend.imports.suppliers.executor import stage, summarise      # noqa: E402
+from backend.imports.suppliers.executor import promote, stage, summarise   # noqa: E402
 from backend.imports.suppliers.parsers import RowError, read_csv     # noqa: E402
 
 
@@ -39,11 +39,21 @@ def main() -> int:
     ap.add_argument("csv", type=Path, help="harvest CSV (see EXPECTED_HEADER in parsers.py)")
     ap.add_argument("--apply", action="store_true", help="actually write (default: dry run)")
     ap.add_argument(
+        "--promote",
+        action="store_true",
+        help="also create a suppliers row per pending candidate, with its one capability at "
+             "platform_vetting_status='pending' so it lands in /admin/vetting-queue. Implies "
+             "--apply. Nothing becomes visible to an employee: marketplace and test_drive "
+             "both filter on 'approved'.",
+    )
+    ap.add_argument(
         "--allow-rejections",
         action="store_true",
         help="exit 0 even when rows were rejected (do not use in a pipeline)",
     )
     args = ap.parse_args()
+    if args.promote:
+        args.apply = True
 
     if not args.csv.exists():
         print(f"✖ no such file: {args.csv}")
@@ -76,6 +86,23 @@ def main() -> int:
         print(summarise(results, rejections))
         if not args.apply:
             conn.rollback()
+
+    if args.promote or not args.apply:
+        # A Session, not the Connection above: supplier_registry.create_supplier commits
+        # internally, so promotion cannot share the staging transaction.
+        from sqlalchemy.orm import sessionmaker
+
+        with sessionmaker(bind=engine)() as session:
+            n, skipped, problems = promote(session, dry_run=not args.promote)
+            print()
+            print(f"promote:    {n} supplier(s) -> vetting queue (platform_vetting_status='pending')")
+            if skipped:
+                print(f"  skipped:  {skipped}")
+                for p_ in problems:
+                    print(f"    - {p_}")
+            if not args.promote:
+                print("  (preview — pass --promote to write)")
+                session.rollback()
 
     if rejections and not args.allow_rejections:
         print(f"\n✖ {len(rejections)} row(s) rejected — nothing about them was staged.")
