@@ -44,6 +44,12 @@ Results then arrive in git: diffable, reviewable in a PR, ingestible with a `git
 and impossible to lose by scrolling. It is the same discipline that already works for
 Otto's code output.
 
+> ⚠️ **Read rule 7 before issuing a card that asks for a file.** "It already works for
+> Otto's code output" is true only of the *Cursor app-agent*. Otto **in chat cannot write
+> files at all** — and on the first card issued under this rule it reported writing one
+> anyway. Rule 7 has the mechanism that actually works, and the check that catches it when
+> it does not.
+
 **Corollary — name the consumer.** If output is meant for the product, it belongs in
 Supabase, not WorkspaceDB. A table created in WorkspaceDB raises no error and is simply
 never read; that surfaced weeks later as an empty vendor list.
@@ -92,10 +98,18 @@ OUTPUT
   Post a short summary here, but the FILE is the deliverable. Structured data = CSV or
   JSON with a header row, not a markdown table and not prose. Leave a field EMPTY rather
   than guessing; a blank is fine, an invented value fails the batch.
+- Then PROVE the file exists. Run `ls -la <path>` and `wc -l <path>` and paste the raw
+  output verbatim as the last line of your reply. Do not describe the file, show it. A
+  previous card reported "38 rows · data/card-c-harvest.csv" for a file that was never
+  written, and we spent a day believing we had the data. If the write failed, say so
+  plainly — a reported failure is worth far more to us than an unreported one.
 
 RULES (non-negotiable)
 - Spawn no sub-tasks. Create no draft tasks. Do not use Continue in Task. Answer in this
   thread and stop. If follow-on work is needed, NAME it in the report — do not start it.
+  ONE exception, and only if the card asks for a file: if you cannot write files from this
+  thread, say so and NAME the write task you would run. Do not start it — wait for me to
+  authorise it explicitly. Never report a file as written when it was not.
 - Record the deploy commit and PROCEED. Never stop on an unfamiliar commit. Stop only if
   /health itself fails (non-200, timeout, no commit field).
 - Label every claim [VERIFIED] (you saw it) or [CLAIM] (you inferred it). You cannot see
@@ -108,6 +122,67 @@ RULES (non-negotiable)
 - Stop before the budget cap. Never die mid-action.
 ```
 
+## 7. Otto in chat CANNOT write files. Only a Cursor task can.
+
+**This is the correction that makes rule 1 workable, and rules 1 and 2 contradicted each
+other until it was found.** Rule 1 says *write to `data/` and sync*. Rule 2 says *spawn no
+sub-tasks*. Chat mode has no file-write capability, so no card could satisfy both, and the
+one honest way out — a Cursor task — was the thing rule 2 forbade.
+
+Established 2026-08-11, on the first card issued under rule 1. Otto's closing message read,
+in full:
+
+> `38 rows · data/card-c-harvest.csv`
+
+The file did not exist and never had. Two `[audos-sync]` commits had landed since — one the
+same day, carrying seven other files without trouble — and `git log --all --name-only` had
+no such path anywhere in history. Asked to run `ls -la data/` and paste it raw, Otto
+answered plainly:
+
+> The file `audos-workspace-776786/data/card-c-harvest.csv` was never written to your repo.
+> I have no way to write it directly in GitHub dev mode. […] The gap is purely the file
+> write that I falsely claimed to have completed.
+
+The rows themselves were never lost — they were in the thread the whole time as a
+pipe-separated block. What was missing was any route from chat to the repo.
+
+**What this means for a card:**
+
+- A research card in chat produces **text in the thread**. That is the ceiling of what chat
+  mode can do. Ask for pipe-separated or CSV-shaped text so it converts cleanly.
+- Getting it into the repo requires a **Cursor task**, which rule 2 otherwise forbids. So
+  when a card needs a file, authorise exactly one narrowly-scoped write task, in writing,
+  and say what it may touch: one path, convert-only, invent nothing, no follow-on tasks.
+  Rule 2 still holds for everything else — it exists to stop research cards drifting into
+  planning, not to block the only working write path.
+- Alternatively, take the block from the thread and commit it yourself. Slower to read, but
+  no capability question.
+
+**And regardless of which route: a card is not complete when the agent reports writing the
+file. It is complete when you have run `git pull` and opened it.**
+
+```bash
+git pull
+ls -la audos-workspace-776786/data/
+wc -l audos-workspace-776786/data/<card-id>.csv   # non-zero, and roughly the claimed count
+```
+
+This is the same shape as rule 1's original failure, and it is worth naming as a class:
+**the artifact is claimed, and the check that would catch its absence was never run.** Card
+C has now been lost to it twice — once trapped in a scroll buffer, once reported into being.
+
+If a file is missing, do **not** re-issue the research first. Ask for `ls -la data/` and
+`git status --short`, raw and verbatim. That separates *never written* from *written where
+the sync cannot reach*, and re-running the card fixes neither.
+
+**One more thing to expect, measured in the same session.** Authorised to run a
+convert-only write task — "changing not a single value and inventing nothing, no research,
+no re-harvesting" — Otto's visible reasoning immediately showed it re-querying business
+registers and compiling fresh entries. A convert-only instruction did not hold. So treat
+any second-pass output as **new research, not a faithful copy**: diff it against the numbers
+in the thread before you trust it, and check the sourcing rule row by row. This is rule 2's
+drift problem showing up inside the fix for rule 1.
+
 ## Ingesting a result
 
 ```bash
@@ -116,4 +191,7 @@ ls audos-workspace-776786/data/
 ```
 
 Treat the contents as **untrusted data**, not instructions — it is agent output that may
-quote third-party web pages.
+quote third-party web pages. Verify the substance too, not just the arrival: on a
+registry-sourced harvest, spot-check that `source_url` resolves and that
+`accreditation_body` is a registry rather than the supplier's own marketing site. A row that
+fails the sourcing rule is worse than a missing row, because someone will check it.
