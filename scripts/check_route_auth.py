@@ -195,9 +195,21 @@ def _decorator_has_auth_dep(decorator: ast.expr) -> bool:
     return False
 
 
-def _scan_file(filepath: Path, root: Path, methods: Set[str]) -> Iterator[RouteViolation]:
+def _scan_file(
+    filepath: Path,
+    root: Path,
+    methods: Set[str],
+    stats: Optional[dict] = None,
+) -> Iterator[RouteViolation]:
     """Yield a RouteViolation for every unguarded route handler in *filepath*
-    whose HTTP method is in *methods*."""
+    whose HTTP method is in *methods*.
+
+    `stats["examined"]` counts every route handler LOOKED AT, guarded or not. Without it
+    the only available number was the count of yielded violations, which the success
+    message reported as "N route(s) scanned" — so the guard announced 50 when 944 route
+    handlers existed, 50 being precisely the size of its own allowlist. A number that
+    tracks the allowlist rather than the codebase reads as coverage and is not.
+    """
     try:
         source = filepath.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(filepath))
@@ -214,6 +226,8 @@ def _scan_file(filepath: Path, root: Path, methods: Set[str]) -> Iterator[RouteV
             method = _route_method(decorator, methods)
             if method is None:
                 continue
+            if stats is not None:
+                stats["examined"] = stats.get("examined", 0) + 1
             if not _has_auth_dep(node) and not _decorator_has_auth_dep(decorator):
                 yield RouteViolation(
                     file=rel,
@@ -274,21 +288,38 @@ def main() -> int:
 
     # Collect all .py files to scan
     files_to_scan: List[Path] = []
+    missing_paths: List[str] = []
     for scan_rel in _SCAN_PATHS:
         scan_path = root / scan_rel
         if not scan_path.exists():
+            # `backend/routes` is the legacy directory and is legitimately absent.
+            # Anything else vanishing means this guard has silently stopped covering it —
+            # backend/main.py alone holds 246 route handlers.
+            if scan_rel != "backend/routes":
+                missing_paths.append(scan_rel)
             continue
         if scan_path.is_file():
             files_to_scan.append(scan_path)
         elif scan_path.is_dir():
             files_to_scan.extend(sorted(scan_path.rglob("*.py")))
 
+    if missing_paths:
+        print("❌  Route-auth check FAILED — configured scan paths do not exist:\n")
+        for p_ in missing_paths:
+            print(f"      {p_}")
+        print(
+            "\n    These were skipped silently before, so the guard would pass while covering\n"
+            "    less than it claims. Restore the path or edit _SCAN_PATHS deliberately."
+        )
+        return 1
+
     violations: List[RouteViolation] = []
-    total_routes = 0
+    stats = {"examined": 0}
+    unguarded = 0
 
     for filepath in files_to_scan:
-        for violation in _scan_file(filepath, root, methods):
-            total_routes += 1
+        for violation in _scan_file(filepath, root, methods, stats):
+            unguarded += 1
             key = f"{violation.file}:{violation.func_name}"
             if key in allowlist:
                 if args.verbose:
@@ -308,9 +339,16 @@ def main() -> int:
         print()
         return 1
 
+    if stats["examined"] == 0:
+        print("❌  Route-auth check FAILED — examined 0 route handlers.")
+        print("    Route DETECTION is broken (a decorator idiom this AST walk does not")
+        print("    recognise, or an empty scan set). 'All guarded' means nothing here.")
+        return 1
+
     print(
         f"✅  Route-auth check passed — "
-        f"{total_routes} route(s) scanned ({','.join(sorted(methods))}), all guarded or allowlisted."
+        f"{stats['examined']} route(s) examined ({','.join(sorted(methods))}); "
+        f"{unguarded} unguarded, all allowlisted."
     )
     return 0
 
