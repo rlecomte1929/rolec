@@ -10,6 +10,7 @@ Houses 5 endpoints:
 """
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from typing import Any, Dict, List, Optional
@@ -106,6 +107,22 @@ router = APIRouter(prefix="/api", tags=["immigration-intake-profile"])
 log = logging.getLogger(__name__)
 
 
+def _jsonb_bind(param: str) -> str:
+    """`CAST(:param AS jsonb)` on Postgres; bare `:param` on SQLite (column is TEXT).
+
+    [AIQ-1800b] `field_sources` is jsonb, and every write path bound a raw Python dict to
+    it. psycopg2 cannot adapt a dict, so EVERY insert and update against
+    imm_employee_profiles raised `ProgrammingError: can't adapt type 'dict'` — which is
+    why the table has 0 rows, key or no key. `json.dumps()` on the value is the half that
+    actually fixes it; this cast is the house convention (see `_jsonb_expr` in
+    admin_form_templates) and keeps the SQLite/Postgres split explicit at the call site.
+    """
+    try:
+        return f"CAST(:{param} AS jsonb)" if db.engine.dialect.name == "postgresql" else f":{param}"
+    except Exception:  # engine not configured (unit tests) — bare bind is correct for sqlite
+        return f":{param}"
+
+
 @router.get("/hr/cases/{case_id}/profile")
 def get_profile_hr(
     case_id: str,
@@ -177,8 +194,8 @@ def update_profile_hr_fields(
         existing_sources = profile.get("field_sources") or {}
         for field_name in updates:
             existing_sources[field_name] = "hr_provided"
-        params["field_sources"] = existing_sources
-        set_clauses.append("field_sources = :field_sources")
+        params["field_sources"] = json.dumps(existing_sources)
+        set_clauses.append(f"field_sources = {_jsonb_bind('field_sources')}")
         set_clauses.append("updated_at = :now")
 
         sql = f"""
@@ -210,12 +227,12 @@ def update_profile_hr_fields(
             "case_id": case_id,
             "employee_id": "",   # Employee not yet known
             "org_id": org_id,
-            "field_sources": field_sources,
+            "field_sources": json.dumps(field_sources),
             "now": now,
         }
         params.update(updates)
         cols = list(params.keys())
-        placeholders = [f":{c}" for c in cols]
+        placeholders = [_jsonb_bind(c) if c == "field_sources" else f":{c}" for c in cols]
         with db.engine.begin() as conn:
             conn.execute(
                 text(f"""
@@ -407,8 +424,8 @@ def upsert_profile_employee(
         if not set_clauses:
             return {"updated_fields": [], "message": "All fields are HR-provided and locked."}
 
-        params["field_sources"] = existing_sources
-        set_clauses.append("field_sources = :field_sources")
+        params["field_sources"] = json.dumps(existing_sources)
+        set_clauses.append(f"field_sources = {_jsonb_bind('field_sources')}")
         set_clauses.append("updated_at = :now")
 
         with db.engine.begin() as conn:
@@ -441,7 +458,7 @@ def upsert_profile_employee(
             "case_id": case_id,
             "employee_id": employee_id,
             "org_id": "",
-            "field_sources": field_sources,
+            "field_sources": json.dumps(field_sources),
             "created_at": now,
             "updated_at": now,
         }
@@ -451,7 +468,7 @@ def upsert_profile_employee(
             conn.execute(
                 text(f"""
                     INSERT INTO public.imm_employee_profiles ({', '.join(cols)})
-                    VALUES ({', '.join([f':{c}' for c in cols])})
+                    VALUES ({', '.join(_jsonb_bind(c) if c == 'field_sources' else f':{c}' for c in cols)})
                 """),
                 params,
             )
