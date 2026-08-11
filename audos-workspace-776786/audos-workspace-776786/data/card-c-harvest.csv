@@ -1,0 +1,39 @@
+corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry
+FR-DE,movers,AGS France (SOFDI – Société Française de Déménagement International),,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/ags-france,FIDI Global Alliance / FAIM Plus (auditor: EY),,2028
+FR-DE,movers,Grospiron International,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/grospiron-mobility-solutions,FIDI Global Alliance / FAIM Plus (auditor: EY),,2026
+FR-DE,movers,Sterling Relocation S.A.R.L (trading as Sterling Lexicon),,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/sterling-lexicon-france,FIDI Global Alliance / FAIM (auditor: EY),,2027
+FR-DE,movers,All World Transport,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/all-world-transport,FIDI Global Alliance / FAIM (auditor: EY),,2026
+FR-DE,movers,Neer Service,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/neer-service-france,FIDI Global Alliance / FAIM (auditor: EY),,2027
+FR-DE,movers,AGS Global Solutions GmbH — Berlin,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/ags-global-solutions-berlin,FIDI Global Alliance / FAIM Plus (auditor: EY),,2026
+FR-DE,movers,AGS Global Solutions GmbH — Koblenz,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/ags-global-solutions-koblenz,FIDI Global Alliance / FAIM (auditor: EY),,2026
+FR-DE,movers,Hasenkamp Relocation Services GmbH,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/hasenkamp-relocation-services-gmbh-1,FIDI Global Alliance / FAIM Plus (auditor: EY),,2026
+FR-DE,movers,Hertling GmbH & Co. KG,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/hertling-gmbh-co-kg,FIDI Global Alliance / FAIM Plus (auditor: EY),,2029
+FR-DE,movers,Intermove GmbH,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/intermove-gmbh,FIDI Global Alliance / FAIM Plus (auditor: EY),,2027
+FR-DE,movers,Paul v. Maur GmbH,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/paul-v-maur-gmbh,FIDI Global Alliance / FAIM Plus (auditor: EY),,2028
+FR-DE,legal_admin,Schlun & Elseven Rechtsanwälte PartG mbB,,Firm Impressum (RAK Köln) + Partnerschaftsregister Essen,https://se-legal.de/impressum/,Rechtsanwaltskammer Köln,PR 3608 Amtsgericht Essen,
+FR-DE,legal_admin,BLKR Rechtsanwältinnen,,Firm Impressum (RAK Berlin stated),https://www.blkr-berlin.de/english/,Rechtsanwaltskammer Berlin,,
+FR-DE,legal_admin,Rechtsanwalt Albert Rühling (Ruehling Immigration Law),,Hamburg city business register + firm Impressum,https://www.hamburg.de/branchenbuch/hamburg/eintrag/10824243/,Hanseatische RAK Hamburg,,
+FR-DE,tax_finance,Matzenbach & Sternberg Partnerschaft mbB Steuerberatungsgesellschaft (MSP Beratung),,Firm Impressum (StBK Hessen) + Partnerschaftsregister Frankfurt,https://www.msp-beratung.com/about/,Steuerberaterkammer Hessen (BStBK member chamber),PR 1869 Amtsgericht Frankfurt am Main,
+FR-DE,tax_finance,EY Tax GmbH Steuerberatungsgesellschaft,,Company legal imprint + LEI record,https://www.ey.com/de_de/legal-and-privacy/impressum,BStBK (via regional chambers),LEI: 5299006Z5RCK6POJJR69,
+FR-DE,tax_finance,Kanzlei Thalmeir — Julian Thalmeir,,Firm website (StBK München stated),https://www.stb-thalmeir.de/,Steuerberaterkammer München,,
+FR-DE,banks,Deutsche Bank AG,,BaFin institute database / regulatory disclosures,https://www.db.com/legal-resources/information-about-the-firm,BaFin (Federal Financial Supervisory Authority),100003,
+FR-DE,banks,Commerzbank AG,,BaFin institute database / regulatory self-classification,https://www.commerzbank.de/group/who-we-are/compliance/regulatory-self-classification.html,BaFin (Federal Financial Supervisory Authority),100005,
+FR-DE,banks,ING-DiBa AG,,BaFin institute database (kontenvergleich.bafin.de),https://kontenvergleich.bafin.de/en/account/678272c6,BaFin (Federal Financial Supervisory Authority),100088,
+FR-DE,banks,N26 Bank SE,,BaFin institute database / Wikidata cross-reference,https://www.wikidata.org/wiki/Q27479372,BaFin (Federal Financial Supervisory Authority),145827,
+FR-NO,movers,AGS France (SOFDI),,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/ags-france,FIDI Global Alliance / FAIM Plus (auditor: EY),,2028
+FR-NO,movers,Grospiron International,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/grospiron-mobility-solutions,FIDI Global Alliance / FAIM Plus (auditor: EY),,2026
+FR-NO,movers,A/S Adams Express,,FIDI Global Alliance affiliate directory,https://www.fidi.org/find-fidi-affiliate/s-adams-express,FIDI Global Alliance / FAIM Plus (auditor: EY),,2027
+FR-NO,movers,Alfa Mobility Norway A/S,,FIDI Global Alliance affiliate directory + EuRA member directory,https://www.fidi.org/find-fidi-affiliate/alfa-mobility-5,FIDI Global Alliance / FAIM (auditor: EY),,2029
+FR-NO,housing_agencies,DNB Eiendom AS,,Finanstilsynet estate agent register,https://www.finanstilsynet.no/en/finanstilsynets-registry/details/?id=104451,Finanstilsynet (Norwegian FSA),104451,
+FR-NO,housing_agencies,Eiendomsmegler Krogsveen AS,,Finanstilsynet estate agent register,https://www.finanstilsynet.no/en/finanstilsynets-registry/details/?id=103923,Finanstilsynet (Norwegian FSA),103923,
+FR-NO,housing_agencies,Eiendomsmegler 1 Østlandet AS,,Finanstilsynet estate agent register,https://www.finanstilsynet.no/en/finanstilsynets-registry/details/?id=104252,Finanstilsynet (Norwegian FSA),104252,
+FR-NO,housing_agencies,Expat Relocation AS,,EuRA member directory,https://www.eura-relocation.com/members/expat-relocation,EuRA (European Relocation Association) — EuRA Quality Seal,,
+FR-NO,legal_admin,Advokatfirmaet Sulland AS,,Advokatforeningen member search + Advokatguiden verified profile,https://www.advokatforeningen.no/en/about-advokatforeningen/search-for-members/,Den Norske Advokatforening,914 450 133,
+FR-NO,legal_admin,Advokatfirmaet Tveter og Kløvfjell AS,,Brønnøysund register + Advokatguiden,https://virksomhet.brreg.no/nb/oppslag/enheter/917334110,Den Norske Advokatforening,917 334 110,
+FR-NO,legal_admin,Humlen Advokater AS — Félix Olivier Helle,,Advokatguiden verified profile + Advokatforeningen committee confirmation,https://www.advokatguiden.no/advokat/22327-felix-olivier-helle,Den Norske Advokatforening,915 363 954,
+FR-NO,legal_admin,Reinholdt Advokatfirma AS — Thomas Reinholdt,,Advokatguiden + Brønnøysund register,https://www.advokatguiden.no/advokat/22051-thomas-reinholdt,Den Norske Advokatforening,926 162 578,
+FR-NO,tax_finance,PricewaterhouseCoopers AS,,Finanstilsynet registry,https://www.finanstilsynet.no/en/finanstilsynets-registry/details/?id=98985,Finanstilsynet (Norwegian FSA),98985,
+FR-NO,tax_finance,KPMG AS,,Finanstilsynet registry,https://www.finanstilsynet.no/en/finanstilsynets-registry/details/?id=98998,Finanstilsynet (Norwegian FSA),98998,
+FR-NO,tax_finance,Deloitte AS,,Finanstilsynet registry,https://www.finanstilsynet.no/virksomhetsregisteret/detalj/?id=99004,Finanstilsynet (Norwegian FSA),99004,
+FR-NO,banks,DNB Bank ASA,,Finanstilsynet registry,https://www.finanstilsynet.no/en/finanstilsynets-registry/details/?id=98973,Finanstilsynet (Norwegian FSA),98973,
+FR-NO,banks,Nordea Bank Abp NUF (Norwegian branch),,Finanstilsynet registry,https://www.finanstilsynet.no/en/finanstilsynets-registry/details/?id=197422,Finanstilsynet (Norwegian FSA),197422,
