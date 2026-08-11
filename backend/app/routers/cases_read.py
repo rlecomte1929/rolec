@@ -202,6 +202,12 @@ class _DossierFormTemplate(BaseModel):
     # fields that carry requires_original=true. Each item: {"key","label","format"}
     # where format (from the field's optional doc_format) may be None. [AIQ-1257a]
     required_documents: List[Dict[str, Optional[str]]] = []
+    # [S1] The section layout: ordered, each entry carrying its own title, authority,
+    # portal, deadline hint, session_group and field_ids. Empty means "group by
+    # fields[].section", which is what every template except RP-NO-DATASHEET does. A
+    # section may reference NO fields — France's absent arrival registration is a section
+    # that is a statement.
+    sections: List[Dict[str, Any]] = []
 
 
 class _DossierFormPerson(BaseModel):
@@ -475,6 +481,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             verification_status=(row.get("template_verification_status") or "representative"),  # [WS1]
             source_language=(row.get("template_source_language") or "en"),  # [AIQ-1757]
             required_documents=required_documents,  # [P1-05 checklist]
+            sections=_parse_sections(row.get("template_sections")),  # [S1]
         )
 
     return CaseFormSummary(
