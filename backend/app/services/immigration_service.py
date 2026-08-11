@@ -117,8 +117,15 @@ def decrypt_passport_for_display(profile: Dict[str, Any]) -> PassportDecryption:
         # A NULL/absent result is a failure, not an empty passport number. Falling
         # through to the input would put the ciphertext back.
         log.warning("passport decryption returned no value; withholding")
-    except Exception:
-        log.warning("passport decryption failed; withholding the value", exc_info=True)
+    except Exception as exc:
+        # NEVER exc_info=True here. SQLAlchemy builds its engine without
+        # hide_parameters, so a DBAPI error stringifies as
+        # "[parameters: ('<ciphertext>', '<encryption key>')]" — the traceback would
+        # write the key that unlocks EVERY stored passport into the application log.
+        # Verified against the pinned SQLAlchemy, not assumed. The exception type is
+        # enough to tell a missing key from a bad ciphertext from a dead connection.
+        log.warning("passport decryption failed (%s); withholding the value",
+                    type(exc).__name__)
 
     p["passport_number"] = None
     return PassportDecryption(profile=p, withheld=True)
