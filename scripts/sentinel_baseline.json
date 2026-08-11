@@ -23,9 +23,9 @@
       "since": "2026-08-10"
     },
     "R4X-B": {
-      "reason": "Adding several picks per category does not write every ai_decisions audit row. Genuine defect, made visible by this PR - it was tagged but absent from scoring_map.json, so it had been failing to nobody.",
+      "reason": "INTERMITTENT, not consistently broken. Failed run 31491543985, PASSED run 31494214298 \u2014 the two runs either side of the gate landing. Kept baselined so a flake cannot turn main red at random; that is the only reason it is here. Flakiness is itself the defect to chase: an audit-row assertion that passes half the time tells you the write races, and 'sometimes logged' is not a control you can describe to a customer. Do NOT delete this entry just because the scorer reports it as now-passing; delete it when the test is reliably green.",
       "ticket": "AIQ-1812 (https://app.notion.com/p/3b9887c64d48819b877df111a8847dba)",
-      "since": "2026-08-11"
+      "since": "2026-08-11 (flaky: 1 fail, 1 pass in the first two observed runs)"
     }
   }
 }
