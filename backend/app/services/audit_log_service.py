@@ -29,6 +29,21 @@ ACTOR_HUMAN = "human"
 ACTOR_SERVICE = "service"
 
 
+def _as_uuid_or_none(value: Optional[str]) -> Optional[str]:
+    """`value` if it parses as a UUID, else None.
+
+    [AIQ-1807] `audit_logs.actor_id` is uuid and nullable. Callers hand it the
+    authenticated user's id, which is TEXT for legacy ReloPass-session accounts. Passing
+    one through raises and — before the savepoint below — took the caller's write with it.
+    """
+    if not value:
+        return None
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
 def _json_param(value: Optional[Dict[str, Any]]) -> Optional[str]:
     if value is None:
         return None
@@ -78,19 +93,57 @@ def insert_audit_log(
               :old_j, :new_j, :actor_t, :actor_id
             )
             """
-    conn.execute(
-        text(sql),
-        {
-            "id": aid,
-            "et": entity_type,
-            "eid": entity_id,
-            "at": action_type,
-            "old_j": old_s,
-            "new_j": new_s,
-            "actor_t": actor_type,
-            "actor_id": actor_id or None,
-        },
-    )
+    # [AIQ-1807] actor_id is a nullable uuid column, and callers pass whatever id the
+    # authenticated user carries. Legacy/seed ReloPass-session accounts have TEXT ids
+    # (e.g. 'seed-emp-testingapril'), which Postgres rejects with `invalid input syntax
+    # for type uuid`. Coerce rather than raise, and keep the real value in the payload so
+    # the actor is still recorded — just not in a column it never fitted.
+    actor_uuid = _as_uuid_or_none(actor_id)
+    if actor_id and actor_uuid is None:
+        new_s = _json_param({**(new_value or {}), "actor_ref": str(actor_id)})
+
+    # THE SAVEPOINT IS THE POINT OF THIS FUNCTION'S FAILURE HANDLING.
+    #
+    # This INSERT runs on the CALLER's connection, inside the caller's transaction. A
+    # failure here aborts that transaction — and a Python `except` around the call does
+    # not un-abort it. 64 call sites wrap this in `try/except: log`, so the caller
+    # believed it had degraded gracefully while SQLAlchemy's commit-on-exit silently
+    # became a ROLLBACK and took the PRIMARY write with it.
+    #
+    # That is not hypothetical: POST /api/employee/cases/{id}/consent returned 201 with a
+    # consent_record_id and wrote no consent row, because this insert raised on a
+    # non-uuid actor_id. The employee was told their GDPR consent was recorded when it
+    # was not, and the consent gate then correctly refused to proceed — an unescapable
+    # loop.
+    #
+    # begin_nested() scopes the damage to a SAVEPOINT: a failure rolls back the audit row
+    # only, and the caller's write survives. Same pattern as _apply_erasure in
+    # routers/gdpr.py.
+    #
+    # SOFT, BUT LOUD. An audit_logs gap is an accountability gap, so a swallowed failure
+    # is its own compliance problem in the opposite direction. Logged at ERROR with the
+    # entity, never silently.
+    try:
+        with conn.begin_nested():
+            conn.execute(
+                text(sql),
+                {
+                    "id": aid,
+                    "et": entity_type,
+                    "eid": entity_id,
+                    "at": action_type,
+                    "old_j": old_s,
+                    "new_j": new_s,
+                    "actor_t": actor_type,
+                    "actor_id": actor_uuid,
+                },
+            )
+    except Exception:
+        log.error(
+            "AUDIT GAP: audit_logs insert failed for %s/%s action=%s — the caller's write "
+            "was preserved, but this action has no audit row",
+            entity_type, entity_id, action_type, exc_info=True,
+        )
     return aid
 
 
