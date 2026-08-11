@@ -58,8 +58,26 @@ jobs:
             hr_dashboard:
               - 'apps/hr-dashboard/**'
               - '.nvmrc'
+            # This filter gates FIVE jobs: RLS coverage, Storage bucket, Migration ledger
+            # drift, Migration column-read, Migration duplicate-version. It was
+            # `supabase/migrations/**` alone, so **editing a guard or its allowlist did not
+            # re-run that guard** — the config a gate reads could change with the gate
+            # skipped, reporting green.
+            #
+            # Not hypothetical: the 2026-08-11 guard sweep (#1813) rewrote
+            # check_rls_coverage.py AND added two entries to rls_allowlist.txt, and those
+            # jobs ran only because the same PR happened to add two files under
+            # supabase/migrations/. A sweep touching just the scripts would have had all
+            # five SKIPPED. Same shape as `.nvmrc` above, which was in no filter at all.
+            #
+            # `case_id_writers` below already got this right — it lists its own guard script
+            # and baseline next to the migrations glob. This copies that.
             migrations:
               - 'supabase/migrations/**'
+              - 'supabase/rls_allowlist.txt'
+              - 'scripts/check_rls_coverage.py'
+              - 'scripts/check_migration_drift.py'
+              - 'scripts/check_column_read_before_apply.py'
             # AIQ-1731: everything that can WRITE (or orphan) a
             # case_assignments.canonical_case_id, plus the drift gate's own files.
             case_id_writers:
