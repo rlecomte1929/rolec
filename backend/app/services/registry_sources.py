@@ -186,6 +186,49 @@ SOURCES: Tuple[RegistrySource, ...] = (
         categories=("legal_admin",),
         notes="Brønnøysund org numbers give a second, government-issued identifier.",
     ),
+    # ── cross-category membership + entity confirmation ──────────────────────
+    #
+    # Added 2026-08-11 from the first real harvest (Card C): three of its evidence domains
+    # had no source here, so honest rows had nowhere to map. Modelling a source you actually
+    # used is the only way `validate()`'s tier rule can mean anything.
+    RegistrySource(
+        name="EuRA member directory",
+        base_url="https://www.eura-relocation.com/members/",
+        tier=1,
+        acquisition=Acquisition.MANUAL_EVIDENCED,
+        corridors=("FR-NO",),
+        categories=("movers", "housing_agencies"),
+        notes="European Relocation Association. Membership is audited (EuRA Global Quality "
+              "Seal), so it evidences standing — but it is an association, not a statutory "
+              "register, and carries no licence number. Scoped to FR-NO deliberately: it is "
+              "the only corridor the harvest actually sourced from it, and widening it to "
+              "FR-DE would make FR-DE housing_agencies look ingestable when recon proved it "
+              "is not (IVD login-gated, FNAIM no public search). Zero rows there is the "
+              "correct answer, and a test pins it.",
+    ),
+    RegistrySource(
+        name="Official public business register (DE)",
+        base_url="https://www.hamburg.de/branchenbuch/",
+        tier=2,
+        acquisition=Acquisition.MANUAL_EVIDENCED,
+        corridors=("FR-DE",),
+        categories=("legal_admin", "tax_finance"),
+        notes="City/state business directories confirm the ENTITY exists and is registered. "
+              "They do not evidence professional accreditation — a chamber roll does. Tier 2 "
+              "so it stages at reduced confidence and never poses as a bar or StBK listing.",
+    ),
+    RegistrySource(
+        name="Self-declared (provider site / non-registry reference)",
+        base_url="",
+        tier=3,
+        acquisition=Acquisition.MANUAL_EVIDENCED,
+        corridors=("FR-DE", "FR-NO"),
+        categories=CATEGORIES,
+        notes="NOT a registry. Exists so a row whose only evidence is the provider's own "
+              "Impressum, marketing site, or a Wikidata entry can be MODELLED honestly — at "
+              "which point validate() rejects it on the tier-3 rule instead of letting it "
+              "through wearing a registry's name. The rejects are the re-sourcing worklist.",
+    ),
     # ── tax_finance ──────────────────────────────────────────────────────────
     RegistrySource(
         name="Bundessteuerberaterkammer / regional StBK (DE)",
@@ -270,8 +313,18 @@ def confidence_for(tier: int, has_accreditation_number: bool, has_expiry: bool,
 
 
 def effective_tier(category: str, declared_tier: int) -> int:
-    """Banks are entity-confirmation only, so they stage as tier 2 whatever the register."""
-    return 2 if category == "banks" else declared_tier
+    """Banks are entity-confirmation only, so they never score better than tier 2.
+
+    `max`, not a flat 2. The original `return 2 if category == "banks"` was written to
+    DOWNGRADE a tier-1 bank register (a BaFin listing proves the institute is authorised, not
+    that it is a good relocation banking partner) — but it also silently UPGRADED tier 3 to 2,
+    which is the opposite of the intent and defeats the tier-3 rule in `validate()`.
+
+    Measured on the first real harvest: three bank rows whose only evidence was the bank's own
+    site — one of them a **Wikidata** entry — passed validation because of this. Every other
+    self-declared row in the same file was correctly rejected. Fixed 2026-08-11 (AIQ-1788).
+    """
+    return max(2, declared_tier) if category == "banks" else declared_tier
 
 
 def pairs_in_scope() -> List[Tuple[str, str]]:
