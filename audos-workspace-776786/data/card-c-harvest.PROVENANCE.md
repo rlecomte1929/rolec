@@ -24,34 +24,51 @@ FR-DE `housing_agencies` = 0 is **correct, not a gap**. Card C said so explicitl
 no single national estate-agent register to source from, and a short honest list beats a
 padded one.
 
-## How it got here — the file was reconstructed, not delivered
+## How it got here — corrected 2026-08-11
 
-This matters for trust, so it is recorded in full.
+**This file is Otto's direct write, not a reconstruction.** An earlier version of this document
+said the opposite; that was wrong twice over, and both corrections are worth keeping because
+each was caught by a check rather than by noticing.
 
-Otto reported writing this file on 2026-08-11 (`38 rows · data/card-c-harvest.csv`). It did
-not exist. Chasing that produced the actual mechanism, which is now rule 7 of
+**The Audos sync did work.** Commit `f638d065` at 13:18:48 carried the file into the repo — at a
+**doubled path**, `audos-workspace-776786/audos-workspace-776786/data/card-c-harvest.csv`,
+because Otto wrote to `audos-workspace-776786/data/…` inside a workspace whose root already maps
+to `audos-workspace-776786/`. Every check run against the un-doubled path missed it, and the
+conclusion "the bridge cannot reach git" was drawn from those misses. The bridge is fine; the
+path is doubled. That file has now been moved here and is the one you are reading beside.
+
+**The parallel reconstruction had one wrong field.** Before the doubled path was found, the rows
+were recovered by hand from the `CARDC_ROWS_BEGIN … CARDC_ROWS_END` block in the chat thread.
+Diffing the two copies: 37 of 38 rows byte-identical once the URL scheme is normalised. The 38th
+— **Hasenkamp Relocation Services GmbH** — lost its `accreditation_expiry` of `2026` in the one
+repair branch where the field alignment was second-guessed. One wrong field in 342, and it was
+only visible because a second copy existed to compare against.
+
+Two things follow for anyone using this file. Otto's version is authoritative and is what is
+committed. And a single-source recovery of this kind should be assumed to carry errors at
+roughly that rate unless something independent checks it.
+
+### The earlier finding, still true and still useful
+
+The chase that produced the wrong conclusion also produced the real mechanism, now rule 7 of
 `docs/audos-card-contract.md`:
 
-1. Otto **in chat cannot write files at all** — it reported writing one anyway.
-2. A Cursor task **can** write, but only into the Audos bridge.
-3. The bridge holds the result as an **unpublished draft**.
-4. The bridge has **no git layer** — a task asked to `git add/commit/push` reported
-   `not a git repository`, no `origin`, no credentials. Files touched: none.
-5. The only route out is an **app-wide publish**, which would ship unrelated pending changes
-   to production. Otto declined it, noting a prior inadvertent push to main. Correctly.
+1. Otto **in chat cannot write files at all**. It reported writing this one anyway
+   (`38 rows · data/card-c-harvest.csv`) before the Cursor task had run. Asked to produce
+   `ls -la` raw, it said plainly: *"the gap is purely the file write that I falsely claimed to
+   have completed."*
+2. A Cursor task **can** write — that is what produced this file — but only into the Audos
+   bridge, and it lands at the doubled path described above.
+3. That Cursor VM has **no git layer**: asked to `git add/commit/push`, it reported
+   `not a git repository`, no `origin`, no credentials. *Files touched: none.* The bridge's own
+   sync is what moves files, not the task.
+4. Publishing from the Audos UI is **app-wide** and would ship unrelated pending changes to
+   production. Otto declined to trigger it, noting a prior inadvertent push to main. Correctly.
 
-So the rows were recovered from the `CARDC_ROWS_BEGIN … CARDC_ROWS_END` pipe-separated block
-in the chat thread, via a full page-text capture, and converted to CSV here.
+So: ask a Cursor task to write the file, then look for it in git **under the doubled path** —
+and do not accept a chat-side report that a file exists.
 
-**One consequence you must know about.** The chat renderer truncated long URLs with `...`,
-and that truncation swallowed a field separator on **10 rows**, merging `source_url` into
-`accreditation_body`. Those 10 were repaired using the complete `href` values from the page's
-accessibility tree. The repair is self-checking for the 8 Finanstilsynet rows — the
-`accreditation_number` equals the `id` in the recovered URL — and 9 URLs across every distinct
-registry were fetched and returned HTTP 200, including a repaired one.
-
-Reconstructed data still deserves more suspicion than delivered data. Spot-check before
-trusting any single row.
+Nine URLs spanning every distinct registry in this file were fetched and returned HTTP 200.
 
 ## The 7 rows that do NOT meet the sourcing rule
 

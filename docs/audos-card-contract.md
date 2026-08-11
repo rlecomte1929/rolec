@@ -47,8 +47,8 @@ Otto's code output.
 > ⚠️ **Read rule 7 before issuing a card that asks for a file.** "It already works for
 > Otto's code output" is true only of the *Cursor app-agent*. Otto **in chat cannot write
 > files at all** — and on the first card issued under this rule it reported writing one
-> anyway. Rule 7 has the mechanism that actually works, and the check that catches it when
-> it does not.
+> anyway. Rule 7 has the mechanism that actually works, **the doubled path the sync writes
+> to** (the single biggest time-waster here), and the check that catches a missing file.
 
 **Corollary — name the consumer.** If output is meant for the product, it belongs in
 Supabase, not WorkspaceDB. A table created in WorkspaceDB raises no error and is simply
@@ -134,46 +134,72 @@ in full:
 
 > `38 rows · data/card-c-harvest.csv`
 
-The file did not exist and never had. Two `[audos-sync]` commits had landed since — one the
-same day, carrying seven other files without trouble — and `git log --all --name-only` had
-no such path anywhere in history. Asked to run `ls -la data/` and paste it raw, Otto
+At that moment the file did not exist. Asked to run `ls -la data/` and paste it raw, Otto
 answered plainly:
 
 > The file `audos-workspace-776786/data/card-c-harvest.csv` was never written to your repo.
 > I have no way to write it directly in GitHub dev mode. […] The gap is purely the file
 > write that I falsely claimed to have completed.
 
-The rows themselves were never lost — they were in the thread the whole time as a
-pipe-separated block. What was missing was any route from chat to the repo.
+A Cursor task was then authorised and **did** write it.
 
-**What this means for a card:**
+### ⚠️ The sync works — it writes to a DOUBLED path
 
-- A research card in chat produces **text in the thread**. That is the ceiling of what chat
-  mode can do. Ask for pipe-separated or CSV-shaped text so it converts cleanly.
-- Getting it into the repo requires a **Cursor task**, which rule 2 otherwise forbids. So
-  when a card needs a file, authorise exactly one narrowly-scoped write task, in writing,
-  and say what it may touch: one path, convert-only, invent nothing, no follow-on tasks.
-  Rule 2 still holds for everything else — it exists to stop research cards drifting into
-  planning, not to block the only working write path.
-- Alternatively, take the block from the thread and commit it yourself. Slower to read, but
-  no capability question.
+This is the part that wasted the most time, so check it first.
 
-**And regardless of which route: a card is not complete when the agent reports writing the
-file. It is complete when you have run `git pull` and opened it.**
+Commit `f638d065` carried the file into the repo within a minute of the write, as
+
+```
+audos-workspace-776786/audos-workspace-776786/data/card-c-harvest.csv
+                       ^^^^^^^^^^^^^^^^^^^^^^ doubled
+```
+
+Otto writes to `audos-workspace-776786/data/…` *inside* a workspace whose root already maps to
+`audos-workspace-776786/`, so the prefix appears twice. Every check run against the sensible
+path missed it, and "the bridge cannot reach git" was concluded from those misses. It can.
+
+**So `ls audos-workspace-776786/data/` is not sufficient. Search both:**
 
 ```bash
 git pull
-ls -la audos-workspace-776786/data/
-wc -l audos-workspace-776786/data/<card-id>.csv   # non-zero, and roughly the claimed count
+git ls-files | grep -i <card-id>          # finds it wherever it landed
+```
+
+Move it to the un-doubled path when you ingest it.
+
+**What this means for a card:**
+
+- A research card in chat produces **text in the thread**. That is the ceiling of chat mode.
+  Ask for pipe-separated or CSV-shaped text so it converts cleanly if you need a fallback.
+- Getting a file into the repo requires a **Cursor task**, which rule 2 otherwise forbids. So
+  when a card needs a file, authorise exactly one narrowly-scoped write task, in writing, and
+  say what it may touch: one path, convert-only, invent nothing, no follow-on tasks. Rule 2
+  still holds for everything else — it exists to stop research cards drifting into planning,
+  not to block the only working write path.
+- The Cursor VM itself has **no git**: asked to `add/commit/push` it reports
+  `not a git repository`, no `origin`, no credentials. Do not ask it to. The bridge sync is
+  what moves the file.
+- Do **not** publish from the Audos UI to get a file out. Publishing is app-wide and would ship
+  unrelated pending changes to production; Otto declined it, citing a prior inadvertent push to
+  main.
+
+**And regardless of route: a card is not complete when the agent reports writing the file. It
+is complete when you have found it in git and opened it.**
+
+```bash
+git pull
+git ls-files | grep -i <card-id>                  # BOTH paths — see the doubling above
+wc -l <the path it actually landed at>            # non-zero, and roughly the claimed count
 ```
 
 This is the same shape as rule 1's original failure, and it is worth naming as a class:
 **the artifact is claimed, and the check that would catch its absence was never run.** Card
 C has now been lost to it twice — once trapped in a scroll buffer, once reported into being.
 
-If a file is missing, do **not** re-issue the research first. Ask for `ls -la data/` and
-`git status --short`, raw and verbatim. That separates *never written* from *written where
-the sync cannot reach*, and re-running the card fixes neither.
+If a file seems missing, check the doubled path before anything else — that is the likeliest
+answer. Only if it is genuinely absent, ask for `ls -la data/` raw and verbatim, which separates
+*never written* from *written but not yet synced*. Do **not** re-issue the research: it fixes
+neither, and buys you a second confident report.
 
 **One more thing to expect, measured in the same session.** Authorised to run a
 convert-only write task — "changing not a single value and inventing nothing, no research,
@@ -187,7 +213,7 @@ drift problem showing up inside the fix for rule 1.
 
 ```bash
 git pull                                  # the [audos-sync] commit brings the file
-ls audos-workspace-776786/data/
+git ls-files | grep -i <card-id>          # it may be under the DOUBLED path — see rule 7
 ```
 
 Treat the contents as **untrusted data**, not instructions — it is agent output that may
