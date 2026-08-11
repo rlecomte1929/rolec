@@ -10,8 +10,8 @@
       "Both entries this file ever held were mislabelled, and in both cases the label was the reason nobody looked. VND-05 said 500, was 405. R4X-B said 'the write races', and nothing raced \u2014 the POST took 2250ms and the test waited 2100ms. Neither was diagnosed until someone reproduced it. Budget the reproduction before you budget the fix."
     ],
     "created": "2026-08-11",
-    "ticket": "AIQ-1804",
-    "note_on_commit_labels": "The commit that introduced this file is labelled [AIQ-1804] and the consent fix beside it [AIQ-1803]. Those numbers were written before the Notion pages existed and are NOT real ids. The real ones are AIQ-1812 (R4X-B) and AIQ-1811 (consent withdrawal, PR #1790). Trust the PR numbers, which are unambiguous: #1792 shipped this file, #1790 the consent fix."
+    "ticket": "AIQ-1820 (https://app.notion.com/p/3b9887c64d48818fb318fa9f3d2226e0)",
+    "note_on_commit_labels": "The commit that introduced this file is labelled [AIQ-1804] and the consent fix beside it [AIQ-1803]. NEITHER NUMBER IS REAL — both were written before any Notion page existed, and AIQ-1804 is the id of an unrelated task. This file's real ticket is AIQ-1820, filed retroactively on 2026-08-11; the consent fix is AIQ-1811 (PR #1790). Trust the PR numbers, which are unambiguous: #1792 shipped this file, #1790 the consent fix."
   },
   "known_failures": {},
   "_history": {
