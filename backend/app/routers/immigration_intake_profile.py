@@ -47,6 +47,7 @@ from ..services.immigration_service import (
     _log_access,
     _now_iso,
     _resolve_canonical_intake_fields,
+    decrypt_passport_for_display,
 )
 from ..services.ocr_passport_extractor import (
     ConflictRecord,
@@ -318,20 +319,24 @@ def get_profile_employee(
         if _v is not None:
             p[_k] = _v
 
-    # Decrypt passport_number for the employee's own view
-    if p.get("passport_number"):
-        try:
-            enc_key = _get_encryption_key()
-            with db.engine.begin() as conn:
-                row = conn.execute(
-                    text("SELECT pgp_sym_decrypt(CAST(:enc AS bytea), :key) AS decrypted"),
-                    {"enc": p["passport_number"], "key": enc_key},
-                ).mappings().first()
-            if row:
-                p["passport_number"] = row["decrypted"]
-        except Exception:
-            pass  # Return encrypted form if decryption fails
+    # Decrypt passport_number for the employee's own view.
+    #
+    # [AIQ-1802] Two bugs met here. The overlay above treats any non-null vault value as
+    # authoritative, so it had already discarded the employee's own canonical intake
+    # value; the decrypt then failed open and returned the ciphertext. Net effect: we
+    # showed the employee an unreadable blob while holding the correct plaintext they
+    # had typed themselves, a few lines earlier.
+    #
+    # An undecryptable vault value is not a winning value. Fall back to canonical.
+    decryption = decrypt_passport_for_display(p)
+    p = decryption.profile
+    withheld = decryption.withheld
+    if withheld and canonical.get("passport_number"):
+        p["passport_number"] = canonical["passport_number"]
+        withheld = False
 
+    if withheld:
+        return {"profile": p, "passport_number_withheld": True}
     return {"profile": p}
 
 

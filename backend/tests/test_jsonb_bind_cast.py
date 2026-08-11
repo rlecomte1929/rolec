@@ -94,6 +94,9 @@ _DOC_MENTIONS = {
     "backend/app/services/coordinator_session_store.py": 1,
     "backend/database.py": 1,
     "backend/db/cases.py": 1,
+    # [AIQ-1802] decrypt_passport_for_display's docstring names the bad form to warn the
+    # next editor off it. The SQL directly beneath uses CAST(:enc AS bytea).
+    "backend/app/services/immigration_service.py": 1,
 }
 
 

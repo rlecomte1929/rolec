@@ -32,10 +32,11 @@ from ..services.audit_log_service import (
 )
 from ..services.gdpr_export_service import build_data_export_pdf
 from ..services.immigration_service import (
-    _get_encryption_key,
+    PassportDecryption,
     _load_profile_for_case_employee,
     _load_session,
     _log_access,
+    decrypt_passport_for_display,
 )
 
 log = logging.getLogger(__name__)
@@ -77,22 +78,15 @@ def _assert_employee_owns_case(case_id: str, employee_id: str) -> None:
         )
 
 
-def _decrypt_passport(profile: Dict[str, Any]) -> Dict[str, Any]:
-    """Return a copy of the profile with passport_number decrypted for the owner's view."""
-    p = dict(profile)
-    if p.get("passport_number"):
-        try:
-            enc_key = _get_encryption_key()
-            with db.engine.begin() as conn:
-                row = conn.execute(
-                    text("SELECT pgp_sym_decrypt(CAST(:enc AS bytea), :key) AS decrypted"),
-                    {"enc": p["passport_number"], "key": enc_key},
-                ).mappings().first()
-            if row:
-                p["passport_number"] = row["decrypted"]
-        except Exception:
-            pass  # leave encrypted form if decryption fails
-    return p
+def _decrypt_passport(profile: Dict[str, Any]) -> "PassportDecryption":
+    """Decrypt passport_number for the owner's view, or withhold it.
+
+    [AIQ-1802] Previously left the ciphertext in place on failure, which put an
+    unreadable blob into the Article 15 subject-access PDF. The caller now surfaces the
+    withholding explicitly — a silent omission is its own Art. 15 problem, because the
+    subject cannot tell a field they never supplied from one we could not return.
+    """
+    return decrypt_passport_for_display(profile)
 
 
 @router.get("/employee/cases/{case_id}/my-data/export")
@@ -128,7 +122,14 @@ def export_my_data(
 
     profile = _load_profile_for_case_employee(case_id, employee_id)
     profile_id = profile.get("id") if profile else None
-    profile = _decrypt_passport(profile) if profile else None
+    withheld_fields: List[str] = []
+    if profile:
+        decryption = _decrypt_passport(profile)
+        profile = decryption.profile
+        if decryption.withheld:
+            # Say so in the PDF. An Art. 15 response that quietly drops a field is
+            # indistinguishable, to the subject, from one where we hold no such data.
+            withheld_fields.append("passport_number")
 
     session = _load_session(case_id, employee_id) or {}
     interview_answers = session.get("answers") or {}
@@ -178,6 +179,7 @@ def export_my_data(
         consent_records=consent_records,
         access_log=access_log,
         generated_at=datetime.now(timezone.utc),
+        withheld_fields=withheld_fields,
     )
 
     filename = f"relopass-data-export-{case_id}.pdf"
