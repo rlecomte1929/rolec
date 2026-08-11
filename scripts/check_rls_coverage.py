@@ -10,8 +10,11 @@ schemas are qualified as `schema.table` (e.g. `rce.foo`), so an rce allowlist
 entry would read `rce.foo`. `rce` needs 0 entries today (29/29 tables covered).
 
 Exit codes:
-  0 — all policy-less tables are on the allowlist (or there are none)
-  1 — at least one policy-less table is NOT on the allowlist (CI should fail)
+  0 — all policy-less tables are on the allowlist (or there are none), and every
+      allowlisted table is still unreachable through PostgREST
+  1 — a policy-less table is NOT on the allowlist; OR an allowlisted table has since
+      been granted to `anon`/`authenticated`, retiring its justification; OR the audit
+      examined 0 tables (CI should fail in all three cases)
   2 — could not connect to DB or query failed (unexpected — investigate)
 
 Usage:
@@ -52,6 +55,35 @@ WHERE t.schemaname = ANY(%s)
 GROUP BY t.schemaname, t.tablename
 HAVING COUNT(p.policyname) = 0
 ORDER BY t.schemaname, t.tablename;
+"""
+
+# Every allowlist entry is justified by the same claim: "server-role-only, not reachable
+# through the Supabase anon client". That claim is checkable, and it can expire without
+# anyone noticing — a later GRANT, or a Supabase default applied to a new table, exposes a
+# policy-less table while the allowlist keeps the guard quiet forever.
+#
+# So the allowlist is verified rather than trusted: an entry that has picked up a grant to
+# `anon` or `authenticated` fails. This is the difference between an exception with a
+# reason and a blindfold, and it is why "add it to the allowlist" is safe advice here at
+# all. PostgREST reaches the public schema through exactly these two roles.
+GRANTS_SQL = """
+SELECT g.table_schema, g.table_name, g.grantee,
+       string_agg(DISTINCT g.privilege_type, ',' ORDER BY g.privilege_type)
+FROM information_schema.role_table_grants g
+WHERE g.table_schema = ANY(%s)
+  AND g.grantee IN ('anon', 'authenticated')
+GROUP BY g.table_schema, g.table_name, g.grantee
+ORDER BY g.table_schema, g.table_name, g.grantee;
+"""
+
+# How many tables the audit looked at AT ALL. `AUDIT_SQL` returns only the offenders, so
+# "0 policy-less tables" is the same output whether every table is covered or the query
+# matched nothing — a renamed schema, a `pg_tables` permission change on the read-only
+# role, an empty database. This guard's whole job is to be believed when it is green, so
+# it has to be able to say what it examined. Same reason check_compliance_claims.py fails
+# on `scanned == 0` and check_route_auth.py fails on `examined == 0`.
+TABLE_COUNT_SQL = """
+SELECT count(*) FROM pg_tables WHERE schemaname = ANY(%s);
 """
 
 
@@ -114,7 +146,16 @@ def find_unjustified_allowlist_entries(path: Path) -> "list[tuple[int, str]]":
     return offenders
 
 
-def query_policy_less_tables(db_url: str) -> list[str]:
+def query_policy_less_tables(
+    db_url: str,
+) -> "tuple[list[str], dict[str, list[str]], int]":
+    """Return ``(policy_less, exposed_grants, tables_examined)``.
+
+    ``exposed_grants`` maps a table name to the ``anon``/``authenticated`` grants it
+    carries, so an allowlist entry's "server-role-only" justification can be re-verified
+    instead of taken on trust. ``tables_examined`` is every table in the audited schemas,
+    so a green result can state its own coverage.
+    """
     try:
         import psycopg2
     except ImportError:
@@ -135,10 +176,24 @@ def query_policy_less_tables(db_url: str) -> list[str]:
         with conn.cursor() as cur:
             cur.execute(AUDIT_SQL, (list(AUDITED_SCHEMAS),))
             rows = cur.fetchall()
+            cur.execute(GRANTS_SQL, (list(AUDITED_SCHEMAS),))
+            grant_rows = cur.fetchall()
+            cur.execute(TABLE_COUNT_SQL, (list(AUDITED_SCHEMAS),))
+            tables_examined = cur.fetchone()[0]
     finally:
         conn.close()
 
-    return [qualify_table(schemaname, tablename) for schemaname, tablename in rows]
+    exposed: dict[str, list[str]] = {}
+    for schemaname, tablename, grantee, privs in grant_rows:
+        exposed.setdefault(qualify_table(schemaname, tablename), []).append(
+            f"{grantee}:{privs}"
+        )
+
+    return (
+        [qualify_table(schemaname, tablename) for schemaname, tablename in rows],
+        exposed,
+        int(tables_examined),
+    )
 
 
 def write_allowlist(path: Path, tables: Iterable[str]) -> None:
@@ -203,8 +258,25 @@ def main() -> int:
         print("DATABASE_URL not set", file=sys.stderr)
         return 2
 
-    policy_less = query_policy_less_tables(db_url)
+    policy_less, exposed_grants, tables_examined = query_policy_less_tables(db_url)
     allowlist = load_allowlist(ALLOWLIST_FILE)
+
+    # Nothing below means anything if the audit saw no tables. Checked before the
+    # --update-allowlist branch too: seeding an allowlist from an empty result would
+    # write an empty file and call it a drained allowlist.
+    if tables_examined == 0:
+        print(
+            "[rls-coverage] FAIL — examined 0 tables in "
+            f"{'+'.join(AUDITED_SCHEMAS)}.",
+            file=sys.stderr,
+        )
+        print(
+            "  The audit query matched nothing, so 'no policy-less tables' is not a\n"
+            "  pass — it is a broken query. Check the schema names, and that the\n"
+            "  DATABASE_URL role can read pg_tables.",
+            file=sys.stderr,
+        )
+        return 1
 
     if args.update_allowlist:
         write_allowlist(ALLOWLIST_FILE, policy_less)
@@ -214,17 +286,46 @@ def main() -> int:
     missing = missing_from_allowlist(policy_less, allowlist)
     extra = sorted(allowlist - set(policy_less))  # in allowlist but now has a policy
 
+    # An allowlisted table is excused because it is server-role-only. Confirm that is
+    # still true: a later GRANT to anon/authenticated exposes a policy-less table while
+    # the allowlist keeps this guard silent. Verified, not trusted.
+    expired = sorted(
+        (t, exposed_grants[t]) for t in allowlist if t in exposed_grants
+    )
+
     if args.json:
         print(json.dumps({
+            "tables_examined": tables_examined,
             "policy_less_total": len(policy_less),
             "allowlist_total": len(allowlist),
             "missing_from_allowlist": missing,
             "stale_allowlist_entries": extra,
-            "pass": len(missing) == 0,
+            # Every allowlisted table that has since picked up a PostgREST-reachable
+            # grant. Reported here as well as in the text output, and counted in `pass`
+            # — a JSON consumer reading `pass: true` while the process exits 1 is its
+            # own silent-pass bug.
+            "expired_justifications": [
+                {"table": t, "grants": grants} for t, grants in expired
+            ],
+            "pass": not missing and not expired,
         }, indent=2))
     else:
-        print(f"[rls-coverage] policy-less tables in {'+'.join(AUDITED_SCHEMAS)} schemas: {len(policy_less)}")
-        print(f"[rls-coverage] allowlist entries: {len(allowlist)}")
+        print(f"[rls-coverage] tables examined in {'+'.join(AUDITED_SCHEMAS)} schemas: {tables_examined}")
+        print(f"[rls-coverage] policy-less tables: {len(policy_less)}")
+        print(f"[rls-coverage] allowlist entries: {len(allowlist)} (grants re-verified)")
+        if expired:
+            print(
+                f"\n[rls-coverage] FAIL — {len(expired)} allowlisted table(s) are now "
+                "reachable through PostgREST:"
+            )
+            for t, grants in expired:
+                print(f"  - {t}  ({'; '.join(grants)})")
+            print(
+                "\nThese are excused from needing a policy because they are server-role-only.\n"
+                "A grant to anon/authenticated retires that justification: the table is\n"
+                "policy-less AND reachable. Revoke the grant, or add a real RLS policy and\n"
+                "drop the allowlist entry."
+            )
         if missing:
             print(f"\n[rls-coverage] FAIL — {len(missing)} tables have no policy and are NOT on the allowlist:")
             for t in missing:
@@ -240,9 +341,12 @@ def main() -> int:
             for t in extra:
                 print(f"  - {t}  (safe to remove from allowlist)")
         else:
-            print("\n[rls-coverage] PASS — every policy-less table is on the allowlist.")
+            print(
+                f"\n[rls-coverage] PASS — {tables_examined} tables examined; every "
+                "policy-less table is allowlisted and still server-role-only."
+            )
 
-    return 1 if missing else 0
+    return 1 if (missing or expired) else 0
 
 
 if __name__ == "__main__":
