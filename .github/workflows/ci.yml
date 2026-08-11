@@ -592,14 +592,23 @@ jobs:
           # author and would be shell-injected. Pass through env and quote.
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if [ -n "$BASE_SHA" ]; then
-            # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
-            # version is exactly the mistake this guard exists to catch. For a rename
-            # --name-only prints the destination path, which is the version we check.
-            files=$(git diff --diff-filter=AR --name-only "$BASE_SHA...HEAD" -- supabase/migrations || true)
-          else
-            files=""
+          # No fallback to an empty list. This workflow is pull_request-only, so an
+          # absent base SHA means the step cannot work out its own scope — and an empty
+          # --added puts check_migration_drift.py into audit mode, where the dead and
+          # duplicate checks degrade to warnings and it exits 0. A guard that silently
+          # stops checking must go red, not green. Same for a failing git diff: `|| true`
+          # here used to convert it into "this PR added no migrations".
+          if [ -z "$BASE_SHA" ]; then
+            echo "::error::No PR base SHA — cannot determine which migrations this PR adds."
+            echo "The dead-version and duplicate-version checks would silently degrade to"
+            echo "warnings. Failing instead. (ci.yml is pull_request-only; base.sha should"
+            echo "always be set — if a new trigger was added, scope this step to PRs.)"
+            exit 1
           fi
+          # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
+          # version is exactly the mistake this guard exists to catch. For a rename
+          # --name-only prints the destination path, which is the version we check.
+          files=$(git diff --diff-filter=AR --name-only "$BASE_SHA...HEAD" -- supabase/migrations)
           {
             echo "files<<__EOF__"
             echo "$files"
@@ -672,14 +681,23 @@ jobs:
           # author and would be shell-injected. Pass through env and quote.
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if [ -n "$BASE_SHA" ]; then
-            # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
-            # version is exactly the mistake this guard exists to catch. For a rename
-            # --name-only prints the destination path, which is the version we check.
-            files=$(git diff --diff-filter=AR --name-only "$BASE_SHA...HEAD" -- supabase/migrations || true)
-          else
-            files=""
+          # No fallback to an empty list. This workflow is pull_request-only, so an
+          # absent base SHA means the step cannot work out its own scope — and an empty
+          # --added puts check_migration_drift.py into audit mode, where the dead and
+          # duplicate checks degrade to warnings and it exits 0. A guard that silently
+          # stops checking must go red, not green. Same for a failing git diff: `|| true`
+          # here used to convert it into "this PR added no migrations".
+          if [ -z "$BASE_SHA" ]; then
+            echo "::error::No PR base SHA — cannot determine which migrations this PR adds."
+            echo "The dead-version and duplicate-version checks would silently degrade to"
+            echo "warnings. Failing instead. (ci.yml is pull_request-only; base.sha should"
+            echo "always be set — if a new trigger was added, scope this step to PRs.)"
+            exit 1
           fi
+          # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
+          # version is exactly the mistake this guard exists to catch. For a rename
+          # --name-only prints the destination path, which is the version we check.
+          files=$(git diff --diff-filter=AR --name-only "$BASE_SHA...HEAD" -- supabase/migrations)
           {
             echo "files<<__EOF__"
             echo "$files"
