@@ -6,17 +6,16 @@
       "This is a RATCHET. Adding an entry needs a ticket and a reason. Removing one is always welcome.",
       "An entry that starts passing is reported as stale and must be deleted \u2014 a stale baseline silently re-opens the hole it documented.",
       "Do not add a failure here to make CI green. Fix it, or file it and link the ticket.",
-      "An entry whose REASON has gone stale is as dangerous as one that starts passing. VND-05 sat here labelled 'create_rfq returns 500' while it was actually a 405 against an endpoint deleted three weeks earlier \u2014 and that label was the stated justification for muzzling the scorer. Before trusting an entry, read the failure in the run artifact, not the label."
+      "An entry whose REASON has gone stale is as dangerous as one that starts passing. VND-05 sat here labelled 'create_rfq returns 500' while it was actually a 405 against an endpoint deleted three weeks earlier \u2014 and that label was the stated justification for muzzling the scorer. Before trusting an entry, read the failure in the run artifact, not the label.",
+      "Both entries this file ever held were mislabelled, and in both cases the label was the reason nobody looked. VND-05 said 500, was 405. R4X-B said 'the write races', and nothing raced \u2014 the POST took 2250ms and the test waited 2100ms. Neither was diagnosed until someone reproduced it. Budget the reproduction before you budget the fix."
     ],
     "created": "2026-08-11",
     "ticket": "AIQ-1804",
-    "note_on_commit_labels": "The commit that introduced this file is labelled [AIQ-1804] and the consent fix beside it [AIQ-1803]. Those numbers were written before the Notion pages existed and are NOT real ids. The real ones are AIQ-1812 (R4X-B, below) and AIQ-1811 (consent withdrawal, PR #1790). Trust the PR numbers, which are unambiguous: #1792 shipped this file, #1790 the consent fix."
+    "note_on_commit_labels": "The commit that introduced this file is labelled [AIQ-1804] and the consent fix beside it [AIQ-1803]. Those numbers were written before the Notion pages existed and are NOT real ids. The real ones are AIQ-1812 (R4X-B) and AIQ-1811 (consent withdrawal, PR #1790). Trust the PR numbers, which are unambiguous: #1792 shipped this file, #1790 the consent fix."
   },
-  "known_failures": {
-    "R4X-B": {
-      "reason": "INTERMITTENT, not consistently broken. Failed run 31491543985, PASSED run 31494214298 \u2014 the two runs either side of the gate landing. Kept baselined so a flake cannot turn main red at random; that is the only reason it is here. Flakiness is itself the defect to chase: an audit-row assertion that passes half the time tells you the write races, and 'sometimes logged' is not a control you can describe to a customer. Do NOT delete this entry just because the scorer reports it as now-passing; delete it when the test is reliably green.",
-      "ticket": "AIQ-1812 (https://app.notion.com/p/3b9887c64d48819b877df111a8847dba)",
-      "since": "2026-08-11 (flaky: 1 fail, 1 pass in the first two observed runs)"
-    }
+  "known_failures": {},
+  "_history": {
+    "VND-05": "Removed 2026-08-11. Never a bug. The test POSTed /api/hr/cases/{id}/rfq, deleted 2026-07-22 when RFQ became employee-led, so it 405'd forever. Replaced by an employee-led [VND-05] in tests/e2e/tests/deep/journey.spec.ts.",
+    "R4X-B": "Removed 2026-08-11 after 10 consecutive green runs against production with a fresh fixture each. Never a product bug either. Baselined as 'the write races'; in fact POST /api/ai/decisions takes ~2250ms and the spec's passive response listener gave the last click 2100ms of fixed sleep, so a 10% latency swing decided the verdict \u2014 5 of 12 runs red (42%). The rows were always written. Fixed by registering waitForResponse before each click. AIQ-1812."
   }
 }
