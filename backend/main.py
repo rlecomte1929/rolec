@@ -3979,6 +3979,46 @@ def get_dashboard(request: Request, user: Dict[str, Any] = Depends(get_current_u
     )
 
 
+def _enrich_case_identities(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Fill in who each case is about, for rows read from relocation_cases.
+
+    [AIQ-1803] That table's employee_id is null for all but 4 of 1,091 production rows,
+    so the HR list rendered a wall of anonymous cases. Resolution goes through
+    case_assignments — see Database.resolve_case_identities for why that is the right
+    source and public.cases is not.
+
+    ONE query for the whole page, not one per row. Only missing fields are filled, so a
+    row that was already correct is untouched, and a case whose identity cannot be
+    determined is left exactly as it was rather than given an invented name.
+    """
+    if not items:
+        return items
+    ids = [str(i.get("id")) for i in items if i.get("id")]
+    try:
+        resolved = db.resolve_case_identities(ids)
+    except Exception:
+        log.exception("list_cases: identity resolution failed")
+        return items
+    if not isinstance(resolved, dict):
+        # Never let this step break the page. Enrichment is additive by definition, so
+        # anything unexpected back from the resolver means "no enrichment", not "error".
+        return items
+    for item in items:
+        found = resolved.get(str(item.get("id") or ""))
+        if not isinstance(found, dict):
+            continue
+        if not item.get("employee_id") and found.get("employee_user_id"):
+            item["employee_id"] = found["employee_user_id"]
+        if found.get("employee_display_name"):
+            item.setdefault("employee_name", found["employee_display_name"])
+        if found.get("employee_email"):
+            item.setdefault("employee_email", found["employee_email"])
+        for key in ("origin_country_code", "dest_country_code"):
+            if not item.get(key) and found.get(key):
+                item[key] = found[key]
+    return items
+
+
 @app.get("/api/hr/cases")
 def list_cases(
     status: Optional[str] = Query(None),
@@ -3995,7 +4035,7 @@ def list_cases(
         company_id=None if is_admin else company_id,
         status=status,
     )
-    return {"cases": items}
+    return {"cases": _enrich_case_identities(items)}
 
 
 @app.post("/api/hr/cases", response_model=CreateCaseResponse)

@@ -269,6 +269,34 @@ def get_case_overview(
             employee_name = user.get("name") or user.get("email") or employee_id
             employee_email = user.get("email")
 
+    # [AIQ-1803] relocation_cases.employee_id is null for all but 4 of 1,091 production
+    # rows, so the branch above almost never fires and every case rendered as
+    # "Case 08b7280b". The identity is reachable through case_assignments — the source
+    # every endpoint that already shows a real name uses. Same for the countries, which
+    # are blank on the legacy row for 26 cases while public.cases has them.
+    #
+    # Fills only what is MISSING: a legacy row that already carries the data still wins,
+    # so this cannot change a case that was previously correct.
+    origin_country_code = case.get("origin_country_code")
+    dest_country_code = case.get("dest_country_code")
+    if not (employee_name and origin_country_code and dest_country_code):
+        try:
+            resolved = db.resolve_case_identities([case_id]).get(case_id)
+        except Exception:
+            logger.exception("hr_case_detail: identity resolution failed for %s", case_id)
+            resolved = None
+        # Enrichment is additive, so anything other than a dict back means "no
+        # enrichment" — never a 500. Without this the overview raised a DTO
+        # ValidationError wherever `db` is a test double.
+        if not isinstance(resolved, dict):
+            resolved = {}
+        if not employee_name and resolved.get("employee_display_name"):
+            employee_name = resolved["employee_display_name"]
+            employee_email = employee_email or resolved.get("employee_email")
+            employee_id = employee_id or (resolved.get("employee_user_id") or "")
+        origin_country_code = origin_country_code or resolved.get("origin_country_code")
+        dest_country_code = dest_country_code or resolved.get("dest_country_code")
+
     family_members: List[FamilyMemberDTO] = []
     try:
         with db.engine.connect() as conn:
@@ -324,9 +352,13 @@ def get_case_overview(
             primary_email=employee_email,
             nationality=case.get("nationality") or None,
         ),
-        origin_country_code=case.get("origin_country_code"),
-        dest_country_code=case.get("dest_country_code"),
-        corridor=case.get("corridor"),
+        origin_country_code=origin_country_code,
+        dest_country_code=dest_country_code,
+        # Derived when both ends are known, matching the STORED GENERATED expression on
+        # both case tables (origin || '-' || dest) rather than inventing a second format.
+        corridor=(case.get("corridor")
+                  or (f"{origin_country_code}-{dest_country_code}"
+                      if origin_country_code and dest_country_code else None)),
         status=str(case.get("status") or "draft"),
         stage=case.get("stage"),
         target_start_date=str(case["target_start_date"]) if case.get("target_start_date") else None,
