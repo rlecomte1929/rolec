@@ -152,7 +152,12 @@ def test_a_bare_year_expiry_survives_the_date_column(engine, candidates):
 
 
 def test_rerunning_stages_nothing_new(engine, candidates):
-    """The property that makes this safe to run twice by accident."""
+    """The property that makes this safe to run twice by accident.
+
+    This test used to assert `dup == 31` — it encoded the append-a-duplicate-set behaviour AS
+    CORRECT, which is why the wart was dismissed as noise instead of fixed. It then happened
+    in production. A second pass must now write nothing at all.
+    """
     with engine.begin() as conn:
         stage(conn, candidates, dry_run=False)
     with engine.begin() as conn:
@@ -161,7 +166,7 @@ def test_rerunning_stages_nothing_new(engine, candidates):
 
     assert sum(r.staged for r in results) == 0
     assert pending == 31, "the second run must not add a single new pending candidate"
-    assert dup == 31
+    assert dup == 0, "nor a single duplicate row — re-staging is a no-op, not an append"
 
 
 def test_a_supplier_we_already_have_stages_as_duplicate(engine, candidates):
@@ -441,3 +446,58 @@ def test_a_harvest_matches_an_existing_supplier_by_LEGAL_name(full_engine, candi
 
     assert rows == 1, "no second Expat Relocation row may be created"
     assert attached == 1, "the FR-NO housing capability attaches to the supplier we already had"
+
+
+def test_staging_twice_writes_nothing_the_second_time(full_engine, candidates):
+    """The bug that hit production on 2026-08-11.
+
+    `--promote` implies `--apply`, so the natural "stage, check the numbers, then promote"
+    sequence runs staging twice. Every row matched the first run's dedupe keys, so the second
+    pass re-staged all 31 as 'duplicate' under 8 fresh runs — 62 candidates and 16 runs where
+    there should have been 31 and 8. The directory was unharmed (the supplier name index and
+    add_capability's duplicate check absorbed it) but the staging tables needed hand cleanup.
+
+    Staging must be a no-op on a file it has already ingested.
+    """
+    _staged(full_engine, candidates)
+    with full_engine.begin() as conn:
+        first = conn.execute(
+            text("SELECT (SELECT count(*) FROM vendor_candidates), "
+                 "       (SELECT count(*) FROM vendor_curation_runs)")
+        ).one()
+
+    _staged(full_engine, candidates)                      # exactly what the CLI did
+    with full_engine.begin() as conn:
+        second = conn.execute(
+            text("SELECT (SELECT count(*) FROM vendor_candidates), "
+                 "       (SELECT count(*) FROM vendor_curation_runs)")
+        ).one()
+
+    assert first == (31, 8)
+    assert second == first, (
+        f"re-staging appended rows: {first} became {second}. A second pass over the same file "
+        "must write nothing."
+    )
+
+
+def test_a_genuinely_new_row_still_stages_after_a_first_run(full_engine, candidates):
+    """The skip must not wedge the table shut — a later harvest with a new company still lands."""
+    from backend.app.services.registry_sources import SOURCES
+    from backend.app.services.vendor_harvester import Candidate
+
+    _staged(full_engine, candidates)
+    fidi = next(s for s in SOURCES if s.name == "FIDI FAIM member directory")
+    newcomer = Candidate(
+        name="Brand New Movers GmbH", website_url="", corridor="FR-DE",
+        service_category="movers", source=fidi,
+        source_url="https://www.fidi.org/find-fidi-affiliate/brand-new-movers",
+        accreditation_body="FIDI", country_code="DE",
+    )
+    _staged(full_engine, list(candidates) + [newcomer])
+
+    with full_engine.begin() as conn:
+        total = conn.execute(text("SELECT count(*) FROM vendor_candidates")).scalar_one()
+        landed = conn.execute(
+            text("SELECT count(*) FROM vendor_candidates WHERE name = 'Brand New Movers GmbH'")
+        ).scalar_one()
+    assert (total, landed) == (32, 1)
