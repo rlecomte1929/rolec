@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from ...database import db
 from ...app.db import SessionLocal
 from ...app import crud
+from .destination_normalizer import normalize_destination_country
 from .guidance_pack_service import build_profile_snapshot
 
 log = logging.getLogger(__name__)
@@ -33,13 +34,38 @@ def _apply_applies_to(applies_to: Dict[str, Any], snapshot: Dict[str, Any]) -> b
     return True
 
 
+def _resolve_destination(raw: Optional[str]) -> Optional[str]:
+    """Normalise a case's destination to ISO-2, falling back to the raw value.
+
+    [AIQ-1821] Cases do not consistently store ISO-2. Measured on prod 2026-08-12:
+    **426 of 1389 wizard_cases store a country NAME** ("Germany", "Norway", "France")
+    rather than "DE"/"NO"/"FR". Both consumers below match exactly —
+    `list_dossier_questions` on `destination_country = :dest`, and
+    `list_approved_requirement_facts` on `e.destination_country = :dest` — so an
+    un-normalised "Norway" silently returned zero questions AND zero facts, and the
+    endpoint reported "ok" with empty results. That reads as "nothing is required of
+    you", which is the opposite of the truth.
+
+    The sibling endpoint GET /api/dossier/questions already normalises; this path did not.
+    Both now share `destination_normalizer`, so they cannot drift apart.
+
+    Falls back to the raw value when the country isn't in the normaliser's table, so an
+    unmapped destination behaves exactly as it does today rather than becoming None —
+    "no facts for Atlantis" must not turn into "no destination set".
+    """
+    if not raw:
+        return None
+    return normalize_destination_country(raw) or raw
+
+
 def compute_requirements_sufficiency(case_id: str, user_id: str) -> Dict[str, Any]:
     with SessionLocal() as session:
         case = crud.get_case(session, case_id)
         if not case:
             raise ValueError("Case not found")
         draft = _safe_parse_case_draft(getattr(case, "draft_json", None))
-        dest = case.dest_country or (draft.get("relocationBasics") or {}).get("destCountry")
+        raw_dest = case.dest_country or (draft.get("relocationBasics") or {}).get("destCountry")
+        dest = _resolve_destination(raw_dest)
 
     dossier_answers = {}
     if dest:

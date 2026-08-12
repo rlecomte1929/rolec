@@ -7,6 +7,32 @@ from typing import Any, Dict, List, Optional
 from .guidance_markdown import render_guidance_markdown
 
 
+# [AIQ-1821] Dossier question keys that establish WHICH visa/permit route applies, as
+# opposed to its progress. Matched as a suffix against `<cc>.<key>` so one rule covers
+# every destination: au.visa_type_confirmed, de.visa_type_confirmed, ch.permit_type_confirmed,
+# no.permit_type_confirmed, za.visa_type_confirmed, fr.work_permit_route, ca.permit_route_confirmed,
+# sg.pass_type_known, us.visa_known. Generalises the SG/US special-case that `build_coverage`
+# hardcodes, without a per-country table that would silently go stale as destinations are added.
+_VISA_TYPE_ANSWER_SUFFIXES = (
+    "visa_type_confirmed",
+    "permit_type_confirmed",
+    "permit_route_confirmed",
+    "work_permit_route",
+    "pass_type_known",
+    "visa_known",
+)
+
+
+def _derive_visa_type(dossier_answers: Dict[str, Any]) -> Optional[Any]:
+    """The answered dossier value that establishes the visa/permit route, if any."""
+    for key, value in (dossier_answers or {}).items():
+        if not isinstance(key, str):
+            continue
+        if key.rsplit(".", 1)[-1] in _VISA_TYPE_ANSWER_SUFFIXES and value not in (None, "", [], {}):
+            return value
+    return None
+
+
 def build_profile_snapshot(draft: Dict[str, Any], dossier_answers: Dict[str, Any], destination_country: Optional[str]) -> Dict[str, Any]:
     basics = draft.get("relocationBasics") or {}
     employee = draft.get("employeeProfile") or {}
@@ -23,6 +49,11 @@ def build_profile_snapshot(draft: Dict[str, Any], dossier_answers: Dict[str, Any
         "nationality": employee.get("nationality"),
         "current_location": employee.get("residenceCountry"),
         "notes": assignment.get("notes") if isinstance(assignment, dict) else None,
+        # [AIQ-1821] Carried so `visa_type` — which requirements_extractor emits as a
+        # required_field for any fact mentioning a visa — can actually be satisfied.
+        # Before this it was never a snapshot key, so it sat in `missing_fields`
+        # permanently: a to-do no user could ever complete.
+        "visa_type": _derive_visa_type(dossier_answers),
         "dossier_answers": dossier_answers,
         "family_members": family,
     }
