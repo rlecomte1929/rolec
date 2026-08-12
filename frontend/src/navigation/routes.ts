@@ -117,10 +117,6 @@ export const ROUTE_DEFS = {
   hrPolicyManagement: { path: '/hr/policy-management', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Policy Builder wizard (AIQ-37-B/C). */
   hrPolicyBuilder: { path: '/hr/settings/policy', roles: ['HR', 'ADMIN'] as RouteRole[] },
-  /** [P2-6] HR validation gate — review extracted policy values before publishing */
-  hrPolicyBuilderReview: { path: '/hr/policy-builder/review', roles: ['HR', 'ADMIN'] as RouteRole[] },
-  /** [P2-8] HR document management — upload history, status badges, version diffs */
-  hrPolicyBuilderDocuments: { path: '/hr/policy-builder/documents', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Policy exceptions inbox — HR review + approve/reject flow. */
   hrExceptions: { path: '/hr/exceptions', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** AI decisions audit (AI-002) — EU AI Act Art. 14(4)(c) human oversight log. */

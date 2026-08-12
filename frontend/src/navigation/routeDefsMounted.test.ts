@@ -60,21 +60,16 @@ function mountedPaths(): Set<string> {
 /**
  * Pre-existing unmounted declarations, enumerated so no NEW one can be added silently.
  *
- * The two `hrPolicyBuilder*` entries belong to the P2-6 policy-extraction pipeline, which is a
- * UI-only shell: `PolicyReviewQueuePage` / `PolicyDocumentsPage` are mounted nowhere, the backend
- * `/api/hr/policy-builder/review` does not exist (prod returns 405), and `public.policy_facts` —
- * the table the queue reads — has 0 rows. Mounting them would surface pages that fail on load.
- * Their deletion is queued; these entries go with it.
+ * The two `hrPolicyBuilder*` entries that used to sit here are gone: the P2-6 policy-extraction
+ * pipeline they belonged to was a UI-only shell — pages mounted nowhere, a backend
+ * `/api/hr/policy-builder/review` that did not exist (prod returned 405), and `public.policy_facts`
+ * at 0 rows — so it was deleted rather than mounted.
  *
- * `HrPolicy.tsx` does contain navigate(buildRoute('hrPolicyBuilderReview')), but it is NOT a live
- * dead link: it sits in `PolicyNextStepCta`'s `activeTab === 'builder'` branch, and HrPolicy
- * renders that component only when `activeTab === 'policy'` — so the button never renders.
- * Confirmed in the browser: the "Next step" banner is absent on the Policy builder tab.
+ * `employeeCaseDossierBuild` is referenced by nothing at all. It is left declared, and listed here,
+ * because an unreferenced declaration is inert; only a *mounted* route or a *live* link is load-bearing.
  */
 const KNOWN_UNMOUNTED = [
   'employeeCaseDossierBuild',
-  'hrPolicyBuilderDocuments',
-  'hrPolicyBuilderReview',
 ];
 
 describe('every declared route is mounted', () => {
