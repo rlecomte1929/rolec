@@ -41,6 +41,7 @@ python -m backend.scripts.list_representative_fixtures --json # machine list
 | `tests/fixtures/rag_eval/triad_cases.json` | `run_rag_triad` | Replace mock-judge-friendly cases with real (answer, chunks, gold-label) triples. |
 | `tests/fixtures/rag_eval/judge_calibration_cases.json` | `run_judge_calibration` | These ARE the expert labels the judge is measured against — needs a real SME pass (Hamel "validate the judge"). Highest-leverage to curate. |
 | `tests/fixtures/ranking/golden_rankings.json` | `run_ranking_eval`, preference learning | Ordering was **seeded from the static engine** → it's a regression guard, not preference ground truth. Replace `ideal_order`/`relevance` with real user-preference judgements before trusting NDCG as a quality signal. |
+| `tests/fixtures/requirement_facts_eval/{golden.jsonl,pages/*.html}` | `test_requirement_extraction_parse_gate` (PR gate), `eval_requirement_extraction` (weekly, report-only) | **v2, snapshot-backed and `verified`.** v1 was 6 live gov URLs, 4 of them hub/JS pages the extractor cannot read, so it measured almost nothing and passed vacuously on network failure. v2 commits the HTML so the eval is offline and deterministic. Anchors were machine-verified against the snapshots, not asserted from memory. Gap: all 9 pages are the **FR→NO corridor** and 4 of 5 authorities are Norwegian — widen to other corridors before treating the recall number as a general quality bar. Snapshots go stale silently; the weekly live-ish run is the only drift signal. |
 
 ## Why this matters
 

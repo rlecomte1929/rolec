@@ -83,6 +83,22 @@ jobs:
             --emit-dashboard --out-dir audit/rag_eval \
             || echo "::warning::run_ranking_judge (live) failed"
 
+      # [AIQ-1821] Requirement-fact extraction quality. Needs OPENAI_API_KEY (the extractor is
+      # a gpt-4o caller), NOT Anthropic, so it is its own guarded step. Reads committed HTML
+      # snapshots rather than live government sites, so it is deterministic apart from the
+      # model itself and cannot be skewed by a site being down. Report-only, like everything
+      # else here — the PR-blocking half of this eval is the network-free parse gate in
+      # backend/tests/test_requirement_extraction_parse_gate.py.
+      - name: Requirement-fact extraction (guarded on OPENAI_API_KEY)
+        if: ${{ env.OPENAI_API_KEY != '' }}
+        run: |
+          set -uo pipefail
+          mkdir -p audit/rag_eval
+          python backend/scripts/eval_requirement_extraction.py \
+            --out "audit/rag_eval/_requirement_extraction_full_$(date +%Y%m%d).json" \
+            --emit-dashboard audit/rag_eval \
+            || echo "::warning::requirement_extraction producer failed"
+
       - name: Upload eval reports
         uses: actions/upload-artifact@v7
         with:
