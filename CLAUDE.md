@@ -364,6 +364,40 @@ A multi-stage remediation plan lives at `audit/REMEDIATION_PLAN.md` with a rolli
 
 **Gate discipline:** No stage starts until the previous stage's PR is merged + canary clean. See `audit/REMEDIATION_PLAN.md` §"Universal stage protocol" for the per-stage checklist.
 
+## Work Queue hygiene (two rules that keep the queue honest)
+
+Audited 2026-08-12: of 26 items in **Human Review**, only 4 were finished work awaiting sign-off.
+15 had no implementing commit at all. A status lane that is 58% phantom cannot be used to decide
+what to work on, and every agent that reads it pays the cost.
+
+**1. `Human Review` means the work SHIPPED and needs a human to check it. Nothing else.**
+
+The lane filled up because it was being set when an Otto draft was *staged* — notes ending
+*"Draft STAGED in Otto — not run, not published."* A staged draft is `Ready for AI`. A blocked one
+is `Blocked`. Neither is a review state, because there is nothing to review.
+
+Before moving anything to `Human Review`, name the artifact: a commit on `origin/main`, a merged
+PR, or a file that exists. If you cannot, it is not ready for review.
+
+**2. Never reuse the `[AIQ-nnnn]` subject-tag form for a cross-reference in a commit body.**
+
+Three commits carry a tag whose diff is about something else entirely — `91a99eed` `[AIQ-1807]`,
+`6b49d1a2` `[AIQ-1806]`, `85fac265` `[AIQ-1794]`. A `git log --grep` closure sweep marks all three
+as shipped; two of the three tickets have no code at all.
+
+The subject tag is a *claim of authorship over that ticket's deliverable*. In a body, refer to
+other work as `AIQ-1807` or "see AIQ-1807" — plain, no brackets. Reserve the bracketed form for
+the subject line of the commit that actually implements it.
+
+**Corollary, learned the same day:** a docs-only commit bearing a ticket's id reads as progress in
+the log and ships nothing. If a ticket's only commit is documentation, its status is not `Done` —
+`AIQ-1794`'s merged document concludes that the fix the ticket prescribes *cannot work*, which is
+a genuine and useful outcome, but it is not the ticket being finished.
+
+**Verifying a closure:** check the file or the diff, never the commit subject alone. Tests are
+often `unittest` classes, so `grep "^def test_"` returns 0 for a file full of them — use
+`grep -nE "^class |    def test_"`.
+
 ## Behavioral Guidelines (Karpathy)
 
 Source: https://raw.githubusercontent.com/forrestchang/andrej-karpathy-skills/main/CLAUDE.md
