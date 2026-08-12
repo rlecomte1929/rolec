@@ -175,6 +175,7 @@ const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage'));
 const AdminAuditLogPage = lazy(() => import('./pages/admin/AdminAuditLogPage'));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
 const AdminVettingQueue = lazy(() => import('./pages/admin/AdminVettingQueue').then((module) => ({ default: module.AdminVettingQueue })));
+const AdminContentReviewPage = lazy(() => import('./pages/admin/AdminContentReviewPage').then((m) => ({ default: m.AdminContentReviewPage })));
 const AdminSupplierSubmissions = lazy(() => import('./pages/admin/AdminSupplierSubmissions').then((module) => ({ default: module.AdminSupplierSubmissions })));
 const AdminPrompts = lazy(() => import('./pages/admin/AdminPrompts').then((module) => ({ default: module.AdminPrompts })));
 const AdminProspects = lazy(() => import('./pages/admin/AdminProspects').then((module) => ({ default: module.AdminProspects })));
@@ -503,6 +504,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminAuditLog.path} element={<RequireAdminRoute><AdminAuditLogPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliers.path} element={<RequireAdminRoute><AdminSuppliers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminVettingQueue.path} element={<RequireAdminRoute><AdminVettingQueue /></RequireAdminRoute>} />
+            <Route path={ROUTE_DEFS.adminContentReview.path} element={<RequireAdminRoute><AdminContentReviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSupplierSubmissions.path} element={<RequireAdminRoute><AdminSupplierSubmissions /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPrompts.path} element={<RequireAdminRoute><AdminPrompts /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminProspects.path} element={<RequireAdminRoute><AdminProspects /></RequireAdminRoute>} />
