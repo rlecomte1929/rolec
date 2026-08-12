@@ -141,6 +141,23 @@ class CaseAccessAuthUuidTests(unittest.TestCase):
         user = {"id": "seed-hr-legacy", "auth_uuid": self.hr_uuid, "role": "HR"}
         case_service._assert_case_access(user, self.case_id)  # granted by company match
 
+    def test_hr_from_another_company_is_forbidden(self):
+        """The company match must be a match, not merely an HR role.
+
+        The sibling test above pins that HR of the SAME company is granted, and the
+        HR case dossier now leans on exactly that branch to show destination
+        requirements for someone else's case. That makes the negative worth its own
+        test: an HR user with a real profile in a DIFFERENT company must be refused.
+        `test_non_owner_is_forbidden` does not cover it — that caller has no profile
+        row at all, so it never reaches the company comparison.
+        """
+        self._seed_case(employee_id=_u())
+        self._seed_profile(self.hr_uuid, "co-2-somebody-else")
+        user = {"id": "seed-hr-other-co", "auth_uuid": self.hr_uuid, "role": "HR"}
+        with self.assertRaises(HTTPException) as ctx:
+            case_service._assert_case_access(user, self.case_id)
+        self.assertEqual(ctx.exception.status_code, 403)
+
     # --- assignment path (no cases row → resolve case_assignments) ----------
 
     def test_legacy_employee_owns_assignment_via_auth_uuid(self):
