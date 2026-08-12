@@ -182,8 +182,13 @@ test.describe('public crawler surface', () => {
       const path = new URL(loc).pathname;
       const { status, body: page } = await fetchRaw(path);
       expect(status, `sitemap advertises ${loc} but it returns ${status}`).toBe(200);
-      // The bare origin legitimately IS the SPA; everything else must be prerendered.
-      if (path !== '/') assertNotTheShell(loc, page);
+      // Every sitemap URL, `/` included. This line used to read
+      //   if (path !== '/') assertNotTheShell(loc, page);
+      // with the comment "the bare origin legitimately IS the SPA". That exemption was made
+      // obsolete by AIQ-1797 (which prerendered the homepage) but left in place, so when the
+      // rewrite serving `/` turned out to be unreachable and prod went back to shipping the
+      // shell at priority 1.0, the one test iterating the sitemap was the one told to skip it.
+      assertNotTheShell(loc, page);
     }
   });
 });
