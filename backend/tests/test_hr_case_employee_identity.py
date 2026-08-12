@@ -236,5 +236,51 @@ class TestTheListResolvesInOneQuery(unittest.TestCase):
         spy.assert_not_called()
 
 
+class CreateCaseMustNotClaimAnEmployeeTests(unittest.TestCase):
+    """[AIQ-1818] The obvious "fix" for the null column is a data-protection defect.
+
+    `POST /api/hr/cases` builds `RelocationProfile(userId=<the HR user>)`, so
+    `profile_json->>'userId'` is the *creator*, not the subject — measured equal to
+    `hr_user_id` in 466 of 466 unclaimed prod rows. `app/routers/gdpr.py` resolves a
+    subject-access request with `relocation_cases.employee_id::text = :uid`, so writing
+    the creator's id into that column would return every case they ever opened, about
+    other people, to whoever asked for *their own* data.
+
+    This test fails if someone adds employee_id to the INSERT.
+    """
+
+    def _captured_insert(self, profile: Dict[str, Any], company_id: Any):
+        from backend.db.cases import CasesMixin
+
+        conn = MagicMock()
+        engine = MagicMock()
+        engine.begin.return_value.__enter__.return_value = conn
+
+        holder = type("_H", (CasesMixin,), {})()
+        holder.engine = engine
+        holder.create_case("case-1", "hr-user-1", profile, company_id=company_id)
+
+        conn.execute.assert_called_once()
+        stmt, params = conn.execute.call_args[0]
+        return str(stmt), params
+
+    def test_the_insert_does_not_write_employee_id(self) -> None:
+        profile = {"userId": "hr-user-1", "primaryApplicant": {}}
+        for company_id in ("company-a", None):
+            with self.subTest(company_id=company_id):
+                sql, params = self._captured_insert(profile, company_id)
+                self.assertNotIn("employee_id", sql,
+                                 "an unclaimed shell must not name a subject it does not have")
+                self.assertNotIn("hr-user-1", [v for k, v in params.items() if k != "hr"],
+                                 "the HR creator's id must not leak into any other column")
+
+    def test_the_creator_is_still_recorded_as_hr_user(self) -> None:
+        """The guard above must not be satisfiable by writing nothing at all."""
+        sql, params = self._captured_insert({"userId": "hr-user-1"}, "company-a")
+        self.assertIn("hr_user_id", sql)
+        self.assertEqual(params["hr"], "hr-user-1")
+        self.assertEqual(params["cid"], "company-a")
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

@@ -107,7 +107,6 @@ collect_ignore = [
     "test_gap_analysis_routers.py",
     "test_hr_assignments_corridor_endpoint.py",
     "test_hr_case_audit.py",
-    "test_hr_case_detail.py",
     "test_hr_case_resolve.py",
     "test_hr_company_resolution_sweep.py",
     "test_hr_legacy_company_resolution.py",
