@@ -1114,7 +1114,11 @@ def register_prefilled_document(
     path's job (``TODO [AIQ-1759]``), so the row is the durable record and the
     binary can be produced later without changing this contract.
     """
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id, exactly as the sibling upload_form_document does — its own
+    # comment says storing the raw id "would make the row invisible to every reader that
+    # resolves". This handler was storing the raw one: with an assignment id the INSERT
+    # succeeded and the reader (cases_read.py, which resolves) could never match the row.
+    resolved_case_id = _assert_case_access(user, case_id)
 
     actor_id = user.get("id") or user.get("sub")
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
@@ -1177,7 +1181,7 @@ def register_prefilled_document(
                     f"          size_bytes, uploaded_by, doc_key, created_at"
                 ),
                 {
-                    "fid": form_id, "cid": case_id, "name": file_name,
+                    "fid": form_id, "cid": resolved_case_id, "name": file_name,
                     "path": storage_path, "ctype": "application/pdf",
                     "uid": actor_id,
                     "report": json.dumps(payload.fill_report or {}),
@@ -1623,7 +1627,12 @@ def post_case_message(
     """
     # Tenant isolation: enforce that the caller is actually linked to the case
     # (assignee / HR in-company / admin) — previously this endpoint had no check.
-    _assert_case_access(user, case_id)
+    #
+    # Key the INSERT on the guard's RESOLVED id. The reader
+    # (cases_read.list_case_messages) goes through _canonical_case_id_or_404, so a message
+    # stored under an assignment id returned 201 and then never appeared in the thread —
+    # written, committed, unreadable.
+    resolved_case_id = _assert_case_access(user, case_id)
     if not body.content.strip():
         raise HTTPException(status_code=422, detail="content must not be empty")
 
@@ -1640,7 +1649,7 @@ def post_case_message(
                     "(id, case_id, sender_id, sender_role, content, created_at) "
                     "VALUES (:id, :case_id, :sender_id, :sender_role, :content, :now)"
                 ),
-                {"id": new_id, "case_id": case_id, "sender_id": sender_id,
+                {"id": new_id, "case_id": resolved_case_id, "sender_id": sender_id,
                  "sender_role": sender_role, "content": body.content, "now": now},
             )
             row = conn.execute(
