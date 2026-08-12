@@ -92,9 +92,9 @@ const rows = [];
 const failures = [];
 
 for (const [route, relSrc, phrase] of TARGETS) {
-  // `/` lives at dist/landing.html, not dist/index.html — see the write-site comment in
-  // prerender.mjs. index.html must stay the pristine shell for the /* catch-all.
-  const file = path.join(DIST, route === '/' ? 'landing.html' : `${route.slice(1)}/index.html`);
+  // `/` IS dist/index.html — a rewrite cannot serve the root while a file exists there.
+  // The shell moved to dist/app.html; see the write-site comment in prerender.mjs.
+  const file = path.join(DIST, route === '/' ? 'index.html' : `${route.slice(1)}/index.html`);
   if (!existsSync(file)) {
     failures.push(`${route}: ${path.relative(FRONTEND, file)} was not emitted`);
     rows.push([route, '—', '—', 'MISSING']);
@@ -143,24 +143,36 @@ for (const [a, b, c, d] of rows) {
 }
 console.log('');
 
-// dist/index.html is the `/*` catch-all document, served to /auth and every
-// authenticated route. It must stay the SHELL. Prerendering marketing copy into it
-// makes an HR user opening /hr/dashboard receive the landing page, see it, and then
-// watch createRoot replace it. This guard exists because that is exactly what the
-// obvious implementation of "prerender /" does.
-const shell = path.join(DIST, 'index.html');
-if (existsSync(shell)) {
+// The catch-all document — served to /auth and every authenticated route — must stay the
+// SHELL. Marketing copy there means an HR user opening /hr/dashboard receives the landing
+// page, sees it, and then watches createRoot replace it.
+//
+// That document used to be dist/index.html, and this guard asserted index.html was empty.
+// It now asserts the swap that replaced that arrangement, because the old one could not
+// work: Render skips rewrite rules whenever a resource exists at the path, so
+// `source: / -> /landing.html` was unreachable and the homepage served the shell to every
+// crawler. index.html is now the homepage and app.html is the shell.
+//
+// Both halves are checked. Asserting only that app.html is empty would pass just as well if
+// app.html were missing entirely and every authenticated route 404'd.
+const shell = path.join(DIST, 'app.html');
+if (!existsSync(shell)) {
+  failures.push(
+    'dist/app.html was not emitted — it is the /* catch-all document for /auth and every ' +
+      'authenticated route. Without it those paths have nothing to serve.',
+  );
+} else {
   const shellText = visibleText(await readFile(shell, 'utf8'));
   if (shellText.length > MIN_VISIBLE) {
     failures.push(
-      `dist/index.html has ${shellText.length} visible chars — it must remain the SPA shell. ` +
-        'It is the /* catch-all served to every authenticated route; marketing copy there ' +
-        'flashes before the app mounts. Emit the landing page to landing.html via ' +
-        "`outFile` and point render.yaml's `source: /` at it.",
+      `dist/app.html has ${shellText.length} visible chars — it must be the SPA shell, not a ` +
+        'prerendered page. It is served to every authenticated route, where marketing copy ' +
+        'flashes before the app mounts. prerender.mjs must write it from the pristine ' +
+        'template BEFORE the route loop overwrites index.html.',
     );
   } else {
     console.log(
-      `[verify-prerender] dist/index.html is still the shell (${shellText.length} visible chars) — ` +
+      `[verify-prerender] dist/app.html is the shell (${shellText.length} visible chars) — ` +
         'authenticated routes unaffected.\n',
     );
   }

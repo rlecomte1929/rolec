@@ -35,9 +35,9 @@ export interface PrerenderedRoute {
   /**
    * [AIQ-1797] Emit to dist/<outFile> instead of dist/<path>/index.html.
    *
-   * Needed only by `/`: the default would write dist/index.html, which is the `/*`
-   * catch-all document every authenticated route is served. See the comment at the
-   * write site in scripts/prerender.mjs.
+   * Needed only by `/`, whose default output path would collapse to dist/index.html
+   * anyway — stating it explicitly is what keeps that from looking like an accident.
+   * See the comment at the write site in scripts/prerender.mjs.
    */
   outFile?: string;
   /** URL path, also the output directory: dist/<dir>/index.html */
@@ -95,8 +95,10 @@ export const ROUTES: PrerenderedRoute[] = [
   // agree, so drift fails the build instead of silently shipping a wrong <title>.
   {
     path: '/',
-    // NOT dist/index.html — that file is the /* catch-all served to every app route.
-    outFile: 'landing.html',
+    // dist/index.html, deliberately. A rewrite cannot serve `/` — Render skips redirect and
+    // rewrite rules whenever a resource already exists at the path, and index.html always
+    // does. The shell moved to dist/app.html instead; `/*` points there.
+    outFile: 'index.html',
     title: 'ReloPass — Global mobility infrastructure',
     description:
       'Run relocation cases, timelines, documents, providers, and policy controls through one operating layer.',

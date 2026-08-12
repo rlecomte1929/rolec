@@ -153,6 +153,16 @@ async function main() {
   const { ROUTES } = await import(path.join(SSR_OUT, 'prerender-entry.js'));
   const baseHtml = await readFile(template, 'utf8');
 
+  // The pristine shell has to be saved under its own name BEFORE the loop, because `/` now
+  // writes over dist/index.html. Ordering is load-bearing in one direction only: `baseHtml`
+  // is already in memory, so the later overwrite cannot corrupt the other routes — but if
+  // this copy ran after `/` was written, the shell would be gone outright. There is no other
+  // copy to recover it from: frontend/index.html is the UNBUILT template, carrying
+  // `/src/main.tsx` instead of the hashed asset tags Vite emits.
+  const shellPath = path.join(DIST, 'app.html');
+  await writeFile(shellPath, baseHtml, 'utf8');
+  console.log(`prerender: saved the SPA shell to ${path.relative(ROOT, shellPath)}`);
+
   for (const route of ROUTES) {
     const markup = route.render();
     if (!markup || markup.length < 200) {
@@ -168,18 +178,25 @@ async function main() {
     }
     html = withDescription(withTitle(html, route.title), route.description);
 
-    // [AIQ-1797] `outFile` exists for exactly one route: `/`.
+    // `outFile` exists for exactly one route: `/`, which writes dist/index.html.
     //
-    // The default (dist/<route>/index.html) would put `/` at dist/index.html — which is
-    // also the `/*` catch-all target for EVERY unmatched path, including /auth and every
-    // authenticated route. Prerendering the landing page there means an HR user opening
-    // /hr/dashboard is served the marketing homepage, sees it, and then watches
-    // createRoot wipe and replace it. Measured: dist/index.html went 1,327 -> 21,182
-    // bytes of landing copy.
+    // [AIQ-1797] first sent `/` to dist/landing.html with a `source: /` rewrite in
+    // render.yaml, to keep dist/index.html a pristine shell for the `/*` catch-all. The
+    // files were correct and the rewrite never fired, because Render's routing says:
     //
-    // So `/` is emitted to dist/landing.html and pointed at by an explicit `source: /`
-    // rewrite in render.yaml. dist/index.html stays the pristine shell, and the flash
-    // never happens.
+    //   "Render does not apply redirect or rewrite rules to a path if a resource exists at
+    //    that path. Instead, Render simply serves the resource at that path."
+    //
+    // dist/index.html IS the resource at `/`, so that rule was unreachable by construction —
+    // and that is also why the other seven routes work: nothing exists at dist/platform, only
+    // dist/platform/index.html, so their rewrites are reached. Production served the 1,670-byte
+    // shell to every crawler hitting the homepage.
+    //
+    // So the roles are swapped: the landing page IS dist/index.html and needs no rewrite, while
+    // the shell lives at dist/app.html (written above) and `/*` points there. The concern the
+    // original comment raised is real and unchanged — an HR user must never be served marketing
+    // copy — and it is now handled by the catch-all target rather than by the homepage's.
+    // verify-prerender.mjs asserts both halves.
     const outPath = route.outFile
       ? path.join(DIST, route.outFile)
       : path.join(DIST, route.path.replace(/^\//, ''), 'index.html');
