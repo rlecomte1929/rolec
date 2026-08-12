@@ -18,8 +18,14 @@
 # cases, the biggest corridor) found ZERO rows and was told nothing was required of it.
 # Germany now has its own nationality-scoped catalog in germany.yaml, which owns the
 # same three long-term titles below. Two files must not both write the same rows.
+#
+# NORWAY was removed for the same reason, and a sharper one. Norway is the Phase 1 wedge, and
+# the generic long-term set here is precisely what made it look covered while the three items
+# the wedge is named for — skattekort before first payroll, D-number, police/EEA registration —
+# were missing. It also left every row unscoped by nationality, which asserted the 6-month
+# passport rule at BLOCKER severity against EU/EEA nationals who need only a national identity
+# card. norway.yaml now owns all six titles below, nationality-scoped.
 purposes_by_country:
-  NORWAY: [employment, other]
   SINGAPORE: [employment, study]
   "UNITED KINGDOM": [employment, other]
   "UNITED STATES": [employment, family, other]
