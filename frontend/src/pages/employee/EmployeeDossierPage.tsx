@@ -41,6 +41,13 @@ const DestinationRequirements = lazy(() =>
   })),
 );
 
+// [AIQ-1821] Same AIQ-1264 reason again: this one imports api/client directly.
+const RequirementsSufficiencyPanel = lazy(() =>
+  import('../../features/platform-v2/dossier/RequirementsSufficiencyPanel').then((m) => ({
+    default: m.RequirementsSufficiencyPanel,
+  })),
+);
+
 type FilterTabKey = 'all' | 'action_needed' | 'blocked' | 'ready' | 'submitted';
 
 const FILTER_TABS: Array<{ key: FilterTabKey; label: string }> = [
@@ -288,6 +295,20 @@ export const EmployeeDossierPage: React.FC = () => {
         {caseId && (
           <Suspense fallback={<div className="mb-6 text-sm text-[#6b7280]">Loading requirements…</div>}>
             <DestinationRequirements caseId={caseId} />
+          </Suspense>
+        )}
+
+        {/* [AIQ-1821] The requirement FACTS an authority published and an admin approved,
+            each with its source — plus, kept separate, the intake answers we still need.
+            DestinationRequirements above says which requirement ITEMS apply; this says
+            what the authorities actually wrote. Until now nothing rendered the approved
+            facts at all: they reached an API no screen called. */}
+        {caseId && (
+          <Suspense fallback={<div className="mb-6 text-sm text-slate-500">Loading requirements on record…</div>}>
+            <RequirementsSufficiencyPanel
+              caseId={caseId}
+              intakeHref={`/employee/case/${caseId}/intake`}
+            />
           </Suspense>
         )}
 
