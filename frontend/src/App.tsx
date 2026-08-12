@@ -60,6 +60,7 @@ const HrDashboard = lazy(() => import('./pages/HrDashboard').then((module) => ({
 const HrWelcomePage = lazy(() => import('./pages/hr/HrWelcomePage').then((module) => ({ default: module.HrWelcomePage })));
 const HrCaseSummary = lazy(() => import('./pages/HrCaseSummary').then((module) => ({ default: module.HrCaseSummary })));
 const HrCaseEstimatePage = lazy(() => import('./pages/hr/HrCaseEstimatePage').then((module) => ({ default: module.HrCaseEstimatePage })));
+const HrCaseDossierPage = lazy(() => import('./pages/hr/HrCaseDossierPage').then((module) => ({ default: module.HrCaseDossierPage })));
 const HrAssignmentReview = lazy(() => import('./pages/HrAssignmentReview').then((module) => ({ default: module.HrAssignmentReview })));
 const HrComplianceCheck = lazy(() => import('./pages/HrComplianceCheck').then((module) => ({ default: module.HrComplianceCheck })));
 const HrAssignmentPackageReview = lazy(() => import('./pages/HrAssignmentPackageReview').then((module) => ({ default: module.HrAssignmentPackageReview })));
@@ -374,6 +375,10 @@ function App() {
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<RequireHrRoute><HrAssignmentReview /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<RequireHrRoute><HrCaseSummary /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrCaseEstimate.path} element={<RequireHrRoute><HrCaseEstimatePage /></RequireHrRoute>} />
+        {/* [P4-2] Defined in routes.ts since 2635d030 but never mounted here, so every
+            /hr/cases/:caseId/dossier hit fell through to the catch-all and redirected to
+            the dashboard. The page and its API have worked the whole time. */}
+        <Route path={ROUTE_DEFS.hrCaseDossier.path} element={<RequireHrRoute><HrCaseDossierPage /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrReview.path} element={<RequireHrRoute><Navigate to={ROUTE_DEFS.hrEmployeeDashboard.path} replace /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrReviewCase.path} element={<RequireHrRoute><ReviewToEmployeeDashboardRedirect /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrAssignmentReview.path} element={<RequireHrRoute><HrAssignmentReview /></RequireHrRoute>} />
