@@ -933,7 +933,14 @@ class MiscMixin:
                     rfq_id TEXT NOT NULL,
                     vendor_id TEXT NOT NULL,
                     status TEXT NOT NULL,
-                    last_activity_at TEXT
+                    last_activity_at TEXT,
+                    -- [AIQ-1819] Present in prod since 20261029000000, applied 2026-08-12.
+                    -- `_vendor_names_for_rfq` orders by it, and while this fixture lacked the
+                    -- column that query raised 42703 here exactly as it did in production —
+                    -- silently, because the function ends `except Exception: return None` and
+                    -- the caller reads `or "Service provider"`. So the SQLite lane went on
+                    -- passing for the whole time the feature had never once worked.
+                    created_at TEXT
                 )
             """))
 
