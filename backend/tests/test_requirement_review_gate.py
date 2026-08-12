@@ -1,0 +1,108 @@
+"""The publication gate on `requirement_items`, and the two ways it could be defeated.
+
+Before `review_status` existed there was no gate at all. A row was readable the instant
+`COMMIT` returned — by authenticated employees via `requirements_builder`, and by anonymous
+callers via `GET /api/public/corridor-requirements`, which takes no credentials. That is how
+the first Otto-promoted France requirements and the whole Norway wedge reached the public
+internet without a human seeing them.
+
+`verification_status` looked like a gate and never was: no read path has ever filtered on it,
+and the public endpoint strips it from the response. These tests pin the difference — one
+column describes *how well sourced* content is, the other decides *whether it is served*.
+"""
+from __future__ import annotations
+
+from datetime import datetime
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from backend.app import crud, models
+
+
+@pytest.fixture()
+def db():
+    engine = create_engine("sqlite://", future=True)
+    models.Base.metadata.create_all(engine, tables=[models.RequirementItem.__table__])
+    with sessionmaker(bind=engine)() as session:
+        yield session
+
+
+def _payload(title: str, **over):
+    base = dict(
+        id=f"id-{title}",
+        country_code="NORWAY",
+        purpose="employment",
+        pillar="RESIDENCE",
+        title=title,
+        description="…",
+        severity="WARN",
+        owner="EMPLOYEE",
+        required_fields_json="[]",
+        citations_json="[]",
+        verification_status="corpus_grounded",
+        last_verified_at=datetime(2026, 8, 12),
+    )
+    base.update(over)
+    return base
+
+
+def test_an_unapproved_row_is_not_served(db):
+    crud.create_requirement_item(db, _payload("Pending item", review_status="pending"))
+    assert crud.list_requirements(db, "NORWAY") == []
+
+
+def test_an_approved_row_is_served(db):
+    crud.create_requirement_item(db, _payload("Approved item", review_status="approved"))
+    assert [r.title for r in crud.list_requirements(db, "NORWAY")] == ["Approved item"]
+
+
+def test_a_rejected_row_is_not_served(db):
+    crud.create_requirement_item(db, _payload("Rejected item", review_status="rejected"))
+    assert crud.list_requirements(db, "NORWAY") == []
+
+
+def test_the_admin_surface_sees_what_it_must_approve(db):
+    crud.create_requirement_item(db, _payload("Pending item", review_status="pending"))
+    got = crud.list_requirements(db, "NORWAY", include_unapproved=True)
+    assert [r.title for r in got] == ["Pending item"]
+
+
+def test_provenance_is_not_a_gate(db):
+    """`representative` content is served exactly like `expert_verified` content. The badge
+    describes sourcing; it has never decided visibility, and conflating the two is what made
+    the missing gate hard to see."""
+    for status in ("representative", "corpus_grounded", "expert_verified"):
+        crud.create_requirement_item(
+            db, _payload(f"{status} item", verification_status=status, review_status="approved")
+        )
+    assert len(crud.list_requirements(db, "NORWAY")) == 3
+
+
+def test_reseeding_cannot_un_approve_live_content(db):
+    """The regression that would quietly break production.
+
+    `create_requirement_item` upserts on (country_code, purpose, title), and every YAML seed
+    now writes `review_status='pending'`. If the update branch synced that column, re-running
+    `seed_requirements.py --file germany.yaml` would pull 16 approved rows back out of the
+    product. It must be set on INSERT and carried on UPDATE.
+    """
+    crud.create_requirement_item(db, _payload("Employment letter", review_status="approved"))
+    crud.create_requirement_item(
+        db, _payload("Employment letter", review_status="pending", description="reworded")
+    )
+    rows = crud.list_requirements(db, "NORWAY")
+    assert [r.title for r in rows] == ["Employment letter"]
+    assert rows[0].review_status == "approved"
+    assert rows[0].description == "reworded", "the seed's content still lands"
+
+
+def test_a_new_row_defaults_to_approved_when_no_writer_states_otherwise(db):
+    """Existing rows predate the column and must not go dark. The backfill and this default
+    agree: silence means approved; only the writers that produce unreviewed content say
+    'pending'."""
+    payload = _payload("Legacy item")
+    payload.pop("review_status", None)
+    crud.create_requirement_item(db, payload)
+    assert [r.title for r in crud.list_requirements(db, "NORWAY")] == ["Legacy item"]

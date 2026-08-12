@@ -438,8 +438,8 @@ function App() {
         <Route path={ROUTE_DEFS.employeeCaseRoadmap.path} element={<RequireEmployeeRoute><EmployeeCaseRoadmapPage /></RequireEmployeeRoute>} />
         {/* [MVG-6B] Employee — immigration document checklist; allowHR so HR can view via timeline link */}
         <Route path={ROUTE_DEFS.employeeCaseImmigrationChecklist.path} element={<RequireEmployeeRoute allowHR><ImmigrationChecklistPage /></RequireEmployeeRoute>} />
-        <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<RequireAdminRoute><CountriesPage /></RequireAdminRoute>} />
-        <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<RequireAdminRoute><CountryDetailPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCountries.path} element={<RequireAdminRoute><CountriesPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCountryDetail.path} element={<RequireAdminRoute><CountryDetailPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRagQuality.path} element={<RequireAdminRoute><AdminRagQualityPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAiUnitEconomics.path} element={<RequireAdminRoute><AdminAiUnitEconomicsPage /></RequireAdminRoute>} />

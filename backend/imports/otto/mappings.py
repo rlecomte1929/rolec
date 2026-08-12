@@ -176,13 +176,25 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
     # `corpus_grounded` requires EVERY contributing fact to have cleared the sourcing gate.
     # One weak fact makes the whole requirement weak, because they are merged into one
     # description a reader cannot unpick.
-    weak = [f for f in facts if f.accuracy_tier != TIER_AUTO]
+    #
+    # **`accuracy_tier` alone is not enough, and trusting it was a real bug.** The tier is a
+    # column in `otto_staging`, and the research routine writes rows straight into that schema
+    # with `accuracy_tier='auto_accepted'` set by itself — the parser's sourcing gate never
+    # ran. On 2026-08-12 that promoted two France requirements as "Source-grounded" when all
+    # 15 contributing facts had `evidence_quote IS NULL`, i.e. nothing a reviewer could
+    # re-check without re-reading the source. A tier the producer assigned to its own output
+    # is a claim, not evidence. So the quote is now checked here, independently.
+    weak = [
+        f for f in facts
+        if f.accuracy_tier != TIER_AUTO or not (f.evidence_quote or "").strip()
+    ]
     verification_status = "representative" if weak else "corpus_grounded"
     if weak:
-        derivations.append(
-            f"verification_status=representative: {len(weak)} of {len(facts)} facts were "
-            "needs_review"
-        )
+        unquoted = sum(1 for f in weak if not (f.evidence_quote or "").strip())
+        reason = f"{len(weak)} of {len(facts)} facts were not source-grounded"
+        if unquoted:
+            reason += f" ({unquoted} with no evidence_quote)"
+        derivations.append(f"verification_status=representative: {reason}")
 
     citations = _distinct([f.source_url for f in facts])
 

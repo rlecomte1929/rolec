@@ -102,7 +102,24 @@ def test_one_needs_review_fact_downgrades_the_whole_requirement():
         _fact(fact_key="cardDuration", accuracy_tier="needs_review"),
     ])
     assert got.verification_status == "representative"
-    assert any("needs_review" in d for d in got.derivations)
+    assert any("not source-grounded" in d for d in got.derivations)
+
+
+def test_a_self_assigned_tier_without_a_quote_does_not_earn_corpus_grounded():
+    """The 2026-08-12 defect, pinned.
+
+    `accuracy_tier` is a column in `otto_staging`, and the research routine writes rows
+    straight into that schema setting `auto_accepted` on its own output — the parser's
+    sourcing gate never runs. Two France requirements shipped badged "Source-grounded" while
+    all 15 contributing facts had `evidence_quote IS NULL`. A tier the producer assigned to
+    itself is a claim; the quote is the evidence, and it is checked independently.
+    """
+    got = resolve(_entity(), [
+        _fact(accuracy_tier="auto_accepted", evidence_quote=None),
+        _fact(fact_key="cardDuration", accuracy_tier="auto_accepted", evidence_quote=""),
+    ])
+    assert got.verification_status == "representative"
+    assert any("no evidence_quote" in d for d in got.derivations)
 
 
 def test_all_auto_accepted_facts_earn_corpus_grounded():
