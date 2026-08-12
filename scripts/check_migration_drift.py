@@ -400,8 +400,11 @@ def main() -> int:
             else:
                 print(f"  • {d['version']}  {d['name']}  → no repo file by this name; commit a prod-as-oracle "
                       f"migration at version {d['version']} (real DDL or stub).")
-        print("\n  Prevention: don't pre-apply repo-tracked migrations via MCP apply_migration — commit the")
-        print("  file and let the main-push migration workflow apply it (it records the repo version). See CLAUDE.md.")
+        print("\n  Prevention: don't pre-apply repo-tracked migrations via MCP apply_migration — it stamps")
+        print("  an APPLY-TIME version, not your file's, so the ledger ends up with a version no repo file")
+        print("  matches and this check fails on every migration PR until someone reconciles it. Commit the")
+        print("  file first, then apply out-of-band with execute_sql and record it with")
+        print("  `supabase migration repair --status applied <version>`. See CLAUDE.md.")
 
     # Direction B (dead) — repo file at or below the ledger max with no prod row.
     # `db push` will skip it forever, so it can never apply and never record a row.
