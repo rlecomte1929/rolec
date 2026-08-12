@@ -1,9 +1,15 @@
-"""Write parsed facts into `otto_staging`, and reconcile the batch honestly.
+"""Write parsed facts into `otto_staging`, reconcile the batch honestly, and promote it.
 
-Two separate operations, mirroring `../suppliers/executor.py`:
+Three separate operations, mirroring `../suppliers/executor.py`:
 
     stage()      immigration_entities -> immigration_fact_candidates
     reconcile()  + load_log, processing_queue
+    promote()    + public.requirement_items          (opt-in, --promote)
+
+`promote()` is the step that was missing from every content system in this repo. Staging
+tables had approve buttons and no promoters: `/admin/requirement-facts` flips a status column
+nothing reads, and 85 approved `requirement_facts` feed an endpoint no screen calls. Staged
+rows that never move are indistinguishable from research nobody did.
 
 **`reconcile()` is the reason this module is worth reading.** On 2026-08-12 at 01:04 UTC the
 batch `WATCH-2026-08-12-w3` wrote a `load_log` row reading `reconcile_status='pass'`,
@@ -21,6 +27,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence
 
 from sqlalchemy import text
@@ -297,6 +304,146 @@ def reconcile(
             },
         )
     return ledger
+
+
+STATUS_READY = "ready"
+STATUS_PROMOTED = "promoted"
+EXPERT_VERIFIED = "expert_verified"
+
+_PROMOTABLE = text(
+    """
+    SELECT e.destination_country, e.topic_key, e.title, e.domain_area,
+           f.id, f.fact_type, f.fact_key, f.fact_text, f.applies_to, f.source_url,
+           f.evidence_quote, f.accuracy_tier
+      FROM otto_staging.immigration_entities e
+      JOIN otto_staging.immigration_fact_candidates f
+        ON f.destination_country = e.destination_country
+       AND f.entity_topic_key = e.topic_key
+     WHERE f.status = :ready
+       AND (:country IS NULL OR e.destination_country = :country)
+     ORDER BY e.destination_country, e.topic_key, f.fact_key
+    """
+)
+
+_MARK_PROMOTED = text(
+    "UPDATE otto_staging.immigration_fact_candidates SET status = :promoted "
+    "WHERE id = ANY(CAST(:ids AS uuid[]))"
+)
+
+
+@dataclass
+class PromoteResult:
+    promoted: int = 0
+    skipped_verified: List[str] = field(default_factory=list)
+    unmapped: List[str] = field(default_factory=list)
+    drafts: List[Any] = field(default_factory=list)
+
+
+def promote(session: Any, *, country: Optional[str] = None, dry_run: bool = True) -> PromoteResult:
+    """Promote ready facts into `public.requirement_items`, one row per entity.
+
+    Writes through `backend.app.crud.create_requirement_item`, which owns the upsert on the
+    natural key `(country_code, purpose, title)`. Reusing it — rather than hand-rolling the
+    SQL — is what lets a promoted row and a later YAML re-seed of the same requirement
+    converge on one row instead of racing each other.
+
+    Nothing here writes `expert_verified`. Promoted rows land `corpus_grounded` at best and
+    render behind the provenance badge in `RequirementList.tsx`, so a reader always sees what
+    the evidence supports. Raising a requirement to expert-verified stays a human act.
+
+    Returns a `PromoteResult`; idempotent, because promoted facts leave `status='ready'`.
+    """
+    import uuid
+    from datetime import datetime
+
+    from backend.app import crud
+    from backend.app.models import RequirementItem
+    # Same namespace as the YAML seeder, so both writers derive the SAME id for the same
+    # natural key. A second namespace here would make `seed_requirements.py` and this promoter
+    # insert two rows for one requirement the moment their titles agreed.
+    from backend.scripts.seed_requirements import _SEED_NS
+    from backend.imports.otto import mappings
+
+    result = PromoteResult()
+    rows = session.execute(
+        _PROMOTABLE, {"ready": STATUS_READY, "country": country}
+    ).mappings().all()
+
+    groups: Dict[Any, List[Any]] = {}
+    entities: Dict[Any, Any] = {}
+    for row in rows:
+        key = (row["destination_country"], row["topic_key"])
+        groups.setdefault(key, []).append(SimpleNamespace(**dict(row)))
+        entities[key] = SimpleNamespace(
+            destination_country=row["destination_country"],
+            topic_key=row["topic_key"],
+            title=row["title"],
+            domain_area=row["domain_area"],
+        )
+
+    stamp = datetime.utcnow()
+
+    for key, facts in groups.items():
+        draft = mappings.resolve(entities[key], facts)
+        if isinstance(draft, mappings.Unmapped):
+            result.unmapped.append(f"{key[0]}/{draft.topic_key}: {draft.reason}")
+            continue
+
+        # Never overwrite a human. crud.create_requirement_item upserts on the natural key and
+        # WILL rewrite description, severity, owner and citations of whatever it finds. FRANCE
+        # already holds 26 curated rows; silently winning against an expert-verified one would
+        # replace a lawyer's answer with an agent's.
+        existing = (
+            session.query(RequirementItem)
+            .filter(RequirementItem.country_code == draft.country_code)
+            .filter(RequirementItem.purpose == draft.purpose)
+            .filter(RequirementItem.title == draft.title)
+            .first()
+        )
+        if existing is not None and existing.verification_status == EXPERT_VERIFIED:
+            result.skipped_verified.append(
+                f"{draft.country_code}/{draft.purpose}/{draft.title} is expert_verified"
+            )
+            continue
+
+        result.drafts.append(draft)
+        if dry_run:
+            result.promoted += 1
+            continue
+
+        payload = dict(draft.payload)
+        payload["id"] = str(
+            uuid.uuid5(_SEED_NS, f"{draft.country_code}|{draft.purpose}|{draft.title}")
+        )
+        payload["last_verified_at"] = stamp
+        crud.create_requirement_item(session, payload)
+        session.execute(_MARK_PROMOTED, {"promoted": STATUS_PROMOTED, "ids": draft.fact_ids})
+        session.commit()
+        result.promoted += 1
+
+    log.info(
+        "promote: %d requirement(s), %d unmapped, %d expert-verified collision(s)",
+        result.promoted, len(result.unmapped), len(result.skipped_verified),
+    )
+    return result
+
+
+def summarise_promotion(result: PromoteResult) -> str:
+    """The promotion block the CLI prints. The unmapped list is a worklist, not an error."""
+    lines = [f"promote:  {result.promoted} requirement(s) into requirement_items"]
+    for draft in result.drafts:
+        lines.append(f"    + [{draft.verification_status}] {draft.country_code} · "
+                     f"{draft.purpose} · {draft.title}")
+        for note in draft.derivations:
+            lines.append(f"        {note}")
+    if result.skipped_verified:
+        lines.append(f"\n  {len(result.skipped_verified)} skipped — a human already owns these:")
+        lines += [f"    - {s}" for s in result.skipped_verified]
+    if result.unmapped:
+        lines.append(f"\n  {len(result.unmapped)} entit(ies) NOT promoted — this is the "
+                     "research worklist, not a failure:")
+        lines += [f"    - {u}" for u in result.unmapped]
+    return "\n".join(lines)
 
 
 def summarise(result: StageResult, ledger: Dict[str, Any]) -> str:
