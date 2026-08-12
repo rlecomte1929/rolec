@@ -58,6 +58,13 @@ def main() -> int:
              "134 of the 142 seed facts carry no quote; they are stored with a real fetched "
              "source and evidence_quote=NULL unless this flag narrows the run.",
     )
+    ap.add_argument(
+        "--keep-unmatched-quotes", action="store_true",
+        help="when an evidence_quote is NOT found in the fetched document, still write the "
+             "fact with evidence_quote=NULL instead of skipping it. The unverified string is "
+             "never stored either way. Use when the quotes are reviewer caveats rather than "
+             "citations — which is the case for all 8 in this seed.",
+    )
     ap.add_argument("--allow-rejections", action="store_true",
                     help="exit 0 even when rows were rejected or sources failed to fetch")
     ap.add_argument("--cache", type=Path, default=REPO_ROOT / ".immigration-fetch-cache.json",
@@ -123,8 +130,10 @@ def main() -> int:
             fetcher=lambda url: docs[url],
             dry_run=not args.apply,
             require_evidence=args.require_evidence,
+            keep_unmatched=args.keep_unmatched_quotes,
         )
-        print(executor.summarise(result, dry_run=not args.apply))
+        print(executor.summarise(result, dry_run=not args.apply,
+                                 keep_unmatched=args.keep_unmatched_quotes))
         if not args.apply:
             conn.rollback()
 

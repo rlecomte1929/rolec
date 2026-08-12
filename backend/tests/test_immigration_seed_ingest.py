@@ -244,6 +244,27 @@ def test_evidence_quote_absent_from_body_is_not_written():
     assert "quote not found" in result.needs_manual_evidence[0]
 
 
+def test_keep_unmatched_writes_the_fact_but_never_the_unverified_string():
+    """The configurable part is the fact's fate. Storing the unverified string is not.
+
+    All 8 quoted rows in this seed are reviewer caveats ("…confirm precise deep link"), not
+    citations, so dropping their facts would discard sourced claims over a column misuse. The
+    string itself must still never reach `evidence_quote` — that is guard #1816, and this test
+    is what stops `keep_unmatched` from quietly becoming a way around it.
+    """
+    conn = FakeConn()
+    row = _row(evidence_quote="Otto flagged source ambiguity — confirm exact basis.")
+    result = executor.ingest(
+        conn, [row], fetcher=lambda u: _doc(), dry_run=False, keep_unmatched=True
+    )
+
+    assert result.facts_inserted == 1
+    written = conn.inserted("requirement_facts")[0]
+    assert written["evidence_quote"] is None, "the unverified string must never be stored"
+    assert written["source_doc_id"], "the fact still gets a real fetched document"
+    assert len(result.needs_manual_evidence) == 1, "still on the worklist"
+
+
 def test_evidence_matching_tolerates_typography_but_not_different_words():
     conn = FakeConn()
     typographic = _row(evidence_quote="The application fee is 320 EUR")

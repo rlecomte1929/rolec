@@ -142,6 +142,7 @@ def ingest(
     fetcher: Fetcher = fetch_url,
     dry_run: bool = True,
     require_evidence: bool = False,
+    keep_unmatched: bool = False,
 ) -> IngestResult:
     """Run the whole chain. Takes a Connection whose transaction the CALLER owns.
 
@@ -185,6 +186,14 @@ def ingest(
                     result.needs_manual_evidence.append(
                         f"{label} — quote not found in {doc.final_url}"
                     )
+                    # The unverified string NEVER reaches evidence_quote either way — that
+                    # invariant is guard #1816 and is not configurable. What is configurable is
+                    # the fate of the fact it was attached to. In this seed all 8 such strings
+                    # are reviewer caveats ("…confirm precise deep link"), so dropping the fact
+                    # would discard a sourced claim over a column misuse; the fact still gets a
+                    # real fetched document and is flagged needs_review for the human pass.
+                    if keep_unmatched:
+                        writable.append((row, None))
                 continue
             if require_evidence:
                 result.skipped_unquoted += 1
@@ -301,7 +310,7 @@ def _resolve_entity(conn: Any, row: FactRow, result: IngestResult,
     return entity_id
 
 
-def summarise(result: IngestResult, *, dry_run: bool) -> str:
+def summarise(result: IngestResult, *, dry_run: bool, keep_unmatched: bool = False) -> str:
     """The report the CLI prints. The two worklists are the point, not the totals."""
     verb = "would write" if dry_run else "wrote"
     lines = [
@@ -319,9 +328,11 @@ def summarise(result: IngestResult, *, dry_run: bool) -> str:
         f"  evidence: {len(result.evidence_verified)} quote(s) verified against the fetched body",
     ]
     if result.needs_manual_evidence:
+        fate = ("fact still written with evidence_quote=NULL" if keep_unmatched
+                else "fact skipped")
         lines.append(
             f"            {len(result.needs_manual_evidence)} quote(s) NOT found — "
-            "fact skipped, needs manual sourcing:"
+            f"{fate}, needs manual sourcing:"
         )
         lines += [f"              - {m}" for m in result.needs_manual_evidence]
     if result.skipped_unquoted:
