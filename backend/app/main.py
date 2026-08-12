@@ -31,6 +31,7 @@ from .routers import (
     policy_helpfulness,
     ocr,
     requirement_facts,
+    admin_content_review,
     benefit_optimizer,
     case_forms_adhoc,
     cases,
@@ -228,6 +229,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_page_config.router)
     app.include_router(assistant_router.router)  # policy-bridge domain routing — POST /api/assistant/route
     app.include_router(requirement_facts.router)  # [AIQ-1091] P4-02 requirement-facts extract
+    app.include_router(admin_content_review.router)  # [AIQ-1821] content review queue
     # [Parker-A] Case-duration prediction (canary: PREDICTIONS_ENABLED, default off)
     app.include_router(predictions.router)
     # [AIQ-1420] TD-2 test-drive self-serve provisioning (canary: RELOPASS_TEST_DRIVE_ENABLED, default off)
