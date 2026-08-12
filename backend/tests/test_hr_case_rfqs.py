@@ -25,8 +25,16 @@ CREATE TABLE rfqs (
   id TEXT PRIMARY KEY, rfq_ref TEXT, case_id TEXT, status TEXT, created_at TEXT
 );
 CREATE TABLE rfq_items (id TEXT PRIMARY KEY, rfq_id TEXT, service_key TEXT);
+-- created_at is load-bearing, not decoration. _vendor_names_for_rfq orders by it, and it was
+-- missing from prod and from every fixture, so that query failed on every call for months
+-- while this lane stayed green. The caller swallows the error and shows a generic label.
+-- Added to prod by migration 20261029000000 for AIQ-1819, mirrored here so they cannot drift.
+-- Keep these comments free of semicolons and quote characters. This whole schema string is
+-- split on the semicolon before execution, so either one truncates the CREATE and SQLite
+-- reports a syntax error that looks nothing like the real cause.
 CREATE TABLE rfq_recipients (
-  id TEXT PRIMARY KEY, rfq_id TEXT, vendor_id TEXT, status TEXT, last_activity_at TEXT
+  id TEXT PRIMARY KEY, rfq_id TEXT, vendor_id TEXT, status TEXT, last_activity_at TEXT,
+  created_at TEXT
 );
 CREATE TABLE suppliers (id TEXT PRIMARY KEY, name TEXT);
 """

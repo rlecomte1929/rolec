@@ -8,6 +8,19 @@
 # reset (see docs/architecture/CASE_ID_UNIFICATION_AUDIT.md). Shrinking
 # this file is the goal; growing it means the cleanup got further away.
 #
+# STATUS 2026-08-11: EMPTY, and that is the strongest state. Measured against prod: 818
+# case_assignments rows, all with a non-null canonical_case_id, zero null / dangling /
+# duplicate. The 51 rows AIQ-1730 inventoried are gone. With nothing baselined, EVERY
+# violation the guard sees is a new one.
+#
+# Two consequences worth writing down:
+#   * UNIQUE(canonical_case_id) — the deferred AIQ-1732 constraint — is satisfiable today,
+#     with none of the ~38 cascading deletes that justified deferring it. Still parked by
+#     choice; this is a note, not a green light.
+#   * An empty baseline means the "all entries went stale at once" signal is gone, so an
+#     emptied case_assignments would have read as a clean pass. The guard now fails on a
+#     zero row count instead (e2e_purge.py runs on every push to main).
+#
 # Do NOT add an id here to make CI green on a NEW bad row — fix the writer.
 # Regenerate after a deliberate cleanup with:
 #   DATABASE_URL=... python scripts/check_canonical_case_id_drift.py --update-baseline

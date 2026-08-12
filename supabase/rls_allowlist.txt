@@ -1,16 +1,21 @@
 # supabase/rls_allowlist.txt
 # AUDIT-A3 (audit/02-expert-security.md SEC-2)
 #
-# STATUS: FULLY DRAINED (2026-06-03) — 0 entries. Every table that was seeded
-# here (113 policy-less public tables as of 2026-05-25) has since been given an
-# RLS policy via a committed migration. The list is intentionally kept (empty)
-# as the standing safety net: any NEW policy-less table landing in `public`
-# must either get a policy migration or be added here with a justification —
-# otherwise scripts/check_rls_coverage.py fails CI.
+# STATUS: DRAINED AGAIN — 0 entries (2026-08-11). The list holds the standing safety net:
+# a NEW policy-less table landing in `public` must either get a policy migration or be
+# listed here with a justification, or scripts/check_rls_coverage.py fails CI.
+#
+# It briefly held two entries earlier the same day (ror_cities, ror_queue), created in
+# public with no RLS, no policy and no REVOKE by an out-of-band apply. They were listed
+# with verified evidence rather than waved through, then given RLS + a service_role policy
+# + REVOKE anon in 20261028000000_ror_tables_rls.sql; once that was applied the guard
+# reported both as stale and they were removed. That round trip — regain, migrate, drain —
+# is the intended lifecycle for an entry here, and it took hours rather than months.
 #
 # Allowlist size on 2026-05-25 (seed):                113
-# Allowlist size after SEC-RLS sprint (this commit):    0
-# Steady-state floor (server-only by design):           0
+# Allowlist size after the SEC-RLS sprint (2026-06-03): 0
+# Allowlist size now (2026-08-11):                      0
+# Steady-state floor (server-only by design):           0  ← at it
 #
 # SEC-RLSf (AIQ-663): every retained entry MUST carry a justification — an
 # inline `# reason` after the name, or a `#` section header above the block.
@@ -43,3 +48,8 @@
 #
 # Format: one tablename per line. Lines starting with `#` are ignored.
 # Inline comments after a `#` on a name line are also ignored.
+
+# --- Drain log, continued ---
+#   2026-08-11  ror_cities + ror_queue added (first entries since the 2026-06-03 drain),
+#               then removed the same day once 20261028000000_ror_tables_rls.sql was
+#               applied and check_rls_coverage.py reported both as stale. 0 -> 2 -> 0.

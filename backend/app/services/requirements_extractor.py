@@ -37,12 +37,25 @@ def _topic_key_from_url(url: str, destination_country: str, domain_area: str, ti
 
 
 def _required_fields_from_text(text: str) -> List[str]:
+    """Profile fields a fact implies we need from the employee.
+
+    [AIQ-1821] INVARIANT: every value emitted here must be a key that
+    `guidance_pack_service.build_profile_snapshot` can produce. `requirements_sufficiency`
+    reports anything absent from the snapshot as a `missing_field`, so a field the snapshot
+    cannot carry becomes a to-do the user can never complete. Enforced by
+    `backend/tests/test_required_fields_snapshot_invariant.py`.
+
+    `passport_expiry_date` was removed for exactly that reason. The value does exist, but in
+    the immigration profile (`immigration_service.py`, column `passport_expiry`), which this
+    pure draft+dossier snapshot has no access to. Re-add it here only together with a snapshot
+    that carries it — `nationality`, emitted by the same branch, is satisfiable and stays.
+    """
     lower = text.lower()
     fields = []
     if "visa" in lower:
         fields.append("visa_type")
     if "passport" in lower:
-        fields.extend(["passport_expiry_date", "nationality"])
+        fields.append("nationality")
     if "employer" in lower or "petition" in lower or "sponsor" in lower:
         fields.extend(["employer_country", "employment_type"])
     if "dependent" in lower:

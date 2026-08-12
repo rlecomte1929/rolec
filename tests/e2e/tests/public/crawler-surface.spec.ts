@@ -80,37 +80,61 @@ test.describe('public crawler surface', () => {
     }
   }
 
-  // Real production user-agent strings. A synthetic one ("OAI-SearchBot/1.0") proves
-  // nothing, because CDN bot rules match on the full string — the bare token is allowed
-  // through here while the real UA is not.
-  const CRAWLERS: Array<[string, string]> = [
+  // Crawlers whose access a USER-AGENT can actually test. Real production UA strings.
+  //
+  // OAI-SearchBot, ChatGPT-User and GPTBot are deliberately NOT here — see the block below.
+  const UA_TESTABLE_CRAWLERS: Array<[string, string]> = [
     ['OAI-AdsBot', 'Mozilla/5.0 (compatible; OAI-AdsBot/1.0; +https://openai.com/adsbot)'],
-    ['OAI-SearchBot', 'Mozilla/5.0 (compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot)'],
-    ['ChatGPT-User', 'Mozilla/5.0 (compatible; ChatGPT-User/1.0; +https://openai.com/bot)'],
-    ['GPTBot', 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.2; +https://openai.com/gptbot)'],
     ['Googlebot', 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'],
     ['facebookexternalhit', 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'],
   ];
 
-  for (const [name, ua] of CRAWLERS) {
+  for (const [name, ua] of UA_TESTABLE_CRAWLERS) {
     test(`[AEO-CRAWLER-FETCH] ${name} can actually fetch a published page`, async () => {
-      // robots.txt is only half the story, and this is the half that bites: Cloudflare
-      // sits in front of this origin and its bot rules are invisible in that file. On
-      // 2026-08-10 robots.txt explicitly Allow'd OAI-SearchBot while Cloudflare returned
-      // 403 "Your request was blocked." to it on every path except /robots.txt itself.
       const path = '/blog/relocate-employee-france-norway-2026/';
       const { status, body } = await fetchRaw(path, ua);
-
-      expect(
-        status,
-        `${name} got HTTP ${status} for ${path}. robots.txt allows it, so this is edge/CDN ` +
-          'bot management, not robots. Fix it in the Cloudflare dashboard (allow the UA, or ' +
-          'add it to Verified Bots) — a crawler that cannot fetch the page cannot cite it, ' +
-          'and for OAI-SearchBot / GPTBot / ChatGPT-User that is the entire AEO investment.',
-      ).toBe(200);
+      expect(status, `${name} got HTTP ${status} for ${path}`).toBe(200);
+      // The real assertion. A crawler-shaped request must get the prerendered document,
+      // not the SPA shell — that is the defect class this whole file exists for.
       assertNotTheShell(`${path} as ${name}`, body);
     });
   }
+
+  /* WHY OAI-SearchBot, ChatGPT-User AND GPTBot ARE NOT TESTED HERE
+   * -------------------------------------------------------------
+   * They were, and the tests could never have passed. Removed 2026-08-11.
+   *
+   * Cloudflare identifies a named bot by CRYPTOGRAPHIC SIGNATURE (Web Bot Auth), PUBLISHED
+   * IP RANGE, or REVERSE DNS — never by the user-agent string. An "allow" rule is therefore
+   * only honoured for traffic that proves its identity. A Playwright request from a GitHub
+   * Actions runner carrying `User-Agent: ...OAI-SearchBot...` proves nothing and is refused,
+   * and measurement confirms it: with OAI-SearchBot and ChatGPT-User both set to ALLOW in
+   * AI Crawl Control, a spoofed request still gets 403 / 25 bytes, while the three UAs above
+   * get 200 / 13,870 bytes on the same path in the same second.
+   *
+   * A PASSING VERSION OF THAT TEST WOULD BE A SECURITY DEFECT. If CI could fetch this
+   * content by claiming to be OAI-SearchBot, so could anyone. We were asserting that
+   * bot impersonation works.
+   *
+   * The old failure message asked the reader to "fix it in the Cloudflare dashboard". That
+   * advice was wrong and cost real time: the dashboard was already correct, and the
+   * telemetry proved it — OAI-SearchBot showed Allowed: 3 and 21.48 kB transferred while
+   * these tests were red. Worse, the ~110 "Unsuccessful" requests attributed to OpenAI
+   * crawlers in that dashboard were mostly THIS TEST and the curls run to debug it. We were
+   * generating the evidence we then read as a fault.
+   *
+   * It also broke this file's own rule, stated at the top: ASSERT CONTENT, NEVER STATUS.
+   *
+   * GPTBot additionally is blocked ON PURPOSE. It feeds model training only (OpenAI:
+   * "content that may be used in training our generative AI foundation models") and returns
+   * no citation benefit, unlike OAI-SearchBot (Search) and ChatGPT-User (Agent). Ruled
+   * 2026-08-11: be citable, don't be training data. Do not "fix" that by allowing it.
+   *
+   * THE REAL SIGNAL is Cloudflare's own per-crawler telemetry: AI Crawl Control -> Metrics,
+   * Allowed vs Unsuccessful. To confirm the Agent path positively, ask ChatGPT to open a
+   * published URL and watch ChatGPT-User's Allowed count increment — that is a verified
+   * request from OpenAI's infrastructure, which is the only kind that can prove it.
+   */
 
   test('[SEO-ROBOTS] robots.txt still allows the OpenAI crawlers and points at the sitemap', async () => {
     const { body } = await fetchRaw('/robots.txt');
@@ -158,8 +182,13 @@ test.describe('public crawler surface', () => {
       const path = new URL(loc).pathname;
       const { status, body: page } = await fetchRaw(path);
       expect(status, `sitemap advertises ${loc} but it returns ${status}`).toBe(200);
-      // The bare origin legitimately IS the SPA; everything else must be prerendered.
-      if (path !== '/') assertNotTheShell(loc, page);
+      // Every sitemap URL, `/` included. This line used to read
+      //   if (path !== '/') assertNotTheShell(loc, page);
+      // with the comment "the bare origin legitimately IS the SPA". That exemption was made
+      // obsolete by AIQ-1797 (which prerendered the homepage) but left in place, so when the
+      // rewrite serving `/` turned out to be unreachable and prod went back to shipping the
+      // shell at priority 1.0, the one test iterating the sitemap was the one told to skip it.
+      assertNotTheShell(loc, page);
     }
   });
 });

@@ -112,3 +112,109 @@ def test_invalid_employee_type_422(monkeypatch):
     # lowercase policy-enum value is the wrong vocabulary for this engine → rejected.
     resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=long_term")
     assert resp.status_code == 422
+
+
+# ── nationality gating on the public surface ─────────────────────────────────────────
+#
+# This endpoint published every mutually exclusive track at once. `_base_items` omitted
+# `appliesToNationalityClasses`, and `rules_engine._applies_to_nationality_class` treats a
+# missing key as "applies to everyone" — so a live NORWAY response carried BOTH
+# `Valid passport (6+ months)` (THIRD_COUNTRY) and `Valid identity card or passport (EU/EEA)`.
+# That is the failure `nationality_class.py` was written to prevent, on the one surface a
+# prospect sees before they trust us.
+
+def _two_track_seed():
+    """Two rows that must never appear together: the EEA route and the third-country route."""
+    common = dict(
+        country_code="NORWAY", purpose="employment", severity="BLOCKER", owner="EMPLOYEE",
+        required_fields_json="[]", citations_json="[]",
+        applies_to_assignment_types_json=None, verification_status="corpus_grounded",
+    )
+    return [
+        SimpleNamespace(
+            id="no-eea-id", pillar="IDENTITY",
+            title="Valid identity card or passport (EU/EEA)",
+            description="An EU/EEA national needs a valid identity card or passport.",
+            applies_to_nationality_classes_json='["OWN_NATIONAL", "EU_EEA"]', **common,
+        ),
+        SimpleNamespace(
+            id="no-passport", pillar="IDENTITY",
+            title="Valid passport (6+ months)",
+            description="Passport must be valid for at least 6 months beyond entry.",
+            applies_to_nationality_classes_json='["THIRD_COUNTRY"]', **common,
+        ),
+        SimpleNamespace(
+            id="no-skattekort", pillar="EMPLOYMENT",
+            title="Tax deduction card (skattekort) before first salary",
+            description="Without a tax deduction card the employer must deduct 50 percent tax.",
+            applies_to_nationality_classes_json=None, **common,   # universal
+        ),
+    ]
+
+
+def _patch_two_track(monkeypatch):
+    monkeypatch.setattr(
+        public_corridor.crud, "list_requirements",
+        lambda db, country, purpose: _two_track_seed() if country == "NORWAY" else [],
+    )
+
+
+def _labels(resp):
+    return {r["label"] for r in resp.json()["requirements"]}
+
+
+def test_the_two_nationality_tracks_are_never_served_together(monkeypatch):
+    _patch_two_track(monkeypatch)
+    for query in ("", "&nationality=FR", "&nationality=IN"):
+        resp = client.get(
+            "/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA" + query
+        )
+        assert resp.status_code == 200, resp.text
+        both = {"Valid identity card or passport (EU/EEA)", "Valid passport (6+ months)"}
+        assert not both.issubset(_labels(resp)), f"both tracks served for {query!r}"
+
+
+def test_an_eu_nationality_gets_the_eea_track(monkeypatch):
+    _patch_two_track(monkeypatch)
+    resp = client.get(
+        "/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA&nationality=FR"
+    )
+    labels = _labels(resp)
+    assert "Valid identity card or passport (EU/EEA)" in labels
+    assert "Valid passport (6+ months)" not in labels
+    assert resp.json()["nationality_class"] == "EU_EEA"
+
+
+def test_a_third_country_nationality_gets_the_permit_track(monkeypatch):
+    _patch_two_track(monkeypatch)
+    resp = client.get(
+        "/api/public/corridor-requirements?from=IN&to=NO&employee_type=LTA&nationality=IN"
+    )
+    labels = _labels(resp)
+    assert "Valid passport (6+ months)" in labels
+    assert "Valid identity card or passport (EU/EEA)" not in labels
+    assert resp.json()["nationality_class"] == "THIRD_COUNTRY"
+
+
+def test_no_nationality_falls_back_to_the_most_demanding_track(monkeypatch):
+    """Unknown must over-show, never under-inform: telling a third-country national they
+    need no visa is a harm; showing an EU citizen a spare passport rule is an annoyance."""
+    _patch_two_track(monkeypatch)
+    resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
+    labels = _labels(resp)
+    assert "Valid passport (6+ months)" in labels
+    assert "Valid identity card or passport (EU/EEA)" not in labels
+    # and the caller is told which track this is, rather than it reading as universal
+    assert resp.json()["nationality_class"] is None
+
+
+def test_a_universal_requirement_survives_every_track(monkeypatch):
+    """NULL nationality classes means "applies to everyone" — the skattekort binds an EU
+    citizen exactly as much as a third-country national, and suppressing it for free movers
+    is the mirror-image of telling them to get a visa."""
+    _patch_two_track(monkeypatch)
+    for query in ("", "&nationality=FR", "&nationality=IN"):
+        resp = client.get(
+            "/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA" + query
+        )
+        assert "Tax deduction card (skattekort) before first salary" in _labels(resp)

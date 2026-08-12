@@ -1,0 +1,274 @@
+# Requirement seed for Norway.
+#
+# WHY THIS FILE EXISTS: Norway is the Phase 1 wedge — the pitch is that ReloPass surfaces the
+# non-obvious France→Norway requirements before week seven. It did not. Norway's twelve rows
+# came from long_term_only.yaml's generic long-term catalog: Employment letter, Long-term
+# housing contract, Minimum lead time, National Insurance registration, Residence registration,
+# Valid passport. The three things the wedge is actually named for — the **skattekort before
+# first payroll**, the **D-number**, and **police/EEA registration** — were absent.
+# public_corridor.py's own docstring already said so: "tax card/skattekort, police
+# registration, EEA registration are not modeled."
+#
+# SOURCE: every new item below is transcribed from `ReloPass_FR-NO_Requirements_VERIFICATION.md`,
+# which checked 9 items against Skatteetaten, UDI, politiet, NAV and CLEISS in July 2026 and
+# found all 9 CONFIRMED, each with an exact official quote and URL. The five wording changes
+# that report asks for are applied here ("typically requires" not "requires"; "supersedes" not
+# "replaces"; "a valid identity/travel document" not "for entry"; the A1 24-month limit; the
+# SUA Oslo appointment reality). This is a LOADING job, not a research job — the research was
+# already done, and to a higher standard than a research agent would reach.
+#
+# SCOPE. France→Norway is an EU→EEA move, and Norway is the EEA-but-not-EU case this codebase
+# keeps tripping over, so the nationality split is the point of the file:
+#   - The skattekort, the D-number and the fødselsnummer are UNIVERSAL. An EU citizen owes every
+#     one of them. Suppressing them for free movers is the mirror-image of telling them to get
+#     a visa, and it is what "50% withholding on your first payslip" feels like when nobody
+#     warned you.
+#   - Police/EEA registration and the A1 are EU/EEA instruments. A third-country national
+#     registers through a residence permit instead, so serving them the EEA route is wrong.
+#   - "Valid passport (6+ months)" is now THIRD_COUNTRY-scoped. UDI is explicit that an EU/EEA
+#     national needs "a valid identity card or passport" — a national ID card is enough — so the
+#     6-month passport rule was being asserted at BLOCKER severity against people it does not
+#     bind. The EEA equivalent is its own item below.
+#
+# PROVENANCE: mixed, deliberately. The six pre-existing rows stay `representative` — they are
+# hand-authored and unverified. The items drawn from the verification report are
+# `corpus_grounded`: quoted from an official source, but NOT expert-signed. Nothing here is
+# `expert_verified`; that report is explicit that "this does not tick your boxes."
+#
+# DO NOT ADD an exact Article 16 extension ceiling without re-checking URSSAF/CLEISS. The
+# report flags a commonly-cited ~5 years as NOT corridor-confirmed, and a wrong number on a
+# social-security exemption is exactly the kind of fact a customer's payroll team will check.
+#
+# RE-CHECK BEFORE A REAL MOVE: quotes were fetched July 2026. Government pages change.
+#
+# TITLES ARE LOAD-BEARING: the seeder's natural key is country_code + purpose + title, and
+# there is no delete path — changing an existing title INSERTS a duplicate and orphans the old
+# row forever. The six original titles below are byte-identical to production, as are their
+# citation UUIDs (crud.create_requirement_item OVERWRITES citations_json, so dropping them
+# would silently sever the source-record links).
+#
+# NORWAY was removed from long_term_only.yaml's purposes_by_country in the same change. Two
+# files must not both write the same rows — the germany.yaml precedent.
+#
+# Reload (idempotent): python backend/scripts/seed_requirements.py --file backend/seeds/requirements/norway.yaml
+
+verification_status: representative
+source_scope: "Norway inbound relocation. EU/EEA/CH free movement (registration route) vs third-country permit route. FR→NO verified against Skatteetaten, UDI, politiet, NAV, CLEISS in July 2026."
+
+# Most of Norway's obligations bind everyone, so the file default is "applies to all" and the
+# two nationality tracks are scoped explicitly. (Germany defaults the other way because its
+# permit track dominates.)
+default_applies_to_nationality_classes: null
+
+purposes_by_country:
+  NORWAY: [employment, other]
+
+requirements:
+  # ── The wedge: non-obvious, universal, and previously missing ────────────────────
+  - key: skattekort_before_first_payroll
+    pillar: EMPLOYMENT
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: null
+    verification_status: corpus_grounded
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.skatteetaten.no/en/business-and-organisation/foreign/employer/tax-deduction-cards/"
+    countries:
+      NORWAY:
+        title: "Tax deduction card (skattekort) before first salary"
+        description: >-
+          Apply for a Norwegian tax deduction card before your first payroll run. Skatteetaten
+          states that without one, "the employer must deduct 50 percent tax" — the employer
+          retrieves the card electronically and applies the deduction, so a missing card shows
+          up as half your first salary withheld rather than as an error anyone flags. The card
+          is not issued until an in-person ID check has been completed, so start early.
+  - key: d_number_short_stay
+    pillar: IDENTITY
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: null
+    verification_status: corpus_grounded
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.udi.no/en/word-definitions/d-number/"
+      - "https://www.skatteetaten.no/en/business-and-organisation/foreign/employer/tax-deduction-cards/"
+    countries:
+      NORWAY:
+        title: "D-number (stays under 6 months)"
+        description: >-
+          A D-number is "a temporary identification number that you receive from the Norwegian
+          Tax Administration" when you do not meet the criteria for a national identity number
+          — i.e. when your stay is under six months. It is issued as part of the tax-card
+          process and typically requires an in-person appointment for the ID check (narrow
+          exemptions exist for continental-shelf-only workers and seafarers on Norwegian-
+          registered ships). Nothing downstream — salary, bank account, health service — works
+          without an identification number.
+
+  # ── EU/EEA free-movement track ───────────────────────────────────────────────────
+  - key: police_eea_registration
+    pillar: RESIDENCE
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    verification_status: corpus_grounded
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.udi.no/en/want-to-apply/residence-under-the-eueeu-regulations/employee-who-is-an-eueea-national/"
+      - "https://www.udi.no/en/word-definitions/employers-employing-someone-who-is-an-eueea-national-/"
+    countries:
+      NORWAY:
+        title: "Police registration for EU/EEA nationals (stays over 3 months)"
+        description: >-
+          EU/EEA nationals "can move to Norway and start working right away, but they must
+          register with the police no later than three months after arriving" when the stay
+          exceeds three months. Registration is free and requires an employment contract or
+          employment certificate. The practical constraint is not the rule but the appointment:
+          registration needs an in-person police ID check, and SUA Oslo has long waiting times,
+          so book as early as possible rather than counting on the three-month deadline.
+  - key: eea_identity_document
+    pillar: IDENTITY
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    verification_status: corpus_grounded
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.udi.no/en/want-to-apply/residence-under-the-eueeu-regulations/"
+    countries:
+      NORWAY:
+        title: "Valid identity card or passport (EU/EEA)"
+        description: >-
+          An EU/EEA national has the right to stay in Norway as an employee with "a valid
+          identity card or passport" — a national identity card is sufficient, and no six-month
+          validity margin is imposed. The document proves the right to stay and to register; it
+          is a valid identity/travel document rather than an entry visa.
+  - key: a1_posted_worker
+    pillar: SOCIAL_SECURITY
+    severity: WARN
+    owner: HR
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    verification_status: corpus_grounded
+    confidence: medium
+    requires_expert_review: true
+    citations:
+      - "https://www.nav.no/en/home/rules-and-regulations/relatert-informasjon/coming-from-an-eu-eea-country-to-work-in-norway"
+      - "https://www.cleiss.fr/particuliers/venir/travailler/detachement/ue883.html"
+    countries:
+      NORWAY:
+        title: "A1 certificate for genuinely posted workers"
+        description: >-
+          EU social-security coordination applies to Norway through the EEA Agreement. A worker
+          genuinely POSTED by their home employer can hold an A1 and stay in the home system,
+          exempt from Norwegian contributions, for a standard limit of 24 months; beyond that an
+          Article 16 exception agreement between the two states may extend it — confirm the
+          ceiling with URSSAF/CLEISS before relying on a figure. This turns on being posted, not
+          on nationality: someone HIRED LOCALLY in Norway is not posted and joins folketrygden,
+          where NAV's rule is that an EU/EEA citizen working in Norway "automatically becomes a
+          member of the Norwegian National Insurance Scheme from your first day of work."
+
+  # ── Third-country track ──────────────────────────────────────────────────────────
+  - key: valid_passport
+    pillar: IDENTITY
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    # Was unscoped, which asserted a 6-month passport rule at BLOCKER severity against EU/EEA
+    # nationals whom UDI says need only a valid identity card. See eea_identity_document.
+    applies_to_nationality_classes: [THIRD_COUNTRY]
+    confidence: medium
+    requires_expert_review: true
+    citations: ["d55e15de-6cb7-41e8-8c6e-b41cd7aef4c8"]
+    countries:
+      NORWAY:
+        title: "Valid passport (6+ months)"
+        description: "Passport must be valid for at least 6 months beyond entry."
+
+  # ── Pre-existing universal rows: titles and citations byte-identical to production ──
+  - key: employment_letter
+    pillar: EMPLOYMENT
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: null
+    confidence: medium
+    requires_expert_review: true
+    citations: ["d55e15de-6cb7-41e8-8c6e-b41cd7aef4c8"]
+    countries:
+      NORWAY:
+        title: "Employment letter"
+        description: >-
+          Provide an employment confirmation letter. For an EU/EEA national this is not
+          paperwork for its own sake: UDI requires the employer to supply an employment
+          certificate or a contract carrying the same information, and "the employee must
+          present the certificate or contract to the police when registering."
+  - key: minimum_lead_time
+    pillar: TIMELINE
+    severity: WARN
+    owner: HR
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: null
+    confidence: medium
+    requires_expert_review: true
+    citations:
+      - "d55e15de-6cb7-41e8-8c6e-b41cd7aef4c8"
+      - "d0bc92ec-e10d-4f7b-b05b-01c63017f4d3"
+    countries:
+      NORWAY:
+        title: "Minimum lead time"
+        description: "Submit documents at least 30 days before start date."
+  - key: residence_registration
+    pillar: RESIDENCE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: ["LTA", "PERMANENT"]
+    applies_to_nationality_classes: null
+    confidence: medium
+    requires_expert_review: true
+    citations:
+      - "https://www.skatteetaten.no/en/person/national-registry/identitetsnummer-og-elektronisk-id/fodselsnummer/"
+    countries:
+      NORWAY:
+        title: "Residence registration (folkeregister)"
+        description: >-
+          Report your move to the National Population Register (Skatteetaten). Skatteetaten's
+          rule is that "if you intend to stay in Norway for at least six months consecutively or
+          more permanently, you must report a move to Norway", which is what issues a national
+          identity number (fødselsnummer). The fødselsnummer supersedes any D-number you were
+          given for a shorter stay. Note the threshold turns on actual stay length around six
+          months, not on the STA/LTA label.
+  - key: national_insurance_registration
+    pillar: SOCIAL_SECURITY
+    severity: WARN
+    owner: HR
+    applies_to_assignment_types: ["LTA", "PERMANENT"]
+    applies_to_nationality_classes: null
+    confidence: medium
+    requires_expert_review: true
+    citations: []
+    countries:
+      NORWAY:
+        title: "National Insurance registration (folketrygden)"
+        description: "Register for the Norwegian National Insurance Scheme. Indicative — confirm with NAV / Skatteetaten."
+  - key: long_term_housing_contract
+    pillar: HOUSING
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: ["LTA", "PERMANENT"]
+    applies_to_nationality_classes: null
+    confidence: medium
+    requires_expert_review: true
+    citations: []
+    countries:
+      NORWAY:
+        title: "Long-term housing contract"
+        description: "Secure a long-term (typically 12-month+) housing contract at the destination. Indicative — confirm with your housing provider."

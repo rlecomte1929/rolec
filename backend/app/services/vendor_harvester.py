@@ -211,6 +211,14 @@ def validate(cand: Candidate) -> None:
             f"{cand.name}: source_tier {tier} — tier 3 (the provider's own site) is never "
             "sufficient evidence on its own"
         )
+    if cand.source.entry_url_pattern and not re.search(
+        cand.source.entry_url_pattern, cand.source_url
+    ):
+        raise HarvestRejected(
+            f"{cand.name}: {cand.source_url} is on {cand.source.name}'s domain but is not an "
+            "entry for one entity — a search form or landing page evidences nobody. "
+            "Re-source to the record page for this company."
+        )
     if cand.source.acquisition is Acquisition.UNAVAILABLE:
         raise HarvestRejected(
             f"{cand.name}: source {cand.source.name} is marked UNAVAILABLE "
@@ -405,6 +413,21 @@ def render_report(results: Sequence[PairResult]) -> str:
             lines.append(f"  - `{name}` unavailable: {reason}")
         if not r.unavailable:
             lines.append("  - No registry marked unavailable; the sources returned nothing usable.")
+
+    # A pair that staged SOMETHING can still have had a registry blocked, and that used to go
+    # unsaid: the loop above only visits pairs at zero. FR-DE/legal_admin stages one row, so
+    # the RAK being unlinkable would have been invisible — a partial success reads as a full
+    # one. Report every blocked registry, then say which pairs those pairs still produced.
+    partial = [r for r in results if r.unavailable and r.staged > 0]
+    if partial:
+        lines += ["", "## Pairs that staged rows but still had a registry blocked", ""]
+        for r in sorted(partial, key=lambda x: (x.corridor, x.service_category)):
+            lines.append(
+                f"- **{r.corridor} / {r.service_category}** — {r.staged} staged, "
+                "but not from every registry:"
+            )
+            for name, reason in r.unavailable.items():
+                lines.append(f"  - `{name}` unavailable: {reason}")
 
     lines += [
         "",

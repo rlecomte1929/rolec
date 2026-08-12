@@ -119,8 +119,49 @@ async function main() {
     },
   });
 
+  // [AIQ-1797] @supabase/realtime-js throws AT IMPORT TIME on Node < 22:
+  //   "Node.js detected but native WebSocket not found."
+  // Node 22 added a global WebSocket; CI pins 20.18.1 via .nvmrc, so this fails there and
+  // passes on any newer local Node — which is exactly how it reached CI green-on-my-machine.
+  //
+  // Supabase is in the SSR graph because the marketing pages import the
+  // `components/marketing` BARREL, which re-exports InlineDemoForm -> api/client ->
+  // api/supabase. (The ad landing pages import individual files, which is why they never
+  // hit this.) `vite build` even warns about that edge today.
+  //
+  // A stub is the right fix rather than unpicking the barrel: prerendering renders static
+  // marketing copy and never opens a realtime channel, so the module only needs to be
+  // IMPORTABLE. Rewriting eight pages' imports to dodge a build-time-only constraint would
+  // be a bigger, riskier diff than the constraint deserves. Build-time only — this file is
+  // never bundled, so nothing reaches the client.
+  //
+  // If a prerendered page ever genuinely needs realtime, this stub will surface it loudly
+  // as a connection that does nothing, not as a silent wrong render.
+  if (typeof globalThis.WebSocket === 'undefined') {
+    class PrerenderWebSocketStub {
+      constructor() {
+        throw new Error(
+          'prerender: a prerendered route tried to open a realtime WebSocket. Prerendering ' +
+            'renders static markup only — move that call out of the render path.',
+        );
+      }
+    }
+    globalThis.WebSocket = PrerenderWebSocketStub;
+    console.log('prerender: installed a WebSocket stub (Node < 22) so @supabase/realtime-js can import');
+  }
+
   const { ROUTES } = await import(path.join(SSR_OUT, 'prerender-entry.js'));
   const baseHtml = await readFile(template, 'utf8');
+
+  // The pristine shell has to be saved under its own name BEFORE the loop, because `/` now
+  // writes over dist/index.html. Ordering is load-bearing in one direction only: `baseHtml`
+  // is already in memory, so the later overwrite cannot corrupt the other routes — but if
+  // this copy ran after `/` was written, the shell would be gone outright. There is no other
+  // copy to recover it from: frontend/index.html is the UNBUILT template, carrying
+  // `/src/main.tsx` instead of the hashed asset tags Vite emits.
+  const shellPath = path.join(DIST, 'app.html');
+  await writeFile(shellPath, baseHtml, 'utf8');
+  console.log(`prerender: saved the SPA shell to ${path.relative(ROOT, shellPath)}`);
 
   for (const route of ROUTES) {
     const markup = route.render();
@@ -137,10 +178,31 @@ async function main() {
     }
     html = withDescription(withTitle(html, route.title), route.description);
 
-    const outDir = path.join(DIST, route.path.replace(/^\//, ''));
-    await mkdir(outDir, { recursive: true });
-    await writeFile(path.join(outDir, 'index.html'), html, 'utf8');
-    console.log(`prerender: wrote ${path.relative(ROOT, path.join(outDir, 'index.html'))} (${markup.length} bytes of markup)`);
+    // `outFile` exists for exactly one route: `/`, which writes dist/index.html.
+    //
+    // [AIQ-1797] first sent `/` to dist/landing.html with a `source: /` rewrite in
+    // render.yaml, to keep dist/index.html a pristine shell for the `/*` catch-all. The
+    // files were correct and the rewrite never fired, because Render's routing says:
+    //
+    //   "Render does not apply redirect or rewrite rules to a path if a resource exists at
+    //    that path. Instead, Render simply serves the resource at that path."
+    //
+    // dist/index.html IS the resource at `/`, so that rule was unreachable by construction —
+    // and that is also why the other seven routes work: nothing exists at dist/platform, only
+    // dist/platform/index.html, so their rewrites are reached. Production served the 1,670-byte
+    // shell to every crawler hitting the homepage.
+    //
+    // So the roles are swapped: the landing page IS dist/index.html and needs no rewrite, while
+    // the shell lives at dist/app.html (written above) and `/*` points there. The concern the
+    // original comment raised is real and unchanged — an HR user must never be served marketing
+    // copy — and it is now handled by the catch-all target rather than by the homepage's.
+    // verify-prerender.mjs asserts both halves.
+    const outPath = route.outFile
+      ? path.join(DIST, route.outFile)
+      : path.join(DIST, route.path.replace(/^\//, ''), 'index.html');
+    await mkdir(path.dirname(outPath), { recursive: true });
+    await writeFile(outPath, html, 'utf8');
+    console.log(`prerender: wrote ${path.relative(ROOT, outPath)} (${markup.length} bytes of markup)`);
   }
 
   // KEEP_PRERENDER_SSR=1 leaves the intermediate bundle for inspection. Useful for

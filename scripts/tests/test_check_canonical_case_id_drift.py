@@ -124,10 +124,15 @@ def test_audit_sql_casts_uuid_to_text():
 # exit codes
 # --------------------------------------------------------------------------
 
+def _stub_query(rows, watched=818):
+    """Stand in for the DB call: (bad_rows, assignments_watched)."""
+    return lambda _url: (rows, watched)
+
+
 def test_main_exits_1_on_a_new_violation(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://stub")
     monkeypatch.setattr(ccd, "BASELINE_FILE", _write(tmp_path, "known-1\n"))
-    monkeypatch.setattr(ccd, "query_bad_rows", lambda url: [("new-1", "duplicate")])
+    monkeypatch.setattr(ccd, "query_bad_rows", _stub_query([("new-1", "duplicate")]))
     monkeypatch.setattr(sys, "argv", ["check_canonical_case_id_drift.py"])
     assert ccd.main() == 1
 
@@ -135,7 +140,7 @@ def test_main_exits_1_on_a_new_violation(monkeypatch, tmp_path):
 def test_main_exits_0_when_only_baselined_rows_are_bad(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://stub")
     monkeypatch.setattr(ccd, "BASELINE_FILE", _write(tmp_path, "known-1\n"))
-    monkeypatch.setattr(ccd, "query_bad_rows", lambda url: [("known-1", "null")])
+    monkeypatch.setattr(ccd, "query_bad_rows", _stub_query([("known-1", "null")]))
     monkeypatch.setattr(sys, "argv", ["check_canonical_case_id_drift.py"])
     assert ccd.main() == 0
 
@@ -144,3 +149,58 @@ def test_main_exits_2_without_a_database_url(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setattr(sys, "argv", ["check_canonical_case_id_drift.py"])
     assert ccd.main() == 2
+
+
+# --------------------------------------------------------------------------
+# A tripwire over an empty table proves nothing (2026-08-11 guard sweep)
+# --------------------------------------------------------------------------
+# AUDIT_SQL returns only offenders, so "0 bad rows" is identical output whether 818
+# assignments are all clean or the table is empty. The baseline is now empty too, so the
+# "every entry went stale at once" signal that used to hint at this is gone. And
+# scripts/e2e_purge.py runs on every push to `main`, which makes an emptied table a live
+# possibility rather than a thought experiment.
+
+
+def test_empty_case_assignments_table_fails(monkeypatch, tmp_path):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://stub")
+    monkeypatch.setattr(ccd, "BASELINE_FILE", _write(tmp_path, "# empty baseline\n"))
+    monkeypatch.setattr(ccd, "query_bad_rows", _stub_query([], watched=0))
+    monkeypatch.setattr(sys, "argv", ["check_canonical_case_id_drift.py"])
+    assert ccd.main() == 1
+
+
+def test_empty_table_fails_even_for_update_baseline(monkeypatch, tmp_path):
+    """Regenerating from an empty table would write an empty baseline and read as a
+    completed cleanup."""
+    baseline = _write(tmp_path, "known-1\n")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://stub")
+    monkeypatch.setattr(ccd, "BASELINE_FILE", baseline)
+    monkeypatch.setattr(ccd, "query_bad_rows", _stub_query([], watched=0))
+    monkeypatch.setattr(
+        sys, "argv", ["check_canonical_case_id_drift.py", "--update-baseline"]
+    )
+    assert ccd.main() == 1
+    assert baseline.read_text() == "known-1\n", "must not have been rewritten"
+
+
+def test_clean_populated_table_still_passes(monkeypatch, tmp_path):
+    """The current prod shape: rows present, none bad, nothing baselined."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql://stub")
+    monkeypatch.setattr(ccd, "BASELINE_FILE", _write(tmp_path, "# empty baseline\n"))
+    monkeypatch.setattr(ccd, "query_bad_rows", _stub_query([], watched=818))
+    monkeypatch.setattr(sys, "argv", ["check_canonical_case_id_drift.py"])
+    assert ccd.main() == 0
+
+
+def test_json_reports_rows_watched(monkeypatch, tmp_path, capsys):
+    import json
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://stub")
+    monkeypatch.setattr(ccd, "BASELINE_FILE", _write(tmp_path, "# empty baseline\n"))
+    monkeypatch.setattr(ccd, "query_bad_rows", _stub_query([], watched=818))
+    monkeypatch.setattr(sys, "argv", ["check_canonical_case_id_drift.py", "--json"])
+    rc = ccd.main()
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 0
+    assert payload["assignments_watched"] == 818
+    assert payload["pass"] is True

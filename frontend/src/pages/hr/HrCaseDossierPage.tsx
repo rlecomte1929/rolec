@@ -3,12 +3,26 @@
  *
  * Route: /hr/cases/:caseId/dossier
  *
- * Shows all CaseForms for a case. Each row expands to reveal:
+ * Two halves, in the order they make sense: what the destination REQUIRES, then the
+ * CaseForms that satisfy it. Each form row expands to reveal:
  *  - Status banner
  *  - History timeline (events)
  *  - Comment thread
  *  - Status change buttons (Approve / Reject / Reset / etc.)
  *  - Flag toggle
+ *
+ * WHY THE REQUIREMENTS SECTION IS HERE. It used to exist for the employee only, on
+ * /employee/case/:caseId/dossier — so HR, the persona accountable for the move, was the
+ * one audience that could not see it. /hr/requirements reads a different table entirely
+ * (immigration_requirements, the entry-visa checklist), and the roadmap overlay carries
+ * copy for only a couple of titles. Meanwhile the same content was public: the
+ * unauthenticated /api/public/corridor-requirements served it to anyone. A stranger could
+ * read that a Norwegian payroll withholds 50% without a skattekort; the HR person running
+ * the move could not.
+ *
+ * No backend change was needed — _assert_case_access already grants HR of the same
+ * company, so GET /api/cases/{id}/requirements always authorised this call. Nothing had
+ * ever made it.
  *
  * Uses AppShell + max-w-5xl consistent with other HR pages.
  */
@@ -18,6 +32,7 @@ import { Button } from '../../components/antigravity/Button';
 import { AppShell } from '../../components/AppShell';
 import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
 import { HrCaseFormRow } from '../../features/platform-v2/hr-dossier/HrCaseFormRow';
+import { DestinationRequirements } from '../../features/platform-v2/dossier/DestinationRequirements';
 import {
   AddDocumentModal,
   type AddDocumentPersonOption,
@@ -124,7 +139,8 @@ export const HrCaseDossierPage: React.FC = () => {
             </p>
             <h1 className="text-2xl font-semibold text-slate-900">Dossier panel</h1>
             <p className="text-sm text-slate-500 mt-1">
-              All official forms for this case. Change status, flag issues, and annotate directly from here.
+              What this destination requires, and the official forms that satisfy it. Change status,
+              flag issues, and annotate directly from here.
             </p>
           </div>
 
@@ -155,6 +171,12 @@ export const HrCaseDossierPage: React.FC = () => {
             </div>
           </div>
         </header>
+
+        {/* ── What the destination requires ─────────────────────────────────
+            Above the forms deliberately: the obligation comes first, the paperwork that
+            discharges it second — the same order the employee dossier uses. Fetches
+            independently, so a requirements outage never blocks the forms below. */}
+        {caseId && <DestinationRequirements caseId={caseId} audience="hr" />}
 
         {/* ── Filter tabs ───────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center gap-1 mb-4 border-b border-slate-200">

@@ -116,7 +116,8 @@ Two enforcement styles, both server-side:
 |---|---|---|---|
 | `/api/hr/vendors`, `/api/hr/vendors/{id}`, `/api/hr/vendors/corridors` | `hr_vendors.py` | `_require_hr` (403 non-HR/Admin) | Vendors are global (no `org_id`); corridors list is non-tenant. |
 | `/api/hr/vendor-performance` | `hr_vendor_performance.py` | `_require_hr` | All review SQL `WHERE pr.company_id = CAST(:cid AS uuid)` with server-derived `cid`. |
-| `/api/hr/rfq-requests` GET/POST/PATCH | `hr_rfq.py` | `_require_hr` (403) | `org_id`/`company_id` from `db.get_hr_company_id`; list/update scoped to it. |
+| ~~`/api/hr/rfq-requests`~~ | — | **route deleted** | Removed 2026-07-22 (AIQ-1683) with `hr_rfq.py`; `rfq_requests` archived to `_legacy`. RFQ creation is employee-led — see `/api/rfqs` below. Listed struck through rather than dropped because this row read as live authz coverage for three weeks after the route was gone. |
+| `/api/rfqs` POST, `/api/rfqs/{id}` GET | `main.py:9292`, `:9490` | `require_hr_or_employee`, then `_require_assignment_visibility` / `_require_case_id_assignment_visible` | Case-scoped, not org-scoped: access is granted by an assignment on the case, so HR sees their company's and the employee sees their own. Recipients are validated against `suppliers` (`validate_vendor_ids`). |
 | `/api/hr/quote-requests` GET, `/{id}` PATCH | `employee_quotes.py` | in-body role check (403 non-HR/Admin) | `_caller_company_id(user)` (403 if none); queries `WHERE company_id = :company`. |
 | `/api/hr/resources/destinations`, `/api/hr/resources/page` | `routes/hr_resources.py` | `_require_hr_or_admin` (403) | Preview tool over **public** destination resources synthesized from query params — no tenant data. |
 | `/api/hr/{company_id}/conjoint/studies/{id}/fit\|results`, POST `studies` | `conjoint.py` | `require_admin_or_hr` | `_assert_company(path company_id vs get_org_id_for_hr_user)` → 403 on mismatch; admin bypass. |

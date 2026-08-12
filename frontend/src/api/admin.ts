@@ -19,3 +19,51 @@ export async function rerunCountryResearch(
 ): Promise<{ jobId: string }> {
   return apiPost(`/api/admin/countries/${countryCode}/research/rerun`, opts, { headers: adminHeaders() });
 }
+
+/** How well-sourced a requirement is. A badge — it does not decide what is served. */
+export type VerificationStatus = 'representative' | 'corpus_grounded' | 'expert_verified';
+/** Whether a requirement is served. Only 'approved' reaches employees or the public endpoint. */
+export type ReviewStatus = 'pending' | 'approved' | 'rejected';
+
+export interface AdminRequirementReview {
+  id: string;
+  purpose: string;
+  pillar: string;
+  title: string;
+  description: string;
+  severity: string;
+  owner: string;
+  verificationStatus?: VerificationStatus | null;
+  reviewStatus: ReviewStatus;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  /** null ⇒ applies to every nationality class — which is how a visa track reaches a free mover. */
+  appliesToNationalityClasses?: string[] | null;
+  appliesToAssignmentTypes?: string[] | null;
+  citations: string[];
+  lastVerifiedAt?: string | null;
+}
+
+export interface AdminRequirementList {
+  countryCode: string;
+  pendingCount: number;
+  items: AdminRequirementReview[];
+}
+
+/** Includes unapproved rows — the whole point of the review surface. */
+export async function listCountryRequirements(countryCode: string): Promise<AdminRequirementList> {
+  return apiGet(`/api/admin/countries/${countryCode}/requirements`, { headers: adminHeaders() });
+}
+
+/** Publish or withhold one requirement. Approving is what makes it readable. */
+export async function reviewCountryRequirement(
+  countryCode: string,
+  requirementId: string,
+  status: Exclude<ReviewStatus, 'pending'>
+): Promise<AdminRequirementReview> {
+  return apiPost(
+    `/api/admin/countries/${countryCode}/requirements/${requirementId}/review`,
+    { status },
+    { headers: adminHeaders() }
+  );
+}

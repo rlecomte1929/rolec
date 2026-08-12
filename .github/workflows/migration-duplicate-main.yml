@@ -38,4 +38,12 @@ jobs:
       - name: Check for duplicate migration versions across the whole tree
         # --no-db: duplicate detection only, no DATABASE_URL and no secret needed.
         # No --added here: on main we want every version compared, not just a diff.
-        run: python scripts/check_migration_drift.py --no-db
+        #
+        # --strict-duplicates is what makes that comparison able to FAIL. Without it, a run
+        # with no --added is in audit mode: duplicates print a warning and the process
+        # returns 0. This job shipped that way, so the backstop CLAUDE.md describes as
+        # "blind to nothing" was structurally incapable of firing from the day it was
+        # written — including for the #1716/#1717/#1718 batch-merge collision it names as
+        # its reason to exist. Found in the 2026-08-11 guard sweep. Safe to turn strict:
+        # the tree is at 591 migration files with zero duplicated versions.
+        run: python scripts/check_migration_drift.py --no-db --strict-duplicates

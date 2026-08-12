@@ -47,7 +47,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -56,6 +56,7 @@ from ...rate_limit import limiter
 from .. import crud
 from ..db import SessionLocal
 from ..services.disclaimers import IMMIGRATION_DISCLAIMER
+from ..services.nationality_class import classify
 from ..services.rules_engine import apply_rules
 # AIQ-1473b: single source of truth for ISO → catalog-name mapping. Imported
 # (not duplicated) so this endpoint stays in sync if the catalog naming changes.
@@ -75,7 +76,15 @@ def _slug(text: str) -> str:
 def _base_items(requirements: List[Any]) -> List[Dict[str, Any]]:
     """Project ORM RequirementItem rows → the dict shape apply_rules expects.
 
-    Mirrors requirements_builder's projection (no case/PII fields are read)."""
+    Mirrors requirements_builder's projection (no case/PII fields are read).
+
+    `appliesToNationalityClasses` MUST be carried. `rules_engine._applies_to_nationality_class`
+    treats a missing key as "applies to everyone", so omitting it here did not merely skip the
+    nationality filter — it published every mutually exclusive track at once. Norway returned
+    both `Valid passport (6+ months)` (THIRD_COUNTRY) and `Valid identity card or passport
+    (EU/EEA)` to the same anonymous caller, which is the exact failure `nationality_class.py`
+    exists to prevent, on the one surface a prospect sees before they trust us.
+    """
     return [
         {
             "id": item.id,
@@ -89,6 +98,12 @@ def _base_items(requirements: List[Any]) -> List[Dict[str, Any]]:
             "appliesToAssignmentTypes": (
                 json.loads(item.applies_to_assignment_types_json)
                 if getattr(item, "applies_to_assignment_types_json", None)
+                else None
+            ),
+            # None ⇒ applies to all nationality classes.
+            "appliesToNationalityClasses": (
+                json.loads(item.applies_to_nationality_classes_json)
+                if getattr(item, "applies_to_nationality_classes_json", None)
                 else None
             ),
             "verificationStatus": getattr(item, "verification_status", None),
@@ -108,6 +123,13 @@ def corridor_requirements(
     to: str = Query(..., min_length=2, max_length=40, description="Destination country (ISO code or name)."),
     employee_type: str = Query(..., description="Assignment type: STA | LTA | PERMANENT."),
     purpose: str = Query("employment", description="Relocation purpose: employment | other | study | family."),
+    nationality: Optional[str] = Query(
+        None, max_length=40,
+        description="Traveller nationality (ISO code or name). A country is NOT a nationality — "
+                    "`from` is the origin of the move and is deliberately not used for this. "
+                    "Omit it and the response is filtered as THIRD_COUNTRY, the most demanding "
+                    "track, which can only ever over-show.",
+    ),
 ) -> JSONResponse:
     """Generic, non-PII requirement set for (destination, employee_type). No auth."""
     etype = (employee_type or "").strip().upper()
@@ -118,8 +140,16 @@ def corridor_requirements(
         raise HTTPException(status_code=422, detail=f"purpose must be one of {sorted(_VALID_PURPOSES)}")
 
     dest_catalog = resolve_catalog_country(to)
-    # Minimal, PII-free draft: only assignment type + purpose drive deterministic filtering.
-    draft = {"relocationBasics": {"purpose": purp}, "assignmentContext": {"assignmentType": etype}}
+    # Minimal, PII-free draft. `destCountry` and `nationality` are here so the engine's
+    # nationality gate can run: without them `classify()` returns None and every response
+    # falls back to THIRD_COUNTRY. A nationality alone is not personal data — no name, no
+    # document, no case is involved.
+    draft = {
+        "relocationBasics": {"purpose": purp, "destCountry": to},
+        "assignmentContext": {"assignmentType": etype},
+        "employeeProfile": ({"nationality": nationality} if nationality else {}),
+    }
+    applied_class = classify(nationality, to) if nationality else None
 
     with SessionLocal() as db:
         base_items = _base_items(crud.list_requirements(db, dest_catalog, purp))
@@ -143,6 +173,9 @@ def corridor_requirements(
         "corridor": {"from": (from_ or "").strip().upper(), "to": dest_catalog},
         "employee_type": etype,
         "purpose": purp,
+        # Which track the caller is looking at. Without a nationality this is null and the
+        # list is the THIRD_COUNTRY one — say so rather than let it read as universal.
+        "nationality_class": applied_class,
         "requirements": requirements,
         # Titles dropped because they don't apply to this assignment type — lets the
         # caller explain a short/empty list instead of it looking like missing data.

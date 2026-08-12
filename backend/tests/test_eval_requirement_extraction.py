@@ -63,6 +63,61 @@ def test_fails_at_threshold_099(tmp_path, monkeypatch):
     assert e.value.code == 1
 
 
+# ── [AIQ-1821] the gate must not go green on a run that measured nothing ─────
+
+async def _extract_nothing(url, *, corridor="", content=None):
+    """The real failure mode: the page body never reached the model."""
+    return []
+
+
+def test_zero_yield_url_scores_zero_not_one(tmp_path, monkeypatch):
+    """A URL the extractor read nothing from must score 0.0, not a perfect 1.0."""
+    monkeypatch.setattr(ev, "extract_requirement_facts", _extract_nothing)
+    out = tmp_path / "r.json"
+    with pytest.raises(SystemExit) as e:
+        ev.main(["--golden", _golden(tmp_path), "--out", str(out), "--threshold", "0.70", "--ci"])
+    assert e.value.code == 1
+    report = json.loads(out.read_text())
+    assert report["precision"] == 0.0
+    assert report["recall"] == 0.0
+    assert report["passes_threshold"] is False
+    assert report["by_url"][0]["precision"] == 0.0
+    assert report["zero_yield_urls"] == ["https://gov.example"]
+
+
+def test_all_entries_skipped_fails_ci(tmp_path, monkeypatch):
+    """Every URL erroring means nothing was measured — that cannot be a pass."""
+    async def _boom(url, *, corridor="", content=None):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(ev, "extract_requirement_facts", _boom)
+    out = tmp_path / "r.json"
+    with pytest.raises(SystemExit) as e:
+        ev.main(["--golden", _golden(tmp_path), "--out", str(out), "--threshold", "0.70", "--ci"])
+    assert e.value.code == 1
+    report = json.loads(out.read_text())
+    assert report["entries_evaluated"] == 0
+    assert report["entries_skipped"] == 1
+    assert report["passes_threshold"] is False
+
+
+def test_recall_is_gated_not_just_precision(tmp_path, monkeypatch):
+    """High precision with poor recall must fail — extracting one safe fact isn't a pass."""
+    async def _one_match(url, *, corridor="", content=None):
+        # 1 extracted, 1 matched → precision 1.0, but only 1 of 2 expected → recall 0.5.
+        return [_f("A valid passport is required.", "document")]
+
+    monkeypatch.setattr(ev, "extract_requirement_facts", _one_match)
+    out = tmp_path / "r.json"
+    with pytest.raises(SystemExit) as e:
+        ev.main(["--golden", _golden(tmp_path), "--out", str(out), "--threshold", "0.70", "--ci"])
+    assert e.value.code == 1
+    report = json.loads(out.read_text())
+    assert report["precision"] == 1.0
+    assert report["recall"] == 0.5
+    assert report["passes_threshold"] is False
+
+
 def test_no_db_imports():
     src = Path(ev.__file__).read_text()
     for forbidden in ("import sqlalchemy", "from sqlalchemy", "supabase", "from backend.database"):

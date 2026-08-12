@@ -220,9 +220,12 @@ def start_research(case_id: str):
 
 @router.get("/{case_id}/requirements", response_model=schemas.CaseRequirementsDTO)
 def get_case_requirements(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id — see the note in cases_read.get_case_requirements. This copy
+    # is shadowed twice over (compat.py serves the path), but a wrong copy left behind is
+    # how the modular cutover reintroduces a fixed bug.
+    resolved_case_id = _assert_case_access(user, case_id)
     try:
-        return compute_case_requirements(case_id)
+        return compute_case_requirements(resolved_case_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Case not found")
 
