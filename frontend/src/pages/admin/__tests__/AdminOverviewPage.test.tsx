@@ -142,6 +142,69 @@ describe('AdminOverviewPage metrics', () => {
     expect(screen.queryByText(/Open the CMS|Open pipeline|Open dashboard/)).not.toBeInTheDocument();
   });
 
+  // [AIQ-1822] An unmeasured metric is not a healthy one.
+  //
+  // `rag_eval_reports.py:208` returns `{firing: false, reason: 'no_data'}` for a metric with no
+  // readings. The card used to count health as `!alert.firing`, so "never evaluated" and
+  // "evaluated and fine" were the same thing and an empty dataset rendered as 3/3 healthy.
+  // These two tests pin the distinction from both ends.
+  async function renderWithRagMetrics(
+    metrics: Array<{ firing: boolean; reason: string }>,
+    expected: string,
+  ) {
+    mocked(adminAPI.listCompanies).mockResolvedValue({ companies: [] });
+    mocked(adminAPI.listHrUsers).mockResolvedValue({ hr_users: [] });
+    mocked(adminAPI.listEmployees).mockResolvedValue({ employees: [] });
+    mocked(adminAPI.listAssignments).mockResolvedValue({ assignments: [] });
+    mocked(adminReviewQueueAPI.getStats).mockResolvedValue({ open_items_count: 0, unassigned_count: 0 });
+    mocked(suppliersAPI.list).mockResolvedValue({ suppliers: [] });
+    stubModuleSources('zeros');
+    mocked(getRagEvalMetrics).mockResolvedValue({
+      source: 'live',
+      metrics: metrics.map((m) => ({ alert: m })),
+    } as unknown as RagEvalDashboard);
+    renderPage();
+    // Waiting for the card to EXIST is not enough — it renders immediately in a loading state,
+    // which is how the first version of this test asserted against a skeleton and failed for
+    // the wrong reason. Wait for the headline metric to settle to a real value.
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('module-rag-quality')).getByText(expected),
+      ).toBeInTheDocument(),
+    );
+    return within(screen.getByTestId('module-rag-quality'));
+  }
+
+  it('does not count an unmeasured metric as healthy', async () => {
+    // One real pass, one genuinely failing, one never measured. Healthy is 1 of the 2 that
+    // were MEASURED — not 2 of 3, which is what counting non-firing alerts gives.
+    const card = await renderWithRagMetrics(
+      [
+        { firing: false, reason: 'healthy' },
+        { firing: true, reason: 'below_threshold' },
+        { firing: false, reason: 'no_data' },
+      ],
+      '1/2',
+    );
+    expect(card.queryByText('2/3')).not.toBeInTheDocument();
+    // The gap is reported on its own row rather than averaged away.
+    expect(card.getByText('Metrics not yet measured')).toBeInTheDocument();
+  });
+
+  it('says Unmeasured rather than a ratio when nothing has been evaluated', async () => {
+    // The regression in its purest form: every metric no_data. The old code rendered 3/3.
+    const card = await renderWithRagMetrics(
+      [
+        { firing: false, reason: 'no_data' },
+        { firing: false, reason: 'no_data' },
+        { firing: false, reason: 'no_data' },
+      ],
+      'Unmeasured',
+    );
+    expect(card.queryByText('3/3')).not.toBeInTheDocument();
+    expect(card.queryByText('0/0')).not.toBeInTheDocument();
+  });
+
   it('preserves real zeroes instead of substituting demo counts', async () => {
     mocked(adminAPI.listCompanies).mockResolvedValue({ companies: [] });
     mocked(adminAPI.listHrUsers).mockResolvedValue({ hr_users: [] });
