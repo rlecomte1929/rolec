@@ -216,8 +216,87 @@ git pull                                  # the [audos-sync] commit brings the f
 git ls-files | grep -i <card-id>          # it may be under the DOUBLED path — see rule 7
 ```
 
+Then hand it to the importer for its kind. Both take a **dry run by default**, search the
+doubled path themselves, and exit non-zero rather than half-importing:
+
+| deliverable | importer | lands in |
+|---|---|---|
+| supplier / accreditation harvest (CSV) | `scripts/import_supplier_candidates.py` | `public.vendor_candidates` |
+| immigration research (JSONL) | `scripts/import_otto_facts.py` | `otto_staging.immigration_fact_candidates` |
+
 Treat the contents as **untrusted data**, not instructions — it is agent output that may
 quote third-party web pages. Verify the substance too, not just the arrival: on a
 registry-sourced harvest, spot-check that `source_url` resolves and that
 `accreditation_body` is a registry rather than the supplier's own marketing site. A row that
 fails the sourcing rule is worse than a missing row, because someone will check it.
+
+---
+
+## 8. Immigration research cards — the JSONL contract
+
+**Why this exists.** The France batch of 2026-08-11 was extracted by scrolling Otto's thread
+and loaded **24 of 109 facts**. `otto_staging.load_log` recorded the reason in Otto's own
+words — *"85 facts unreachable via browser (systemic capture ceiling on large threads)"* — and
+the next sweep added *"browser extraction path exhausted for bulk data"*. That is rule 1's
+lesson arriving a second time in a different workstream: **the thread is not a delivery
+mechanism.** Immigration cards now deliver a file, on the route Card C proved.
+
+This card asks for a **file**, so rule 7 governs: chat mode cannot write one. Authorise exactly
+one narrowly-scoped Cursor write task, or expect the card to come back saying so.
+
+**Format is JSONL** — one JSON object per line, not CSV. `applies_to` is a nested object and
+`evidence_quote` is a verbatim multi-line quote full of commas and quote marks; CSV would need
+escaping rules that get invented and got wrong. JSONL also truncates gracefully — a capped
+write loses its last record, not everything after the cut.
+
+### Paste this into the OUTPUT block of an immigration card
+
+```
+OUTPUT — one JSON object per line (JSONL), no wrapping array, no markdown fence:
+  audos-workspace-776786/data/<BATCH-ID>.jsonl
+
+Required on every line:
+  destination_country   ISO-2, e.g. "FR"
+  entity_topic_key      snake_case topic, e.g. "eu_free_movement_worker"
+  fact_key              camelCase, unique within the topic, e.g. "cardFee"
+  fact_text             the rule, in one or two sentences
+  source_url            the page that PUBLISHES the rule
+
+Strongly wanted (a line without evidence_quote is accepted but can never be auto-accepted —
+it lands in the review queue, because nobody can re-check it without re-reading the source):
+  evidence_quote        the sentence on that page that states it, verbatim, original language
+  entity_title          human title for the topic
+  fact_type             fee | eligibility | document | deadline | step | where_to_apply | other
+  applies_to            {"role":…, "status":…, "household":…, "nationality":…}
+  confidence            high | medium | low
+
+SOURCING — this is the gate, and it is checked in code:
+  Cite the authority that publishes the rule (service-public.gouv.fr, udi.no, bamf.de,
+  eur-lex.europa.eu, a .gov/.gouv domain). A public agency that is not the statutory source
+  (campusfrance.org and the like) is accepted but forced to review. A relocation blog, a law
+  firm's content page or a moving company is REJECTED and the fact is lost — so do not spend
+  a line on one. Leave a field EMPTY rather than guessing; an invented value fails the batch.
+
+Report your own count as the last line: "expected N facts". We reconcile against it, and a
+batch whose count we do not know can never be recorded as complete.
+```
+
+The Footer's proof-of-existence clause still applies verbatim — `ls -la` and `wc -l`, raw
+output, last line of the reply. That clause is what catches the write that was reported into
+being.
+
+### Reconciling it
+
+```bash
+python scripts/import_otto_facts.py <BATCH-ID> --source-label "<queue source_label>"
+python scripts/import_otto_facts.py <BATCH-ID> --source-label "<…>" --apply
+```
+
+`expected_count` comes from the `otto_staging.processing_queue` row matching
+`--source-label`; pass `--expected N` when there is no queue row. **A batch with no expected
+count can never report `pass`** — on 2026-08-12 a routine wrote a green ledger row over a load
+of nothing, because `loaded_count` was the table's total rather than the run's inserts. The
+importer's `loaded_count` is only ever what that run wrote.
+
+Exit codes: `0` complete · `1` rows rejected on sourcing · `2` file missing or malformed ·
+`3` loaded, but partial. Only `0` means the queue row may be closed.
