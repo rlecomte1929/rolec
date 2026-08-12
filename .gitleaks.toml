@@ -23,6 +23,17 @@ regexes = [
   # log scrubber (_scrub redacts bearer tokens); not a real secret. Surgical match
   # (this exact string only) so real secrets in test files still fail the scan.
   '''abcdefghijklmnopqrstuvwxyz123456\.signaturepart''',
+  # [AIQ-1821] Google reCAPTCHA SITE key baked into skatteetaten.no / udi.no pages,
+  # captured verbatim in backend/tests/fixtures/requirement_facts_eval/pages/*.html.
+  # A reCAPTCHA *site* key is public by design — it is rendered into every visitor's
+  # browser; the confidential counterpart is the *secret* key, which is server-side
+  # only and appears nowhere here. Not ours, and not a secret.
+  # Matched on this specific key's prefix rather than allowlisting the fixture
+  # directory, so those snapshots stay scanned for anything that IS a real secret.
+  '''6Ld4-R0bAAAA''',
+  # [AIQ-1821] Same class: the Kindly chat widget's public `data-bot-key` on udi.no.
+  # A client-side widget identifier shipped in the page markup to every visitor.
+  '''746157c0-bb21-4a''',
 ]
 
 # --- Known false-positive paths ------------------------------------------------
