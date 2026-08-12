@@ -42,10 +42,12 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from backend.imports.otto.executor import (          # noqa: E402
     PASS,
+    promote,
     queue_expected,
     reconcile,
     stage,
     summarise,
+    summarise_promotion,
 )
 from backend.imports.otto.parsers import FactRowError, read_jsonl   # noqa: E402
 
@@ -90,11 +92,21 @@ def main() -> int:
              "success, not to assume it.",
     )
     ap.add_argument(
+        "--promote",
+        action="store_true",
+        help="also write one public.requirement_items row per entity whose facts are ready, "
+             "so the research reaches /api/cases/{id}/requirements and the public corridor "
+             "endpoint. Implies --apply. Promoted rows land 'corpus_grounded' at best and "
+             "render behind the provenance badge — nothing here writes 'expert_verified'.",
+    )
+    ap.add_argument(
         "--allow-rejections",
         action="store_true",
         help="exit 0 even when rows were rejected on sourcing (do not use in a pipeline)",
     )
     args = ap.parse_args()
+    if args.promote:
+        args.apply = True
 
     path = resolve(args.target)
     if path is None:
@@ -154,6 +166,22 @@ def main() -> int:
         if not args.apply:
             print("\n  (preview — pass --apply to write, including the load_log row)")
             conn.rollback()
+
+    # A Session, not the Connection above: crud.create_requirement_item commits internally, so
+    # promotion cannot share the staging transaction. Same split as the supplier importer.
+    from sqlalchemy.orm import sessionmaker
+
+    with sessionmaker(bind=engine)() as session:
+        promoted = promote(
+            session,
+            country=(rows[0].destination_country if rows else None),
+            dry_run=not args.promote,
+        )
+        print()
+        print(summarise_promotion(promoted))
+        if not args.promote:
+            print("\n  (preview — pass --promote to write these)")
+            session.rollback()
 
     if rejections and not args.allow_rejections:
         print(f"\n✖ {len(rejections)} row(s) rejected — nothing about them was staged.")
