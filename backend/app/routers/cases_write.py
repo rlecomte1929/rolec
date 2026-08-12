@@ -43,6 +43,7 @@ from ..services.case_service import (
     _pg_table,
     _sql_now,
     _sql_uuid_gen,
+    resolve_case_forms_case_id,
 )
 from ..services.prefill_engine import run_prefill_for_dependents
 from ..services.relocation_plan_view_service import invalidate_relocation_plan_cache
@@ -182,6 +183,20 @@ def patch_case(
                     "destCountry": td_route["host_country"],
                     "destCity": td_route["host_city"],
                 }
+        # Resolve BEFORE deciding whether this case exists. `crud.get_case` looks
+        # `wizard_cases` up by the raw id, but route params are routinely ASSIGNMENT ids
+        # (HrDashboard.tsx navigates with assignment.id). Handed one, `get_case` returned
+        # None for a case that plainly EXISTS, so the handler took the create-on-missing
+        # branch below — which by design skips the access check. That minted a SECOND
+        # wizard_cases row keyed by the assignment id: the guard never ran for a case that
+        # exists and may belong to another tenant, and the case's data forked in two, with
+        # apply_wizard_patch_side_effects / fire_roadmap_events / invalidate_relocation_plan_cache
+        # / _audit_case all firing on the wrong id.
+        #
+        # resolve_case_forms_case_id never raises and returns its input unchanged when
+        # nothing resolves, so a genuinely new id still falls through to create — which is
+        # the whole point of SEC-CASES-2 and the flow the wizard depends on.
+        case_id = resolve_case_forms_case_id(case_id)
         case = crud.get_case(db, case_id)
         if not case:
             # SEC-CASES-2: create-on-missing path — authentication (above) is the
