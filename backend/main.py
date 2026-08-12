@@ -1852,54 +1852,12 @@ def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = No
     return target
 
 
-def _normalize_destination_country(value: Optional[str]) -> Optional[str]:
-    if not value:
-        return None
-    normalized = value.strip().upper()
-    if normalized in ("SG", "SINGAPORE"):
-        return "SG"
-    if normalized in ("US", "USA", "UNITED STATES", "NEW YORK", "NEW YORK CITY", "NYC"):
-        return "US"
-    if normalized in ("GB", "UK", "UNITED KINGDOM", "LONDON", "ENGLAND"):
-        return "GB"
-    if normalized in ("FR", "FRANCE", "PARIS"):
-        return "FR"
-    if normalized in ("DE", "GERMANY", "DEUTSCHLAND", "BERLIN", "MUNICH", "MÜNCHEN"):
-        return "DE"
-    if normalized in ("NO", "NORWAY", "NORGE", "OSLO"):
-        return "NO"
-    if normalized in ("BR", "BRAZIL", "BRASIL", "RIO DE JANEIRO", "RIO", "SÃO PAULO", "SAO PAULO"):
-        return "BR"
-    if normalized in ("IT", "ITALY", "ITALIA", "ROME", "ROMA", "MILAN", "MILANO"):
-        return "IT"
-    if normalized in ("ES", "SPAIN", "ESPAÑA", "ESPANA", "MADRID", "BARCELONA"):
-        return "ES"
-    if normalized in ("AU", "AUSTRALIA", "SYDNEY", "MELBOURNE", "BRISBANE", "PERTH",
-                      "ADELAIDE", "CANBERRA", "GOLD COAST", "NEWCASTLE", "SUNSHINE COAST", "WOLLONGONG"):
-        return "AU"
-    if normalized in ("CA", "CANADA", "TORONTO", "VANCOUVER", "MONTREAL", "CALGARY",
-                      "EDMONTON", "OTTAWA", "WINNIPEG", "HAMILTON", "KITCHENER", "QUEBEC CITY"):
-        return "CA"
-    if normalized in ("CH", "SWITZERLAND", "SCHWEIZ", "SUISSE", "ZURICH", "ZÜRICH",
-                      "GENEVA", "GENÈVE", "GENEVE", "BERN", "BERNE", "BASEL", "BIEL",
-                      "LAUSANNE", "LUCERNE", "LUGANO", "ST. GALLEN", "ST GALLEN", "WINTERTHUR"):
-        return "CH"
-    if normalized in ("HK", "HONG KONG", "KOWLOON", "NEW TERRITORIES"):
-        return "HK"
-    if normalized in ("JP", "JAPAN", "TOKYO", "OSAKA", "FUKUOKA", "NAGOYA", "SAPPORO",
-                      "KAWASAKI", "KOBE", "KYOTO", "SAITAMA", "YOKOHAMA"):
-        return "JP"
-    if normalized in ("NL", "NETHERLANDS", "NEDERLAND", "AMSTERDAM", "ROTTERDAM",
-                      "THE HAGUE", "DEN HAAG", "UTRECHT", "EINDHOVEN", "GRONINGEN",
-                      "ALMERE", "BREDA", "NIJMEGEN", "TILBURG"):
-        return "NL"
-    if normalized in ("AE", "UAE", "UNITED ARAB EMIRATES", "DUBAI", "ABU DHABI",
-                      "SHARJAH", "AJMAN", "FUJAIRAH", "RAS AL KHAIMAH", "UMM AL QUWAIN"):
-        return "AE"
-    if normalized in ("ZA", "SOUTH AFRICA", "JOHANNESBURG", "CAPE TOWN", "DURBAN",
-                      "PRETORIA", "BLOEMFONTEIN", "PORT ELIZABETH", "EAST LONDON", "PIETERMARITZBURG"):
-        return "ZA"
-    return None
+# [AIQ-1821] Moved to backend/app/services/destination_normalizer.py so services can use it
+# without importing this module. Re-exported under the original private name for the
+# existing call sites in this file.
+from .app.services.destination_normalizer import (  # noqa: E402
+    normalize_destination_country as _normalize_destination_country,
+)
 
 
 def _build_profile_snapshot(draft: Dict[str, Any]) -> Dict[str, Any]:
