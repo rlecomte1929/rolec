@@ -245,4 +245,7 @@ async def replace_adhoc_pdf(
         logger.exception("adhoc: replace-pdf failed form_id=%s", form_id)
         raise HTTPException(status_code=500, detail="Failed to replace PDF")
 
-    return _fetch_single_form_summary(case_id, form_id)
+    # AIQ-1776 resolved both SQL statements above but left the response re-fetch on the raw
+    # param, and _fetch_single_form_summary filters `WHERE cf.case_id = :case_id` — so the
+    # PDF swap committed and then 404'd the caller.
+    return _fetch_single_form_summary(resolved_case_id, form_id)
