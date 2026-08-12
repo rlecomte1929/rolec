@@ -270,12 +270,15 @@ def patch_case_service_selections(
 
 @router.post("/{case_id}/research/start")
 def start_research(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
+    # SEC-CASES-2: enforce ownership / tenant access before kicking off research.
+    # Hoisted above the lookup so its RESOLVED id is what `crud.get_case` receives:
+    # `get_case` keys on the raw value, so an assignment id 404'd here before the guard
+    # ever ran, on a case that exists.
+    case_id = _assert_case_access(user, case_id)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
-        # SEC-CASES-2: enforce ownership / tenant access before kicking off research.
-        _assert_case_access(user, case_id)
         draft = json.loads(case.draft_json)
         basics = draft.get("relocationBasics", {})
         dest_country = basics.get("destCountry")
@@ -346,12 +349,15 @@ def create_case(
     request: Request,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
+    # SEC-CASES-2: enforce ownership / tenant access before finalising. Hoisted above the
+    # lookup so everything below keys on the RESOLVED id — `crud.get_case` 404'd an
+    # assignment id before the guard ran, and the `create_snapshot` insert further down was
+    # storing the raw value into a canonically-keyed table.
+    case_id = _assert_case_access(user, case_id)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
-        # SEC-CASES-2: enforce ownership / tenant access before finalising.
-        _assert_case_access(user, case_id)
 
         draft = json.loads(case.draft_json)
         basics = draft.get("relocationBasics", {})
@@ -416,6 +422,16 @@ def update_household(
     GAP 1b: Save structured household (family members + pets) to the case draft.
     Merges into familyMembers and pets sections of the draft.
     """
+    # [SEC] This endpoint had authentication (Depends(get_current_user)) and NO
+    # authorization: it was the only handler in this router with no tenant guard, while it
+    # WRITES family members and pets into the case draft. Any authenticated user could
+    # therefore write household PII into any company's case by id. It is live — the frontend
+    # calls it from api/roadmap.ts. Its siblings all received this guard under SEC-CASES-2;
+    # this one was missed.
+    #
+    # The guard also returns the resolved canonical id, which `crud.get_case` needs: it keys
+    # on the raw value, so an assignment id 404'd a case that exists.
+    case_id = _assert_case_access(user, case_id)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
@@ -514,7 +530,10 @@ def bulk_update_form_fields(
     and reviewed=True. AI-filled values get overridden=True. Recomputes
     completion_pct and returns the updated CaseFormSummary.
     """
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id. The write path below resolves correctly, but the response
+    # re-fetch (_fetch_single_form_summary) filters `WHERE cf.case_id = :case_id` — so an
+    # assignment id 404'd the caller AFTER the update had already committed.
+    case_id = _assert_case_access(user, case_id)
 
     try:
         with main_db.engine.begin() as conn:
@@ -647,7 +666,8 @@ def patch_form_status(
     'ready' validates required fields; 'submitted' requires receipt_ref;
     'approved'/'rejected'/'not_started' are HR/ADMIN only.
     """
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id — same 404-after-committed-write shape as bulk_update_form_fields.
+    case_id = _assert_case_access(user, case_id)
 
     # [P2-6/P4-2] 'approved'/'rejected'/'not_started' added for specialist + HR review.
     allowed_all = {"ready", "submitted", "approved", "rejected", "not_started"}

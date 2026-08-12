@@ -90,14 +90,25 @@ class CreateAndResearchAccessWiringTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 403)
         guard.assert_called_once_with(_OWNER, "c1")
 
-    def test_create_case_404_before_access_when_missing(self):
+    def test_create_case_404s_a_missing_case(self):
+        """A missing case is still a 404 — but the guard now runs FIRST.
+
+        The guard was moved above `crud.get_case` because `get_case` keys on the RAW route
+        param while route params are routinely assignment ids, so a case that exists 404'd.
+        `_assert_case_access` both authorises and returns the canonical id, so it has to run
+        before the lookup for the lookup to be correct.
+
+        The user-visible contract is unchanged: `_assert_case_access` itself raises 404 for
+        an unknown id and 403 for another tenant's, exactly as this ordering did. Only the
+        internal call order moved, so this test now asserts the outcome plus the new order.
+        """
         with mock.patch.object(cases_write, "SessionLocal"), \
              mock.patch.object(cases_write.crud, "get_case", return_value=None), \
              mock.patch.object(cases_write, "_assert_case_access") as guard:
             with self.assertRaises(HTTPException) as ctx:
                 cases_write.create_case(case_id="missing", request=mock.Mock(), user=_OWNER)
         self.assertEqual(ctx.exception.status_code, 404)
-        guard.assert_not_called()
+        guard.assert_called_once_with(_OWNER, "missing")
 
     def test_start_research_enforces_access_on_existing(self):
         with mock.patch.object(cases_write, "SessionLocal"), \
@@ -109,14 +120,15 @@ class CreateAndResearchAccessWiringTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 403)
         guard.assert_called_once_with(_OWNER, "c1")
 
-    def test_start_research_404_before_access_when_missing(self):
+    def test_start_research_404s_a_missing_case(self):
+        """Same reordering as create_case above, and for the same reason."""
         with mock.patch.object(cases_write, "SessionLocal"), \
              mock.patch.object(cases_write.crud, "get_case", return_value=None), \
              mock.patch.object(cases_write, "_assert_case_access") as guard:
             with self.assertRaises(HTTPException) as ctx:
                 cases_write.start_research(case_id="missing", user=_OWNER)
         self.assertEqual(ctx.exception.status_code, 404)
-        guard.assert_not_called()
+        guard.assert_called_once_with(_OWNER, "missing")
 
 
 if __name__ == "__main__":
