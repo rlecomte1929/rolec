@@ -24,9 +24,22 @@ assignment ids and fails on **new** violations only — never on the frozen stoc
 When the deferred cleanup finally runs, cleaned ids simply drop out of the live
 set and the baseline shrinks via ``--update-baseline``.
 
+**State as of 2026-08-11** (measured, not inherited from the AIQ-1730 doc): the stock is
+GONE, not frozen. Prod holds 818 `case_assignments`, all with a non-null
+`canonical_case_id`, and **zero** null / dangling / duplicate rows. The baseline file is
+correspondingly empty. That is the tripwire at its strongest — every violation is now a
+new one — and it means `UNIQUE(canonical_case_id)` is satisfiable today without the ~38
+cascading deletes that justified deferring it. AIQ-1731/1732 remain parked by choice; this
+note exists so the next reader does not go looking for 51 baselined ids that aren't there.
+
+Because the baseline is empty, the "all baseline entries went stale at once" signal is
+gone too — so an emptied `case_assignments` would otherwise read as a clean pass. It is
+not hypothetical: `scripts/e2e_purge.py` runs on every push to `main`. A row count of zero
+therefore FAILS: a tripwire watching an empty table proves nothing.
+
 Exit codes:
   0 — no violation outside the baseline (or none at all)
-  1 — at least one NEW bad row (CI should fail)
+  1 — at least one NEW bad row, or `case_assignments` is empty (CI should fail)
   2 — could not connect to DB or query failed (unexpected — investigate)
 
 Usage:
@@ -77,6 +90,13 @@ cls AS (
 SELECT assignment_id, bucket FROM cls WHERE bucket <> 'ok' ORDER BY bucket, assignment_id;
 """
 
+# How many rows the tripwire is actually watching. AUDIT_SQL returns only offenders, so
+# "0 bad rows" is the same output whether 818 assignments are all clean or the table is
+# empty — and scripts/e2e_purge.py runs on every push to `main`. Same reason
+# check_rls_coverage.py counts tables examined and check_route_auth.py counts route
+# handlers: a guard has to be able to state what it looked at.
+ROW_COUNT_SQL = "SELECT count(*) FROM public.case_assignments;"
+
 
 def load_baseline(path: Path) -> "set[str]":
     """Known-bad assignment ids. Comments (`#`) and blank lines are ignored;
@@ -114,7 +134,12 @@ def stale_baseline_entries(
     return sorted(baseline - live_ids)
 
 
-def query_bad_rows(db_url: str) -> "list[tuple[str, str]]":
+def query_bad_rows(db_url: str) -> "tuple[list[tuple[str, str]], int]":
+    """Return ``(bad_rows, assignments_watched)``.
+
+    The row count is what lets a green result state its own coverage, and what makes an
+    emptied table a failure rather than a pass.
+    """
     try:
         import psycopg2
     except ImportError:
@@ -138,10 +163,12 @@ def query_bad_rows(db_url: str) -> "list[tuple[str, str]]":
         with conn.cursor() as cur:
             cur.execute(AUDIT_SQL)
             rows = cur.fetchall()
+            cur.execute(ROW_COUNT_SQL)
+            watched = cur.fetchone()[0]
     finally:
         conn.close()
 
-    return [(str(aid), str(bucket)) for aid, bucket in rows]
+    return [(str(aid), str(bucket)) for aid, bucket in rows], int(watched)
 
 
 def write_baseline(path: Path, rows: "Iterable[tuple[str, str]]") -> None:
@@ -199,8 +226,27 @@ def main() -> int:
         print("DATABASE_URL not set", file=sys.stderr)
         return 2
 
-    live = query_bad_rows(db_url)
+    live, watched = query_bad_rows(db_url)
     baseline = load_baseline(BASELINE_FILE)
+
+    # A tripwire over an empty table proves nothing, and with the baseline now empty there
+    # is no "every entry went stale" signal to notice it either. scripts/e2e_purge.py runs
+    # on every push to `main`, so this is a live possibility, not a theoretical one.
+    # Checked before --update-baseline too: regenerating from an empty table would write an
+    # empty baseline and look like a completed cleanup.
+    if watched == 0:
+        print(
+            "[canonical-drift] FAIL — public.case_assignments is empty, so 'no violations'"
+            " is not a pass.",
+            file=sys.stderr,
+        )
+        print(
+            "  Either the audit is pointed at the wrong database, or a purge/teardown\n"
+            "  emptied the table (scripts/e2e_purge.py runs on every push to main).\n"
+            "  Investigate before trusting this check again.",
+            file=sys.stderr,
+        )
+        return 1
 
     if args.update_baseline:
         write_baseline(BASELINE_FILE, live)
@@ -218,6 +264,7 @@ def main() -> int:
 
     if args.json:
         print(json.dumps({
+            "assignments_watched": watched,
             "live_bad_rows": len(live),
             "by_bucket": counts,
             "baseline_total": len(baseline),
@@ -227,7 +274,8 @@ def main() -> int:
         }, indent=2))
     else:
         summary = ", ".join(f"{b}={counts[b]}" for b in sorted(counts)) or "none"
-        print(f"[canonical-drift] live bad case_assignments rows: {len(live)} ({summary})")
+        print(f"[canonical-drift] case_assignments rows watched: {watched}")
+        print(f"[canonical-drift] live bad rows: {len(live)} ({summary})")
         print(f"[canonical-drift] baseline entries: {len(baseline)}")
         if new:
             print(
@@ -254,7 +302,10 @@ def main() -> int:
                 print(f"  - {aid}  (safe to remove from the baseline)")
             print("\n  Trim with --update-baseline.")
         else:
-            print("\n[canonical-drift] PASS — no new violations.")
+            print(
+                f"\n[canonical-drift] PASS — no new violations across {watched} "
+                "case_assignments rows."
+            )
 
     return 1 if new else 0
 

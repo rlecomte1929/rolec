@@ -141,6 +141,47 @@ class CountryProfileDTO(BaseModel):
     requirementGroups: List[Dict[str, Any]] = []
 
 
+class AdminRequirementReviewDTO(BaseModel):
+    """One requirement as an ADMIN needs to see it before deciding to publish it.
+
+    Deliberately not `RequirementItemDTO`: that one is the employee-facing shape, its
+    `citations` are resolved `SourceRecordDTO` records (which is why the admin handler used to
+    pass `citations=[]` and drop them), and it carries no review fields. An admin needs the raw
+    source URLs, the provenance, the nationality scope and the review state — the things the
+    decision actually turns on.
+    """
+
+    id: str
+    purpose: str
+    pillar: str
+    title: str
+    description: str
+    severity: str
+    owner: str
+    # How well-sourced: representative | corpus_grounded | expert_verified. A badge.
+    verificationStatus: Optional[str] = None
+    # Whether it is served: pending | approved | rejected. The gate.
+    reviewStatus: str = "approved"
+    reviewedBy: Optional[str] = None
+    reviewedAt: Optional[datetime] = None
+    # None ⇒ applies to every nationality class. Shown explicitly because a NULL here is what
+    # serves a third-country visa track to an EU free mover.
+    appliesToNationalityClasses: Optional[List[str]] = None
+    appliesToAssignmentTypes: Optional[List[str]] = None
+    citations: List[str] = []
+    lastVerifiedAt: Optional[datetime] = None
+
+
+class AdminRequirementListDTO(BaseModel):
+    countryCode: str
+    pendingCount: int = 0
+    items: List[AdminRequirementReviewDTO] = []
+
+
+class AdminRequirementReviewRequest(BaseModel):
+    status: str  # approved | rejected
+
+
 class CountryListItemDTO(BaseModel):
     countryCode: str
     lastUpdatedAt: Optional[datetime] = None

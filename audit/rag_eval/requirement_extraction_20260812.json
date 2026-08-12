@@ -1,0 +1,60 @@
+{
+  "precision": 0.125,
+  "recall": 0.1429,
+  "threshold": 0.7,
+  "passes_threshold": false,
+  "entries_evaluated": 5,
+  "entries_skipped": 1,
+  "by_url": [
+    {
+      "url": "https://www.make-it-in-germany.com/en/visa-residence/types",
+      "corridor": "IN-DE",
+      "extracted": 0,
+      "expected": 2,
+      "matched_extracted": 0,
+      "matched_expected": 0,
+      "precision": 1.0,
+      "recall": 0.0
+    },
+    {
+      "url": "https://www.udi.no/en/want-to-apply/work-immigration/",
+      "corridor": "FR-NO",
+      "extracted": 1,
+      "expected": 1,
+      "matched_extracted": 1,
+      "matched_expected": 1,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    {
+      "url": "https://www.ica.gov.sg/enter-transit-depart/entering-singapore/visa_requirements",
+      "corridor": "US-SG",
+      "extracted": 7,
+      "expected": 1,
+      "matched_extracted": 0,
+      "matched_expected": 0,
+      "precision": 0.0,
+      "recall": 0.0
+    },
+    {
+      "url": "https://www.make-it-in-germany.com/en/visa-residence/process",
+      "corridor": "GB-DE",
+      "extracted": 0,
+      "expected": 2,
+      "matched_extracted": 0,
+      "matched_expected": 0,
+      "precision": 1.0,
+      "recall": 0.0
+    },
+    {
+      "url": "https://imigrante.sef.pt/en/solicitar/residir/",
+      "corridor": "ES-PT",
+      "extracted": 0,
+      "expected": 1,
+      "matched_extracted": 0,
+      "matched_expected": 0,
+      "precision": 1.0,
+      "recall": 0.0
+    }
+  ]
+}

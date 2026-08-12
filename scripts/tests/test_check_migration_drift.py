@@ -192,9 +192,86 @@ def test_no_db_mode_needs_no_database_url(monkeypatch, tmp_path):
 
 
 def test_no_db_mode_audit_only_is_green(monkeypatch, tmp_path):
-    """Without --added the pre-existing duplicates warn but do not fail."""
+    """Without --added the pre-existing duplicates warn but do not fail.
+
+    This is deliberate for a PR run (the repo carries duplicate debt no single PR
+    introduced) — and it is exactly why the whole-tree job on main needs
+    --strict-duplicates. See the next test.
+    """
     d = _mkmigrations(tmp_path, "20261010000000_a.sql", "20261010000000_b.sql")
     monkeypatch.setattr(cmd, "MIGRATIONS_DIR", d)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setattr(sys, "argv", ["check_migration_drift.py", "--no-db"])
     assert cmd.main() == 0
+
+
+# ── --strict-duplicates: the whole-tree backstop must be able to fail ───────────
+#
+# migration-duplicate-main.yml runs on push to main to catch the ONE collision the
+# PR-time guards cannot see: two already-green PRs batch-merged back to back (GitHub
+# does not re-run a PR when its base moves — #1716/#1717/#1718, 2026-08-04). It ran
+# `--no-db` with no --added, i.e. audit mode, so it could only ever print a warning and
+# exit 0. It had never been capable of failing. Found in the 2026-08-11 guard sweep.
+
+
+def test_strict_duplicates_fails_on_a_duplicate_no_added_would_catch(monkeypatch, tmp_path):
+    """The batch-merge case: the collision exists on main and is in NO PR's diff."""
+    d = _mkmigrations(tmp_path, "20261010000000_a.sql", "20261010000000_b.sql")
+    monkeypatch.setattr(cmd, "MIGRATIONS_DIR", d)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(
+        sys, "argv", ["check_migration_drift.py", "--no-db", "--strict-duplicates"]
+    )
+    assert cmd.main() == 1
+
+
+def test_strict_duplicates_is_green_on_a_clean_tree(monkeypatch, tmp_path):
+    """Strict must not mean noisy: no duplicates, no failure. (The live tree is at
+    591 files with zero duplicated versions, which is what makes strict adoptable.)"""
+    d = _mkmigrations(tmp_path, "20261010000000_a.sql", "20261011000000_b.sql")
+    monkeypatch.setattr(cmd, "MIGRATIONS_DIR", d)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(
+        sys, "argv", ["check_migration_drift.py", "--no-db", "--strict-duplicates"]
+    )
+    assert cmd.main() == 0
+
+
+def test_strict_duplicates_reports_pass_false_in_json(monkeypatch, tmp_path, capsys):
+    import json
+
+    d = _mkmigrations(tmp_path, "20261010000000_a.sql", "20261010000000_b.sql")
+    monkeypatch.setattr(cmd, "MIGRATIONS_DIR", d)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["check_migration_drift.py", "--no-db", "--strict-duplicates", "--json"],
+    )
+    rc = cmd.main()
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 1
+    assert payload["pass"] is False
+    assert payload["fail_count"] == 1
+    assert "STRICT" in payload["mode"]
+
+
+# ── A guard that read no migration files has not checked anything ───────────────
+
+
+def test_empty_migrations_dir_fails(monkeypatch, tmp_path):
+    """Every check compares against the repo version set, so an empty one makes
+    'no duplicates' meaningless. Before this, --no-db printed
+    "✅  No duplicate migration versions (0 repo files)" and exited 0."""
+    d = tmp_path / "migrations"
+    d.mkdir()
+    monkeypatch.setattr(cmd, "MIGRATIONS_DIR", d)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(sys, "argv", ["check_migration_drift.py", "--no-db"])
+    assert cmd.main() == 1
+
+
+def test_missing_migrations_dir_fails(monkeypatch, tmp_path):
+    monkeypatch.setattr(cmd, "MIGRATIONS_DIR", tmp_path / "nope")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(sys, "argv", ["check_migration_drift.py", "--no-db"])
+    assert cmd.main() == 1

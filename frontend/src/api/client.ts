@@ -2591,9 +2591,41 @@ export const adminCollaborationAPI = {
     api.get<unknown>('/api/admin/collaboration/notifications/unread-count').then((r) => r.data),
 };
 
+/**
+ * [AIQ-1821] `GET /api/requirements/sufficiency` returns HTTP 200 for BOTH degraded states,
+ * so callers must branch on `compute_status`, never on the HTTP status:
+ *  - 'ok'                — the computation ran. Empty arrays mean "we hold no verified
+ *                          requirements for this corridor", NOT "nothing is required of you".
+ *  - 'insufficient_data' — the case lacks the inputs to compute.
+ *  - 'unavailable'       — something upstream broke.
+ */
+export type RequirementsComputeStatus = 'ok' | 'insufficient_data' | 'unavailable';
+
+/** One approved requirement fact, with the official source it was extracted from. */
+export interface SupportingRequirement {
+  fact_id: string;
+  fact_text: string;
+  source_url: string;
+  /** Profile fields this fact implies we need. Keys of the case profile snapshot. */
+  required_fields: string[];
+}
+
+export interface RequirementsSufficiency {
+  compute_status: RequirementsComputeStatus;
+  /** Non-null only when compute_status !== 'ok'. */
+  message: string | null;
+  /** Raw as stored on the case — normalised server-side but not guaranteed ISO-2. */
+  destination_country: string | null;
+  /** Profile fields still unanswered. INTAKE completeness — not legal obligations. */
+  missing_fields: string[];
+  supporting_requirements: SupportingRequirement[];
+}
+
 export const requirementsAPI = {
-  getSufficiency: async (caseId: string): Promise<{ missing_fields?: string[]; compute_status?: string; message?: string }> => {
-    const response = await api.get<{ missing_fields?: string[]; compute_status?: string; message?: string }>('/api/requirements/sufficiency', { params: { case_id: caseId } });
+  getSufficiency: async (caseId: string): Promise<RequirementsSufficiency> => {
+    const response = await api.get<RequirementsSufficiency>('/api/requirements/sufficiency', {
+      params: { case_id: caseId },
+    });
     return response.data;
   },
 };

@@ -43,6 +43,7 @@ from ..services.case_service import (
     _pg_table,
     _sql_now,
     _sql_uuid_gen,
+    resolve_case_forms_case_id,
 )
 from ..services.prefill_engine import run_prefill_for_dependents
 from ..services.relocation_plan_view_service import invalidate_relocation_plan_cache
@@ -182,6 +183,20 @@ def patch_case(
                     "destCountry": td_route["host_country"],
                     "destCity": td_route["host_city"],
                 }
+        # Resolve BEFORE deciding whether this case exists. `crud.get_case` looks
+        # `wizard_cases` up by the raw id, but route params are routinely ASSIGNMENT ids
+        # (HrDashboard.tsx navigates with assignment.id). Handed one, `get_case` returned
+        # None for a case that plainly EXISTS, so the handler took the create-on-missing
+        # branch below — which by design skips the access check. That minted a SECOND
+        # wizard_cases row keyed by the assignment id: the guard never ran for a case that
+        # exists and may belong to another tenant, and the case's data forked in two, with
+        # apply_wizard_patch_side_effects / fire_roadmap_events / invalidate_relocation_plan_cache
+        # / _audit_case all firing on the wrong id.
+        #
+        # resolve_case_forms_case_id never raises and returns its input unchanged when
+        # nothing resolves, so a genuinely new id still falls through to create — which is
+        # the whole point of SEC-CASES-2 and the flow the wizard depends on.
+        case_id = resolve_case_forms_case_id(case_id)
         case = crud.get_case(db, case_id)
         if not case:
             # SEC-CASES-2: create-on-missing path — authentication (above) is the
@@ -255,12 +270,15 @@ def patch_case_service_selections(
 
 @router.post("/{case_id}/research/start")
 def start_research(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
+    # SEC-CASES-2: enforce ownership / tenant access before kicking off research.
+    # Hoisted above the lookup so its RESOLVED id is what `crud.get_case` receives:
+    # `get_case` keys on the raw value, so an assignment id 404'd here before the guard
+    # ever ran, on a case that exists.
+    case_id = _assert_case_access(user, case_id)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
-        # SEC-CASES-2: enforce ownership / tenant access before kicking off research.
-        _assert_case_access(user, case_id)
         draft = json.loads(case.draft_json)
         basics = draft.get("relocationBasics", {})
         dest_country = basics.get("destCountry")
@@ -331,12 +349,15 @@ def create_case(
     request: Request,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
+    # SEC-CASES-2: enforce ownership / tenant access before finalising. Hoisted above the
+    # lookup so everything below keys on the RESOLVED id — `crud.get_case` 404'd an
+    # assignment id before the guard ran, and the `create_snapshot` insert further down was
+    # storing the raw value into a canonically-keyed table.
+    case_id = _assert_case_access(user, case_id)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
-        # SEC-CASES-2: enforce ownership / tenant access before finalising.
-        _assert_case_access(user, case_id)
 
         draft = json.loads(case.draft_json)
         basics = draft.get("relocationBasics", {})
@@ -401,6 +422,16 @@ def update_household(
     GAP 1b: Save structured household (family members + pets) to the case draft.
     Merges into familyMembers and pets sections of the draft.
     """
+    # [SEC] This endpoint had authentication (Depends(get_current_user)) and NO
+    # authorization: it was the only handler in this router with no tenant guard, while it
+    # WRITES family members and pets into the case draft. Any authenticated user could
+    # therefore write household PII into any company's case by id. It is live — the frontend
+    # calls it from api/roadmap.ts. Its siblings all received this guard under SEC-CASES-2;
+    # this one was missed.
+    #
+    # The guard also returns the resolved canonical id, which `crud.get_case` needs: it keys
+    # on the raw value, so an assignment id 404'd a case that exists.
+    case_id = _assert_case_access(user, case_id)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
@@ -499,7 +530,10 @@ def bulk_update_form_fields(
     and reviewed=True. AI-filled values get overridden=True. Recomputes
     completion_pct and returns the updated CaseFormSummary.
     """
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id. The write path below resolves correctly, but the response
+    # re-fetch (_fetch_single_form_summary) filters `WHERE cf.case_id = :case_id` — so an
+    # assignment id 404'd the caller AFTER the update had already committed.
+    case_id = _assert_case_access(user, case_id)
 
     try:
         with main_db.engine.begin() as conn:
@@ -632,7 +666,8 @@ def patch_form_status(
     'ready' validates required fields; 'submitted' requires receipt_ref;
     'approved'/'rejected'/'not_started' are HR/ADMIN only.
     """
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id — same 404-after-committed-write shape as bulk_update_form_fields.
+    case_id = _assert_case_access(user, case_id)
 
     # [P2-6/P4-2] 'approved'/'rejected'/'not_started' added for specialist + HR review.
     allowed_all = {"ready", "submitted", "approved", "rejected", "not_started"}
@@ -1099,7 +1134,11 @@ def register_prefilled_document(
     path's job (``TODO [AIQ-1759]``), so the row is the durable record and the
     binary can be produced later without changing this contract.
     """
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id, exactly as the sibling upload_form_document does — its own
+    # comment says storing the raw id "would make the row invisible to every reader that
+    # resolves". This handler was storing the raw one: with an assignment id the INSERT
+    # succeeded and the reader (cases_read.py, which resolves) could never match the row.
+    resolved_case_id = _assert_case_access(user, case_id)
 
     actor_id = user.get("id") or user.get("sub")
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
@@ -1162,7 +1201,7 @@ def register_prefilled_document(
                     f"          size_bytes, uploaded_by, doc_key, created_at"
                 ),
                 {
-                    "fid": form_id, "cid": case_id, "name": file_name,
+                    "fid": form_id, "cid": resolved_case_id, "name": file_name,
                     "path": storage_path, "ctype": "application/pdf",
                     "uid": actor_id,
                     "report": json.dumps(payload.fill_report or {}),
@@ -1608,7 +1647,12 @@ def post_case_message(
     """
     # Tenant isolation: enforce that the caller is actually linked to the case
     # (assignee / HR in-company / admin) — previously this endpoint had no check.
-    _assert_case_access(user, case_id)
+    #
+    # Key the INSERT on the guard's RESOLVED id. The reader
+    # (cases_read.list_case_messages) goes through _canonical_case_id_or_404, so a message
+    # stored under an assignment id returned 201 and then never appeared in the thread —
+    # written, committed, unreadable.
+    resolved_case_id = _assert_case_access(user, case_id)
     if not body.content.strip():
         raise HTTPException(status_code=422, detail="content must not be empty")
 
@@ -1625,7 +1669,7 @@ def post_case_message(
                     "(id, case_id, sender_id, sender_role, content, created_at) "
                     "VALUES (:id, :case_id, :sender_id, :sender_role, :content, :now)"
                 ),
-                {"id": new_id, "case_id": case_id, "sender_id": sender_id,
+                {"id": new_id, "case_id": resolved_case_id, "sender_id": sender_id,
                  "sender_role": sender_role, "content": body.content, "now": now},
             )
             row = conn.execute(

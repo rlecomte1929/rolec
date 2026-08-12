@@ -25,6 +25,31 @@ import pytest
 # can't skip a module that fails to import — so they're ignored here, by category,
 # until fixed. Skip-list (shrinks over time), NOT an inclusion list — every other
 # test now gates automatically.
+# ⚠️ THIS LIST IS 70 FILES LONG AND HAS NO REVIEW. Audited 2026-08-12.
+#
+# ~10% of backend/tests is excluded from CI collection here, plus 4 more via --ignore in
+# ci.yml. That is a blind spot of unknown size: nobody has checked what these files would
+# report, and entries have no expiry.
+#
+# The sample that was checked found one stale entry — test_upload_validator.py passes 10/10
+# cleanly and is excluded for no current reason — one with a known open ticket
+# (test_hr_case_detail.py, AIQ-1806), and several whose local failures are environment
+# artefacts rather than real defects. So the list is not rotten, but it is unexamined, and
+# it contains auth, RLS and upload-validation files.
+#
+# TWO RULES WHEN TOUCHING THIS LIST:
+#   1. Every entry states WHY, and what would let it be removed. An entry with no stated exit
+#      condition is permanent by accident.
+#   2. Adding a file here to make CI green is not a fix. If a test fails, it is telling you
+#      something; silence it only with a ticket and a reason, exactly as
+#      scripts/sentinel_baseline.json requires for E2E.
+#
+# To check whether an entry is still needed, name the file directly — note that pytest
+# honours collect_ignore even then, so run it from a checkout without this conftest, or
+# temporarily remove the line:
+#   DATABASE_URL=sqlite:///./probe.db pytest backend/tests/<file>.py -q
+# (The DATABASE_URL is required: a46faf91 added a guard that refuses to run the suite
+#  against the prod URL that a local .env supplies.)
 collect_ignore = [
     # Pre-migration `from services...` imports — resolve only with backend/ on
     # sys.path; canonical path is backend.app.services (AUDIT-A9.3 service-tree
@@ -42,7 +67,8 @@ collect_ignore = [
     # importlib import-mode — out of scope for this CI-wiring change).
     "test_collaboration_api.py",
     "test_employee_policy_resolution.py",
-    "test_official_ingest.py",
+    # test_official_ingest.py removed from the skip-list (AIQ-1821): its imports are
+    # now canonical `backend.app.services`, so it collects and runs.
     "test_admin.py",
     "test_admin_verification.py",
     # scipy removed `trapz` (use scipy.integrate.trapezoid / numpy.trapezoid) —

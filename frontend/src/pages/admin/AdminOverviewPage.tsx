@@ -37,7 +37,10 @@ type OverviewStats = {
   resourcesPublished: number | null;
   resourcesDraft: number | null;
   prospectsTotal: number | null;
+  /** Metrics that were measured AND are within threshold. Excludes `no_data`. */
   ragHealthy: number | null;
+  /** Metrics that produced a reading at all — the honest denominator for "healthy". */
+  ragMeasured: number | null;
   ragTotal: number | null;
   aiSpendUsd: number | null;
   aiCalls: number | null;
@@ -60,6 +63,7 @@ const EMPTY_STATS: OverviewStats = {
   resourcesDraft: null,
   prospectsTotal: null,
   ragHealthy: null,
+  ragMeasured: null,
   ragTotal: null,
   aiSpendUsd: null,
   aiCalls: null,
@@ -125,7 +129,17 @@ export const AdminOverviewPage: React.FC = () => {
         resourcesPublished: settledNumber(results[8], (value) => value.resources_published),
         resourcesDraft: settledNumber(results[8], (value) => value.resources_draft),
         prospectsTotal: settledNumber(results[9], (value) => value.total),
-        ragHealthy: settledNumber(results[10], (value) => (value as RagEvalDashboard).metrics?.filter((m) => !m.alert.firing).length),
+        // `!alert.firing` is NOT health. A metric with no reading at all also does not fire —
+        // rag_eval_reports.py:208 returns {"firing": false, "reason": "no_data"} — so the old
+        // filter counted "we have never measured this" as "this is fine", and the overview card
+        // read 3/3 healthy on an empty dataset. Health is an explicit reason, not the absence
+        // of an alarm.
+        ragHealthy: settledNumber(results[10], (value) =>
+          (value as RagEvalDashboard).metrics?.filter(
+            (m) => m.alert.reason !== 'no_data' && !m.alert.firing,
+          ).length),
+        ragMeasured: settledNumber(results[10], (value) =>
+          (value as RagEvalDashboard).metrics?.filter((m) => m.alert.reason !== 'no_data').length),
         ragTotal: settledNumber(results[10], (value) => (value as RagEvalDashboard).metrics?.length),
         aiSpendUsd: settledNumber(results[11], (value) => value.totals?.total_cost_usd),
         aiCalls: settledNumber(results[11], (value) => value.totals?.n_calls),
@@ -137,10 +151,25 @@ export const AdminOverviewPage: React.FC = () => {
   const stats: OverviewStats = statsQuery.data ?? EMPTY_STATS;
   const loading = statsQuery.isLoading;
 
-  // RAG quality has no single count — summarise it as "healthy / total" metrics
-  // and surface how many thresholds are currently alerting.
-  const ragSummary = stats.ragTotal === null ? null : `${stats.ragHealthy ?? 0}/${stats.ragTotal}`;
-  const ragAlerting = stats.ragTotal === null ? null : stats.ragTotal - (stats.ragHealthy ?? 0);
+  // RAG quality has no single count, so it is summarised as healthy / MEASURED — not
+  // healthy / total. Dividing by total silently treats an unmeasured metric as a healthy one,
+  // which is how this card reported 3/3 while nothing had been evaluated at all.
+  //
+  // When nothing has been measured the card says "Unmeasured" rather than "0/0", because 0/0
+  // still reads as a number someone can glance past. Unmeasured metrics are then reported on
+  // their own row, so the gap is visible instead of being averaged away.
+  const ragUnmeasured =
+    stats.ragTotal === null || stats.ragMeasured === null
+      ? null
+      : stats.ragTotal - stats.ragMeasured;
+  const ragSummary =
+    stats.ragMeasured === null
+      ? null
+      : stats.ragMeasured === 0
+        ? 'Unmeasured'
+        : `${stats.ragHealthy ?? 0}/${stats.ragMeasured}`;
+  const ragAlerting =
+    stats.ragMeasured === null ? null : stats.ragMeasured - (stats.ragHealthy ?? 0);
 
   const aiSpendLabel = stats.aiSpendUsd === null ? null : `$${stats.aiSpendUsd.toFixed(2)}`;
   const aiCo2eLabel = stats.aiCo2eGrams === null ? null : `${stats.aiCo2eGrams.toFixed(1)} g`;
@@ -266,7 +295,13 @@ export const AdminOverviewPage: React.FC = () => {
           subtitle="Retrieval & generation health over time"
           metric={ragSummary}
           loading={loading}
-          rows={[{ label: 'Thresholds alerting', value: ragAlerting }]}
+          rows={[
+            { label: 'Thresholds alerting', value: ragAlerting },
+            // Deliberately not the word "Unmeasured" on its own — that is the headline metric
+            // when nothing has been evaluated, and two identical strings in one card make it
+            // impossible to assert on either.
+            { label: 'Metrics not yet measured', value: ragUnmeasured },
+          ]}
         />
         <ModuleCard
           testId="module-ai-unit-economics"

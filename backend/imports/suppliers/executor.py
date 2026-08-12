@@ -32,6 +32,7 @@ from sqlalchemy import text
 from backend.app.services.vendor_harvester import (
     RUN_FAILED,
     RUN_STAGED,
+    STATUS_PENDING,
     Candidate,
     PairResult,
     existing_dedupe_keys,
@@ -64,6 +65,21 @@ _INSERT_CANDIDATE = text(
          :bar_registered, :dedupe_key, :status, :notes)
     """
 )
+
+
+_STAGED_KEYS = text(
+    "SELECT dedupe_key FROM public.vendor_candidates "
+    "WHERE corridor = :corridor AND service_category = :category AND dedupe_key IS NOT NULL"
+)
+
+
+def _staged_keys(conn: Any, corridor: str, category: str) -> set:
+    """Dedupe keys already present in vendor_candidates for this corridor+category."""
+    return {
+        k for (k,) in conn.execute(
+            _STAGED_KEYS, {"corridor": corridor, "category": category}
+        ) if k
+    }
 
 
 def group_by_pair(
@@ -101,6 +117,29 @@ def stage(
         known = existing_dedupe_keys(conn, corridor=corridor)
         rows, result, pair_rejections = plan_pair(corridor, category, pair_candidates, known)
         rejections.extend(pair_rejections)
+
+        # Already-staged rows are not re-inserted. Without this a second run appends a full
+        # duplicate set: every row matches the first run's dedupe keys, so it stages again as
+        # 'duplicate' under a fresh run. That is not hypothetical — `--promote` implies
+        # `--apply`, so running `--apply` and then `--promote` (the natural "stage, check,
+        # then promote" sequence) did exactly that in production on 2026-08-11 and left 62
+        # candidates and 16 runs where there should have been 31 and 8. The directory itself
+        # was unharmed — the name index and add_capability's duplicate check absorbed it —
+        # but the staging tables needed manual cleanup.
+        already = _staged_keys(conn, corridor, category)
+        skipped_existing = [r for r in rows if r["dedupe_key"] in already]
+        rows = [r for r in rows if r["dedupe_key"] not in already]
+        if skipped_existing:
+            result.staged -= sum(
+                1 for r in skipped_existing if r["status"] == STATUS_PENDING
+            )
+            result.suppressed_duplicates -= sum(
+                1 for r in skipped_existing if r["status"] != STATUS_PENDING
+            )
+            log.info(
+                "%s/%s: %d row(s) already staged, not re-inserted",
+                corridor, category, len(skipped_existing),
+            )
 
         if not dry_run and rows:
             try:

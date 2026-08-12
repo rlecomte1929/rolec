@@ -999,9 +999,18 @@ def get_case(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
 
 @router.get("/{case_id}/requirements", response_model=schemas.CaseRequirementsDTO)
 def get_case_requirements(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id, never the raw param — the rule _assert_case_access's own
+    # docstring states, and one of the twelve endpoints AIQ-1775 found ignoring it. A route
+    # param is commonly an assignment id (HrDashboard navigates with assignment.id), and
+    # requirements_builder keys on the canonical case id, so the raw param resolved the
+    # destination to "UNKNOWN" and the dossier showed a coverage gap on a covered corridor.
+    #
+    # NOTE: in production this handler is SHADOWED by backend/routes/compat.py, which is
+    # registered first and wins FastAPI's first-match. Fixed there too; fixing only here
+    # would have changed nothing.
+    resolved_case_id = _assert_case_access(user, case_id)
     try:
-        return compute_case_requirements(case_id)
+        return compute_case_requirements(resolved_case_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Case not found")
 
@@ -1037,7 +1046,12 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
     Replaces window.PATHWAY_V2.deriveTimeline() with a real server-side computation.
     Tracks: Visa & Permit | Civil Documents | Family (conditional) | Settlement.
     """
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id: `crud.get_case` looks `wizard_cases` up by the raw value, and
+    # route params are routinely assignment ids (HrDashboard.tsx navigates with
+    # assignment.id). Handed one, this 404'd the live employee RoadmapScreen for a case that
+    # exists. Unlike the requirements endpoint, this route is NOT shadowed by compat.py —
+    # this handler is the one that serves.
+    case_id = _assert_case_access(user, case_id)
     assert_roadmap_access(case_id)  # server-side paywall (no-op while flag off — default)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)

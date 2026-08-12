@@ -50,7 +50,12 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("advokatguiden.no",      "Advokatforeningen + Brønnøysund register (NO)"),
     ("brreg.no",              "Advokatforeningen + Brønnøysund register (NO)"),
     ("eura-relocation.com",   "EuRA member directory"),
-    ("blkr-berlin.de",        "Rechtsanwaltskammer (RAK) + Partnerschaftsregister (DE)"),
+    # NOTE: blkr-berlin.de was listed here as the "Rechtsanwaltskammer (RAK)" until 2026-08-12.
+    # It is the LAW FIRM'S OWN WEBSITE (BLKR Rechtsanwält*innen, Berlin — verified by fetching
+    # it), so the one row citing it passed as tier-1 registry evidence on the strength of its
+    # own homepage. Its source_name in the harvest CSV is literally
+    # "Firm Impressum (RAK Berlin stated)" — the exact shape the docstring above says must not
+    # be trusted. Do not re-add a provider domain here; that is what SELF_DECLARED is for.
     ("rechtsanwaltsregister.org", "Rechtsanwaltskammer (RAK) + Partnerschaftsregister (DE)"),
     ("bstbk.de",              "Bundessteuerberaterkammer / regional StBK (DE)"),
     ("hamburg.de",            "Official public business register (DE)"),

@@ -32,7 +32,11 @@ def get_rule_updates(
     case_id: str,
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id. Rows are written by active_case_finder from
+    # `rce.cases`/`rce.rule_citations`, i.e. the CANONICAL case id, while this read used the
+    # raw route param — so on an assignment id the "Rule updated — please review" banner was
+    # permanently empty rather than wrong, which is why nobody reported it.
+    case_id = _assert_case_access(user, case_id)
     with engine.connect() as conn:
         items = list_active_rule_updates(conn, case_id)
     return {"items": items, "count": len(items)}
@@ -44,7 +48,9 @@ def post_dismiss_rule_update(
     notification_id: str,
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    _assert_case_access(user, case_id)
+    # Same scoping as the read above — dismissing via an assignment id matched no row and
+    # 404'd a legitimate dismiss.
+    case_id = _assert_case_access(user, case_id)
     try:
         with engine.begin() as conn:
             return dismiss_rule_update(conn, case_id, notification_id)

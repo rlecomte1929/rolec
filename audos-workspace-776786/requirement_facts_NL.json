@@ -1,0 +1,1066 @@
+[
+  {
+    "fact_id": "nl-kennismigrant-salary-30plus-2026",
+    "entity_id": "nl-kennismigrant-salary-thresholds",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "salary_threshold_30plus",
+    "fact_text": "Highly Skilled Migrants aged 30 and over must earn at least €5,942.00 gross per month (2026 threshold) from an IND-recognised sponsor.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/required-amounts-income-requirements",
+    "evidence_quote": "30 years or older: € 5,942.00 monthly gross salary",
+    "source_last_updated": "2026-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-kennismigrant-salary-under30-2026",
+    "entity_id": "nl-kennismigrant-salary-thresholds",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "salary_threshold_under30",
+    "fact_text": "Highly Skilled Migrants under the age of 30 must earn at least €4,357.00 gross per month (2026 threshold) from an IND-recognised sponsor.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/required-amounts-income-requirements",
+    "evidence_quote": "Under 30 years: € 4,357.00 monthly gross salary",
+    "source_last_updated": "2026-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-kennismigrant-salary-reduced-2026",
+    "entity_id": "nl-kennismigrant-salary-thresholds",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "salary_threshold_reduced_graduate",
+    "fact_text": "Highly Skilled Migrants who graduated or completed research within the last 3 years may qualify for a reduced salary criterion of €3,122.00 gross per month (2026 threshold).",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/required-amounts-income-requirements",
+    "evidence_quote": "Reduced salary criterion: € 3,122.00 monthly gross salary (applies within 3 years of graduation or completing research)",
+    "source_last_updated": "2026-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-kennismigrant-fee",
+    "entity_id": "nl-kennismigrant-application-process",
+    "destination_iso2": "NL",
+    "fact_type": "fee",
+    "fact_key": "application_fee",
+    "fact_text": "The IND application fee for a Highly Skilled Migrant (Kennismigrant) permit is €423.00, paid by the employer (recognised sponsor) via direct debit.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant",
+    "evidence_quote": "The application costs € 423,00",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-kennismigrant-processing-time",
+    "entity_id": "nl-kennismigrant-application-process",
+    "destination_iso2": "NL",
+    "fact_type": "deadline",
+    "fact_key": "processing_time",
+    "fact_text": "The IND must decide on a Highly Skilled Migrant application within 90 days of receiving a complete application.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant",
+    "evidence_quote": "The IND must take a decision within 90 days",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-kennismigrant-permit-validity",
+    "entity_id": "nl-kennismigrant-application-process",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "permit_validity",
+    "fact_text": "The Kennismigrant residence permit is valid for the duration of the employment contract, up to a maximum of 5 years.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant",
+    "evidence_quote": "valid for the same period of your contract or job. The residence permit is valid for a maximum of 5 years",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-kennismigrant-recognised-sponsor-required",
+    "entity_id": "nl-recognised-sponsor",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "recognised_sponsor_required",
+    "fact_text": "The employer must be an IND-recognised sponsor to apply for a Kennismigrant permit on behalf of an employee. The public register of recognised sponsors is searchable at ind.nl and updated monthly.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/public-register-recognised-sponsors",
+    "evidence_quote": "a company, school, or organisation that has been recognised by the IND",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-recognised-sponsor-cost",
+    "entity_id": "nl-recognised-sponsor",
+    "destination_iso2": "NL",
+    "fact_type": "fee",
+    "fact_key": "sponsor_recognition_fee",
+    "fact_text": "The fee to become an IND recognised sponsor is €5,080 (standard) or €2,539 for small businesses (up to 50 employees) or exchange purposes.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/fees-costs-of-an-application",
+    "evidence_quote": "Standard: €5,080.00 / Small business (≤50 persons): €2,539.00",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-kennismigrant-mvv-step",
+    "entity_id": "nl-mvv-process",
+    "destination_iso2": "NL",
+    "fact_type": "step",
+    "fact_key": "mvv_appointment",
+    "fact_text": "After IND approval of a Kennismigrant application, the applicant must make an appointment at a Dutch embassy or consulate within 3 months to collect the MVV entry visa. The MVV is valid for 90 days.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant",
+    "evidence_quote": "Obtain MVV visa sticker at Dutch embassy/consulate within 3 months of decision. The MVV is valid for 90 days.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-kennismigrant-market-rate",
+    "entity_id": "nl-kennismigrant-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "market_rate_requirement",
+    "fact_text": "In addition to meeting the salary threshold, the agreed salary must be in line with the market rate — meaning the applicant earns the same as what people in the same job earn on average.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant",
+    "evidence_quote": "The agreed salary is in line with the market rate. In line with the market rate means that you earn the same as what people in the same job earn on average.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-eu-blue-card-salary-standard-2026",
+    "entity_id": "nl-eu-blue-card-salary-thresholds",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "salary_threshold_standard",
+    "fact_text": "The EU Blue Card standard salary threshold for 2026 is €5,942.00 gross per month.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/required-amounts-income-requirements",
+    "evidence_quote": "European Blue Card Standard rate: € 5,942.00 monthly gross salary",
+    "source_last_updated": "2026-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-eu-blue-card-salary-reduced-2026",
+    "entity_id": "nl-eu-blue-card-salary-thresholds",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "salary_threshold_reduced",
+    "fact_text": "The EU Blue Card reduced salary criterion for recent graduates (within 3 years of completion) is €4,754.00 gross per month (2026).",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/required-amounts-income-requirements",
+    "evidence_quote": "European Blue Card Reduced criterion: € 4,754.00 monthly gross salary (for recent graduates within 3 years of completion)",
+    "source_last_updated": "2026-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-eu-blue-card-education-requirement",
+    "entity_id": "nl-eu-blue-card-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "education_requirement",
+    "fact_text": "EU Blue Card applicants must have a higher-education diploma from a programme of at least 3 years, OR 5 years of relevant experience at higher-education level, OR for IT professionals: 3 years of relevant experience within the last 7 years.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/european-blue-card-residence-permit",
+    "evidence_quote": "you have a diploma of a programme in higher education. This programme was at least 3 years",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-eu-blue-card-contract-duration",
+    "entity_id": "nl-eu-blue-card-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "contract_minimum_duration",
+    "fact_text": "For an EU Blue Card, the employment contract must be valid for at least 6 months.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/european-blue-card-residence-permit",
+    "evidence_quote": "Your employment contract must be valid for at least 6 months",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-eu-blue-card-fee",
+    "entity_id": "nl-eu-blue-card-application",
+    "destination_iso2": "NL",
+    "fact_type": "fee",
+    "fact_key": "application_fee",
+    "fact_text": "The EU Blue Card application fee is €423.00.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/european-blue-card-residence-permit",
+    "evidence_quote": "The application costs € 423,00",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-eu-blue-card-processing-time",
+    "entity_id": "nl-eu-blue-card-application",
+    "destination_iso2": "NL",
+    "fact_type": "deadline",
+    "fact_key": "processing_time",
+    "fact_text": "EU Blue Card processing time: 30 days for recognised sponsor applications; 45 days for current permit holders; 90 days for all other applications.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/european-blue-card-residence-permit",
+    "evidence_quote": "30 days for applications from recognized sponsors... 45 days for applicants currently holding permits for paid employment... 90 days for all other applications",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-orientation-year-fee",
+    "entity_id": "nl-orientation-year-application",
+    "destination_iso2": "NL",
+    "fact_type": "fee",
+    "fact_key": "application_fee",
+    "fact_text": "The Orientation Year (Zoekjaar) permit application fee is €254.00.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/residence-permit-for-orientation-year",
+    "evidence_quote": "The application costs € 254,00",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-orientation-year-validity",
+    "entity_id": "nl-orientation-year-application",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "permit_validity",
+    "fact_text": "The Orientation Year permit is valid for 1 year and cannot be extended. Holders must transition to a different permit (kennismigrant, startup, or self-employed) after finding work.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/residence-permit-for-orientation-year",
+    "evidence_quote": "The residence permit for the orientation year for highly educated persons is valid for 1 year... You cannot extend the residence permit for the orientation year for highly educated persons.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-orientation-year-work-rights",
+    "entity_id": "nl-orientation-year-application",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "work_rights",
+    "fact_text": "During the Orientation Year, the holder may work freely without a separate work permit (TWV).",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/residence-permit-for-orientation-year",
+    "evidence_quote": "Work freely permitted, TWV not required",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-orientation-year-foreign-institution-ranking",
+    "entity_id": "nl-orientation-year-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "foreign_institution_ranking",
+    "fact_text": "For degrees from foreign institutions outside the Netherlands, the institution must rank in the top 200 of at least 2 of 3 recognised university ranking publishers: Times Higher Education, QS, and ShanghaiRanking.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/residence-permit-for-orientation-year",
+    "evidence_quote": "Foreign institutions must rank in top 200 of at least 2 of 3 publishers (Times Higher Education, QS, ShanghaiRanking)",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-ict-prior-employment",
+    "entity_id": "nl-ict-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "prior_employment_minimum",
+    "fact_text": "ICT permit applicants must have worked for the transferring company abroad for at least 3 months before the transfer, and the transfer period must exceed 90 days.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/intra-corporate-transferee-residence-permit-directive-201466eu",
+    "evidence_quote": "Must have worked for the company abroad for at least 3 months. Transfer period must exceed 90 days.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-ict-max-duration",
+    "entity_id": "nl-ict-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "maximum_transfer_duration",
+    "fact_text": "The maximum duration of an ICT transfer is 3 years for managers and specialists, and 1 year for trainees.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/intra-corporate-transferee-residence-permit-directive-201466eu",
+    "evidence_quote": "The maximum duration of a transfer to the European Union...may not exceed three years. For a trainee, this is 1 year",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-ict-fee",
+    "entity_id": "nl-ict-application",
+    "destination_iso2": "NL",
+    "fact_type": "fee",
+    "fact_key": "application_fee",
+    "fact_text": "The ICT permit application fee is €423.00.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/intra-corporate-transferee-residence-permit-directive-201466eu",
+    "evidence_quote": "The application costs € 423,00",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-startup-fee",
+    "entity_id": "nl-startup-application",
+    "destination_iso2": "NL",
+    "fact_type": "fee",
+    "fact_key": "application_fee",
+    "fact_text": "The Startup permit application fee is €423.00.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/start-up",
+    "evidence_quote": "The application costs € 423,00",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-startup-validity",
+    "entity_id": "nl-startup-application",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "permit_validity",
+    "fact_text": "The Startup permit is valid for a maximum of 1 year and cannot be extended. After 1 year, the applicant must transition to a self-employed person permit.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/start-up",
+    "evidence_quote": "Permit validity: maximum 1 year. Extension not permitted; transition to self-employed permit required after 1 year",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-startup-facilitator-required",
+    "entity_id": "nl-startup-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "facilitator_required",
+    "fact_text": "A startup permit requires a mandatory facilitator listed by RVO. The facilitator must have experience mentoring innovative startups, be financially healthy, hold no majority interest in the startup, not be a close relative (within 3rd degree), and have an internal deputy.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/start-up",
+    "evidence_quote": "has experience with mentoring innovative start-ups... does not have a majority interest in the start-up company",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-researcher-fee",
+    "entity_id": "nl-researcher-application",
+    "destination_iso2": "NL",
+    "fact_type": "fee",
+    "fact_key": "application_fee",
+    "fact_text": "The Researcher permit application fee is €254.00, paid by the employing research institution.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/residence-permit-researcher-directive-eu-2016801",
+    "evidence_quote": "The application fee is €254.00, paid by employer via direct debit",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-researcher-processing-time",
+    "entity_id": "nl-researcher-application",
+    "destination_iso2": "NL",
+    "fact_type": "deadline",
+    "fact_key": "processing_time",
+    "fact_text": "The IND must decide on a Researcher permit application within 60 days.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/residence-permit-researcher-directive-eu-2016801",
+    "evidence_quote": "The IND must take a decision within 60 days. This is called the decision period.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-researcher-income-threshold-2026",
+    "entity_id": "nl-researcher-application",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "income_threshold",
+    "fact_text": "Researchers must earn at least €1,635.90 per month (without holiday allowance) or €1,766.77 (with holiday allowance) in 2026.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/required-amounts-income-requirements",
+    "evidence_quote": "Researchers & Guest Lecturers: € 1,635.90 monthly without holiday allowance; € 1,766.77 with holiday allowance",
+    "source_last_updated": "2026-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-researcher-work-rights",
+    "entity_id": "nl-researcher-application",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "work_rights",
+    "fact_text": "The Researcher permit allows the holder to work without a separate work permit, with no restrictions.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/residence-permit-researcher-directive-eu-2016801",
+    "evidence_quote": "With this residence permit, you may work without a work permit...Work permitted without restrictions.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-study-fee",
+    "entity_id": "nl-study-permit-application",
+    "destination_iso2": "NL",
+    "fact_type": "fee",
+    "fact_key": "application_fee",
+    "fact_text": "The study residence permit application fee is €254.00.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "student",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/study/student-residence-permit-for-university-or-higher-professional-education",
+    "evidence_quote": "The application costs € 254,00",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-study-processing-time",
+    "entity_id": "nl-study-permit-application",
+    "destination_iso2": "NL",
+    "fact_type": "deadline",
+    "fact_key": "processing_time",
+    "fact_text": "The IND must decide on a student residence permit application within 60 days.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "student",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/study/student-residence-permit-for-university-or-higher-professional-education",
+    "evidence_quote": "The IND must take a decision within 60 days",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-study-work-hours",
+    "entity_id": "nl-study-permit-application",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "student_work_hours",
+    "fact_text": "Students may work as an employee up to 16 hours per week, or full-time during June, July, and August. Self-employed work is permitted with no hour restriction (Chamber of Commerce registration required).",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "student",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/study/student-residence-permit-for-university-or-higher-professional-education",
+    "evidence_quote": "up to 16 hours a week; or fulltime during the months of June, July and August",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-study-academic-progress",
+    "entity_id": "nl-study-permit-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "academic_progress",
+    "fact_text": "Students must make sufficient academic progress annually: at least 50% of study credits for each study year must be obtained to maintain permit eligibility.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "student",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/study/student-residence-permit-for-university-or-higher-professional-education",
+    "evidence_quote": "Every year you make enough progress in your studies. This means that you obtain at least 50% of the credits for each study year",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-study-institution-recognised",
+    "entity_id": "nl-study-permit-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "institution_accreditation",
+    "fact_text": "The educational institution must be an IND-recognised sponsor, and the study programme must be accredited by NVAO or EQAR.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "student",
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/study/student-residence-permit-for-university-or-higher-professional-education",
+    "evidence_quote": "Study programme must be accredited by NVAO or EQAR. Educational institution must be IND-recognized sponsor.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-partner-fee",
+    "entity_id": "nl-partner-permit-application",
+    "destination_iso2": "NL",
+    "fact_type": "fee",
+    "fact_key": "application_fee",
+    "fact_text": "The partner/spouse residence permit application fee is €254.00.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": ["student","professional"],
+      "household": ["couple_no_kids","couple_with_kids"],
+      "role": "dependent_spouse"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/family-and-partner/residence-permit-for-partner",
+    "evidence_quote": "The application costs € 254,00",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-partner-processing-time",
+    "entity_id": "nl-partner-permit-application",
+    "destination_iso2": "NL",
+    "fact_type": "deadline",
+    "fact_key": "processing_time",
+    "fact_text": "The IND must decide on a partner/spouse residence permit application within 90 days.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": ["student","professional"],
+      "household": ["couple_no_kids","couple_with_kids"],
+      "role": "dependent_spouse"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/family-and-partner/residence-permit-for-partner",
+    "evidence_quote": "The IND must take a decision within 90 days",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-partner-age-requirement",
+    "entity_id": "nl-partner-permit-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "age_requirement",
+    "fact_text": "Both the primary permit holder and the partner must be 21 years or older to qualify for a partner permit (exception: if they were married before the primary holder moved to the Netherlands, both may be 18+).",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": ["student","professional"],
+      "household": ["couple_no_kids","couple_with_kids"],
+      "role": "dependent_spouse"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/family-and-partner/residence-permit-for-partner",
+    "evidence_quote": "You are both 21 years or older",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-family-income-spouse-2026",
+    "entity_id": "nl-family-income-thresholds",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "income_threshold_spouse",
+    "fact_text": "For family reunification (spouse/partner), the sponsor must earn at least €2,337.00 per month (without holiday allowance) or €2,523.96 (with holiday allowance) in 2026.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "professional",
+      "household": ["couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/required-amounts-income-requirements",
+    "evidence_quote": "Spouse/unmarried partner: € 2,337.00 monthly without holiday allowance; € 2,523.96 with holiday allowance",
+    "source_last_updated": "2026-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-family-income-single-parent-2026",
+    "entity_id": "nl-family-income-thresholds",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "income_threshold_single_parent",
+    "fact_text": "For family reunification by a single parent bringing a child to the Netherlands, the sponsor must earn at least €1,635.90 per month (without holiday allowance) or €1,766.77 (with holiday allowance) in 2026.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": ["student","professional"],
+      "household": ["couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/required-amounts-income-requirements",
+    "evidence_quote": "Single parent with child: € 1,635.90 monthly without holiday allowance; € 1,766.77 with holiday allowance",
+    "source_last_updated": "2026-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-child-permit-fee",
+    "entity_id": "nl-child-permit-application",
+    "destination_iso2": "NL",
+    "fact_type": "fee",
+    "fact_key": "application_fee",
+    "fact_text": "The minor child residence permit application fee is €85.00.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": ["student","professional"],
+      "household": ["couple_with_kids"],
+      "role": "dependent_child"
+    },
+    "source_url": "https://ind.nl/en/fees-costs-of-an-application",
+    "evidence_quote": "Child under 18 with parent: €85.00",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-child-permit-processing-time",
+    "entity_id": "nl-child-permit-application",
+    "destination_iso2": "NL",
+    "fact_type": "deadline",
+    "fact_key": "processing_time",
+    "fact_text": "The IND must decide on a minor child residence permit application within 90 days.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": ["student","professional"],
+      "household": ["couple_with_kids"],
+      "role": "dependent_child"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/family-and-partner/residence-permit-for-minor-child-to-stay-with-parent",
+    "evidence_quote": "The IND must take a decision within 90 days",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-eu-free-movement-no-permit",
+    "entity_id": "nl-eu-free-movement",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "no_ind_permit_required",
+    "fact_text": "EU, EEA, and Swiss nationals do not require an IND residence permit to live or work in the Netherlands. They benefit from free movement rights.",
+    "applies_to": {
+      "nationality": "eu-eea-swiss",
+      "status": ["student","professional"],
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://www.government.nl/topics/immigration-to-the-netherlands",
+    "evidence_quote": "Freedom of movement and residence within the EU/EEA and Switzerland",
+    "source_last_updated": "2025-01-01",
+    "confidence": "medium",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-eu-free-movement-gemeente-registration",
+    "entity_id": "nl-eu-free-movement",
+    "destination_iso2": "NL",
+    "fact_type": "step",
+    "fact_key": "gemeente_registration",
+    "fact_text": "EU/EEA/Swiss nationals who intend to stay in the Netherlands longer than 4 months must register at their local municipality (gemeente) in the BRP (Basisregistratie Personen).",
+    "applies_to": {
+      "nationality": "eu-eea-swiss",
+      "status": ["student","professional"],
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://www.rvig.nl/brp",
+    "evidence_quote": "BRP covers persoonsgegevens van inwoners van Nederland (ingezetenen) en van personen (niet ingezetenen) die Nederland hebben verlaten of die korter dan 4 maanden in Nederland wonen.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "medium",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-health-insurance-obligation",
+    "entity_id": "nl-health-insurance",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "mandatory_enrollment",
+    "fact_text": "Every person who lives or works in the Netherlands is legally obliged to take out standard health insurance (basisverzekering). This applies to EU and non-EU residents alike.",
+    "applies_to": {
+      "nationality": "all",
+      "status": ["student","professional"],
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "all"
+    },
+    "source_url": "https://www.government.nl/topics/health-insurance",
+    "evidence_quote": "Every person who lives or works in the Netherlands is legally obliged to take out standard health insurance.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-health-insurance-insurer-obligation",
+    "entity_id": "nl-health-insurance",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "insurer_acceptance_obligation",
+    "fact_text": "Healthcare insurers are legally obliged to accept any applicant for standard health insurance and must charge all policyholders the same premium regardless of age or health status.",
+    "applies_to": {
+      "nationality": "all",
+      "status": ["student","professional"],
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "all"
+    },
+    "source_url": "https://www.government.nl/topics/health-insurance",
+    "evidence_quote": "Healthcare insurers are obliged to accept anyone who applies for the standard insurance package and must charge all policyholders the same premium, regardless of their age or state of health.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-health-insurance-children",
+    "entity_id": "nl-health-insurance",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "children_coverage",
+    "fact_text": "Children under 18 must also be insured under Dutch health insurance, but parents register them. Children under 18 receive the standard package coverage without additional premiums.",
+    "applies_to": {
+      "nationality": "all",
+      "status": ["student","professional"],
+      "household": ["couple_with_kids"],
+      "role": "dependent_child"
+    },
+    "source_url": "https://www.government.nl/topics/health-insurance",
+    "evidence_quote": "Children under 18 must also be insured, though parents register them. Children under 18 receive free standard package coverage (no premiums).",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-digid-bsn-required",
+    "entity_id": "nl-digid",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "bsn_required",
+    "fact_text": "DigiD requires a BSN (citizen service number) to register. It enables access to Dutch government digital services including tax, healthcare, and municipal portals.",
+    "applies_to": {
+      "nationality": "all",
+      "status": ["student","professional"],
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "all"
+    },
+    "source_url": "https://www.digid.nl/en/",
+    "evidence_quote": "DigiD is the Dutch government's digital identification system... enabling users to identify themselves and manage affairs with government agencies like tax authorities.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "medium",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-brp-bsn-all-residents",
+    "entity_id": "nl-brp-bsn-registration",
+    "destination_iso2": "NL",
+    "fact_type": "step",
+    "fact_key": "brp_registration_all_residents",
+    "fact_text": "All residents of the Netherlands (EU and non-EU) must register in the BRP (Basisregistratie Personen) at their local gemeente. Registration triggers automatic assignment of a BSN, which is required for employment, tax, banking, and government services.",
+    "applies_to": {
+      "nationality": "all",
+      "status": ["student","professional"],
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "all"
+    },
+    "source_url": "https://www.rvig.nl/brp",
+    "evidence_quote": "BRP covers persoonsgegevens van inwoners van Nederland (ingezetenen)... Access is restricted: institutions receive only data necessary for their legal duties.",
+    "source_last_updated": "2025-01-01",
+    "confidence": "medium",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-uk-post-brexit-non-eu",
+    "entity_id": "nl-uk-post-brexit",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "uk_third_country_status",
+    "fact_text": "Since 1 January 2021, UK nationals are treated as third-country (non-EU) nationals in the Netherlands and must apply for IND residence permits under the same rules as other non-EU nationals. MVV is required for stays over 90 days.",
+    "applies_to": {
+      "nationality": ["GB"],
+      "status": ["student","professional"],
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant",
+    "evidence_quote": "Post-Brexit: UK nationals treated as non-EU third-country nationals from Jan 2021",
+    "source_last_updated": "2025-01-01",
+    "confidence": "medium",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-ukraine-temporary-protection-status",
+    "entity_id": "nl-ukraine-temporary-protection",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "temporary_protection_work_rights",
+    "fact_text": "Ukrainians displaced by the conflict may be entitled to Temporary Protection under the EU Temporary Protection Directive. TP holders in the Netherlands may live and work without a separate IND work permit. TP status is reviewed periodically — current status must be verified at ind.nl/en/situation-ukraine.",
+    "applies_to": {
+      "nationality": ["UA"],
+      "status": ["student","professional"],
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "all"
+    },
+    "source_url": "https://ind.nl/en/situation-ukraine",
+    "evidence_quote": "Note: this page returned 404 at time of research (August 2026). Information derived from EU Temporary Protection Directive framework and IND general guidance. Verify current status directly at ind.nl/en/situation-ukraine.",
+    "source_last_updated": null,
+    "confidence": "low",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-study-financing-threshold-single-2026",
+    "entity_id": "nl-study-permit-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "financing_threshold_single",
+    "fact_text": "For a student studying at university/HBO who is single, the income/financing threshold for 2026 is €2,766.67 per month (without holiday allowance).",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "student",
+      "household": ["single"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/required-amounts-income-requirements",
+    "evidence_quote": "University/HBO financier (single): € 2,766.67 without holiday allowance",
+    "source_last_updated": "2026-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-study-financing-threshold-couple-2026",
+    "entity_id": "nl-study-permit-eligibility",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "financing_threshold_couple",
+    "fact_text": "For a student at university/HBO who is married, the income/financing threshold for 2026 is €3,467.77 per month (without holiday allowance).",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": "student",
+      "household": ["couple_no_kids","couple_with_kids"],
+      "role": "primary"
+    },
+    "source_url": "https://ind.nl/en/required-amounts-income-requirements",
+    "evidence_quote": "University/HBO financier (married couple): € 3,467.77 without holiday allowance",
+    "source_last_updated": "2026-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-partner-permit-validity",
+    "entity_id": "nl-partner-permit-application",
+    "destination_iso2": "NL",
+    "fact_type": "eligibility",
+    "fact_key": "permit_validity",
+    "fact_text": "The partner permit is valid for 5 years if the sponsor holds Dutch nationality or permanent residence, or matches the sponsor's permit expiration date.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": ["student","professional"],
+      "household": ["couple_no_kids","couple_with_kids"],
+      "role": "dependent_spouse"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/family-and-partner/residence-permit-for-partner",
+    "evidence_quote": "Validity: 5 years (if sponsor is Dutch/permanent resident) or matches sponsor's permit expiration",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-mvv-validity",
+    "entity_id": "nl-mvv-process",
+    "destination_iso2": "NL",
+    "fact_type": "document",
+    "fact_key": "mvv_validity_period",
+    "fact_text": "The MVV (Machtiging tot Voorlopig Verblijf / Authorisation for Temporary Stay) is valid for 90 days from the date of issue.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": ["student","professional"],
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "all"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/family-and-partner/residence-permit-for-partner",
+    "evidence_quote": "The MVV is valid for 90 days",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  },
+  {
+    "fact_id": "nl-document-legalisation",
+    "entity_id": "nl-kennismigrant-application-process",
+    "destination_iso2": "NL",
+    "fact_type": "document",
+    "fact_key": "foreign_document_legalisation",
+    "fact_text": "Foreign documents submitted to the IND must be legalised and translated into Dutch, English, French, or German.",
+    "applies_to": {
+      "nationality": "all-non-eu",
+      "status": ["student","professional"],
+      "household": ["single","couple_no_kids","couple_with_kids"],
+      "role": "all"
+    },
+    "source_url": "https://ind.nl/en/residence-permits/work/highly-skilled-migrant",
+    "evidence_quote": "have foreign documents legalised and translated into Dutch, English, French or German",
+    "source_last_updated": "2025-01-01",
+    "confidence": "high",
+    "status": "pending"
+  }
+]

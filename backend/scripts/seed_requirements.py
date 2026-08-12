@@ -88,6 +88,10 @@ def build_payloads(seed: Dict[str, Any], only_country: Optional[str] = None) -> 
                     "applies_to_nationality_classes_json": nat_classes_json,
                     "verification_status": req.get("verification_status")
                     or default_verification_status,
+                    # New rows wait for an admin at /admin/countries; only 'approved' is
+                    # served. Ignored on the update branch of create_requirement_item, so
+                    # re-running a seed never un-approves content already signed off.
+                    "review_status": "pending",
                     "last_verified_at": stamp,
                 })
     return payloads

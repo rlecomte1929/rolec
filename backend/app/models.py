@@ -99,7 +99,14 @@ class RequirementItem(Base):
     # being served to an EU/EEA national. See services/nationality_class.py.
     applies_to_nationality_classes_json = Column(Text, nullable=True)
     # AIQ-1349: provenance level (representative / corpus_grounded / expert_verified).
+    # Describes how well-sourced the content is. It is a DISPLAY BADGE, not a gate — no read
+    # path filters on it. Use review_status below to decide what is served.
     verification_status = Column(String, nullable=True)
+    # Admin publication gate: pending | approved | rejected. Only 'approved' is served, by
+    # employees and by the public corridor endpoint alike. Set on insert, carried on update.
+    review_status = Column(String, nullable=False, server_default="approved")
+    reviewed_by = Column(String, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
     last_verified_at = Column(DateTime, nullable=False)
 
 

@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from backend.app.services.registry_sources import effective_tier
-from backend.app.services.vendor_harvester import HarvestRejected, validate
+from backend.app.services.vendor_harvester import Candidate, HarvestRejected, validate
 from backend.imports.suppliers.parsers import (
     RowError,
     SELF_DECLARED,
@@ -90,9 +90,26 @@ def test_reads_all_38_rows():
     assert len(list(read_csv(HARVEST))) == 38
 
 
-def test_every_row_used_to_be_rejected_and_now_31_pass():
+def test_every_row_used_to_be_rejected_and_now_32_pass():
     """Before the dedupe fallback, `website_url` was empty on all 38 rows so every one failed
-    on 'no domain'. Now the only rejects are the seven whose evidence is not a registry."""
+    on 'no domain'. Now the only rejects are the six whose evidence is not a registry record.
+
+    The count went 7 -> 9 -> 6 on 2026-08-12, and the route matters more than the number:
+
+    +2  Two rows were passing on a check that only looked at the URL's DOMAIN. BLKR cited its
+        own website (`blkr-berlin.de` was mis-allowlisted as the Rechtsanwaltskammer), and
+        Advokatfirmaet Sulland cited Advokatforeningen's generic `/search-for-members/` form.
+        Both now fail — the tier check asks two questions instead of one: who published the
+        page, AND is the page about this company.
+
+    -3  The three banks were genuinely re-sourced to BaFin institute records.
+
+    The six that remain are honest gaps, not oversights. Their registers (the RAK/BRAV roll and
+    the amtliches Steuerberaterverzeichnis) are form searches with no per-entity URL, so there
+    is nothing linkable to cite; both are marked UNAVAILABLE with that reason. Sulland's only
+    per-entity options were a company register (proves the company exists, not bar admission)
+    and a review aggregator, which `registry_sources.py` forbids as a primary source.
+    """
     accepted, rejected = [], []
     for cand in read_csv(HARVEST):
         try:
@@ -101,16 +118,85 @@ def test_every_row_used_to_be_rejected_and_now_31_pass():
         except HarvestRejected:
             rejected.append(cand)
 
-    assert len(accepted) == 31
+    assert len(accepted) == 32
     assert {c.name for c in rejected} == {
+        "Advokatfirmaet Sulland AS",
         "Schlun & Elseven Rechtsanwälte PartG mbB",
         "Matzenbach & Sternberg Partnerschaft mbB Steuerberatungsgesellschaft (MSP Beratung)",
         "EY Tax GmbH Steuerberatungsgesellschaft",
         "Kanzlei Thalmeir — Julian Thalmeir",
-        "Deutsche Bank AG",
-        "Commerzbank AG",
-        "N26 Bank SE",
+        "BLKR Rechtsanwältinnen",
     }, "the reject list IS the re-sourcing worklist — it must match the PROVENANCE doc"
+
+
+def test_a_law_firms_own_domain_is_not_a_registry():
+    """Regression guard for the allowlist bug removed 2026-08-12.
+
+    `blkr-berlin.de` sat in `_DOMAIN_TO_SOURCE` mapped to the Rechtsanwaltskammer. Verified by
+    fetching it: BLKR Rechtsanwält*innen is an independent Berlin law firm, not a chamber. A
+    provider domain in the allowlist silently converts 'the supplier says so' into 'a registry
+    says so', which is the one thing the sourcing rule exists to prevent.
+    """
+    assert source_for_url("https://www.blkr-berlin.de/english/").name == SELF_DECLARED
+
+
+def _bank(url: str):
+    """A synthetic bank candidate carrying `url` as its only evidence."""
+    return Candidate(
+        name="Some Bank AG",
+        website_url="https://example.de/",
+        corridor="FR-DE",
+        service_category="banks",
+        source=source_for_url(url),
+        source_url=url,
+        accreditation_body="BaFin",
+        accreditation_number="",
+        accreditation_expiry="",
+    )
+
+
+def test_a_registry_search_page_is_not_evidence_for_a_bank():
+    """The hole `entry_url_pattern` closes, stated as the case that motivated it.
+
+    `portal.mvp.bafin.de/database/InstInfo/` is BaFin's search FORM. It is on a tier-1 domain,
+    so before 2026-08-12 pasting it into all three bank rows would have made them pass while
+    proving nothing about any of them. The domain says who published the page; it cannot say
+    the page is about this company.
+    """
+    with pytest.raises(HarvestRejected, match="not an entry for one entity"):
+        validate(_bank("https://portal.mvp.bafin.de/database/InstInfo/"))
+
+
+def test_a_bafin_per_institution_page_IS_evidence():
+    """The other half — the guard must not reject the real thing.
+
+    Shape verified 2026-08-12: this URL returns HTTP 200 with no login and lists the
+    institution's authorisations and their dates.
+    """
+    url = (
+        "https://portal.mvp.bafin.de/database/InstInfo/institutDetails.do"
+        "?cmd=loadInstitutAction&institutId=118938"
+    )
+    validate(_bank(url))  # must not raise
+
+
+def test_the_association_search_page_that_slipped_through():
+    """Advokatfirmaet Sulland's real evidence URL, kept as the concrete regression case."""
+    cand = Candidate(
+        name="Advokatfirmaet Sulland AS",
+        website_url="https://sulland.no/",
+        corridor="FR-NO",
+        service_category="legal_admin",
+        source=source_for_url(
+            "https://www.advokatforeningen.no/en/about-advokatforeningen/search-for-members/"
+        ),
+        source_url="https://www.advokatforeningen.no/en/about-advokatforeningen/search-for-members/",
+        accreditation_body="Advokatforeningen",
+        accreditation_number="",
+        accreditation_expiry="",
+    )
+    with pytest.raises(HarvestRejected, match="not an entry for one entity"):
+        validate(cand)
 
 
 def test_rows_carry_a_note_explaining_every_inference():
@@ -149,11 +235,37 @@ def test_banks_tier_is_capped_not_forced():
     assert effective_tier("movers", 3) == 3
 
 
-def test_the_three_self_declared_banks_are_rejected():
-    rejected = set()
-    for cand in read_csv(HARVEST):
-        try:
-            validate(cand)
-        except HarvestRejected:
-            rejected.add(cand.name)
-    assert {"Deutsche Bank AG", "Commerzbank AG", "N26 Bank SE"} <= rejected
+def test_a_self_declared_bank_is_rejected():
+    """Kept synthetic on purpose.
+
+    This read the real file until 2026-08-12 and asserted that Deutsche Bank, Commerzbank and
+    N26 were rejected — they were, on the bank's own site and, for N26, a Wikidata entry. All
+    three now carry real BaFin institute records, so sourcing it from the fixture would delete
+    the record of the bug. The rule it guards is unchanged, so it is pinned directly instead.
+    """
+    for url in (
+        "https://www.db.com/legal-resources/information-about-the-firm",
+        "https://www.wikidata.org/wiki/Q27479372",
+    ):
+        with pytest.raises(HarvestRejected, match="tier 3"):
+            validate(_bank(url))
+
+
+def test_the_three_banks_now_carry_bafin_institute_records():
+    """The re-sourcing, asserted on the real file.
+
+    Each URL was fetched 2026-08-12: HTTP 200, no login, and the page names the institution
+    ("Unternehmen DEUTSCHE BANK AKTIENGESELLSCHAFT", "COMMERZBANK Aktiengesellschaft",
+    "N26 Bank SE") above its list of KWG/CRR authorisations. Note N26 has two BaFin entries —
+    145827 is the Bank SE, 160862 is the holding company. The bank is the licensed entity.
+    """
+    by_name = {c.name: c for c in read_csv(HARVEST)}
+    for name, institut_id in (
+        ("Deutsche Bank AG", "100003"),
+        ("Commerzbank AG", "100005"),
+        ("N26 Bank SE", "145827"),
+    ):
+        cand = by_name[name]
+        assert f"institutId={institut_id}" in cand.source_url, name
+        assert cand.source.name == "BaFin institute register (DE)", name
+        validate(cand)  # must not raise
