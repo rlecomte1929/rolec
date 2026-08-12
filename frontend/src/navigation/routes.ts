@@ -146,6 +146,12 @@ export const ROUTE_DEFS = {
   adminConsole: { path: '/admin', roles: ['ADMIN'] as RouteRole[] },
   adminOverview: { path: '/admin', roles: ['ADMIN'] as RouteRole[] },
   adminCatalogQueue: { path: '/admin/catalog-queue', roles: ['ADMIN'] as RouteRole[] },
+  // Country requirement catalog — the review surface for what employees, HR and the public
+  // corridor endpoint are served. Declared here (rather than only in the legacy src/routes.ts)
+  // so it carries the ADMIN guard like its siblings and can be linked from the sidebar; it was
+  // reachable only by typing the URL, which is why content shipped unreviewed.
+  adminCountries: { path: '/admin/countries', roles: ['ADMIN'] as RouteRole[] },
+  adminCountryDetail: { path: '/admin/countries/:countryCode', roles: ['ADMIN'] as RouteRole[] },
   adminRequirementFacts: { path: '/admin/requirement-facts', roles: ['ADMIN'] as RouteRole[] },
   adminResearchRequests: { path: '/admin/research-requests', roles: ['ADMIN'] as RouteRole[] },
   adminCompanies: { path: '/admin/companies', roles: ['ADMIN'] as RouteRole[] },

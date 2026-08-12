@@ -416,6 +416,10 @@ def promote(session: Any, *, country: Optional[str] = None, dry_run: bool = True
             uuid.uuid5(_SEED_NS, f"{draft.country_code}|{draft.purpose}|{draft.title}")
         )
         payload["last_verified_at"] = stamp
+        # Agent-derived content is never published by the act of promoting it. It waits at
+        # /admin/countries for a human, exactly as a harvested supplier waits in the vetting
+        # queue. Ignored on the update branch, so approving a row once makes it stick.
+        payload["review_status"] = "pending"
         crud.create_requirement_item(session, payload)
         session.execute(_MARK_PROMOTED, {"promoted": STATUS_PROMOTED, "ids": draft.fact_ids})
         session.commit()
