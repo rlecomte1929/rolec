@@ -42,7 +42,8 @@ collect_ignore = [
     # importlib import-mode — out of scope for this CI-wiring change).
     "test_collaboration_api.py",
     "test_employee_policy_resolution.py",
-    "test_official_ingest.py",
+    # test_official_ingest.py removed from the skip-list (AIQ-1821): its imports are
+    # now canonical `backend.app.services`, so it collects and runs.
     "test_admin.py",
     "test_admin_verification.py",
     # scipy removed `trapz` (use scipy.integrate.trapezoid / numpy.trapezoid) —

@@ -3703,9 +3703,14 @@ class MiscMixin:
             "citations": json.dumps([doc_id]),
             "version": 1,
             "supersedes_rule_id": None,
-            "is_baseline": 1,
+            # [AIQ-1821] Booleans, not 1/0. knowledge_rules.is_baseline / is_active are
+            # `boolean` in Postgres, which rejects an integer bind outright
+            # ("column is of type boolean but expression is of type integer"). SQLite
+            # accepts 1/0, so this only ever failed against a real database — the
+            # official-ingest path could not complete on Postgres at all.
+            "is_baseline": True,
             "baseline_priority": baseline_priority,
-            "is_active": 1,
+            "is_active": True,
             "created_at": now,
         }
         with self.engine.begin() as conn:

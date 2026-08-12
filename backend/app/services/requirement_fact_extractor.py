@@ -19,6 +19,7 @@ from typing import Any, List, Optional
 
 import httpx
 
+from ...crawler.parsers import immigration_page_parser
 from .llm_client import complete_text
 from .pii_masker import mask_pii
 
@@ -57,11 +58,23 @@ class RequirementFact:
 
 
 async def fetch_url_content(url: str, *, timeout: float = _FETCH_TIMEOUT_S) -> str:
-    """Fetch a URL's text body. Separated from extraction so tests inject content directly."""
+    """Fetch a URL and return its readable article text.
+
+    [AIQ-1821] Returns PARSED text, not raw HTML. Returning `resp.text` fed the model
+    `<head>`, stylesheet links and the nav menu: on a modern government page the article
+    starts well past `_MAX_CONTENT_CHARS`, so the body never reached the prompt at all
+    (measured on skatteetaten.no: `<main>` at ~35,000 chars vs a 24,000-char cap → zero
+    facts, every time). The crawler's immigration-page parser strips chrome and keeps
+    headings, lists and tables as markdown, which is where requirement semantics live.
+    """
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         resp = await client.get(url, headers={"User-Agent": "ReloPass-RequirementExtractor/1.0"})
         resp.raise_for_status()
-        return resp.text
+        html = resp.text
+    parsed = (immigration_page_parser.parse(html).get("text") or "").strip()
+    # A JS-only shell parses to nothing; fall back to the raw body rather than returning
+    # an empty string, so the caller sees the same "no facts" outcome either way.
+    return parsed or html
 
 
 def _build_user_prompt(masked_content: str, corridor: str, source_url: str) -> str:
