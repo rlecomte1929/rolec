@@ -1,5 +1,5 @@
 <!-- __compiler_v:5 -->
-<!-- AUDOS_PUBLISH_TOKEN:435c1ab6-c109-487b-91a1-14a58e9b5b90 -->
+<!-- AUDOS_PUBLISH_TOKEN:06fbf767-b333-4797-90e2-a2f2c4713047 -->
 <!DOCTYPE html>
 <html lang="en" class="light">
   <head>
@@ -4926,10 +4926,10 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// ../../../tmp/space-workspace-776786-XHSVIT/lib/colors.ts
+// ../../../tmp/space-workspace-776786-eDJ4Bc/lib/colors.ts
 var brand, semantic, neutral, typography, colors, tw, authStyles, settingsStyles;
 var init_colors = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/lib/colors.ts"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/lib/colors.ts"() {
     brand = {
       primary: {
         50: "var(--space-brand-primary-50)",
@@ -5145,7 +5145,7 @@ var init_colors = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/ReloPassLanding/App.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/ReloPassLanding/App.tsx
 var App_exports = {};
 __export(App_exports, {
   default: () => ReloPassLanding
@@ -5434,7 +5434,7 @@ function ReloPassLanding() {
 }
 var WORKSPACE_ID, SPACE_ID, SOURCE_TAG, SESSION_STORAGE_KEY, EMAIL_RE;
 var init_App = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/ReloPassLanding/App.tsx"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/ReloPassLanding/App.tsx"() {
     WORKSPACE_ID = "d0c29613-9cb5-4652-9c6a-494eeed352e5";
     SPACE_ID = typeof window !== "undefined" && window.__SPACE_ID__ || "workspace-776786";
     SOURCE_TAG = "relopass-test-drive";
@@ -5443,7 +5443,7 @@ var init_App = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/move-roadmaps/sample-data.ts
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/move-roadmaps/sample-data.ts
 function getRoadmapDetail(roadmapId) {
   if (ROADMAP_DETAILS[roadmapId]) return ROADMAP_DETAILS[roadmapId];
   const summary = DEMO_ROADMAPS.find((r) => r.id === roadmapId);
@@ -5567,7 +5567,7 @@ function formatDate(dateStr) {
 }
 var PHASE_ORDER, PHASE_META, SARAH_CHEN_ROADMAP, ROADMAP_DETAILS, DEMO_ROADMAPS;
 var init_sample_data = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/move-roadmaps/sample-data.ts"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/move-roadmaps/sample-data.ts"() {
     PHASE_ORDER = ["pre-move", "in-transit", "post-arrival"];
     PHASE_META = {
       "pre-move": { label: "Pre-Move", shortLabel: "Pre-Move" },
@@ -5996,7 +5996,7 @@ var init_sample_data = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/move-roadmaps/App.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/move-roadmaps/App.tsx
 var App_exports2 = {};
 __export(App_exports2, {
   default: () => MoveRoadmaps
@@ -6524,7 +6524,7 @@ function MoveRoadmaps() {
 }
 var ROADMAP_STATUS, MILESTONE_STATUS, CHECKPOINT_STATUS, VENDOR_STATUS, CATEGORY_ICON, PHASE_ICON;
 var init_App2 = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/move-roadmaps/App.tsx"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/move-roadmaps/App.tsx"() {
     init_colors();
     init_sample_data();
     ROADMAP_STATUS = {
@@ -6565,7 +6565,7 @@ var init_App2 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/lib/pricing.ts
+// ../../../tmp/space-workspace-776786-eDJ4Bc/lib/pricing.ts
 function tierAtLeast(tier, required) {
   const rank = TIER_RANK[tier || "free"] ?? 0;
   return rank >= TIER_RANK[required];
@@ -6576,14 +6576,14 @@ function formatEur(cents) {
 }
 var PRICE_ROADMAP_CENTS, PRICE_ESSENTIALS_CENTS, TIER_RANK;
 var init_pricing = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/lib/pricing.ts"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/lib/pricing.ts"() {
     PRICE_ROADMAP_CENTS = 8e4;
     PRICE_ESSENTIALS_CENTS = 2e5;
     TIER_RANK = { free: 0, roadmap: 1, essentials: 2 };
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/components/CaseGate.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/components/CaseGate.tsx
 import { useState as useState9, useEffect as useEffect7, useCallback as useCallback3, useRef as useRef4 } from "react";
 import {
   Lock as Lock2,
@@ -6906,14 +6906,14 @@ function CaseGate({
 }
 var SPACE_ID2, HOOK_BASE;
 var init_CaseGate = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/components/CaseGate.tsx"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/components/CaseGate.tsx"() {
     init_pricing();
     SPACE_ID2 = typeof window !== "undefined" && (window.__APP_ID__ || window.__SPACE_ID__) || "workspace-776786";
     HOOK_BASE = `/api/workspaces/${SPACE_ID2}/hooks`;
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/case-command/rule-engine.ts
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/case-command/rule-engine.ts
 function isoToEpochDays(iso) {
   const [y, m, d] = iso.split("-").map((n) => parseInt(n, 10));
   return Math.round(Date.UTC(y, m - 1, d) / 864e5);
@@ -6991,7 +6991,7 @@ function runCaseCheck(employeeType, anchorDate, today = localTodayIso(), corrido
 }
 var EMPLOYEE_TYPE_OPTIONS, FRANCE_NORWAY_REQUIREMENTS, SPAIN_IRELAND_REQUIREMENTS, NORWAY_FRANCE_REQUIREMENTS, NORWAY_FRANCE_EMPLOYEE_TYPE_OPTIONS, CORRIDORS;
 var init_rule_engine = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/case-command/rule-engine.ts"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/case-command/rule-engine.ts"() {
     EMPLOYEE_TYPE_OPTIONS = [
       {
         id: "eea",
@@ -7614,7 +7614,7 @@ var init_rule_engine = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/case-command/CorridorCheck.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/case-command/CorridorCheck.tsx
 import { useState as useState10, useEffect as useEffect8, useMemo as useMemo2 } from "react";
 import {
   Route as Route3,
@@ -7912,7 +7912,7 @@ function CorridorCheck() {
 }
 var SPACE_ID3, STORAGE_KEY, CORRIDOR_UI, CORRIDOR_OPTIONS, FEASIBILITY_STYLE, OWNER_ICON;
 var init_CorridorCheck = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/case-command/CorridorCheck.tsx"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/case-command/CorridorCheck.tsx"() {
     init_CaseGate();
     init_rule_engine();
     SPACE_ID3 = typeof window !== "undefined" && (window.__APP_ID__ || window.__SPACE_ID__) || "workspace-776786";
@@ -7951,7 +7951,7 @@ var init_CorridorCheck = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/case-command/sample-data.ts
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/case-command/sample-data.ts
 function getCaseDetail(caseId) {
   if (CASE_DETAILS[caseId]) return CASE_DETAILS[caseId];
   const c = DEMO_CASES.find((x) => x.id === caseId);
@@ -8019,7 +8019,7 @@ function countByStatus2(cases) {
 }
 var DEMO_CASES, MARCUS_OBI_DETAIL, CASE_DETAILS;
 var init_sample_data2 = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/case-command/sample-data.ts"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/case-command/sample-data.ts"() {
     DEMO_CASES = [
       {
         id: "case-marcus-obi",
@@ -8369,7 +8369,7 @@ var init_sample_data2 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/case-command/App.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/case-command/App.tsx
 var App_exports3 = {};
 __export(App_exports3, {
   default: () => CaseCommand
@@ -8846,7 +8846,7 @@ function CaseCommand() {
 }
 var CASE_STATUS, TIMELINE_STATUS, COMPLIANCE_STATUS, VENDOR_STATUS2, APPROVAL_STATUS, CATEGORY_ICON2;
 var init_App3 = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/case-command/App.tsx"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/case-command/App.tsx"() {
     init_colors();
     init_CorridorCheck();
     init_sample_data2();
@@ -8889,7 +8889,7 @@ var init_App3 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/TasksDB/sample-data.ts
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/TasksDB/sample-data.ts
 function daysUntil3(dateStr) {
   try {
     const d = /* @__PURE__ */ new Date(dateStr + "T12:00:00");
@@ -8955,7 +8955,7 @@ function caseTaskCounts(tasks) {
 }
 var TASK_STATUSES, TASK_PRIORITIES, TASK_CATEGORIES, SAMPLE_TASKS, RELOCATION_CASES;
 var init_sample_data3 = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/TasksDB/sample-data.ts"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/TasksDB/sample-data.ts"() {
     TASK_STATUSES = ["To Do", "In Progress", "Done"];
     TASK_PRIORITIES = ["High", "Medium", "Low"];
     TASK_CATEGORIES = ["immigration", "compliance", "logistics"];
@@ -9176,7 +9176,7 @@ var init_sample_data3 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/TasksDB/App.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/TasksDB/App.tsx
 var App_exports4 = {};
 __export(App_exports4, {
   default: () => TasksDB
@@ -9816,7 +9816,7 @@ function TasksDB() {
 }
 var PRIORITY_STYLE, STATUS_STYLE, CATEGORY_META, CASE_STATUS_DOT;
 var init_App4 = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/TasksDB/App.tsx"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/TasksDB/App.tsx"() {
     init_colors();
     init_sample_data3();
     PRIORITY_STYLE = {
@@ -9851,7 +9851,7 @@ var init_App4 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/Tasks/App.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/Tasks/App.tsx
 var App_exports5 = {};
 __export(App_exports5, {
   default: () => Tasks
@@ -10534,7 +10534,7 @@ function Tasks() {
 }
 var TABLE, TASK_STATUSES2, TASK_PRIORITIES2, TASK_CATEGORIES2, RELOCATION_CASES2, SAMPLE_TASKS2, PRIORITY_STYLE2, STATUS_STYLE2, CATEGORY_META2, CASE_STATUS_DOT2;
 var init_App5 = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/Tasks/App.tsx"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/Tasks/App.tsx"() {
     init_colors();
     TABLE = "relocation_tasks";
     TASK_STATUSES2 = ["To Do", "In Progress", "Done"];
@@ -10600,7 +10600,7 @@ var init_App5 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/egress-probe/App.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/egress-probe/App.tsx
 var App_exports6 = {};
 __export(App_exports6, {
   default: () => EgressProbe
@@ -10897,7 +10897,7 @@ ${result.errorDump}` })
 }
 var TARGET_URL, PROBE_TIMEOUT_MS, MARKER, AMBIGUITY_NOTE;
 var init_App6 = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/egress-probe/App.tsx"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/egress-probe/App.tsx"() {
     TARGET_URL = "https://api.relopass.com/api/probe";
     PROBE_TIMEOUT_MS = 1e4;
     MARKER = "audos-egress-probe-v1";
@@ -10905,7 +10905,7 @@ var init_App6 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/NewApp/App.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/NewApp/App.tsx
 var App_exports7 = {};
 __export(App_exports7, {
   default: () => NewApp
@@ -10925,12 +10925,12 @@ function NewApp({ appConfig }) {
 }
 var TABLE2;
 var init_App7 = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/NewApp/App.tsx"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/NewApp/App.tsx"() {
     TABLE2 = "new_app";
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/apps/FRNODataSheet/App.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/apps/FRNODataSheet/App.tsx
 var App_exports8 = {};
 __export(App_exports8, {
   default: () => FRNODataSheetPrototype
@@ -11226,7 +11226,7 @@ function FRNODataSheetPrototype() {
 }
 var SECTIONS, SPARSE_KNOWN_FIELD_IDS, SPARSE_SECTIONS, PROGRESS_LABELS, LEGEND;
 var init_App8 = __esm({
-  "../../../tmp/space-workspace-776786-XHSVIT/apps/FRNODataSheet/App.tsx"() {
+  "../../../tmp/space-workspace-776786-eDJ4Bc/apps/FRNODataSheet/App.tsx"() {
     SECTIONS = [
       {
         id: "dnumber",
@@ -11350,7 +11350,7 @@ var init_App8 = __esm({
   }
 });
 
-// ../../../tmp/space-workspace-776786-XHSVIT/main.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/main.tsx
 import React2, { Suspense as Suspense2, useState as useState16, useEffect as useEffect12, Component as Component2 } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -11377,7 +11377,7 @@ function resolveCompiledPublicAppId(publicRoute, hash, privateRoute) {
   return null;
 }
 
-// ../../../tmp/space-workspace-776786-XHSVIT/SpaceRuntimeContext.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/SpaceRuntimeContext.tsx
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { jsx } from "react/jsx-runtime";
 var SpaceRuntimeContext = createContext(null);
@@ -12371,11 +12371,11 @@ function useSpaceRuntime() {
   return context;
 }
 
-// ../../../tmp/space-workspace-776786-XHSVIT/Desktop.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/Desktop.tsx
 import { useState as useState6, Suspense, useEffect as useEffect6, useRef as useRef3, Component } from "react";
 import { Bot as Bot2, Folder as Folder2, Minus, Activity, Moon, Heart, Calendar, Users, FileText, BarChart, Settings as SettingsIcon, ArrowUp, MessageCircle, ChevronUp, Plane, TrendingUp, LineChart, Dumbbell, Brain, Target, Zap, Star, Clock as Clock2, CheckCircle, List, BookOpen as BookOpen2, Coffee, Music, Camera, MapPin, Wallet, ShoppingCart, Gift, Lightbulb, Sparkles as Sparkles2, Rocket, Home, Building, Globe, Mail, Phone, Video, Mic, Image, Play, Pause, Volume2, Wifi, Cloud, Sun, Umbrella, Thermometer, Wind, Droplets, Leaf, Flower2, Mountain, Waves, Compass, Map as Map2, Navigation, Car, Bike, Ship, Award, Trophy, Medal, Crown, Diamond, Gem, Key, Lock, Unlock, Shield, Eye as Eye2, Search as Search2, Filter, SortAsc, Download, Upload, Share2, Link, ExternalLink as ExternalLink2, Copy, Clipboard, Trash2, Edit as Edit2, Pencil, PenTool, Scissors, Bookmark, Flag, Bell, AlertCircle as AlertCircle2, Info, HelpCircle, XCircle as XCircle2, CheckCircle2 as CheckCircle22, Circle, Square, Triangle, Hexagon, Octagon, Hash, AtSign, DollarSign, Percent, Calculator, Code, Terminal, Database, Server, Cpu, Monitor, Smartphone, Tablet, Laptop, Watch, Headphones, Speaker, Radio, Tv, Printer, Scan, QrCode, Barcode, CreditCard as CreditCard2, Receipt, Banknote, PiggyBank, TrendingDown, AreaChart, PieChart, CheckSquare, Route, ClipboardCheck } from "lucide-react";
 
-// ../../../tmp/space-workspace-776786-XHSVIT/components/AgentChatView.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/components/AgentChatView.tsx
 import {
   Bot,
   Send,
@@ -12396,7 +12396,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-// ../../../tmp/space-workspace-776786-XHSVIT/lib/friendly-terms.ts
+// ../../../tmp/space-workspace-776786-eDJ4Bc/lib/friendly-terms.ts
 var TOOL_NAME_PREFIX_RE = /^(?:functions\.|tools\.)/;
 var toolNameAliases = {
   "edit_file": "edit",
@@ -12462,7 +12462,7 @@ function getToolColor(toolName) {
   return toolColors[normalizeToolName(toolName)] || "text-gray-500";
 }
 
-// ../../../tmp/space-workspace-776786-XHSVIT/components/AgentChatView.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/components/AgentChatView.tsx
 init_colors();
 import { jsx as jsx2, jsxs } from "react/jsx-runtime";
 function WorkingIndicator({
@@ -12926,11 +12926,11 @@ function AgentChatView({ runtime }) {
   );
 }
 
-// ../../../tmp/space-workspace-776786-XHSVIT/components/useAgentChatRuntime.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/components/useAgentChatRuntime.tsx
 import { useState as useState2, useEffect as useEffect2, useRef as useRef2, useCallback as useCallback2 } from "react";
 import { flushSync } from "react-dom";
 
-// ../../../tmp/space-workspace-776786-XHSVIT/lib/tenant-delegation-scope.ts
+// ../../../tmp/space-workspace-776786-eDJ4Bc/lib/tenant-delegation-scope.ts
 function getTenantDelegationScope() {
   if (typeof window === "undefined") return null;
   const injected = window.__TENANT_DELEGATION__;
@@ -12962,7 +12962,7 @@ function isTenantChatSuppressed() {
   return scope?.chatSuppressed === true;
 }
 
-// ../../../tmp/space-workspace-776786-XHSVIT/components/useAgentChatRuntime.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/components/useAgentChatRuntime.tsx
 var globalSendingLock = false;
 var lastSendTimestamp = 0;
 var BEACON_SPACE_IDS = /* @__PURE__ */ new Set(["workspace-193216"]);
@@ -13076,6 +13076,7 @@ function useAgentChatRuntime(props) {
   const [isDraggingOver, setIsDraggingOver] = useState2(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState2(true);
   const [hasLoadedHistory, setHasLoadedHistory] = useState2(false);
+  const [pendingMessageRetryNonce, setPendingMessageRetryNonce] = useState2(0);
   const [workspaceSessionId, setWorkspaceSessionId] = useState2();
   const [configWelcomeMessage, setConfigWelcomeMessage] = useState2(
     inlineAgentConfig.welcomeMessage
@@ -13106,7 +13107,8 @@ function useAgentChatRuntime(props) {
   const textareaRef = useRef2(null);
   const fileInputRef = useRef2(null);
   const dropZoneRef = useRef2(null);
-  const pendingMessageProcessed = useRef2(false);
+  const pendingMessageClaimedRef = useRef2(false);
+  const pendingMessageRetryTimerRef = useRef2(null);
   const isSendingRef = useRef2(false);
   const welcomeInjectedSourceRef = useRef2(null);
   const greetingSentRef = useRef2(false);
@@ -13756,22 +13758,6 @@ function useAgentChatRuntime(props) {
       sessionStorage.setItem(sessionKey, claudeSessionId);
     }
   }, [claudeSessionId, spaceId]);
-  useEffect2(() => {
-    if (pendingMessage && !pendingMessageProcessed.current && !loading) {
-      pendingMessageProcessed.current = true;
-      setInput(pendingMessage);
-      setTimeout(() => {
-        onPendingMessageConsumed?.();
-      }, 100);
-    }
-  }, [pendingMessage, loading]);
-  useEffect2(() => {
-    if (input && pendingMessageProcessed.current && !loading && hasLoadedHistory) {
-      pendingMessageProcessed.current = false;
-      sendMessageWithContent(input, []);
-      setInput("");
-    }
-  }, [input, hasLoadedHistory]);
   const uploadFiles = async (files) => {
     if (chatSuppressed) return;
     if (files.length === 0) return;
@@ -13859,7 +13845,7 @@ function useAgentChatRuntime(props) {
       await uploadFiles(files);
     }
   };
-  const sendMessageWithContent = async (messageContent, attachmentsToSend) => {
+  const sendMessageWithContent = async (messageContent, attachmentsToSend, onAccepted) => {
     if (chatSuppressed) {
       console.log("[AgentChat] Chat is suppressed in this context \u2014 send ignored");
       return;
@@ -13883,6 +13869,11 @@ function useAgentChatRuntime(props) {
     isSendingRef.current = true;
     globalSendingLock = true;
     lastSendTimestamp = now;
+    try {
+      onAccepted?.();
+    } catch (error) {
+      console.error("[AgentChat] Send acceptance callback failed:", error);
+    }
     const userMessage = {
       role: "user",
       content: messageContent,
@@ -14070,6 +14061,49 @@ function useAgentChatRuntime(props) {
       }, 2e3);
     }
   };
+  useEffect2(() => {
+    if (pendingMessageRetryTimerRef.current) {
+      clearTimeout(pendingMessageRetryTimerRef.current);
+      pendingMessageRetryTimerRef.current = null;
+    }
+    if (!pendingMessage) {
+      pendingMessageClaimedRef.current = false;
+      return;
+    }
+    if (pendingMessageClaimedRef.current || chatSuppressed || !hasLoadedHistory) return;
+    const scheduleRetry = (delayMs) => {
+      pendingMessageRetryTimerRef.current = setTimeout(() => {
+        pendingMessageRetryTimerRef.current = null;
+        setPendingMessageRetryNonce((nonce) => nonce + 1);
+      }, Math.max(1, delayMs));
+    };
+    if (loading || isSendingRef.current || globalSendingLock) {
+      scheduleRetry(100);
+    } else {
+      const cooldownRemaining = 1e3 - (Date.now() - lastSendTimestamp);
+      if (cooldownRemaining > 0) {
+        scheduleRetry(cooldownRemaining + 1);
+      } else {
+        sendMessageWithContent(pendingMessage, [], () => {
+          pendingMessageClaimedRef.current = true;
+          onPendingMessageConsumed?.();
+        });
+      }
+    }
+    return () => {
+      if (pendingMessageRetryTimerRef.current) {
+        clearTimeout(pendingMessageRetryTimerRef.current);
+        pendingMessageRetryTimerRef.current = null;
+      }
+    };
+  }, [
+    pendingMessage,
+    loading,
+    hasLoadedHistory,
+    chatSuppressed,
+    onPendingMessageConsumed,
+    pendingMessageRetryNonce
+  ]);
   const abortStream = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -14135,14 +14169,14 @@ function useAgentChatRuntime(props) {
   };
 }
 
-// ../../../tmp/space-workspace-776786-XHSVIT/components/AgentChat.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/components/AgentChat.tsx
 import { jsx as jsx3 } from "react/jsx-runtime";
 function AgentChat(props) {
   const runtime = useAgentChatRuntime(props);
   return /* @__PURE__ */ jsx3(AgentChatView, { runtime });
 }
 
-// ../../../tmp/space-workspace-776786-XHSVIT/components/FileBrowser.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/components/FileBrowser.tsx
 import { useState as useState3, useEffect as useEffect3 } from "react";
 import { File as File2, Folder, Eye, Edit } from "lucide-react";
 import { jsx as jsx4, jsxs as jsxs2 } from "react/jsx-runtime";
@@ -14280,7 +14314,7 @@ function FileBrowser({ fileAccessLogs = [] }) {
   ] });
 }
 
-// ../../../tmp/space-workspace-776786-XHSVIT/components/EmailGate.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/components/EmailGate.tsx
 import { useState as useState4, useEffect as useEffect4 } from "react";
 import { jsx as jsx5, jsxs as jsxs3 } from "react/jsx-runtime";
 function isRecord(value) {
@@ -15488,7 +15522,7 @@ function EmailGate({
   );
 }
 
-// ../../../tmp/space-workspace-776786-XHSVIT/components/Settings.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/components/Settings.tsx
 import { useState as useState5, useEffect as useEffect5 } from "react";
 import { Save as Save2, CreditCard, LogOut, Clock, CheckCircle2, AlertCircle, Loader2 as Loader22, ExternalLink, CalendarX } from "lucide-react";
 init_colors();
@@ -15934,7 +15968,7 @@ function Settings({ spaceId }) {
   ] }) });
 }
 
-// ../../../tmp/space-workspace-776786-XHSVIT/Desktop.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/Desktop.tsx
 init_colors();
 import { Fragment as Fragment2, jsx as jsx7, jsxs as jsxs5 } from "react/jsx-runtime";
 function useIsMobile() {
@@ -16864,7 +16898,7 @@ function SpaceDesktop({
   ] });
 }
 
-// ../../../tmp/space-workspace-776786-XHSVIT/main.tsx
+// ../../../tmp/space-workspace-776786-eDJ4Bc/main.tsx
 import { Fragment as Fragment7, jsx as jsx18, jsxs as jsxs16 } from "react/jsx-runtime";
 window.React = React2;
 var CONFIG = {
