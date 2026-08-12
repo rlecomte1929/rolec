@@ -267,8 +267,22 @@ it lands in the review queue, because nobody can re-check it without re-reading 
   evidence_quote        the sentence on that page that states it, verbatim, original language
   entity_title          human title for the topic
   fact_type             fee | eligibility | document | deadline | step | where_to_apply | other
-  applies_to            {"role":…, "status":…, "household":…, "nationality":…}
   confidence            high | medium | low
+
+NATIONALITY — applies_to.nationality must be "EU" or "non-EEA". NEVER "any".
+  applies_to            {"role":…, "status":…, "household":…, "nationality":"EU"|"non-EEA"}
+  "any" is not an answer, it is the absence of one, and a fact carrying it is NOT promoted —
+  it stays staged and the research is wasted. This is not pedantry: on the France batch it
+  cost us 2 of 5 topics, including schengen_court_sejour, a short-stay visa an EU citizen
+  does not need at all. Marking it "any" would have served visa paperwork to free movers.
+  If a rule genuinely binds both audiences, emit it TWICE — once per nationality — rather
+  than once as "any".
+
+COUNTRY — we can only promote research for countries the product already serves:
+  DE · FR · GB · NL · NO · SG · US
+  Facts for any other country stage but can never reach a user, so do not run the card.
+  Australia, Canada and Ireland were researched before this rule existed; those 22 facts
+  are stranded.
 
 SOURCING — this is the gate, and it is checked in code:
   Cite the authority that publishes the rule (service-public.gouv.fr, udi.no, bamf.de,
