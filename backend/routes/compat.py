@@ -13,7 +13,7 @@ from ..app.db import SessionLocal
 from ..app import crud as app_crud
 from ..app.routers import cases as wizard_cases_router
 from ..app.services.requirements_builder import compute_case_requirements
-from ..app.services.case_service import _assert_case_access
+from ..app.services.case_service import _assert_case_access, resolve_case_forms_case_id
 
 router = APIRouter(prefix="/api", tags=["compat"])
 
@@ -174,6 +174,23 @@ def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
 
 @router.get("/cases/{case_id}/requirements")
 def compat_get_requirements(case_id: str, authorization: Optional[str] = Header(None)):
+    """
+    THIS is the handler that serves GET /api/cases/{id}/requirements in production.
+    `cases_read.get_case_requirements` and `cases.get_case_requirements` declare the same
+    path but are registered later, and FastAPI matches first — verified by enumerating
+    `backend.main.app.routes` (compat at index 11, cases_read at 15). Fix this one.
+
+    Route params are commonly an ASSIGNMENT id: `HrDashboard.tsx` navigates with
+    `assignment.id`, and the HR/employee dossiers pass whatever the route carries.
+    `requirements_builder` keys on the canonical case id, so an assignment id resolved the
+    destination to "UNKNOWN" and the dossier rendered "Requirements not available yet for
+    UNKNOWN" — on a case whose destination is plainly NO. Same case via its canonical id
+    returned all 22 Norway requirements. Confirmed in production 2026-08-12.
+
+    It failed SAFE (the not-covered notice, never "nothing is required"), which is why it
+    went unnoticed: the page looked like a coverage gap rather than a bug.
+    """
+    case_id = resolve_case_forms_case_id(case_id)
     token = _extract_bearer_token(authorization)
     if _is_jwt(token):
         client, _ = _get_supabase_client_from_header(authorization)
