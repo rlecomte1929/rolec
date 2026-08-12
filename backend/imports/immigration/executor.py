@@ -1,7 +1,7 @@
 """Write the seed into `knowledge_packs -> knowledge_docs -> requirement_entities ->
 requirement_facts`, all new content `status='pending'`.
 
-**This module is additive. It never updates a row it did not create.** That is the one design
+**This module never overwrites content a human could have reviewed.** That is the one design
 decision worth reading, because the obvious implementation gets it wrong: `backend/db/misc.py`
 already ships `upsert_knowledge_doc_by_url` and `upsert_requirement_entity`, both of which take
 the natural key this importer dedupes on, and reusing them would have been three lines. But
@@ -16,6 +16,17 @@ So a pre-existing doc or entity is *adopted*: read, reused as an FK target, and 
 it was. Only `requirement_facts` rows are created, and only where `(entity_id, fact_key)` is
 absent. None of these tables has a unique index, so every dedupe below is app-level and reads
 the live table first — including the pre-existing product rows, not just this seed's own.
+
+**One exception, added after the first live run exposed the hole: a *stub* document is
+repaired.** Adopting any existing row regardless of its contents attached 32 of this seed's 92
+facts to bodies reading `"Otto bridge capture, unverified — see source_url"` (48 characters)
+— rows an earlier pipeline wrote, 22 of them still flagged `fetch_status='not_fetched'` —
+even though the page had been fetched successfully moments earlier. The fact ended up citing a
+placeholder instead of its source, which is the exact failure guard #1816 exists to prevent,
+arrived at from the opposite direction. `MIN_REAL_DOC_CHARS` is what keeps the repair from
+becoming the destructive upsert rejected above: a row already holding a real document is never
+written to, so nothing a human could have read is replaced, and going from a stub to the actual
+page cannot lose information. It also repairs every other fact hanging off the same stub.
 
 Evidence, per guard #1816: `evidence_quote` must appear in the document body actually fetched.
 A quote that does not match is dropped to the manual worklist and its fact is **not** written.
@@ -46,6 +57,12 @@ log = logging.getLogger(__name__)
 
 PENDING = "pending"
 
+#: A stored body shorter than this is a stub, not a document — the Otto bridge wrote 121 rows
+#: reading "Otto bridge capture, unverified — see source_url" (48 chars), 22 of them still
+#: flagged fetch_status='not_fetched'. Matches fetcher.MIN_TEXT_CHARS, which is the floor a
+#: freshly fetched page must clear to be stored at all; a row below it is repairable.
+MIN_REAL_DOC_CHARS = 600
+
 _SELECT_PACK = text(
     "SELECT id FROM knowledge_packs WHERE destination_country = :country AND domain = :domain "
     "AND status = 'active' ORDER BY created_at DESC LIMIT 1"
@@ -55,7 +72,19 @@ _INSERT_PACK = text(
     "last_verified_at, created_at) "
     "VALUES (:id, :destination_country, :domain, 1, 'active', :now, :now)"
 )
-_SELECT_DOC = text("SELECT id FROM knowledge_docs WHERE source_url = :url LIMIT 1")
+_SELECT_DOC = text(
+    "SELECT id, coalesce(length(text_content), 0) AS len FROM knowledge_docs "
+    "WHERE source_url = :url LIMIT 1"
+)
+#: Repairs a stub body in place. Deliberately narrow: only `text_content` and the fetch
+#: bookkeeping, and only on rows whose body is already too short to be a document.
+_REPAIR_DOC = text(
+    "UPDATE knowledge_docs SET text_content = :text_content, content_excerpt = :content_excerpt, "
+    "content_sha256 = :content_sha256, fetch_status = :fetch_status, fetched_at = :now, "
+    "last_verified_at = :now, title = coalesce(nullif(title, ''), :title), "
+    "publisher = coalesce(nullif(publisher, ''), :publisher) "
+    "WHERE id = :id AND coalesce(length(text_content), 0) < :floor"
+)
 _INSERT_DOC = text(
     "INSERT INTO knowledge_docs (id, pack_id, title, publisher, source_url, text_content, "
     "fetched_at, fetch_status, content_excerpt, content_sha256, last_verified_at, created_at) "
@@ -90,6 +119,7 @@ class IngestResult:
     packs_adopted: int = 0
     docs_created: int = 0
     docs_adopted: int = 0
+    docs_repaired: int = 0
     entities_created: int = 0
     entities_adopted: int = 0
     facts_inserted: int = 0
@@ -206,11 +236,28 @@ def ingest(
         country_of_doc = writable[0][0].destination_country
         pack_id = _resolve_pack(conn, country_of_doc, result, pack_ids, dry_run)
 
-        existing_doc = _one(conn, _SELECT_DOC, {"url": url})
-        if existing_doc:
-            # Adopted, not refreshed. See the module docstring.
-            result.docs_adopted += 1
-            doc_id = existing_doc
+        existing = conn.execute(_SELECT_DOC, {"url": url}).first()
+        if existing:
+            doc_id, existing_len = existing[0], existing[1]
+            if existing_len < MIN_REAL_DOC_CHARS:
+                # Repair, not overwrite. Adoption originally reused ANY existing row, which
+                # silently attached 32 of this seed's 92 facts to bodies like "Otto bridge
+                # capture, unverified — see source_url" (48 chars) while the page had in fact
+                # been fetched successfully. The fact then cited a stub instead of its source.
+                #
+                # The floor is what keeps this from becoming the destructive upsert the module
+                # docstring rejects: a row that already holds a real document is never written
+                # to, so no human-reviewed body is replaced. Going from a placeholder to the
+                # actual page cannot lose information, and it repairs every other fact hanging
+                # off the same stub rather than only this run's.
+                result.docs_repaired += 1
+                if not dry_run:
+                    conn.execute(_REPAIR_DOC, {
+                        **_doc_params(doc_id, pack_id, doc, url, now),
+                        "floor": MIN_REAL_DOC_CHARS,
+                    })
+            else:
+                result.docs_adopted += 1
         else:
             result.docs_created += 1
             doc_id = str(uuid.uuid4())
@@ -319,7 +366,7 @@ def summarise(result: IngestResult, *, dry_run: bool, keep_unmatched: bool = Fal
         f"  fetch:    {result.fetch_ok} URL(s) fetched, {len(result.fetch_failed)} failed",
         f"  packs:    {result.packs_created} created, {result.packs_adopted} adopted",
         f"  docs:     {result.docs_created} created, {result.docs_adopted} adopted "
-        "(existing rows reused untouched)",
+        f"(reused untouched), {result.docs_repaired} repaired (stub body -> fetched page)",
         f"  entities: {result.entities_created} created, {result.entities_adopted} adopted",
         f"  facts:    {verb} {result.facts_inserted}, "
         f"{result.facts_already_present} already present "

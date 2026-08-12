@@ -80,12 +80,14 @@ class FakeConn:
     validation, not here.
     """
 
-    def __init__(self, *, packs=None, docs=None, entities=None, fact_keys=None):
+    def __init__(self, *, packs=None, docs=None, entities=None, fact_keys=None, doc_lens=None):
         self.packs = packs or {}            # country -> pack id
         self.docs = docs or {}              # url -> doc id
+        self.doc_lens = doc_lens or {}      # doc id -> length(text_content); default a real body
         self.entities = entities or {}      # (country, topic) -> entity id
         self.fact_keys = fact_keys or {}    # entity id -> [fact_key]
         self.writes: List[Dict[str, Any]] = []
+        self.updates: List[Dict[str, Any]] = []
 
     def execute(self, stmt, params=None):
         sql = " ".join(str(stmt).split())
@@ -94,10 +96,18 @@ class FakeConn:
             table = sql.split("INSERT INTO ")[1].split(" ")[0]
             self.writes.append({"table": table, **params})
             return _Result(None)
+        if sql.startswith("UPDATE"):
+            table = sql.split("UPDATE ")[1].split(" ")[0]
+            self.updates.append({"table": table, **params})
+            return _Result(None)
         if "FROM knowledge_packs" in sql:
             return _Result(self.packs.get(params["country"]))
         if "FROM knowledge_docs" in sql:
-            return _Result(self.docs.get(params["url"]))
+            doc_id = self.docs.get(params["url"])
+            if not doc_id:
+                return _Result(None)
+            # default to a real body so existing tests keep exercising the adopt path
+            return _Result(doc_id, extra=(self.doc_lens.get(doc_id, 20_000),))
         if "FROM requirement_entities" in sql:
             return _Result(self.entities.get((params["country"], params["topic_key"])))
         if "FROM requirement_facts" in sql:
@@ -107,14 +117,18 @@ class FakeConn:
     def inserted(self, table: str) -> List[Dict[str, Any]]:
         return [w for w in self.writes if w["table"] == table]
 
+    def updated(self, table: str) -> List[Dict[str, Any]]:
+        return [u for u in self.updates if u["table"] == table]
+
 
 class _Result:
-    def __init__(self, value: Optional[str], rows: Optional[List] = None):
+    def __init__(self, value: Optional[str], rows: Optional[List] = None, extra: tuple = ()):
         self._value = value
         self._rows = rows or []
+        self._extra = extra
 
     def first(self):
-        return (self._value,) if self._value else None
+        return (self._value, *self._extra) if self._value else None
 
     def __iter__(self):
         return iter(self._rows)
@@ -352,6 +366,43 @@ def test_adopts_existing_doc_without_rewriting_it():
     assert result.docs_created == 0
     assert conn.inserted("knowledge_docs") == [], "must not rewrite an existing document"
     assert conn.inserted("requirement_facts")[0]["source_doc_id"] == "doc-1"
+
+
+def test_repairs_a_stub_document_body():
+    """A stub is repaired, not adopted — the hole the first live run exposed.
+
+    Adopting any existing row regardless of contents attached 32 of the seed's 92 facts to
+    `"Otto bridge capture, unverified — see source_url"` (48 chars) while the page had been
+    fetched fine. The fact then cited a placeholder as its source.
+    """
+    conn = FakeConn(docs={"https://example.gov/permit": "doc-1"},
+                    doc_lens={"doc-1": 48})
+    result = executor.ingest(conn, [_row()], fetcher=lambda u: _doc(), dry_run=False)
+
+    assert result.docs_repaired == 1
+    assert result.docs_adopted == 0
+    repaired = conn.updated("knowledge_docs")
+    assert len(repaired) == 1
+    assert repaired[0]["text_content"] == BODY
+    assert repaired[0]["floor"] == executor.MIN_REAL_DOC_CHARS, "guarded in SQL, not just here"
+
+
+def test_never_repairs_a_document_that_already_has_a_real_body():
+    """The floor is what stops the repair becoming the destructive upsert. No real body is lost."""
+    conn = FakeConn(docs={"https://example.gov/permit": "doc-1"},
+                    doc_lens={"doc-1": 20_000})
+    result = executor.ingest(conn, [_row()], fetcher=lambda u: _doc(), dry_run=False)
+
+    assert result.docs_adopted == 1
+    assert result.docs_repaired == 0
+    assert conn.updated("knowledge_docs") == [], "must not touch a real document"
+
+
+def test_dry_run_does_not_repair():
+    conn = FakeConn(docs={"https://example.gov/permit": "doc-1"}, doc_lens={"doc-1": 48})
+    result = executor.ingest(conn, [_row()], fetcher=lambda u: _doc(), dry_run=True)
+    assert result.docs_repaired == 1
+    assert conn.writes == []
 
 
 def test_adopts_existing_entity_without_downgrading_status():
