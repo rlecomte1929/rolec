@@ -129,9 +129,15 @@ SOURCES: Tuple[RegistrySource, ...] = (
     # ── movers — the highest-yield structured sources in the project ──────────
     RegistrySource(
         name="FIDI FAIM member directory",
-        base_url="https://www.fidi.org/find-mover",
+        # Re-verified 2026-08-13 (Stage 9 Phase 0). The old base_url `/find-mover` now 404s,
+        # which is what made this source look MANUAL_EVIDENCED. It is not: the country-scoped
+        # index below is live and lists a per-entity detail link for every affiliate
+        # (France, country=101, returns 11). Promoted to HTTP_LISTING accordingly — this is
+        # exactly the drift the module docstring warns about, where a source that stopped
+        # listing is indistinguishable from a category with no members.
+        base_url="https://www.fidi.org/find-fidi-affiliate",
         tier=1,
-        acquisition=Acquisition.MANUAL_EVIDENCED,
+        acquisition=Acquisition.HTTP_LISTING,
         corridors=CORRIDORS,
         categories=("movers",),
         entry_url_pattern=r"/find-fidi-affiliate/[^/]",
