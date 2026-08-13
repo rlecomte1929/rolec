@@ -223,16 +223,29 @@ def _get_case_details(case_id: str, org_id: str) -> Optional[Dict[str, Any]]:
     both so a wizard case (e.g. FR→NO demo 08b7280b) resolves its corridor instead of
     reporting covered=false/corridor=null — mirroring how exception-requests resolves
     geography (AIQ-863).
+
+    relocation_cases is the third arm (AIQ-1831). It is the HR case of record and the
+    table submit_assignment actually writes the route to (backend/main.py, via
+    sync_relocation_case_route_from_wizard_draft), but it was never consulted here — so
+    a case that exists ONLY in relocation_cases resolved to corridor=null even though its
+    origin/dest columns were correctly populated at submit. Measured in prod 2026-08-13:
+    3 of 498 submitted assignments, and zero disagreement between the three tables where
+    more than one is present. It is COALESCEd LAST deliberately: it can only fire where
+    the existing arms are already null, so it cannot change any answer that is correct
+    today.
     """
     with db.engine.begin() as conn:
         row = conn.execute(
             text("""
                 SELECT ca.id, ca.case_id, ca.employee_user_id,
-                       COALESCE(mc.destination_country, wc.dest_country)   AS dest_country,
-                       COALESCE(mc.origin_country,      wc.origin_country) AS origin_country
+                       COALESCE(mc.destination_country, wc.dest_country,
+                                rc.dest_country_code)    AS dest_country,
+                       COALESCE(mc.origin_country,      wc.origin_country,
+                                rc.origin_country_code)  AS origin_country
                 FROM public.case_assignments ca
-                LEFT JOIN public.mobility_cases mc ON mc.id::text = ca.case_id
-                LEFT JOIN public.wizard_cases   wc ON wc.id::text = ca.case_id
+                LEFT JOIN public.mobility_cases   mc ON mc.id::text = ca.case_id
+                LEFT JOIN public.wizard_cases     wc ON wc.id::text = ca.case_id
+                LEFT JOIN public.relocation_cases rc ON rc.id::text = ca.case_id
                 WHERE ca.id = :case_id OR ca.case_id = :case_id
                 LIMIT 1
             """),
