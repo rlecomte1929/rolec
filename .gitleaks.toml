@@ -8,6 +8,11 @@ title = "ReloPass gitleaks config"
 # Start from gitleaks' built-in rule set (AWS, GCP, Stripe, JWT, generic, …).
 useDefault = true
 
+# Keep this as the singular `[allowlist]` table. The `[[allowlists]]` array form is
+# accepted by gitleaks 8.30 but silently ignored by 8.24.3, which is the version
+# gitleaks-action@v3 installs in CI — the AIQ-1825 slug regex below scanned clean
+# locally and still reported its 8 findings on the runner until this was reverted.
+# Pin any future change against 8.24.3, not against whatever `brew install` gives.
 [allowlist]
 description = "Intentionally-public values and known false positives"
 
@@ -34,6 +39,25 @@ regexes = [
   # [AIQ-1821] Same class: the Kindly chat widget's public `data-bot-key` on udi.no.
   # A client-side widget identifier shipped in the page markup to every visitor.
   '''746157c0-bb21-4a''',
+  # [AIQ-1825] Immigration fact-seed topic_key/fact_key slugs. Hyphenated identifiers
+  # mixing letters and digits — "h1b-annual-cap-lottery", "hqa-subordinate-art61a",
+  # "skills-in-demand-482-eligibility" — clear the generic-api-key entropy threshold;
+  # eight failed the scan on #1842.
+  #
+  # Matched by SHAPE rather than by a `paths` entry like the two below, and that was
+  # arrived at by measurement. A `paths` entry for the seed directory blinds the
+  # scanner to everything in it: a planted sk_live_ there scanned clean. Adding the
+  # shape under `condition = "AND"` was no better — the control, an identical Stripe
+  # key written both inside and outside the path, was caught only outside. The seed
+  # is machine-generated and grows a file per country batch, so a directory blind
+  # spot would widen with every import.
+  #
+  # This requires the ENTIRE string to be lowercase alphanumerics joined by - or _,
+  # which is the shape of a topic slug and of no credential the rules look for.
+  # Verified on gitleaks 8.24.3 (the CI version): the real 142-fact seed reports 0
+  # findings, and sk_live_ / AKIA / a service_role JWT / ghp_ planted in that same
+  # file still fire as stripe-access-token, generic-api-key, jwt and github-pat.
+  '''^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)+$''',
 ]
 
 # --- Known false-positive paths ------------------------------------------------
@@ -44,3 +68,4 @@ paths = [
   '''backend/seed_data/.*\.json''',
   '''docs/superpowers/.*\.md''',
 ]
+
