@@ -121,3 +121,44 @@ untracked** — `audit/ReloPass_Vendor_Sourcing_Addendum_2026-08-13.md`,
 They are readable, so this did not block Phase 0. But CI cannot see them, no other agent or
 worktree has them, and a stray `git checkout` loses the spec this whole workstream depends on.
 Worth committing before Phase 1.
+
+---
+
+## RESOLUTION — Blocker 1 cleared (2026-08-13, commit `758d6e11`)
+
+Route chosen: **harvest FR movers from FIDI directly.**
+
+FIDI turned out to be enumerable. The catalogue had it as `MANUAL_EVIDENCED` because its
+`base_url` `/find-mover` 404s — but **`/find-fidi-affiliate?country=101`** is live and lists a
+per-entity detail link for every French affiliate. The stale entry is corrected to
+`HTTP_LISTING`; that drift is exactly what `registry_sources.py`'s own docstring warns about.
+
+**11 French FIDI affiliates, all tier-1 FAIM, each with a per-entity evidence URL:**
+
+| affiliate | FAIM valid through |
+|---|---|
+| PRS Premium Removals Solutions · Santa Fe Relocation Paris | 2029 |
+| AGS France (two listings) | 2028 |
+| Gosselin · Neer Service France · Sterling Lexicon France | 2027 |
+| 2Sage Alba · All World Transport · France Global Relocation · Grospiron | 2026 |
+
+Each detail page also carries a postal address with the country — the only base-country signal
+that exists anywhere, which partly answers Blocker 2 for movers.
+
+### Expiry convention changed, deliberately
+
+FIDI publishes a **year only**. The 2026-08-11 harvest coerced to **1 Jan** as the "earliest
+consistent date". That is the right default for a START date and the wrong one for an END date:
+applied on 2026-08-13 it marks the four "Expiry 2026" affiliates as **already expired**,
+including Grospiron — one of only two suppliers in the whole directory able to evidence Norway
+reach. Stored as **31 Dec** of the published year instead.
+
+⚠️ **The 15 existing rows still carry the 1-Jan convention.** Five of them read
+`valid_until = 2026-01-01` and are therefore recorded as expired today. Worth a follow-up
+pass to re-read them as 31 Dec; not done here, since it is a write outside Phase 0.
+
+### Blocker 2 still stands
+
+Nothing here creates a `based_in` column. `suppliers.incorporation_country` remains 0 of 108.
+The FIDI address gives a per-supplier country for *movers harvested this way*, but the engine
+still has no field to filter on, so **Phase 2 remains blocked on a spec decision**.

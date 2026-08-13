@@ -65,10 +65,15 @@ class ParseTests(unittest.TestCase):
         aff = parse_affiliate("santa-fe-relocation-paris", _DETAIL)
         self.assertEqual(aff.name, "SANTA FE RELOCATION - PARIS")
 
-    def test_the_expiry_year_is_coerced_to_1_jan(self) -> None:
-        """The page publishes a year only; 1 Jan is the earliest consistent date, matching
-        what the 2026-08-11 harvest already recorded in its notes."""
-        self.assertEqual(parse_affiliate("x", _DETAIL).faim_expiry, "2029-01-01")
+    def test_the_expiry_year_becomes_31_dec_not_1_jan(self) -> None:
+        """"Expiry 2026" means valid THROUGH 2026. The older 1-Jan convention is the wrong
+        direction for an end date: on 2026-08-13 it marked 4 of 11 live FIDI affiliates as
+        already expired, including one of only two suppliers able to evidence Norway reach."""
+        self.assertEqual(parse_affiliate("x", _DETAIL).faim_expiry, "2029-12-31")
+
+    def test_a_current_year_certificate_is_not_treated_as_expired(self) -> None:
+        aff = parse_affiliate("x", _DETAIL.replace("2029", "2026"))
+        self.assertEqual(aff.faim_expiry, "2026-12-31")
 
     def test_a_missing_expiry_is_none_not_invented(self) -> None:
         aff = parse_affiliate("x", "<title>SOME MOVER | FIDI</title>")

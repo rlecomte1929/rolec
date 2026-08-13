@@ -34,12 +34,11 @@ capability for employee display.
 from __future__ import annotations
 
 import html
-import json
 import logging
 import re
 import urllib.request
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from backend.app.services.registry_sources import RegistrySource, sources_for
 from backend.app.services.vendor_harvester import Candidate
@@ -108,13 +107,21 @@ class Affiliate:
     slug: str
     name: str
     evidence_url: str
-    faim_expiry: Optional[str] = None   # ISO date, 1 Jan of the published year
+    faim_expiry: Optional[str] = None   # ISO date, 31 Dec of the published year
     address_country: Optional[str] = None
     faim_plus: bool = False
 
 
-#: The page prints only a year ("FAIM Expiry date: 2029"). 1 Jan is the earliest date
-#: consistent with it — the same coercion the 2026-08-11 harvest recorded in its notes.
+#: The page prints only a year ("FAIM Expiry date: 2029"), stored as 31 DEC of that year.
+#:
+#: "Expiry 2026" means valid THROUGH 2026, not lapsed on 1 January. The 2026-08-11 harvest
+#: coerced to 1 Jan as the "earliest consistent date", which is the wrong direction for an
+#: expiry: applied here on 2026-08-13 it marked 4 of 11 live affiliates as already expired —
+#: 2Sage Alba, All World Transport, France Global Relocation and Grospiron, the last being
+#: one of only two suppliers in the whole directory able to evidence Norway reach.
+#:
+#: Earliest-consistent is the right default for a START date and the wrong one for an END
+#: date. The 15 rows carrying the older convention are noted in the Phase 0 worksheet.
 _EXPIRY = re.compile(r"FAIM\s+Expiry\s+date:\s*(\d{4})", re.I)
 _TITLE = re.compile(r"<title>([^<|]+)", re.I)
 
@@ -136,7 +143,7 @@ def parse_affiliate(slug: str, markup: str, *, country_hint: str = "") -> Option
         slug=slug,
         name=name,
         evidence_url=DETAIL.format(slug=slug),
-        faim_expiry=f"{expiry.group(1)}-01-01" if expiry else None,
+        faim_expiry=f"{expiry.group(1)}-12-31" if expiry else None,
         address_country=country,
         # "FAIM Plus" is a distinct, higher certification. Only claim it when the page says so;
         # inventing it would overstate an audited credential.
@@ -177,8 +184,8 @@ def to_candidate(aff: Affiliate, *, country: str) -> Candidate:
         notes=(
             f"FIDI affiliate directory, country listing {country.upper()}. "
             f"FAIM{' Plus' if aff.faim_plus else ''}"
-            + (f", certificate expiry {aff.faim_expiry} (page publishes the year only; "
-               f"coerced to 1 Jan)" if aff.faim_expiry else ", no expiry published")
+            + (f", certificate valid through {aff.faim_expiry} (page publishes the year "
+               f"only; stored as 31 Dec)" if aff.faim_expiry else ", no expiry published")
             + ". Accreditation is CLAIMED until harden_accreditations.py confirms the name "
               "on this page."
         ),
