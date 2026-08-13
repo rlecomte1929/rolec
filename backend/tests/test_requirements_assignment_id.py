@@ -68,7 +68,11 @@ def test_compat_resolves_an_assignment_id_before_computing():
         seen["case_id"] = case_id
         raise ValueError("stop here — we only care which id was passed")
 
-    with mock.patch.object(compat, "resolve_case_forms_case_id", return_value=CANONICAL) as resolver, \
+    # The session branch now resolves via the TENANT GUARD rather than a standalone
+    # resolver: `_assert_case_access` both authorises the caller and returns the canonical
+    # id, so one call does both jobs. (It replaced the bare resolve_case_forms_case_id this
+    # test originally mocked — see test_compat_shadow_guards.py for why the guard was added.)
+    with mock.patch.object(compat, "_assert_case_access", return_value=CANONICAL) as guard, \
          mock.patch.object(compat, "compute_case_requirements", side_effect=_fake_compute), \
          mock.patch.object(compat, "_extract_bearer_token", return_value="session-token"), \
          mock.patch.object(compat, "_is_jwt", return_value=False), \
@@ -78,7 +82,7 @@ def test_compat_resolves_an_assignment_id_before_computing():
         with pytest.raises(ValueError):
             compat.compat_get_requirements(ASSIGNMENT, authorization="Bearer session-token")
 
-    resolver.assert_called_once_with(ASSIGNMENT)
+    guard.assert_called_once_with({"id": "u1"}, ASSIGNMENT)
     assert seen["case_id"] == CANONICAL, (
         "the raw route param reached the requirements builder — an assignment id there "
         'resolves the destination to "UNKNOWN"'
@@ -86,8 +90,8 @@ def test_compat_resolves_an_assignment_id_before_computing():
 
 
 def test_a_canonical_id_is_passed_through_unchanged():
-    """`resolve_case_forms_case_id` returns its input when nothing resolves, so the
-    canonical path must be untouched by the fix."""
+    """The guard returns its input when the id is already canonical, so that path is
+    untouched by the resolution fix."""
     from backend.routes import compat
 
     seen = {}
@@ -96,7 +100,7 @@ def test_a_canonical_id_is_passed_through_unchanged():
         seen["case_id"] = case_id
         raise ValueError("stop")
 
-    with mock.patch.object(compat, "resolve_case_forms_case_id", side_effect=lambda x: x), \
+    with mock.patch.object(compat, "_assert_case_access", side_effect=lambda _u, x: x), \
          mock.patch.object(compat, "compute_case_requirements", side_effect=_fake_compute), \
          mock.patch.object(compat, "_extract_bearer_token", return_value="session-token"), \
          mock.patch.object(compat, "_is_jwt", return_value=False), \

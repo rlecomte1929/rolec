@@ -86,7 +86,6 @@ class _BaseCase(unittest.TestCase):
         app.dependency_overrides.clear()
 
     def _patches(self, case: Optional[Dict[str, Any]] = _CASE_A, hr_user_id: str = "user-hr-a"):
-        company_id = _HR_COMPANY.get(hr_user_id)
         return [
             patch(
                 "backend.app.routers.hr_case_detail.db.get_relocation_case",
@@ -99,6 +98,17 @@ class _BaseCase(unittest.TestCase):
             patch(
                 "backend.app.auth_deps.db.get_profile_record",
                 side_effect=lambda uid: {"id": uid, "company_id": _HR_COMPANY.get(uid)},
+            ),
+            # [AIQ-1806] get_org_id_for_hr_user resolves the caller's company via
+            # db.get_hr_company_id (AIQ-862), NOT get_profile_record — that one is
+            # only an internal fallback. Leaving it unpatched resolved org_id to ""
+            # and 404'd every route here, which is why this file sat in
+            # conftest.collect_ignore. It also made the cross-tenant test pass for
+            # the wrong reason: "" never matches any company, so the assertion held
+            # even for the case's own owner.
+            patch(
+                "backend.app.auth_deps.db.get_hr_company_id",
+                side_effect=lambda uid: _HR_COMPANY.get(uid),
             ),
             # Force the rce.* queries to raise — the router's try/except
             # then catches and returns empty arrays / zeroes. This isolates
@@ -129,7 +139,8 @@ def _make_failing_engine() -> Any:
 class TestOverviewEndpoint(_BaseCase):
     def test_overview_returns_case_meta_for_own_company(self) -> None:
         client = self._client_for(_HR_A)
-        with self._patches()[0], self._patches()[1], self._patches()[2], self._patches()[3]:
+        with (self._patches()[0], self._patches()[1], self._patches()[2],
+              self._patches()[3], self._patches()[4]):
             resp = client.get(
                 "/api/hr/cases/case-a/overview",
                 headers={"Authorization": "Bearer hr-a-token"},
@@ -155,11 +166,17 @@ class TestOverviewEndpoint(_BaseCase):
                 "backend.app.auth_deps.db.get_profile_record",
                 side_effect=lambda uid: {"id": uid, "company_id": _HR_COMPANY.get(uid)},
             ),
+            patch(
+                "backend.app.auth_deps.db.get_hr_company_id",
+                side_effect=lambda uid: _HR_COMPANY.get(uid),
+            ),
         ):
             resp = client.get(
                 "/api/hr/cases/case-a/overview",
                 headers={"Authorization": "Bearer hr-b-token"},
             )
+        # HR-B genuinely resolves to company-b here; the 404 is the tenant check
+        # rejecting company-b → company-a, not an unresolved empty org id.
         self.assertEqual(resp.status_code, 404)
         self.assertNotIn("company-a", resp.text)
 
@@ -174,6 +191,10 @@ class TestOverviewEndpoint(_BaseCase):
                 "backend.app.auth_deps.db.get_profile_record",
                 side_effect=lambda uid: {"id": uid, "company_id": _HR_COMPANY.get(uid)},
             ),
+            patch(
+                "backend.app.auth_deps.db.get_hr_company_id",
+                side_effect=lambda uid: _HR_COMPANY.get(uid),
+            ),
         ):
             resp = client.get(
                 "/api/hr/cases/missing-id/overview",
@@ -185,7 +206,8 @@ class TestOverviewEndpoint(_BaseCase):
 class TestDocumentsEndpoint(_BaseCase):
     def test_documents_degrades_to_empty_list(self) -> None:
         client = self._client_for(_HR_A)
-        with self._patches()[0], self._patches()[1], self._patches()[2], self._patches()[3]:
+        with (self._patches()[0], self._patches()[1], self._patches()[2],
+              self._patches()[3], self._patches()[4]):
             resp = client.get(
                 "/api/hr/cases/case-a/documents",
                 headers={"Authorization": "Bearer hr-a-token"},
@@ -197,7 +219,8 @@ class TestDocumentsEndpoint(_BaseCase):
 class TestStepsEndpoint(_BaseCase):
     def test_steps_degrades_to_empty_list(self) -> None:
         client = self._client_for(_HR_A)
-        with self._patches()[0], self._patches()[1], self._patches()[2], self._patches()[3]:
+        with (self._patches()[0], self._patches()[1], self._patches()[2],
+              self._patches()[3], self._patches()[4]):
             resp = client.get(
                 "/api/hr/cases/case-a/steps",
                 headers={"Authorization": "Bearer hr-a-token"},
@@ -209,7 +232,8 @@ class TestStepsEndpoint(_BaseCase):
 class TestContradictionsSummaryEndpoint(_BaseCase):
     def test_summary_degrades_to_zero_counts(self) -> None:
         client = self._client_for(_HR_A)
-        with self._patches()[0], self._patches()[1], self._patches()[2], self._patches()[3]:
+        with (self._patches()[0], self._patches()[1], self._patches()[2],
+              self._patches()[3], self._patches()[4]):
             resp = client.get(
                 "/api/hr/cases/case-a/contradictions/summary",
                 headers={"Authorization": "Bearer hr-a-token"},
@@ -225,7 +249,8 @@ class TestContradictionsSummaryEndpoint(_BaseCase):
 class TestContradictionsListEndpoint(_BaseCase):
     def test_contradictions_list_degrades_to_empty(self) -> None:
         client = self._client_for(_HR_A)
-        with self._patches()[0], self._patches()[1], self._patches()[2], self._patches()[3]:
+        with (self._patches()[0], self._patches()[1], self._patches()[2],
+              self._patches()[3], self._patches()[4]):
             resp = client.get(
                 "/api/hr/cases/case-a/contradictions",
                 headers={"Authorization": "Bearer hr-a-token"},
@@ -237,7 +262,8 @@ class TestContradictionsListEndpoint(_BaseCase):
 class TestContradictionHistoryEndpoint(_BaseCase):
     def test_history_degrades_to_empty(self) -> None:
         client = self._client_for(_HR_A)
-        with self._patches()[0], self._patches()[1], self._patches()[2], self._patches()[3]:
+        with (self._patches()[0], self._patches()[1], self._patches()[2],
+              self._patches()[3], self._patches()[4]):
             resp = client.get(
                 "/api/hr/cases/case-a/contradictions/cid-x/history",
                 headers={"Authorization": "Bearer hr-a-token"},

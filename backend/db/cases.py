@@ -156,6 +156,19 @@ class CasesMixin:
     def create_case(
         self, case_id: str, hr_user_id: str, profile: Dict[str, Any], company_id: Optional[str] = None
     ) -> None:
+        """Create an *unclaimed* relocation_cases shell owned by an HR user.
+
+        [AIQ-1818] These INSERTs deliberately omit ``employee_id``, and that is not a bug:
+        ``POST /api/hr/cases`` runs before any employee exists, so there is no id to write.
+        The employee is linked later via ``case_assignments.employee_user_id``.
+
+        Do NOT "fix" this by backfilling from ``profile_json->>'userId'``. Measured in prod
+        2026-08-12, that key equals ``hr_user_id`` in 466 of 466 unclaimed rows — it is the
+        HR creator, not the subject. Writing it here would make the GDPR subject-access
+        union in ``app/routers/gdpr.py`` return hundreds of other people's cases to an HR
+        user. The canonical ``public.cases.employee_id`` is 518/518 populated; this legacy
+        column is vestigial.
+        """
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             if company_id is not None:

@@ -1046,7 +1046,12 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
     Replaces window.PATHWAY_V2.deriveTimeline() with a real server-side computation.
     Tracks: Visa & Permit | Civil Documents | Family (conditional) | Settlement.
     """
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id: `crud.get_case` looks `wizard_cases` up by the raw value, and
+    # route params are routinely assignment ids (HrDashboard.tsx navigates with
+    # assignment.id). Handed one, this 404'd the live employee RoadmapScreen for a case that
+    # exists. Unlike the requirements endpoint, this route is NOT shadowed by compat.py —
+    # this handler is the one that serves.
+    case_id = _assert_case_access(user, case_id)
     assert_roadmap_access(case_id)  # server-side paywall (no-op while flag off — default)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)

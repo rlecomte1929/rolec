@@ -2447,7 +2447,15 @@ class MiscMixin:
                     evidence_quote TEXT,
                     confidence TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'pending',
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    -- [AIQ-1821] Evidence ledger — mirrors 20261033000000_fact_evidence_ledger.sql.
+                    -- Keep in step with that migration or SQLite-backed tests pass while prod 500s
+                    -- on the missing column (the mocked-DB-misses-PG-constraints trap).
+                    evidence_verified INTEGER,
+                    evidence_offset INTEGER,
+                    evidence_checked_at TEXT,
+                    reviewed_by TEXT,
+                    reviewed_at TEXT
                 )
             """))
             conn.execute(text("""
@@ -2458,7 +2466,12 @@ class MiscMixin:
                     reviewer_user_id TEXT NOT NULL,
                     action TEXT NOT NULL,
                     notes TEXT,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    -- [AIQ-1821] action='edit' has been allowed by the CHECK since the table was
+                    -- created and nothing ever wrote it. Correcting an overstated fact beats
+                    -- rejecting accurate content over a modal verb.
+                    previous_fact_text TEXT,
+                    new_fact_text TEXT
                 )
             """))
 

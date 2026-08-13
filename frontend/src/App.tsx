@@ -60,6 +60,7 @@ const HrDashboard = lazy(() => import('./pages/HrDashboard').then((module) => ({
 const HrWelcomePage = lazy(() => import('./pages/hr/HrWelcomePage').then((module) => ({ default: module.HrWelcomePage })));
 const HrCaseSummary = lazy(() => import('./pages/HrCaseSummary').then((module) => ({ default: module.HrCaseSummary })));
 const HrCaseEstimatePage = lazy(() => import('./pages/hr/HrCaseEstimatePage').then((module) => ({ default: module.HrCaseEstimatePage })));
+const HrCaseDossierPage = lazy(() => import('./pages/hr/HrCaseDossierPage').then((module) => ({ default: module.HrCaseDossierPage })));
 const HrAssignmentReview = lazy(() => import('./pages/HrAssignmentReview').then((module) => ({ default: module.HrAssignmentReview })));
 const HrComplianceCheck = lazy(() => import('./pages/HrComplianceCheck').then((module) => ({ default: module.HrComplianceCheck })));
 const HrAssignmentPackageReview = lazy(() => import('./pages/HrAssignmentPackageReview').then((module) => ({ default: module.HrAssignmentPackageReview })));
@@ -174,6 +175,7 @@ const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage'));
 const AdminAuditLogPage = lazy(() => import('./pages/admin/AdminAuditLogPage'));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
 const AdminVettingQueue = lazy(() => import('./pages/admin/AdminVettingQueue').then((module) => ({ default: module.AdminVettingQueue })));
+const AdminContentReviewPage = lazy(() => import('./pages/admin/AdminContentReviewPage').then((m) => ({ default: m.AdminContentReviewPage })));
 const AdminSupplierSubmissions = lazy(() => import('./pages/admin/AdminSupplierSubmissions').then((module) => ({ default: module.AdminSupplierSubmissions })));
 const AdminPrompts = lazy(() => import('./pages/admin/AdminPrompts').then((module) => ({ default: module.AdminPrompts })));
 const AdminProspects = lazy(() => import('./pages/admin/AdminProspects').then((module) => ({ default: module.AdminProspects })));
@@ -374,6 +376,10 @@ function App() {
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<RequireHrRoute><HrAssignmentReview /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<RequireHrRoute><HrCaseSummary /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrCaseEstimate.path} element={<RequireHrRoute><HrCaseEstimatePage /></RequireHrRoute>} />
+        {/* [P4-2] Defined in routes.ts since 2635d030 but never mounted here, so every
+            /hr/cases/:caseId/dossier hit fell through to the catch-all and redirected to
+            the dashboard. The page and its API have worked the whole time. */}
+        <Route path={ROUTE_DEFS.hrCaseDossier.path} element={<RequireHrRoute><HrCaseDossierPage /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrReview.path} element={<RequireHrRoute><Navigate to={ROUTE_DEFS.hrEmployeeDashboard.path} replace /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrReviewCase.path} element={<RequireHrRoute><ReviewToEmployeeDashboardRedirect /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrAssignmentReview.path} element={<RequireHrRoute><HrAssignmentReview /></RequireHrRoute>} />
@@ -498,6 +504,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminAuditLog.path} element={<RequireAdminRoute><AdminAuditLogPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliers.path} element={<RequireAdminRoute><AdminSuppliers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminVettingQueue.path} element={<RequireAdminRoute><AdminVettingQueue /></RequireAdminRoute>} />
+            <Route path={ROUTE_DEFS.adminContentReview.path} element={<RequireAdminRoute><AdminContentReviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSupplierSubmissions.path} element={<RequireAdminRoute><AdminSupplierSubmissions /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPrompts.path} element={<RequireAdminRoute><AdminPrompts /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminProspects.path} element={<RequireAdminRoute><AdminProspects /></RequireAdminRoute>} />

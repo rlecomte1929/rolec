@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import type { PolicyDocument, PolicyDocumentClause } from '../features/policy/types';
 import { Checkbox } from '../components/antigravity/Checkbox';
 import { FileInput } from '../components/antigravity/FileInput';
@@ -70,7 +70,6 @@ function EmployeePolicyContent() {
 export const HrPolicy: React.FC = () => {
   const role = getAuthItem('relopass_role');
   const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const adminCompanyId = searchParams.get('adminCompanyId') || null;
   // Tab state — driven by ?tab= search param so the URL is bookmarkable and
@@ -185,11 +184,7 @@ export const HrPolicy: React.FC = () => {
           AIQ-1600: only on the 'policy' tab now — the reorganized builder/summary
           tabs carry their own guidance (starter card / full builder). */}
       {!adminCompanyId && activeTab === 'policy' && (
-        <PolicyNextStepCta
-          activeTab={activeTab}
-          setTab={setTab}
-          onReviewPublish={() => navigate(buildRoute('hrPolicyBuilderReview'))}
-        />
+        <PolicyNextStepCta setTab={setTab} />
       )}
 
       <div data-hr-policy-page="v3" id="hr-policy-top">
@@ -300,48 +295,25 @@ function HrPolicyQaTab() {
 }
 
 /**
- * Guided next-step CTA shown above each Policy tab (NAV-POL-1). Nudges HR toward
- * the natural next action without touching the tab content:
- *   • Published policy → Edit in Builder
- *   • Policy builder    → Review & publish / See benefits summary
- *   • Benefits summary  → Edit in Builder
+ * Guided next-step CTA for the **Published policy** tab (NAV-POL-1). Nudges HR toward
+ * the natural next action without touching the tab content.
+ *
+ * AIQ-1600 narrowed this to the 'policy' tab only — the builder and summary tabs carry
+ * their own guidance. It kept branches for those two tabs anyway, which could no longer
+ * render; one of them held a "Review & publish" button pointing at an unmounted route,
+ * and it read as a live dead link for as long as it sat here. The component now takes no
+ * `activeTab` at all, so the dead branches cannot come back by accident.
  */
 function PolicyNextStepCta({
-  activeTab,
   setTab,
-  onReviewPublish,
 }: {
-  activeTab: 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa';
   setTab: (tab: 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa') => void;
-  onReviewPublish: () => void;
 }) {
   // AIQ-1588: the 'policy' tab CTA hard-coded "This is your live, published
   // policy" even with nothing published. Gate the copy on the canonical
   // published-state read so a no-policy company sees a get-started nudge.
   const published = usePolicyPublished();
   const config: { hint: string; actions: React.ReactNode } = (() => {
-    if (activeTab === 'builder') {
-      return {
-        hint: 'Finished editing? Review the extracted values before publishing, or preview what employees will see.',
-        actions: (
-          <>
-            <Button size="sm" onClick={onReviewPublish}>Review &amp; publish</Button>
-            <Button size="sm" variant="outline" onClick={() => setTab('summary')}>
-              See benefits summary
-            </Button>
-          </>
-        ),
-      };
-    }
-    if (activeTab === 'summary') {
-      return {
-        hint: 'This is what employees see. Need to change a cap or rule?',
-        actions: (
-          <Button size="sm" onClick={() => setTab('builder')}>Edit in Builder</Button>
-        ),
-      };
-    }
-    // 'policy' (Published policy) tab.
     if (published === true) {
       return {
         hint: 'This is your live, published policy. Make changes in the Policy builder.',
