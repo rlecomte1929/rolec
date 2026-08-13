@@ -253,21 +253,35 @@ def bulk_select(
     company_id = _caller_company_id(user)
     actor_id = user["id"]
     updated = []
+    rejected = []
     for t in body.toggles:
-        row = vendor_curation.upsert_master_selection(
-            company_id=company_id,
-            category=body.category,
-            master_item_id=t.master_item_id,
-            selected=t.selected,
-            destination_city=body.destination_city,
-            country=body.country,
-            actor_user_id=actor_id,
-        )
+        try:
+            row = vendor_curation.upsert_master_selection(
+                company_id=company_id,
+                category=body.category,
+                master_item_id=t.master_item_id,
+                selected=t.selected,
+                destination_city=body.destination_city,
+                country=body.country,
+                actor_user_id=actor_id,
+            )
+        except vendor_curation.CountryMismatch as exc:
+            # Per toggle, not per batch. HR saves many rows at once; discarding the whole
+            # save because one vendor is in the wrong country would be a worse bug than the
+            # one this guard exists to fix. The rejects are returned so nothing is silent.
+            rejected.append({"master_item_id": t.master_item_id, "reason": str(exc)})
+            continue
         updated.append(row)
     if updated:
         _audit_catalog(actor_id, company_id, ACTION_UPDATE, "vendor_selections_updated",
                        {"category": body.category, "count": len(updated)})
-    return {"updated": len(updated), "rows": updated}
+    if rejected:
+        logger.warning(
+            "bulk_select: %d toggle(s) rejected on country mismatch (company=%s category=%s)",
+            len(rejected), company_id, body.category,
+        )
+    # `rejected` is additive — the existing client reads `updated`/`rows` and is unaffected.
+    return {"updated": len(updated), "rows": updated, "rejected": rejected}
 
 
 @router.post("/curation/custom")
