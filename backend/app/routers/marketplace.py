@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ..auth_deps import get_current_user
+from ..services.immigration_service import _get_case_details
 from ...database import db as main_db
 
 router = APIRouter(prefix="/api/employee/assignments", tags=["marketplace"])
@@ -205,14 +206,31 @@ def get_marketplace(
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     company_id = assignment.get("company_id") or ""
-    dest_country = assignment.get("destination_country") or assignment.get("dest_country")
+
+    # AIQ-1831: these four keys have never existed as columns on case_assignments, so
+    # both reads below always returned None — corridor was null for 100% of assignments
+    # since inception, and _fetch_suppliers was called with dest_country=None. Resolve
+    # from the shared corridor resolver (the same one the immigration surface uses)
+    # rather than adding a fourth resolution path. The dict reads are kept as the first
+    # arm so a future real column on case_assignments would still win.
+    case_route = _get_case_details(assignment_id, "") or {}
+
+    dest_country = (
+        assignment.get("destination_country")
+        or assignment.get("dest_country")
+        or case_route.get("dest_country")
+    )
 
     # Gather covered benefit keys and preferred supplier IDs
     covered_keys = _get_covered_benefit_keys(assignment_id)
     preferred_ids = _get_preferred_supplier_ids(company_id)
 
     corridor = None
-    origin_country = assignment.get("origin_country") or assignment.get("from_country")
+    origin_country = (
+        assignment.get("origin_country")
+        or assignment.get("from_country")
+        or case_route.get("origin_country")
+    )
     if origin_country and dest_country:
         corridor = f"{origin_country}→{dest_country}"
 
