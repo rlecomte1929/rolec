@@ -25,6 +25,7 @@ from ..services.audit_log_service import (
     ACTOR_HUMAN,
     insert_audit_log,
 )
+from ..services.immigration_regime import default_visa_type_for_destination
 from ..services.immigration_requirement_service import (
     RiskFlag,
     evaluate_risks,
@@ -60,7 +61,7 @@ router = APIRouter(prefix="/api", tags=["immigration-intake-consent"])
 def _uncovered_response(
     corridor_from: Optional[str],
     corridor_to: Optional[str],
-    visa_type: str,
+    visa_type: Optional[str],
 ) -> Dict[str, Any]:
     """
     Structured fail-closed payload for a corridor we cannot answer for —
@@ -113,7 +114,8 @@ def _log_view_access(case_id: str, hr_user: Dict[str, Any]) -> None:
 @router.get("/hr/cases/{case_id}/immigration-requirements")
 def get_immigration_requirements(
     case_id: str,
-    visa_type: str = "blue_card",
+    # [AIQ-1833] No default — resolved from the corridor below.
+    visa_type: Optional[str] = None,
     corridor_from: Optional[str] = None,
     corridor_to: Optional[str] = None,
     employee_type: str = "any",
@@ -134,8 +136,21 @@ def get_immigration_requirements(
             corridor_from = corridor_from or case.get("origin_country")
             corridor_to = corridor_to or case.get("dest_country")
 
+    # [AIQ-1833] Resolve the visa type from the destination instead of defaulting to
+    # blue_card. Ireland and Denmark are the two EU states outside Directive 2021/1883
+    # and issue no Blue Card; nor do non-EU destinations such as Norway. Reporting one
+    # anyway was a confident wrong answer about immigration.
+    if visa_type is None:
+        visa_type = default_visa_type_for_destination(corridor_to)
+
     # Fail closed: missing geography cannot be answered authoritatively.
     if not corridor_from or not corridor_to:
+        _log_view_access(case_id, hr_user)
+        return _uncovered_response(corridor_from, corridor_to, visa_type)
+
+    # Fail closed: no determinable visa type for this destination. Querying with None
+    # would match nothing regardless — say so explicitly rather than implying a permit.
+    if not visa_type:
         _log_view_access(case_id, hr_user)
         return _uncovered_response(corridor_from, corridor_to, visa_type)
 
