@@ -8250,8 +8250,28 @@ def get_country_resources(
                 draft = {}
 
     profile = build_profile_context(draft)
+
+    # AIQ-1831: the wizard draft is only one of the places the route lives, and for a
+    # case bridged straight to relocation_cases it is empty — which rendered a resource
+    # pack with destination_country="" and, via the "NO" fallback below, silently served
+    # NORWAY content for a Dublin move. Overlay the authoritative route (same resolver
+    # the immigration surface uses) instead of writing back to the draft.
+    if not profile.get("destination_country") or not profile.get("destination_city"):
+        try:
+            from .app.services.immigration_service import _get_case_details
+
+            route = _get_case_details(assignment_id, "") or {}
+        except Exception:  # noqa: BLE001 - resources must degrade, never 500
+            route = {}
+        if not profile.get("destination_country") and route.get("dest_country"):
+            profile["destination_country"] = route["dest_country"]
+            profile["country_code"] = str(route["dest_country"]).upper()
+        if not profile.get("destination_city") and route.get("dest_city"):
+            profile["destination_city"] = route["dest_city"]
+
     hints = get_personalization_hints(profile)
-    country_code = (profile.get("country_code") or "NO").upper()
+    # No destination resolves to no country — an empty pack is honest, Norway is not.
+    country_code = (profile.get("country_code") or "").upper()
     city = (profile.get("destination_city") or "").strip()
 
     filter_dict = {}
