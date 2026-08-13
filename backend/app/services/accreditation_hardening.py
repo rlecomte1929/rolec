@@ -202,16 +202,22 @@ def entity_key(name: str) -> str:
     return " ".join(tokens)
 
 
-def page_confirms_entity(page_text: str, supplier_name: str) -> bool:
+def page_confirms_entity(
+    page_text: str, supplier_name: str, legal_name: Optional[str] = None
+) -> bool:
     """True when the fetched register page names this entity.
 
-    Two candidate spellings are tried, because neither alone is sufficient:
+    Three candidate spellings are tried, because none alone is sufficient:
 
       * the FULL normalised name, legal form included — "deloitte as". Short brand names
         collapse to a single token once the form is stripped, and a lone "deloitte" is too
         weak to accept; keeping "as" restores the second token honestly.
       * the stripped `entity_key` — "humlen advokater". Needed where the row carries a
         person or branch suffix the register does not print.
+      * `suppliers.legal_name`, when set. A register prints the REGISTERED name while we
+        often store a trading name. `Expat Relocation Norway` failed against its EuRA page
+        purely for this reason — the page is titled "Expat Relocation AS", which is exactly
+        what its `legal_name` column already held.
 
     A two-token floor applies to both: a one-token match could hit a register footer or an
     unrelated listing, and a false verification is worse than an unverified row.
@@ -224,7 +230,10 @@ def page_confirms_entity(page_text: str, supplier_name: str) -> bool:
     hay = normalise_text(page_text)
     if not hay:
         return False
-    for candidate in (normalise_text(supplier_name), entity_key(supplier_name)):
+    candidates = [normalise_text(supplier_name), entity_key(supplier_name)]
+    if legal_name:
+        candidates += [normalise_text(legal_name), entity_key(legal_name)]
+    for candidate in candidates:
         if candidate and len(candidate.split()) >= 2 and candidate in hay:
             return True
     return False
@@ -248,6 +257,9 @@ class AccreditationRow:
     supplier_name: str
     body: str
     status: str
+    #: The REGISTERED name, where it differs from the trading name we display. Registers
+    #: print this one, so the matcher must be allowed to try it.
+    legal_name: Optional[str] = None
     membership_number: Optional[str] = None
     evidence_url: Optional[str] = None
     #: Existing notes. Carried so the writer can MERGE rather than clobber — the harvest
@@ -374,7 +386,7 @@ def decide(row: AccreditationRow, lookup: Optional[LookupResult]) -> Decision:
         return _d(ACTION_KEEP_CLAIMED, STATUS_CLAIMED,
                   f"register unreachable ({detail}) — unchecked, not disproved")
 
-    if not page_confirms_entity(lookup.text, row.supplier_name):
+    if not page_confirms_entity(lookup.text, row.supplier_name, row.legal_name):
         return _d(
             ACTION_NAME_MISMATCH,
             STATUS_CLAIMED,

@@ -104,6 +104,24 @@ class NameMatchTests(unittest.TestCase):
         self.assertTrue(page_confirms_entity(page, "Deloitte AS"))
         self.assertTrue(page_confirms_entity("<h1>KPMG AS</h1>", "KPMG AS"))
 
+    def test_the_registered_name_confirms_where_the_trading_name_cannot(self) -> None:
+        """Live case: the supplier is stored as `Expat Relocation Norway`, but its EuRA
+        register page is titled `Expat Relocation AS` — and `legal_name` already held that
+        exact string. Matching only the display name reported a false mismatch."""
+        page = "<title>Expat Relocation AS | EuRA</title>"
+        self.assertFalse(page_confirms_entity(page, "Expat Relocation Norway"))
+        self.assertTrue(
+            page_confirms_entity(page, "Expat Relocation Norway",
+                                 legal_name="Expat Relocation AS")
+        )
+
+    def test_a_wrong_legal_name_does_not_rescue_a_mismatch(self) -> None:
+        """The extra candidate must widen the match, not weaken it."""
+        self.assertFalse(
+            page_confirms_entity("<h1>Ingen treff</h1>", "Expat Relocation Norway",
+                                 legal_name="Expat Relocation AS")
+        )
+
     def test_a_bare_single_token_still_never_confirms(self) -> None:
         """The floor still holds where there is genuinely only one token to match on."""
         self.assertFalse(page_confirms_entity("Deloitte", "Deloitte"))
