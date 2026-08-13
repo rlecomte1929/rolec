@@ -223,16 +223,52 @@ def _get_case_details(case_id: str, org_id: str) -> Optional[Dict[str, Any]]:
     both so a wizard case (e.g. FR→NO demo 08b7280b) resolves its corridor instead of
     reporting covered=false/corridor=null — mirroring how exception-requests resolves
     geography (AIQ-863).
+
+    relocation_cases is the third arm (AIQ-1831). It is the HR case of record and the
+    table submit_assignment actually writes the route to (backend/main.py, via
+    sync_relocation_case_route_from_wizard_draft), but it was never consulted here — so
+    a case that exists ONLY in relocation_cases resolved to corridor=null even though its
+    origin/dest columns were correctly populated at submit. Measured in prod 2026-08-13:
+    3 of 498 submitted assignments, and zero disagreement between the three tables where
+    more than one is present. It is COALESCEd LAST deliberately: it can only fire where
+    the existing arms are already null, so it cannot change any answer that is correct
+    today.
+
+    It also returns origin_city / dest_city / employment_type (AIQ-1831). These are
+    additive keys — no existing caller reads them — and they exist so the non-immigration
+    corridor consumers can stop inventing their own resolution:
+
+      * marketplace.py read case_assignments.origin_country / dest_country, columns that
+        have never existed on that table, so its corridor was null for 100% of
+        assignments since inception;
+      * compat.py's missing_fields read flat origin_country / destination_country /
+        employment_type off relocation_cases.profile_json, which carries none of them
+        (prod: 1, 1 and 0 respectively, out of 1391 cases);
+      * /api/resources/country read only wizard_cases.draft_json.relocationBasics and
+        silently fell back to rendering Norway for a case with no destination.
+
+    employment_type maps to contract_type, not assignment_type: contract_type is the
+    nature of the employment contract ('permanent'), which is what compute_missing_fields
+    sits beside origin/destination to ask about. assignment_type (STA/LTA/PERMANENT) is
+    mobility duration and already has its own consumers.
     """
     with db.engine.begin() as conn:
         row = conn.execute(
             text("""
                 SELECT ca.id, ca.case_id, ca.employee_user_id,
-                       COALESCE(mc.destination_country, wc.dest_country)   AS dest_country,
-                       COALESCE(mc.origin_country,      wc.origin_country) AS origin_country
+                       COALESCE(mc.destination_country, wc.dest_country,
+                                rc.dest_country_code)    AS dest_country,
+                       COALESCE(mc.origin_country,      wc.origin_country,
+                                rc.origin_country_code)  AS origin_country,
+                       COALESCE(wc.dest_city,   rc.dest_city)    AS dest_city,
+                       COALESCE(wc.origin_city, rc.origin_city)  AS origin_city,
+                       COALESCE(wc.contract_type,
+                                (ca.intake_draft::jsonb ->> 'contract_type'))
+                                                          AS employment_type
                 FROM public.case_assignments ca
-                LEFT JOIN public.mobility_cases mc ON mc.id::text = ca.case_id
-                LEFT JOIN public.wizard_cases   wc ON wc.id::text = ca.case_id
+                LEFT JOIN public.mobility_cases   mc ON mc.id::text = ca.case_id
+                LEFT JOIN public.wizard_cases     wc ON wc.id::text = ca.case_id
+                LEFT JOIN public.relocation_cases rc ON rc.id::text = ca.case_id
                 WHERE ca.id = :case_id OR ca.case_id = :case_id
                 LIMIT 1
             """),

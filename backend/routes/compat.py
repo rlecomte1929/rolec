@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Header, HTTPException
 from sqlalchemy import text
 
+from ..app.services.immigration_service import _get_case_details
 from ..app.services.relocation_profile import compute_missing_fields
 from ..app.services.supabase_client import get_supabase_client
 from .relocation import _extract_bearer_token, _is_permission_error
@@ -47,6 +48,42 @@ def _get_case_row_for_user(case_id: str, user_id: str) -> Optional[Dict[str, Any
             {"id": case_id, "uid": user_id},
         ).fetchone()
     return db._row_to_dict(row)
+
+
+def _with_resolved_route(
+    profile: Dict[str, Any], case_id: str
+) -> Dict[str, Any]:
+    """Overlay the authoritative route onto a profile before checking completeness.
+
+    AIQ-1831. `compute_missing_fields` asks for the FLAT keys origin_country /
+    destination_country / employment_type on relocation_cases.profile_json. Almost
+    nothing writes them: of 1391 prod cases with a profile_json, 1 carried
+    origin_country, 1 carried destination_country and 0 carried employment_type — so
+    all three were reported missing on essentially every case since inception, no
+    matter how complete the intake was.
+
+    The values do exist, on the route columns submit writes. Read them rather than
+    backfilling profile_json: AIQ-1818 recorded that write as a DSAR defect, and
+    profile_json also carries the vestigial Oslo->Singapore movePlan default (present
+    on 1355 of those 1391 rows), so it is not a record to trust or repair.
+
+    Fail-soft on purpose: a resolver error must degrade to the old behaviour
+    (report the field missing), never 500 a requirements page.
+    """
+    resolved = dict(profile or {})
+    try:
+        route = _get_case_details(case_id, "") or {}
+    except Exception:  # noqa: BLE001 - completeness hint must never break the page
+        return resolved
+
+    for profile_key, route_key in (
+        ("origin_country", "origin_country"),
+        ("destination_country", "dest_country"),
+        ("employment_type", "employment_type"),
+    ):
+        if not resolved.get(profile_key) and route.get(route_key):
+            resolved[profile_key] = route[route_key]
+    return resolved
 
 
 def _get_wizard_case_dto(
@@ -228,7 +265,7 @@ def compat_get_requirements(case_id: str, authorization: Optional[str] = Header(
             _ensure_wizard_case(case_id)
             return compute_case_requirements(case_id).model_dump()
         profile = _safe_parse_profile(row.get("profile_json"))
-    missing_fields = compute_missing_fields(profile)
+    missing_fields = compute_missing_fields(_with_resolved_route(profile, case_id))
     label_map = {
         "origin_country": "Origin country",
         "destination_country": "Destination country",
