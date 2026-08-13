@@ -169,17 +169,25 @@ def policy_to_wizard_criteria(
         ma = shipment.get("maxAllowed", {})
         criteria["acc_type"] = "apartment"
         criteria["move_type"] = "international"
-        criteria["origin_city"] = _extract_city(profile, "origin", "Oslo")
-        criteria["move_dest"] = _extract_city(profile, "destination", "Singapore")
+        criteria["origin_city"] = _extract_city(profile, "origin")
+        criteria["move_dest"] = _extract_city(profile, "destination")
 
     return criteria
 
 
-def _extract_city(profile: Optional[Dict[str, Any]], key: str, default: str) -> str:
+def _extract_city(profile: Optional[Dict[str, Any]], key: str) -> str:
+    """City from `movePlan`, or "" when we do not know it.
+
+    This used to take a `default` and was called with "Oslo" / "Singapore" — the same invented
+    pair as the old `MovePlan` schema defaults, so an unknown city silently became a real-looking
+    one and went into the movers criteria. Returning "" instead is what the rest of the
+    recommendation path already means by "unknown": `plugins/movers.py` declares
+    `origin_city: str = ""`, and `criteria_builder` only sets the key `if origin_city`.
+    """
     if not profile:
-        return default
+        return ""
     mp = profile.get("movePlan") or {}
-    val = mp.get(key, default)
+    val = mp.get(key) or ""
     if isinstance(val, str) and "," in val:
         return val.split(",")[0].strip()
-    return str(val or default)
+    return str(val)
