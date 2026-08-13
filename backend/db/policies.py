@@ -1436,9 +1436,14 @@ class PoliciesMixin:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             for fid in fact_ids:
+                # [AIQ-1821] Denormalised reviewer stamp so the queue can show "approved by X
+                # on Y" without an aggregate join. requirement_reviews below stays the
+                # append-only source of truth.
                 conn.execute(text(
-                    "UPDATE requirement_facts SET status = :status WHERE id = :id"
-                ), {"status": status, "id": fid})
+                    "UPDATE requirement_facts "
+                    "SET status = :status, reviewed_by = :reviewer, reviewed_at = :now "
+                    "WHERE id = :id"
+                ), {"status": status, "reviewer": reviewer_user_id, "now": now, "id": fid})
                 conn.execute(text(
                     "INSERT INTO requirement_reviews "
                     "(id, entity_id, fact_id, reviewer_user_id, action, notes, created_at) "
@@ -1452,6 +1457,66 @@ class PoliciesMixin:
                     "notes": notes,
                     "created_at": now,
                 })
+
+    def edit_requirement_fact(
+        self,
+        fact_id: str,
+        new_fact_text: str,
+        reviewer_user_id: str,
+        notes: Optional[str] = None,
+        approve: bool = True,
+    ) -> Optional[Dict[str, Any]]:
+        """[AIQ-1821] Correct a fact's wording, recording both sides.
+
+        `action='edit'` has been permitted by the requirement_reviews CHECK since the table was
+        created and nothing has ever written it. It is the right verdict for a claim that is true
+        but overstated — extraction turns "you can get a D number if you provide X" into "you MUST
+        provide X" — where approving publishes something stronger than the source says and
+        rejecting throws away accurate content over a modal verb.
+
+        Storing before AND after is also the clearest signal the extractor can get about how it
+        was wrong. Returns None when the fact does not exist.
+        """
+        new_text = (new_fact_text or "").strip()
+        if not new_text:
+            raise ValueError("new_fact_text is required")
+
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            row = conn.execute(text(
+                "SELECT fact_text FROM requirement_facts WHERE id = :id"
+            ), {"id": fact_id}).first()
+            if not row:
+                return None
+            previous = row[0]
+
+            # An edited fact is re-verified against its source by the next backfill run: the
+            # reviewer rewrote the claim, so the stored evidence offset no longer describes it.
+            conn.execute(text(
+                "UPDATE requirement_facts "
+                "SET fact_text = :txt, reviewed_by = :reviewer, reviewed_at = :now, "
+                "    evidence_verified = NULL, evidence_offset = NULL"
+                + (", status = 'approved'" if approve else "")
+                + " WHERE id = :id"
+            ), {"txt": new_text, "reviewer": reviewer_user_id, "now": now, "id": fact_id})
+
+            conn.execute(text(
+                "INSERT INTO requirement_reviews "
+                "(id, entity_id, fact_id, reviewer_user_id, action, notes, created_at, "
+                " previous_fact_text, new_fact_text) "
+                "VALUES (:id, :entity_id, :fact_id, :reviewer_user_id, 'edit', :notes, "
+                "        :created_at, :previous, :new)"
+            ), {
+                "id": str(uuid.uuid4()),
+                "entity_id": None,
+                "fact_id": fact_id,
+                "reviewer_user_id": reviewer_user_id,
+                "notes": notes,
+                "created_at": now,
+                "previous": previous,
+                "new": new_text,
+            })
+        return {"fact_id": fact_id, "previous_fact_text": previous, "fact_text": new_text}
 
     # ── policy knowledge snapshots / document chunks (AUDIT-C1.3 batch 12) ────
 

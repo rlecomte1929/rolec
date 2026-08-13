@@ -146,6 +146,7 @@ from .app.routers import payment as payment_router  # Stripe roadmap paywall (TE
 from .app.routers import stripe_webhook as stripe_webhook_router  # Stripe webhook Path A — POST /api/stripe/webhook
 from .app.routers import auth_page_config as auth_page_config_router  # GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 from .app.routers import requirement_facts as requirement_facts_router  # [AIQ-1091] P4-02 requirement-facts extract
+from .app.routers import admin_content_review as admin_content_review_router  # [AIQ-1821] content review queue
 from .app.routers import nlg as nlg_router  # [Parker-J] dual-layer registration (PR #207 §9)
 from .app.routers import predictions as predictions_router  # [Parker-A] dual-layer registration (PR #207 §9)
 from .app.routers import test_drive as test_drive_router  # [AIQ-1420] TD-2 — dual-layer registration per CLAUDE.md
@@ -837,6 +838,7 @@ app.include_router(payment_router.router)  # Stripe roadmap paywall (TEST MODE) 
 app.include_router(stripe_webhook_router.router)  # Stripe webhook Path A — POST /api/stripe/webhook
 app.include_router(auth_page_config_router.router)  # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 app.include_router(requirement_facts_router.router)  # [AIQ-1091] P4-02 — POST /api/admin/requirement-facts/extract
+app.include_router(admin_content_review_router.router)  # [AIQ-1821] /api/admin/content-review
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
 app.include_router(rag_roadmap_router.router)  # [P1-01d] /api/internal/rag/generate-roadmap (dual-layer registration)
 app.include_router(compliance_router.router)  # [BL-Compliance.4] /api/compliance (dual-layer registration)
@@ -8248,8 +8250,28 @@ def get_country_resources(
                 draft = {}
 
     profile = build_profile_context(draft)
+
+    # AIQ-1831: the wizard draft is only one of the places the route lives, and for a
+    # case bridged straight to relocation_cases it is empty — which rendered a resource
+    # pack with destination_country="" and, via the "NO" fallback below, silently served
+    # NORWAY content for a Dublin move. Overlay the authoritative route (same resolver
+    # the immigration surface uses) instead of writing back to the draft.
+    if not profile.get("destination_country") or not profile.get("destination_city"):
+        try:
+            from .app.services.immigration_service import _get_case_details
+
+            route = _get_case_details(assignment_id, "") or {}
+        except Exception:  # noqa: BLE001 - resources must degrade, never 500
+            route = {}
+        if not profile.get("destination_country") and route.get("dest_country"):
+            profile["destination_country"] = route["dest_country"]
+            profile["country_code"] = str(route["dest_country"]).upper()
+        if not profile.get("destination_city") and route.get("dest_city"):
+            profile["destination_city"] = route["dest_city"]
+
     hints = get_personalization_hints(profile)
-    country_code = (profile.get("country_code") or "NO").upper()
+    # No destination resolves to no country — an empty pack is honest, Norway is not.
+    country_code = (profile.get("country_code") or "").upper()
     city = (profile.get("destination_city") or "").strip()
 
     filter_dict = {}

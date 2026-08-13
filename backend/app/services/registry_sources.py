@@ -275,6 +275,43 @@ SOURCES: Tuple[RegistrySource, ...] = (
               "which point validate() rejects it on the tier-3 rule instead of letting it "
               "through wearing a registry's name. The rejects are the re-sourcing worklist.",
     ),
+    # ── FR origin — entity register, NOT professional accreditation ──────────
+    #
+    # [AIQ-1827] Added after the four FR anchors the brief named turned out to be
+    # unusable on 2026-08-12: CCI fichier national 403, FIDI find-mover 404, and both the
+    # CNB annuaire and the OEC tableau are JS-driven with no listable index. That left
+    # FR-NO's origin half with zero sources and zero suppliers.
+    #
+    # recherche-entreprises.api.gouv.fr (INSEE SIRENE + RNE) IS enumerable: free, no auth,
+    # filterable by NAF activity code and postcode, and it answered for all four categories
+    # (69.10Z avocats, 49.42Z demenagement, 68.31Z agences immobilieres, 69.20Z
+    # experts-comptables) scoped to Paris.
+    #
+    # TIER 2, and the distinction is the whole point. SIRENE proves a company is REGISTERED
+    # and what activity it SELF-DECLARED at registration. It does not evidence bar
+    # membership, a carte T, or a place on the Ordre's tableau — those are the tier-1 claims,
+    # and conflating them is exactly the defect found in the Den Norske Advokatforening rows,
+    # where a Bronnoysund organisation number was sitting under a bar's name. Rows sourced
+    # here stage at reduced confidence and must never be written `verified`.
+    RegistrySource(
+        name="INSEE SIRENE / recherche-entreprises (FR)",
+        base_url="https://recherche-entreprises.api.gouv.fr/search",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("FR-NO",),
+        categories=("legal_admin", "movers", "housing_agencies", "tax_finance"),
+        # One entity per SIREN: annuaire-entreprises.data.gouv.fr/entreprise/<9 digits>.
+        entry_url_pattern=r"^https://annuaire-entreprises\.data\.gouv\.fr/entreprise/\d{9}$",
+        notes=(
+            "Entity confirmation only: registered company + self-declared NAF activity. "
+            "Enumerable by activite_principale + code_postal. Scoped to FR-NO deliberately "
+            "\u2014 that is the only corridor sourced from it; widening it to FR-DE would make "
+            "FR-DE look covered by a source no one has run there. The per-entity evidence "
+            "page at annuaire-entreprises.data.gouv.fr is a JS shell (212 bytes to a fetch), "
+            "so it is human-checkable but cannot self-verify \u2014 which is consistent with "
+            "tier 2: these rows stay `claimed`."
+        ),
+    ),
     # ── tax_finance ──────────────────────────────────────────────────────────
     RegistrySource(
         name="Bundessteuerberaterkammer / regional StBK (DE)",
