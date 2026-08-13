@@ -182,6 +182,25 @@ _PROMOTABLE = text(
     """
 )
 
+#: [AIQ-1827] The same query, scoped to the runs a caller just staged.
+#:
+#: Unscoped promotion is a foot-gun that only shows up once the staging table has history.
+#: Measured 2026-08-13: `vendor_candidates` held **233 unpromoted rows with corridor NULL**
+#: from an earlier import, so a 16-row French harvest previewed as "promote: 235 suppliers".
+#: A caller that stages a handful of rows and then promotes almost never means "and also
+#: everything anyone ever staged and abandoned".
+_PROMOTABLE_BY_RUN = text(
+    """
+    SELECT id, name, website_url, corridor, service_category, country_code, city,
+           source_url, source_name, accreditation_body, accreditation_number,
+           accreditation_expiry, notes
+    FROM public.vendor_candidates
+    WHERE status IN ('pending', 'duplicate') AND promoted_supplier_id IS NULL
+      AND run_id = ANY(CAST(:run_ids AS uuid[]))
+    ORDER BY created_at
+    """
+)
+
 _LINK_CANDIDATE = text(
     "UPDATE public.vendor_candidates SET promoted_supplier_id = :sid, updated_at = now() "
     "WHERE id = :cid"
@@ -238,7 +257,12 @@ def _attach_accreditation(session: Any, supplier_id: str, row: Any) -> None:
     )
 
 
-def promote(session: Any, *, dry_run: bool = True) -> Tuple[int, int, List[str]]:
+def promote(
+    session: Any,
+    *,
+    dry_run: bool = True,
+    run_ids: Optional[Sequence[str]] = None,
+) -> Tuple[int, int, List[str]]:
     """Promote pending candidates into the live directory as UNVETTED suppliers.
 
     Each becomes a `suppliers` row with exactly one capability at
@@ -250,6 +274,10 @@ def promote(session: Any, *, dry_run: bool = True) -> Tuple[int, int, List[str]]
     does exactly this for scraper results; a second promotion path would be a second thing to
     keep correct.
 
+    Pass `run_ids` to promote ONLY what those runs staged. Omit it and every unpromoted
+    candidate in the table is promoted, which is rarely what a caller means once the staging
+    table has history — see `_PROMOTABLE_BY_RUN`.
+
     Returns (promoted, skipped, problems). Idempotent on `promoted_supplier_id`, so a re-run
     promotes nothing.
     """
@@ -258,7 +286,14 @@ def promote(session: Any, *, dry_run: bool = True) -> Tuple[int, int, List[str]]
     from backend.app.services.supplier_registry import DuplicateSupplierError
     from backend.app.services.vendor_harvester import _name_key
 
-    rows = session.execute(_PROMOTABLE).mappings().all()
+    if run_ids is not None:
+        if not run_ids:
+            return 0, 0, []
+        rows = session.execute(
+            _PROMOTABLE_BY_RUN, {"run_ids": list(run_ids)}
+        ).mappings().all()
+    else:
+        rows = session.execute(_PROMOTABLE).mappings().all()
     # Keyed by _name_key, not raw lowercase: it folds accents, strips legal form and drops
     # parenthetical asides, so "AGS France (SOFDI)" finds "AGS France (SOFDI – Société ...)".
     # Both name AND legal_name — a register reports the legal entity, and "Expat Relocation
