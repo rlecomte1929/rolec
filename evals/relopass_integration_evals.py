@@ -557,7 +557,17 @@ class Harness:
             if not (p.is_dir() and y.is_file()):
                 continue
             text = y.read_text(encoding="utf-8")
-            files = re.findall(r'file:\s*["\']?([^"\'\n]+)', text)
+            # Drop comment lines BEFORE matching, and anchor the key to a YAML key position.
+            # Two false positives otherwise, both live on corridors/FR_NO/corridor.yaml:
+            #   * `#   questions_file: "interview_questions.json"` is commented out — the
+            #     surrounding prose says the file is deliberately omitted — yet a raw-text
+            #     regex reported it as a missing pathway;
+            #   * bare `file:` also matched the TAIL of `questions_file:`, so even uncommented
+            #     it would have been read as a pathway declaration.
+            body = "\n".join(
+                ln for ln in text.splitlines() if not ln.lstrip().startswith("#")
+            )
+            files = re.findall(r'(?m)^\s*(?:-\s*)?file:\s*["\']?([^"\'\n]+)', body)
             if not files:
                 offenders.append({"corridor": p.name, "reason": "no pathway file declared"})
             for f in files:
@@ -609,7 +619,10 @@ class Harness:
             where table_schema = 'public' and table_name = %(t)s
         """, {"t": table})
         have = {r["column_name"] for r in rows}
-        return bool(have & cols)
+        # ALL of them, not any. Intersection let E1 through on `requirement_items`, which has
+        # `country_code` but not `country`; the guarded query coalesces BOTH and died with
+        # `column "country" does not exist`, taking the whole suite down before any eval ran.
+        return cols.issubset(have)
 
     # -- driver ----------------------------------------------------------
 

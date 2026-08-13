@@ -136,6 +136,11 @@ def _attach_fidi_pages(evidence: List[SupplierEvidence]) -> List[SupplierEvidenc
     return out
 
 
+#: Never DOWNGRADE evidence. A re-run with --no-fetch cannot reach the FIDI pages, so a
+#: supplier that resolved `registry:fidi` would fall through to its catalog listing — and
+#: without this guard the second run would quietly replace a register-backed country with a
+#: directory's guess. Nothing here can weaken a row: a registry source is only ever replaced
+#: by another registry source.
 _UPDATE = """
 UPDATE public.suppliers
    SET based_in_country         = :country,
@@ -144,6 +149,10 @@ UPDATE public.suppliers
        legal_registration_number = COALESCE(:legal, legal_registration_number),
        updated_at               = now()
  WHERE id = :sid
+   AND NOT (
+         coalesce(entity_verified_source, '') LIKE 'registry:%'
+     AND :source NOT LIKE 'registry:%'
+   )
 """
 
 
