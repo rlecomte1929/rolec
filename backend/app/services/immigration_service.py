@@ -233,6 +233,24 @@ def _get_case_details(case_id: str, org_id: str) -> Optional[Dict[str, Any]]:
     more than one is present. It is COALESCEd LAST deliberately: it can only fire where
     the existing arms are already null, so it cannot change any answer that is correct
     today.
+
+    It also returns origin_city / dest_city / employment_type (AIQ-1831). These are
+    additive keys — no existing caller reads them — and they exist so the non-immigration
+    corridor consumers can stop inventing their own resolution:
+
+      * marketplace.py read case_assignments.origin_country / dest_country, columns that
+        have never existed on that table, so its corridor was null for 100% of
+        assignments since inception;
+      * compat.py's missing_fields read flat origin_country / destination_country /
+        employment_type off relocation_cases.profile_json, which carries none of them
+        (prod: 1, 1 and 0 respectively, out of 1391 cases);
+      * /api/resources/country read only wizard_cases.draft_json.relocationBasics and
+        silently fell back to rendering Norway for a case with no destination.
+
+    employment_type maps to contract_type, not assignment_type: contract_type is the
+    nature of the employment contract ('permanent'), which is what compute_missing_fields
+    sits beside origin/destination to ask about. assignment_type (STA/LTA/PERMANENT) is
+    mobility duration and already has its own consumers.
     """
     with db.engine.begin() as conn:
         row = conn.execute(
@@ -241,7 +259,12 @@ def _get_case_details(case_id: str, org_id: str) -> Optional[Dict[str, Any]]:
                        COALESCE(mc.destination_country, wc.dest_country,
                                 rc.dest_country_code)    AS dest_country,
                        COALESCE(mc.origin_country,      wc.origin_country,
-                                rc.origin_country_code)  AS origin_country
+                                rc.origin_country_code)  AS origin_country,
+                       COALESCE(wc.dest_city,   rc.dest_city)    AS dest_city,
+                       COALESCE(wc.origin_city, rc.origin_city)  AS origin_city,
+                       COALESCE(wc.contract_type,
+                                (ca.intake_draft::jsonb ->> 'contract_type'))
+                                                          AS employment_type
                 FROM public.case_assignments ca
                 LEFT JOIN public.mobility_cases   mc ON mc.id::text = ca.case_id
                 LEFT JOIN public.wizard_cases     wc ON wc.id::text = ca.case_id

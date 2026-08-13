@@ -86,3 +86,100 @@ def test_resolver_still_matches_by_pk_or_fk():
     """The dual PK/FK match is why one helper serves both call shapes — keep it."""
     sql = _resolver_sql()
     assert "WHERE ca.id = :case_id OR ca.case_id = :case_id" in sql
+
+
+def test_resolver_exposes_city_and_employment_type():
+    """The non-immigration consumers need more than the two country codes.
+
+    marketplace / missing_fields / resources-country were each inventing their own
+    (broken) resolution. They now read these keys off the one resolver.
+    """
+    sql = _resolver_sql()
+    assert "AS dest_city" in sql and "AS origin_city" in sql
+    assert "AS employment_type" in sql
+    assert "contract_type" in sql, (
+        "employment_type maps to contract_type (nature of the employment contract), "
+        "not assignment_type (STA/LTA/PERMANENT mobility duration)"
+    )
+
+
+def test_missing_fields_overlays_the_resolved_route():
+    """compute_missing_fields must see the route columns, not just profile_json.
+
+    profile_json carries the flat keys on 1 of 1391 prod cases, so without the overlay
+    origin_country/destination_country/employment_type are reported missing on
+    effectively every case regardless of how complete the intake was.
+    """
+    from backend.routes import compat
+
+    profile = {}  # the realistic prod shape: no flat keys at all
+    route = {
+        "origin_country": "ES",
+        "dest_country": "IE",
+        "employment_type": "permanent",
+    }
+    original = compat._get_case_details
+    compat._get_case_details = lambda case_id, org_id: route
+    try:
+        merged = compat._with_resolved_route(profile, "case-1")
+    finally:
+        compat._get_case_details = original
+
+    assert merged["origin_country"] == "ES"
+    assert merged["destination_country"] == "IE"
+    assert merged["employment_type"] == "permanent"
+    from backend.app.services.relocation_profile import compute_missing_fields
+
+    assert compute_missing_fields(merged) == []
+
+
+def test_missing_fields_overlay_never_overrides_a_real_profile_value():
+    """The profile wins where it actually has a value — the overlay only fills gaps."""
+    from backend.routes import compat
+
+    original = compat._get_case_details
+    compat._get_case_details = lambda case_id, org_id: {"origin_country": "XX"}
+    try:
+        merged = compat._with_resolved_route({"origin_country": "FR"}, "case-1")
+    finally:
+        compat._get_case_details = original
+    assert merged["origin_country"] == "FR"
+
+
+def test_missing_fields_overlay_is_fail_soft():
+    """A resolver failure degrades to the old answer — it must never 500 the page."""
+    from backend.routes import compat
+
+    def _boom(case_id, org_id):
+        raise RuntimeError("db down")
+
+    original = compat._get_case_details
+    compat._get_case_details = _boom
+    try:
+        merged = compat._with_resolved_route({"origin_country": "FR"}, "case-1")
+    finally:
+        compat._get_case_details = original
+    assert merged == {"origin_country": "FR"}
+
+
+def test_resources_country_no_longer_defaults_to_norway():
+    """A case with no destination must render an empty pack, not Norway's.
+
+    `country_code = (profile.get("country_code") or "NO")` served Norwegian resources
+    to any case whose destination could not be resolved — a confident wrong answer.
+    """
+    # Read the source rather than importing backend.main: that module pulls in the
+    # whole app (upload_validator -> python-magic), which makes an otherwise pure
+    # assertion depend on a system library being installed.
+    from pathlib import Path
+
+    main_py = Path(__file__).resolve().parents[1] / "main.py"
+    src = main_py.read_text(encoding="utf-8")
+
+    start = src.index("def get_country_resources(")
+    body = src[start : start + 4000]
+    assert 'or "NO"' not in body, (
+        "the silent Norway fallback is back — an unresolved destination must yield an "
+        "empty country_code, not another country's resource pack"
+    )
+    assert 'profile.get("country_code") or ""' in body
