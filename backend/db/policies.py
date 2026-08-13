@@ -1389,11 +1389,34 @@ class PoliciesMixin:
         return items
 
     def list_approved_requirement_facts(self, destination_country: str) -> List[Dict[str, Any]]:
+        """Approved facts for a destination, minus the ones we have already DISPROVED.
+
+        This feeds `compute_requirements_sufficiency` → `GET /api/requirements/sufficiency`,
+        so every row here is served to a user.
+
+        `status='approved'` alone was not enough. The evidence ledger
+        (20261033000000, AIQ-1821) records whether `evidence_quote` was actually found in the
+        archived source text, and measured 2026-08-13 on production: of 375 approved facts only
+        54 were `evidence_verified = TRUE`, while **74 were `evidence_verified = FALSE`** — the
+        quote is provably not in the source — and were being served anyway. 705 facts sit on
+        222 `knowledge_docs` whose entire `text_content` is the literal string
+        "Otto bridge capture, unverified — see source_url"; all 705 store a quote that is not a
+        substring of it, and 246 of those are approved.
+
+        Only `FALSE` is excluded, deliberately. `NULL` means never checked, not wrong: 247
+        approved facts are unchecked, and dropping them would empty the surface on no evidence.
+        Narrowing "unknown" is the backfill's job (`backend/scripts/backfill_fact_evidence.py`),
+        not this reader's.
+
+        COALESCE rather than `IS NOT FALSE` so the predicate means the same thing on SQLite,
+        which is what CI runs against.
+        """
         with self.engine.connect() as conn:
             rows = conn.execute(text(
                 "SELECT f.* FROM requirement_facts f "
                 "JOIN requirement_entities e ON e.id = f.entity_id "
-                "WHERE e.destination_country = :dest AND f.status = 'approved'"
+                "WHERE e.destination_country = :dest AND f.status = 'approved' "
+                "AND COALESCE(f.evidence_verified, TRUE) = TRUE"
             ), {"dest": destination_country}).fetchall()
         items = self._rows_to_list(rows)
         for item in items:
