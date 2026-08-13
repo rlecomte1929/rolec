@@ -111,6 +111,54 @@ def _is_eu_member_destination(destination: Optional[str]) -> bool:
     return _n(destination) in _EU_MEMBER_STATES
 
 
+# EU members that actually issue an EU Blue Card. Directive 2021/1883 does not bind
+# Denmark or Ireland — both sit outside the EU's Title V area of freedom, security and
+# justice under Protocols 21 and 22 to the TFEU, and neither opted in. The European
+# Commission states it plainly: "The EU Blue Card applies in 25 of the 27 EU Member
+# States. It does not apply in Denmark and Ireland."
+# (home-affairs.ec.europa.eu/policies/migration-and-asylum/eu-immigration-portal/eu-blue-card_en)
+#
+# Ireland's equivalent instrument is the Critical Skills Employment Permit (DETE);
+# Denmark runs its own Positive List / Pay Limit schemes. Neither is modelled here yet,
+# so a third-country national heading to IE or DK falls through to the catch-all rather
+# than being offered a permit that country does not issue.
+#
+# Same reasoning as _EU_MEMBER_STATES above, one directive-membership level down.
+_BLUE_CARD_STATES: FrozenSet[str] = _EU_MEMBER_STATES - frozenset({
+    "ireland", "ie", "denmark", "dk",
+})
+
+
+def _is_blue_card_destination(destination: Optional[str]) -> bool:
+    return _n(destination) in _BLUE_CARD_STATES
+
+
+def default_visa_type_for_destination(destination: Optional[str]) -> Optional[str]:
+    """The visa type to assume when the caller supplied none — or None if unknowable.
+
+    [AIQ-1833] Three endpoints defaulted `visa_type="blue_card"` outright. That value
+    was returned verbatim for Ireland (which does not issue one), for Denmark (likewise),
+    and for non-EU destinations such as Norway — a confident wrong answer about
+    immigration, which is the defect class that can actually harm someone: a
+    third-country national acting on it would pursue a permit Ireland does not issue and
+    miss the 12-week Critical Skills Employment Permit lodgement window.
+
+    The default is nonetheless load-bearing and cannot simply be dropped. Every seeded
+    blue_card row in immigration_requirements is a "-> DE" corridor (CA/FR/IN/UK/US),
+    and those corridors are queried with no explicit visa_type, so returning None
+    unconditionally would empty five working corridors. Measured 2026-08-13: IN->DE with
+    no visa_type parameter returns covered=true with 11 requirements purely because of
+    this default.
+
+    So: keep the assumption exactly where the instrument genuinely exists, and return
+    None — "not determined" — everywhere else. No corridor's requirement count changes;
+    only the honesty of the reported visa_type does.
+    """
+    if not destination:
+        return None
+    return "blue_card" if _is_blue_card_destination(destination) else None
+
+
 def _is_us_destination(destination: Optional[str]) -> bool:
     return _n(destination) in _US_DESTINATIONS
 
@@ -338,8 +386,10 @@ class ImmigrationRegimeRouter:
         # nationals never reach here; and before the catch-all, so non-EEA→EU is a
         # Blue Card rather than a generic work permit. EEA/EFTA destinations
         # (Norway etc.) are NOT EU members → they fall through to the catch-all.
+        # Ireland and Denmark are EU members that the directive does not bind, so they
+        # fall through too — see _BLUE_CARD_STATES (AIQ-1833).
         if (
-            _is_eu_member_destination(destination_country)
+            _is_blue_card_destination(destination_country)
             and not _is_eu_national(nationality)
             and not intra_group_transfer  # intra-group secondments → ICT (catch-all below), not Blue Card
         ):
