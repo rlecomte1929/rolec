@@ -16,8 +16,9 @@ rather than an empty checklist that reads as "nothing required".
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
+from .immigration_regime import default_visa_type_for_destination
 from .immigration_requirement_service import RiskFlag, evaluate_risks, get_requirements
 from .immigration_service import _get_case_details, _load_profile_for_case
 
@@ -44,15 +45,28 @@ def _uncovered(corridor_from, corridor_to, visa_type) -> Dict[str, Any]:
     }
 
 
-def build_immigration_snapshot(case_id: str, visa_type: str = "blue_card") -> Dict[str, Any]:
+def build_immigration_snapshot(
+    case_id: str, visa_type: Optional[str] = None
+) -> Dict[str, Any]:
     """Build the proactive snapshot for a case. Ownership is the caller's job."""
     # org_id is unused by _get_case_details' query; ownership is enforced upstream.
     case = _get_case_details(case_id, "")
     corridor_from = (case or {}).get("origin_country")
     corridor_to = (case or {}).get("dest_country")
 
+    # [AIQ-1833] Resolve the visa type from the destination rather than defaulting to
+    # blue_card. This endpoint reaches the EMPLOYEE, so a wrong permit here is the
+    # version of this bug that can actually mislead someone.
+    if visa_type is None:
+        visa_type = default_visa_type_for_destination(corridor_to)
+
     # Fail closed: missing geography cannot be answered authoritatively.
     if not corridor_from or not corridor_to:
+        return _uncovered(corridor_from, corridor_to, visa_type)
+
+    # Fail closed: a destination with no Blue Card and no explicit visa type cannot be
+    # answered. Querying with visa_type=None would match nothing anyway.
+    if not visa_type:
         return _uncovered(corridor_from, corridor_to, visa_type)
 
     requirements = get_requirements(corridor_from, corridor_to, visa_type)

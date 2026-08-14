@@ -108,6 +108,45 @@ def list_curation(
     ]
 
 
+class CountryMismatch(ValueError):
+    """The selection's destination country disagrees with the catalog item's own country."""
+
+
+def check_country_agreement(conn: Any, master_item_id: str, country: Optional[str]) -> Optional[str]:
+    """Return a rejection reason, or None when the pair is acceptable.
+
+    Audit finding F-2: HR curation rows were saved with a `country` that contradicts the
+    `service_catalog_items` row they point at — 177 Norwegian companies approved a Sydney
+    mover. Nothing at the write path ever compared the two.
+
+    This is deliberately NOT a raise. Cross-country rows are still arriving daily (39 on
+    2026-08-10, 102 on the 11th, 55 on the 12th), which is why the guard matters more than any
+    one-off cleanup — but the only production writer, `hr_catalog.bulk_select`, loops toggles
+    with no error handling, so raising would abort an HR user's entire save because of one bad
+    row. The caller collects reasons and reports them instead.
+
+    An UNKNOWN country is permitted. `service_catalog_items.country` is 981 of 985 populated;
+    rejecting on absence would block legitimate saves for the remainder, and "we do not know"
+    is not evidence of a mismatch.
+    """
+    if not master_item_id or not country:
+        return None
+    row = conn.execute(
+        text("SELECT name, country FROM service_catalog_items WHERE id = :mid"),
+        {"mid": master_item_id},
+    ).mappings().first()
+    if not row or not row.get("country"):
+        return None
+    item_country = str(row["country"]).strip().upper()
+    want = str(country).strip().upper()
+    if item_country == want:
+        return None
+    return (
+        f"{row.get('name') or master_item_id} is in {item_country}; this selection is for "
+        f"{want}. A vendor cannot serve a country it is not in."
+    )
+
+
 def upsert_master_selection(
     *,
     company_id: str,
@@ -118,12 +157,21 @@ def upsert_master_selection(
     country: Optional[str] = None,
     actor_user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """HR toggles a master item on/off for their company. Idempotent."""
+    """HR toggles a master item on/off for their company. Idempotent.
+
+    Raises `CountryMismatch` when the destination country contradicts the catalog item's own
+    country — see `check_country_agreement`. Callers handling batches should catch it per
+    toggle so one bad row does not discard the rest.
+    """
     now = datetime.utcnow().isoformat()
     # Bind a Python bool, not 1/0 — the `selected` column is a Postgres BOOLEAN and an
     # int bind raises psycopg2 DatatypeMismatch → 500 (SQLite coerces it, masking the bug).
     selected_bool = bool(selected)
     with db.engine.begin() as conn:
+        # Before anything is written. A rejected toggle must leave no row behind.
+        reason = check_country_agreement(conn, master_item_id, country)
+        if reason:
+            raise CountryMismatch(reason)
         existing = conn.execute(
             text(
                 "SELECT id FROM company_vendor_selections "

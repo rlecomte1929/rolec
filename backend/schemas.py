@@ -142,8 +142,21 @@ class MoversPreferences(BaseModel):
 
 # Move plan model
 class MovePlan(BaseModel):
-    origin: str = "Oslo, Norway"
-    destination: str = "Singapore"
+    # These were "Oslo, Norway" / "Singapore". As pydantic DEFAULTS they were written into
+    # relocation_cases.profile_json for every case that never set them explicitly — 1365 of 1401
+    # cases in production (97.4%) carried the pair, including Paris->Oslo cases on the FR-NO
+    # corridor, whose summary therefore read "Oslo, Norway -> Singapore".
+    #
+    # The value is not inert: frontend/src/features/cases/caseEssentials.ts resolves
+    # `movePlan.origin ?? caseOriginHint`, movePlan FIRST, so a non-empty default beats the real
+    # route on every case that has one.
+    #
+    # Empty string rather than None: "" is already how this codebase spells "city unknown"
+    # (recommendations/plugins/movers.py `origin_city: str = ""`, and criteria_builder only sets
+    # the key `if origin_city`), and it keeps the annotation `str` so no caller has to learn to
+    # handle None. Every reader treats empty as absent and falls through to the real route.
+    origin: str = ""
+    destination: str = ""
     targetArrivalDate: Optional[date] = None
     shippingDatePreference: Optional[date] = None
     housing: HousingPreferences = Field(default_factory=HousingPreferences)

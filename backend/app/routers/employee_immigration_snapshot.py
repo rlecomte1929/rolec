@@ -10,7 +10,7 @@ Auth: require_hr_or_employee + require_case_access (employee's own assignment, o
 HR visibility) — mirrors the relocation-plan-view ownership model. No body case_id;
 the path id is authorized before anything is computed.
 """
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Query
 
@@ -23,7 +23,9 @@ router = APIRouter(prefix="/api/employee", tags=["employee-immigration"])
 @router.get("/cases/{case_id}/immigration-snapshot")
 def get_immigration_snapshot(
     case_id: str,
-    visa_type: str = Query("blue_card"),
+    # [AIQ-1833] No default. Resolved from the destination in the service, so an
+    # Ireland or Denmark case is never told it needs an EU Blue Card.
+    visa_type: Optional[str] = Query(None),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ) -> Dict[str, Any]:
     # Enforce ownership BEFORE computing anything (fail-closed on cross-case access).
