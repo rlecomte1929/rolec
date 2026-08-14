@@ -234,6 +234,29 @@ def _attach_precedent_insight(conn, row: Dict[str, Any]) -> Dict[str, Any]:
         )
         insight["recommendation_id"] = insight_recommendation_id(str(row["id"]))
         row["precedent_insight"] = insight
+        # AIQ-1694·4b — record the surfaced precedent insight to the human-oversight
+        # audit trail so the production event (not just the eventual human decision) is
+        # logged. Best-effort and deduped per request via the stable recommendation_id,
+        # so re-rendering the inbox writes at most one row per exception request.
+        _org = str(row.get("organization_id") or "")
+        if _org:
+            try:
+                from ..services.ai_decision_logger import record_ai_recommendation
+                record_ai_recommendation(
+                    feature="precedent_insight",
+                    recommendation_id=str(insight["recommendation_id"]),
+                    input_context={
+                        "exception_request_id": str(row.get("id") or ""),
+                        "category": str(row.get("category") or ""),
+                        "benefit_key": row.get("benefit_key"),
+                    },
+                    ai_output=insight,
+                    company_id=_org,
+                    model_name="rule-based",
+                    skip_if_exists=True,
+                )
+            except Exception:
+                logger.exception("precedent_insight audit-log failed for id=%s", row.get("id"))
     except Exception:
         logger.exception("precedent_insight compute failed for id=%s", row.get("id"))
     return row
@@ -347,6 +370,33 @@ def _fmt_amount(amount: float, currency: str) -> str:
     return f"{amount:,.0f} {currency}"
 
 
+def _email_exception_recipient_directly(
+    user_id: str, *, subject: str, plain: str, request_id: str, who: str
+) -> None:
+    """Email a legacy non-uuid recipient directly, bypassing the in-app/outbox pipeline.
+
+    Both ``notifications.user_id`` and ``notification_outbox.user_id`` are ``uuid NOT NULL``, so a
+    legacy non-uuid id (the ~27/239 HR and 1/245 employee demo/seed accounts) can't get an in-app
+    bell or an outbox row. It CAN still get the email — resolve ``users.email`` and send via Resend
+    directly, the same pattern as ``admin_notify``. Best-effort and one-shot (no cron retry), which
+    is acceptable for this legacy tail; the modern uuid path keeps in-app + outbox + instant-fire.
+    """
+    from ..services.assignment_invite_email import _resend_send
+
+    user = db.get_user_by_id(user_id) or {}
+    to_email = (user.get("email") or "").strip()
+    if not to_email:
+        logger.warning(
+            "exception_requests: %s NOT NOTIFIED (legacy id, no email) user_id=%s id=%s",
+            who, user_id, request_id,
+        )
+        return
+    _resend_send(
+        to_email=to_email, subject=subject, plain=plain,
+        request_id=request_id, context=f"exception {who} (legacy direct)",
+    )
+
+
 def _notify_hr_of_exception_request(
     *,
     request_id: str,
@@ -383,25 +433,28 @@ def _notify_hr_of_exception_request(
             )
             return
 
-        # Order matters: the regex is free and matches the overwhelming majority of
-        # ids, so a uuid recipient never touches db.engine at all.
-        if not _UUID_RE.match(str(hr_user_id)) and not _is_sqlite_engine():
-            # Not an error in our code — a data-migration debt. Greppable on purpose.
-            logger.warning(
-                "exception_requests: HR NOT NOTIFIED (legacy non-uuid hr_user_id) "
-                "hr_user_id=%s case_id=%s id=%s — notifications.user_id is uuid NOT NULL",
-                hr_user_id, case_id, request_id,
-            )
-            return
-
         requested = _fmt_amount(body.requested_amount, body.currency.upper())
         cap = _fmt_amount(body.cap_amount, body.currency.upper())
         label = body.type_label or body.category
+        summary = f"{label}: {requested} requested against a {cap} cap."
+
+        # Order matters: the regex is free and matches the overwhelming majority of
+        # ids, so a uuid recipient never touches db.engine at all.
+        if not _UUID_RE.match(str(hr_user_id)) and not _is_sqlite_engine():
+            # Legacy non-uuid HR can't get an in-app/outbox row (both user_id cols are uuid NOT
+            # NULL), but they CAN get the email — send it directly rather than dropping the
+            # notification. (Was a silent skip before; the ~27/239 legacy HR got nothing.)
+            _email_exception_recipient_directly(
+                str(hr_user_id), subject="Policy exception requested", plain=summary,
+                request_id=request_id, who="HR",
+            )
+            return
+
         db.create_notification_with_preferences(
             user_id=hr_user_id,
             type_=NOTIFICATION_TYPE_EXCEPTION_REQUESTED,
             title="Policy exception requested",
-            body=f"{label}: {requested} requested against a {cap} cap.",
+            body=summary,
             assignment_id=str(assignment.get("id") or "") or None,
             case_id=case_id,
             metadata={
@@ -414,6 +467,12 @@ def _notify_hr_of_exception_request(
                 "currency": body.currency.upper(),
             },
         )
+        # [AIQ-1610 follow-up] Instant-fire the just-enqueued email off the request path so HR is
+        # notified in seconds, not on the GitHub-throttled (~2h) cron tick. Best-effort; the cron
+        # remains the safety-net. No-op when the recipient opted out of email (nothing enqueued).
+        from ..services.notification_outbox_dispatch import dispatch_outbox_soon
+
+        dispatch_outbox_soon()
     except Exception as exc:
         logger.warning(
             "exception_requests: HR notification failed case_id=%s id=%s error=%s",
@@ -454,14 +513,6 @@ def _notify_employee_of_decision(
             )
             return
 
-        if not _UUID_RE.match(str(employee_id)) and not _is_sqlite_engine():
-            logger.warning(
-                "exception_requests: EMPLOYEE NOT NOTIFIED (legacy non-uuid user id) "
-                "user_id=%s id=%s — notifications.user_id is uuid NOT NULL",
-                employee_id, request_id,
-            )
-            return
-
         category = existing.get("category") or "Your request"
         currency = (existing.get("currency") or "USD").upper()
         try:
@@ -476,11 +527,21 @@ def _notify_employee_of_decision(
             detail += f" — {amount}"
         note = (hr_note or "").strip()
         body_text = f"{detail}. {('HR noted: ' + note) if note else 'No note was left.'}"
+        subject = f"Your policy exception was {verb}"
+
+        if not _UUID_RE.match(str(employee_id)) and not _is_sqlite_engine():
+            # Legacy non-uuid employee: no in-app/outbox row possible, but still email them the
+            # outcome directly rather than dropping it (was a silent skip before).
+            _email_exception_recipient_directly(
+                str(employee_id), subject=subject, plain=body_text,
+                request_id=request_id, who="employee",
+            )
+            return
 
         db.create_notification_with_preferences(
             user_id=str(employee_id),
             type_=NOTIFICATION_TYPE_EXCEPTION_DECIDED,
-            title=f"Your policy exception was {verb}",
+            title=subject,
             body=body_text,
             case_id=existing.get("case_id"),
             metadata={
@@ -492,6 +553,11 @@ def _notify_employee_of_decision(
                 "hr_note": note or None,
             },
         )
+        # [AIQ-1610 follow-up] Instant-fire so the employee is emailed the decision in seconds,
+        # symmetric to the HR-request path. Best-effort; cron is the safety-net.
+        from ..services.notification_outbox_dispatch import dispatch_outbox_soon
+
+        dispatch_outbox_soon()
     except Exception as exc:
         logger.warning(
             "exception_requests: employee decision notification failed id=%s error=%s",

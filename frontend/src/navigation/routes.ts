@@ -8,6 +8,10 @@ export const ROUTE_DEFS = {
   why: { path: '/why', roles: ['PUBLIC'] as RouteRole[] },
   howItWorks: { path: '/how-it-works', roles: ['PUBLIC'] as RouteRole[] },
   getStarted: { path: '/get-started', roles: ['PUBLIC'] as RouteRole[] },
+  // [AIQ-1783] Paid-ad landing pages (ADS-3). Prerendered to static HTML at build
+  // time — see frontend/scripts/prerender.mjs and PRERENDER_ROUTES there.
+  mobilityTeams: { path: '/mobility-teams', roles: ['PUBLIC'] as RouteRole[] },
+  relocationChecklist: { path: '/relocation-checklist', roles: ['PUBLIC'] as RouteRole[] },
   testDrive: { path: '/test-drive', roles: ['PUBLIC'] as RouteRole[] },
   testDriveSurvey: { path: '/test-drive/survey', roles: ['PUBLIC'] as RouteRole[] },
   security: { path: '/security', roles: ['PUBLIC'] as RouteRole[] },
@@ -113,10 +117,6 @@ export const ROUTE_DEFS = {
   hrPolicyManagement: { path: '/hr/policy-management', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Policy Builder wizard (AIQ-37-B/C). */
   hrPolicyBuilder: { path: '/hr/settings/policy', roles: ['HR', 'ADMIN'] as RouteRole[] },
-  /** [P2-6] HR validation gate — review extracted policy values before publishing */
-  hrPolicyBuilderReview: { path: '/hr/policy-builder/review', roles: ['HR', 'ADMIN'] as RouteRole[] },
-  /** [P2-8] HR document management — upload history, status badges, version diffs */
-  hrPolicyBuilderDocuments: { path: '/hr/policy-builder/documents', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Policy exceptions inbox — HR review + approve/reject flow. */
   hrExceptions: { path: '/hr/exceptions', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** AI decisions audit (AI-002) — EU AI Act Art. 14(4)(c) human oversight log. */
@@ -142,6 +142,12 @@ export const ROUTE_DEFS = {
   adminConsole: { path: '/admin', roles: ['ADMIN'] as RouteRole[] },
   adminOverview: { path: '/admin', roles: ['ADMIN'] as RouteRole[] },
   adminCatalogQueue: { path: '/admin/catalog-queue', roles: ['ADMIN'] as RouteRole[] },
+  // Country requirement catalog — the review surface for what employees, HR and the public
+  // corridor endpoint are served. Declared here (rather than only in the legacy src/routes.ts)
+  // so it carries the ADMIN guard like its siblings and can be linked from the sidebar; it was
+  // reachable only by typing the URL, which is why content shipped unreviewed.
+  adminCountries: { path: '/admin/countries', roles: ['ADMIN'] as RouteRole[] },
+  adminCountryDetail: { path: '/admin/countries/:countryCode', roles: ['ADMIN'] as RouteRole[] },
   adminRequirementFacts: { path: '/admin/requirement-facts', roles: ['ADMIN'] as RouteRole[] },
   adminResearchRequests: { path: '/admin/research-requests', roles: ['ADMIN'] as RouteRole[] },
   adminCompanies: { path: '/admin/companies', roles: ['ADMIN'] as RouteRole[] },
@@ -150,6 +156,7 @@ export const ROUTE_DEFS = {
   adminPolicies: { path: '/admin/policies', roles: ['ADMIN'] as RouteRole[] },
   adminSuppliers: { path: '/admin/suppliers', roles: ['ADMIN'] as RouteRole[] },
   adminVettingQueue: { path: '/admin/vetting-queue', roles: ['ADMIN'] as RouteRole[] },
+  adminContentReview: { path: '/admin/content-review', roles: ['ADMIN'] as RouteRole[] },
   adminSupplierSubmissions: { path: '/admin/supplier-submissions', roles: ['ADMIN'] as RouteRole[] },
   adminPrompts: { path: '/admin/prompts', roles: ['ADMIN'] as RouteRole[] },
   adminRagQuality: { path: '/admin/rag-quality', roles: ['ADMIN'] as RouteRole[] },

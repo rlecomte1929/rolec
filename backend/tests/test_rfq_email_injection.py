@@ -90,6 +90,14 @@ class EmailInjectionTests(unittest.TestCase):
 class PersonalDomainGuardTests(unittest.TestCase):
     """AIQ-1533 — personal/webmail domains in the catalog must never receive RFQ emails."""
 
+    def setUp(self):
+        # These assert EMAIL-mode address guards; opt into email egress so the go-live gate
+        # (RELOPASS_SUPPLIER_EMAIL_LIVE) doesn't force inbox and skip the guards under test.
+        from unittest.mock import patch as _patch
+        p = _patch.dict(os.environ, {"RELOPASS_SUPPLIER_EMAIL_LIVE": "true"})
+        p.start()
+        self.addCleanup(p.stop)
+
     def _targets(self, email):
         return [{"recipient_id": "r-1", "vendor_id": "v-1", "supplier_name": "Test Mover", "email": email}]
 
@@ -99,6 +107,7 @@ class PersonalDomainGuardTests(unittest.TestCase):
         results = dispatch_supplier_links(
             rfq_id="rfq-test-1",
             targets=self._targets("someone@hotmail.com"),
+            dispatch_mode="email",
             send_email=True,
         )
         self.assertEqual(len(results), 1)
@@ -110,6 +119,7 @@ class PersonalDomainGuardTests(unittest.TestCase):
         results = dispatch_supplier_links(
             rfq_id="rfq-test-2",
             targets=self._targets(None),
+            dispatch_mode="email",
             send_email=False,
         )
         self.assertEqual(len(results), 1)
@@ -123,6 +133,7 @@ class PersonalDomainGuardTests(unittest.TestCase):
         results = dispatch_supplier_links(
             rfq_id="rfq-test-3",
             targets=self._targets("rfq@asiantigers-worldwide.com"),
+            dispatch_mode="email",
             send_email=False,
         )
         self.assertEqual(len(results), 1)
@@ -138,6 +149,7 @@ class PersonalDomainGuardTests(unittest.TestCase):
         results = dispatch_supplier_links(
             rfq_id="rfq-test-4",
             targets=self._targets("contact@gmail.com"),
+            dispatch_mode="email",
             send_email=True,
         )
         self.assertFalse(results[0]["ok"])

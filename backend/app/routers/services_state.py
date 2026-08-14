@@ -129,6 +129,10 @@ def get_services_state(
     # company), then derive the tenant from the case record — not the caller's
     # profile (AIQ-1012). require_case_access returns the assignment row.
     assignment = require_case_access(case_id, user)
+    # AIQ-1704: services_state.case_id is the canonical case id (UNIQUE). require_case_access
+    # accepts an assignment id but returns the assignment, so resolve to the canonical case id
+    # before keying the table — else a GET with an assignment id misses the saved row.
+    case_id = str((assignment or {}).get("canonical_case_id") or (assignment or {}).get("case_id") or case_id)
     organization_id = _org_id_for_case(case_id, assignment)
     with db.engine.begin() as conn:
         row = conn.execute(
@@ -182,6 +186,12 @@ def put_services_state(
     # company), then derive the tenant from the case record — not the caller's
     # profile (AIQ-1012). require_case_access returns the assignment row.
     assignment = require_case_access(case_id, user)
+    # AIQ-1704: services_state.case_id is the canonical case id (UNIQUE). require_case_access
+    # accepts an assignment id but returns the assignment, so resolve to the canonical case id
+    # BEFORE keying the table — else a POST with an assignment id writes a phantom row the read
+    # path (keyed on the case id) can never find. Falls back to the raw id only when there's no
+    # assignment (HR-no-assignment path — unchanged there).
+    case_id = str((assignment or {}).get("canonical_case_id") or (assignment or {}).get("case_id") or case_id)
     organization_id = _org_id_for_case(case_id, assignment)
     actor_id = user["id"]
     blob = json.dumps(body.state, default=str)

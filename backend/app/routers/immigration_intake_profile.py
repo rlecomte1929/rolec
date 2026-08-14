@@ -10,6 +10,7 @@ Houses 5 endpoints:
 """
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from typing import Any, Dict, List, Optional
@@ -46,6 +47,7 @@ from ..services.immigration_service import (
     _log_access,
     _now_iso,
     _resolve_canonical_intake_fields,
+    decrypt_passport_for_display,
 )
 from ..services.ocr_passport_extractor import (
     ConflictRecord,
@@ -104,6 +106,22 @@ class EmployeeProfileUpdate(BaseModel):
 router = APIRouter(prefix="/api", tags=["immigration-intake-profile"])
 
 log = logging.getLogger(__name__)
+
+
+def _jsonb_bind(param: str) -> str:
+    """`CAST(:param AS jsonb)` on Postgres; bare `:param` on SQLite (column is TEXT).
+
+    [AIQ-1800b] `field_sources` is jsonb, and every write path bound a raw Python dict to
+    it. psycopg2 cannot adapt a dict, so EVERY insert and update against
+    imm_employee_profiles raised `ProgrammingError: can't adapt type 'dict'` — which is
+    why the table has 0 rows, key or no key. `json.dumps()` on the value is the half that
+    actually fixes it; this cast is the house convention (see `_jsonb_expr` in
+    admin_form_templates) and keeps the SQLite/Postgres split explicit at the call site.
+    """
+    try:
+        return f"CAST(:{param} AS jsonb)" if db.engine.dialect.name == "postgresql" else f":{param}"
+    except Exception:  # engine not configured (unit tests) — bare bind is correct for sqlite
+        return f":{param}"
 
 
 @router.get("/hr/cases/{case_id}/profile")
@@ -177,8 +195,8 @@ def update_profile_hr_fields(
         existing_sources = profile.get("field_sources") or {}
         for field_name in updates:
             existing_sources[field_name] = "hr_provided"
-        params["field_sources"] = existing_sources
-        set_clauses.append("field_sources = :field_sources")
+        params["field_sources"] = json.dumps(existing_sources)
+        set_clauses.append(f"field_sources = {_jsonb_bind('field_sources')}")
         set_clauses.append("updated_at = :now")
 
         sql = f"""
@@ -210,12 +228,12 @@ def update_profile_hr_fields(
             "case_id": case_id,
             "employee_id": "",   # Employee not yet known
             "org_id": org_id,
-            "field_sources": field_sources,
+            "field_sources": json.dumps(field_sources),
             "now": now,
         }
         params.update(updates)
         cols = list(params.keys())
-        placeholders = [f":{c}" for c in cols]
+        placeholders = [_jsonb_bind(c) if c == "field_sources" else f":{c}" for c in cols]
         with db.engine.begin() as conn:
             conn.execute(
                 text(f"""
@@ -301,20 +319,24 @@ def get_profile_employee(
         if _v is not None:
             p[_k] = _v
 
-    # Decrypt passport_number for the employee's own view
-    if p.get("passport_number"):
-        try:
-            enc_key = _get_encryption_key()
-            with db.engine.begin() as conn:
-                row = conn.execute(
-                    text("SELECT pgp_sym_decrypt(:enc::bytea, :key) AS decrypted"),
-                    {"enc": p["passport_number"], "key": enc_key},
-                ).mappings().first()
-            if row:
-                p["passport_number"] = row["decrypted"]
-        except Exception:
-            pass  # Return encrypted form if decryption fails
+    # Decrypt passport_number for the employee's own view.
+    #
+    # [AIQ-1802] Two bugs met here. The overlay above treats any non-null vault value as
+    # authoritative, so it had already discarded the employee's own canonical intake
+    # value; the decrypt then failed open and returned the ciphertext. Net effect: we
+    # showed the employee an unreadable blob while holding the correct plaintext they
+    # had typed themselves, a few lines earlier.
+    #
+    # An undecryptable vault value is not a winning value. Fall back to canonical.
+    decryption = decrypt_passport_for_display(p)
+    p = decryption.profile
+    withheld = decryption.withheld
+    if withheld and canonical.get("passport_number"):
+        p["passport_number"] = canonical["passport_number"]
+        withheld = False
 
+    if withheld:
+        return {"profile": p, "passport_number_withheld": True}
     return {"profile": p}
 
 
@@ -407,8 +429,8 @@ def upsert_profile_employee(
         if not set_clauses:
             return {"updated_fields": [], "message": "All fields are HR-provided and locked."}
 
-        params["field_sources"] = existing_sources
-        set_clauses.append("field_sources = :field_sources")
+        params["field_sources"] = json.dumps(existing_sources)
+        set_clauses.append(f"field_sources = {_jsonb_bind('field_sources')}")
         set_clauses.append("updated_at = :now")
 
         with db.engine.begin() as conn:
@@ -441,7 +463,7 @@ def upsert_profile_employee(
             "case_id": case_id,
             "employee_id": employee_id,
             "org_id": "",
-            "field_sources": field_sources,
+            "field_sources": json.dumps(field_sources),
             "created_at": now,
             "updated_at": now,
         }
@@ -451,7 +473,7 @@ def upsert_profile_employee(
             conn.execute(
                 text(f"""
                     INSERT INTO public.imm_employee_profiles ({', '.join(cols)})
-                    VALUES ({', '.join([f':{c}' for c in cols])})
+                    VALUES ({', '.join(_jsonb_bind(c) if c == 'field_sources' else f':{c}' for c in cols)})
                 """),
                 params,
             )

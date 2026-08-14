@@ -20,9 +20,9 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
 # [AUDIT-C1 fix] These helpers were referenced by the extracted CasesMixin
@@ -38,8 +38,29 @@ from ..readiness_service import (
 )
 from ..sla_rules import compute_sla_status
 from ..intake_route_fields import wizard_basics_to_route
+# [AIQ-1778] Country codes are stored as ISO alpha-2. requirements_country_key is the
+# declared owner of that mapping; it imports only `typing`, so there is no import cycle.
+from ..app.services.requirements_country_key import to_iso_alpha2
 
 log = logging.getLogger(__name__)
+
+
+def _employee_display_name(row: Any) -> Optional[str]:
+    """The employee's name from an assignment row, or None if it cannot be determined.
+
+    [AIQ-1803] The precedence ladder is lifted from `list_hr_conversation_summaries`
+    (backend/db/hr.py) rather than invented, so the HR inbox and the HR case surface can
+    never disagree about what a person is called.
+
+    Returns None instead of a generic fallback: this is used where the caller already
+    has its own placeholder, and two layers each substituting a different stand-in is
+    how "Employee" and "Case 08b7280b" ended up meaning the same thing in two places.
+    """
+    def _s(key: str) -> str:
+        return str(row.get(key) or "").strip()
+
+    composed = (_s("employee_first_name") + " " + _s("employee_last_name")).strip()
+    return _s("employee_full_name") or composed or _s("employee_identifier") or None
 
 # CasesMixin methods branch on `_is_sqlite` for SQLite-vs-Postgres SQL. The C1
 # mixin extraction left these references pointing at a module global that only
@@ -51,6 +72,26 @@ log = logging.getLogger(__name__)
 from ..db_config import DATABASE_URL as _raw_url
 
 _is_sqlite = _raw_url.startswith("sqlite")
+
+
+def _coerce_answers_field(value: Any) -> Dict[str, Any]:
+    """Normalise the case_service_answers.answers column to a dict.
+
+    Postgres returns the jsonb column already parsed as a dict (psycopg2); the old
+    json.loads() raised on it and the except silently blanked it to {} — so saved
+    service answers never reached the recommendation criteria (personalization was
+    ignored in prod, invisible to SQLite tests where the column reads back as text).
+    Accept a dict (Postgres jsonb) OR a JSON string (SQLite/text); anything else → {}.
+    """
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value or "{}")
+        except (json.JSONDecodeError, TypeError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
 # JSONB cast suffix, mirroring backend/database.py (empty on SQLite). Referenced
 # by extracted CasesMixin methods that build jsonb SQL.
 _jb = "" if _is_sqlite else "::jsonb"
@@ -89,12 +130,45 @@ _CASE_PURPOSE_MAP = {
 }
 
 
+class CaseIds(NamedTuple):
+    """Resolved id context for a case-scoped request (AIQ-1704).
+
+    The canonical boundary primitive: given ANY of the three id forms a route/URL
+    might carry — the assignment PK (``case_assignments.id``), the ``case_id``, or
+    the ``canonical_case_id`` — :meth:`CasesMixin.resolve_case_ids` returns this
+    context so a handler never has to guess which form it was handed. Handlers pick
+    the field they need: ``canonical_case_id`` for case-keyed tables (services_state,
+    case_vendor_shortlist, case_messages, milestones…), ``assignment_id`` for
+    assignment-keyed state, and ``assignment`` for company/type/status fields.
+    """
+
+    assignment_id: str
+    # The id case-keyed tables actually use: COALESCE(canonical_case_id, case_id).
+    canonical_case_id: str
+    # The raw case_assignments.case_id (may differ from canonical for legacy rows).
+    case_id: Optional[str]
+    assignment: Dict[str, Any]
+
+
 class CasesMixin:
     """Cases-domain methods mixed into :class:`backend.database.Database`."""
 
     def create_case(
         self, case_id: str, hr_user_id: str, profile: Dict[str, Any], company_id: Optional[str] = None
     ) -> None:
+        """Create an *unclaimed* relocation_cases shell owned by an HR user.
+
+        [AIQ-1818] These INSERTs deliberately omit ``employee_id``, and that is not a bug:
+        ``POST /api/hr/cases`` runs before any employee exists, so there is no id to write.
+        The employee is linked later via ``case_assignments.employee_user_id``.
+
+        Do NOT "fix" this by backfilling from ``profile_json->>'userId'``. Measured in prod
+        2026-08-12, that key equals ``hr_user_id`` in 466 of 466 unclaimed rows — it is the
+        HR creator, not the subject. Writing it here would make the GDPR subject-access
+        union in ``app/routers/gdpr.py`` return hundreds of other people's cases to an HR
+        user. The canonical ``public.cases.employee_id`` is 518/518 populated; this legacy
+        column is vestigial.
+        """
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             if company_id is not None:
@@ -230,6 +304,37 @@ class CasesMixin:
         """Prefer canonical when resolvable (exists in wizard_cases), else return original."""
         canonical = self.resolve_canonical_case_id(case_id)
         return canonical if canonical is not None else (case_id or "")
+
+    def resolve_case_ids(
+        self, any_id: str, request_id: Optional[str] = None
+    ) -> Optional[CaseIds]:
+        """Canonical fail-closed id resolver for case-scoped requests (AIQ-1704).
+
+        Accepts ANY of the three id forms a route/URL may carry — the assignment PK
+        (``case_assignments.id``), the ``case_id``, or the ``canonical_case_id`` —
+        and returns a :class:`CaseIds` context, or ``None`` when the id resolves to
+        no assignment. Callers key their case-scoped query on the returned
+        ``canonical_case_id`` and 4xx on ``None`` — never silently empty and never
+        fail open. This is the boundary that ends the case-vs-assignment id
+        confusion class: the endpoint stops caring which form it was handed.
+
+        Thin wrapper over :meth:`get_assignment_by_case_id`, which already matches
+        all three forms; this adds the fail-closed contract and the resolved-id
+        context that handlers need (they usually need more than one form).
+        """
+        assignment = self.get_assignment_by_case_id(any_id, request_id=request_id)
+        if not assignment:
+            return None
+        canonical = (str(assignment.get("canonical_case_id") or "").strip()
+                     or str(assignment.get("case_id") or "").strip())
+        if not canonical:
+            return None
+        return CaseIds(
+            assignment_id=str(assignment["id"]),
+            canonical_case_id=canonical,
+            case_id=(assignment.get("case_id") or None),
+            assignment=assignment,
+        )
 
     def update_assignment_intake_progress(
         self,
@@ -700,7 +805,13 @@ class CasesMixin:
         self, case_id: str, request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List case_milestones for a case, ordered by sort_order then created_at."""
-        cid = self.coalesce_case_lookup_id(case_id)
+        # AIQ-1704: case_milestones has no assignment column, so an assignment-id
+        # path arg (the form the timeline URL can carry) matched neither arm of the
+        # WHERE below → a silently empty timeline. Resolve the assignment PK to its
+        # canonical case id first. Additive: falls back to the existing 2-form
+        # coalesce when the id resolves to no assignment (degrade, never raise).
+        ids = self.resolve_case_ids(case_id, request_id=request_id)
+        cid = ids.canonical_case_id if ids else self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = self._exec(
                 conn,
@@ -1052,12 +1163,16 @@ class CasesMixin:
         return self._row_to_dict(row)
 
     def get_assignment_by_case_id(self, case_id: str, request_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Prefer canonical_case_id when resolving, fall back to case_id for legacy."""
+        """Prefer canonical_case_id when resolving, fall back to case_id, then to the
+        assignment's own id for legacy. The `id = :cid` arm matters for callers keyed on
+        the assignment id itself — e.g. the employee roadmap URL and the Stripe checkout
+        success_url both use case_assignments.id, so without it require_case_access 404s
+        those and its callers fail open. Mirrors resolve_case_status' lookup."""
         cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             row = self._exec(
                 conn,
-                "SELECT * FROM case_assignments WHERE (canonical_case_id = :cid OR case_id = :cid)",
+                "SELECT * FROM case_assignments WHERE (canonical_case_id = :cid OR case_id = :cid OR id = :cid)",
                 {"cid": cid},
                 op_name="get_assignment_by_case_id",
                 request_id=request_id,
@@ -1279,10 +1394,7 @@ class CasesMixin:
             ).fetchall()
         items = self._rows_to_list(rows)
         for item in items:
-            try:
-                item["answers"] = json.loads(item.get("answers") or "{}")
-            except Exception:
-                item["answers"] = {}
+            item["answers"] = _coerce_answers_field(item.get("answers"))
         return items
 
     def upsert_case_service_answers(
@@ -1846,6 +1958,123 @@ class CasesMixin:
                 {"id": case_id},
             ).fetchone()
         return self._row_to_dict(row)
+
+    def resolve_case_identities(
+        self, case_ids: List[str]
+    ) -> Dict[str, Dict[str, Any]]:
+        """case_id → who the case is about, for HR-facing reads.
+
+        [AIQ-1803] `relocation_cases.employee_id` is null for all but 4 of the 1,091 rows
+        in production, so every surface reading it rendered an anonymous placeholder
+        ("Case 08b7280b") in place of the employee's name. The identity is reachable —
+        just not from that table.
+
+        Resolves through `case_assignments`, which is what EVERY endpoint that already
+        shows a real name does (`list_hr_conversation_summaries`,
+        `_risk_flagged_assignments`, the command-center list). Measured 2026-08-11:
+        case_assignments reaches 706 of 1,091 cases; `public.cases` reaches 360 and adds
+        ZERO beyond it — every case with a `public.cases` row also has an assignment. So
+        this is the one source worth joining, not one of two.
+
+        Countries come from `public.cases` as a secondary fill: 26 cases have a blank
+        origin on the legacy row while `cases` has it. Narrow read, mirroring
+        `trigger_engine._build_context`.
+
+        Returns only what it could determine. A case with no assignment is ABSENT from
+        the result rather than present with an invented name — callers keep their own
+        placeholder. 385 cases are reachable by neither table, and inventing an identity
+        for them would be worse than the placeholder they have.
+
+        Batched deliberately: the HR list renders 34+ cases and a per-case lookup would
+        be an N+1.
+        """
+        ids = [str(c).strip() for c in (case_ids or []) if str(c or "").strip()]
+        if not ids:
+            return {}
+
+        out: Dict[str, Dict[str, Any]] = {}
+        wanted = set(ids)
+
+        # ── identity, via case_assignments → profiles ─────────────────────────
+        # Matches all three id forms the way get_assignment_by_case_id does; the row
+        # carries each one back so the match can be attributed to the caller's id.
+        sql = text(
+            """
+            SELECT a.id           AS assignment_id,
+                   a.case_id      AS a_case_id,
+                   a.canonical_case_id AS a_canonical_case_id,
+                   a.employee_user_id,
+                   a.employee_identifier,
+                   a.employee_first_name,
+                   a.employee_last_name,
+                   a.created_at,
+                   p.full_name    AS employee_full_name,
+                   p.email        AS employee_email
+            FROM case_assignments a
+            -- profiles.id is uuid; case_assignments.employee_user_id is text. Without
+            -- the cast Postgres raises `operator does not exist: uuid = text` and the
+            -- whole join fails -- which is how this returned zero names on first run.
+            LEFT JOIN profiles p ON CAST(p.id AS TEXT) = a.employee_user_id
+            WHERE a.canonical_case_id IN :ids
+               OR a.case_id IN :ids
+               OR a.id IN :ids
+            ORDER BY a.created_at ASC
+            """
+        ).bindparams(bindparam("ids", expanding=True))
+
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(sql, {"ids": ids}).mappings().all()
+        except Exception:
+            log.warning("resolve_case_identities: assignment lookup failed", exc_info=True)
+            rows = []
+
+        for r in rows:
+            # ORDER BY created_at ASC means a later row overwrites an earlier one, so the
+            # MOST RECENT assignment wins — the same choice resolve_case_status makes.
+            for key in (r.get("a_canonical_case_id"), r.get("a_case_id"), r.get("assignment_id")):
+                k = str(key).strip() if key else ""
+                if k not in wanted:
+                    continue
+                display = _employee_display_name(r)
+                if not display:
+                    continue
+                out[k] = {
+                    "employee_user_id": (str(r["employee_user_id"])
+                                         if r.get("employee_user_id") else None),
+                    "employee_display_name": display,
+                    "employee_email": r.get("employee_email"),
+                }
+
+        # ── countries, via public.cases ───────────────────────────────────────
+        try:
+            with self.engine.connect() as conn:
+                crows = conn.execute(
+                    text(
+                        # cases.id is uuid. Comparing it as TEXT keeps a single
+                        # non-uuid legacy id in the batch from raising and taking the
+                        # whole country fill down with it.
+                        "SELECT CAST(id AS TEXT) AS id, origin_country_code, "
+                        "       dest_country_code "
+                        "FROM cases WHERE CAST(id AS TEXT) IN :ids"
+                    ).bindparams(bindparam("ids", expanding=True)),
+                    {"ids": ids},
+                ).mappings().all()
+        except Exception:
+            log.warning("resolve_case_identities: cases lookup failed", exc_info=True)
+            crows = []
+
+        for r in crows:
+            k = str(r["id"]).strip()
+            if k not in wanted:
+                continue
+            entry = out.setdefault(k, {})
+            if r.get("origin_country_code"):
+                entry["origin_country_code"] = r["origin_country_code"]
+            if r.get("dest_country_code"):
+                entry["dest_country_code"] = r["dest_country_code"]
+
+        return out
 
     def list_support_cases(
         self,
@@ -2993,7 +3222,28 @@ class CasesMixin:
         a partial/invalid row. Caller (apply_wizard_patch_side_effects) is itself
         wrapped in try/except by the PATCH handler, so a failure can't break intake.
         """
-        dest = (derived.get("dest_country") or "").strip()
+        # [AIQ-1778] Both country columns are stored as canonical ISO 3166-1 alpha-2.
+        #
+        # They used to be written with a bare .strip() — not even .upper() — while their
+        # neighbours in the same parameter block were normalised (`purpose` through
+        # _CASE_PURPOSE_MAP because a CHECK rejected bad values, `assignment_type` via
+        # .upper()). Countries were simply missed, and prod accumulated 22 rows of
+        # 'France' plus 'Germany', 'India' and one empty string.
+        #
+        # Why a name is not a harmless variant: trigger_engine's EEA gate is exact
+        # membership of a pure ISO-2 frozenset, and it upper-cases without shortening.
+        # 'France' becomes 'FRANCE', misses the set, and visa_type falls through to
+        # 'skilled_worker' instead of 'eea_registration' — so the employee is handed EU
+        # Blue Card and national work-visa paperwork they are not subject to, while the
+        # corridor data sheet never attaches. immigration_requirement_service then
+        # matches no corridor and returns zero requirements, which reads as "nothing
+        # required". Both failures are silent.
+        #
+        # Fail closed, per this method's own docstring above: an unresolvable country
+        # skips the upsert rather than storing a value the readers cannot use. Note the
+        # docstring already promised this for "every NOT NULL column" while only `dest`
+        # was ever checked — origin never was.
+        dest = to_iso_alpha2(derived.get("dest_country"))
         employee_uuid = self._resolve_employee_profile_id(assignment)
         if not dest or not employee_uuid:
             return  # trigger needs a destination; public.cases needs a profile employee_id
@@ -3001,7 +3251,18 @@ class CasesMixin:
         company_id = self._resolve_canonical_case_company(canonical, assignment, employee_uuid)
         if not company_id:
             return
-        origin = (derived.get("origin_country") or "").strip()
+        origin = to_iso_alpha2(derived.get("origin_country"))
+        if not origin:
+            # origin_country_code is NOT NULL and every corridor rule keys on it, so a
+            # row without a usable origin is worse than no row: it renders in HR as a
+            # real case and silently matches nothing.
+            log.warning(
+                "cases bridge: skipping canonical upsert for case=%s — origin country "
+                "%r is not resolvable to ISO alpha-2",
+                case_id,
+                derived.get("origin_country"),
+            )
+            return
         # public.cases.purpose has a CHECK constraint
         # (work | intra_company_transfer | family_join | remote_work). The wizard
         # emits free-er values (and the old default 'relocation' is invalid), which
@@ -3198,6 +3459,54 @@ class CasesMixin:
                 op_name="create_assignment",
                 request_id=request_id,
             )
+
+    def get_active_assignment_for_case_employee(
+        self,
+        case_id: str,
+        employee_identifier: str,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """AIQ-1731: the idempotency key for HR case assignment — (case, employee).
+
+        POST /api/hr/cases/{case_id}/assign dispatches creation to a thread pool and
+        raises 503 "Please retry in a moment" if it hasn't finished in 8s. The future is
+        never cancelled, so the row still commits — and the retry the copy asks for used
+        to mint a SECOND row carrying an identical canonical_case_id. That is one of the
+        duplicate groups inventoried in docs/architecture/CASE_ID_UNIFICATION_AUDIT.md
+        (`7181b3a4…`: the same employee twice, <70s apart). Callers use this to reuse the
+        existing assignment instead of creating a duplicate.
+
+        Matches the way create_assignment writes the row: canonical_case_id and case_id
+        both get the case key, and employee_identifier is stored via normalize_invite_key
+        (lower-cased) — so compare case-insensitively for older rows written before that.
+        Deliberately does NOT match on `id` (unlike get_assignment_by_case_id): this is a
+        creation guard keyed on a case, not a general-purpose id resolver.
+
+        Terminal assignments (rejected/closed) are excluded so a case can legitimately be
+        re-assigned to the same person after one is closed out. Returns the most recent
+        match; CAST(... AS TEXT) rather than ::text so it runs on SQLite too.
+        """
+        ck = (case_id or "").strip()
+        ident = (employee_identifier or "").strip().lower()
+        if not ck or not ident:
+            return None
+        # The admin placeholder sentinel is shared by every admin-created assignment;
+        # collapsing on it would make the admin path unable to create more than one.
+        if ident == "admin-created":
+            return None
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM case_assignments "
+                "WHERE (CAST(canonical_case_id AS TEXT) = :ck OR CAST(case_id AS TEXT) = :ck) "
+                "  AND LOWER(employee_identifier) = :ident "
+                "  AND COALESCE(status, '') NOT IN ('rejected', 'closed') "
+                "ORDER BY created_at DESC LIMIT 1",
+                {"ck": ck, "ident": ident},
+                op_name="get_active_assignment_for_case_employee",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row)
 
     def update_assignment_status(self, assignment_id: str, status: str, request_id: Optional[str] = None) -> None:
         with self.engine.begin() as conn:
@@ -3779,7 +4088,7 @@ class CasesMixin:
                     text("""
                         UPDATE employee_tasks
                         SET status       = 'submitted',
-                            submission_data = COALESCE(:sub_data::jsonb, submission_data),
+                            submission_data = COALESCE(CAST(:sub_data AS jsonb), submission_data),
                             file_url     = COALESCE(:file_url, file_url),
                             submitted_at = :now,
                             updated_at   = :now

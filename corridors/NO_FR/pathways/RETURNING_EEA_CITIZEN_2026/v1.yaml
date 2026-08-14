@@ -117,6 +117,10 @@ corridor_agent:
     # than as a comfortable future date.
     - step_id: A0_DEPART_NO
       name: "Depart Norway"
+      # This corridor has no separate "arrive in France" step: a returning citizen
+      # needs no visa, permit or registration (C2_IMMIGRATION_RIGHT_OF_RETURN), so
+      # departure IS the move event and the pre-arrival runway is legitimately zero.
+      arrival_anchor: true
       responsible_party: EMPLOYEE
       expected_duration_days: 0
       prerequisite_step_ids: []

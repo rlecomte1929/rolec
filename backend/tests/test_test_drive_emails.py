@@ -80,6 +80,38 @@ class TestTestDriveEmails(unittest.TestCase):
         self.assertNotIn("jordan@globex.test", without)
         self.assertIn("consent not granted", without)
 
+    # ── multi-referral ────────────────────────────────────────────────────────
+
+    def test_notify_email_lists_every_consented_referral(self):
+        _, plain, _ = render_notify_email(**{**_SURVEY, "referrals": [
+            {"name": "Marie", "company_role": "Head of Mobility", "contact": "marie@x.test",
+             "consent": True},
+            {"name": "Jan", "company_role": "HRBP", "contact": "jan@x.test", "consent": True},
+        ]})
+        self.assertIn("Referrals (consented: 2)", plain)
+        self.assertIn("marie@x.test", plain)
+        self.assertIn("jan@x.test", plain)
+        # The array wins over the legacy scalars when both are supplied.
+        self.assertNotIn("jordan@globex.test", plain)
+
+    def test_notify_email_consent_is_per_person(self):
+        """An unconsented person must not ride along on a consented one."""
+        _, plain, _ = render_notify_email(**{**_SURVEY, "referrals": [
+            {"name": "NoConsent", "contact": "no@x.test", "consent": False},
+            {"name": "YesConsent", "contact": "yes@x.test", "consent": True},
+        ]})
+        self.assertIn("yes@x.test", plain)
+        self.assertNotIn("no@x.test", plain)
+        self.assertNotIn("NoConsent", plain)
+        self.assertIn("1 referral(s) given, consent not granted", plain)
+
+    def test_notify_email_single_referral_keeps_original_wording(self):
+        _, plain, _ = render_notify_email(**{**_SURVEY, "referrals": [
+            {"name": "Solo", "company_role": "HRD", "contact": "solo@x.test", "consent": True},
+        ]})
+        self.assertIn("Referral (consented)", plain)  # singular, as before
+        self.assertIn("solo@x.test", plain)
+
     def test_no_tester_email_skips_thank_you(self):
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("RESEND_API_KEY", None)

@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  ClipboardCheck,
   Sparkles,
   UserRound,
   Activity,
@@ -101,6 +102,7 @@ export const NAV_ICONS = {
   'resources-cms': BookOpen,
   'form-templates': FileText,
   'policy-versions': GitBranch,
+  'country-requirements': Globe2,
   'requirement-facts': ListChecks,
   'auth-page-design': Palette,
   'research-requests': FlaskConical,
@@ -115,6 +117,7 @@ export const NAV_ICONS = {
   outreach: Megaphone,
   integrations: Layers,
   'vetting-queue': ShieldCheck,
+  'content-review': ClipboardCheck,
   'supplier-submissions': ShieldCheck,
 } satisfies Record<string, LucideIcon>;
 

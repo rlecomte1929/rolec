@@ -116,23 +116,121 @@ def test_policyless_rce_table_not_on_allowlist_is_missing():
     assert missing == ["rce.secrets"]
 
 
+def _stub_query(policy_less, exposed=None, examined=369):
+    """Stand in for the DB call: (policy_less, exposed_grants, tables_examined)."""
+    return lambda _url: (policy_less, exposed or {}, examined)
+
+
+def _run_main(monkeypatch, allowlist_path, query, argv=None):
+    monkeypatch.setattr(crc, "ALLOWLIST_FILE", allowlist_path)
+    monkeypatch.setattr(crc, "query_policy_less_tables", query)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://stub")
+    monkeypatch.setattr(sys, "argv", argv or ["check_rls_coverage.py"])
+    return crc.main()
+
+
 def test_main_exits_1_on_unlisted_policyless_table(monkeypatch, tmp_path):
     """End-to-end: a policy-less table absent from the allowlist makes main()
     return 1 (CI fail), without touching a live DB."""
     allowlist = tmp_path / "rls_allowlist.txt"
     allowlist.write_text("# server-only\naudit_log\n")
-    monkeypatch.setattr(crc, "ALLOWLIST_FILE", allowlist)
-    monkeypatch.setattr(crc, "query_policy_less_tables", lambda _url: ["leaky_table"])
-    monkeypatch.setenv("DATABASE_URL", "postgresql://stub")
-    monkeypatch.setattr(sys, "argv", ["check_rls_coverage.py"])
-    assert crc.main() == 1
+    assert _run_main(monkeypatch, allowlist, _stub_query(["leaky_table"])) == 1
 
 
 def test_main_exits_0_when_all_policyless_tables_allowlisted(monkeypatch, tmp_path):
     allowlist = tmp_path / "rls_allowlist.txt"
     allowlist.write_text("# server-only\nleaky_table  # internal ops table\n")
-    monkeypatch.setattr(crc, "ALLOWLIST_FILE", allowlist)
-    monkeypatch.setattr(crc, "query_policy_less_tables", lambda _url: ["leaky_table"])
-    monkeypatch.setenv("DATABASE_URL", "postgresql://stub")
-    monkeypatch.setattr(sys, "argv", ["check_rls_coverage.py"])
-    assert crc.main() == 0
+    assert _run_main(monkeypatch, allowlist, _stub_query(["leaky_table"])) == 0
+
+
+# ── The allowlist justification is VERIFIED, not trusted (2026-08-11 sweep) ─────
+#
+# Every entry is excused by one claim: "server-role-only, unreachable through the anon
+# key". PostgREST reaches the public schema as `anon` / `authenticated`, so that claim is
+# checkable — and it can expire without anyone touching the allowlist. A later GRANT
+# leaves the table policy-less AND reachable while the allowlist keeps the gate quiet.
+
+
+def test_allowlisted_table_with_anon_grant_fails(monkeypatch, tmp_path):
+    allowlist = tmp_path / "rls_allowlist.txt"
+    allowlist.write_text("# server-only\nror_cities  # ops catalogue\n")
+    exit_code = _run_main(
+        monkeypatch,
+        allowlist,
+        _stub_query(["ror_cities"], exposed={"ror_cities": ["anon:SELECT"]}),
+    )
+    assert exit_code == 1, "an anon-granted allowlisted table must fail the gate"
+
+
+def test_allowlisted_table_with_authenticated_grant_fails(monkeypatch, tmp_path):
+    # `authenticated` is just as reachable — any logged-in user of any tenant.
+    allowlist = tmp_path / "rls_allowlist.txt"
+    allowlist.write_text("# server-only\nror_queue  # rollout queue\n")
+    exit_code = _run_main(
+        monkeypatch,
+        allowlist,
+        _stub_query(["ror_queue"], exposed={"ror_queue": ["authenticated:SELECT,UPDATE"]}),
+    )
+    assert exit_code == 1
+
+
+def test_grant_on_a_non_allowlisted_table_is_not_the_expiry_check(monkeypatch, tmp_path):
+    # A grant on a table that HAS policies is normal and must not fail: RLS is what
+    # constrains it. This check is only about retired justifications.
+    allowlist = tmp_path / "rls_allowlist.txt"
+    allowlist.write_text("# server-only\nror_queue  # rollout queue\n")
+    exit_code = _run_main(
+        monkeypatch,
+        allowlist,
+        _stub_query(["ror_queue"], exposed={"cases": ["anon:SELECT"]}),
+    )
+    assert exit_code == 0
+
+
+def test_json_pass_flag_agrees_with_exit_code(monkeypatch, tmp_path, capsys):
+    """A JSON consumer reading `pass: true` while the process exits 1 is its own
+    silent pass. The expired-justification failure must show up in both."""
+    import json
+
+    allowlist = tmp_path / "rls_allowlist.txt"
+    allowlist.write_text("# server-only\nror_cities  # ops catalogue\n")
+    exit_code = _run_main(
+        monkeypatch,
+        allowlist,
+        _stub_query(["ror_cities"], exposed={"ror_cities": ["anon:SELECT"]}),
+        argv=["check_rls_coverage.py", "--json"],
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 1
+    assert payload["pass"] is False
+    assert payload["expired_justifications"] == [
+        {"table": "ror_cities", "grants": ["anon:SELECT"]}
+    ]
+
+
+# ── A guard that examined nothing has not passed ───────────────────────────────
+
+
+def test_zero_tables_examined_fails(monkeypatch, tmp_path):
+    """AUDIT_SQL returns only offenders, so "0 policy-less tables" looks identical
+    whether coverage is complete or the query matched nothing (renamed schema, a
+    read-only role that cannot read pg_tables, empty DB). Same failure shape as
+    check_compliance_claims' `scanned == 0` and check_route_auth's `examined == 0`."""
+    allowlist = tmp_path / "rls_allowlist.txt"
+    allowlist.write_text("# fully drained\n")
+    assert _run_main(monkeypatch, allowlist, _stub_query([], examined=0)) == 1
+
+
+def test_zero_tables_examined_fails_even_for_update_allowlist(monkeypatch, tmp_path):
+    # Seeding the allowlist from an empty result would write an empty file and read
+    # as a drained allowlist.
+    allowlist = tmp_path / "rls_allowlist.txt"
+    allowlist.write_text("# fully drained\n")
+    exit_code = _run_main(
+        monkeypatch,
+        allowlist,
+        _stub_query([], examined=0),
+        argv=["check_rls_coverage.py", "--update-allowlist"],
+    )
+    assert exit_code == 1
+    assert allowlist.read_text() == "# fully drained\n", "must not have been rewritten"

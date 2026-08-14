@@ -21,6 +21,7 @@ own PII handling (you cannot mask an image you must OCR); this module maps + rou
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Optional, Tuple
 from uuid import UUID
@@ -48,15 +49,52 @@ class OcrParseResult:
 # ── Pure mappers ──────────────────────────────────────────────────────────────
 
 
+_FILLER_RUN = re.compile(r"<+")
+_TD3_LINE_LEN = 44
+
+
+def normalize_mrz_filler(line: str, target: int = _TD3_LINE_LEN) -> str:
+    """Pad or trim the longest ``<`` filler run so ``line`` is exactly ``target``.
+
+    Vision OCR reads every MRZ *character* correctly but miscounts long runs of the
+    ``<`` filler — measured against gpt-4o on a clean TD3 render: line lengths came
+    back (42, 45) and (44, 45) on consecutive runs of the same image. ``parse_mrz``
+    is strict about the 44-char layout (rightly — it decodes by position), so it
+    returned MRZ_FORMAT_UNRECOGNIZED and the passport agent emitted **zero fields**
+    despite the OCR having read the document perfectly. ICAO TD3 pads the name field
+    to 39 chars and the personal number to 14, so this hits real passports exactly as
+    hard as synthetic ones.
+
+    Adjusting filler is information-preserving — ``<`` is padding, not data — and the
+    correction is independently verifiable: the ICAO check digits are computed over
+    the data characters, so ``parse_mrz`` still rejects anything this gets wrong. That
+    is why the fix lives here at the OCR boundary rather than inside ``parse_mrz``:
+    the parser's strictness is a feature for every other caller, and only OCR output
+    carries this particular noise.
+    """
+    if not line or len(line) == target:
+        return line
+    runs = [(m.start(), m.end()) for m in _FILLER_RUN.finditer(line)]
+    if not runs:
+        return line  # nothing safe to adjust — let parse_mrz reject it
+    start, end = max(runs, key=lambda r: r[1] - r[0])
+    delta = target - len(line)
+    if delta > 0:
+        return line[:end] + ("<" * delta) + line[end:]
+    trim = min(-delta, end - start)
+    return line[: end - trim] + line[end:]
+
+
 def mrz_text_from_lines(
     mrz_line1: Optional[str], mrz_line2: Optional[str]
 ) -> Optional[str]:
     """Join the two MRZ lines into the ``mrz_text`` the agents parse, or None if
-    either is missing/blank."""
+    either is missing/blank. Filler runs are length-normalised first — see
+    ``normalize_mrz_filler``."""
     l1 = (mrz_line1 or "").strip()
     l2 = (mrz_line2 or "").strip()
     if l1 and l2:
-        return f"{l1}\n{l2}"
+        return f"{normalize_mrz_filler(l1)}\n{normalize_mrz_filler(l2)}"
     return None
 
 
@@ -180,16 +218,52 @@ async def parse_stored_document(
 
 
 def _classify(file_name: Optional[str], mime_type: Optional[str]) -> str:
-    # Reuse the existing intake heuristic so passport routing matches the queue.
-    from .document_extraction_queue import classify_document
+    # Reuse the shared heuristic so routing matches the ingest path.
+    #
+    # [AIQ-1764] Previously imported from `document_extraction_queue`. That made
+    # the rce pipeline depend on the module the ownership ruling narrows to OCR
+    # ingest — the reason that module is narrowed rather than deleted. Now both
+    # paths depend on the neutral classifier module instead of on each other.
+    from .document_classifier import classify_document
 
     return classify_document(file_name, mime_type)
+
+
+# Two upload paths write into rce.documents, into DIFFERENT storage buckets:
+#
+#   document_upload_service (immigration)  -> "immigration-documents", uri "{case_id}/{doc_id}.{ext}"
+#   case_documents (the roadmap-CTA path)  -> "case-documents",        uri "case-docs/{case}/{key}/..."
+#
+# rce.documents has no bucket column, but the two prefixes are distinguishable, so the
+# stored storage_uri already carries the discriminator. Before this was resolved the
+# downloader was hardcoded to the immigration bucket, so every case_documents upload
+# 404'd here and was swallowed by parse_stored_document's fail-soft — the document row
+# existed, the extraction silently never ran.
+#
+# Constants are local on purpose: BUCKET_IMMIGRATION_DOCS is already duplicated across
+# two service modules, and the "case-documents" constant (_FORM_DOC_BUCKET) lives in a
+# ROUTER — a service importing a router is the wrong direction. AIQ-1764 also
+# deliberately decoupled this module from document_extraction_queue; importing from it
+# again would undo that.
+_BUCKET_CASE_DOCUMENTS = "case-documents"
+_BUCKET_IMMIGRATION_DOCS = "immigration-documents"
+_CASE_DOCS_PREFIX = "case-docs/"
+
+
+def _bucket_for_storage_path(storage_path: Optional[str]) -> str:
+    """The storage bucket a given rce.documents.storage_uri lives in."""
+    return (
+        _BUCKET_CASE_DOCUMENTS
+        if (storage_path or "").startswith(_CASE_DOCS_PREFIX)
+        else _BUCKET_IMMIGRATION_DOCS
+    )
 
 
 def _default_downloader(storage_path: str) -> bytes:
     from .supabase_client import get_supabase_admin_client
 
-    return get_supabase_admin_client().storage.from_("immigration-documents").download(storage_path)
+    bucket = _bucket_for_storage_path(storage_path)
+    return get_supabase_admin_client().storage.from_(bucket).download(storage_path)
 
 
 async def _default_passport_ocr(content: bytes, mime_type: str) -> Any:

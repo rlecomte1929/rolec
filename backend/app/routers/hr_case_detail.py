@@ -25,6 +25,7 @@ for engine-derived data.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -33,9 +34,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ..auth_deps import get_org_id_for_hr_user, require_admin_or_hr
+from ..services.case_feasibility import feasibility_for_case
 from ..services.contradiction_store_pg import run_contradiction_detection_for_case
 from ...database import db
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/hr/cases", tags=["hr-case-detail"])
 
@@ -60,6 +64,20 @@ class EmployeeDTO(BaseModel):
     nationality: Optional[str] = None
 
 
+class CaseFeasibilityDTO(BaseModel):
+    """Does the target start date leave room for the corridor to run? (AIQ-1749)
+
+    Null on the overview when there is no opinion to give — an unresolvable
+    corridor, no declared arrival anchor, or no target start date. Absent must
+    render as nothing, never as reassurance.
+    """
+
+    verdict: str  # 'critical' | 'tight' | 'ok'
+    required_days: int
+    available_days: int
+    derivation: str
+
+
 class CaseOverviewDTO(BaseModel):
     case_id: str
     employee: EmployeeDTO
@@ -72,6 +90,7 @@ class CaseOverviewDTO(BaseModel):
     actual_start_date: Optional[str] = None
     target_close_date: Optional[str] = None
     family_members: List[FamilyMemberDTO] = Field(default_factory=list)
+    feasibility: Optional[CaseFeasibilityDTO] = None
 
 
 class OverviewResponse(BaseModel):
@@ -93,6 +112,30 @@ class CaseDocumentDTO(BaseModel):
 
 class DocumentsResponse(BaseModel):
     documents: List[CaseDocumentDTO] = Field(default_factory=list)
+
+
+class ExtractedFieldDTO(BaseModel):
+    """One field the extraction engine read out of a document.
+
+    `value` is already masked server-side for sensitive keys — see `_MASKED_FIELD_KEYS`.
+    The client must not have to know which keys are sensitive to avoid leaking one.
+    """
+    field_key: str
+    value: Optional[str] = None
+    confidence: Optional[float] = None
+    resolution_status: Optional[str] = None
+    masked: bool = False
+    page: Optional[int] = None
+
+
+class ExtractedFieldsResponse(BaseModel):
+    document_id: str
+    document_type_code: Optional[str] = None
+    # Deduplicated count. Deliberately NOT the raw row count: re-processing a document
+    # APPENDS extracted_fields rather than replacing them, so the raw count over-reports
+    # (the AIQ-1780 probe document reads 22 rows for 13 real fields).
+    field_count: int = 0
+    fields: List[ExtractedFieldDTO] = Field(default_factory=list)
 
 
 class CaseCitationDTO(BaseModel):
@@ -226,6 +269,34 @@ def get_case_overview(
             employee_name = user.get("name") or user.get("email") or employee_id
             employee_email = user.get("email")
 
+    # [AIQ-1803] relocation_cases.employee_id is null for all but 4 of 1,091 production
+    # rows, so the branch above almost never fires and every case rendered as
+    # "Case 08b7280b". The identity is reachable through case_assignments — the source
+    # every endpoint that already shows a real name uses. Same for the countries, which
+    # are blank on the legacy row for 26 cases while public.cases has them.
+    #
+    # Fills only what is MISSING: a legacy row that already carries the data still wins,
+    # so this cannot change a case that was previously correct.
+    origin_country_code = case.get("origin_country_code")
+    dest_country_code = case.get("dest_country_code")
+    if not (employee_name and origin_country_code and dest_country_code):
+        try:
+            resolved = db.resolve_case_identities([case_id]).get(case_id)
+        except Exception:
+            logger.exception("hr_case_detail: identity resolution failed for %s", case_id)
+            resolved = None
+        # Enrichment is additive, so anything other than a dict back means "no
+        # enrichment" — never a 500. Without this the overview raised a DTO
+        # ValidationError wherever `db` is a test double.
+        if not isinstance(resolved, dict):
+            resolved = {}
+        if not employee_name and resolved.get("employee_display_name"):
+            employee_name = resolved["employee_display_name"]
+            employee_email = employee_email or resolved.get("employee_email")
+            employee_id = employee_id or (resolved.get("employee_user_id") or "")
+        origin_country_code = origin_country_code or resolved.get("origin_country_code")
+        dest_country_code = dest_country_code or resolved.get("dest_country_code")
+
     family_members: List[FamilyMemberDTO] = []
     try:
         with db.engine.connect() as conn:
@@ -254,6 +325,25 @@ def get_case_overview(
         # rce.family_members may not be populated yet for legacy cases — non-fatal.
         family_members = []
 
+    # Permit corridors need ~15 weeks of runway before the employee can even travel,
+    # so a start date inside that window is unrecoverable however diligent the case
+    # is. Resolution is fallback-safe: None when there is no opinion to give.
+    assessment = feasibility_for_case(
+        case.get("origin_country_code"),
+        case.get("dest_country_code"),
+        case.get("target_start_date"),
+    )
+    feasibility = (
+        CaseFeasibilityDTO(
+            verdict=assessment.verdict,
+            required_days=assessment.required_days,
+            available_days=assessment.available_days,
+            derivation=assessment.derivation,
+        )
+        if assessment is not None
+        else None
+    )
+
     overview = CaseOverviewDTO(
         case_id=case_id,
         employee=EmployeeDTO(
@@ -262,15 +352,20 @@ def get_case_overview(
             primary_email=employee_email,
             nationality=case.get("nationality") or None,
         ),
-        origin_country_code=case.get("origin_country_code"),
-        dest_country_code=case.get("dest_country_code"),
-        corridor=case.get("corridor"),
+        origin_country_code=origin_country_code,
+        dest_country_code=dest_country_code,
+        # Derived when both ends are known, matching the STORED GENERATED expression on
+        # both case tables (origin || '-' || dest) rather than inventing a second format.
+        corridor=(case.get("corridor")
+                  or (f"{origin_country_code}-{dest_country_code}"
+                      if origin_country_code and dest_country_code else None)),
         status=str(case.get("status") or "draft"),
         stage=case.get("stage"),
         target_start_date=str(case["target_start_date"]) if case.get("target_start_date") else None,
         actual_start_date=str(case["actual_start_date"]) if case.get("actual_start_date") else None,
         target_close_date=str(case["target_close_date"]) if case.get("target_close_date") else None,
         family_members=family_members,
+        feasibility=feasibility,
     )
     return OverviewResponse(overview=overview)
 
@@ -299,7 +394,6 @@ def get_case_documents(
                       d.storage_uri,
                       d.created_at,
                       dt.code AS document_type_code,
-                      dt.label AS document_type_label,
                       ef_stats.mean_confidence,
                       ef_stats.min_confidence,
                       ef_stats.field_count
@@ -327,7 +421,9 @@ def get_case_documents(
                 CaseDocumentDTO(
                     document_id=str(r["document_id"]),
                     document_type_code=str(r.get("document_type_code") or "UNKNOWN"),
-                    document_type_label=r.get("document_type_label"),
+                    # rce.document_types has no label column (only code,
+                    # expected_fields_json, validator_pack). Clients fall back to the code.
+                    document_type_label=None,
                     filename=str(r.get("original_filename") or f"document-{str(r['document_id'])[:8]}"),
                     uploaded_at=r["created_at"].isoformat() if r.get("created_at") else "",
                     confidence_mean=r.get("mean_confidence"),
@@ -338,12 +434,149 @@ def get_case_documents(
                 )
             )
     except Exception:
-        # rce.documents table may not exist in legacy environments — degrade
-        # gracefully with an empty list so the frontend renders the empty
-        # state instead of an error banner.
+        # rce.documents may be absent in legacy environments — degrade to an empty list
+        # so the frontend renders the empty state rather than an error banner.
+        #
+        # LOGGED, not swallowed. This block hid a hard `column dt.label does not exist`
+        # for the entire life of the endpoint: every call raised, every call returned
+        # [], and an empty list is indistinguishable from "this case has no documents".
+        # The extraction pipeline had been producing fields in production for a day
+        # before anyone noticed nothing could read them. A degrade path that reports
+        # nothing is a place bugs go to live.
+        logger.exception("hr_case_detail: documents query failed for case %s", case_id)
         documents = []
 
     return DocumentsResponse(documents=documents)
+
+
+# ---------------------------------------------------------------------------
+# 2b. GET /documents/{document_id}/fields
+# ---------------------------------------------------------------------------
+#
+# [AIQ-1790] The values the extraction engine actually read. GET /documents above
+# returns only AGGREGATES (field_count, mean/min confidence), so until this existed
+# nothing could show a user *what* was extracted — the pipeline ran, produced 13
+# structured passport fields in production, and the product displayed none of them.
+
+# Masked in the response, not at the client. `document_number` is the passport number
+# and `personal_number` the national ID / D-number; both identify a person on their own.
+# Mirrors frontend PassportOCRFlow.tsx, which already renders the passport number as
+# '••••••••' even in the employee's own review step.
+#
+# NOT driven by `rce.extracted_fields.phi_class`. When this endpoint was written, every
+# one of the 22 production rows — passport document number included — carried
+# phi_class='NONE', so trusting that column would have leaked.
+#
+# [AIQ-1805, 2026-08-11] The classifier is now fixed and those rows are backfilled, but
+# this masking deliberately still keys on field_key. Classify first, prove it, and only
+# then let something depend on it — retrofitting a protection onto a column that was
+# wrong for months is how the wrong thing ships confidently. Switching this to phi_class
+# is a separate, deliberate change.
+_MASKED_FIELD_KEYS = frozenset({"document_number", "personal_number"})
+_MASK = "••••••••"
+
+
+@router.get("/{case_id}/documents/{document_id}/fields",
+            response_model=ExtractedFieldsResponse)
+def get_case_document_fields(
+    case_id: str,
+    document_id: str,
+    _hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> ExtractedFieldsResponse:
+    _require_case_access(case_id, org_id)
+
+    try:
+        UUID(document_id)
+    except (ValueError, AttributeError, TypeError):
+        # Same 404-not-422 posture as the tenant check: a malformed id must not read
+        # differently from one belonging to another tenant.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    fields: List[ExtractedFieldDTO] = []
+    document_type_code: Optional[str] = None
+    try:
+        with db.engine.connect() as conn:
+            doc = conn.execute(
+                text(
+                    """
+                    SELECT d.document_id, dt.code AS document_type_code
+                    FROM rce.documents d
+                    LEFT JOIN rce.document_types dt
+                      ON dt.document_type_id = d.document_type_id
+                    WHERE d.document_id = CAST(:doc_id AS uuid)
+                      AND d.case_id = :case_id
+                    """
+                ),
+                {"doc_id": document_id, "case_id": case_id},
+            ).mappings().first()
+            if not doc:
+                # Belongs to another case (or does not exist). 404 either way — the
+                # caller already proved access to THIS case, not to that document.
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                    detail="Document not found")
+            document_type_code = doc.get("document_type_code")
+
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT ef.field_key,
+                           ef.value_raw,
+                           ef.confidence,
+                           ef.resolution_status,
+                           ef.bbox_page
+                    FROM rce.extracted_fields ef
+                    WHERE ef.document_id = CAST(:doc_id AS uuid)
+                    ORDER BY ef.field_key, ef.created_at DESC
+                    """
+                ),
+                {"doc_id": document_id},
+            ).mappings().all()
+
+        # Keep the newest row per field_key. Re-processing a document APPENDS to
+        # extracted_fields rather than replacing, so a twice-processed document yields
+        # every field twice — the production probe reads 22 rows for 13 real fields.
+        #
+        # Deliberately deduplicated here rather than with SQL `DISTINCT ON`: that is
+        # Postgres-only syntax, and because these tests mock the engine it would make the
+        # rule untestable — the assertion would only prove the fixture. The row counts are
+        # tens, so the cost is nil. ORDER BY above makes "first seen wins" = "newest wins".
+        seen: set = set()
+        for r in rows:
+            key = str(r["field_key"])
+            if key in seen:
+                continue
+            seen.add(key)
+            is_masked = key in _MASKED_FIELD_KEYS
+            raw = r.get("value_raw")
+            fields.append(
+                ExtractedFieldDTO(
+                    field_key=key,
+                    value=(_MASK if (is_masked and raw) else raw),
+                    confidence=float(r["confidence"]) if r.get("confidence") is not None else None,
+                    resolution_status=r.get("resolution_status"),
+                    masked=is_masked and bool(raw),
+                    page=r.get("bbox_page"),
+                )
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        # Matches GET /documents: rce.* may be absent in legacy environments. Degrade to
+        # an empty list so the panel renders "not yet processed" rather than an error —
+        # but log it, for the reason spelled out on that endpoint's handler.
+        logger.exception(
+            "hr_case_detail: extracted-fields query failed for case %s document %s",
+            case_id, document_id,
+        )
+        fields = []
+
+    return ExtractedFieldsResponse(
+        document_id=document_id,
+        document_type_code=document_type_code,
+        field_count=len(fields),
+        fields=fields,
+    )
 
 
 # ---------------------------------------------------------------------------

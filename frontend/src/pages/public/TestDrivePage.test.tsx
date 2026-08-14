@@ -19,6 +19,12 @@ vi.mock('../../api/client', () => ({ authAPI: { logout: () => mockLogout() } }))
 vi.mock('../../components/public', () => ({
   PublicLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
+// AIQ-1640: spy on navigation so we can assert the survey link the completion CTA routes to.
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+vi.mock('react-router-dom', async (importActual) => {
+  const actual = await importActual<typeof import('react-router-dom')>();
+  return { ...actual, useNavigate: () => mockNavigate };
+});
 
 import { provisionTestDrive, completeTestDrive, recordTestDriveEvent } from '../../api/testDrive';
 import { TestDrivePage } from './TestDrivePage';
@@ -342,6 +348,43 @@ describe('TestDrivePage', () => {
 
     fireEvent.click(await screen.findByTestId('td-sign-out'));
     await waitFor(() => expect(mockLogout).toHaveBeenCalled());
+  });
+
+  it('[AIQ-1640] restores the run from localStorage on return — credentials, completion CTA, campaign-tagged survey link', async () => {
+    // A full stash written at provision on a previous visit — the test-drive is a
+    // deliberate round trip (leave, use the product, come back). This visit does NOT
+    // re-provision; the whole result block must be restored from storage. Rendering
+    // fresh with a pre-seeded localStorage models both SPA return and a full reload.
+    window.localStorage.setItem(
+      'relopass_test_drive',
+      JSON.stringify({
+        campaign: 'qa-posthog',
+        corridor_id: 'FR_NO',
+        session_id: 's-return-1',
+        tester_name: 'Returning',
+        tester_email: 'ret@example.com',
+        hr: { username: 'HR-ret', email: 'hr-ret@probe.test', password: 'p', role: 'HR' },
+        employee: { username: 'EMP-ret', email: 'emp-ret@probe.test', password: 'p', role: 'EMPLOYEE' },
+      }),
+    );
+    mockComplete.mockResolvedValue(undefined);
+    renderAt('?campaign=qa-posthog');
+
+    // Credentials block restored without any provision call.
+    expect(await screen.findByText('hr-ret@probe.test')).toBeInTheDocument();
+    expect(screen.getByText('emp-ret@probe.test')).toBeInTheDocument();
+    expect(mockProvision).not.toHaveBeenCalled();
+
+    // Completion CTA restored; clicking it records completion for the restored session
+    // and routes to the survey link carrying session_id, corridor_id AND campaign.
+    fireEvent.click(screen.getByRole('button', { name: /i've completed my test/i }));
+    await waitFor(() => expect(mockComplete).toHaveBeenCalledWith('s-return-1'));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledTimes(1));
+    const dest = mockNavigate.mock.calls[0][0] as string;
+    expect(dest).toContain('/test-drive/survey');
+    expect(dest).toContain('session=s-return-1');
+    expect(dest).toContain('corridor=FR_NO');
+    expect(dest).toContain('campaign=qa-posthog');
   });
 
   it('storage throwing (private mode) degrades to the plain link, never a crash', async () => {

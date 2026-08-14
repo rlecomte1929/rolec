@@ -9,6 +9,8 @@ export interface RecommendationExplanation {
   budget_fit: string;
   family_fit: string;
   policy_fit: string;
+  /** Estimated monthly cost as a % of the company housing cap (FX-normalized). */
+  budget_pct_of_cap?: number | null;
   coverage_fit: string;
   warning_flags: string[];
   explanation_summary: string;
@@ -51,6 +53,23 @@ export interface RecommendationItem {
       lng: number;
       commute_min: number;
     }>;
+    /** Multimodal commute to the office (living_areas): per-mode time + cost + carbon. */
+    commute_modes?: Array<{
+      mode: string;
+      minutes: number;
+      distance_km: number;
+      cost: number;
+      carbon_g: number;
+    }>;
+    /** Multimodal commute to the nearest school (living_areas, school-age cases). */
+    school_commute_modes?: Array<{
+      mode: string;
+      minutes: number;
+      distance_km: number;
+      cost: number;
+      carbon_g: number;
+    }>;
+    nearest_school_name?: string;
   };
   explanation?: RecommendationExplanation;
 }

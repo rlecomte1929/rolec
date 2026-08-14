@@ -53,6 +53,20 @@ export interface FieldDefinition {
   pdf_y?: number;
   pdf_page?: number;
   pdf_font_size?: number;
+  /**
+   * [S3] Keys this editor does not model, carried through verbatim.
+   *
+   * The editor is not the only writer of `form_templates.fields`. Seeded data sheets
+   * carry `section`, `label_nb`/`label_de`/`label_fr`, `note`, `portal_url` and
+   * `consult_professional` — none of which the admin UI shows. Reconstructing each
+   * field from the modelled keys alone silently DELETED them on save, which for the
+   * FR→NO data sheet meant losing both its Norwegian labels and its section grouping.
+   *
+   * The cost is that a typo in a FieldDefinition literal no longer fails type-check.
+   * That is worth it: a mistyped key is a visible bug in an admin form, whereas the
+   * data loss was silent and irreversible.
+   */
+  [unmodelledKey: string]: unknown;
 }
 
 const FIELD_TYPE_OPTIONS: FieldType[] = ['text', 'date', 'number', 'boolean', 'select'];
@@ -290,6 +304,44 @@ const FieldRow: React.FC<FieldRowProps> = ({ dndId, field, disabled, onChange, o
 /** Compute final `position` values from current array order. */
 export function withComputedPositions(fields: FieldDefinition[]): FieldDefinition[] {
   return fields.map((f, i) => ({ ...f, position: i + 1 }));
+}
+
+/**
+ * Coerce raw `form_templates.fields` jsonb into the canonical FieldDefinition shape.
+ *
+ * Templates seeded by P1-4, or edited via earlier passes, may carry entries that do not
+ * conform. Coerce gracefully so the editor does not error on legacy shapes.
+ *
+ * [S3] Two things matter here, and both were wrong:
+ *
+ * 1. **Unmodelled keys are preserved.** The spread comes first, so `section`,
+ *    `label_nb`/`label_de`/`label_fr`, `note`, `portal_url` and `consult_professional`
+ *    survive a load/save round trip. The editor never displayed them, so it never
+ *    showed them disappearing — opening the FR→NO data sheet and pressing Save
+ *    destroyed its Norwegian labels and its section grouping in one click.
+ *
+ * 2. **There is one copy.** This was duplicated verbatim in AdminFormTemplateEditor and
+ *    AdminFormTemplateMap, which is exactly why the defect existed in both — the PDF
+ *    coordinate mapper saves the whole fields array too.
+ */
+export function normalizeFields(raw: Array<Record<string, unknown>>): FieldDefinition[] {
+  const asFiniteNumber = (v: unknown): number | undefined =>
+    typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+  return (raw || []).map((r, i) => ({
+    ...r,
+    id: typeof r.id === 'string' ? r.id : '',
+    label: typeof r.label === 'string' ? r.label : '',
+    type: ((r.type as FieldDefinition['type']) ?? 'text'),
+    required: r.required === true,
+    prefill_source: typeof r.prefill_source === 'string' ? r.prefill_source : undefined,
+    requires_original: r.requires_original === true,
+    position: typeof r.position === 'number' ? r.position : i + 1,
+    options: Array.isArray(r.options) ? (r.options as string[]) : undefined,
+    pdf_x: asFiniteNumber(r.pdf_x),
+    pdf_y: asFiniteNumber(r.pdf_y),
+    pdf_page: asFiniteNumber(r.pdf_page),
+    pdf_font_size: asFiniteNumber(r.pdf_font_size),
+  }));
 }
 
 /** Quick validation: every id must be non-empty and unique. */

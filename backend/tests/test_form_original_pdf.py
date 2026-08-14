@@ -59,7 +59,8 @@ CREATE TABLE form_templates (
     code              TEXT NOT NULL,
     name              TEXT NOT NULL,
     version           TEXT NOT NULL DEFAULT '1.0.0',
-    original_pdf_url  TEXT
+    original_pdf_url  TEXT,
+    source_language TEXT NOT NULL DEFAULT 'en'
 );
 CREATE TABLE case_forms (
     id               TEXT PRIMARY KEY,
@@ -135,8 +136,12 @@ class OriginalPdfEndpointTests(unittest.TestCase):
         )
         self.engine_patcher.start()
 
+        # [AIQ-1776] _assert_case_access now RETURNS the resolved canonical case
+        # id and the endpoint keys its SQL on that return value. A stub returning
+        # None would make every query read `case_id = NULL` and 404. These tests
+        # seed case_forms under the same id they pass in, so identity is right.
         self.auth_patcher = mock.patch.object(
-            pdf_router, "_assert_case_access", return_value=None
+            pdf_router, "_assert_case_access", side_effect=lambda _user, cid: cid
         )
         self.auth_patcher.start()
 

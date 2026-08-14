@@ -9,7 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { ConsentBanner } from '../ConsentBanner';
 import { getAnalyticsConsent } from '../../analytics';
 
@@ -93,5 +93,45 @@ describe('ConsentBanner', () => {
     store.set(CONSENT_KEY, 'denied');
     renderBanner();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  // AIQ-1660: the band is suppressed for the admin profile only. A first-time
+  // ADMIN visitor (no stored decision, so it would otherwise show) sees nothing.
+  it('is hidden for the admin profile even with no stored decision', () => {
+    expect(getAnalyticsConsent()).toBeNull();
+    store.set('relopass_role', 'ADMIN');
+    renderBanner();
+    expect(screen.queryByRole('dialog', { name: /analytics consent/i })).not.toBeInTheDocument();
+  });
+
+  it('still shows for a non-admin (HR) first-time visitor', () => {
+    store.set('relopass_role', 'HR');
+    renderBanner();
+    expect(screen.getByRole('dialog', { name: /analytics consent/i })).toBeInTheDocument();
+  });
+
+  // AIQ-1678: the banner mounts ONCE at the app root and never remounts, so it must
+  // re-evaluate admin status when the role is set AFTER first mount (the same-page-load
+  // login case). Regression for the stale `useMemo(..., [])` that cached the pre-login
+  // 'false' forever. Here the banner stays mounted; the role is written after mount, then a
+  // navigation (as happens on login redirect) must make it hide.
+  it('hides once the user becomes admin after mount, without remounting', () => {
+    function Nav() {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate('/admin')}>go admin</button>;
+    }
+    // First mount with no role → a first-time visitor sees the band.
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <ConsentBanner />
+        <Nav />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('dialog', { name: /analytics consent/i })).toBeInTheDocument();
+
+    // Log in as admin (role written) and navigate — the same still-mounted banner must hide.
+    store.set('relopass_role', 'ADMIN');
+    fireEvent.click(screen.getByRole('button', { name: /go admin/i }));
+    expect(screen.queryByRole('dialog', { name: /analytics consent/i })).not.toBeInTheDocument();
   });
 });

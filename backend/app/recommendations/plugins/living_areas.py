@@ -114,6 +114,11 @@ class LivingAreasCriteria(BaseModel):
 class LivingAreasPlugin(BasePlugin):
     key = "living_areas"
     title = "Living Areas"
+    # Neighbourhoods are advisory content, not suppliers: rank from the static/geo
+    # dataset only, never gate behind HR curation or let supplier shells shadow the
+    # real rows. Housing *agencies* (the gated, RFQ-backed concept) are a separate
+    # category. See the "Living Areas = 0" rework.
+    advisory = True
 
     @property
     def CriteriaModel(self) -> type:
@@ -145,6 +150,13 @@ class LivingAreasPlugin(BasePlugin):
         b_max = c.budget_monthly.get("max", 5000)
         rent = item.get("avg_rent_2br") if c.bedrooms <= 2 else item.get("avg_rent_3br", item.get("avg_rent_2br", 3000))
 
+        # Defense-in-depth: a foreign/supplier-shaped row (no rent data) has no
+        # place in an advisory neighbourhood ranking. Score it 0 so it filters out
+        # instead of raising `None > b_max` (the Living Areas = 0 crash).
+        if not isinstance(rent, (int, float)) or isinstance(rent, bool):
+            return {"score_raw": 0, "breakdown": {}, "summary": "No housing data",
+                    "rationale": "This entry has no rent data.", "pros": [], "cons": [], "metadata": {}}
+
         budget_match = 100.0
         if rent > b_max:
             budget_match = max(0, 100 - 20 * (rent - b_max) / 1000)
@@ -156,13 +168,20 @@ class LivingAreasPlugin(BasePlugin):
         # per-row/per-city degradation for un-geocoded data).
         commute_mins = item.get("commute_to_work_minutes_estimate", 30)
         mode = (c.commute_work or {}).get("mode", "transit") if c.commute_work else "transit"
+        commute_modes: List[Dict[str, Any]] = []
         if (
             c.office_lat is not None and c.office_lng is not None
             and item.get("lat") is not None and item.get("lng") is not None
         ):
-            est = geo.commute_minutes((c.office_lat, c.office_lng), (item["lat"], item["lng"]), mode)
+            office = (c.office_lat, c.office_lng)
+            area = (item["lat"], item["lng"])
+            est = geo.commute_minutes(office, area, mode)
             if est is not None:
                 commute_mins = int(round(est))
+            # Multimodal enrichment (walk/bike/transit/car time + cost + carbon) to the
+            # office — a keyless heuristic, no routing sub-processor. Surfaced on metadata
+            # for the card; the chosen mode still drives the headline commute_match.
+            commute_modes = geo.multimodal_commute(office, area)
         max_mins = 45
         if c.commute_work:
             max_mins = c.commute_work.get("max_minutes", 45)
@@ -195,11 +214,34 @@ class LivingAreasPlugin(BasePlugin):
             + w_avail * availability_score
         )
 
+        # Preferred / avoid neighbourhoods the employee named (by area name). Additive
+        # nudge, never a hard filter — an avoided area still appears, just ranked lower.
+        item_name = (item.get("name") or "").strip().lower()
+
+        def _named(names: List[str]) -> bool:
+            return any(item_name and n.strip().lower() in item_name for n in (names or []))
+
+        preferred_hit = _named(c.preferred_areas)
+        avoid_hit = _named(c.avoid_areas)
+        if preferred_hit:
+            score_raw += 15
+        if avoid_hit:
+            score_raw = max(0, score_raw - 20)
+
+        # Rationale cites the employee's own inputs (product facts — no decision/status
+        # framing, keeping the compliance guard green).
         rationale_parts = [
-            f"Budget: {'within' if b_min <= rent <= b_max else 'above'} your range.",
-            f"Commute ~{commute_mins} min.",
-            f"Lifestyle: safety {tags.get('safety', 7)}, green {tags.get('green', 6)}.",
+            f"Budget: {'within' if b_min <= rent <= b_max else 'above'} the range you entered.",
+            f"~{commute_mins} min by {mode} to your office.",
         ]
+        if c.lifestyle_priorities:
+            top = [k for k, v in c.lifestyle_priorities.items() if v >= 7]
+            if top:
+                rationale_parts.append(f"Matches your priorities: {', '.join(top)}.")
+        if preferred_hit:
+            rationale_parts.append("A neighbourhood you said you'd prefer.")
+        if avoid_hit:
+            rationale_parts.append("You asked to avoid this area.")
         if avail in ("low", "scarce"):
             nd = item.get("next_available_days", 30)
             rationale_parts.append(f"⚠ Scarcity: next available in ~{nd} days.")
@@ -244,5 +286,9 @@ class LivingAreasPlugin(BasePlugin):
                 # Coords for the neighborhood map (Phase 2); null until geocoded.
                 "lat": item.get("lat"),
                 "lng": item.get("lng"),
+                # Multimodal commute to the office (walk/bike/transit/car; time + cost +
+                # carbon). Empty when coords are unavailable — the card falls back to the
+                # single headline estimate.
+                "commute_modes": commute_modes,
             },
         }

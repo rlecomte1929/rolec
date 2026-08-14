@@ -3,6 +3,21 @@
 Wires the P4-01 pure extractor (`extract_requirement_facts`) to a REST API and persists the
 results to `requirement_fact_candidates` with status='pending', for admin review (P4-03).
 Admin-only. The persist is best-effort (a missing/un-applied table never fails the request).
+
+⚠️ SUPERSEDED (AIQ-1821). `requirement_fact_candidates` is a dead end: approving a row here
+moves it into an "Approved" tab that **no product surface, service or ingestion path reads**.
+The promotion step this page's subtitle promises ("before they enter the knowledge base") was
+never built, and the table lacks the columns a consumer needs (entity_id, applies_to,
+required_fields, source_doc_id).
+
+`docs/AI_ARCHITECTURE_ROADMAP.md` specified that extraction should land in the legacy
+`requirement_facts` table instead, reusing the existing approval flow — which has a live
+consumer: admin approve → `list_approved_requirement_facts` → `compute_requirements_sufficiency`
+→ `GET /api/requirements/sufficiency`. AIQ-1821 wired the P4-01 extractor into
+`official_ingest_service.ingest_url_to_knowledge_doc`, which follows that path.
+
+**Prefer the official-ingest route for new extraction work.** This router and its 13 existing
+rows are kept for review/audit; do not build on them.
 """
 from __future__ import annotations
 

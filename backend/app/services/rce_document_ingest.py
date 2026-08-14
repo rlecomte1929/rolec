@@ -59,8 +59,18 @@ def classify_rce_document_type(file_name: Optional[str]) -> Optional[str]:
         return "FOSTER_CARE_ORDER"
     if "diploma" in name or "degree" in name or "diplom" in name:
         return "DIPLOMA"
-    if "tax" in name or "avis" in name or "lohnsteuer" in name or "skatte" in name:
-        return "TAX_CERT"
+    # [AIQ-1774] One code per locale. The three tax certificates are genuinely
+    # different documents with different agents, so the locale-specific tokens route
+    # to their own code and the bare, ambiguous "tax" routes nowhere — a wrong agent
+    # emits confidently wrong fields, which is worse than not extracting.
+    # ("tax" alone did previously return TAX_CERT, but that code resolved to no agent,
+    #  so extraction was skipped then too. No extraction is lost by returning None.)
+    if "lohnsteuer" in name or "steuerbescheid" in name:
+        return "TAX_CERT_DE"
+    if "avis" in name or "imposition" in name:
+        return "TAX_CERT_FR"
+    if "skatte" in name:
+        return "TAX_CERT_NO"
     if (
         "visa" in name
         or "permit" in name
@@ -71,6 +81,21 @@ def classify_rce_document_type(file_name: Optional[str]) -> Optional[str]:
         or "brp" in name
     ):
         return "VISA_PERMIT"
+    # [AIQ-1766] Last, because it is the broadest token here: "contract" appears in
+    # plenty of filenames that name a more specific type ("tax_contract_2026.pdf"),
+    # and those branches above should win. Unlike TAX_CERT there is no per-locale
+    # code to pick — EmploymentContractAgent reads the locale from the document
+    # text, so a filename that names no language costs nothing.
+    if (
+        "contract" in name
+        or "contrat" in name
+        or "arbeitsvertrag" in name
+        or "arbeidsavtale" in name
+        or "arbeidskontrakt" in name
+        or "cdi" in name
+        or "cdd" in name
+    ):
+        return "EMPLOYMENT_CONTRACT"
     return None
 
 
@@ -106,9 +131,13 @@ def ingest_rce_document(
 ) -> Optional[str]:
     """Insert one rce.documents row (idempotent on (case_id, sha256)).
 
-    Returns the document_id (existing or new), or None if the row already existed
-    (ON CONFLICT) — callers that need the id can re-select. Caller supplies an open
-    Connection so this can run inside a transaction.
+    Returns the document_id — existing OR new. ``ON CONFLICT DO NOTHING`` returns no row,
+    so a re-upload of identical bytes used to yield None even though a perfectly good
+    rce.documents row existed; the caller then read that as "not bridged" and never kicked
+    the extraction pipeline, making re-upload a silent no-op. We re-select on conflict so
+    the contract in this docstring is actually true.
+
+    Caller supplies an open Connection so this can run inside a transaction.
     """
     document_type_id = _document_type_id(conn, document_type_code)
     row = conn.execute(
@@ -134,7 +163,18 @@ def ingest_rce_document(
             "uploaded_by": _as_uuid_or_none(uploaded_by),
         },
     ).first()
-    return str(row[0]) if row else None
+    if row:
+        return str(row[0])
+    # Conflict → the row already exists for this (case_id, sha256). Return the existing id
+    # so a re-upload still reaches the extraction pipeline instead of silently doing nothing.
+    existing = conn.execute(
+        text(
+            "SELECT document_id FROM rce.documents "
+            "WHERE case_id = CAST(:case_id AS UUID) AND sha256 = :sha256"
+        ),
+        {"case_id": case_id, "sha256": sha256},
+    ).first()
+    return str(existing[0]) if existing else None
 
 
 def bridge_case_document_to_rce(

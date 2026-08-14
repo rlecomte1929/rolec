@@ -1,16 +1,25 @@
 """
 AI decision audit log — EU AI Act Art. 14 (human oversight).
 
-Every HR action on an AI-generated recommendation (accept / override / reject)
+Every human action on an AI-generated recommendation (accept / override / reject)
 is recorded here, paired with the original AI output. This is the storage
 contract behind the `AIRecommendationCard` frontend component (AI-002).
 
 Endpoints:
-  POST  /api/ai/decisions      — HR records a decision on an AI recommendation
+  POST  /api/ai/decisions      — the human overseer records a decision on an AI rec
   GET   /api/ai/decisions      — HR lists decisions (own-company), with filters
 
-Both routes require HR or Admin. Override and reject must include a non-empty
-reason; the DB allows null reason for `accept`.
+POST allows HR, Admin OR Employee: the Art. 14 human overseer is whoever is in the
+loop for that recommendation — HR in the command center, and the EMPLOYEE in the
+Services → Recommendations step (where they override the top AI provider pick). The
+record is always scoped to the actor's OWN company (see `_caller_company_id`), so an
+employee can only write for their own case. AIQ-1653: this route used to require
+HR/Admin only, so an employee override 403'd — and the UI still claimed the reason was
+"Logged for human oversight audit", asserting a record it never wrote. GET stays
+HR/Admin (listing the company's decisions is an oversight-review action).
+
+Override and reject must include a non-empty reason; the DB allows null reason for
+`accept`.
 """
 from __future__ import annotations
 
@@ -23,7 +32,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from ..auth_deps import require_admin_or_hr
+from ..auth_deps import require_admin_or_hr, require_hr_or_employee
 from ...database import db
 from ..services.audit_log_service import (
     ACTION_INSERT,
@@ -63,6 +72,12 @@ class AIDecisionRead(BaseModel):
     decision: str
     reason: Optional[str]
     outcome: Optional[str]
+    # AIQ-1694: the production-time audit fields — the PII-masked input that produced the
+    # recommendation, the producing model, and when it was produced. Nullable for legacy
+    # rows written before the audit-hardening migration.
+    input_context: Optional[Dict[str, Any]] = None
+    model_name: Optional[str] = None
+    produced_at: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -113,9 +128,14 @@ def _row_to_dict(row: Any) -> Dict[str, Any]:
 )
 def create_ai_decision(
     body: AIDecisionCreate,
-    user: Dict[str, Any] = Depends(require_admin_or_hr),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
 ) -> Dict[str, Any]:
-    """Record an HR admin's accept / override / reject on an AI recommendation."""
+    """Record a human overseer's accept / override / reject on an AI recommendation.
+
+    AIQ-1653: the actor may be HR/Admin (command center) OR the Employee (Services →
+    Recommendations override) — both are legitimate Art. 14 overseers. Always scoped to
+    the actor's own company via ``_caller_company_id``.
+    """
     if body.decision in REASON_REQUIRED_DECISIONS and not (body.reason and body.reason.strip()):
         raise HTTPException(
             status_code=400,
@@ -205,7 +225,7 @@ def create_ai_decision(
 def list_ai_decisions(
     user: Dict[str, Any] = Depends(require_admin_or_hr),
     feature: Optional[str] = Query(None, max_length=100),
-    decision: Optional[str] = Query(None, pattern=r"^(accept|override|reject)$"),
+    decision: Optional[str] = Query(None, pattern=r"^(accept|override|reject|produced)$"),
     limit: int = Query(100, ge=1, le=500),
 ) -> List[Dict[str, Any]]:
     """List AI decisions for the caller's company, newest first."""

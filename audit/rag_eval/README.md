@@ -84,9 +84,42 @@ metric to `source: "live"` automatically.
 
 ## Current status
 
-No real report has been committed yet, because the evaluators must run against an
-environment with the corpus index built and an `OPENAI_API_KEY` available — which
-is why `/admin/rag-quality` still shows the honest mock banner. Everything else is
-in place: the golden set, the two wired evaluators, the report→dashboard wiring,
-and this runbook. `outcome_accuracy` additionally needs its evaluator built once
-the P1-07 case-outcomes table ships.
+_Last verified 2026-08-12 (AIQ-1821)._
+
+**The dashboard is already `source: "live"`** — the paragraph that used to sit here
+("no real report has been committed yet… still shows the honest mock banner") was
+stale. Four reports are on disk and three metric families are plotted:
+
+| Metric family | Latest | Threshold | State |
+|---|---|---|---|
+| `context_precision` | 0.348 (`_baseline_20260615_v2`) | 0.85 | 🔴 below threshold |
+| `hr_policy_context_precision` | 0.6 (`20260630`) | 0.50 | 🟢 passing |
+| `outcome_accuracy` | 1.0 (`20260630`) | 0.90 | 🟢 passing |
+
+Two behaviours are worth knowing before you read the dashboard:
+
+- **`source` is global, not per-metric.** One valid report anywhere in this
+  directory flips the *whole* dashboard to `live`; every metric without a report
+  then renders as an empty series with alert reason `no_data` — not as mock.
+- **`factual_consistency` has no data and cannot honestly get any yet.** Its
+  evaluator needs both a `--generated-steps` sidecar (absent) and an indexed
+  immigration corpus — prod `immigration_documents` is empty and
+  `immigration_chunks` does not exist. Running it now would emit a vacuous
+  zero-entry report. Don't.
+
+Both `context_precision_baseline_20260615*.json` also resolve to the *same* date,
+so that metric plots two points on 2026-06-15.
+
+### Non-dashboard reports
+
+`requirement_extraction_20260812.json` is a real run of
+`backend/scripts/eval_requirement_extraction.py` (P4-04) committed as a record. It
+is **deliberately inert here**: it has no top-level `aggregate` and no matching
+`MetricSpec` prefix, so `load_live_reports` skips it. It does not appear on
+`/admin/rag-quality` and does not affect any other metric.
+
+That run measured precision **0.125** / recall **0.143** across 5 evaluated golden
+entries (1 skipped) — and surfaced that the gate can report a false green: a URL
+from which the extractor extracts *zero* facts scores `precision = 1.0` via the
+empty-denominator branch, and `--ci` gates on precision only. The FR-NO entry
+"passes" at 1.0/1.0 while the extractor never reads the page body. See AIQ-1821.

@@ -1,6 +1,48 @@
 # ReloPass — allow all crawlers.
 # Added for FRIDAY-004e (AIQ-769): the marketing app shipped without a robots.txt,
 # so /robots.txt fell through to the SPA index.html and failed Lighthouse SEO.
-# TODO [FRIDAY-004d §11 follow-up]: add a Sitemap: line once sitemap.xml ships.
 User-agent: *
+Allow: /
+
+# sitemap.xml is generated at build time by frontend/scripts/prerender-content.mjs.
+# It lists the marketing pages, the two ad landing pages, and every published guide.
+# (Closes the FRIDAY-004d §11 TODO that sat here from AIQ-769: until 2026-08-10 there was
+# no sitemap to point at — /sitemap.xml returned the SPA shell like every other unmatched
+# path.)
+Sitemap: https://relopass.com/sitemap.xml
+
+# ── [AIQ-1782 / ADS-2] OpenAI crawlers — explicit, not merely covered by `*` ──
+#
+# OAI-AdsBot validates ad landing pages. If it cannot fetch them, ads fail approval
+# with no actionable error — they just underdeliver. OAI-SearchBot is the organic
+# side: being citable in ChatGPT answers keeps compounding after the paid test ends.
+#
+# The wildcard above already permits both. These blocks exist so that intent is
+# RECORDED — the next person tightening this file for scrapers needs to see that
+# these two are deliberate, not collateral.
+#
+# ⚠️ robots.txt is only half the story. Cloudflare sits in front of this origin and its
+# bot rules are invisible here.
+#
+# BUT DO NOT VERIFY WITH A SPOOFED USER-AGENT. This comment used to say
+#     curl -A "OAI-SearchBot" -I https://relopass.com   # "must be 200"
+# and that advice was wrong. Cloudflare identifies a named bot by cryptographic signature
+# (Web Bot Auth), published IP range, or reverse DNS — never by the UA string. A curl from
+# your laptop claiming to be OAI-SearchBot is an impostor and SHOULD get 403, even when
+# that crawler is set to Allow. Expecting 200 sends you hunting a phantom
+# misconfiguration; it already cost one round of that on 2026-08-11.
+#
+# The real signal is Cloudflare's own per-crawler telemetry:
+#     AI Crawl Control -> Metrics -> Allowed vs Unsuccessful
+# To confirm positively, ask ChatGPT to open a published URL and watch ChatGPT-User's
+# Allowed count increment — a verified request from OpenAI is the only proof.
+#
+# A spoofed UA *is* still a fair test for crawlers Cloudflare does not gate on AI policy
+# (OAI-AdsBot, Googlebot, facebookexternalhit); those are covered in
+# tests/e2e/tests/public/crawler-surface.spec.ts.
+
+User-agent: OAI-AdsBot
+Allow: /
+
+User-agent: OAI-SearchBot
 Allow: /

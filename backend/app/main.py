@@ -23,12 +23,15 @@ from .routers import (
     advisors,
     ai_decisions,
     ai_feedback,
+    payment,
+    stripe_webhook,
     resources_activities,
     auth_page_config,
     assistant_router,
     policy_helpfulness,
     ocr,
     requirement_facts,
+    admin_content_review,
     benefit_optimizer,
     case_forms_adhoc,
     cases,
@@ -46,6 +49,7 @@ from .routers import (
     hr_vendor_performance,
     exception_requests,
     hr_analytics,
+    hr_case_summary,
     hr_onboarding,
     hr_export,
     hr_case_audit,
@@ -117,6 +121,13 @@ def create_app() -> FastAPI:
     # audit patterns out of every record before any handler emits it.
     install_pii_log_filter()
 
+    # [AIQ-1780] Vendor completers for the relopass LLM router. Registered here AND
+    # in backend/main.py's lifespan — prod boots that app, this one backs the tests
+    # and the modular cutover, and the registry is a process-global dict, so an
+    # entry point that skips it silently reproduces the "zero extracted fields" bug.
+    from .services.llm_router_clients import install_router_completers
+    install_router_completers()
+
     init_db()
     seed_demo_cases()
 
@@ -165,6 +176,7 @@ def create_app() -> FastAPI:
     app.include_router(research_requests.router)  # [AIQ-1349 P2] research-request intake
     app.include_router(hr_coordination.router)
     app.include_router(hr_analytics.router)
+    app.include_router(hr_case_summary.router)  # AIQ-1697 — AI case summary proxy
     app.include_router(hr_onboarding.router)  # AIQ-1223c — deterministic onboarding inference
     app.include_router(hr_export.router)
     # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.
@@ -211,10 +223,13 @@ def create_app() -> FastAPI:
     app.include_router(geocoding.router)   # [AIQ-1607] GET /api/employee/geocode/autocomplete
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
+    app.include_router(payment.router)  # Stripe roadmap paywall (TEST MODE) — POST /api/payment/checkout
+    app.include_router(stripe_webhook.router)  # Stripe webhook Path A — POST /api/stripe/webhook
     # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
     app.include_router(auth_page_config.router)
     app.include_router(assistant_router.router)  # policy-bridge domain routing — POST /api/assistant/route
     app.include_router(requirement_facts.router)  # [AIQ-1091] P4-02 requirement-facts extract
+    app.include_router(admin_content_review.router)  # [AIQ-1821] content review queue
     # [Parker-A] Case-duration prediction (canary: PREDICTIONS_ENABLED, default off)
     app.include_router(predictions.router)
     # [AIQ-1420] TD-2 test-drive self-serve provisioning (canary: RELOPASS_TEST_DRIVE_ENABLED, default off)

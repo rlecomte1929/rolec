@@ -63,6 +63,28 @@ CASE_CHILDREN = [
 ]
 
 
+# [AIQ-1737·1] case_assignments carries canonical_case_id alongside case_id. Purging by
+# case_id ALONE leaves a surviving assignment whose canonical points at a now-deleted case
+# → a DANGLING canonical (the drift checker's second bad shape). Match BOTH keys wherever
+# the purge selects assignments, so no assignment referencing a purged case can survive.
+# ARRAY[...] && %s::text[] is the case_id-OR-canonical overlap (NULL canonical is ignored),
+# bound with the SAME single case-id array param the other ANY(%s) deletes already use.
+_ASSIGNMENT_CASE_MATCH = "ARRAY[case_id::text, canonical_case_id::text] && %s::text[]"
+_ASSIGNMENT_IDS_SUBQ = f"SELECT id::text FROM case_assignments WHERE {_ASSIGNMENT_CASE_MATCH}"
+
+
+def _case_child_where(table: str, col: str, src: str) -> str:
+    """WHERE clause selecting the case-child rows to purge for the bound case-id array
+    (one %s ::text[]). case_assignments is matched canonical-aware (case_id OR
+    canonical_case_id); assignment-scoped children resolve through the same canonical-aware
+    set, so neither the assignment nor its children can be orphaned by the purge."""
+    if table == "case_assignments":
+        return _ASSIGNMENT_CASE_MATCH
+    if src == "case":
+        return f"{col}::text = ANY(%s)"
+    return f"{col}::text IN ({_ASSIGNMENT_IDS_SUBQ})"
+
+
 # Reserved synthetic test-email domains (mirrors backend/db/test_data_filter.py
 # _TEST_EMAIL_DOMAINS). public.users has no is_test column and auth.users lives in
 # the auth schema, so test accounts there are matched by these reserved domains —
@@ -200,11 +222,7 @@ def main():
     if not args.apply:
         print("\nDRY-RUN — counts of rows that WOULD be deleted (pass --apply to delete):")
         for table, col, src in CASE_CHILDREN:
-            if src == "case":
-                q = f"SELECT count(*) FROM {table} WHERE {col}::text = ANY(%s)"
-            else:
-                q = (f"SELECT count(*) FROM {table} WHERE {col}::text IN "
-                     f"(SELECT id::text FROM case_assignments WHERE case_id::text = ANY(%s))")
+            q = f"SELECT count(*) FROM {table} WHERE {_case_child_where(table, col, src)}"
             n = guarded(cur, q, (case_ids,)) if case_ids else 0
             if n:
                 print(f"  {table:28} {n}")
@@ -240,11 +258,7 @@ def main():
     users_q = f"SELECT id::text FROM users WHERE {TEST_EMAIL_PREDICATE}{AGE}"
     ops = []
     for table, col, src in CASE_CHILDREN:
-        if src == "case":
-            ops.append((table, f"DELETE FROM {table} WHERE {col}::text = ANY(%s)", (case_ids,)))
-        else:
-            ops.append((table, f"DELETE FROM {table} WHERE {col}::text IN "
-                               f"(SELECT id::text FROM case_assignments WHERE case_id::text = ANY(%s))", (case_ids,)))
+        ops.append((table, f"DELETE FROM {table} WHERE {_case_child_where(table, col, src)}", (case_ids,)))
     ops.append(("relocation_cases", "DELETE FROM relocation_cases WHERE id::text = ANY(%s)", (case_ids,)))
     ops.append(("cases", "DELETE FROM cases WHERE id::text = ANY(%s)", (case_ids,)))
     for ref, idq in (("profiles", prof_q), ("companies", comp_q), ("users", users_q)):

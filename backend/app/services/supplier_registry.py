@@ -87,6 +87,21 @@ def list_suppliers(
     return [_supplier_to_dict(r, session, include_list_summary=True) for r in rows]
 
 
+def _has_accreditations_table(session: Session) -> bool:
+    """Whether `supplier_accreditations` exists on this bind.
+
+    Checked rather than caught: the table is real in production but absent from the SQLite
+    unit lane, and swallowing the error would also hide a genuinely missing table in prod —
+    which would silently drop the evidence a reviewer needs, with no signal at all.
+    """
+    try:
+        from sqlalchemy import inspect as sa_inspect
+
+        return sa_inspect(session.get_bind()).has_table("supplier_accreditations")
+    except Exception:  # noqa: BLE001 — an uninspectable bind (a mock) simply has no table
+        return False
+
+
 def list_pending_capabilities(session: Session, *, limit: int = 200) -> List[Dict[str, Any]]:
     """Cross-supplier queue of capabilities awaiting a vetting decision.
     Returns the oldest-first flat rows the admin vetting queue renders."""
@@ -98,6 +113,37 @@ def list_pending_capabilities(session: Session, *, limit: int = 200) -> List[Dic
         .limit(limit)
         .all()
     )
+    # Accreditation, for the registry-harvested suppliers (AIQ-1788). Approving one of those
+    # without being able to see WHICH register vouched for it is a rubber stamp — and the
+    # evidence is the only thing separating a harvested candidate from a scrape. One extra
+    # query rather than N, and an empty dict when the table has no rows for these suppliers.
+    accreditations: Dict[str, Dict[str, Any]] = {}
+    supplier_ids = [s.id for _, s in rows]
+    if supplier_ids and _has_accreditations_table(session):
+        from sqlalchemy import bindparam
+        from sqlalchemy import text as _text
+
+        # Portable on purpose: the unit lane runs on SQLite, which has neither `DISTINCT ON`
+        # nor `= ANY(:ids)`. Ascending order plus dict overwrite gives newest-wins without
+        # either. A first attempt used both and broke six unrelated tests.
+        stmt = _text(
+            "SELECT supplier_id, body, membership_number, valid_until, status, evidence_url "
+            "FROM supplier_accreditations WHERE supplier_id IN :ids ORDER BY created_at"
+        ).bindparams(bindparam("ids", expanding=True))
+        for a in session.execute(stmt, {"ids": supplier_ids}).mappings():
+            valid_until = a["valid_until"]
+            accreditations[a["supplier_id"]] = {
+                "body": a["body"],
+                "number": a["membership_number"],
+                # date on Postgres, str on SQLite
+                "valid_until": (
+                    valid_until.isoformat() if hasattr(valid_until, "isoformat")
+                    else valid_until
+                ),
+                "status": a["status"],
+                "evidence_url": a["evidence_url"],
+            }
+
     return [
         {
             "supplier_id": s.id,
@@ -108,6 +154,7 @@ def list_pending_capabilities(session: Session, *, limit: int = 200) -> List[Dic
             "city_name": c.city_name,
             "source": getattr(s, "source", None),
             "source_url": getattr(s, "source_url", None),
+            "accreditation": accreditations.get(s.id),
             "created_at": c.created_at.isoformat() if c.created_at else None,
         }
         for c, s in rows
@@ -284,7 +331,43 @@ def search_by_service_destination(
         meta = session.query(SupplierScoringMetadata).filter(
             SupplierScoringMetadata.supplier_id == s.id
         ).first()
-        result.append(_supplier_to_recommendation_item(s, meta, destination_city or ""))
+        item = _supplier_to_recommendation_item(s, meta, destination_city or "")
+        # Surface the matched capability's specialization tags so category plugins can
+        # read sub-types (e.g. housing_agencies temporary/permanent). Harmless for other
+        # categories, which ignore the field.
+        cap = (
+            session.query(SupplierServiceCapability)
+            .filter(
+                SupplierServiceCapability.supplier_id == s.id,
+                SupplierServiceCapability.service_category == service_category,
+            )
+            .first()
+        )
+        item["specialization_tags"] = _parse_json_array(cap.specialization_tags) if cap else []
+        result.append(item)
+
+    # Attach real per-agency neighbourhood coverage (supplier_service_area_coverage) so
+    # category plugins can boost by served areas from the curated table rather than the
+    # `area:*` tag heuristic. Best-effort: one batched query; if the table is absent
+    # (pre-migration / SQLite) the plugins fall back to the specialization_tags.
+    if result:
+        try:
+            from sqlalchemy import bindparam as _bindparam, text as _text
+            ids = [str(it.get("item_id")) for it in result if it.get("item_id")]
+            cov_rows = session.execute(
+                _text(
+                    "SELECT supplier_id, area_id FROM supplier_service_area_coverage "
+                    "WHERE service_category = :cat AND supplier_id IN :ids"
+                ).bindparams(_bindparam("ids", expanding=True)),
+                {"cat": service_category, "ids": ids},
+            ).fetchall()
+            by_supplier: Dict[str, List[str]] = {}
+            for sup_id, area_id in cov_rows:
+                by_supplier.setdefault(str(sup_id), []).append(str(area_id))
+            for it in result:
+                it["served_area_ids"] = by_supplier.get(str(it.get("item_id")), [])
+        except Exception:
+            pass
     return result
 
 

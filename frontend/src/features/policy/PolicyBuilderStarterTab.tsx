@@ -12,12 +12,18 @@ import { Button, Card } from '../../components/antigravity';
 import { StarterPolicyOnboardingCard } from './StarterPolicyOnboardingCard';
 import { type StarterTemplateKey } from './starterPolicyCopy';
 import { applyStarterBaseline, parseStarterBaselineError } from './applyStarterBaseline';
+import { usePolicyPublished } from '../../hooks/usePolicyPublished';
 
 export const PolicyBuilderStarterTab: React.FC<{ onOpenFullBuilder: () => void }> = ({
   onOpenFullBuilder,
 }) => {
   const [busyTemplateKey, setBusyTemplateKey] = useState<StarterTemplateKey | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // AIQ-1644: this tab must not contradict the Published tab. Both read the SAME canonical
+  // published-state signal (GET /api/hr/policy-config/published); when a policy already
+  // exists, offer to edit / version it instead of inviting a from-scratch baseline. `null`
+  // = unknown (still loading / check failed) → keep the baseline invite, exactly as before.
+  const hasPublishedPolicy = usePolicyPublished();
 
   const handleSelectTemplate = async (key: StarterTemplateKey) => {
     setError(null);
@@ -39,6 +45,29 @@ export const PolicyBuilderStarterTab: React.FC<{ onOpenFullBuilder: () => void }
       setBusyTemplateKey(null);
     }
   };
+
+  // AIQ-1644: a policy is already published — reflect that instead of a blank-baseline
+  // invitation, so the Policy builder tab agrees with the Published tab.
+  if (hasPublishedPolicy === true) {
+    return (
+      <div className="space-y-6">
+        <Card padding="lg">
+          <h2 className="text-base font-semibold text-[#0b2b43]">
+            A relocation policy is already set up for your company
+          </h2>
+          <p className="text-sm text-[#4b5563] mt-1 max-w-2xl">
+            You don’t need to start from a baseline. Open the full policy builder to review the
+            current benefits matrix, adjust the tier caps, or publish a new version.
+          </p>
+          <div className="mt-4">
+            <Button variant="primary" onClick={onOpenFullBuilder}>
+              Edit or version your policy →
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

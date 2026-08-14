@@ -23,21 +23,40 @@ import type { CaseFormSummary } from './dossier';
 export interface FieldValueItem {
   field_id: string;
   label: string;
+  /** The label in the form's OWN language, resolved server-side from the template's
+   *  source_language (label_nb for a Norwegian sheet, label_de for a German one, …).
+   *  null when the template is English or seeded no translation for this field.
+   *  Labels translate for comprehension; identifier VALUES never do. */
+  label_localised?: string | null;
+  /** @deprecated Use label_localised. Populated only for a Norwegian template, which is
+   *  what this field meant before source_language existed. */
+  label_nb?: string | null;
   field_type: string;         // text | date | select | boolean | number | ...
   required: boolean;
   position: number;
   prefill_source: string | null;
   requires_original: boolean;
+  /** A determination a regulated professional must make — never pre-filled. */
+  consult_professional?: boolean;
   options: string[] | null;   // only for select fields
   /** Current stored value — null if no value has been saved yet */
   value: string | null;
   /** Who last wrote this value: ai | system | employee | specialist | hr */
   filled_by: string | null;
   ai_confidence: number | null;
+  /** Data origin of the value: intake_profile | contract | banking |
+   *  passport_ocr | prior_form | ... — drives the source badge. */
+  source?: string | null;
   reviewed: boolean;
   overridden: boolean;
   /** Optional section label — not present in all form templates */
   section?: string | null;
+  /** Short guidance seeded on the template field — deadlines, "bring the original",
+   *  and the output-vs-input warnings. Rendered under the input. */
+  note?: string | null;
+  /** The authority portal this step is actually completed in (Skatteetaten, UDI,
+   *  politiet). Rendered as a link so the employee can go straight there. */
+  portal_url?: string | null;
 }
 
 export interface FieldUpsertInput {

@@ -13,6 +13,7 @@ import { AppShell } from '../../components/AppShell';
 import { Badge, Button, Card } from '../../components/antigravity';
 import { buildRoute } from '../../navigation/routes';
 import { CaseDocumentsPanel } from '../../components/case/CaseDocumentsPanel';
+import { CaseExtractedDataPanel } from '../../components/case/CaseExtractedDataPanel';
 import api from '../../api/client';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -265,6 +266,16 @@ export const ImmigrationCasePage: React.FC = () => {
             Documents
           </h2>
           <CaseDocumentsPanel caseId={immCase.case_id} />
+        </Card>
+
+        {/* AIQ-1790 — what the extraction engine read out of those documents.
+            Separate card from Documents above because it reads a different
+            backend (rce) with its own document-id space; see the panel header. */}
+        <Card className="p-6 mb-6">
+          <h2 className="text-sm font-semibold text-[#94a3b8] uppercase tracking-wider mb-4">
+            Extracted data
+          </h2>
+          <CaseExtractedDataPanel caseId={immCase.case_id} />
         </Card>
 
         {/* Actions */}

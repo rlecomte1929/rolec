@@ -51,7 +51,12 @@ def _engine():
             "recommendation_snapshot TEXT, was_recommended BOOLEAN, override_reason_category TEXT)"
         ))
         c.execute(text("CREATE TABLE rfq_items (id TEXT, rfq_id TEXT, service_key TEXT, requirements TEXT, created_at TEXT)"))
-        c.execute(text("CREATE TABLE rfq_recipients (id TEXT, rfq_id TEXT, vendor_id TEXT, status TEXT)"))
+        # created_at mirrors prod (added by 20261029000000, AIQ-1819). `_vendor_names_for_rfq`
+        # orders by it; without it that query raises 42703 here exactly as it did in production.
+        c.execute(text(
+            "CREATE TABLE rfq_recipients "
+            "(id TEXT, rfq_id TEXT, vendor_id TEXT, status TEXT, created_at TEXT)"
+        ))
         c.execute(text(
             "CREATE TABLE quotes (id TEXT, rfq_id TEXT, vendor_id TEXT, currency TEXT, "
             "total_amount REAL, valid_until TEXT, status TEXT, created_at TEXT, created_by_user_id TEXT)"
@@ -244,6 +249,59 @@ class AuthWiringTests(unittest.TestCase):
         )
         # propose stays open to the employee: the model is employee-led.
         self.assertEqual(_dep_name(m.propose_quote), "require_hr_or_employee")
+
+
+class VendorNameLabelTests(unittest.TestCase):
+    """[AIQ-1819] The fast lane must notice when `_vendor_names_for_rfq` stops working.
+
+    That function orders by `rfq_recipients.created_at`. The column existed in no fixture and
+    not in production either, so the query raised 42703 on every call for months — and every
+    test stayed green, because the function ends `except Exception: return None` and its caller
+    reads `or "Service provider"`. A hard SQL error rendered as a plausible label.
+
+    So this asserts the LABEL, not the query. Asserting the query would pass against a fixture
+    that has drifted from prod; asserting the label fails the moment the fallback takes over,
+    whatever the cause.
+    """
+
+    @staticmethod
+    def _engine_with(created_at: bool):
+        cols = "id TEXT, rfq_id TEXT, vendor_id TEXT, status TEXT"
+        if created_at:
+            cols += ", created_at TEXT"
+        e = create_engine("sqlite://", connect_args={"check_same_thread": False},
+                          poolclass=StaticPool)
+        with e.begin() as c:
+            c.execute(text(f"CREATE TABLE rfq_recipients ({cols})"))
+            c.execute(text("CREATE TABLE suppliers (id TEXT, name TEXT)"))
+            c.execute(text("INSERT INTO suppliers VALUES ('s1','Bravo Movers'),('s2','Alpha Reloc')"))
+            # Inserted Bravo first, but Alpha was invited first — so ordering by created_at,
+            # not by insertion, is what puts Alpha at the front of the label.
+            tail_b = ",'2026-03-02')" if created_at else ")"
+            tail_a = ",'2026-03-01')" if created_at else ")"
+            c.execute(text("INSERT INTO rfq_recipients VALUES ('r1','RFQ','s1','sent'" + tail_b))
+            c.execute(text("INSERT INTO rfq_recipients VALUES ('r2','RFQ','s2','sent'" + tail_a))
+        return e
+
+    def test_the_employee_sees_a_vendor_name_not_the_fallback(self):
+        host = _Host(self._engine_with(created_at=True))
+        label = host._vendor_names_for_rfq("RFQ") or "Service provider"
+        self.assertNotEqual(
+            label, "Service provider",
+            "the caller fell back to the generic label — _vendor_names_for_rfq returned None, "
+            "which it does for ANY exception including a missing column",
+        )
+        self.assertEqual(label, "Alpha Reloc (+1)", "ordered by created_at, earliest first")
+
+    def test_without_created_at_it_degrades_silently(self):
+        """Characterisation of the bug, kept executable.
+
+        This is what every fixture looked like before 2026-08-12, and what production looked
+        like too. It documents that the failure is *silent* — no raise, just None — which is
+        the property that let it survive so long.
+        """
+        host = _Host(self._engine_with(created_at=False))
+        self.assertIsNone(host._vendor_names_for_rfq("RFQ"))
 
 
 if __name__ == "__main__":

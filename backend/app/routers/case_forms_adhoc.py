@@ -106,7 +106,11 @@ async def create_adhoc_form(
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> CaseFormSummary:
     """Create an ad-hoc (template-less) CaseForm and return it as a CaseFormSummary."""
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id. `cases_read.list_case_forms` resolves before querying, so an
+    # ad-hoc form stored under an assignment id was created successfully and then never
+    # appeared in the Dossier. The sibling `replace_adhoc_pdf` below was fixed for exactly
+    # this by AIQ-1776; this one was missed.
+    resolved_case_id = _assert_case_access(user, case_id)
 
     clean_name = (name or "").strip()
     if not clean_name:
@@ -135,7 +139,7 @@ async def create_adhoc_form(
                 ),
                 {
                     "id": form_id,
-                    "case_id": case_id,
+                    "case_id": resolved_case_id,
                     "person_id": (person_id or None),
                     "status": _ADHOC_DEFAULT_STATUS,
                     "is_adhoc": True,
@@ -171,7 +175,12 @@ async def create_adhoc_form(
         logger.exception("adhoc: insert failed case_id=%s", case_id)
         raise HTTPException(status_code=500, detail="Failed to create ad-hoc document")
 
-    return _fetch_single_form_summary(case_id, form_id)
+    # MUST use the resolved id too: _fetch_single_form_summary ends
+    # `WHERE cf.id = :form_id AND cf.case_id = :case_id`, so re-fetching with the raw param
+    # after inserting the resolved one would 404 the row we just created. (Before this fix
+    # both sides were raw, so they matched each other while being invisible to every other
+    # reader — fixing the write alone would have converted that into a 404-after-write.)
+    return _fetch_single_form_summary(resolved_case_id, form_id)
 
 
 @router.post(
@@ -185,7 +194,9 @@ async def replace_adhoc_pdf(
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> CaseFormSummary:
     """Replace the uploaded PDF on an ad-hoc form."""
-    _assert_case_access(user, case_id)
+    # [AIQ-1776] case_forms.case_id holds the canonical case id; this route's
+    # {case_id} may be an assignment id. Key both statements on the resolved value.
+    resolved_case_id = _assert_case_access(user, case_id)
 
     with main_db.engine.connect() as conn:
         row = conn.execute(
@@ -193,7 +204,7 @@ async def replace_adhoc_pdf(
                 f"SELECT is_adhoc FROM {_pg_table('case_forms')} "
                 "WHERE id = :form_id AND case_id = :case_id"
             ),
-            {"form_id": form_id, "case_id": case_id},
+            {"form_id": form_id, "case_id": resolved_case_id},
         ).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="Form not found")
@@ -211,7 +222,7 @@ async def replace_adhoc_pdf(
                     f"SET original_file_url=:url, updated_at={_sql_now()} "
                     "WHERE id=:form_id AND case_id=:case_id"
                 ),
-                {"url": original_file_url, "form_id": form_id, "case_id": case_id},
+                {"url": original_file_url, "form_id": form_id, "case_id": resolved_case_id},
             )
             # fix: [ADHOC-FORM] SAVEPOINT-isolate the audit-event insert so a
             # non-uuid actor_id (legacy sessions) can't poison the outer tx.
@@ -234,4 +245,7 @@ async def replace_adhoc_pdf(
         logger.exception("adhoc: replace-pdf failed form_id=%s", form_id)
         raise HTTPException(status_code=500, detail="Failed to replace PDF")
 
-    return _fetch_single_form_summary(case_id, form_id)
+    # AIQ-1776 resolved both SQL statements above but left the response re-fetch on the raw
+    # param, and _fetch_single_form_summary filters `WHERE cf.case_id = :case_id` — so the
+    # PDF swap committed and then 404'd the caller.
+    return _fetch_single_form_summary(resolved_case_id, form_id)

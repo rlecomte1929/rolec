@@ -41,6 +41,41 @@ from backend.relopass.agents.models import (
 
 _PHI_CLASSES = {"NONE", "PII", "SENSITIVE", "BIOMETRIC", "CRIMINAL"}
 
+# [AIQ-1805] Field keys that are NOT about the data subject. Everything else extracted
+# from an identity document is, so this set — not the PII case — is what must be
+# justified per entry.
+#
+# The taxonomy is GDPR-shaped: PII = Art. 4(1) personal data, SENSITIVE = Art. 9
+# special category, CRIMINAL = Art. 10. `sex` and `nationality` are deliberately PII and
+# NOT SENSITIVE: Art. 9 covers racial/ethnic origin and sexual orientation, and
+# nationality is legally not ethnicity while administrative sex is not sexual
+# orientation. Ruled 2026-08-11. Keeping SENSITIVE to mean genuine Art. 9 data is what
+# lets a future rule key on it and apply the stricter handling Art. 9 actually demands;
+# labelling ordinary identifiers SENSITIVE would erode that to noise.
+_NON_SUBJECT_FIELD_KEYS = {
+    "agent_confidence",  # the model's confidence in its own extraction
+}
+
+
+def _phi_class_for_key(field_key: str) -> str:
+    """Classify by field key, defaulting to PII.
+
+    [AIQ-1805] The default is the fix. Every passport field in production was stamped
+    NONE — including the passport number and the national ID — because the old default
+    was NONE and only ONE field (the photo bbox) ever carried an explicit hint. Nothing
+    read the column, so nothing leaked; but it is the obvious thing for a future
+    masking, retention or subject-access rule to key on, and it would have told that
+    rule a passport number is not personal data.
+
+    Defaulting to PII makes the failure mode over-protection instead of under-protection.
+    A field extracted from someone's identity document relates to an identified person,
+    which is exactly what Art. 4(1) covers — the individual value looking anodyne
+    ('issuing state = FRA', an expiry date) does not change that, because it is stored
+    in a row keyed to that person's document. A new field key added by a future agent is
+    therefore PII until someone deliberately says otherwise.
+    """
+    return "NONE" if field_key in _NON_SUBJECT_FIELD_KEYS else "PII"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Pure mapping helpers (unit-tested)
@@ -48,12 +83,18 @@ _PHI_CLASSES = {"NONE", "PII", "SENSITIVE", "BIOMETRIC", "CRIMINAL"}
 
 
 def _phi_class(field: ExtractedField) -> str:
-    """rce.extracted_fields.phi_class is NOT NULL with a CHECK. The agents stash a
-    phi_class hint inside value_canonical (e.g. passport biometric); fall back to
-    'NONE'."""
+    """rce.extracted_fields.phi_class is NOT NULL with a CHECK.
+
+    An agent's explicit hint in value_canonical still wins — that is how the passport
+    photo/signature region gets BIOMETRIC, which is more specific than anything a field
+    key could tell us. [AIQ-1805] What changed is the fallback: an unhinted field is now
+    PII rather than NONE. See _phi_class_for_key.
+    """
     vc = field.value_canonical if isinstance(field.value_canonical, dict) else {}
     pc = vc.get("phi_class")
-    return pc if pc in _PHI_CLASSES else "NONE"
+    if pc in _PHI_CLASSES:
+        return pc
+    return _phi_class_for_key(field.field_key)
 
 
 def _extracted_field_params(f: ExtractedField) -> dict:

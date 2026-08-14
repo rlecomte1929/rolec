@@ -1,13 +1,17 @@
 """
 Regression tests for GET /api/cases/{case_id}/vendors (list_case_vendors).
 
-[AIQ-1011 / AUDIT-2026-06-13-VENDORS] The endpoint 500'd because its SELECT
-referenced columns absent from the deployed schema (cvs.status,
-cvs.contact_name, cvs.contact_email, v.website). These tests reconstruct the
-real schema in sqlite — under a `public` schema so the production
-public.-qualified SQL runs unmodified — and assert the endpoint returns 200
-with rows that conform to the frontend VendorRow contract for both empty and
-populated shortlists.
+[AIQ-1646] public.vendors was DROPPED in the platform redesign, so the endpoint's
+`JOIN public.vendors` 500'd on every HR case-summary load. The fix repoints the
+join at public.suppliers (suppliers.vendor_id references the old vendors.id, the
+same key case_vendor_shortlist.vendor_id carries). These tests reconstruct the
+POST-DROP schema in sqlite — under a `public` schema so the production
+public.-qualified SQL runs unmodified, WITHOUT a public.vendors table — so they
+actually reproduce the drop and assert 200 + a VendorRow-conformant contract for
+both empty and populated shortlists.
+
+[AIQ-1011 / AUDIT-2026-06-13-VENDORS] history: the per-case contact + status live
+on case_vendor_shortlist; vendor name/website come from the joined registry.
 
 Direct-call pattern (same as test_services_state_router.py) — bypasses the
 FastAPI app wiring and stubs _assert_case_access so tenant enforcement is
@@ -31,20 +35,25 @@ if _REPO_ROOT not in sys.path:
 from backend.app.routers import cases_read as router_module  # noqa: E402
 from backend.app.routers.cases_read import list_case_vendors  # noqa: E402
 
-# Mirror of the ACTUAL deployed schema (verified against prod information_schema
-# 2026-06-13), created under a "public" schema so the router's public.-qualified
-# SQL runs as-is. NB: vendors has website_url + email (no `contact_email`); the
-# per-case contact + status live on case_vendor_shortlist. The previous version
-# of this test encoded the inverse — which is why it passed CI while the route
-# still 500'd in prod.
+# The POST-DROP schema (AIQ-1646): NO public.vendors. Vendor identity now comes
+# from public.suppliers, joined on suppliers.vendor_id = case_vendor_shortlist.vendor_id
+# (both hold the old vendors.id). Created under a "public" schema so the router's
+# public.-qualified SQL runs as-is. A test that still created public.vendors would
+# NOT reproduce the bug (the query would keep working) — that was the prior gap.
+#
+# CAVEAT (AIQ-1646 follow-up): on PROD cvs.vendor_id is `uuid` and suppliers.vendor_id
+# is `varchar`, so a bare `s.vendor_id = cvs.vendor_id` raises 42883 (no varchar=uuid
+# operator). SQLite is dynamically typed (everything is TEXT here) so it CANNOT
+# reproduce that type error — the join is CAST(...AS TEXT) on both sides, which is
+# what makes it work on both engines. The real guard for the type mismatch is the
+# live prod-query check, not this test.
 SCHEMA = """
-CREATE TABLE public.vendors (
+CREATE TABLE public.suppliers (
   id TEXT PRIMARY KEY,
+  vendor_id TEXT,
   name TEXT NOT NULL,
-  website_url TEXT,
-  email TEXT,
-  logo_url TEXT,
-  is_active INTEGER NOT NULL DEFAULT 1,
+  website TEXT,
+  status TEXT,
   created_at TEXT
 );
 CREATE TABLE public.case_vendor_shortlist (
@@ -111,17 +120,31 @@ class ListCaseVendorsTests(unittest.TestCase):
         self.access_patcher.start()
         self.addCleanup(self.access_patcher.stop)
 
-    def _seed_vendor(self, name, website_url="https://vendor.example"):
-        vid = str(uuid.uuid4())
+        # AIQ-1704: the endpoint now resolves the (possibly assignment) path id to
+        # the canonical case id before its query. That resolution is covered by
+        # test_resolve_case_ids / test_case_id_resolution_a2; here we exercise the
+        # vendor query in isolation, so stub it to pass the id through unchanged
+        # (these fixtures seed no case_assignments row).
+        self.resolve_patcher = mock.patch.object(
+            router_module, "_canonical_case_id_or_404", side_effect=lambda cid: cid
+        )
+        self.resolve_patcher.start()
+        self.addCleanup(self.resolve_patcher.stop)
+
+    def _seed_supplier(self, name, website="https://vendor.example"):
+        """Insert a supplier and return its ``vendor_id`` link (the value the
+        shortlist row references — mirrors prod, where cvs.vendor_id and
+        suppliers.vendor_id both hold the old vendors.id)."""
+        vendor_link = str(uuid.uuid4())
         with self.engine.begin() as conn:
             conn.execute(
                 text(
-                    "INSERT INTO public.vendors (id, name, website_url) "
-                    "VALUES (:id, :n, :w)"
+                    "INSERT INTO public.suppliers (id, vendor_id, name, website) "
+                    "VALUES (:id, :vid, :n, :w)"
                 ),
-                {"id": vid, "n": name, "w": website_url},
+                {"id": str(uuid.uuid4()), "vid": vendor_link, "n": name, "w": website},
             )
-        return vid
+        return vendor_link
 
     def _seed_shortlist(self, case_id, vendor_id, service_key="housing", selected=1,
                         status=None, contact_name=None, contact_email=None):
@@ -145,12 +168,13 @@ class ListCaseVendorsTests(unittest.TestCase):
             )
 
     def test_empty_shortlist_returns_empty_list_not_500(self) -> None:
+        # AIQ-1646 criterion 4: 200 (empty array), not a 500, on a case with no shortlist.
         result = list_case_vendors(case_id=str(uuid.uuid4()), user=_HR_USER)
         self.assertEqual(result, [])
 
     def test_populated_shortlist_rows_conform_to_contract(self) -> None:
         case_id = str(uuid.uuid4())
-        vid = self._seed_vendor("Acme Movers", website_url="https://acme.example")
+        vid = self._seed_supplier("Acme Movers", website="https://acme.example")
         self._seed_shortlist(
             case_id, vid, service_key="moving", selected=1,
             status="Assigned", contact_name="Ops Team", contact_email="ops@acme.com",
@@ -162,27 +186,38 @@ class ListCaseVendorsTests(unittest.TestCase):
         # Every contract key is present — no more, no less.
         self.assertEqual(set(row.keys()), EXPECTED_KEYS)
         self.assertEqual(row["category"], "moving")
+        # Vendor identity now comes from the supplier join (AIQ-1646).
         self.assertEqual(row["vendor_name"], "Acme Movers")
-        # Real per-case + vendor columns now flow through (the #701 regression).
+        self.assertEqual(row["vendor_website"], "https://acme.example")
+        # Per-case contact + status flow from the shortlist row.
         self.assertEqual(row["contact_email"], "ops@acme.com")
         self.assertEqual(row["contact_name"], "Ops Team")
         self.assertEqual(row["status"], "Assigned")
-        self.assertEqual(row["vendor_website"], "https://acme.example")
         self.assertTrue(row["shortlist_id"])
 
     def test_status_falls_back_to_selected_when_null(self) -> None:
         # No explicit status on the row → derive from the `selected` flag.
         case_id = str(uuid.uuid4())
-        vid = self._seed_vendor("Old Vendor")
+        vid = self._seed_supplier("Old Vendor")
         self._seed_shortlist(case_id, vid, selected=0, status=None)
         result = list_case_vendors(case_id=case_id, user=_HR_USER)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["status"], "Removed")
 
+    def test_shortlist_row_with_no_matching_supplier_still_returns_200(self) -> None:
+        # AIQ-1646: a shortlist row whose vendor_id has no supplier match must NOT
+        # 500 (the LEFT JOIN keeps the row; vendor name/website come back NULL).
+        case_id = str(uuid.uuid4())
+        self._seed_shortlist(case_id, str(uuid.uuid4()), service_key="banking", selected=1)
+        result = list_case_vendors(case_id=case_id, user=_HR_USER)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(set(result[0].keys()), EXPECTED_KEYS)
+        self.assertIsNone(result[0]["vendor_name"])
+
     def test_multiple_rows_each_conform(self) -> None:
         case_id = str(uuid.uuid4())
-        v1 = self._seed_vendor("Bank A")
-        v2 = self._seed_vendor("School B")
+        v1 = self._seed_supplier("Bank A")
+        v2 = self._seed_supplier("School B")
         self._seed_shortlist(case_id, v1, service_key="banking")
         self._seed_shortlist(case_id, v2, service_key="school")
         result = list_case_vendors(case_id=case_id, user=_HR_USER)

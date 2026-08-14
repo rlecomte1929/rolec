@@ -8,11 +8,21 @@
  * - Supports field types: text, date, select, boolean, number, and a fallback
  *   textarea for everything else.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
+import { Badge } from '../../../components/antigravity/Badge';
+import { translateText } from '../../../api/translation';
 import type { FieldValueItem } from '../../../api/formEditor';
+
+/** Display language for LABELS only. Field values are always rendered verbatim
+ *  (the toggle never translates a name, passport number, D-number, or date).
+ *
+ *  Anything other than 'en' is a template's `source_language` — the language the
+ *  authority's own form is in, not a user preference. Adding a language means adding it
+ *  here and to SUPPORTED_LABEL_LANGUAGES in backend/app/services/localised_labels.py. */
+export type FieldLang = 'en' | 'nb' | 'de' | 'fr';
 
 interface FieldRowProps {
   field: FieldValueItem;
@@ -21,6 +31,66 @@ interface FieldRowProps {
   onValueChange: (fieldId: string, value: string) => void;
   /** Highlight as missing required */
   showMissing?: boolean;
+  /** Label display language — 'nb' shows label_nb when present. Values stay verbatim. */
+  lang?: FieldLang;
+}
+
+// ---------------------------------------------------------------------------
+// Source badge — provenance of a prefilled value (case_form_field_values.source)
+// ---------------------------------------------------------------------------
+
+const SOURCE_META: Record<string, { label: string; variant: 'success' | 'info' | 'warning' | 'neutral' }> = {
+  intake_profile: { label: 'From your intake', variant: 'info' },
+  contract: { label: 'From your contract', variant: 'info' },
+  banking: { label: 'From your bank details', variant: 'info' },
+  passport_ocr: { label: 'From your passport scan', variant: 'success' },
+  prior_form: { label: 'From a form you completed', variant: 'success' },
+  authority_lookup: { label: 'From an authority lookup', variant: 'info' },
+  ai_inference: { label: 'AI suggestion', variant: 'warning' },
+};
+
+function SourceBadge({ source }: { source: string }) {
+  const meta = SOURCE_META[source];
+  if (!meta) return null;
+  return (
+    <Badge variant={meta.variant} size="sm">
+      {meta.label}
+    </Badge>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Translatable label (AIQ-1757) — LABELS ONLY, never values.
+//
+// Renders a field label in the form's official language. A statically-seeded
+// translation (label_nb) is authoritative and shown instantly; only labels
+// WITHOUT one fall through to the /api/translate service (domain='ui', cached),
+// degrading to the original English label on any error (503). A field VALUE is
+// never passed here — only the label string, which carries no PII.
+// ---------------------------------------------------------------------------
+
+function TranslatableLabel({ text, tgt }: { text: string; tgt: string }) {
+  const [translated, setTranslated] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!text || !tgt || tgt === 'en') {
+      setTranslated(null);
+      return;
+    }
+    translateText({ text, src: 'en', tgt, domain: 'ui' })
+      .then((r) => {
+        if (!cancelled) setTranslated(r.text);
+      })
+      .catch(() => {
+        if (!cancelled) setTranslated(null); // degrade to the original label
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [text, tgt]);
+
+  return <>{translated ?? text}</>;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,18 +173,18 @@ function FieldInput({ field, value, onChange, hasError }: InputProps) {
   const normalClass = 'border-slate-300 ';
   const cls = base + (hasError ? errorClass : normalClass);
 
-  if (field.requires_original) {
-    return (
-      <div className={`rounded border px-3 py-2 text-sm ${hasError ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}>
-        <span className="text-slate-500 italic">
-          Document upload — attach the original physical document (P3-2).
-        </span>
-      </div>
-    );
-  }
+  // Fields that need the original physical document still show their known
+  // value (e.g. a prefilled passport number, verbatim) plus a reminder to bring
+  // the original — the value must not be hidden behind an upload stub.
+  const originalNote = field.requires_original ? (
+    <p className="mt-1 text-xs text-slate-500 italic">
+      Bring the original document to your appointment.
+    </p>
+  ) : null;
 
+  let control: React.ReactNode;
   if (field.field_type === 'boolean') {
-    return (
+    control = (
       <label className="inline-flex items-center gap-2 cursor-pointer">
         <Checkbox
           checked={value === 'true'}
@@ -124,10 +194,8 @@ function FieldInput({ field, value, onChange, hasError }: InputProps) {
         <span className="text-sm text-slate-700">{value === 'true' ? 'Yes' : 'No'}</span>
       </label>
     );
-  }
-
-  if (field.field_type === 'select' && field.options && field.options.length > 0) {
-    return (
+  } else if (field.field_type === 'select' && field.options && field.options.length > 0) {
+    control = (
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -141,39 +209,31 @@ function FieldInput({ field, value, onChange, hasError }: InputProps) {
         ))}
       </select>
     );
-  }
-
-  if (field.field_type === 'date') {
-    return (
+  } else if (field.field_type === 'date') {
+    control = (
+      <Input unstyled type="date" value={value} onChange={(v) => onChange(v)} className={cls} />
+    );
+  } else if (field.field_type === 'number') {
+    control = (
+      <Input unstyled type="number" value={value} onChange={(v) => onChange(v)} className={cls} />
+    );
+  } else {
+    control = (
       <Input unstyled
-        type="date"
+        type="text"
         value={value}
         onChange={(v) => onChange(v)}
+        placeholder={field.required ? 'Required' : 'Optional'}
         className={cls}
       />
     );
   }
 
-  if (field.field_type === 'number') {
-    return (
-      <Input unstyled
-        type="number"
-        value={value}
-        onChange={(v) => onChange(v)}
-        className={cls}
-      />
-    );
-  }
-
-  // Default: text
   return (
-    <Input unstyled
-      type="text"
-      value={value}
-      onChange={(v) => onChange(v)}
-      placeholder={field.required ? 'Required' : 'Optional'}
-      className={cls}
-    />
+    <>
+      {control}
+      {originalNote}
+    </>
   );
 }
 
@@ -186,51 +246,128 @@ export const FieldRow: React.FC<FieldRowProps> = ({
   liveValue,
   onValueChange,
   showMissing = false,
+  lang = 'en',
 }) => {
+  // A determination a regulated professional must make — never pre-filled, never editable.
+  const isConsult = field.consult_professional === true;
+  const hasValue = (liveValue ?? '').trim() !== '';
+  // Nothing sourced the value and it isn't a consult determination → the
+  // employee must supply it.
+  const isNeedsInput = !isConsult && !hasValue && !field.source;
   const isAiFilled = field.filled_by === 'ai';
-  const isMissing = showMissing && field.required && (!liveValue || liveValue.trim() === '');
+  const isMissing =
+    !isConsult && showMissing && field.required && !hasValue;
+
+  // Labels translate for comprehension; VALUES never do (verbatim identifiers).
+  // A seeded label wins (authoritative, instant); labels without one fall through to the
+  // translation service via TranslatableLabel, which degrades to English on a 503.
+  //
+  // `lang` is the template's own language, so the translation target follows it rather than
+  // being hardcoded — that hardcoded 'nb' is why a label_de would have been ignored.
+  // label_nb is read only as a fallback, for a response from a backend predating
+  // label_localised.
+  const seededLabel = field.label_localised ?? (lang === 'nb' ? field.label_nb : null);
+  const labelNode: React.ReactNode =
+    lang === 'en'
+      ? field.label
+      : (seededLabel ? seededLabel : <TranslatableLabel text={field.label} tgt={lang} />);
 
   return (
-    <div className={`rounded-lg border px-4 py-3 transition-colors ${isMissing ? 'border-rose-300 bg-rose-50/40' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+    <div className={`rounded-lg border px-4 py-3 transition-colors ${isConsult ? 'border-amber-200 bg-amber-50/40' : isMissing ? 'border-rose-300 bg-rose-50/40' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
       {/* Label row */}
       <div className="flex items-center gap-2 mb-1.5">
         <label className="text-sm font-medium text-slate-800 flex-1 leading-snug">
-          {field.label}
-          {field.required && (
+          {labelNode}
+          {field.required && !isConsult && (
             <span className="ml-0.5 text-rose-500" aria-label="required">*</span>
           )}
         </label>
         <div className="flex items-center gap-1.5 shrink-0">
-          {isAiFilled && (
-            <AiBadge
-              confidence={field.ai_confidence}
-              prefillSource={field.prefill_source}
-            />
-          )}
-          {field.overridden && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200">
-              Edited
-            </span>
-          )}
-          {field.reviewed && !field.overridden && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
-              Reviewed
-            </span>
+          {isConsult ? (
+            <Badge variant="warning" size="sm">Consult a professional</Badge>
+          ) : (
+            <>
+              {field.source ? (
+                <SourceBadge source={field.source} />
+              ) : (
+                isAiFilled && (
+                  <AiBadge
+                    confidence={field.ai_confidence}
+                    prefillSource={field.prefill_source}
+                  />
+                )
+              )}
+              {isNeedsInput && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-700 border border-rose-200">
+                  Needs input
+                </span>
+              )}
+              {field.overridden && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                  Edited
+                </span>
+              )}
+              {field.reviewed && !field.overridden && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+                  Reviewed
+                </span>
+              )}
+            </>
           )}
         </div>
       </div>
 
-      {/* Input */}
-      <FieldInput
-        field={field}
-        value={liveValue}
-        onChange={(v) => onValueChange(field.field_id, v)}
-        hasError={isMissing}
-      />
+      {isConsult ? (
+        // No value, no input — a regulated advisor determines this.
+        <p className="text-xs text-amber-700 italic">
+          A regulated advisor will determine this — ReloPass won&apos;t pre-fill it.
+        </p>
+      ) : (
+        <>
+          <FieldInput
+            field={field}
+            value={liveValue}
+            onChange={(v) => onValueChange(field.field_id, v)}
+            hasError={isMissing}
+          />
+          {isMissing && (
+            <p className="mt-1 text-xs text-rose-600">This field is required.</p>
+          )}
+        </>
+      )}
 
-      {isMissing && (
-        <p className="mt-1 text-xs text-rose-600">This field is required.</p>
+      {/* Guidance seeded on the template field. Rendered for consult fields too — a
+          determination the employee can't fill still has a portal and a deadline. */}
+      {field.note && (
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{field.note}</p>
+      )}
+      {field.portal_url && (
+        <a
+          href={field.portal_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-accent-600 hover:text-accent-700 hover:underline focus:outline-none focus:ring-2 focus:ring-accent-500/40 rounded"
+        >
+          {portalLinkLabel(field.portal_url)}
+          <span aria-hidden="true">→</span>
+        </a>
       )}
     </div>
   );
 };
+
+/**
+ * "https://www.skatteetaten.no/en/forms/d-number" → "Open in Skatteetaten".
+ * Falls back to a generic label when the host can't be parsed, so a malformed
+ * seeded URL degrades to a working link rather than throwing.
+ */
+function portalLinkLabel(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const name = host.split('.')[0] || '';
+    if (!name) return 'Open the official portal';
+    return `Open in ${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+  } catch {
+    return 'Open the official portal';
+  }
+}

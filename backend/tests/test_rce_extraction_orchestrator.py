@@ -79,7 +79,9 @@ def test_agent_error_is_failsoft(monkeypatch):
         async def run(self, document):
             raise RuntimeError("agent blew up")
 
-    monkeypatch.setattr(orch, "_agent_class", lambda code: _BoomAgent)
+    # AIQ-1765: _agent_class also takes issuing_country (TAX_CERT routing), so the stub
+    # must accept it — this test only cares that a raising agent stays fail-soft.
+    monkeypatch.setattr(orch, "_agent_class", lambda code, **_kw: _BoomAgent)
     out = asyncio.run(orch.dispatch_and_run(
         ocr_result=OcrParseResult(
             parsed_document=ParsedDocument(document_id=uuid4(), text="x", words=()),

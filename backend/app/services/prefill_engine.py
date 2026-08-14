@@ -5,11 +5,19 @@ Populates case_form_field_values records when a CaseForm is first created
 (or re-triggered after an upstream dependency is approved).
 
 Source priority (highest → lowest):
-  1. Structured profile   — cases.intake_data + profiles row
-  2. Contract / employment — cases.intake_data (camelCase + snake_case aliases)
-  3. Previously approved forms — (future: P2-3)
-  4. Authority lookups    — (future: Brønnøysund API)
-  5. AI inference         — (future: GPT-4o mini)
+  1. Structured profile   — cases.intake_data + profiles row      (source='intake_profile')
+  2. Contract / employment — cases.intake_data (camelCase aliases) (source='contract')
+  3. Passport / ID OCR     — imm_employee_profiles vault (OCR fields) (source='passport_ocr')
+  4. Previously approved forms — donated values from the same person's
+     approved case forms                                          (source='prior_form')
+  5. Authority lookups    — (future: Brønnøysund API)
+  6. AI inference         — (future: GPT-4o mini)
+
+Each resolved value is tagged with a `source` (the DATA ORIGIN) written to
+case_form_field_values.source, alongside a confidence. A lower-priority source
+only fills a leaf that every higher source left empty — it never overrides a
+value that intake already supplied. Unsourced fields stay blank: the engine
+never invents a value (AIQ-1755).
 
 Idempotency: never overwrites a FieldValue row where overridden=True.
 Errors are logged but never raised — a prefill failure must not block the
@@ -38,6 +46,39 @@ from ...database import db
 from .audit_log_service import ACTION_INSERT, ACTOR_SYSTEM, insert_audit_log
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Source descriptors (written to case_form_field_values.source) + confidences.
+# `source` is the DATA ORIGIN of a value; `filled_by` stays the coarse actor
+# ('system' for everything the engine resolves). See migration
+# 20261011000000_autofill_prefill_provenance_and_source_language.sql.
+# ---------------------------------------------------------------------------
+
+SOURCE_INTAKE_PROFILE = "intake_profile"
+SOURCE_CONTRACT = "contract"
+SOURCE_BANKING = "banking"
+SOURCE_PASSPORT_OCR = "passport_ocr"
+SOURCE_PRIOR_FORM = "prior_form"
+SOURCE_SYSTEM = "system"
+
+_INTAKE_CONFIDENCE = 0.99
+_PASSPORT_OCR_CONFIDENCE = 0.9
+_PRIOR_FORM_CONFIDENCE = 0.95
+
+# ctx top-level key → default source for intake-origin leaves.
+_KEY_SOURCE = {
+    "profile": SOURCE_INTAKE_PROFILE,
+    "person": SOURCE_INTAKE_PROFILE,
+    "family": SOURCE_INTAKE_PROFILE,
+    "contract": SOURCE_CONTRACT,
+    "banking": SOURCE_BANKING,
+    # `case` was missing here, so every case.* leaf resolved with source = NULL and
+    # lost its provenance badge in the dossier. Case-level facts (move date, stay
+    # length, corridor) originate from the intake the employee/HR completed, so they
+    # carry the same origin as the profile leaves.
+    "case": SOURCE_INTAKE_PROFILE,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -99,8 +140,14 @@ def _run(case_form_id: str, case_uuid: str) -> int:
         logger.debug("prefill_engine: template has no fields, skipping cf=%s", case_form_id)
         return 0
 
-    # 2. Build the case context
+    # 2. Build the case context (intake) + a per-path provenance map, then
+    #    layer the lower-priority sources (passport OCR, prior approved forms)
+    #    onto leaves the higher sources left empty. A source never overrides a
+    #    value a higher source already supplied (AIQ-1755).
     context = _build_context(case_uuid, form_row.get("person_id"), form_row.get("dependent_id"))
+    sources = _build_sources_map(context)
+    _apply_passport_ocr(context, sources, case_uuid)
+    _apply_prior_forms(context, sources, form_row.get("person_id"), case_form_id)
 
     # 3. Load existing field state to skip overrides and detect real changes
     overridden_ids = _load_overridden_field_ids(case_form_id)
@@ -132,12 +179,15 @@ def _run(case_form_id: str, case_uuid: str) -> int:
         if existing_values.get(field_id) == new_value:
             continue  # already holds this exact value — no write, no change event
 
+        # Provenance for this value: which source supplied it + its confidence.
+        src_info = sources.get(prefill_source)
         _upsert_field_value(
             case_form_id=case_form_id,
             field_id=field_id,
             value=new_value,
             filled_by="system",
-            ai_confidence=0.99,
+            ai_confidence=(src_info[1] if src_info else _INTAKE_CONFIDENCE),
+            source=(src_info[0] if src_info else None),
         )
         changed_field_ids.append(field_id)
 
@@ -250,7 +300,9 @@ def _build_context(
             case_row = conn.execute(
                 text(
                     f"SELECT dest_country_code, origin_country_code, "
-                    f"       employee_id, intake_data "
+                    f"       employee_id, intake_data, "
+                    f"       target_move_date, actual_move_date, "
+                    f"       expected_duration_months "
                     f"FROM {_t('cases')} WHERE id = :id"
                 ),
                 {"id": case_uuid},
@@ -264,6 +316,18 @@ def _build_context(
             # ── case-level ───────────────────────────────────────────────────
             ctx["case"]["dest_country_code"] = case_row.get("dest_country_code")
             ctx["case"]["origin_country_code"] = case_row.get("origin_country_code")
+
+            # Arrival / stay length live on the case, not on intake_data. Exposed so
+            # corridor data-sheets can pre-fill "date of arrival" and "intended length
+            # of stay" instead of leaving them blank for the employee to re-key
+            # (AIQ-1754: the FR->NO sheet needs both). actual_move_date wins over
+            # target_move_date once the move has happened — same coalesce-the-aliases
+            # shape used for the profile/contract leaves below.
+            _arrival = case_row.get("actual_move_date") or case_row.get("target_move_date")
+            if hasattr(_arrival, "isoformat"):
+                _arrival = _arrival.isoformat()
+            ctx["case"]["arrival_date"] = _arrival
+            ctx["case"]["intended_stay_months"] = case_row.get("expected_duration_months")
 
             # ── profile — try multiple intake_data sub-keys ──────────────────
             profile_raw = (
@@ -415,6 +479,221 @@ def _build_context(
 
 
 # ---------------------------------------------------------------------------
+# Provenance map + lower-priority source overlays
+# ---------------------------------------------------------------------------
+
+def _build_sources_map(ctx: Dict[str, Any]) -> Dict[str, tuple]:
+    """
+    Walk the intake context and tag every non-empty leaf with its data origin.
+
+    Returns {dotted_path: (source, confidence)}. The source is derived from the
+    top-level key (profile/person/family → intake_profile, contract → contract,
+    banking → banking, everything else → system). Lists are not descended into —
+    _resolve_path can't index them, so they never become fillable paths.
+    """
+    sources: Dict[str, tuple] = {}
+
+    def walk(node: Any, prefix: str) -> None:
+        if not isinstance(node, dict):
+            return
+        for key, val in node.items():
+            path = f"{prefix}.{key}" if prefix else key
+            if isinstance(val, dict):
+                walk(val, path)
+            elif val is not None and not (isinstance(val, str) and not val.strip()):
+                top = path.split(".")[0]
+                src = _KEY_SOURCE.get(top, SOURCE_SYSTEM)
+                sources[path] = (src, _INTAKE_CONFIDENCE)
+
+    walk(ctx, "")
+    return sources
+
+
+def _set_path(ctx: Dict[str, Any], path: str, value: Any) -> None:
+    """Set a dotted path in ctx, creating intermediate dicts as needed."""
+    parts = path.split(".")
+    node = ctx
+    for part in parts[:-1]:
+        nxt = node.get(part)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            node[part] = nxt
+        node = nxt
+    node[parts[-1]] = value
+
+
+# vault (imm_employee_profiles) scalar column → ctx path. legal name and the
+# encrypted passport_number are handled specially below.
+_VAULT_SCALAR_TO_PATH = {
+    "date_of_birth": "profile.date_of_birth",
+    "nationality": "profile.nationality",
+    "passport_expiry": "profile.passport_expiry",
+}
+
+
+def _apply_passport_ocr(
+    ctx: Dict[str, Any],
+    sources: Dict[str, tuple],
+    case_uuid: str,
+) -> None:
+    """
+    Source 3 — passport / ID OCR extractions (imm_employee_profiles vault).
+
+    Fills identity leaves that intake left empty, from vault columns whose
+    field_sources marks them 'ocr'. passport_number is decrypted only at fill
+    time (Postgres + key), fail-soft. Never raises — a vault read failure must
+    not break prefill.
+    """
+    try:
+        with db.engine.connect() as conn:
+            case_row = conn.execute(
+                text(f"SELECT employee_id FROM {_t('cases')} WHERE id = :id"),
+                {"id": case_uuid},
+            ).mappings().first()
+            employee_id = case_row.get("employee_id") if case_row else None
+            if not employee_id:
+                return
+            vault = conn.execute(
+                text(
+                    f"SELECT legal_first_name, legal_last_name, date_of_birth, "
+                    f"       nationality, passport_expiry, passport_number, "
+                    f"       field_sources "
+                    f"FROM {_t('imm_employee_profiles')} "
+                    f"WHERE case_id = :cid AND employee_id = :eid LIMIT 1"
+                ),
+                {"cid": case_uuid, "eid": employee_id},
+            ).mappings().first()
+    except Exception:
+        logger.exception(
+            "prefill_engine: passport-OCR vault read failed case_uuid=%s", case_uuid
+        )
+        return
+
+    if not vault:
+        return
+
+    field_sources = _parse_json(vault.get("field_sources")) or {}
+
+    def _is_ocr(col: str) -> bool:
+        return field_sources.get(col) == "ocr"
+
+    def _fill(path: str, value: Any) -> None:
+        if value is None or (isinstance(value, str) and not str(value).strip()):
+            return
+        if _resolve_path(ctx, path) is not None:
+            return  # a higher source already supplied it
+        _set_path(ctx, path, str(value))
+        sources[path] = (SOURCE_PASSPORT_OCR, _PASSPORT_OCR_CONFIDENCE)
+
+    # Scalar OCR fields.
+    for col, path in _VAULT_SCALAR_TO_PATH.items():
+        if _is_ocr(col):
+            _fill(path, vault.get(col))
+
+    # Legal full name — compose from first + last when either is OCR-sourced.
+    if _is_ocr("legal_first_name") or _is_ocr("legal_last_name"):
+        full = " ".join(
+            p for p in (vault.get("legal_first_name"), vault.get("legal_last_name")) if p
+        ).strip()
+        _fill("profile.legal_full_name", full)
+
+    # Passport number — decrypt at fill time only (never logged).
+    if _is_ocr("passport_number") and vault.get("passport_number"):
+        decrypted = _decrypt_vault_passport(vault.get("passport_number"))
+        _fill("profile.passport_number", decrypted)
+
+
+def _decrypt_vault_passport(enc: Any) -> Optional[str]:
+    """
+    Decrypt a vault passport_number blob at fill time via pgcrypto.
+
+    Postgres-only and gated on IMMIGRATION_ENCRYPTION_KEY; returns None on any
+    failure or when no key/dialect support exists. Never raises, never logs the
+    plaintext (PII discipline, CLAUDE.md).
+    """
+    import os
+
+    key = os.environ.get("IMMIGRATION_ENCRYPTION_KEY", "")
+    if not key:
+        return None
+    try:
+        if db.engine.dialect.name != "postgresql":
+            return None
+        with db.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT pgp_sym_decrypt(CAST(:enc AS bytea), :key) AS d"),
+                {"enc": enc, "key": key},
+            ).mappings().first()
+        return row["d"] if row and row.get("d") else None
+    except Exception:
+        logger.warning("prefill_engine: vault passport decrypt failed")
+        return None
+
+
+def _apply_prior_forms(
+    ctx: Dict[str, Any],
+    sources: Dict[str, tuple],
+    person_id: Optional[str],
+    current_case_form_id: str,
+) -> None:
+    """
+    Source 4 — previously approved forms for the same person.
+
+    Donates values from the person's other APPROVED case forms into leaves that
+    every higher source left empty. Each donated value is mapped back to a ctx
+    path via its donor template field's prefill_source, so donation stays on the
+    same dotted-path model the rest of the engine uses. Latest-approved wins.
+    Never raises.
+    """
+    if not person_id:
+        return
+    try:
+        with db.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    f"SELECT cfv.field_id AS field_id, cfv.value AS value, "
+                    f"       ft.fields AS fields "
+                    f"FROM {_t('case_forms')} cf "
+                    f"JOIN {_t('form_templates')} ft ON ft.id = cf.form_template_id "
+                    f"JOIN {_t('case_form_field_values')} cfv "
+                    f"       ON cfv.case_form_id = cf.id "
+                    f"WHERE cf.person_id = :pid "
+                    f"  AND cf.status = 'approved' "
+                    f"  AND cf.id <> :cur "
+                    f"ORDER BY cf.updated_at DESC"
+                ),
+                {"pid": person_id, "cur": current_case_form_id},
+            ).mappings().fetchall()
+    except Exception:
+        logger.exception(
+            "prefill_engine: prior-form source query failed person_id=%s", person_id
+        )
+        return
+
+    for r in rows:
+        try:
+            value = r.get("value")
+            if value is None or (isinstance(value, str) and not value.strip()):
+                continue
+            field_id = r.get("field_id")
+            path: Optional[str] = None
+            for f in _parse_json(r.get("fields")) or []:
+                if (f.get("id") or f.get("field_id")) == field_id:
+                    path = f.get("prefill_source")
+                    break
+            if not path:
+                continue
+            if _resolve_path(ctx, path) is not None:
+                continue  # a higher source (or a newer donor) already filled it
+            _set_path(ctx, path, str(value))
+            sources[path] = (SOURCE_PRIOR_FORM, _PRIOR_FORM_CONFIDENCE)
+        except Exception:
+            logger.exception(
+                "prefill_engine: prior-form donation failed field=%s", r.get("field_id")
+            )
+
+
+# ---------------------------------------------------------------------------
 # Path resolution
 # ---------------------------------------------------------------------------
 
@@ -447,10 +726,11 @@ def _upsert_field_value(
     value: str,
     filled_by: str,
     ai_confidence: float,
+    source: Optional[str] = None,
 ) -> None:
     """
     Insert or update a case_form_field_values row.
-    ON CONFLICT updates value + filled_by + ai_confidence but only when
+    ON CONFLICT updates value + filled_by + ai_confidence + source but only when
     overridden is false (checked at call site, but the WHERE clause is a
     safety net for Postgres).
     """
@@ -459,12 +739,13 @@ def _upsert_field_value(
             conn.execute(
                 text(
                     f"INSERT INTO {_t('case_form_field_values')} "
-                    f"  (case_form_id, field_id, value, filled_by, ai_confidence) "
-                    f"VALUES (:cfid, :fid, :val, :by, :conf) "
+                    f"  (case_form_id, field_id, value, filled_by, ai_confidence, source) "
+                    f"VALUES (:cfid, :fid, :val, :by, :conf, :src) "
                     f"ON CONFLICT (case_form_id, field_id) DO UPDATE "
                     f"  SET value = EXCLUDED.value, "
                     f"      filled_by = EXCLUDED.filled_by, "
                     f"      ai_confidence = EXCLUDED.ai_confidence, "
+                    f"      source = EXCLUDED.source, "
                     f"      updated_at = {_now()} "
                     f"WHERE {_t('case_form_field_values')}.overridden = false"
                 ),
@@ -474,6 +755,7 @@ def _upsert_field_value(
                     "val": value,
                     "by": filled_by,
                     "conf": ai_confidence,
+                    "src": source,
                 },
             )
     except Exception:

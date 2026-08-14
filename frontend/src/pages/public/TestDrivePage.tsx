@@ -72,7 +72,7 @@ export const TestDrivePage: React.FC = () => {
   const [result, setResult] = useState<ProvisionSuccess | null>(null);
   // A session started in a previous visit (stashed at provision, TD-9) — lets the
   // "Finish with the survey" button work even after a reload, once a run exists.
-  const [priorSession, setPriorSession] = useState<{ session: string; corridor: string } | null>(null);
+  const [priorSession, setPriorSession] = useState<{ session: string; corridor: string; campaign?: string } | null>(null);
 
   // TD-8: record a funnel "click" once on landing (per-invite token / corridor).
   useEffect(() => {
@@ -86,15 +86,40 @@ export const TestDrivePage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recover a prior session from localStorage so the survey stays reachable on return.
+  // AIQ-1640: recover a prior run from localStorage so it survives navigating away and
+  // coming back — the test-drive is a deliberate round trip (leave, use the product,
+  // return to complete + survey). localStorage (not session-scoped) so it also survives
+  // a FULL browser reload, not just SPA navigation. When the full credential set was
+  // stashed we rehydrate the whole `result` (credentials + completion CTA + survey link);
+  // otherwise we fall back to the lighter priorSession so at least the survey stays
+  // reachable (e.g. an older stash from before credential persistence).
   useEffect(() => {
     try {
       const raw = localStorage.getItem(TEST_DRIVE_LS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { session_id?: string; corridor_id?: string };
-        if (parsed?.session_id) {
-          setPriorSession({ session: parsed.session_id, corridor: parsed.corridor_id || assignedCorridorId || '' });
-        }
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        session_id?: string;
+        corridor_id?: string;
+        campaign?: string;
+        hr?: TestDriveCredential;
+        employee?: TestDriveCredential;
+      };
+      if (!parsed?.session_id) return;
+      setPriorSession({
+        session: parsed.session_id,
+        corridor: parsed.corridor_id || assignedCorridorId || '',
+        campaign: parsed.campaign,
+      });
+      if (parsed.hr && parsed.employee && parsed.corridor_id && parsed.campaign) {
+        setAssignedCorridorId(parsed.corridor_id);
+        setResult({
+          ok: true,
+          sessionId: parsed.session_id,
+          corridorId: parsed.corridor_id,
+          campaign: parsed.campaign,
+          hr: parsed.hr,
+          employee: parsed.employee,
+        });
       }
     } catch {
       /* storage unavailable / private mode — no prior session */
@@ -148,6 +173,13 @@ export const TestDrivePage: React.FC = () => {
             tester_name: firstName.trim(),
             // May be '' — the survey lead-in then simply has nothing to pre-fill.
             tester_email: trimmedEmail,
+            // AIQ-1640: stash the credential pairs too, so returning to /test-drive
+            // after using the product (the test-drive is a deliberate round trip)
+            // restores the whole result block — credentials, completion CTA, survey
+            // link — not just the survey link. These are disposable @probe.test
+            // accounts already shown on screen; persisting them is what the design needs.
+            hr: res.hr,
+            employee: res.employee,
           }),
         );
       } catch {
@@ -162,10 +194,13 @@ export const TestDrivePage: React.FC = () => {
 
   // Link to the survey, carrying the run's session for attribution. Available once a
   // run exists (this visit's result, or a prior visit recovered from localStorage).
+  // AIQ-1640: the survey link carries session_id, corridor_id AND campaign so the
+  // returning tester's survey is attributed correctly (the survey endpoint still derives
+  // campaign from the session server-side, but the link is self-describing either way).
   const surveyLink = result
-    ? `/test-drive/survey?corridor=${result.corridorId}&session=${result.sessionId}`
+    ? `/test-drive/survey?corridor=${result.corridorId}&session=${result.sessionId}&campaign=${encodeURIComponent(result.campaign)}`
     : priorSession
-      ? `/test-drive/survey?corridor=${priorSession.corridor}&session=${priorSession.session}`
+      ? `/test-drive/survey?corridor=${priorSession.corridor}&session=${priorSession.session}${priorSession.campaign ? `&campaign=${encodeURIComponent(priorSession.campaign)}` : ''}`
       : null;
   const surveySessionId = result?.sessionId ?? priorSession?.session ?? null;
 
@@ -403,6 +438,24 @@ export const TestDrivePage: React.FC = () => {
         </FadeIn>
       </Section>
 
+      {/* Unlocking the roadmap — test payment with EXACT card details (no surprises) */}
+      <Section spacing="lg" background="muted">
+        <FadeIn>
+          <div className="mx-auto max-w-2xl">
+            <SectionHeader title={c.paymentTest.header} align="center" narrow />
+            <p className="mt-6 text-marketing-body text-marketing-text leading-relaxed text-center">
+              {c.paymentTest.intro}
+            </p>
+            <div className="mt-6 mx-auto max-w-md space-y-2 rounded-xl border border-marketing-border bg-white p-4">
+              {c.paymentTest.card.map((row) => (
+                <CopyRow key={row.label} label={row.label} value={row.value} />
+              ))}
+            </div>
+            <p className="mt-4 text-center text-sm text-marketing-text-muted">{c.paymentTest.note}</p>
+          </div>
+        </FadeIn>
+      </Section>
+
       {/* Before you start — video placeholders (real embeds land in TD-11) */}
       <Section spacing="lg" background="muted">
         <FadeIn>
@@ -608,6 +661,16 @@ const CredentialResult: React.FC<{
         credential={result.employee}
       />
     </div>
+    {/* Test card, right where the logins are — the tester needs it at the roadmap unlock. */}
+    <div className="mt-6 mx-auto max-w-md rounded-xl border border-marketing-border bg-marketing-surface-muted p-4">
+      <p className="text-sm font-semibold text-marketing-primary">{c.paymentTest.reminderHeader}</p>
+      <p className="mt-1 text-xs text-marketing-text-muted leading-relaxed">{c.paymentTest.reminderIntro}</p>
+      <div className="mt-3 space-y-2">
+        {c.paymentTest.card.map((row) => (
+          <CopyRow key={row.label} label={row.label} value={row.value} />
+        ))}
+      </div>
+    </div>
     {/* AIQ-1539: plain line — where the test ends, and that the survey is required. */}
     <p className="mt-8 text-center text-marketing-body text-marketing-text leading-relaxed">
       {c.credentials.doneNote}
@@ -617,7 +680,7 @@ const CredentialResult: React.FC<{
         onClick={() =>
           onComplete(
             result.sessionId,
-            `/test-drive/survey?corridor=${result.corridorId}&session=${result.sessionId}`,
+            `/test-drive/survey?corridor=${result.corridorId}&session=${result.sessionId}&campaign=${encodeURIComponent(result.campaign)}`,
           )
         }
         variant="primary"

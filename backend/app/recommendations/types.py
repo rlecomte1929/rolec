@@ -36,6 +36,9 @@ class RecommendationExplanation(BaseModel):
     budget_fit: str = "unknown"
     family_fit: str = "unknown"
     policy_fit: str = "unknown"
+    # Cost-of-living: the neighbourhood's estimated monthly cost as a % of the company
+    # housing cap, FX-normalized to the policy currency. None when there's no cap/cost.
+    budget_pct_of_cap: Optional[float] = None
     coverage_fit: str = "unknown"
     warning_flags: List[str] = Field(default_factory=list)
     explanation_summary: str = ""

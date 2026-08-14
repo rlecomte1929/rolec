@@ -1,12 +1,17 @@
 /// <reference types="vite/client" />
 import React, { useCallback, useEffect, useRef, useState } from "react"
+import { Link } from "react-router-dom"
 import { supabase } from "../api/supabase"
 import {
   assignTask,
   cancelTask,
+  dispatchCaseRfq,
   getCaseProviders,
+  getCaseRfqs,
   updateTask,
   type CaseProvider,
+  type CaseRfq,
+  type DispatchRfqTargetResult,
   type ProviderTask,
 } from "../api/hrCoordination"
 import { Input } from './antigravity/Input';
@@ -485,6 +490,287 @@ function ProviderRowSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
+// EmployeeRfqSection — [AIQ-1671] the RFQs the EMPLOYEE submitted for this case,
+// read from the canonical `rfqs` table (AIQ-1669). This is the HR-visible surface that
+// makes the employee's "your HR team can see the providers you picked" true. Read-only
+// here; dispatch to suppliers is AIQ-1670.
+// ---------------------------------------------------------------------------
+
+/**
+ * [AIQ-1743] The supplier magic links produced by the dispatch that just ran.
+ *
+ * Why a separate block instead of a "copy" cell on each recipient row: the dispatch results
+ * are keyed by `recipient_id`, but `rfq.recipients` rows carry only `supplier_id` — the sole
+ * overlapping field is the display name. Joining on a name would, for two suppliers sharing
+ * one, show A's credential on B's row. A wrong bearer token on the wrong supplier is not a
+ * cosmetic bug, so this renders the dispatch's own list and joins nothing.
+ *
+ * These links exist ONLY in this response — `rfq_recipients` stores just a hash — so they are
+ * held in component state and vanish on reload. Deliberately not persisted anywhere.
+ */
+function DispatchedSupplierLinks({ results }: { results: DispatchRfqTargetResult[] }) {
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+  const withLinks = results.filter((r) => r.link)
+
+  if (withLinks.length === 0) return null
+
+  const copy = async (link: string, idx: number) => {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopiedIdx(idx)
+      window.setTimeout(() => setCopiedIdx((c) => (c === idx ? null : c)), 2000)
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+      <div className="text-xs font-medium text-navy-800 mb-2">
+        Supplier links from this dispatch
+      </div>
+      <ul className="flex flex-col gap-1.5">
+        {withLinks.map((r, i) => (
+          <li
+            key={r.recipient_id ?? i}
+            className="flex items-center justify-between gap-2 text-sm"
+          >
+            <span className="text-gray-800 truncate">
+              {r.supplier_name ?? "Provider"}
+            </span>
+            <Button unstyled
+              type="button"
+              onClick={() => copy(r.link as string, i)}
+              className="shrink-0 px-2 py-1 text-xs font-medium rounded-md border border-[#cbd5e1] bg-white hover:bg-[#f1f5f9] text-navy-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              {copiedIdx === i ? "Copied" : "Copy link"}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-gray-500">
+        Shown only right after dispatching — these links are not stored, so they disappear when
+        you reload. Dispatching again issues fresh links and invalidates these. Anyone with a
+        link can submit that supplier&rsquo;s quote, so share it only with that supplier.
+      </p>
+    </div>
+  )
+}
+
+function RfqCard({
+  caseId,
+  rfq,
+  onDispatched,
+}: {
+  caseId: string
+  rfq: CaseRfq
+  onDispatched: () => void
+}) {
+  const [dispatching, setDispatching] = useState(false)
+  const [dispatchError, setDispatchError] = useState<string | null>(null)
+  const [dispatchedCount, setDispatchedCount] = useState<number | null>(null)
+  // [AIQ-1743] Per-recipient results of the dispatch that just ran, carrying the magic links.
+  // Session-only by necessity: the raw token is never persisted server-side.
+  const [dispatchResults, setDispatchResults] = useState<DispatchRfqTargetResult[] | null>(null)
+
+  // [AIQ-1673] The email-suppliers flow is a SEPARATE, explicitly-confirmed action — it emails
+  // real companies, so it must never fire by accident. Inline two-click confirm (no modal).
+  const [emailConfirming, setEmailConfirming] = useState(false)
+  const [emailing, setEmailing] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [emailedCount, setEmailedCount] = useState<number | null>(null)
+  const [emailedTotal, setEmailedTotal] = useState<number | null>(null)
+  const [emailSkipReason, setEmailSkipReason] = useState<string | null>(null)
+
+  // [AIQ-1670] HR-gated dispatch: mint a supplier token for every recipient (reuses the
+  // audited path). send_email stays OFF here — clicking mints the links; it never emails a
+  // real supplier by accident.
+  const handleDispatch = async () => {
+    setDispatching(true)
+    setDispatchError(null)
+    try {
+      const res = await dispatchCaseRfq(caseId, rfq.id)
+      setDispatchedCount(res.dispatched)
+      // [AIQ-1743] Keep the per-recipient results so HR can see and copy each supplier link.
+      // Before this, the response was read for `dispatched` only and the links were discarded.
+      setDispatchResults(res.results ?? null)
+      onDispatched()
+    } catch (err) {
+      setDispatchError(err instanceof Error ? err.message : "Dispatch failed.")
+    } finally {
+      setDispatching(false)
+    }
+  }
+
+  // [AIQ-1673] Second click of the two-step confirm actually emails (send_email=true). With no
+  // RESEND_API_KEY configured the backend no-ops (links returned, nothing sent).
+  const handleSendEmail = async () => {
+    setEmailing(true)
+    setEmailError(null)
+    try {
+      const res = await dispatchCaseRfq(caseId, rfq.id, true)
+      // [AIQ-1677] Report the ACTUAL number emailed (results[].sent === true), not the recipient
+      // count — honest feedback when some are skipped (no verified address, no RESEND key, …).
+      const results = res.results ?? []
+      const sent = results.filter((r) => r.sent).length
+      const total = results.length || res.dispatched
+      const firstSkip = results.find((r) => !r.sent && r.error)?.error ?? null
+      setEmailedCount(sent)
+      setEmailedTotal(total)
+      setEmailSkipReason(sent < total ? firstSkip : null)
+      // [AIQ-1743] The email path mints links too — and when a send is SKIPPED (unverified
+      // address, no RESEND key) the copyable link is the only way HR can still reach that
+      // supplier. Surface them here as well.
+      setDispatchResults(results.length > 0 ? results : null)
+      setEmailConfirming(false)
+      onDispatched()
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "Could not email suppliers.")
+    } finally {
+      setEmailing(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-[#e2e8f0] bg-white p-4">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="font-mono text-xs font-medium text-navy-800">
+          {rfq.rfq_ref ?? rfq.id}
+        </span>
+        <div className="flex items-center gap-2">
+          {rfq.status && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-navy-50 text-navy-700 border border-navy-100">
+              {rfq.status}
+            </span>
+          )}
+          {/* HR-side entry to the quote-review / accept surface (QuoteRfqDetail, /quotes/rfq/:id).
+              HR is the payer, but the only path to it was the employee plan CTA — so from case
+              management HR could see the RFQ (AIQ-1671) but not review/accept the quotes. */}
+          <Link
+            to={`/quotes/rfq/${rfq.id}`}
+            className="text-xs font-medium text-[#2563eb] underline underline-offset-2 hover:text-[#1d4ed8] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-sm"
+          >
+            Review quotes →
+          </Link>
+        </div>
+      </div>
+      {rfq.service_keys.length > 0 && (
+        <div className="text-xs text-gray-500 mb-2">
+          Services: {rfq.service_keys.join(", ")}
+        </div>
+      )}
+      <ul className="divide-y divide-[#f1f5f9] border border-[#f1f5f9] rounded-lg overflow-hidden">
+        {rfq.recipients.map((r, i) => (
+          <li
+            key={r.supplier_id ?? i}
+            className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+          >
+            <span className="text-gray-800 truncate">
+              {r.supplier_name ?? r.supplier_id ?? "Provider"}
+            </span>
+            <span className="text-xs text-gray-500 shrink-0">{r.status ?? "—"}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 flex flex-col gap-2">
+        {/* [AIQ-1670] Mint-only: prepares supplier links, never emails. */}
+        <div className="flex items-center gap-3">
+          <Button unstyled
+            type="button"
+            onClick={handleDispatch}
+            disabled={dispatching}
+            className="px-3 py-1.5 bg-navy-800 hover:bg-navy-900 disabled:opacity-60 text-white text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            {dispatching ? "Dispatching…" : "Dispatch to suppliers"}
+          </Button>
+          {dispatchedCount != null && !dispatchError && (
+            <span className="text-xs text-green-700">
+              ✅ Links prepared for {dispatchedCount} {dispatchedCount === 1 ? "supplier" : "suppliers"}.
+            </span>
+          )}
+          {dispatchError && <span className="text-xs text-red-600">{dispatchError}</span>}
+        </div>
+
+        {/* [AIQ-1673] Email suppliers — a SEPARATE, explicitly-confirmed action (two clicks).
+            Emails real companies, so it is never the default and never auto-fires. */}
+        <div className="flex items-center gap-2">
+          {emailedCount != null && !emailError ? (
+            <span className={`text-xs ${emailedCount > 0 ? "text-green-700" : "text-amber-700"}`}>
+              {/* [AIQ-1677] Honest count: emailed X of N, with the skip reason when some didn't send. */}
+              ✉️ Emailed {emailedCount} of {emailedTotal}{" "}
+              {emailedTotal === 1 ? "supplier" : "suppliers"}
+              {emailedTotal != null && emailedCount < emailedTotal && emailSkipReason
+                ? ` — ${emailedTotal - emailedCount} skipped (${emailSkipReason})`
+                : ""}
+              .
+            </span>
+          ) : emailConfirming ? (
+            <>
+              <Button unstyled
+                type="button"
+                onClick={handleSendEmail}
+                disabled={emailing}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
+              >
+                {emailing
+                  ? "Emailing…"
+                  : `Confirm: email ${rfq.recipients.length} ${rfq.recipients.length === 1 ? "supplier" : "suppliers"}?`}
+              </Button>
+              {!emailing && (
+                <Button unstyled
+                  type="button"
+                  onClick={() => setEmailConfirming(false)}
+                  className="px-2 py-1.5 text-gray-500 hover:text-gray-700 text-xs font-medium"
+                >
+                  Cancel
+                </Button>
+              )}
+            </>
+          ) : (
+            <Button unstyled
+              type="button"
+              onClick={() => setEmailConfirming(true)}
+              className="px-3 py-1.5 border border-[#e2e8f0] hover:bg-gray-50 text-gray-700 text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              Email suppliers
+            </Button>
+          )}
+          {emailError && <span className="text-xs text-red-600">{emailError}</span>}
+        </div>
+      </div>
+      {/* [AIQ-1743] HR dispatches, so HR must be able to see and relay the link. Before this it
+          surfaced only in the EMPLOYEE's inbox thread (supplier_link_dispatch posts it to
+          quote_messages under the employee's auth id), leaving HR blind to the artifact they
+          are responsible for. */}
+      {dispatchResults && <DispatchedSupplierLinks results={dispatchResults} />}
+    </div>
+  )
+}
+
+function EmployeeRfqSection({
+  caseId,
+  rfqs,
+  onDispatched,
+}: {
+  caseId: string
+  rfqs: CaseRfq[]
+  onDispatched: () => void
+}) {
+  if (rfqs.length === 0) return null
+  return (
+    <div className="mb-6" data-testid="employee-rfqs">
+      <h2 className="text-sm font-semibold text-gray-700 mb-2 px-1">
+        Employee-requested quotes
+      </h2>
+      <div className="flex flex-col gap-3">
+        {rfqs.map((rfq) => (
+          <RfqCard key={rfq.id} caseId={caseId} rfq={rfq} onDispatched={onDispatched} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ProviderCoordinationPanel — main export
 // ---------------------------------------------------------------------------
 
@@ -494,9 +780,21 @@ interface ProviderCoordinationPanelProps {
 
 export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelProps) {
   const [providers, setProviders] = useState<CaseProvider[]>([])
+  const [rfqs, setRfqs] = useState<CaseRfq[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
+
+  // [AIQ-1671] Best-effort: the employee's canonical RFQs are additive context; a failure
+  // here must never break the provider panel, so it's fetched separately and errors are
+  // swallowed (the section just doesn't render).
+  const fetchRfqs = useCallback(async () => {
+    try {
+      setRfqs(await getCaseRfqs(caseId))
+    } catch {
+      setRfqs([])
+    }
+  }, [caseId])
 
   const fetchProviders = useCallback(async () => {
     setFetchError(null)
@@ -514,7 +812,8 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
   useEffect(() => {
     setLoading(true)
     void fetchProviders()
-  }, [fetchProviders])
+    void fetchRfqs()
+  }, [fetchProviders, fetchRfqs])
 
   // Supabase Realtime subscription
   useEffect(() => {
@@ -554,6 +853,11 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
           </Button>
         )}
       </div>
+
+      {/* [AIQ-1671] Employee's canonical RFQs — shown above providers (and even when no
+          provider tasks exist yet) so HR actually sees the picks the employee submitted.
+          [AIQ-1670] each card carries the HR-gated "Dispatch to suppliers" action. */}
+      <EmployeeRfqSection caseId={caseId} rfqs={rfqs} onDispatched={fetchRfqs} />
 
       {/* Error state */}
       {fetchError && (

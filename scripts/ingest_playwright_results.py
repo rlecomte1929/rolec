@@ -77,31 +77,47 @@ def walk_specs(node):
             yield from walk_specs(item)
 
 
+def _spec_status(spec: dict) -> str:
+    """Worst status across this spec's tests/projects."""
+    status = "SKIP"
+    for t in spec.get("tests", []) or []:
+        res = (t.get("results") or [{}])
+        pw = res[-1].get("status", "skipped")
+        s = PW_STATUS.get(pw, "FAIL")
+        # A failure caused by a deploy-window backend outage is environmental, not a
+        # bug: reclassify FAIL -> ENV so the scorer never files a P0 for it.
+        if s == "FAIL" and _is_environmental(t):
+            s = "ENV"
+        if RANK[s] >= RANK[status]:
+            status = s
+    return status
+
+
 def parse_playwright(pw_path: Path):
+    """Return (rows, untagged) — the scorable rows, and every spec that had no [TAG].
+
+    `untagged` is returned rather than discarded on purpose. A spec with no tag is
+    invisible to the scorer and therefore to the Notion filer, so if it fails, it fails
+    to nobody. That is not hypothetical: `tests/e2e/tests/public/crawler-surface.spec.ts`
+    ran against production for a day with untagged titles while Cloudflare 403'd three of
+    the crawlers it asserts on, and nothing anywhere went red (AIQ-1804). The caller turns
+    a FAILING untagged spec into a hard error.
+    """
     data = json.loads(pw_path.read_text(encoding="utf-8"))
     rows = {}
+    untagged = []
     roots = data.get("suites", data)
     for spec in walk_specs({"suites": roots} if isinstance(roots, list) else data):
         title = spec.get("title", "")
+        status = _spec_status(spec)
         tid = tag_of(title)
         if not tid:
+            untagged.append({"title": title.strip(), "status": status})
             continue
-        # worst status across this spec's tests/projects
-        status = "SKIP"
-        for t in spec.get("tests", []) or []:
-            res = (t.get("results") or [{}])
-            pw = res[-1].get("status", "skipped")
-            s = PW_STATUS.get(pw, "FAIL")
-            # A failure caused by a deploy-window backend outage is environmental, not a
-            # bug: reclassify FAIL -> ENV so the scorer never files a P0 for it.
-            if s == "FAIL" and _is_environmental(t):
-                s = "ENV"
-            if RANK[s] >= RANK[status]:
-                status = s
         prev = rows.get(tid)
         if prev is None or RANK[status] >= RANK[prev["status"]]:
             rows[tid] = {"id": tid, "title": title.strip(), "status": status, "source": "browser"}
-    return list(rows.values())
+    return list(rows.values()), untagged
 
 
 def summarize(results):
@@ -126,9 +142,14 @@ def main():
     ap.add_argument("--pw", required=True, help="Playwright _results.json path")
     ap.add_argument("--api", default=None, help="API runner test_results.json (optional)")
     ap.add_argument("--out", default=None, help="output path (default results/test_results_<ts>.json)")
+    ap.add_argument(
+        "--allow-untagged-failures",
+        action="store_true",
+        help="report untagged failing specs but exit 0 anyway (escape hatch; do not use in CI)",
+    )
     args = ap.parse_args()
 
-    browser = parse_playwright(Path(args.pw))
+    browser, untagged = parse_playwright(Path(args.pw))
 
     merged = {}  # id -> row ; API layer first, browser overrides/adds
     api_meta = {}
@@ -163,6 +184,39 @@ def main():
     print(f"✔ merged {len(browser)} browser + {len(merged) - len(browser)} api → {out_path}")
     print(f"  summary: {out['summary']}")
 
+    return _report_untagged(untagged, allow_failures=args.allow_untagged_failures)
+
+
+def _report_untagged(untagged, *, allow_failures: bool) -> int:
+    """Print every spec the tag filter dropped, and fail if any of them FAILED.
+
+    A passing untagged spec is a gap worth naming but not worth breaking a run over. A
+    FAILING one is different: the test found a real problem and there is no path from
+    here to the scorer, the health band, or the Notion queue. Silence in that case is
+    indistinguishable from success, which is the whole defect class this guards.
+    """
+    if not untagged:
+        return 0
+
+    failing = [u for u in untagged if u["status"] in ("FAIL", "BLOCKED")]
+
+    print(f"\n  {len(untagged)} spec(s) had no [TAG] and are invisible to the scorer:")
+    for u in untagged:
+        print(f"    {u['status']:<5} {u['title']}")
+    print("  Add a leading [TAG] to the spec title AND an entry in scripts/scoring_map.json.")
+
+    if not failing:
+        return 0
+
+    print(
+        f"\n✖ {len(failing)} untagged spec(s) FAILED. A failing test that cannot reach the "
+        "scorer reports to nobody — the run would go green on a real defect.",
+    )
+    if allow_failures:
+        print("  --allow-untagged-failures set; exiting 0 anyway.")
+        return 0
+    return 1
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

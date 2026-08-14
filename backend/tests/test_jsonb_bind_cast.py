@@ -60,3 +60,79 @@ def test_jbind_postgres_wraps_in_cast(monkeypatch):
 
     monkeypatch.setattr(cases_mod, "_is_sqlite", False)
     assert cases_mod._jbind("ctx") == "CAST(:ctx AS jsonb)"
+
+
+# ── Tree-wide guard ───────────────────────────────────────────────────────────
+#
+# The tests above prove the helper is correct. They cannot see a hand-written
+# `:param::type` somewhere else in the tree — and there were EIGHT of them when
+# this guard was added (AIQ-1780), including four `pgp_sym_decrypt(:enc::bytea…)`
+# calls on the passport-decryption and GDPR-export paths, every one wrapped in a
+# bare `except Exception` that swallowed the syntax error silently.
+#
+# Why the pattern is so easy to write and so hard to notice: SQLAlchemy's bind
+# regex refuses to match a name followed by ':', so it BACKTRACKS and binds a
+# truncated name — `:enc::bytea` binds a param called `en` and leaves the literal
+# `:enc::bytea` in the SQL. Postgres then says `syntax error at or near ":"`.
+# SQLite never sees a cast, so the curated CI suite cannot catch it.
+
+import os
+import re
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+_SCAN_ROOTS = ("backend/app", "backend/db", "backend/relopass")
+_SCAN_FILES = ("backend/database.py",)
+
+# `:name::` — a bind placeholder immediately followed by a Postgres cast.
+_BAD = re.compile(r":[A-Za-z_][A-Za-z0-9_]*::")
+
+# Prose that deliberately names the broken form to warn about it. Key = repo path,
+# value = how many such mentions are expected. A NEW match in one of these files
+# still fails, because the count moves.
+_DOC_MENTIONS = {
+    "backend/app/routers/feedback.py": 1,
+    "backend/app/services/coordinator_session_store.py": 1,
+    "backend/database.py": 1,
+    "backend/db/cases.py": 1,
+    # [AIQ-1802] decrypt_passport_for_display's docstring names the bad form to warn the
+    # next editor off it. The SQL directly beneath uses CAST(:enc AS bytea).
+    "backend/app/services/immigration_service.py": 1,
+}
+
+
+def _scan() -> dict:
+    hits: dict = {}
+    paths = []
+    for root in _SCAN_ROOTS:
+        for dirpath, _dirs, files in os.walk(os.path.join(_REPO_ROOT, root)):
+            if "__pycache__" in dirpath:
+                continue
+            paths += [os.path.join(dirpath, f) for f in files if f.endswith(".py")]
+    paths += [os.path.join(_REPO_ROOT, f) for f in _SCAN_FILES]
+
+    for path in paths:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                n = len(_BAD.findall(fh.read()))
+        except OSError:
+            continue
+        if n:
+            hits[os.path.relpath(path, _REPO_ROOT)] = n
+    return hits
+
+
+def test_no_unbound_postgres_cast_placeholders():
+    """`:param::type` anywhere in the backend is a latent Postgres-only failure.
+
+    Fix by writing `CAST(:param AS type)`. If your match is prose warning about
+    the bug, add the file to _DOC_MENTIONS with its expected count.
+    """
+    unexpected = {
+        path: n for path, n in _scan().items() if _DOC_MENTIONS.get(path) != n
+    }
+    assert unexpected == {}, (
+        "Unbound Postgres cast placeholder(s) — SQLAlchemy binds a TRUNCATED name and "
+        "leaves the literal `:param` in the SQL, so Postgres raises "
+        'syntax error at or near ":". SQLite masks it. Use CAST(:param AS type). '
+        f"Offenders {{path: count}}: {unexpected}"
+    )

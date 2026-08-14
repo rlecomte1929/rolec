@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "purpose": "Known-open E2E failures the campaign is allowed to be red on. Anything failing that is NOT listed here fails the run.",
+    "why": "The 'Ingest + score' step carried continue-on-error: true with the comment 'Phase 1: known-open bugs (RFQ 500 etc.) keep it RED; don't fail the job yet'. That mask was the only thing standing between a red test and a red run, so NO test outcome could ever fail the campaign. This file removes the reason for the mask: known-open bugs are named here, and everything else is a real failure.",
+    "rules": [
+      "This is a RATCHET. Adding an entry needs a ticket and a reason. Removing one is always welcome.",
+      "An entry that starts passing is reported as stale and must be deleted \u2014 a stale baseline silently re-opens the hole it documented.",
+      "Do not add a failure here to make CI green. Fix it, or file it and link the ticket.",
+      "An entry whose REASON has gone stale is as dangerous as one that starts passing. VND-05 sat here labelled 'create_rfq returns 500' while it was actually a 405 against an endpoint deleted three weeks earlier \u2014 and that label was the stated justification for muzzling the scorer. Before trusting an entry, read the failure in the run artifact, not the label.",
+      "Both entries this file ever held were mislabelled, and in both cases the label was the reason nobody looked. VND-05 said 500, was 405. R4X-B said 'the write races', and nothing raced \u2014 the POST took 2250ms and the test waited 2100ms. Neither was diagnosed until someone reproduced it. Budget the reproduction before you budget the fix."
+    ],
+    "created": "2026-08-11",
+    "ticket": "AIQ-1820 (https://app.notion.com/p/3b9887c64d48818fb318fa9f3d2226e0)",
+    "note_on_commit_labels": "The commit that introduced this file is labelled [AIQ-1804] and the consent fix beside it [AIQ-1803]. NEITHER NUMBER IS REAL — both were written before any Notion page existed, and AIQ-1804 is the id of an unrelated task. This file's real ticket is AIQ-1820, filed retroactively on 2026-08-11; the consent fix is AIQ-1811 (PR #1790). Trust the PR numbers, which are unambiguous: #1792 shipped this file, #1790 the consent fix."
+  },
+  "known_failures": {},
+  "_history": {
+    "VND-05": "Removed 2026-08-11. Never a bug. The test POSTed /api/hr/cases/{id}/rfq, deleted 2026-07-22 when RFQ became employee-led, so it 405'd forever. Replaced by an employee-led [VND-05] in tests/e2e/tests/deep/journey.spec.ts.",
+    "R4X-B": "Removed 2026-08-11 after 10 consecutive green runs against production with a fresh fixture each. Never a product bug either. Baselined as 'the write races'; in fact POST /api/ai/decisions takes ~2250ms and the spec's passive response listener gave the last click 2100ms of fixed sleep, so a 10% latency swing decided the verdict \u2014 5 of 12 runs red (42%). The rows were always written. Fixed by registering waitForResponse before each click. AIQ-1812."
+  }
+}

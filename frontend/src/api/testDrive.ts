@@ -84,6 +84,14 @@ export async function provisionTestDrive(input: ProvisionInput): Promise<Provisi
 
 // ── TD-5 (AIQ-1423): completion survey ────────────────────────────────────────
 
+/** One warm intro. A respondent can leave several — see `SurveyInput.referrals`. */
+export interface SurveyReferral {
+  name?: string;
+  company_role?: string;
+  contact?: string;
+  consent?: boolean;
+}
+
 export interface SurveyInput {
   session_id?: string;
   campaign?: string;
@@ -105,6 +113,13 @@ export interface SurveyInput {
   testimonial_consent?: boolean;
   pilot_interest?: 'yes' | 'maybe' | 'no';
   pilot_note?: string;
+  /**
+   * Every referral the respondent left. The backend stores the whole list in
+   * `survey_responses.referrals` (jsonb) and mirrors `referrals[0]` into the legacy scalar
+   * columns below — which are still read by the admin "intro" count and the daily warm-lead
+   * alert, so we also send them from `referrals[0]` for a backend that predates this field.
+   */
+  referrals?: SurveyReferral[];
   referral_name?: string;
   referral_company_role?: string;
   referral_contact?: string;

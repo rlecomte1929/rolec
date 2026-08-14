@@ -38,6 +38,17 @@ CREATE TABLE company_vendor_selections (
         OR (master_item_id IS NULL AND custom_item_json IS NOT NULL)
     )
 );
+
+-- [F-2] The guard in upsert_master_selection reads this table to compare the selection's
+-- country against the catalog item's own. Without it every write would hit "no such table".
+CREATE TABLE service_catalog_items (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    category TEXT,
+    city TEXT,
+    country TEXT,
+    active INTEGER NOT NULL DEFAULT 1
+);
 """
 
 
@@ -54,6 +65,95 @@ class VendorCurationTests(unittest.TestCase):
         self.engine_patcher = mock.patch.object(vendor_curation.db, "engine", self.engine)
         self.engine_patcher.start()
         self.addCleanup(self.engine_patcher.stop)
+
+    def _catalog_item(self, item_id: str, name: str, country, city=None) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("INSERT INTO service_catalog_items (id, name, category, city, country) "
+                     "VALUES (:i, :n, 'movers', :c, :co)"),
+                {"i": item_id, "n": name, "c": city, "co": country},
+            )
+
+    # ------------------------------------------------------------------
+    # [F-2] country agreement at the WRITE path
+    #
+    # 177 Norwegian companies had approved a Sydney mover because nothing ever
+    # compared the selection's country with the catalog item's. Cross-country rows
+    # were still arriving daily when this guard was written, which is why it matters
+    # more than any one-off cleanup.
+    # ------------------------------------------------------------------
+    def test_a_vendor_in_the_wrong_country_is_refused(self) -> None:
+        master = str(uuid.uuid4())
+        self._catalog_item(master, "Santa Fe Relocation", "AU", city="Sydney")
+        with self.assertRaises(vendor_curation.CountryMismatch) as ctx:
+            vendor_curation.upsert_master_selection(
+                company_id=str(uuid.uuid4()), category="movers", master_item_id=master,
+                selected=True, destination_city="Oslo", country="NO",
+            )
+        self.assertIn("AU", str(ctx.exception))
+        self.assertIn("NO", str(ctx.exception))
+
+    def test_a_refused_toggle_leaves_no_row_behind(self) -> None:
+        """The check runs before the INSERT, inside the same transaction."""
+        company, master = str(uuid.uuid4()), str(uuid.uuid4())
+        self._catalog_item(master, "Santa Fe Relocation", "AU")
+        with self.assertRaises(vendor_curation.CountryMismatch):
+            vendor_curation.upsert_master_selection(
+                company_id=company, category="movers", master_item_id=master,
+                selected=True, country="NO",
+            )
+        with self.engine.begin() as conn:
+            n = conn.execute(
+                text("SELECT count(*) FROM company_vendor_selections WHERE company_id = :c"),
+                {"c": company},
+            ).scalar()
+        self.assertEqual(n, 0)
+
+    def test_a_matching_country_is_allowed(self) -> None:
+        master = str(uuid.uuid4())
+        self._catalog_item(master, "Alfa Mobility Norway", "NO", city="Oslo")
+        row = vendor_curation.upsert_master_selection(
+            company_id=str(uuid.uuid4()), category="movers", master_item_id=master,
+            selected=True, destination_city="Oslo", country="NO",
+        )
+        self.assertTrue(row["selected"])
+
+    def test_case_and_whitespace_do_not_make_a_false_mismatch(self) -> None:
+        master = str(uuid.uuid4())
+        self._catalog_item(master, "Alfa Mobility Norway", "no")
+        row = vendor_curation.upsert_master_selection(
+            company_id=str(uuid.uuid4()), category="movers", master_item_id=master,
+            selected=True, country=" NO ",
+        )
+        self.assertTrue(row["selected"])
+
+    def test_an_unknown_country_is_permitted_not_rejected(self) -> None:
+        """service_catalog_items.country is 981 of 985 populated. "We do not know" is not
+        evidence of a mismatch, and rejecting on absence would block legitimate saves."""
+        master = str(uuid.uuid4())
+        self._catalog_item(master, "Unlocated Vendor", None)
+        row = vendor_curation.upsert_master_selection(
+            company_id=str(uuid.uuid4()), category="movers", master_item_id=master,
+            selected=True, country="NO",
+        )
+        self.assertTrue(row["selected"])
+
+    def test_a_selection_with_no_country_is_permitted(self) -> None:
+        master = str(uuid.uuid4())
+        self._catalog_item(master, "Santa Fe Relocation", "AU")
+        row = vendor_curation.upsert_master_selection(
+            company_id=str(uuid.uuid4()), category="movers", master_item_id=master,
+            selected=True, country=None,
+        )
+        self.assertTrue(row["selected"])
+
+    def test_an_unknown_master_item_is_permitted(self) -> None:
+        """A master id with no catalog row cannot be compared against anything."""
+        row = vendor_curation.upsert_master_selection(
+            company_id=str(uuid.uuid4()), category="movers",
+            master_item_id=str(uuid.uuid4()), selected=True, country="NO",
+        )
+        self.assertTrue(row["selected"])
 
     # ------------------------------------------------------------------
     # upsert_master_selection

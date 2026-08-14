@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _REPO_ROOT not in sys.path:
@@ -412,6 +413,68 @@ class PolicyConfigMatrixServiceTests(unittest.TestCase):
         self.assertEqual(self.db.publish_atomic_calls, [vid])
         self.assertEqual(out.get("status"), "published")
         self.assertEqual(out.get("source"), "published")
+
+    def _seed_publishable(self) -> str:
+        """Insert a draft version + one benefit row so publish_draft can run. Returns vid."""
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-04-01")
+        self.db.insert_policy_config_benefit_row(
+            {
+                "policy_config_version_id": vid,
+                "benefit_key": "mobility_premium",
+                "benefit_label": "Mobility premium",
+                "category": "compensation_allowances",
+                "covered": True,
+                "value_type": "currency",
+                "amount_value": 1000,
+                "currency_code": "USD",
+                "unit_frequency": "monthly",
+                "cap_rule_json": {},
+                "conditions_json": {},
+                "assignment_types": [],
+                "family_statuses": [],
+                "targeting_signature": compute_targeting_signature([], []),
+                "is_active": True,
+                "display_order": 0,
+            }
+        )
+        return vid
+
+    def test_publish_defers_reindex_when_hook_provided(self) -> None:
+        # AIQ-1642: with a defer hook the RAG re-index leaves the request path — the hook
+        # is called with the company id, and index_company_policy is NOT run inline (that
+        # blocking OpenAI call + chunk-insert loop is what made publish take 20-40s).
+        vid = self._seed_publishable()
+        hook = mock.Mock()
+        with mock.patch(
+            "backend.app.services.policy_chunk_indexer.index_company_policy"
+        ) as m_index:
+            self.svc.publish_draft(
+                self.db.company_id, policy_version_id=vid, created_by="u1", defer_reindex=hook
+            )
+        m_index.assert_not_called()
+        hook.assert_called_once_with(self.db.company_id)
+        self.assertEqual(self.db.publish_atomic_calls, [vid])
+
+    def test_publish_reindexes_inline_without_hook(self) -> None:
+        # Backward compat: callers that don't defer (test-drive provisioning, other code)
+        # still get the inline re-index.
+        vid = self._seed_publishable()
+        with mock.patch(
+            "backend.app.services.policy_chunk_indexer.index_company_policy"
+        ) as m_index:
+            self.svc.publish_draft(self.db.company_id, policy_version_id=vid, created_by="u1")
+        m_index.assert_called_once_with(self.db.company_id)
+
+    def test_publish_records_duration_ms(self) -> None:
+        # AIQ-1642: the on-request-path publish duration is emitted so <5s is measurable.
+        vid = self._seed_publishable()
+        with mock.patch("backend.app.services.policy_chunk_indexer.index_company_policy"), \
+                mock.patch("backend.app.services.analytics_service.emit_event") as m_emit:
+            self.svc.publish_draft(self.db.company_id, policy_version_id=vid, created_by="u1")
+        pub_calls = [c for c in m_emit.call_args_list if c.args and c.args[0] == "policy_published"]
+        self.assertEqual(len(pub_calls), 1)
+        self.assertIn("duration_ms", pub_calls[0].kwargs)
+        self.assertIsNotNone(pub_calls[0].kwargs["duration_ms"])
 
     def test_ensure_draft_reuses_existing_without_second_version_insert(self) -> None:
         calls = {"n": 0}

@@ -134,6 +134,12 @@ backend/app/routers/test_drive.py:provision
 # identities. Defense in depth: campaign gate (404 unless RELOPASS_TEST_DRIVE_ENABLED,
 # dark by default) + invite-token gate (constant-time vs RELOPASS_TEST_DRIVE_INVITE_TOKEN,
 # 403 incl. when unset — never fails open) + slowapi rate-limit + is_test stamping.
+backend/app/routers/test_drive.py:provision_staged
+# PUBLIC (Task 4, QA-only): staged-provisioning fixture — mints a session AND drives it to
+# a named stage via the REAL handlers so QA can reach the RFQ-submit step in one call.
+# Intentionally unauthenticated (same public surface as :provision) but gated HARDER: campaign
+# gate (404 unless RELOPASS_TEST_DRIVE_ENABLED) + qa-* campaign only (404 for insead-2026 and
+# any non-qa) + is_test-company assertion + optional invite-token + slowapi rate-limit.
 backend/app/routers/test_drive.py:survey
 # PUBLIC (AIQ-1423 / TD-5): completion-survey submission. Intentionally unauthenticated
 # (post-test feedback from the same public flow). Campaign gate (404 unless
@@ -156,6 +162,13 @@ backend/app/routers/integrations_personio_webhook.py:personio_webhook
 # WEBHOOK (PERMANENT): verifies X-Personio-Signature HMAC-SHA256 inline against
 # PERSONIO_WEBHOOK_SECRET (integrations_personio_webhook.py:_verify_signature,
 # raises 401 on mismatch) before any work.
+
+backend/app/routers/stripe_webhook.py:stripe_webhook
+# WEBHOOK (PERMANENT): Stripe webhook (Path A). Intentionally public — Stripe calls it.
+# Authenticates by verifying the Stripe signature on the RAW request body via the SDK's
+# stripe.Webhook.construct_event (timing-safe HMAC + timestamp tolerance), returning 400
+# on an invalid signature, not a FastAPI Depends the AST scanner can see. Also 503s when
+# RELOPASS_STRIPE_ENABLED is off. Same pattern as the Personio webhook above.
 
 # ── Cron (invoked by the scheduler, not an end user; inline secret check) ──────
 backend/app/routers/crons.py:deadline_reminder
@@ -190,6 +203,9 @@ backend/app/routers/crons.py:roadmap_review_notify
 # CRON (AIQ-1526): _verify_cron_secret(request) inline. Hourly safety-net that
 # (re)notifies HR about roadmaps stuck pending review, invoked by the
 # roadmap-review-notify workflow, not an end user.
+backend/app/routers/crons.py:dispatch_outbox
+# CRON (AIQ-1610): _verify_cron_secret(request) inline. ~15-min notification_outbox
+# email-delivery consumer, invoked by the outbox-dispatch workflow, not an end user.
 backend/app/routers/crons.py:recompute_source_reliability
 # CRON (N8/AIQ-848): _verify_cron_secret(request) inline. Nightly source-reliability
 # recompute, invoked by the scheduler, not an end user.

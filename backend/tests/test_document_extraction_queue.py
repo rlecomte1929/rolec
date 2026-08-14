@@ -38,12 +38,25 @@ def tearDownModule() -> None:  # noqa: N802
 
 
 class ClassifyTests(unittest.TestCase):
+    """[AIQ-1764] Behaviour is unchanged by the move; only the owner changed.
+
+    Asserted against `document_classifier`, the module that now OWNS the function,
+    rather than `document_extraction_queue`, which merely imports it. Testing the
+    consumer would keep passing if the import were later dropped.
+    """
+
     def test_filename_heuristic(self) -> None:
+        from backend.app.services.document_classifier import classify_document
+
+        self.assertEqual(classify_document("priya_passport.jpg", "image/jpeg"), "PASSPORT")
+        self.assertEqual(classify_document("employment_contract.pdf", "application/pdf"), "CONTRACT")
+        self.assertEqual(classify_document("march_payslip.pdf", "application/pdf"), "PAYSLIP")
+        self.assertEqual(classify_document("random.pdf", "application/pdf"), "OTHER")
+        self.assertEqual(classify_document(None, None), "OTHER")
+
+    def test_queue_still_resolves_it_for_its_own_use(self) -> None:
+        # The queue calls it at run_extraction time; the import must stay live.
         self.assertEqual(q.classify_document("priya_passport.jpg", "image/jpeg"), "PASSPORT")
-        self.assertEqual(q.classify_document("employment_contract.pdf", "application/pdf"), "CONTRACT")
-        self.assertEqual(q.classify_document("march_payslip.pdf", "application/pdf"), "PAYSLIP")
-        self.assertEqual(q.classify_document("random.pdf", "application/pdf"), "OTHER")
-        self.assertEqual(q.classify_document(None, None), "OTHER")
 
 
 class RunExtractionTests(unittest.TestCase):

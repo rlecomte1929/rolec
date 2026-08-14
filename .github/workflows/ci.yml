@@ -33,23 +33,67 @@ jobs:
       hr_dashboard: ${{ steps.filter.outputs.hr_dashboard }}
       migrations: ${{ steps.filter.outputs.migrations }}
       workflows: ${{ steps.filter.outputs.workflows }}
+      edge_functions: ${{ steps.filter.outputs.edge_functions }}
+      case_id_writers: ${{ steps.filter.outputs.case_id_writers }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
+            # `.nvmrc` is listed under BOTH Node-built apps on purpose. It sets the Node
+            # version for every one of them and for the production Render build, yet it
+            # was in no filter — so a Node bump triggered NOTHING. Changing it to 22.23.2
+            # ran the frontend jobs only by accident, because that commit also touched
+            # frontend/package.json; the HR Dashboard build was skipped, and a Node
+            # upgrade could have shipped without ever building it. Same silent-drift
+            # shape as the four duplicated Node pins this change collapses into one.
+            # Not added to `backend` — that suite is Python and `.nvmrc` cannot affect it.
             frontend:
               - 'frontend/**'
+              - '.nvmrc'
             backend:
               - 'backend/**'
               - 'scripts/**'
             hr_dashboard:
               - 'apps/hr-dashboard/**'
+              - '.nvmrc'
+            # This filter gates FIVE jobs: RLS coverage, Storage bucket, Migration ledger
+            # drift, Migration column-read, Migration duplicate-version. It was
+            # `supabase/migrations/**` alone, so **editing a guard or its allowlist did not
+            # re-run that guard** — the config a gate reads could change with the gate
+            # skipped, reporting green.
+            #
+            # Not hypothetical: the 2026-08-11 guard sweep (#1813) rewrote
+            # check_rls_coverage.py AND added two entries to rls_allowlist.txt, and those
+            # jobs ran only because the same PR happened to add two files under
+            # supabase/migrations/. A sweep touching just the scripts would have had all
+            # five SKIPPED. Same shape as `.nvmrc` above, which was in no filter at all.
+            #
+            # `case_id_writers` below already got this right — it lists its own guard script
+            # and baseline next to the migrations glob. This copies that.
             migrations:
               - 'supabase/migrations/**'
+              - 'supabase/rls_allowlist.txt'
+              - 'scripts/check_rls_coverage.py'
+              - 'scripts/check_migration_drift.py'
+              - 'scripts/check_column_read_before_apply.py'
+            # AIQ-1731: everything that can WRITE (or orphan) a
+            # case_assignments.canonical_case_id, plus the drift gate's own files.
+            case_id_writers:
+              - 'supabase/migrations/**'
+              - 'supabase/canonical_case_id_baseline.txt'
+              - 'scripts/check_canonical_case_id_drift.py'
+              - 'scripts/seed_demo.sql'
+              - 'scripts/reset_demo.sh'
+              - 'scripts/e2e_purge.py'
+              - 'scripts/fresh_onboarding_teardown.sql'
+              - 'backend/db/cases.py'
+              - 'backend/app/services/unified_assignment_creation.py'
             workflows:
               - '.github/workflows/**'
+            edge_functions:
+              - 'supabase/functions/**'
 
   actionlint:
     # Catches workflow YAML errors (bad `uses:` refs, secrets.* in job-level
@@ -111,7 +155,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -183,7 +227,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -226,7 +270,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -275,7 +319,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -317,7 +361,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -356,20 +400,63 @@ jobs:
         # pytest.ini) lets async tests collect.
         run: |
           # Call 1 — full-suite discovery. Env-dependent / import-broken files are in
-          # collect_ignore (backend/tests/conftest.py). The 3 --ignore'd files below
+          # collect_ignore (backend/tests/conftest.py). The 4 --ignore'd files below
           # PASS in isolation but leak/collide when run with the whole suite (shared
           # sqlite state); they keep gating via Call 2 (isolation fix is a follow-up).
+          #
+          # [AIQ-1780] test_case_documents_rce_bridge joined this list rather than
+          # being made suite-safe. It needs the real Database (the root conftest
+          # installs a MagicMock), which means reaching for the same
+          # sys.modules.pop + engine-swap dance test_case_documents_flow uses. Two
+          # rounds of narrowing — deferring the harness import to setUp, restoring
+          # dbmod._engine/_is_sqlite in tearDown — each fixed the module it was
+          # breaking and shifted the collision to another (catalog_promotion →
+          # providers_company_resolution), which is the signature of the shared
+          # `db` singleton rather than of anything this file does wrong. Root-causing
+          # that is the same deferred isolation fix the other three are waiting on.
           python -m pytest -q -c backend/pytest.ini --rootdir . \
             backend/tests scripts/tests \
             -m "not integration and not policy_assistant_audit" \
             --ignore=backend/tests/test_llm_client_text.py \
             --ignore=backend/tests/test_policy_propagation.py \
-            --ignore=backend/tests/test_supabase_password_sync.py
+            --ignore=backend/tests/test_supabase_password_sync.py \
+            --ignore=backend/tests/test_case_documents_rce_bridge.py
           # Call 2 — the isolation-sensitive previously-gated files, on their own.
           python -m pytest -q -c backend/pytest.ini --rootdir . \
             backend/tests/test_llm_client_text.py \
             backend/tests/test_policy_propagation.py \
-            backend/tests/test_supabase_password_sync.py
+            backend/tests/test_supabase_password_sync.py \
+            backend/tests/test_case_documents_rce_bridge.py
+
+  # Supabase Edge Functions are Deno, so neither the Python nor the Node job
+  # covers them: before AIQ-1702 a PR touching ONLY supabase/functions/** ran no
+  # test of its own change (PR #1662 merged exactly that way, with backend-tests
+  # and frontend both "skipping"). That matters most for case-summary, which
+  # builds an LLM prompt from an explicit non-PII whitelist — its
+  # `no PII reaches the prompt` test is the automated half of the GDPR rule in
+  # CLAUDE.md, and until now nothing ran it on a PR.
+  #
+  # `deno test <dir>` discovers every *.test.ts underneath, so a new function's
+  # suite is picked up with no change here. The tests are pure logic (no network,
+  # no DB, no Claude) — remote std imports are fetched by the module loader, so
+  # no --allow-* flags are needed.
+  edge-function-tests:
+    name: Edge Function tests (Deno)
+    needs: changes
+    if: needs.changes.outputs.edge_functions == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          # Pinned, not `latest` — a silent runtime bump must not be able to
+          # change whether the compliance test passes.
+          deno-version: v2.1.4
+
+      - name: Run Edge Function tests
+        run: deno test --no-check=remote supabase/functions/
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
@@ -385,7 +472,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Run route-auth check
@@ -405,11 +492,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Check for prohibited compliance claims
         run: python scripts/check_compliance_claims.py
+
+      # The ADS geography rule permits EU ad targeting only while no third-party ad
+      # pixel is installed — a pixel is the one thing that makes EU traffic legally
+      # different (ePrivacy Art. 5(3): storing/accessing information on a device).
+      # Runs in this job because it is the same kind of promise: a sentence in a doc
+      # that is worthless unless something measures it. ADS-4's gate G1 sat ticked
+      # while both landing pages served an empty shell to every crawler, precisely
+      # because nobody ran the check.
+      - name: Check no ungated ad pixel on the public surface
+        run: python scripts/check_ad_pixel_consent.py
+
+      # [AIQ-1795b] A permit/visa template must not be attachable by someone who needs
+      # no permit. RESID-PERMIT-DE sent EU citizens to an Auslaenderbehoerde for a
+      # residence title FreizuegG/EU s 2(4) says they cannot be issued; fixing it by hand
+      # revealed FAM-SPOUSE and FAM-CHILD doing the same with Familiennachzug. Three
+      # instances of one class, all found by eye.
+      #
+      # In THIS job, not behind the supabase/migrations path filter, for the same reason
+      # the compliance guard is unfiltered: the invariant keys off a template's NAME as
+      # well as its rules, so renaming one in any file can create a violation. It needs
+      # no DB and no secret, so it costs nothing to always run.
+      #
+      # Cannot be replaced by test_trigger_condition_vocabulary.py, which scans the same
+      # corpus and passed on all three: that guard validates the condition keys that are
+      # PRESENT, and an OMITTED visa_type is the entire defect.
+      - name: Check form-template honesty (no permit for free-movers)
+        run: python scripts/check_form_template_honesty.py
 
   rls-coverage:
     # AUDIT-A3: lists `public.*` + `rce.*` tables with zero RLS policies and asserts
@@ -440,7 +554,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install psycopg2
@@ -464,7 +578,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install psycopg2
@@ -490,16 +604,207 @@ jobs:
     if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Need the PR base to work out which migrations this PR ADDS.
+          fetch-depth: 0
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install psycopg2
         run: pip install psycopg2-binary==2.9.9
+      - name: Collect migrations added by this PR
+        id: added
+        env:
+          # Never interpolate ${{ }} straight into run: — filenames come from the PR
+          # author and would be shell-injected. Pass through env and quote.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # No fallback to an empty list. This workflow is pull_request-only, so an
+          # absent base SHA means the step cannot work out its own scope — and an empty
+          # --added puts check_migration_drift.py into audit mode, where the dead and
+          # duplicate checks degrade to warnings and it exits 0. A guard that silently
+          # stops checking must go red, not green. Same for a failing git diff: `|| true`
+          # here used to convert it into "this PR added no migrations".
+          if [ -z "$BASE_SHA" ]; then
+            echo "::error::No PR base SHA — cannot determine which migrations this PR adds."
+            echo "The dead-version and duplicate-version checks would silently degrade to"
+            echo "warnings. Failing instead. (ci.yml is pull_request-only; base.sha should"
+            echo "always be set — if a new trigger was added, scope this step to PRs.)"
+            exit 1
+          fi
+          # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
+          # version is exactly the mistake this guard exists to catch. For a rename
+          # --name-only prints the destination path, which is the version we check.
+          files=$(git diff --diff-filter=AR --name-only "$BASE_SHA...HEAD" -- supabase/migrations)
+          {
+            echo "files<<__EOF__"
+            echo "$files"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+          echo "Added migrations:"; echo "${files:-(none)}"
       - name: Run migration-drift check
         env:
           DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
-        run: python scripts/check_migration_drift.py
+          ADDED: ${{ steps.added.outputs.files }}
+        run: python scripts/check_migration_drift.py --added "$ADDED"
+
+  migration-column-read:
+    # A PR that adds a column AND ships code reading it. Migrations here are applied
+    # OUT OF BAND, so merging the migration does not create the column — Render deploys
+    # the code first and the endpoint 500s. This is not hypothetical: PR #1781 did
+    # exactly that on 2026-08-11 and GET /api/cases/{id}/forms was down for 2h33m
+    # (`column ft.sections does not exist`). CI was green because the backend suite runs
+    # on a SQLite fixture that the same PR edited to add the column.
+    #
+    # Needs no database, so like the duplicate-version check it runs EVERYWHERE and is
+    # deliberately not gated on vars.RLS_COVERAGE_DATABASE_URL_SET. A guard that no-ops
+    # where the secret is missing would have been absent on the PR that caused this.
+    name: Migration column-read check
+    needs: changes
+    runs-on: ubuntu-latest
+    if: ${{ needs.changes.outputs.migrations == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need the PR base to diff against.
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Check for a column read shipped with its own migration
+        env:
+          # Never interpolate ${{ }} straight into run:.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$BASE_SHA" ]; then
+            echo "No PR base SHA (not a pull_request event) — skipping."
+            exit 0
+          fi
+          python scripts/check_column_read_before_apply.py --base "$BASE_SHA"
+
+  migration-duplicate-versions:
+    # Two migration files sharing a 14-digit version: schema_migrations is keyed on
+    # version, so only one can ever be recorded and the other silently never applies
+    # (this is how source_change_reviews lost its slot and left tables missing in
+    # prod). Needs NO database, so unlike the ledger check above it is deliberately
+    # NOT gated on vars.RLS_COVERAGE_DATABASE_URL_SET — it must run everywhere.
+    name: Migration duplicate-version check
+    needs: changes
+    runs-on: ubuntu-latest
+    if: ${{ needs.changes.outputs.migrations == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Collect migrations added by this PR
+        id: added
+        env:
+          # Never interpolate ${{ }} straight into run: — filenames come from the PR
+          # author and would be shell-injected. Pass through env and quote.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # No fallback to an empty list. This workflow is pull_request-only, so an
+          # absent base SHA means the step cannot work out its own scope — and an empty
+          # --added puts check_migration_drift.py into audit mode, where the dead and
+          # duplicate checks degrade to warnings and it exits 0. A guard that silently
+          # stops checking must go red, not green. Same for a failing git diff: `|| true`
+          # here used to convert it into "this PR added no migrations".
+          if [ -z "$BASE_SHA" ]; then
+            echo "::error::No PR base SHA — cannot determine which migrations this PR adds."
+            echo "The dead-version and duplicate-version checks would silently degrade to"
+            echo "warnings. Failing instead. (ci.yml is pull_request-only; base.sha should"
+            echo "always be set — if a new trigger was added, scope this step to PRs.)"
+            exit 1
+          fi
+          # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
+          # version is exactly the mistake this guard exists to catch. For a rename
+          # --name-only prints the destination path, which is the version we check.
+          files=$(git diff --diff-filter=AR --name-only "$BASE_SHA...HEAD" -- supabase/migrations)
+          {
+            echo "files<<__EOF__"
+            echo "$files"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+          echo "Added migrations:"; echo "${files:-(none)}"
+      - name: Check for duplicate migration versions
+        env:
+          ADDED: ${{ steps.added.outputs.files }}
+        run: python scripts/check_migration_drift.py --no-db --added "$ADDED"
+      # The check above sees this PR's merge ref, which is only as fresh as the last
+      # CI run. GitHub does NOT re-run a PR when its base moves, so two PRs opened in
+      # parallel can each pick the same "next free" version, both stay green, and the
+      # collision only exists after both merge. That happened on 2026-08-04: #1716,
+      # #1717 and #1718 all landed a migration at 20261011000000. Comparing against
+      # LIVE origin/main catches it while the second PR is still open.
+      - name: Check added versions against live main
+        env:
+          ADDED: ${{ steps.added.outputs.files }}
+        run: |
+          [ -n "$ADDED" ] || { echo "No migrations added — nothing to compare."; exit 0; }
+          git fetch --quiet origin main
+          git ls-tree -r origin/main --name-only supabase/migrations \
+            | xargs -n1 basename | sed 's/_.*//' | sort -u > /tmp/main_versions
+          printf '%s\n' "$ADDED" | sed '/^$/d' \
+            | xargs -n1 basename | sed 's/_.*//' | sort -u > /tmp/added_versions
+          clash=$(comm -12 /tmp/main_versions /tmp/added_versions)
+          if [ -n "$clash" ]; then
+            echo "::error::This PR adds a migration at a version already used on origin/main:"
+            echo "$clash" | awk '{print "  " $0}'
+            echo "schema_migrations is keyed on version — only one file per version can ever"
+            echo "be recorded, so the others silently never apply. Restamp above the current"
+            echo "max on main and re-push."
+            exit 1
+          fi
+          echo "OK — no added version collides with origin/main."
+
+  canonical-case-id-drift:
+    # AIQ-1731: fail when prod grows a NEW bad case_assignments.canonical_case_id
+    # (NULL/blank, dangling, or duplicate). The column is nullable with no FK and
+    # no UNIQUE, so all three shapes are permitted by the schema.
+    #
+    # AIQ-1730's audit found 51 such rows and returned the verdict "the model is
+    # 1:1, UNIQUE is correct". Cleaning them (AIQ-1731) and enforcing the
+    # constraint (AIQ-1732) are deliberately DEFERRED to the pre-launch data
+    # reset — the cleanup means ~38 cascading deletes of throwaway pre-launch data
+    # for a constraint the resolve_case_ids bridge already substitutes for.
+    #
+    # That deferral is only safe while the stock stays frozen, and nothing was
+    # watching. This is that tripwire: known-bad ids are baselined in
+    # supabase/canonical_case_id_baseline.txt and only NEW offenders fail.
+    #
+    # As of 2026-08-11 that baseline is EMPTY and prod is clean — 818 case_assignments,
+    # all with a non-null canonical, zero null/dangling/duplicate. The 51 rows are gone,
+    # so every violation this job sees is now a new one. It also means an emptied
+    # case_assignments would have read as a clean pass, which e2e_purge.py makes a live
+    # possibility; the script fails on a zero row count for that reason.
+    # The diff logic is unit-tested on every PR via
+    # scripts/tests/test_check_canonical_case_id_drift.py, so the fail path is
+    # covered even where the DB secret is unset.
+    #
+    # Mirrors rls-coverage / migration-drift: read-only DATABASE_URL secret, gated
+    # on a repo variable because secrets.* is not allowed in a job-level if:.
+    name: canonical_case_id drift check
+    needs: changes
+    runs-on: ubuntu-latest
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.case_id_writers == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Run canonical_case_id drift check
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/check_canonical_case_id_drift.py
 
   deliverable-integrity:
     # HYGIENE-1: assert that "Done" AI Work Queue tasks' claimed deliverable
@@ -516,7 +821,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Run deliverable-integrity check
@@ -540,7 +845,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Run queue-status-hygiene check

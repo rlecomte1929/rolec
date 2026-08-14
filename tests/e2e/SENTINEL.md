@@ -57,7 +57,7 @@ Two manual workflows ship gated-OFF (no-op until you opt in):
 - ✅ Deep provisioned-case journey (`tests/deep/journey.spec.ts`): fill wizard → submit → poll roadmap → assert it renders.
 - ✅ Gated Slack notify (`E2E_SLACK_ENABLED` + `SLACK_WEBHOOK_URL`).
 - ✅ Gated per-run auto-delete of `is_test` data (`E2E_AUTODELETE_ENABLED` + `DATABASE_URL`).
-- ✅ Deterministic Notion Work Queue sync (`E2E_NOTION_SYNC_ENABLED` + `NOTION_API_KEY`) —
+- ✅ Deterministic Notion Work Queue sync (`E2E_NOTION_SYNC_ENABLED` + `NOTION_QUEUE_TOKEN`) —
   `scripts/notion_sync_candidates.py` creates/updates tasks from `notion_candidates`, de-duped, no LLM.
 
 ### Notion sync (manual run)

@@ -14,18 +14,54 @@ because `MCP apply_migration` records an apply-TIME version (e.g. 20260604140233
 while the committed file carries a forward timestamp (e.g. 20260608100000). This
 guard catches that drift at PR time instead of after merge.
 
-Direction matters — only the **prod-not-in-repo** direction is an error:
-  * prod version with no repo file  -> DRIFT (fail): `db push` can't find it.
-  * repo version not yet on prod     -> fine: undeployed work; Preview replays it.
+Direction matters:
+  * prod version with no repo file      -> DRIFT (fail): `db push` can't find it.
+  * repo version ABOVE the ledger max   -> fine: undeployed work; Preview replays it.
+  * repo version AT/BELOW the ledger max-> DEAD (fail): `db push` treats an out-of-order
+    version as already-passed and skips it, so the file can never apply and never
+    record a ledger row.
+  * two repo files sharing a version    -> DUPLICATE (fail): schema_migrations is keyed
+    on version, so only one can be recorded and the rest never apply.
+
+The dead-version case is #1708: the ES_IE corpus seed merged at 20261004000000 while
+prod's max was 20261009000000 — dead on arrival, yet every CI check went green because
+this direction was only ever a warning. Restamped in #1709; the guard closes the hole.
+
+`db push` is referenced below only to explain the ordering semantics the ledger inherits —
+it must NEVER be run against prod (it would apply all ~147 pending migrations, including
+known-destructive ones). Applies are operator-run and out-of-band; record them with
+`supabase migration repair --status applied <version>`. See CLAUDE.md 'Migration discipline'.
+
+Scoping — the dead and duplicate failures apply ONLY to migrations a change ADDS, passed
+via `--added`. As of 2026-08 the repo has 426 ledger rows against 573 migration files, so
+146 files already sit below the ledger max. That is long-standing debt no single PR
+introduced; failing on it would redden every migration PR and the guard would be switched
+off within a day. Without `--added` those two checks are audit warnings, which is also
+what makes a full-repo run useful for the batch cleanup.
+
+`--strict-duplicates` opts out of that softness for duplicates alone, and the whole-tree
+job on `main` uses it. Without it, a run with no `--added` CANNOT FAIL: `dup_fail` is
+empty, so duplicates print a warning and the process returns 0. That is exactly how
+`.github/workflows/migration-duplicate-main.yml` was configured — the job CLAUDE.md's
+guard table describes as the backstop "blind to nothing", running `--no-db` with no
+`--added` and structurally incapable of firing since the day it was written (found in the
+2026-08-11 guard sweep). The duplicate debt that justified the soft default is also gone:
+the tree is at 591 files with zero duplicated versions, so strict costs nothing.
+
+The dead-version check stays scoped to `--added`, because ITS debt is real and unpaid.
 
 Exit codes (mirrors scripts/check_rls_coverage.py):
-  0 — every applied prod version has a matching repo file (or none drift)
-  1 — at least one prod version has no repo file (CI should fail)
+  0 — no drift; nothing newly dead or newly duplicated
+  1 — prod version with no repo file; a NEW dead/duplicate migration; any duplicate under
+      --strict-duplicates; or 0 migration files read (CI should fail)
   2 — could not connect to DB / query failed (unexpected — investigate)
 
 Usage:
   DATABASE_URL=postgresql://... python scripts/check_migration_drift.py
   DATABASE_URL=postgresql://... python scripts/check_migration_drift.py --json
+  python scripts/check_migration_drift.py --no-db --strict-duplicates  # whole-tree gate
+  python scripts/check_migration_drift.py --no-db --added "$(git diff --diff-filter=A \
+      --name-only origin/main...HEAD -- supabase/migrations)"
 """
 from __future__ import annotations
 
@@ -117,6 +153,74 @@ def find_repo_only(applied: Dict[str, str], repo_by_version: Dict[str, str]) -> 
     return sorted(repo_only, key=lambda d: d["version"])
 
 
+def split_dead_and_ahead(
+    repo_only: List[Dict[str, str]], applied: Dict[str, str]
+) -> "tuple[List[Dict[str, str]], List[Dict[str, str]]]":
+    """
+    Partition Direction-B rows into (dead, ahead) on the prod ledger max.
+
+    `db push` applies a migration only when its version sorts ABOVE the highest
+    version already in `schema_migrations`; an out-of-order version is treated as
+    already-passed and skipped. So a repo file with no prod row is either:
+
+      * version >  ledger max -> AHEAD: ordinary undeployed work, applies on the
+                                 next push. Warning only, as before.
+      * version <= ledger max -> DEAD:  can never apply and can never record a
+                                 ledger row. Hard failure.
+
+    This is the AIQ/#1708 regression: the ES_IE corpus seed merged at
+    20261004000000 while prod's max was 20261009000000, so it was dead on arrival
+    and every CI check still went green (fixed by restamping in #1709).
+
+    Versions are zero-padded 14-digit strings, so lexicographic comparison is
+    equivalent to numeric. With an empty ledger nothing can be dead.
+    """
+    if not applied:
+        return [], list(repo_only)
+    ledger_max = max(applied)
+    dead = [r for r in repo_only if r["version"] <= ledger_max]
+    ahead = [r for r in repo_only if r["version"] > ledger_max]
+    return dead, ahead
+
+
+def parse_added_versions(raw: str) -> Set[str]:
+    """
+    Extract 14-digit versions from a comma/newline-separated list of added paths.
+
+    Fed by `git diff --diff-filter=A --name-only <base>...HEAD -- supabase/migrations`,
+    so the hard failures below apply only to files THIS change introduces. Entries that
+    don't look like a migration filename are ignored.
+    """
+    out: Set[str] = set()
+    for chunk in raw.replace(",", "\n").splitlines():
+        name = chunk.strip().rsplit("/", 1)[-1]
+        m = _FILENAME_RE.match(name)
+        if m:
+            out.add(m.group(1))
+    return out
+
+
+def find_duplicate_versions(migrations_dir: Path) -> Dict[str, List[str]]:
+    """
+    Map version -> sorted names, for every 14-digit version claimed by >1 file.
+
+    `supabase_migrations.schema_migrations` is keyed on `version` (one row per
+    version), so when two files share a timestamp only one can ever be recorded
+    and the other silently never applies. That is how `source_change_reviews`
+    lost its slot to `feature_flags` and left two tables missing in prod.
+
+    Needs no DB, so this runs even where the ledger check is gated off.
+    """
+    by_version: Dict[str, List[str]] = {}
+    if not migrations_dir.exists():
+        return {}
+    for p in migrations_dir.glob("*.sql"):
+        m = _FILENAME_RE.match(p.name)
+        if m:
+            by_version.setdefault(m.group(1), []).append(m.group(2))
+    return {ver: sorted(names) for ver, names in by_version.items() if len(names) > 1}
+
+
 # ---------------------------------------------------------------------------
 # DB access (mirrors check_rls_coverage.py)
 # ---------------------------------------------------------------------------
@@ -151,10 +255,96 @@ def query_applied_versions(db_url: str) -> Dict[str, str]:
 # CLI
 # ---------------------------------------------------------------------------
 
+def _print_duplicates(duplicates: Dict[str, List[str]], hard: bool) -> None:
+    """Shared reporting for duplicate versions (both --no-db and full runs)."""
+    mark = "❌  Migration-drift check FAILED —" if hard else "⚠  WARN (pre-existing) —"
+    print(f"\n{mark} {len(duplicates)} duplicated migration version(s):")
+    print("    (schema_migrations is keyed on version — only ONE file per version can be")
+    print("     recorded, so the others silently never apply)\n")
+    for ver in sorted(duplicates):
+        print(f"  • {ver}")
+        for name in duplicates[ver]:
+            print(f"      {ver}_{name}.sql")
+    if hard:
+        print("\n  Fix: restamp the newer file to a unique version above the prod ledger max.")
+        print("  On main this is a post-merge collision — most often two PRs batch-merged")
+        print("  back to back, since GitHub does not re-run a PR when its base moves.")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Check prod migration ledger vs repo files.")
     parser.add_argument("--json", action="store_true", help="Output drift as JSON.")
+    parser.add_argument(
+        "--no-db",
+        action="store_true",
+        help="Run only the checks that need no database (duplicate repo versions). "
+             "Lets CI catch colliding timestamps even where the ledger check is gated off.",
+    )
+    parser.add_argument(
+        "--added",
+        default="",
+        help="Comma/newline-separated migration paths ADDED by this change (from "
+             "`git diff --diff-filter=A`). Scopes the dead-version and duplicate hard "
+             "failures to those files. Without it both are audit warnings, because the "
+             "repo carries long-standing pre-existing drift that no single PR introduced.",
+    )
+    parser.add_argument(
+        "--strict-duplicates",
+        action="store_true",
+        help="Treat EVERY duplicated version as a hard failure, not only ones in "
+             "--added. Required for a whole-tree run to be able to fail at all; used by "
+             "the post-merge backstop on main.",
+    )
     args = parser.parse_args()
+
+    # A guard that read no migration files has not checked anything. Without this,
+    # `--no-db` on an empty or misplaced directory prints
+    # "✅  No duplicate migration versions (0 repo files)" and exits 0.
+    all_versions = repo_versions(MIGRATIONS_DIR)
+    if not all_versions:
+        print(f"❌  Migration-drift check FAILED — read 0 migration files from {MIGRATIONS_DIR}.")
+        print("    Every check below compares against that set, so an empty one makes")
+        print("    'no duplicates' and 'no drift' meaningless rather than reassuring.")
+        return 1
+
+    duplicates = find_duplicate_versions(MIGRATIONS_DIR)
+    added_versions = parse_added_versions(args.added)
+    # Scope hard failures to what this change actually adds. `--added` absent = audit mode.
+    scoped = bool(args.added.strip())
+    if args.strict_duplicates:
+        dup_fail = dict(duplicates)
+    elif scoped:
+        dup_fail = {v: n for v, n in duplicates.items() if v in added_versions}
+    else:
+        dup_fail = {}
+
+    # State the mode. A green run that examined a diff of zero files reads identically to
+    # one that verified the whole tree, and the difference is the entire question.
+    if args.strict_duplicates:
+        mode = "STRICT — every duplicated version is a failure"
+    elif scoped:
+        mode = f"scoped to {len(added_versions)} added version(s)"
+    else:
+        mode = "AUDIT MODE — dead/duplicate are warnings only, this run cannot fail on them"
+    if not args.json:
+        print(f"[migration-drift] {len(all_versions)} repo versions; {mode}.")
+
+    # --no-db: duplicate detection only. Deliberately independent of DATABASE_URL so
+    # this can run unconditionally, unlike the ledger comparison below.
+    if args.no_db:
+        if args.json:
+            print(json.dumps(
+                {"repo_versions": len(all_versions), "mode": mode,
+                 "duplicates": duplicates, "count": len(duplicates),
+                 "duplicates_failing": dup_fail, "fail_count": len(dup_fail),
+                 "pass": not dup_fail},
+                indent=2,
+            ))
+        elif duplicates:
+            _print_duplicates(dup_fail or duplicates, hard=bool(dup_fail))
+        else:
+            print(f"✅  No duplicate migration versions ({len(all_versions)} repo files).")
+        return 1 if dup_fail else 0
 
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
@@ -166,7 +356,15 @@ def main() -> int:
     repo_by_ver = repo_files_by_version(MIGRATIONS_DIR)
     by_name = repo_versions_by_name(MIGRATIONS_DIR)
     drift = find_drift(applied, repo_vers)          # Direction A — prod not in repo (hard fail)
-    repo_only = find_repo_only(applied, repo_by_ver)  # Direction B — repo not on prod (warning)
+    repo_only = find_repo_only(applied, repo_by_ver)  # Direction B — repo not on prod
+    # Direction B splits: below the ledger max a file can never apply (hard fail);
+    # above it, it is ordinary undeployed work (warning, as before).
+    dead, repo_ahead = split_dead_and_ahead(repo_only, applied)
+    ledger_max = max(applied) if applied else None
+    # Only files this change ADDS are a hard failure. The repo carries 100+ pre-existing
+    # below-max files (the ledger is far sparser than the migrations dir), and failing on
+    # those would redden every migration PR for debt it did not create.
+    dead_fail = [d for d in dead if d["version"] in added_versions] if scoped else []
 
     # Annotate each drift row with a suggested reconciliation target if the same
     # migration NAME exists in the repo at a different version (the common case:
@@ -178,7 +376,13 @@ def main() -> int:
     if args.json:
         print(json.dumps(
             {"drift": drift, "count": len(drift),
-             "repo_only": repo_only, "warn_count": len(repo_only)},
+             "repo_only": repo_ahead, "warn_count": len(repo_ahead),
+             "dead": dead, "dead_count": len(dead),
+             "dead_added": dead_fail, "dead_added_count": len(dead_fail),
+             "duplicates": duplicates, "duplicate_count": len(duplicates),
+             "duplicates_failing": dup_fail, "duplicates_failing_count": len(dup_fail),
+             "ledger_max": ledger_max, "mode": mode,
+             "pass": not (drift or dead_fail or dup_fail)},
             indent=2,
         ))
 
@@ -196,26 +400,58 @@ def main() -> int:
             else:
                 print(f"  • {d['version']}  {d['name']}  → no repo file by this name; commit a prod-as-oracle "
                       f"migration at version {d['version']} (real DDL or stub).")
-        print("\n  Prevention: don't pre-apply repo-tracked migrations via MCP apply_migration — commit the")
-        print("  file and let the main-push migration workflow apply it (it records the repo version). See CLAUDE.md.")
+        print("\n  Prevention: don't pre-apply repo-tracked migrations via MCP apply_migration — it stamps")
+        print("  an APPLY-TIME version, not your file's, so the ledger ends up with a version no repo file")
+        print("  matches and this check fails on every migration PR until someone reconciles it. Commit the")
+        print("  file first, then apply out-of-band with execute_sql and record it with")
+        print("  `supabase migration repair --status applied <version>`. See CLAUDE.md.")
 
-    # Direction B — repo file with no prod row. WARNING only (exit 0): legitimate for
-    # undeployed work on a PR branch, but it breaks `db push` / Supabase Branching.
-    if repo_only and not args.json:
-        print(f"\n⚠  WARN — {len(repo_only)} repo migration file(s) have no matching prod row:")
-        for r in repo_only:
+    # Direction B (dead) — repo file at or below the ledger max with no prod row.
+    # `db push` will skip it forever, so it can never apply and never record a row.
+    if dead_fail and not args.json:
+        print(f"\n❌  Migration-drift check FAILED — {len(dead_fail)} NEW migration(s) can NEVER apply:")
+        print(f"    (the ledger is keyed by version and prod's max is {ledger_max}; a version at")
+        print("     or below it can never be recorded for this file)\n")
+        for d in dead_fail:
+            print(f"  • {d['version']}_{d['name']}.sql  ≤  {ledger_max}")
+        print("\n  Fix: restamp the file above the ledger max, e.g.")
+        print("    git mv supabase/migrations/<old>_<name>.sql supabase/migrations/<new>_<name>.sql")
+        print("  and update the header comment.")
+        print("  Then apply it out-of-band (operator-run MCP apply_migration/execute_sql) and record")
+        print("  it with:  supabase migration repair --status applied <version> --db-url \"$DATABASE_URL\"")
+        print("  NEVER `supabase db push` against prod — it applies every pending migration, and")
+        print("  never hand-insert into schema_migrations. See CLAUDE.md 'Migration discipline'.")
+    elif dead and not args.json:
+        print(f"\n⚠  WARN (pre-existing) — {len(dead)} repo migration(s) sit at or below the")
+        print(f"    ledger max ({ledger_max}) with no prod row, so `db push` would skip them.")
+        print("    Not introduced by this change; tracked for batch reconciliation.")
+
+    # Duplicate repo versions — schema_migrations is keyed on version, so only one
+    # file per version can ever be recorded and the rest silently never apply.
+    if duplicates and not args.json:
+        _print_duplicates(dup_fail or duplicates, hard=bool(dup_fail))
+
+    # Direction B (ahead) — repo file above the ledger max with no prod row. WARNING
+    # only (exit 0): legitimate undeployed work, but it breaks `db push` / Branching.
+    if repo_ahead and not args.json:
+        print(f"\n⚠  WARN — {len(repo_ahead)} repo migration file(s) have no matching prod row:")
+        for r in repo_ahead:
             print(f"  • {r['version']}_{r['name']}.sql has no matching prod row.")
         print("     Apply the migration or delete the file if it was committed by mistake.")
         print("     This will cause `db push` / Supabase Branching to fail with")
         print("     'local migration files not found in remote database'.")
 
+    failed = bool(drift or dead_fail or dup_fail)
+
     # Summary line — always printed.
     if not args.json:
-        mark = "❌" if drift else ("⚠ " if repo_only else "✅")
+        mark = "❌" if failed else ("⚠ " if (repo_ahead or dead or duplicates) else "✅")
         print(f"{mark}  Migration ledger: {len(applied)} prod rows, {len(repo_by_ver)} repo files, "
-              f"{len(drift)} mismatch(es), {len(repo_only)} repo-ahead warning(s).")
+              f"{len(drift)} mismatch(es), {len(dead)} dead ({len(dead_fail)} failing), "
+              f"{len(duplicates)} duplicate version(s) ({len(dup_fail)} failing), "
+              f"{len(repo_ahead)} repo-ahead warning(s). [{mode}]")
 
-    return 1 if drift else 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

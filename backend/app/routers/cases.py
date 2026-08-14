@@ -220,9 +220,12 @@ def start_research(case_id: str):
 
 @router.get("/{case_id}/requirements", response_model=schemas.CaseRequirementsDTO)
 def get_case_requirements(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id — see the note in cases_read.get_case_requirements. This copy
+    # is shadowed twice over (compat.py serves the path), but a wrong copy left behind is
+    # how the modular cutover reintroduces a fixed bug.
+    resolved_case_id = _assert_case_access(user, case_id)
     try:
-        return compute_case_requirements(case_id)
+        return compute_case_requirements(resolved_case_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Case not found")
 
@@ -981,6 +984,19 @@ class FormStatusPatchPayload(BaseModel):
     receipt_ref: Optional[str] = None
     note: Optional[str] = None            # [P4-2] optional HR annotation written to case_form_events
     rejection_reason: Optional[str] = None  # [P4-5] stored on case_forms when status='rejected'
+
+
+class RegisterPrefilledPayload(BaseModel):
+    """[AIQ-1758] Body for registering a reviewed prefilled data-sheet."""
+
+    # Snapshot of what the prefill engine produced and what the human changed.
+    # Stored verbatim on the document row so the artifact stays self-describing
+    # even if the underlying field values are edited afterwards.
+    fill_report: Optional[Dict[str, Any]] = None
+    file_name: Optional[str] = None
+    # False registers the artifact without moving the form's lifecycle — e.g.
+    # re-registering a corrected version of an already-'ready' form.
+    advance_status: bool = True
 
 
 def _load_form_with_template(
@@ -3386,13 +3402,16 @@ def list_case_vendors(
                         cvs.status,
                         cvs.contact_name,
                         cvs.contact_email,
-                        v.name            AS vendor_name,
-                        v.website         AS vendor_website
+                        s.name            AS vendor_name,
+                        s.website         AS vendor_website
                     FROM public.case_vendor_shortlist cvs
-                    LEFT JOIN public.vendors v ON v.id = cvs.vendor_id
+                    LEFT JOIN public.suppliers s ON CAST(s.vendor_id AS TEXT) = CAST(cvs.vendor_id AS TEXT)
                     WHERE cvs.case_id = :case_id
-                    ORDER BY cvs.service_key, v.name
+                    ORDER BY cvs.service_key, s.name
                     """
+                    # AIQ-1646: dead duplicate of cases_read.list_case_vendors (this
+                    # router is NOT wired — AUDIT-B9-cases-6); kept aligned so no stale
+                    # `public.vendors` join lingers in the tree.
                 ),
                 {"case_id": case_id},
             ).mappings().all()

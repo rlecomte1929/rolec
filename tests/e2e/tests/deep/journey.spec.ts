@@ -1,5 +1,6 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
 import { assertLogicalPage, shot, requestWithGatewayRetry } from '../_helpers';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
@@ -31,6 +32,46 @@ function token(key: string): string {
 function provisioned(key: string): { email: string } {
   const p = JSON.parse(fs.readFileSync(path.join(AUTH_DIR, '_provisioned.json'), 'utf8'));
   return p?.personas?.[key] || {};
+}
+
+/**
+ * [AIQ-1685] Unlock a case's roadmap the way a real payment does. The roadmap is now
+ * server-side paywalled (RELOPASS_ROADMAP_PAYWALL_ENABLED); a provisioned case is
+ * access_tier='free', so GET /roadmap 402s until it is paid. Rather than bypass the
+ * paywall, we drive the REAL fulfilment path: POST a locally-signed
+ * `checkout.session.completed` at /api/stripe/webhook so the fulfilment brain flips
+ * access_tier→'roadmap'. Signing mirrors scripts/stripe_test_mode_smoke.py
+ * (Stripe-Signature: `t={ts},v1=HMAC_SHA256(secret, "{ts}." + rawBody)`), using Node's
+ * crypto — no new dependency, no test-only bypass endpoint.
+ *
+ * Returns true only when the webhook reports applied|duplicate (the case is now paid).
+ * Returns false when it cannot run — STRIPE_WEBHOOK_SECRET unset in CI, payments disabled
+ * (503), an unresolved case_id (ignored), or a rejected signature — so the caller can skip
+ * with a clear reason instead of mis-reporting a roadmap-generation regression.
+ */
+async function unlockRoadmapViaTestPayment(api: APIRequestContext, caseId: string): Promise<boolean> {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret || !caseId) return false;
+  // A string body is sent verbatim by Playwright, so the bytes we sign are the bytes verified.
+  const body = JSON.stringify({
+    id: `evt_e2e_${crypto.randomUUID()}`,
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: 'cs_e2e', amount_total: 80000, currency: 'eur', payment_intent: 'pi_e2e',
+        metadata: { case_id: caseId, tier: 'roadmap' },
+      },
+    },
+  });
+  const ts = Math.floor(Date.now() / 1000);
+  const sig = crypto.createHmac('sha256', secret).update(`${ts}.${body}`).digest('hex');
+  const r = await api.post(`${API}/api/stripe/webhook`, {
+    headers: { 'Content-Type': 'application/json', 'Stripe-Signature': `t=${ts},v1=${sig}` },
+    data: body,
+  });
+  if (!r.ok()) return false;
+  const j = await r.json().catch(() => ({} as { status?: string }));
+  return j?.status === 'applied' || j?.status === 'duplicate';
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -87,9 +128,15 @@ test.describe('deep — provisioned-case journey (fill → submit → roadmap)',
 
   test('[DEEP-ROADMAP-API] roadmap generates (tracks non-empty within 60s)', async ({}, info) => {
     test.skip(!state.submitted, 'submit did not succeed → no roadmap to generate');
+    // [AIQ-1685] The roadmap is server-side paywalled; a provisioned case is 'free' so GET
+    // /roadmap 402s until paid. Complete a test-mode payment via the real webhook first so this
+    // check validates GENERATION for a paid case (not the paywall). No-op if it can't run.
+    const paid = await unlockRoadmapViaTestPayment(api, state.caseId!);
     let tracks = 0;
+    let lastStatus = 0;
     for (let i = 0; i < 30; i++) {
       const r = await api.get(`${API}/api/cases/${state.caseId}/roadmap`, { headers: { Authorization: `Bearer ${emp}` } });
+      lastStatus = r.status();
       if (r.ok()) {
         const j = await r.json().catch(() => ({}));
         tracks = Array.isArray(j.tracks) ? j.tracks.length : 0;
@@ -97,7 +144,13 @@ test.describe('deep — provisioned-case journey (fill → submit → roadmap)',
       }
       await new Promise((res) => setTimeout(res, 2000));
     }
-    await info.attach('roadmap-api', { body: JSON.stringify({ tracks }), contentType: 'application/json' });
+    await info.attach('roadmap-api', { body: JSON.stringify({ tracks, paid, lastStatus }), contentType: 'application/json' });
+    // Paywalled (402) AND the test-mode payment couldn't complete → a payments-config gap
+    // (STRIPE_WEBHOOK_SECRET not set in the E2E env, or payments disabled), NOT a roadmap
+    // regression. Skip so the Sentinel doesn't file a false P0; a genuine generation break
+    // (paid but still no tracks) still fails below.
+    test.skip(lastStatus === 402 && !paid,
+      'roadmap paywalled (402) and the test-mode unlock could not run — set STRIPE_WEBHOOK_SECRET in the E2E env (same value the backend verifies against)');
     state.roadmapReady = tracks > 0;
     expect(tracks, 'roadmap should have ≥1 track after submit').toBeGreaterThan(0);
   });
@@ -145,5 +198,74 @@ test.describe('deep — provisioned-case journey (fill → submit → roadmap)',
     const vendorCards = await page.locator('[role="checkbox"]').count().catch(() => 0);
     await info.attach('services-ux', { body: JSON.stringify({ signals: v.signals, vendorCards }), contentType: 'application/json' });
     expect(v.signals, `services: ${v.signals}`).not.toContain('permanent-spinner(B10)');
+  });
+
+  /**
+   * [VND-05] The last step of the employee's journey: having seen the vendor list, ask them
+   * for prices. This is the canonical RFQ creator and until now it had NO end-to-end test —
+   * despite 500ing in production twice on schema drift (rfqs_created_by_user_id_fkey, then
+   * created_by_user_id uuid→text).
+   *
+   * It replaces an HR-side test that POSTed to /api/hr/rfq-requests. That endpoint was deleted
+   * on 2026-07-22 (AIQ-1683) when RFQ creation moved to the employee, so the old test had been
+   * asserting a 405 for three weeks — and its noise was the stated reason the Sentinel scorer
+   * was muzzled. Note POST /api/rfqs still ACCEPTS an HR token (require_hr_or_employee), so
+   * simply repointing the old test would have gone green while testing a flow nobody uses.
+   *
+   * The recipient is resolved from the employee's own recommendations rather than hardcoded.
+   * The previous test carried `VENDOR_ID = 'ed599b41-…'`, a `vendors.id` — and `public.vendors`
+   * was renamed to `vendors_legacy` on 2026-07-19 while `validate_vendor_ids` moved to reading
+   * `suppliers`. A hardcoded id outliving its table is exactly how this rotted; a fresh one
+   * would re-arm the same trap. Resolving live also exercises the real chain, because
+   * `resolve_recipient_ids` maps a catalog external_id onto a supplier.
+   */
+  test('[VND-05] employee requests quotes from a shortlisted vendor', async ({}, info) => {
+    test.skip(!state.caseId || !state.submitted, 'no submitted case');
+
+    const recsRes = await requestWithGatewayRetry(() =>
+      api.get(`${API}/api/employee/recommendations`, { headers: { Authorization: `Bearer ${emp}` } }));
+    const recs = await recsRes.json().catch(() => ({} as Record<string, { item_id?: string }[]>));
+    const movers = Array.isArray(recs.movers) ? recs.movers : [];
+    const supplierId = movers.find((m) => m?.item_id)?.item_id;
+
+    await info.attach('rfq-recipient', {
+      body: JSON.stringify({ recsStatus: recsRes.status(), moversOffered: movers.length, supplierId }),
+      contentType: 'application/json',
+    });
+    // No recommendation is an upstream gap, not an RFQ defect — say so rather than fail here.
+    test.skip(!supplierId, `no mover recommended for this case (movers=${movers.length})`);
+
+    const r = await requestWithGatewayRetry(() => api.post(`${API}/api/rfqs`, {
+      headers: { Authorization: `Bearer ${emp}` },
+      // service_key 'movers' — prod rfq_items holds only 'movers' and 'schools'. The old test
+      // sent service_category:'moving', a field this endpoint does not read.
+      data: {
+        case_id: state.caseId,
+        items: [{ service_key: 'movers', requirements: { note: `deep-e2e ${info.workerIndex}` } }],
+        supplier_ids: [supplierId],
+      },
+    }));
+    const body = await r.text();
+    const j = JSON.parse(body || '{}');
+    await info.attach('rfq-create', {
+      body: JSON.stringify({ status: r.status(), body: body.slice(0, 600) }),
+      contentType: 'application/json',
+    });
+
+    expect([200, 201], `create RFQ: ${body.slice(0, 300)}`).toContain(r.status());
+    const rfqId = j?.rfq?.id;
+    expect(rfqId, 'response carried no rfq id').toBeTruthy();
+    expect(j?.unreachable ?? [], 'the shortlisted supplier was unreachable').toHaveLength(0);
+
+    // ASSERT CONTENT, NEVER STATUS: a 201 only proves the handler returned. Read it back.
+    const got = await requestWithGatewayRetry(() =>
+      api.get(`${API}/api/rfqs/${rfqId}`, { headers: { Authorization: `Bearer ${emp}` } }));
+    const detail = await got.json().catch(() => ({} as { id?: string; case_id?: string }));
+    await info.attach('rfq-readback', {
+      body: JSON.stringify({ status: got.status(), id: detail?.id, case_id: detail?.case_id }),
+      contentType: 'application/json',
+    });
+    expect(got.status(), 'created RFQ is not retrievable').toBe(200);
+    expect(detail?.case_id, 'RFQ came back attached to a different case').toBe(state.caseId);
   });
 });

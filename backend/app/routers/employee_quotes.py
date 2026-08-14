@@ -221,9 +221,18 @@ def list_hr_quote_requests(
     case_id: Optional[str] = None,
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> List[Dict[str, Any]]:
-    """
-    HR lists all quote requests from employees in their company.
-    Optional ?status=pending|acknowledged|fulfilled and ?case_id= filters.
+    """LEGACY — historical rows only. Do NOT wire a new surface to this.
+
+    Reads the retired `quote_requests` table, whose employee write path was tombstoned in
+    AIQ-1525 (newest production row: 2026-06-29), so it can only ever return pre-retirement
+    rows. It is also keyed on the canonical case_id, while the HR case-detail route param is
+    an assignment id — 0 of its 51 rows match one, so its only frontend caller displayed an
+    empty panel for every case and was removed.
+
+    The canonical HR read of what an employee actually requested is
+    GET /api/hr/cases/{case_id}/rfqs (`hr_coordination.get_case_rfqs`, AIQ-1669), which reads
+    `rfqs` + `rfq_items` + `rfq_recipients`. Kept here only so the 51 historical rows stay
+    retrievable. Optional ?status=pending|acknowledged|fulfilled and ?case_id= filters.
     """
     role = (user.get("role") or "").upper()
     if role not in (UserRole.HR.value, UserRole.ADMIN.value) and not user.get("is_admin"):
@@ -413,3 +422,17 @@ def list_employee_destination_requests(
     if role == UserRole.EMPLOYEE.value:
         return [r for r in all_reqs if r.get("requested_by") == str(user["id"])]
     return all_reqs
+
+
+@router.get("/api/employee/destinations")
+def list_employee_destinations(
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+) -> List[Dict[str, Any]]:
+    """[AIQ-1656] Employee-readable supported-destination catalogue (same list as the
+    HR-only GET /api/hr/catalog/destinations). The employee intake uses this to seed the
+    destination-city typeahead; a city not in this list is still accepted (never blocks
+    intake) and fires a POST /api/employee/destination-request so an admin can validate
+    it into the catalogue — controlled scaling of supported destinations."""
+    from ..services import scrape_safety
+
+    return scrape_safety.list_allowlist()

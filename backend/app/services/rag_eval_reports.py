@@ -69,6 +69,14 @@ METRIC_SPECS: List[MetricSpec] = [
     # audit/rag_eval/hr_policy_context_precision_*.json; the first committed
     # report flips this metric from mock to live.
     MetricSpec("hr_policy_context_precision", "HR policy context precision", 0.50),
+    # [AIQ-1821] Requirement-fact extraction recall over the snapshot-backed golden set
+    # (backend/scripts/eval_requirement_extraction.py --emit-dashboard, run report-only on
+    # the weekly eval-llm-reports workflow). 0.60 matches the runner's measured default so
+    # the dashboard alert line agrees with the gate; it was derived from three baseline runs
+    # (recall 0.909-1.000), not chosen aspirationally. Recall rather than precision: substring
+    # matching depresses precision whenever the model finds true facts beyond the curated
+    # expectations, so precision would penalise a better extractor.
+    MetricSpec("requirement_extraction_recall", "Requirement extraction recall", 0.60),
     # P3: real-LLM eval producers surfaced via the eval-llm-reports workflow.
     # RAG triad (run_rag_triad --judge claude) — thresholds match the runner's
     # DEFAULT_THRESHOLDS so the dashboard alert line agrees with the gate.
@@ -174,6 +182,10 @@ _MOCK_VALUES: Dict[str, List[float]] = {
     "answer_relevance": [0.38, 0.40, 0.41, 0.42, 0.44, 0.45, 0.46, 0.45, 0.46, 0.47, 0.46, 0.45, 0.44],
     "judge_calibration_kappa": [0.62, 0.64, 0.65, 0.67, 0.68, 0.70, 0.71, 0.70, 0.72, 0.73, 0.72, 0.71, 0.70],
     "ranking_agreement": [0.74, 0.75, 0.76, 0.78, 0.79, 0.80, 0.81, 0.80, 0.81, 0.82, 0.81, 0.80, 0.80],
+    # [AIQ-1821] Mock series anchored on the real measured baseline (0.909-1.000 across three
+    # runs over the v2 snapshot set), so the placeholder does not imply better quality than
+    # the eval has actually demonstrated.
+    "requirement_extraction_recall": [0.82, 0.84, 0.85, 0.86, 0.88, 0.89, 0.90, 0.91, 0.91, 0.92, 0.91, 0.91, 0.91],
 }
 _MOCK_WEEKS = 13
 

@@ -14,6 +14,14 @@ type PendingCapability = {
   city_name?: string | null;
   source?: string | null;
   source_url?: string | null;
+  /** [AIQ-1788] Present for registry-harvested suppliers; absent for manually-added ones. */
+  accreditation?: {
+    body: string;
+    number?: string | null;
+    valid_until?: string | null;
+    status: string;
+    evidence_url?: string | null;
+  } | null;
   created_at?: string | null;
 };
 
@@ -128,6 +136,41 @@ export const AdminVettingQueue: React.FC = () => {
                     </div>
                   )}
                 </button>
+
+                {/* [AIQ-1788] Registry-harvested suppliers arrive with accreditation evidence.
+                    Approving one without being able to see WHICH register vouched for it is a
+                    rubber stamp, and the evidence is the only thing separating a harvested
+                    candidate from a scrape. Absent for manually-added suppliers, so both the
+                    block and the link render only when there is something to show. */}
+                {(row.accreditation || row.source_url) && (
+                  <div className="text-xs text-[#6b7280] mt-1 min-w-0 flex-1">
+                    {row.accreditation && (
+                      <div>
+                        <span className="text-[#0b2b43]">{row.accreditation.body}</span>
+                        {row.accreditation.number && ` · ${row.accreditation.number}`}
+                        {row.accreditation.valid_until &&
+                          ` · expires ${row.accreditation.valid_until}`}
+                        {row.accreditation.status === 'claimed' && (
+                          <span className="text-[#9ca3af]"> · unverified</span>
+                        )}
+                      </div>
+                    )}
+                    {row.source_url && (
+                      <a
+                        href={
+                          row.source_url.startsWith('http')
+                            ? row.source_url
+                            : `https://${row.source_url}`
+                        }
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="text-accent-700 underline break-all"
+                      >
+                        Check the register ↗
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   <Button variant="secondary" size="sm" onClick={() => approve(row)} disabled={saving}>

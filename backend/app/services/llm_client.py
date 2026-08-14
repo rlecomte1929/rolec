@@ -33,7 +33,7 @@ import os
 import random
 import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from .llm_tracing import traced_generation  # AIQ-571: fail-soft Langfuse trace emission
 
@@ -471,7 +471,75 @@ async def complete_text(
         lambda: client.chat.completions.create(**kwargs),
         label="complete_text", model=model, timeout=timeout, max_retries=max_retries,
     )
-    return resp.choices[0].message.content or ""
+    text, _tokens_in, _tokens_out = _text_and_usage(resp)
+    return text
+
+
+def _text_and_usage(resp: Any) -> Tuple[str, int, int]:
+    """(text, prompt_tokens, completion_tokens) from an OpenAI chat response.
+
+    ``_run_with_retry`` already returns the full SDK response and logs usage, but
+    ``complete_text`` throws the counts away. The relopass LLM router computes
+    ``cost_usd`` from real token counts and writes them onto every ``rce.agent_runs``
+    row, so a completer reporting 0/0 would silently zero the AI unit-economics
+    rollups. Usage is absent on some streaming/error shapes — degrade to 0 rather
+    than raise, since the text is the part callers actually need.
+    """
+    text = ""
+    try:
+        text = resp.choices[0].message.content or ""
+    except (AttributeError, IndexError, TypeError):
+        text = ""
+    usage = getattr(resp, "usage", None)
+    tokens_in = int(getattr(usage, "prompt_tokens", 0) or 0) if usage else 0
+    tokens_out = int(getattr(usage, "completion_tokens", 0) or 0) if usage else 0
+    return text, tokens_in, tokens_out
+
+
+@traced_generation("openai")
+async def complete_text_with_usage(
+    *,
+    system: str,
+    user: str,
+    model: str = _OPENAI_DEFAULT_MODEL,
+    temperature: float = 0.2,
+    json_object: bool = False,
+    timeout: float = DEFAULT_TIMEOUT,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_tokens: Optional[int] = None,
+) -> Tuple[str, int, int]:
+    """``complete_text`` plus the real token counts: ``(text, tokens_in, tokens_out)``.
+
+    Exists for the relopass LLM router adapter (``llm_router_clients``), whose
+    ``CompletionResult`` contract requires genuine usage numbers — see
+    ``_text_and_usage``. Shares the same retry/timeout/tracing policy as every other
+    entry point here; it is the same call with the usage kept rather than dropped.
+    """
+    try:
+        from openai import AsyncOpenAI  # type: ignore
+    except ImportError:
+        raise RuntimeError("openai package is not installed — run: pip install openai")
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY environment variable is not set.")
+
+    client = AsyncOpenAI(api_key=api_key)
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": user})
+    kwargs: Dict[str, Any] = {"model": model, "messages": messages, "temperature": temperature}
+    if json_object:
+        kwargs["response_format"] = {"type": "json_object"}
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
+
+    resp = await _run_with_retry(
+        lambda: client.chat.completions.create(**kwargs),
+        label="complete_text_with_usage", model=model,
+        timeout=timeout, max_retries=max_retries,
+    )
+    return _text_and_usage(resp)
 
 
 @traced_generation("anthropic")

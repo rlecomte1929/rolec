@@ -933,7 +933,14 @@ class MiscMixin:
                     rfq_id TEXT NOT NULL,
                     vendor_id TEXT NOT NULL,
                     status TEXT NOT NULL,
-                    last_activity_at TEXT
+                    last_activity_at TEXT,
+                    -- [AIQ-1819] Present in prod since 20261029000000, applied 2026-08-12.
+                    -- `_vendor_names_for_rfq` orders by it, and while this fixture lacked the
+                    -- column that query raised 42703 here exactly as it did in production —
+                    -- silently, because the function ends `except Exception: return None` and
+                    -- the caller reads `or "Service provider"`. So the SQLite lane went on
+                    -- passing for the whole time the feature had never once worked.
+                    created_at TEXT
                 )
             """))
 
@@ -2440,7 +2447,15 @@ class MiscMixin:
                     evidence_quote TEXT,
                     confidence TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'pending',
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    -- [AIQ-1821] Evidence ledger — mirrors 20261033000000_fact_evidence_ledger.sql.
+                    -- Keep in step with that migration or SQLite-backed tests pass while prod 500s
+                    -- on the missing column (the mocked-DB-misses-PG-constraints trap).
+                    evidence_verified INTEGER,
+                    evidence_offset INTEGER,
+                    evidence_checked_at TEXT,
+                    reviewed_by TEXT,
+                    reviewed_at TEXT
                 )
             """))
             conn.execute(text("""
@@ -2451,7 +2466,12 @@ class MiscMixin:
                     reviewer_user_id TEXT NOT NULL,
                     action TEXT NOT NULL,
                     notes TEXT,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    -- [AIQ-1821] action='edit' has been allowed by the CHECK since the table was
+                    -- created and nothing ever wrote it. Correcting an overstated fact beats
+                    -- rejecting accurate content over a modal verb.
+                    previous_fact_text TEXT,
+                    new_fact_text TEXT
                 )
             """))
 
@@ -3696,9 +3716,14 @@ class MiscMixin:
             "citations": json.dumps([doc_id]),
             "version": 1,
             "supersedes_rule_id": None,
-            "is_baseline": 1,
+            # [AIQ-1821] Booleans, not 1/0. knowledge_rules.is_baseline / is_active are
+            # `boolean` in Postgres, which rejects an integer bind outright
+            # ("column is of type boolean but expression is of type integer"). SQLite
+            # accepts 1/0, so this only ever failed against a real database — the
+            # official-ingest path could not complete on Postgres at all.
+            "is_baseline": True,
             "baseline_priority": baseline_priority,
-            "is_active": 1,
+            "is_active": True,
             "created_at": now,
         }
         with self.engine.begin() as conn:

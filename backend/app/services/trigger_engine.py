@@ -189,7 +189,8 @@ def _build_context(
         with db.engine.connect() as conn:
             row = conn.execute(
                 text(
-                    "SELECT id, employee_id, dest_country_code, purpose "
+                    "SELECT id, employee_id, origin_country_code, "
+                    "dest_country_code, purpose "
                     f"FROM {_t('cases')} WHERE id = :id"
                 ),
                 {"id": case_uuid},
@@ -210,10 +211,15 @@ def _build_context(
     ).upper() or None
 
     basics = draft.get("relocationBasics") or {}
-    # Origin: derived (in-flight PATCH) wins over the wizard draft basics.
+    # Origin: derived (in-flight PATCH) wins over the wizard draft basics, which
+    # in turn wins over the persisted column. The DB fallback matters because the
+    # draft only exists mid-wizard: without it a case at rest resolves to None,
+    # which silently collapses visa_type below and makes any rule gated on
+    # origin_country unfireable outside a live wizard session.
     origin_country = (
         (derived.get("origin_country") or "").strip()
         or (basics.get("originCountry") or "").strip()
+        or (row["origin_country_code"] or "").strip()
     ).upper() or None
 
     # visa_type: [P1-04] an EEA national relocating to another EEA country uses
@@ -241,11 +247,11 @@ def _build_context(
 
 # EU/EEA member states (ISO 3166-1 alpha-2). An EEA national relocating to
 # another EEA country follows the registration scheme rather than a work permit.
-_EEA_COUNTRIES = frozenset({
-    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR",
-    "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK",
-    "SI", "ES", "SE", "IS", "LI", "NO",
-})
+#
+# [AIQ-1795b] Moved to a dependency-free module so a CI guard can import the set without
+# importing this engine (and therefore SQLAlchemy). The alias is kept because several tests
+# and services already read `trigger_engine._EEA_COUNTRIES`; there is still exactly one copy.
+from .eea_countries import EEA_COUNTRIES as _EEA_COUNTRIES  # noqa: E402
 
 
 def _purpose_to_visa_type(purpose: str) -> Optional[str]:
@@ -272,18 +278,20 @@ def _derive_events(
     """
     events: set = set()
     dest = context.get("destination_country")
-    basics = draft.get("relocationBasics") or {}
 
     # roadmap.destination_confirmed — destination country is known
     if dest:
         events.add("roadmap.destination_confirmed")
 
     # roadmap.profile_completed — origin + destination + at least one
-    # other meaningful field is present
-    origin = (
-        (derived.get("origin_country") or "").strip()
-        or (basics.get("originCountry") or "").strip()
-    )
+    # other meaningful field is present.
+    # Read origin from the context rather than recomputing it from the draft:
+    # context already applied the derived → draft → cases.origin_country_code
+    # precedence. Recomputing here saw only the first two, so a later PATCH that
+    # omits relocationBasics fired destination_confirmed (dest resolves from the
+    # DB) but not profile_completed — an inconsistency between the two, not a
+    # deliberate narrowing.
+    origin = context.get("origin_country")
     if dest and origin:
         events.add("roadmap.profile_completed")
 

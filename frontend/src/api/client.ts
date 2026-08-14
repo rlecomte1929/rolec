@@ -546,22 +546,6 @@ export interface CommandCenterKPIs {
   completedCount: number;
 }
 
-export interface HrQuoteRequest {
-  id: string;
-  case_id: string;
-  employee_id: string;
-  company_id: string;
-  service_categories: string[];
-  notes: string | null;
-  budget_range: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  // [AIQ-1514/1515] The vendors the employee shortlisted. Absent/empty on requests created
-  // before AIQ-1514 — that choice was never captured and cannot be recovered.
-  vendors?: Array<{ service_category: string; item_id: string; name: string }>;
-}
-
 export interface VendorPerformanceResponse {
   summary: {
     avg_rating: number | null;
@@ -699,25 +683,6 @@ export interface ProcessErasureResponse {
   profiles_anonymised: number;
   reviewed_by: string;
   reviewed_at: string;
-}
-
-export interface HrRfqRequestsResponse {
-  rfqs: Array<{
-    id: string;
-    case_id: string;
-    vendor_id: string;
-    vendor_name: string;
-    vendor_email: string;
-    service_category: string;
-    move_date: string | null;
-    budget_range: string | null;
-    special_requirements: string | null;
-    hr_email: string;
-    hr_name: string;
-    status: string;
-    created_at: string;
-  }>;
-  total: number;
 }
 
 export interface HrAnalyticsResponse {
@@ -1129,23 +1094,10 @@ export const hrAPI = {
     return response.data;
   },
 
-  getQuoteRequests: async (params?: {
-    status?: string;
-    case_id?: string;
-  }): Promise<{ quote_requests: HrQuoteRequest[] }> => {
-    const response = await api.get<{ quote_requests: HrQuoteRequest[] } | HrQuoteRequest[]>('/api/hr/quote-requests', { params });
-    // backend returns a list directly; normalise to named key
-    const data = response.data;
-    return { quote_requests: Array.isArray(data) ? data : (data.quote_requests ?? []) };
-  },
-
-  updateQuoteRequestStatus: async (
-    requestId: string,
-    status: 'acknowledged' | 'fulfilled'
-  ): Promise<{ id: string; status: string }> => {
-    const response = await api.patch<{ id: string; status: string }>(`/api/hr/quote-requests/${requestId}`, { status });
-    return response.data;
-  },
+  // `getQuoteRequests` / `updateQuoteRequestStatus` (GET+PATCH /api/hr/quote-requests) are
+  // gone: they read the retired `quote_requests` table, whose write path was tombstoned in
+  // AIQ-1525 (newest row 2026-06-29). The HR case detail was their only caller and it now
+  // reads the canonical `rfqs` via getCaseRfqs() in api/hrCoordination.ts.
 
   // ── NAV-SP-2: Vendor performance dashboard ───────────────────────────────
 
@@ -1255,48 +1207,10 @@ export const hrAPI = {
     return response.data;
   },
 
-  // ── AIQ-40-C: RFQ flow ────────────────────────────────────────────────────
-
-  /** POST /api/hr/rfq-requests */
-  createRfqRequest: async (payload: {
-    case_id: string;
-    vendor_id: string;
-    service_category: string;
-    move_date?: string;
-    budget_range?: string;
-    special_requirements?: string;
-    // IMM-15: optional immigration case context (immigration-originated RFQs)
-    visa_type?: string;
-    corridor_from?: string;
-    corridor_to?: string;
-    employee_nationality?: string;
-    has_dependents?: boolean;
-    risk_flags?: string[];
-  }): Promise<{ ok: boolean; rfq_id: string; vendor_name: string; status: string; message: string }> => {
-    const response = await api.post<{ ok: boolean; rfq_id: string; vendor_name: string; status: string; message: string }>('/api/hr/rfq-requests', payload);
-    return response.data;
-  },
-
-  /** GET /api/hr/rfq-requests?case_id=X */
-  getRfqRequests: async (params?: { case_id?: string }): Promise<HrRfqRequestsResponse> => {
-    const response = await api.get<HrRfqRequestsResponse>('/api/hr/rfq-requests', { params });
-    return response.data;
-  },
-
-  /** PATCH /api/hr/rfq-requests/{id} */
-  updateRfqStatus: async (
-    rfqId: string,
-    status: 'quote_received' | 'accepted' | 'cancelled',
-    quoteDetails?: {
-      quote_amount?: number;
-      quote_currency?: string;
-      quote_deadline?: string;
-      quote_deliverable?: string;
-    }
-  ): Promise<{ ok: boolean; rfq_id: string; status: string }> => {
-    const response = await api.patch<{ ok: boolean; rfq_id: string; status: string }>(`/api/hr/rfq-requests/${rfqId}`, { status, ...quoteDetails });
-    return response.data;
-  },
+  // [AIQ-1683] The HR-initiated `rfq_requests` model is fully retired — RFQs are
+  // employee-led (canonical `rfqs`/`rfq_items`/`quotes` via servicesAPI.createRfq →
+  // POST /api/rfqs), HR is payer/approver. The last `/api/hr/rfq-requests` reader was
+  // removed and the table archived to `rfq_requests_legacy` (read-only).
 
   // ── AIQ-34-C: Employee task management (HR side) ──────────────────────────
 
@@ -2677,9 +2591,41 @@ export const adminCollaborationAPI = {
     api.get<unknown>('/api/admin/collaboration/notifications/unread-count').then((r) => r.data),
 };
 
+/**
+ * [AIQ-1821] `GET /api/requirements/sufficiency` returns HTTP 200 for BOTH degraded states,
+ * so callers must branch on `compute_status`, never on the HTTP status:
+ *  - 'ok'                — the computation ran. Empty arrays mean "we hold no verified
+ *                          requirements for this corridor", NOT "nothing is required of you".
+ *  - 'insufficient_data' — the case lacks the inputs to compute.
+ *  - 'unavailable'       — something upstream broke.
+ */
+export type RequirementsComputeStatus = 'ok' | 'insufficient_data' | 'unavailable';
+
+/** One approved requirement fact, with the official source it was extracted from. */
+export interface SupportingRequirement {
+  fact_id: string;
+  fact_text: string;
+  source_url: string;
+  /** Profile fields this fact implies we need. Keys of the case profile snapshot. */
+  required_fields: string[];
+}
+
+export interface RequirementsSufficiency {
+  compute_status: RequirementsComputeStatus;
+  /** Non-null only when compute_status !== 'ok'. */
+  message: string | null;
+  /** Raw as stored on the case — normalised server-side but not guaranteed ISO-2. */
+  destination_country: string | null;
+  /** Profile fields still unanswered. INTAKE completeness — not legal obligations. */
+  missing_fields: string[];
+  supporting_requirements: SupportingRequirement[];
+}
+
 export const requirementsAPI = {
-  getSufficiency: async (caseId: string): Promise<{ missing_fields?: string[]; compute_status?: string; message?: string }> => {
-    const response = await api.get<{ missing_fields?: string[]; compute_status?: string; message?: string }>('/api/requirements/sufficiency', { params: { case_id: caseId } });
+  getSufficiency: async (caseId: string): Promise<RequirementsSufficiency> => {
+    const response = await api.get<RequirementsSufficiency>('/api/requirements/sufficiency', {
+      params: { case_id: caseId },
+    });
     return response.data;
   },
 };

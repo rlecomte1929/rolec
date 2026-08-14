@@ -6,6 +6,7 @@ import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { looksLikeTestEmail } from '../../utils/testAccount';
 import { markWelcomeSeen } from '../../utils/welcomeSeen';
+import { persistWelcomeSeen } from '../../api/welcome';
 
 /**
  * HR first-login orientation. Shown once (see useWelcomeRedirect + welcomeSeen),
@@ -30,17 +31,20 @@ export function HrWelcomePage() {
 
   const handleSkip = () => {
     markWelcomeSeen(userId);
+    void persistWelcomeSeen().catch(() => {});
     navigate('/hr/dashboard');
   };
 
   const handleGoToDashboard = () => {
     markWelcomeSeen(userId);
+    void persistWelcomeSeen().catch(() => {});
     navigate('/hr/command-center');
   };
 
   // AIQ-1571: straight to the one real case form, via the ?new=1 deep link AIQ-1568 added.
   const handleCreateCase = () => {
     markWelcomeSeen(userId);
+    void persistWelcomeSeen().catch(() => {});
     navigate(`${buildRoute('hrDashboard')}?new=1`);
   };
 

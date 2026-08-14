@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { RecommendationResults } from '../../features/recommendations/RecommendationResults';
+import { recommendationsEngineAPI } from '../../features/recommendations/api';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { ServicesContextBanner } from '../../features/services/ServicesContextBanner';
 import { useServicesMoveBanner } from '../../features/services/useServicesMoveBanner';
@@ -13,7 +14,8 @@ import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmen
 import { buildRoute, type RouteKey } from '../../navigation/routes';
 
 const CATEGORY_LABELS: Record<string, string> = {
-  living_areas: 'Living Areas',
+  living_areas: 'Neighbourhoods',
+  housing_agencies: 'Housing Agencies',
   schools: 'Schools',
   movers: 'Movers',
   banks: 'Banks',
@@ -32,7 +34,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 export const ServicesRecommendations: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { recommendations, shortlist, setShortlist, displayCurrency, setActiveCaseId } = useServicesFlow();
+  const { recommendations, setRecommendations, shortlist, setShortlist, displayCurrency, setActiveCaseId } = useServicesFlow();
   const { assignmentId: primaryAssignmentId, linkedSummaries } = useEmployeeAssignment();
   // [AIQ-1285] caseId from the path is authoritative; fall back to legacy ?assignment=.
   const { caseId: pathCaseId } = useParams<{ caseId?: string }>();
@@ -55,6 +57,30 @@ export const ServicesRecommendations: React.FC = () => {
   const caseStep = (key: RouteKey) => buildRoute(key, { caseId: routeCaseId });
   // AIQ-1249d: case-context banner — which move this services flow is scoped to.
   const moveBanner = useServicesMoveBanner(assignmentId || null);
+
+  // Δ2/Δ3: when the employee shortlists neighbourhoods, re-rank the housing agencies
+  // to favour those serving the shortlisted areas (a boost, never a filter). Debounced;
+  // only the housing_agencies block is refreshed, and only once ≥1 neighbourhood is
+  // shortlisted. Best-effort — the existing order stays on failure.
+  const neighbourhoodShortlistKey = (shortlist.get('living_areas') || []).join(',');
+  useEffect(() => {
+    const areaIds = shortlist.get('living_areas') || [];
+    if (!assignmentId || !recommendations?.housing_agencies || areaIds.length === 0) return;
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const { results } = await recommendationsEngineAPI.recommendBatch(assignmentId, ['housing'], areaIds);
+          if (results?.housing_agencies) {
+            setRecommendations({ ...recommendations, housing_agencies: results.housing_agencies });
+          }
+        } catch {
+          /* best-effort re-rank; keep the current order on failure */
+        }
+      })();
+    }, 600);
+    return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [neighbourhoodShortlistKey, assignmentId]);
 
   if (!recommendations || Object.keys(recommendations).length === 0) {
     return (

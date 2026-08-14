@@ -15,10 +15,24 @@ describe('matchCountry', () => {
     expect(matchCountry('  germany ', COUNTRIES)?.code).toBe('DE');
   });
 
-  it('commits on an unambiguous code match — incl. a code that prefixes its OWN name', () => {
-    // "fr" is the prefix of "France", but France IS the code's country, so it commits.
-    expect(matchCountry('fr', COUNTRIES)?.code).toBe('FR');
-    expect(matchCountry('FR', COUNTRIES)?.code).toBe('FR');
+  it('commits on an unambiguous code match that starts NO country name', () => {
+    // "us" is the United States code and no country name starts with "us", so the
+    // user cannot be mid-typing a name → it commits.
+    expect(matchCountry('us', COUNTRIES)?.code).toBe('US');
+    expect(matchCountry('US', COUNTRIES)?.code).toBe('US');
+  });
+
+  it('does NOT commit a code that prefixes a country name — the user may be mid-typing it (AIQ-1643)', () => {
+    // "fr" is France's code but also the start of "France": committing here truncated
+    // the word and the browser appended the rest → "Franceance". Wait for the full name.
+    expect(matchCountry('fr', COUNTRIES)).toBeUndefined();
+    expect(matchCountry('FR', COUNTRIES)).toBeUndefined();
+    // The canonical field report: "Nor" → "Norwayr" (code NO commits at 2 chars).
+    const withNorway: CountryOption[] = [...COUNTRIES, { code: 'NO', name: 'Norway' }];
+    expect(matchCountry('no', withNorway)).toBeUndefined();
+    expect(matchCountry('nor', withNorway)).toBeUndefined();
+    // Once the full name is typed it resolves correctly — no corruption.
+    expect(matchCountry('norway', withNorway)?.code).toBe('NO');
   });
 
   it('does not commit on a partial / empty query', () => {

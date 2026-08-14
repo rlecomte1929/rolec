@@ -38,10 +38,12 @@ from sqlalchemy import text as _sql_text
 from .. import crud, schemas
 from ..auth_deps import get_current_user, require_case_access
 from ..db import SessionLocal
+from ..services.roadmap_entitlement import assert_roadmap_access
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.roadmap_projection import project_tracks, track_label_for_form
 from ..services.confidence_mapping import tier_to_confidence
+from ..services.localised_labels import localised_label
 from ..services.roadmap_lead_times import lead_time_days_for
 from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
 from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case, gate_ai_roadmap
@@ -192,10 +194,20 @@ class _DossierFormTemplate(BaseModel):
     # Drives the "indicative guidance — confirm with the authority" notice so the
     # dossier never implies unverified immigration content is authoritative.
     verification_status: Optional[str] = None
+    # [AIQ-1757] Official language of the form's labels (ISO 639-1, default 'en').
+    # When != 'en' the dossier offers a label-only translation toggle; identifier
+    # VALUES are never translated.
+    source_language: Optional[str] = "en"
     # [P1-05 checklist] Required supporting documents, derived from the template
     # fields that carry requires_original=true. Each item: {"key","label","format"}
     # where format (from the field's optional doc_format) may be None. [AIQ-1257a]
     required_documents: List[Dict[str, Optional[str]]] = []
+    # [S1] The section layout: ordered, each entry carrying its own title, authority,
+    # portal, deadline hint, session_group and field_ids. Empty means "group by
+    # fields[].section", which is what every template except RP-NO-DATASHEET does. A
+    # section may reference NO fields — France's absent arrival registration is a section
+    # that is a statement.
+    sections: List[Dict[str, Any]] = []
 
 
 class _DossierFormPerson(BaseModel):
@@ -270,16 +282,41 @@ class FieldValueItem(BaseModel):
     """A single field value as returned by the GET endpoint."""
     field_id: str
     label: str
+    # The label in the form's OWN language, resolved from the template's source_language
+    # (label_nb for a Norwegian sheet, label_de for a German one, …). Drives the label
+    # toggle. None when the template is English or seeded no translation for the field —
+    # the client then shows `label`, or machine-translates it.
+    # Labels are translated for comprehension; identifier VALUES never are.
+    label_localised: Optional[str] = None
+    # Deprecated alias, kept so an older client keeps working. Always equal to
+    # label_localised on a Norwegian template and None on any other, which is exactly what
+    # it meant before source_language existed. New clients read label_localised.
+    label_nb: Optional[str] = None
     field_type: str           # text | date | select | boolean | …
     required: bool
     position: int
     prefill_source: Optional[str]
     requires_original: bool
+    # A determination that must be made by a regulated professional and is NEVER
+    # pre-filled (tax residency, A1, contract classification, shadow payroll, PE).
+    consult_professional: bool = False
+    # Optional grouping section from the template field definition.
+    section: Optional[str] = None
+    # Short guidance seeded on the template field ("bring the original", deadlines, the
+    # OUTPUT-vs-INPUT warnings). Present on 10 of the 18 RP-NO-DATASHEET fields and, until
+    # AIQ-1759, dropped here — so it sat in the database invisible to the employee.
+    note: Optional[str] = None
+    # The authority portal the employee actually completes this step in (Skatteetaten, UDI,
+    # politiet). Seeded on 5 fields; same story as `note`.
+    portal_url: Optional[str] = None
     options: Optional[List[str]]   # only for select fields
     # Stored value metadata (None if no value has been saved yet)
     value: Optional[str]
     filled_by: Optional[str]       # ai | system | employee | specialist | hr
     ai_confidence: Optional[float]
+    # Data origin of the value (case_form_field_values.source): intake_profile |
+    # contract | banking | passport_ocr | prior_form | ... — drives the UI source badge.
+    source: Optional[str] = None
     reviewed: bool
     overridden: bool
 
@@ -442,7 +479,9 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             source_last_verified=_iso(row.get("source_last_verified")),  # [P1-05d]
             source_tier=(str(row["source_tier"]) if row.get("source_tier") is not None else None),  # [P3-04e-FU]
             verification_status=(row.get("template_verification_status") or "representative"),  # [WS1]
+            source_language=(row.get("template_source_language") or "en"),  # [AIQ-1757]
             required_documents=required_documents,  # [P1-05 checklist]
+            sections=_parse_sections(row.get("template_sections")),  # [S1]
         )
 
     return CaseFormSummary(
@@ -490,12 +529,31 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
     )
 
 
+def _parse_sections(raw: Any) -> List[Dict[str, Any]]:
+    """`form_templates.sections` as a list, whatever the driver handed back.
+
+    Postgres returns jsonb already decoded; the SQLite schema the tests use stores it as TEXT.
+    Mirrors how `template_fields` is handled a few hundred lines below. A malformed value
+    degrades to `[]`, which means "fall back to grouping by fields[].section" — the sheet still
+    renders rather than 500ing on a bad row.
+    """
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return raw if isinstance(raw, list) else []
+
+
 def _load_form_with_template(
     conn: Any,
     case_id: str,
     form_id: str,
 ) -> Optional[Dict[str, Any]]:
     """Return the case_form row joined with its template fields, or None if not found."""
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     row = conn.execute(
         _sql_text(
             f"""
@@ -514,6 +572,16 @@ def _load_form_with_template(
                    ft.category AS template_category,
                    ft.version AS template_version,
                    ft.fields  AS template_fields,
+                   -- [S1] The section layout. Selected here as well as in the field-values
+                   -- query below: C1 had to add source_language to this loader for exactly
+                   -- this reason — a column the renderer needs but nobody selected resolves
+                   -- to None and the feature silently does nothing.
+                   ft.sections AS template_sections,
+                   -- The authority's own language. get_form_pdf needs it to print the
+                   -- localised label under each English one; without it selected here the
+                   -- lookup would silently find nothing and the sheet would render
+                   -- English-only with no error to notice.
+                   ft.source_language AS template_source_language,
                    cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes
             FROM {_pg_table('case_forms')} cf
             -- [P4-3] LEFT JOIN so ad-hoc forms (form_template_id IS NULL) still appear.
@@ -931,9 +999,18 @@ def get_case(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
 
 @router.get("/{case_id}/requirements", response_model=schemas.CaseRequirementsDTO)
 def get_case_requirements(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id, never the raw param — the rule _assert_case_access's own
+    # docstring states, and one of the twelve endpoints AIQ-1775 found ignoring it. A route
+    # param is commonly an assignment id (HrDashboard navigates with assignment.id), and
+    # requirements_builder keys on the canonical case id, so the raw param resolved the
+    # destination to "UNKNOWN" and the dossier showed a coverage gap on a covered corridor.
+    #
+    # NOTE: in production this handler is SHADOWED by backend/routes/compat.py, which is
+    # registered first and wins FastAPI's first-match. Fixed there too; fixing only here
+    # would have changed nothing.
+    resolved_case_id = _assert_case_access(user, case_id)
     try:
-        return compute_case_requirements(case_id)
+        return compute_case_requirements(resolved_case_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Case not found")
 
@@ -969,7 +1046,13 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
     Replaces window.PATHWAY_V2.deriveTimeline() with a real server-side computation.
     Tracks: Visa & Permit | Civil Documents | Family (conditional) | Settlement.
     """
-    _assert_case_access(user, case_id)
+    # Key on the RESOLVED id: `crud.get_case` looks `wizard_cases` up by the raw value, and
+    # route params are routinely assignment ids (HrDashboard.tsx navigates with
+    # assignment.id). Handed one, this 404'd the live employee RoadmapScreen for a case that
+    # exists. Unlike the requirements endpoint, this route is NOT shadowed by compat.py —
+    # this handler is the one that serves.
+    case_id = _assert_case_access(user, case_id)
+    assert_roadmap_access(case_id)  # server-side paywall (no-op while flag off — default)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
@@ -1034,6 +1117,7 @@ def get_case_roadmap_tracks(
     no longer read. Used by the employee RoadmapScreen.
     """
     _assert_case_access(user, case_id)
+    assert_roadmap_access(case_id)  # server-side paywall (no-op while flag off — default)
 
     # [AIQ-800] Option B — project the roadmap from the case's real forms instead
     # of reading the (never-written) roadmap_tracks/roadmap_steps tables. Reuses
@@ -1259,8 +1343,10 @@ def _load_case_form_summaries(
           ft.category AS template_category,
           ft.version AS template_version,
           ft.fields  AS template_fields,
+          ft.sections AS template_sections,
           ft.source_url AS template_source_url,
           ft.verification_status AS template_verification_status,
+          ft.source_language AS template_source_language,
           sp.last_fetched_at AS source_last_verified,
           sp.tier AS source_tier,
           rs.title AS roadmap_step_title,
@@ -1334,6 +1420,7 @@ def list_form_documents(
     unavailable, e.g. dev/test).
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
 
     with main_db.engine.connect() as conn:
         rows = conn.execute(
@@ -1411,7 +1498,7 @@ def get_form_fields(
             fv_rows = conn.execute(
                 _sql_text(
                     f"""
-                    SELECT field_id, value, filled_by, ai_confidence, reviewed, overridden
+                    SELECT field_id, value, filled_by, ai_confidence, source, reviewed, overridden
                     FROM {_pg_table('case_form_field_values')}
                     WHERE case_form_id = :form_id
                     """
@@ -1435,22 +1522,36 @@ def get_form_fields(
         except (json.JSONDecodeError, TypeError):
             raw_fields = []
 
+    # The label language is the TEMPLATE's, not the viewer's — which authority's form this is.
+    template_language = form_row.get("template_source_language") or "en"
+
     items: List[FieldValueItem] = []
     for fd in sorted(raw_fields, key=lambda f: f.get("position", 0)):
         fid = fd.get("id", "")
         sv = stored.get(fid)
+        localised = localised_label(fd, template_language)
         items.append(FieldValueItem(
             field_id=fid,
             label=fd.get("label", fid),
+            label_localised=localised,
+            # Deprecated: only ever populated for a Norwegian template, so an older client
+            # sees exactly what it saw before and a German sheet does not surprise it with a
+            # German string in a field named _nb.
+            label_nb=localised if template_language == "nb" else None,
             field_type=fd.get("type", "text"),
             required=bool(fd.get("required", False)),
             position=int(fd.get("position", 0)),
             prefill_source=fd.get("prefill_source"),
             requires_original=bool(fd.get("requires_original", False)),
+            consult_professional=bool(fd.get("consult_professional", False)),
+            section=fd.get("section"),
+            note=fd.get("note"),
+            portal_url=fd.get("portal_url"),
             options=fd.get("options"),
             value=sv["value"] if sv else None,
             filled_by=sv["filled_by"] if sv else None,
             ai_confidence=sv["ai_confidence"] if sv else None,
+            source=sv.get("source") if sv else None,
             reviewed=bool(sv["reviewed"]) if sv else False,
             overridden=bool(sv["overridden"]) if sv else False,
         ))
@@ -1466,6 +1567,7 @@ def list_form_comments(
 ) -> List[CommentItem]:
     """List all comments on a CaseForm, newest first."""
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.connect() as conn:
             # Verify the form belongs to this case
@@ -1519,6 +1621,7 @@ def list_form_events(
 ) -> List[EventItem]:
     """Return the history log for a CaseForm, newest first."""
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.connect() as conn:
             exists = conn.execute(
@@ -1587,6 +1690,7 @@ def get_form_original(
     - Returns 404 when no original PDF has been attached to the template yet.
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
 
     with main_db.engine.connect() as conn:
         row = conn.execute(
@@ -1665,13 +1769,18 @@ def get_form_pdf(
             # Fetch all current field values
             fv_rows = conn.execute(
                 _sql_text(
-                    f"SELECT field_id, value FROM {_pg_table('case_form_field_values')} "
+                    f"SELECT field_id, value, source FROM {_pg_table('case_form_field_values')} "
                     f"WHERE case_form_id = :form_id AND value IS NOT NULL AND value != ''"
                 ),
                 {"form_id": form_id},
             ).mappings().all()
             field_values: Dict[str, str] = {
                 str(r["field_id"]): str(r["value"]) for r in fv_rows
+            }
+            # Data origin per field — drives the "From your passport scan" line on the data
+            # sheet, so the employee can see which values came from where.
+            field_sources: Dict[str, str] = {
+                str(r["field_id"]): str(r["source"]) for r in fv_rows if r.get("source")
             }
 
             # Parse template fields JSON
@@ -1739,16 +1848,43 @@ def get_form_pdf(
                         status_code=500, detail="PDF generation failed"
                     )
             else:
-                # No original PDF — generate a placeholder
+                # No original PDF. For corridors with no fillable government form (FR→NO, and
+                # DE — see docs/form-autofill/ACROFORM-FEASIBILITY-DE-FR.md) the deliverable is
+                # a personal data sheet, not a stand-in for an official form. This used to emit
+                # two lines of Helvetica with a comma-joined dump of ten raw field ids.
                 form_name = form_row.get("template_name") or form_code
-                pdf_bytes = _make_blank_pdf(
-                    title=form_name,
-                    message=(
-                        "This form has not been uploaded yet. "
-                        "Field values captured so far: "
-                        + ", ".join(f"{k}: {v}" for k, v in list(field_values.items())[:10])
-                    ),
-                )
+                pdf_bytes = None
+                if template_fields:
+                    try:
+                        from ..services.data_sheet_pdf import render_data_sheet
+
+                        pdf_bytes = render_data_sheet(
+                            title=form_name,
+                            subtitle=form_row.get("template_authority_name") or None,
+                            fields=template_fields,
+                            values=field_values,
+                            sources=field_sources,
+                            # Prints each label in the authority's own language beneath the
+                            # English one, so the employee can match the sheet to the counter.
+                            source_language=form_row.get("template_source_language"),
+                            # [S1] When the template declares sections, they ARE the layout.
+                            # None/[] falls back to grouping by fields[].section.
+                            sections=_parse_sections(form_row.get("template_sections")),
+                        )
+                    except Exception:  # noqa: BLE001 — never turn a download into a 500
+                        logger.exception(
+                            "data sheet render failed form_id=%s, using placeholder", form_id
+                        )
+                if pdf_bytes is None:
+                    # Genuinely nothing to lay out (no template fields, or reportlab absent).
+                    pdf_bytes = _make_blank_pdf(
+                        title=form_name,
+                        message=(
+                            "This form has not been uploaded yet. "
+                            "Field values captured so far: "
+                            + ", ".join(f"{k}: {v}" for k, v in list(field_values.items())[:10])
+                        ),
+                    )
 
             # Async-friendly: try to cache to storage (non-blocking failure)
             _try_store_draft_pdf(form_id, pdf_bytes, conn)
@@ -1786,6 +1922,7 @@ def get_dossier_zip(
     Returns as application/zip download.
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
 
     try:
         with main_db.engine.begin() as conn:
@@ -1854,6 +1991,9 @@ def list_dossiers(
 ) -> List[DossierPackageDetailResponse]:
     """[P3-6] List all DossierPackage records for a case, with staleness flag."""
     _assert_case_access(user, case_id)
+    # AIQ-1704: dossier_packages.case_id is the canonical case id (sole key);
+    # resolve the (possibly assignment) path id so the list isn't silently empty.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(
@@ -1905,6 +2045,7 @@ def get_dossier(
 ) -> DossierPackageDetailResponse:
     """[P3-6] Get a single DossierPackage with staleness flag."""
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.begin() as conn:
             row = conn.execute(
@@ -1956,6 +2097,7 @@ def get_dossier_pdf(
     If pdf_url is set, redirect/stream it; otherwise regenerate on-the-fly.
     """
     _assert_case_access(user, case_id)
+    case_id = resolve_case_forms_case_id(case_id)  # AIQ-1719: forms/dossier keys use the canonical case id
     try:
         with main_db.engine.begin() as conn:
             row = conn.execute(
@@ -2077,6 +2219,23 @@ _SERVICE_BENEFIT_KEYS: Dict[str, List[str]] = {
 }
 
 
+def _canonical_case_id_or_404(case_id: str) -> str:
+    """Resolve any id form a route may carry — the assignment PK, the case_id, or
+    the canonical_case_id — to the canonical case id that case-keyed tables
+    (services_state, case_vendor_shortlist, case_messages…) actually use.
+
+    AIQ-1704: case-scoped reads used to key their SQL on the RAW path id, so an
+    assignment id (the form the employee roadmap / HR case-detail URLs carry)
+    matched no rows and the endpoint returned an empty list — a silent wrong
+    answer. Resolve once here and 404 on an id that maps to no case (fail
+    closed), never silent-empty.
+    """
+    ids = main_db.resolve_case_ids(case_id)
+    if ids is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return ids.canonical_case_id
+
+
 def _case_service_estimates(case_id: str) -> Dict[str, Dict[str, Any]]:
     """[AIQ-1527] The estimated cost per service, from case_services.
 
@@ -2150,6 +2309,33 @@ def _selected_services_for_case(case_id: str) -> List[str]:
     return []
 
 
+def _budget_status(
+    cap_amount: Optional[float],
+    cap_currency: Optional[str],
+    estimated_amount: Optional[float],
+    estimated_currency: Optional[str],
+) -> str:
+    """[AIQ-1527] The honest per-service budget decision — never claim within_budget
+    having compared nothing. Extracted from ``_budget_categories_from_policy_config`` so
+    the decision is unit-testable in isolation (tests/test_budget_summary_honest.py).
+
+    - no cap                        -> ``no_cap``
+    - cap but no estimate           -> ``no_estimate`` (the common case; a fake tick is worse)
+    - cap + estimate, diff currency -> ``not_comparable`` (refuse to invent an FX rate)
+    - estimate <= cap               -> ``within_budget`` (== cap; a zero estimate is an answer)
+    - estimate  > cap               -> ``over_budget``
+    """
+    if cap_amount is None:
+        return "no_cap"
+    if estimated_amount is None:
+        return "no_estimate"
+    if estimated_currency and cap_currency and estimated_currency != cap_currency:
+        return "not_comparable"
+    if float(estimated_amount) <= float(cap_amount):
+        return "within_budget"
+    return "over_budget"
+
+
 def _budget_categories_from_policy_config(
     company_id: str,
     selected_services: List[str],
@@ -2209,20 +2395,10 @@ def _budget_categories_from_policy_config(
         estimated_amount: Optional[float] = est.get("amount")
         estimated_currency: Optional[str] = est.get("currency")
 
-        if total is None:
-            status = "no_cap"
-        elif estimated_amount is None:
-            # Still the common case — only 3 of 31 case_services rows carry an estimated_cost in
-            # prod. "We don't know yet" is fine. A fake green tick is not.
-            status = "no_estimate"
-        elif estimated_currency and currency and estimated_currency != currency:
-            # Refuse to rank rather than invent an FX rate — the same refusal
-            # policy_config_cap_compare already makes on a currency mismatch.
-            status = "not_comparable"
-        elif float(estimated_amount) <= float(total):
-            status = "within_budget"
-        else:
-            status = "over_budget"
+        # Honest decision (extracted to _budget_status for unit-testability). Only 3 of 31
+        # case_services rows carry an estimated_cost in prod, so "no_estimate" is the common,
+        # correct answer — a fake green tick is not.
+        status = _budget_status(total, currency, estimated_amount, estimated_currency)
         categories.append({
             "name": svc_name,
             "cap_amount": total,
@@ -2311,6 +2487,10 @@ def get_budget_summary(
     list_case_forms.
     """
     _assert_case_access(user, case_id)
+    # AIQ-1704: the id may be an assignment id; services_state / case_services are
+    # keyed on the canonical case id, so resolve before reading (else the caps
+    # comparison silently sees an empty selection). Fail closed on an unknown id.
+    case_id = _canonical_case_id_or_404(case_id)
 
     # Resolve company + employee context from the CASE itself — caps belong to the
     # company that owns this case, and the employee's assignment_type / family_status
@@ -2376,6 +2556,15 @@ def list_case_messages(
     """
     Return the full message thread for a case, oldest-first.
     """
+    # SECURITY: authorize before reading — case_messages carry relocation PII and
+    # this endpoint previously had NO access check (only get_current_user), so any
+    # authenticated user could read any case's thread by id (cross-tenant IDOR).
+    # Mirrors every sibling case-scoped read in this module.
+    _assert_case_access(user, case_id)
+    # AIQ-1704: case_messages.case_id holds the canonical case id; resolve the
+    # (possibly assignment) path id so the thread isn't silently empty. Fail
+    # closed on an unknown id.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(
@@ -2426,18 +2615,22 @@ def list_case_vendors(
     the vendors table.  Available to HR and ADMIN roles.
     """
     _assert_case_access(user, case_id)
+    # AIQ-1704: case_vendor_shortlist.case_id is the canonical case id; resolve the
+    # (possibly assignment) path id so the list isn't silently empty on the HR
+    # case-detail URL. Fail closed on an unknown id.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(
                 _sql_text(
-                    # AIQ-1011 follow-up — columns matched to the ACTUAL deployed
-                    # schema (verified read-only against prod). case_vendor_shortlist
-                    # DOES carry status/contact_name/contact_email + selected; the
-                    # only truly-missing column was vendors.website — the real column
-                    # is vendors.website_url (vendors has no `contact_email`; the
-                    # per-case contact lives on the shortlist row). #701 swapped one
-                    # absent column (v.website) for another (v.contact_email), so the
-                    # route still 500'd.
+                    # AIQ-1646 — public.vendors was DROPPED (platform redesign,
+                    # 20260520000000), so the old `JOIN public.vendors` 500'd on every
+                    # HR case-summary load. Repoint the vendor-identity join at
+                    # public.suppliers: suppliers.vendor_id still references the old
+                    # vendors.id, the same key case_vendor_shortlist.vendor_id holds, so
+                    # the join key is s.vendor_id = cvs.vendor_id. Vendor name/website
+                    # come from suppliers (col is `website`, not `website_url`); the
+                    # per-case contact + status live on the shortlist row (verified prod).
                     """
                     SELECT
                         cvs.id            AS shortlist_id,
@@ -2446,12 +2639,15 @@ def list_case_vendors(
                         cvs.contact_name  AS contact_name,
                         cvs.contact_email AS contact_email,
                         cvs.selected      AS selected,
-                        v.name            AS vendor_name,
-                        v.website_url     AS vendor_website
+                        s.name            AS vendor_name,
+                        s.website         AS vendor_website
                     FROM public.case_vendor_shortlist cvs
-                    LEFT JOIN public.vendors v ON v.id = cvs.vendor_id
+                    -- AIQ-1646: cvs.vendor_id is uuid, suppliers.vendor_id is varchar on
+                    -- prod, so a bare `=` raises 42883 (character varying = uuid). CAST both
+                    -- to TEXT — works on Postgres AND SQLite (the `::text` operator does not).
+                    LEFT JOIN public.suppliers s ON CAST(s.vendor_id AS TEXT) = CAST(cvs.vendor_id AS TEXT)
                     WHERE cvs.case_id = :case_id
-                    ORDER BY cvs.service_key, v.name
+                    ORDER BY cvs.service_key, s.name
                     """
                 ),
                 {"case_id": case_id},
@@ -2490,6 +2686,9 @@ def list_case_budget_lines(
     Return budget line items for the case.  Available to HR and ADMIN roles.
     """
     _assert_case_access(user, case_id)
+    # AIQ-1704: case_budget_lines.case_id is the canonical case id (sole key);
+    # resolve the (possibly assignment) path id so the list isn't silently empty.
+    case_id = _canonical_case_id_or_404(case_id)
     try:
         with main_db.engine.begin() as conn:
             rows = conn.execute(

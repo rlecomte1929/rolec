@@ -1578,11 +1578,11 @@ def seed(dry_run: bool = False) -> int:
                         :corridor_from, :corridor_to, :visa_type, :employee_type,
                         :document_type, :document_name,
                         :is_required, :is_conditional, :condition_expression,
-                        :freshness_days, :requires_apostille, :apostille_countries::jsonb,
-                        :requires_translation, :translation_languages::jsonb,
+                        :freshness_days, :requires_apostille, CAST(:apostille_countries AS jsonb),
+                        :requires_translation, CAST(:translation_languages AS jsonb),
                         :can_be_prefilled, :can_be_ocr_extracted,
                         :typical_processing_days, :book_early_flag, :book_early_reason,
-                        :success_tips::jsonb, :common_rejection_reasons::jsonb,
+                        CAST(:success_tips AS jsonb), CAST(:common_rejection_reasons AS jsonb),
                         :form_url, :form_version
                     )
                     ON CONFLICT (corridor_from, corridor_to, visa_type, employee_type, document_type)

@@ -10,100 +10,580 @@
       "BLOCKED": 0.0,
       "SKIP": null,
       "domain_weights": {
-        "Authentication":     4,
-        "Case Management":    4,
-        "Employee Journey":   4,
-        "Policy Management":  3,
-        "Forms & Dossiers":   3,
-        "Immigration":        2,
-        "Suppliers & Vendors":2,
-        "Resources":          2,
-        "Admin Console":      1,
-        "Notifications":      1,
-        "Collaboration":      1,
-        "Coordination":       1,
+        "Authentication": 4,
+        "Case Management": 4,
+        "Employee Journey": 4,
+        "Policy Management": 3,
+        "Forms & Dossiers": 3,
+        "Immigration": 2,
+        "Suppliers & Vendors": 2,
+        "Resources": 2,
+        "Admin Console": 1,
+        "Notifications": 1,
+        "Collaboration": 1,
+        "Coordination": 1,
         "Exception Requests": 1,
-        "Integrations":       1,
-        "Security & RLS":     4,
-        "Performance":        2,
-        "End-to-End Flows":   3
+        "Integrations": 1,
+        "Security & RLS": 4,
+        "Performance": 2,
+        "End-to-End Flows": 3,
+        "Public Surface": 2
       },
       "health_bands": {
-        "GREEN":  { "min": 90, "label": "Ready for wider use" },
-        "AMBER":  { "min": 70, "label": "Usable with workarounds" },
-        "RED":    { "min":  0, "label": "Do not expose to customers" }
+        "GREEN": {
+          "min": 90,
+          "label": "Ready for wider use"
+        },
+        "AMBER": {
+          "min": 70,
+          "label": "Usable with workarounds"
+        },
+        "RED": {
+          "min": 0,
+          "label": "Do not expose to customers"
+        }
       }
     }
   },
   "tests": {
-    "CORE-HR-dashboard":       { "domain": "Case Management",     "priority": "P1", "category": "UX Logical",         "title": "HR dashboard renders (no B10/B13, empty state)",  "notion_worthy": true  },
-    "CORE-HR-command-center":  { "domain": "Case Management",     "priority": "P0", "category": "UX Logical",         "title": "HR command-center renders (no B10 spinner)",      "notion_worthy": true  },
-    "CORE-HR-vendor-curation": { "domain": "Suppliers & Vendors", "priority": "P1", "category": "UX Logical",         "title": "HR vendor-curation renders (no B10/B13)",         "notion_worthy": true  },
-    "CORE-EMP-dashboard":      { "domain": "Employee Journey",    "priority": "P1", "category": "UX Logical",         "title": "Employee dashboard renders (graceful empty)",     "notion_worthy": true  },
-    "CORE-RLS":                { "domain": "Security & RLS",      "priority": "P0", "category": "Tenant Isolation",    "title": "HR cases scoped + admin endpoint denied (403)",   "notion_worthy": true  },
-    "CORE-DEGRADE":            { "domain": "Case Management",     "priority": "P1", "category": "Graceful Degradation","title": "Fresh HR policy-config not 5xx",                  "notion_worthy": true  },
-    "PER-H1":                  { "domain": "Case Management",     "priority": "P0", "category": "Lifecycle",          "title": "HR create case (POST /api/hr/cases)",             "notion_worthy": true  },
-    "MSG-02":                  { "domain": "Notifications",       "priority": "P1", "category": "Hand-off",           "title": "HR assigns employee (<5s); in-app notify fired?", "notion_worthy": true  },
-    "MSG-01":                  { "domain": "Notifications",       "priority": "P1", "category": "Hand-off",           "title": "Employee submit → HR notify (AIQ-1342)",          "notion_worthy": true  },
-    "MSG-03":                  { "domain": "Collaboration",       "priority": "P2", "category": "Hand-off",           "title": "HR posts case message",                           "notion_worthy": true  },
-    "VND-05":                  { "domain": "Suppliers & Vendors", "priority": "P2", "category": "RFQ",                "title": "HR sends RFQ (POST /api/hr/rfq-requests)",        "notion_worthy": true  },
-    "DEEP-PROVISION-CASE":     { "domain": "Case Management",     "priority": "P0", "category": "Lifecycle",          "title": "HR create + assign a fresh case",                 "notion_worthy": true  },
-    "DEEP-WIZARD":             { "domain": "Employee Journey",    "priority": "P0", "category": "Intake",             "title": "Employee fills intake wizard (no 5xx)",           "notion_worthy": true  },
-    "DEEP-SUBMIT":             { "domain": "Employee Journey",    "priority": "P0", "category": "Intake",             "title": "Employee submits (profile ≥90% → 200)",           "notion_worthy": true  },
-    "DEEP-ROADMAP-API":        { "domain": "End-to-End Flows",    "priority": "P0", "category": "Roadmap",            "title": "Roadmap generates (tracks non-empty)",            "notion_worthy": true  },
-    "DEEP-ROADMAP-UX":         { "domain": "End-to-End Flows",    "priority": "P0", "category": "Roadmap",            "title": "Roadmap page renders (not 'couldn't load')",      "notion_worthy": true  },
-    "DEEP-SERVICES-UX":        { "domain": "Suppliers & Vendors", "priority": "P1", "category": "Roadmap",            "title": "Services page renders a vendor list",             "notion_worthy": true  },
-    "AT1":  { "domain": "Authentication",    "priority": "P0", "category": "Happy Path",    "title": "Platform admin login",                        "notion_worthy": true  },
-    "AT2":  { "domain": "Authentication",    "priority": "P0", "category": "Happy Path",    "title": "Seeded HR login",                             "notion_worthy": true  },
-    "AT2b": { "domain": "Authentication",    "priority": "P0", "category": "Happy Path",    "title": "Seeded HR company profile (B18)",             "notion_worthy": true  },
-    "AT2c": { "domain": "Authentication",    "priority": "P0", "category": "Happy Path",    "title": "Fresh HR + new company_name can create a case (B18b)", "notion_worthy": true  },
-    "AT2_FRESH": { "domain": "Authentication", "priority": "P0", "category": "Happy Path",  "title": "Fresh HR account registered",                 "notion_worthy": true  },
-    "AT3":  { "domain": "Authentication",    "priority": "P0", "category": "Happy Path",    "title": "Seeded Employee login",                       "notion_worthy": true  },
-    "AT3_FRESH": { "domain": "Authentication", "priority": "P0", "category": "Happy Path",  "title": "Fresh Employee account registered",           "notion_worthy": true  },
-    "AT4":  { "domain": "Authentication",    "priority": "P0", "category": "Security",      "title": "Invalid credentials rejected",                "notion_worthy": true  },
-    "AT5":  { "domain": "Authentication",    "priority": "P0", "category": "API Contract",  "title": "Registration token is full 36-char UUID",     "notion_worthy": true  },
-    "CT1":  { "domain": "Case Management",   "priority": "P0", "category": "Smoke",         "title": "GET /api/hr/cases not 405",                   "notion_worthy": true  },
-    "CT2":  { "domain": "Case Management",   "priority": "P0", "category": "Happy Path",    "title": "POST /api/hr/cases creates draft",            "notion_worthy": true  },
-    "CT5":  { "domain": "Case Management",   "priority": "P0", "category": "Performance",   "title": "GET /api/hr/assignments responds <8s",        "notion_worthy": true  },
-    "HP1":  { "domain": "Case Management",   "priority": "P1", "category": "Happy Path",    "title": "HR command center returns cases",             "notion_worthy": true  },
-    "HP2":  { "domain": "Security & RLS",    "priority": "P0", "category": "Tenant Isolation","title": "HR individual case RLS (B8)",               "notion_worthy": true  },
-    "AD1":  { "domain": "Admin Console",     "priority": "P1", "category": "Smoke",         "title": "Admin assignment endpoint not 500",           "notion_worthy": true  },
-    "EP1":  { "domain": "Employee Journey",  "priority": "P0", "category": "Role Isolation", "title": "Employee API rejects HR token",              "notion_worthy": true  },
-    "RT1":  { "domain": "Resources",         "priority": "P0", "category": "API Contract",  "title": "Destination count ≥20",                       "notion_worthy": true  },
-    "VT1":  { "domain": "Suppliers & Vendors","priority": "P1","category": "API Contract",  "title": "Service categories count ≥14",                "notion_worthy": true  },
-    "RE1":  { "domain": "Performance",       "priority": "P0", "category": "Smoke",         "title": "5 health checks pass",                        "notion_worthy": true  },
-    "WZ0":  { "domain": "Employee Journey",  "priority": "P0", "category": "Happy Path",    "title": "Wizard test case creation",                   "notion_worthy": true  },
-    "CORS__api_auth_login":    { "domain": "Security & RLS", "priority": "P0", "category": "Security", "title": "CORS preflight: POST /api/auth/login",           "notion_worthy": false },
-    "CORS__api_hr_cases":      { "domain": "Security & RLS", "priority": "P0", "category": "Security", "title": "CORS preflight: POST /api/hr/cases",            "notion_worthy": false },
-    "CORS__api_cases_00000000-":{ "domain": "Security & RLS","priority": "P0", "category": "Security", "title": "CORS preflight: PATCH /api/cases/{id}",         "notion_worthy": false },
-    "CORS__api_hr_cases_000000":{ "domain": "Security & RLS","priority": "P0", "category": "Security", "title": "CORS preflight: POST /api/hr/cases/{id}/assign","notion_worthy": false },
-    "CORS__api_hr_assignments": { "domain": "Security & RLS","priority": "P0", "category": "Security", "title": "CORS preflight: GET /api/hr/assignments",       "notion_worthy": false },
-    "CORS1":{ "domain": "Security & RLS",    "priority": "P0", "category": "Security",      "title": "CORS summary: all key endpoints pass preflight","notion_worthy": true  },
-    "RL1":  { "domain": "Security & RLS",    "priority": "P0", "category": "Security",      "title": "Rate limit on /api/auth/login",               "notion_worthy": true  },
-    "SEC1": { "domain": "Security & RLS",    "priority": "P1", "category": "Security",      "title": "XSS: case creation with script payload",     "notion_worthy": true  },
-    "PERF1":{ "domain": "Performance",       "priority": "P1", "category": "Performance",   "title": "GET /health avg response time",               "notion_worthy": true  },
-    "PERF2":{ "domain": "Performance",       "priority": "P1", "category": "Performance",   "title": "POST /api/auth/login avg response time",     "notion_worthy": true  },
-    "PERF3":{ "domain": "Performance",       "priority": "P1", "category": "Performance",   "title": "GET /api/hr/cases avg response time",        "notion_worthy": true  },
-    "PERF4":{ "domain": "Performance",       "priority": "P1", "category": "Performance",   "title": "GET /api/hr/assignments avg response time",  "notion_worthy": true  },
-    "PERF5":{ "domain": "Performance",       "priority": "P1", "category": "Performance",   "title": "GET /api/hr/resources/destinations avg",     "notion_worthy": true  },
-    "PERF6":{ "domain": "Performance",       "priority": "P1", "category": "Performance",   "title": "GET /api/hr/service-categories avg",         "notion_worthy": true  },
-    "RLS0": { "domain": "Security & RLS",    "priority": "P0", "category": "Tenant Isolation","title": "Second HR (Other Corp) registered + linked","notion_worthy": true  },
-    "RLS1": { "domain": "Security & RLS",    "priority": "P0", "category": "Tenant Isolation","title": "RLS case creation",                        "notion_worthy": true  },
-    "T1_FLOW":  { "domain": "End-to-End Flows","priority": "P0","category": "Scenario",     "title": "T1 Adrien Moreau: France Passeport Talent",  "notion_worthy": true  },
-    "T2_FLOW":  { "domain": "End-to-End Flows","priority": "P0","category": "Scenario",     "title": "T2 Camille Renard: Belgium→UK",               "notion_worthy": true  },
-    "T3_FLOW":  { "domain": "End-to-End Flows","priority": "P0","category": "Scenario",     "title": "T3 Stefan Weber: Germany→Netherlands",        "notion_worthy": true  },
-    "T4_FLOW":  { "domain": "End-to-End Flows","priority": "P1","category": "Scenario",     "title": "T4 Lucia Martinez: Spain→Germany",            "notion_worthy": true  },
-    "T5_FLOW":  { "domain": "End-to-End Flows","priority": "P1","category": "Scenario",     "title": "T5 Anders Lindqvist: Sweden→Singapore",      "notion_worthy": true  },
-    "T6_FLOW":  { "domain": "End-to-End Flows","priority": "P2","category": "Scenario",     "title": "T6 Marc Dubois: France→Tokyo (unsupported)", "notion_worthy": true  },
-    "T7_FLOW":  { "domain": "End-to-End Flows","priority": "P1","category": "Scenario",     "title": "T7 Camille Dupont: France→Canada",           "notion_worthy": true  },
-    "T8_FLOW":  { "domain": "End-to-End Flows","priority": "P1","category": "Scenario",     "title": "T8 Valentine Martin: France→UAE",            "notion_worthy": true  },
-    "T15_FLOW": { "domain": "End-to-End Flows","priority": "P1","category": "Scenario",     "title": "T15 Isabelle Fontaine: intra-EU",             "notion_worthy": true  },
-    "T16_FLOW": { "domain": "End-to-End Flows","priority": "P2","category": "Scenario",     "title": "T16 Ahmed Mansouri: Dubai (unsupported)",    "notion_worthy": true  },
-    "T13_B9":   { "domain": "Admin Console",   "priority": "P1","category": "Smoke",        "title": "Admin assignments endpoint (B9)",            "notion_worthy": true  },
-    "T13_B2_API":{ "domain": "Admin Console",  "priority": "P1","category": "Happy Path",   "title": "Admin create user via API (B2)",             "notion_worthy": true  },
-    "T13_B1_FRESH":{"domain":"Case Management","priority": "P1","category": "Performance",  "title": "Fresh HR user: /api/hr/assignments <5s",     "notion_worthy": false },
-    "T13_FLOW": { "domain": "End-to-End Flows","priority": "P1","category": "Scenario",     "title": "T13 Admin Onboarding full flow",             "notion_worthy": true  },
-    "T14_CREATE":{ "domain": "Case Management","priority": "P0","category": "Happy Path",   "title": "HR creates fresh case for T14",              "notion_worthy": true  },
-    "T14_FLOW": { "domain": "End-to-End Flows","priority": "P0","category": "Scenario",     "title": "T14 Cross-Role Full-Stack",                  "notion_worthy": true  }
+    "CORE-HR-dashboard": {
+      "domain": "Case Management",
+      "priority": "P1",
+      "category": "UX Logical",
+      "title": "HR dashboard renders (no B10/B13, empty state)",
+      "notion_worthy": true
+    },
+    "CORE-HR-command-center": {
+      "domain": "Case Management",
+      "priority": "P0",
+      "category": "UX Logical",
+      "title": "HR command-center renders (no B10 spinner)",
+      "notion_worthy": true
+    },
+    "CORE-HR-vendor-curation": {
+      "domain": "Suppliers & Vendors",
+      "priority": "P1",
+      "category": "UX Logical",
+      "title": "HR vendor-curation renders (no B10/B13)",
+      "notion_worthy": true
+    },
+    "CORE-EMP-dashboard": {
+      "domain": "Employee Journey",
+      "priority": "P1",
+      "category": "UX Logical",
+      "title": "Employee dashboard renders (graceful empty)",
+      "notion_worthy": true
+    },
+    "CORE-RLS": {
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "category": "Tenant Isolation",
+      "title": "HR cases scoped + admin endpoint denied (403)",
+      "notion_worthy": true
+    },
+    "CORE-DEGRADE": {
+      "domain": "Case Management",
+      "priority": "P1",
+      "category": "Graceful Degradation",
+      "title": "Fresh HR policy-config not 5xx",
+      "notion_worthy": true
+    },
+    "PER-H1": {
+      "domain": "Case Management",
+      "priority": "P0",
+      "category": "Lifecycle",
+      "title": "HR create case (POST /api/hr/cases)",
+      "notion_worthy": true
+    },
+    "MSG-02": {
+      "domain": "Notifications",
+      "priority": "P1",
+      "category": "Hand-off",
+      "title": "HR assigns employee (<5s); in-app notify fired?",
+      "notion_worthy": true
+    },
+    "MSG-01": {
+      "domain": "Notifications",
+      "priority": "P1",
+      "category": "Hand-off",
+      "title": "Employee submit \u2192 HR notify (AIQ-1342)",
+      "notion_worthy": true
+    },
+    "MSG-03": {
+      "domain": "Collaboration",
+      "priority": "P2",
+      "category": "Hand-off",
+      "title": "HR posts case message",
+      "notion_worthy": true
+    },
+    "VND-05": {
+      "domain": "Suppliers & Vendors",
+      "priority": "P2",
+      "category": "RFQ",
+      "title": "Employee requests quotes from a shortlisted vendor (POST /api/rfqs)",
+      "notion_worthy": true
+    },
+    "DEEP-PROVISION-CASE": {
+      "domain": "Case Management",
+      "priority": "P0",
+      "category": "Lifecycle",
+      "title": "HR create + assign a fresh case",
+      "notion_worthy": true
+    },
+    "DEEP-WIZARD": {
+      "domain": "Employee Journey",
+      "priority": "P0",
+      "category": "Intake",
+      "title": "Employee fills intake wizard (no 5xx)",
+      "notion_worthy": true
+    },
+    "DEEP-SUBMIT": {
+      "domain": "Employee Journey",
+      "priority": "P0",
+      "category": "Intake",
+      "title": "Employee submits (profile \u226590% \u2192 200)",
+      "notion_worthy": true
+    },
+    "DEEP-ROADMAP-API": {
+      "domain": "End-to-End Flows",
+      "priority": "P0",
+      "category": "Roadmap",
+      "title": "Roadmap generates (tracks non-empty)",
+      "notion_worthy": true
+    },
+    "DEEP-ROADMAP-UX": {
+      "domain": "End-to-End Flows",
+      "priority": "P0",
+      "category": "Roadmap",
+      "title": "Roadmap page renders (not 'couldn't load')",
+      "notion_worthy": true
+    },
+    "DEEP-SERVICES-UX": {
+      "domain": "Suppliers & Vendors",
+      "priority": "P1",
+      "category": "Roadmap",
+      "title": "Services page renders a vendor list",
+      "notion_worthy": true
+    },
+    "AT1": {
+      "domain": "Authentication",
+      "priority": "P0",
+      "category": "Happy Path",
+      "title": "Platform admin login",
+      "notion_worthy": true
+    },
+    "AT2": {
+      "domain": "Authentication",
+      "priority": "P0",
+      "category": "Happy Path",
+      "title": "Seeded HR login",
+      "notion_worthy": true
+    },
+    "AT2b": {
+      "domain": "Authentication",
+      "priority": "P0",
+      "category": "Happy Path",
+      "title": "Seeded HR company profile (B18)",
+      "notion_worthy": true
+    },
+    "AT2c": {
+      "domain": "Authentication",
+      "priority": "P0",
+      "category": "Happy Path",
+      "title": "Fresh HR + new company_name can create a case (B18b)",
+      "notion_worthy": true
+    },
+    "AT2_FRESH": {
+      "domain": "Authentication",
+      "priority": "P0",
+      "category": "Happy Path",
+      "title": "Fresh HR account registered",
+      "notion_worthy": true
+    },
+    "AT3": {
+      "domain": "Authentication",
+      "priority": "P0",
+      "category": "Happy Path",
+      "title": "Seeded Employee login",
+      "notion_worthy": true
+    },
+    "AT3_FRESH": {
+      "domain": "Authentication",
+      "priority": "P0",
+      "category": "Happy Path",
+      "title": "Fresh Employee account registered",
+      "notion_worthy": true
+    },
+    "AT4": {
+      "domain": "Authentication",
+      "priority": "P0",
+      "category": "Security",
+      "title": "Invalid credentials rejected",
+      "notion_worthy": true
+    },
+    "AT5": {
+      "domain": "Authentication",
+      "priority": "P0",
+      "category": "API Contract",
+      "title": "Registration token is full 36-char UUID",
+      "notion_worthy": true
+    },
+    "CT1": {
+      "domain": "Case Management",
+      "priority": "P0",
+      "category": "Smoke",
+      "title": "GET /api/hr/cases not 405",
+      "notion_worthy": true
+    },
+    "CT2": {
+      "domain": "Case Management",
+      "priority": "P0",
+      "category": "Happy Path",
+      "title": "POST /api/hr/cases creates draft",
+      "notion_worthy": true
+    },
+    "CT5": {
+      "domain": "Case Management",
+      "priority": "P0",
+      "category": "Performance",
+      "title": "GET /api/hr/assignments responds <8s",
+      "notion_worthy": true
+    },
+    "HP1": {
+      "domain": "Case Management",
+      "priority": "P1",
+      "category": "Happy Path",
+      "title": "HR command center returns cases",
+      "notion_worthy": true
+    },
+    "HP2": {
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "category": "Tenant Isolation",
+      "title": "HR individual case RLS (B8)",
+      "notion_worthy": true
+    },
+    "AD1": {
+      "domain": "Admin Console",
+      "priority": "P1",
+      "category": "Smoke",
+      "title": "Admin assignment endpoint not 500",
+      "notion_worthy": true
+    },
+    "EP1": {
+      "domain": "Employee Journey",
+      "priority": "P0",
+      "category": "Role Isolation",
+      "title": "Employee API rejects HR token",
+      "notion_worthy": true
+    },
+    "RT1": {
+      "domain": "Resources",
+      "priority": "P0",
+      "category": "API Contract",
+      "title": "Destination count \u226520",
+      "notion_worthy": true
+    },
+    "VT1": {
+      "domain": "Suppliers & Vendors",
+      "priority": "P1",
+      "category": "API Contract",
+      "title": "Service categories count \u226514",
+      "notion_worthy": true
+    },
+    "RE1": {
+      "domain": "Performance",
+      "priority": "P0",
+      "category": "Smoke",
+      "title": "5 health checks pass",
+      "notion_worthy": true
+    },
+    "WZ0": {
+      "domain": "Employee Journey",
+      "priority": "P0",
+      "category": "Happy Path",
+      "title": "Wizard test case creation",
+      "notion_worthy": true
+    },
+    "CORS__api_auth_login": {
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "category": "Security",
+      "title": "CORS preflight: POST /api/auth/login",
+      "notion_worthy": false
+    },
+    "CORS__api_hr_cases": {
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "category": "Security",
+      "title": "CORS preflight: POST /api/hr/cases",
+      "notion_worthy": false
+    },
+    "CORS__api_cases_00000000-": {
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "category": "Security",
+      "title": "CORS preflight: PATCH /api/cases/{id}",
+      "notion_worthy": false
+    },
+    "CORS__api_hr_cases_000000": {
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "category": "Security",
+      "title": "CORS preflight: POST /api/hr/cases/{id}/assign",
+      "notion_worthy": false
+    },
+    "CORS__api_hr_assignments": {
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "category": "Security",
+      "title": "CORS preflight: GET /api/hr/assignments",
+      "notion_worthy": false
+    },
+    "CORS1": {
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "category": "Security",
+      "title": "CORS summary: all key endpoints pass preflight",
+      "notion_worthy": true
+    },
+    "RL1": {
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "category": "Security",
+      "title": "Rate limit on /api/auth/login",
+      "notion_worthy": true
+    },
+    "SEC1": {
+      "domain": "Security & RLS",
+      "priority": "P1",
+      "category": "Security",
+      "title": "XSS: case creation with script payload",
+      "notion_worthy": true
+    },
+    "PERF1": {
+      "domain": "Performance",
+      "priority": "P1",
+      "category": "Performance",
+      "title": "GET /health avg response time",
+      "notion_worthy": true
+    },
+    "PERF2": {
+      "domain": "Performance",
+      "priority": "P1",
+      "category": "Performance",
+      "title": "POST /api/auth/login avg response time",
+      "notion_worthy": true
+    },
+    "PERF3": {
+      "domain": "Performance",
+      "priority": "P1",
+      "category": "Performance",
+      "title": "GET /api/hr/cases avg response time",
+      "notion_worthy": true
+    },
+    "PERF4": {
+      "domain": "Performance",
+      "priority": "P1",
+      "category": "Performance",
+      "title": "GET /api/hr/assignments avg response time",
+      "notion_worthy": true
+    },
+    "PERF5": {
+      "domain": "Performance",
+      "priority": "P1",
+      "category": "Performance",
+      "title": "GET /api/hr/resources/destinations avg",
+      "notion_worthy": true
+    },
+    "PERF6": {
+      "domain": "Performance",
+      "priority": "P1",
+      "category": "Performance",
+      "title": "GET /api/hr/service-categories avg",
+      "notion_worthy": true
+    },
+    "RLS0": {
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "category": "Tenant Isolation",
+      "title": "Second HR (Other Corp) registered + linked",
+      "notion_worthy": true
+    },
+    "RLS1": {
+      "domain": "Security & RLS",
+      "priority": "P0",
+      "category": "Tenant Isolation",
+      "title": "RLS case creation",
+      "notion_worthy": true
+    },
+    "T1_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P0",
+      "category": "Scenario",
+      "title": "T1 Adrien Moreau: France Passeport Talent",
+      "notion_worthy": true
+    },
+    "T2_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P0",
+      "category": "Scenario",
+      "title": "T2 Camille Renard: Belgium\u2192UK",
+      "notion_worthy": true
+    },
+    "T3_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P0",
+      "category": "Scenario",
+      "title": "T3 Stefan Weber: Germany\u2192Netherlands",
+      "notion_worthy": true
+    },
+    "T4_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "category": "Scenario",
+      "title": "T4 Lucia Martinez: Spain\u2192Germany",
+      "notion_worthy": true
+    },
+    "T5_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "category": "Scenario",
+      "title": "T5 Anders Lindqvist: Sweden\u2192Singapore",
+      "notion_worthy": true
+    },
+    "T6_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P2",
+      "category": "Scenario",
+      "title": "T6 Marc Dubois: France\u2192Tokyo (unsupported)",
+      "notion_worthy": true
+    },
+    "T7_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "category": "Scenario",
+      "title": "T7 Camille Dupont: France\u2192Canada",
+      "notion_worthy": true
+    },
+    "T8_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "category": "Scenario",
+      "title": "T8 Valentine Martin: France\u2192UAE",
+      "notion_worthy": true
+    },
+    "T15_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "category": "Scenario",
+      "title": "T15 Isabelle Fontaine: intra-EU",
+      "notion_worthy": true
+    },
+    "T16_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P2",
+      "category": "Scenario",
+      "title": "T16 Ahmed Mansouri: Dubai (unsupported)",
+      "notion_worthy": true
+    },
+    "T13_B9": {
+      "domain": "Admin Console",
+      "priority": "P1",
+      "category": "Smoke",
+      "title": "Admin assignments endpoint (B9)",
+      "notion_worthy": true
+    },
+    "T13_B2_API": {
+      "domain": "Admin Console",
+      "priority": "P1",
+      "category": "Happy Path",
+      "title": "Admin create user via API (B2)",
+      "notion_worthy": true
+    },
+    "T13_B1_FRESH": {
+      "domain": "Case Management",
+      "priority": "P1",
+      "category": "Performance",
+      "title": "Fresh HR user: /api/hr/assignments <5s",
+      "notion_worthy": false
+    },
+    "T13_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P1",
+      "category": "Scenario",
+      "title": "T13 Admin Onboarding full flow",
+      "notion_worthy": true
+    },
+    "T14_CREATE": {
+      "domain": "Case Management",
+      "priority": "P0",
+      "category": "Happy Path",
+      "title": "HR creates fresh case for T14",
+      "notion_worthy": true
+    },
+    "T14_FLOW": {
+      "domain": "End-to-End Flows",
+      "priority": "P0",
+      "category": "Scenario",
+      "title": "T14 Cross-Role Full-Stack",
+      "notion_worthy": true
+    },
+    "SEO-LANDING": {
+      "domain": "Public Surface",
+      "priority": "P0",
+      "category": "Content",
+      "title": "Paid-ad landing pages serve prerendered HTML, both URL forms",
+      "notion_worthy": true
+    },
+    "AEO-CRAWLER-FETCH": {
+      "domain": "Public Surface",
+      "priority": "P1",
+      "category": "Content",
+      "title": "Real crawler user-agents can fetch a published page (not 403/challenge)",
+      "notion_worthy": true
+    },
+    "SEO-ROBOTS": {
+      "domain": "Public Surface",
+      "priority": "P2",
+      "category": "Content",
+      "title": "robots.txt allows the OpenAI crawlers and points at the sitemap",
+      "notion_worthy": true
+    },
+    "SEO-BLOG-INDEX": {
+      "domain": "Public Surface",
+      "priority": "P2",
+      "category": "Content",
+      "title": "Blog index lists posts and each resolves to its own page",
+      "notion_worthy": true
+    },
+    "SEO-SITEMAP": {
+      "domain": "Public Surface",
+      "priority": "P2",
+      "category": "Content",
+      "title": "sitemap.xml is XML and every advertised URL resolves",
+      "notion_worthy": true
+    },
+    "R4X-A": {
+      "domain": "Suppliers & Vendors",
+      "priority": "P1",
+      "category": "Data Integrity",
+      "title": "Every vetted mover is reachable, not capped at 10",
+      "notion_worthy": true
+    },
+    "R4X-B": {
+      "domain": "Suppliers & Vendors",
+      "priority": "P1",
+      "category": "Data Integrity",
+      "title": "Several picks per category write every ai_decisions audit row",
+      "notion_worthy": true
+    },
+    "READINESS": {
+      "domain": "End-to-End Flows",
+      "priority": "P2",
+      "category": "Harness",
+      "title": "Company data paths are warm before the scored projects run",
+      "notion_worthy": false
+    }
   }
 }

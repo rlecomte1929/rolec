@@ -37,7 +37,7 @@ def test_environmental_fail_becomes_env(tmp_path):
         _spec("[CORE-RLS] scoped", "failed"),          # genuine fail, no annotation
         _spec("[CORE-EMP-dashboard] ok", "passed"),
     ])
-    rows = {r["id"]: r for r in ing.parse_playwright(pw)}
+    rows = {r["id"]: r for r in ing.parse_playwright(pw)[0]}
     assert rows["CORE-HR-dashboard"]["status"] == "ENV", "env-annotated FAIL must become ENV"
     assert rows["CORE-RLS"]["status"] == "FAIL", "un-annotated FAIL must stay FAIL"
     assert rows["CORE-EMP-dashboard"]["status"] == "PASS"
@@ -49,7 +49,7 @@ def test_env_excluded_from_fail_count_and_score(tmp_path):
         _spec("[B] b", "failed", [{"type": "environmental"}]),  # ENV
         _spec("[C] c", "passed"),
     ])
-    rows = ing.parse_playwright(pw)
+    rows = ing.parse_playwright(pw)[0]
     summ = ing.summarize(rows)
     assert summ["fail"] == 0, "ENV must not count as a failure"
     assert summ.get("env") == 1, "ENV counted in its own bucket"
@@ -63,5 +63,5 @@ def test_non_environmental_annotation_does_not_reclassify(tmp_path):
     pw = _pw(tmp_path, [
         _spec("[D] d", "failed", [{"type": "slow", "description": "took a while"}]),
     ])
-    rows = {r["id"]: r for r in ing.parse_playwright(pw)}
+    rows = {r["id"]: r for r in ing.parse_playwright(pw)[0]}
     assert rows["D"]["status"] == "FAIL"

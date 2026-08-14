@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
-import { SegmentedOptionCards } from '../../../components/antigravity/SegmentedOptionCards';
 import { useGeocodedAddress } from '../../../components/geocode';
 import { AddressAutocompleteInput } from '../../../components/AddressAutocompleteInput';
 import { patchCase } from '../../../api/cases';
@@ -31,6 +30,12 @@ import { matchCountry } from './countryMatch';
 // COUNTRIES below stays scoped to the relocation origin/destination pickers,
 // which also rely on CITIES_BY_COUNTRY (AIQ-1341).
 import { COUNTRY_OPTIONS as ALL_COUNTRY_OPTIONS } from '../../policy-config/countryList';
+// AIQ-1656: catalogue-backed destination suggestions + "request a new destination" flow.
+import {
+  listEmployeeDestinations,
+  requestDestination,
+  type AllowlistedDestination,
+} from '../../../api/destinations';
 
 // Leaflet is heavy — only load the real commute map once an address resolves.
 const RichCommuteMap = lazy(() =>
@@ -441,8 +446,12 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
   );
 }
 
-function CityCombo({ country, value, onChange, testId, disabled }: { country: string; value: string; onChange: (v: string) => void; testId?: string; disabled?: boolean }) {
-  const opts = CITIES_BY_COUNTRY[country] ?? [];
+function CityCombo({ country, value, onChange, testId, disabled, catalogueCities }: { country: string; value: string; onChange: (v: string) => void; testId?: string; disabled?: boolean; catalogueCities?: string[] }) {
+  // AIQ-1656: prefer the live supported-destination catalogue for the selected country;
+  // fall back to the static seed list when the catalogue has none, so suggestions are
+  // never worse than before. Input stays free-text — a city not listed is still accepted
+  // (the caller fires an admin "request this destination" ticket on commit).
+  const opts = (catalogueCities && catalogueCities.length > 0) ? catalogueCities : (CITIES_BY_COUNTRY[country] ?? []);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -671,6 +680,29 @@ export function EmployeeIntakePage() {
   const navigate = useNavigate();
   const [data, setData] = useState<IntakeData>(INITIAL_DATA);
   const [step, setStep] = useState(1);
+  // AIQ-1656: live supported-destination catalogue seeds the city typeahead; a chosen city
+  // that isn't in it is still accepted (never blocks intake) and fires an admin request on
+  // commit so the destination can be validated in — controlled scaling. Fail-soft: an empty
+  // catalogue (or a fetch error) just falls back to the static city suggestions.
+  const [destinations, setDestinations] = useState<AllowlistedDestination[]>([]);
+  const [destRequested, setDestRequested] = useState<string | null>(null);
+  const requestedDestRef = useRef<string>('');
+  useEffect(() => {
+    let cancelled = false;
+    listEmployeeDestinations()
+      .then((d) => { if (!cancelled) setDestinations(d); })
+      .catch(() => { /* fail-soft — keep static suggestions */ });
+    return () => { cancelled = true; };
+  }, []);
+  const countryNameForCode = (code: string): string =>
+    COUNTRIES.find((c) => c.code === code)?.name
+    || ALL_COUNTRY_OPTIONS.find((c) => c.code === code)?.name
+    || code;
+  const catalogueCitiesForCode = (code: string): string[] => {
+    if (!code || destinations.length === 0) return [];
+    const name = countryNameForCode(code).toLowerCase();
+    return destinations.filter((d) => (d.country || '').toLowerCase() === name).map((d) => d.city);
+  };
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   // Locks default to false. A field is only badged "🔒 HR pre-filled" once
   // the hydration effect below has actually populated it from the case
@@ -861,6 +893,24 @@ export function EmployeeIntakePage() {
     // — retry") so navigation never silently drops unsaved data.
     const ok = await flushSave();
     if (!ok) return;
+    // AIQ-1656: leaving step 1 commits the destination. If the chosen city isn't in the
+    // supported catalogue, it is still accepted (intake is never blocked) but we fire a
+    // request so an admin can validate it into the catalogue. Backend dedupes per
+    // (city, country, company); the ref avoids re-firing for the same city this session.
+    if (step === 1 && s > 1) {
+      const city = (data.dest_city || '').trim();
+      const countryName = countryNameForCode(data.dest_country).trim();
+      if (city && countryName) {
+        const inCatalogue = catalogueCitiesForCode(data.dest_country).some((c) => c.toLowerCase() === city.toLowerCase());
+        const key = `${city}|${countryName}`.toLowerCase();
+        if (!inCatalogue && requestedDestRef.current !== key) {
+          requestedDestRef.current = key;
+          void requestDestination(city, countryName)
+            .then(() => setDestRequested(city))
+            .catch(() => { /* non-blocking: the destination is already accepted locally */ });
+        }
+      }
+    }
     // Analytics: only count a step as "completed" when advancing forward past it.
     if (s > step) {
       const name = WIZARD_STEP_NAMES[step];
@@ -1167,6 +1217,14 @@ export function EmployeeIntakePage() {
           {/* Step body */}
           <div className="p-5" onBlur={() => { void flushSave(); }}>
 
+            {/* AIQ-1656: persists across steps — the destination request fires when the
+                user leaves step 1, by which point step-1 content is unmounted. */}
+            {destRequested && (
+              <div className="flex items-start gap-2 mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-700" data-testid="intake-dest-requested">
+                ✓ <span>Thanks — we&apos;ve asked the ReloPass team to add <strong>{destRequested}</strong> to our supported destinations. You can keep going; your roadmap will use it in the meantime.</span>
+              </div>
+            )}
+
             {/* ── Step 1 — Journey ── */}
             {step === 1 && (
               <>
@@ -1176,7 +1234,7 @@ export function EmployeeIntakePage() {
                     <CountryCombo testId="intake-origin_country" value={data.origin_country} onChange={(v) => setField('origin_country', v)} disabled={locks.origin} />
                   </FieldWrap>
                   <FieldWrap label="Origin city" required prefill={locks.originCity} onUnlock={routeUnlock('originCity')}>
-                    <CityCombo testId="intake-origin_city" country={data.origin_country} value={data.origin_city} onChange={(v) => setField('origin_city', v)} disabled={locks.originCity} />
+                    <CityCombo testId="intake-origin_city" country={data.origin_country} value={data.origin_city} onChange={(v) => setField('origin_city', v)} disabled={locks.originCity} catalogueCities={catalogueCitiesForCode(data.origin_country)} />
                   </FieldWrap>
                   <FieldWrap label="Destination country" required prefill={locks.dest} onUnlock={routeUnlock('dest')}>
                     <CountryCombo testId="intake-dest_country" value={data.dest_country} onChange={(v) => setField('dest_country', v)} disabled={locks.dest} />
@@ -1185,7 +1243,7 @@ export function EmployeeIntakePage() {
                       is the pre-TD-FIX-7 behaviour and the city is often the part HR gets
                       wrong. Disabled only on a test drive, where the corridor is fixed. */}
                   <FieldWrap label="Destination city" required prefill={locks.destCity} onUnlock={routeUnlock('destCity')}>
-                    <CityCombo testId="intake-dest_city" country={data.dest_country} value={data.dest_city} onChange={(v) => setField('dest_city', v)} disabled={isTestDrive && locks.destCity} />
+                    <CityCombo testId="intake-dest_city" country={data.dest_country} value={data.dest_city} onChange={(v) => setField('dest_city', v)} disabled={isTestDrive && locks.destCity} catalogueCities={catalogueCitiesForCode(data.dest_country)} />
                   </FieldWrap>
                   <FieldWrap label="Target move date" required>
                     <Input unstyled type="date" data-testid="intake-target_date" aria-label="Target move date" className={inputCls()} value={data.target_date}
@@ -1367,8 +1425,13 @@ export function EmployeeIntakePage() {
                         <div className="text-xs text-gray-400">Shorter = fewer neighborhoods but better matches.</div>
                       </FieldWrap>
                       <FieldWrap label="Preferred way to commute">
-                        <SegmentedOptionCards value={data.commute_preference}
-                          onChange={(v) => setField('commute_preference', v)}
+                        {/* AIQ-1657: single-select MultiChip (like Work pattern / Assignment
+                            type above) so the commute options are homogeneous with the rest of
+                            the page and each label fits inside its pill — the previous
+                            SegmentedOptionCards forced 5 equal narrow columns in this half-width
+                            cell, so "Public transport" overflowed. */}
+                        <MultiChip value={data.commute_preference ? [data.commute_preference] : []}
+                          onChange={(v) => setField('commute_preference', v[v.length - 1] || '')}
                           options={COMMUTE_OPTIONS} />
                       </FieldWrap>
                     </div>

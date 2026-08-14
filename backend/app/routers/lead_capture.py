@@ -4,6 +4,7 @@ emits a `lead_captured` analytics event (bottom of the marketing funnel).
 
 PII: `message` is stored raw for GTM. If a future ticket routes it to an
 LLM for enrichment, it MUST pass mask_pii() first (repo data-minimisation rule)."""
+import logging
 import uuid
 
 from fastapi import APIRouter, Request
@@ -12,10 +13,12 @@ from fastapi.responses import JSONResponse
 from ...rate_limit import limiter
 from ..db import SessionLocal
 from ..models import Lead, ProspectCandidate
+from ..services.admin_notify import notify_admins_new_lead
 from ..services.analytics_service import emit_event
 from ._leads_schemas import LeadCaptureIn
 
 router = APIRouter(tags=["public-lead-capture"])
+logger = logging.getLogger(__name__)
 
 
 def _domain_from_email(email: str) -> str | None:
@@ -48,4 +51,15 @@ def capture_lead(body: LeadCaptureIn, request: Request) -> JSONResponse:
         "source": body.source, "utm_source": body.utm_source,
         "utm_campaign": body.utm_campaign, "matched_prospect": matched,
     })
+    # [AIQ-1783] Push, not poll. The lead row alone is not a "monitored destination" —
+    # Admin → Leads is a page someone has to remember to open. Fail-soft by contract:
+    # a delivery problem must never turn a captured lead into a failed submission,
+    # which on paid traffic means a paid click thrown away.
+    try:
+        notify_admins_new_lead(
+            company_domain=domain, source=body.source,
+            utm_campaign=body.utm_campaign, matched_prospect=matched,
+        )
+    except Exception:  # noqa: BLE001 — notification must never break capture
+        logger.warning("lead_capture: admin notification failed (suppressed)")
     return JSONResponse(status_code=201, content={"id": lead_id, "matched_prospect": matched})

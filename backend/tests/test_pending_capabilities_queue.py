@@ -28,6 +28,11 @@ from backend.app.auth_deps import require_admin  # noqa: E402
 _PENDING_KEYS = {
     "supplier_id", "supplier_name", "capability_id", "service_category",
     "country_code", "city_name", "source", "source_url", "created_at",
+    # [AIQ-1788] Registry-harvested suppliers carry accreditation evidence, and the vetting
+    # queue renders it — approving one without seeing WHICH register vouched for it is a
+    # rubber stamp. None here: this lane is SQLite and has no supplier_accreditations table,
+    # which is exactly the case list_pending_capabilities has to tolerate.
+    "accreditation",
 }
 
 

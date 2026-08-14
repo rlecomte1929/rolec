@@ -9,16 +9,24 @@ BEGIN;
 -- Resolve the probe tenant set once.
 CREATE TEMP TABLE _probe_companies ON COMMIT DROP AS
   SELECT id::text AS id FROM companies WHERE name LIKE 'Probe %';
+-- [AIQ-1737·1] Include canonical_case_id, not just case_id: a probe assignment can carry
+-- canonical_case_id ≠ case_id, and deleting only the case_id case row would leave the
+-- canonical dangling. Capturing both keys means the case deletes below remove every case a
+-- probe assignment references.
 CREATE TEMP TABLE _probe_cases ON COMMIT DROP AS
   SELECT id::text AS cid FROM relocation_cases WHERE company_id::text IN (SELECT id FROM _probe_companies)
   UNION
-  SELECT case_id FROM case_assignments WHERE employee_identifier LIKE '%@probe.test';
+  SELECT case_id FROM case_assignments WHERE employee_identifier LIKE '%@probe.test'
+  UNION
+  SELECT canonical_case_id::text FROM case_assignments
+    WHERE employee_identifier LIKE '%@probe.test' AND canonical_case_id IS NOT NULL;
 
 -- Case-scoped children first.
 DELETE FROM case_forms WHERE case_id::text IN (SELECT cid FROM _probe_cases);
 DELETE FROM assignment_claim_invites WHERE assignment_id IN (
   SELECT id FROM case_assignments WHERE case_id IN (SELECT cid FROM _probe_cases));
 DELETE FROM case_assignments WHERE case_id IN (SELECT cid FROM _probe_cases)
+  OR canonical_case_id::text IN (SELECT cid FROM _probe_cases)
   OR employee_identifier LIKE '%@probe.test';
 DELETE FROM public.cases WHERE id::text IN (SELECT cid FROM _probe_cases);
 DELETE FROM wizard_cases WHERE id IN (SELECT cid FROM _probe_cases);

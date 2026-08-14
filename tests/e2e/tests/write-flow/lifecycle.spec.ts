@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * Write-flow lifecycle (PER-H1 + MSG truth-table + VND-05 RFQ), driven via the
+ * Write-flow lifecycle (PER-H1 + the MSG truth-table), driven via the
  * REAL API with the saved bearer tokens (robust vs multi-step UI forms). Runs on
  * the WORKING TestCompany pair (hr_tc + emp_tc) — the demo cases can't load.
  *
@@ -17,12 +17,15 @@ import path from 'path';
  *  - POST /api/hr/cases/{id}/assign                  (HR) { employeeIdentifier,… } → { assignmentId }
  *  - POST /api/employee/assignments/{id}/submit      (EMP) → { success }  (fires AIQ-1342 HR notify)
  *  - POST /api/cases/{id}/messages                   (HR/EMP) { content }  (poll-based, NO notification)
- *  - POST /api/hr/rfq-requests                       (HR) { case_id, vendor_id, service_category,… }
+ *
+ * RFQ is NOT here. POST /api/hr/rfq-requests was deleted on 2026-07-22 (AIQ-1683) when RFQ
+ * creation moved to the employee; the coverage now lives as [VND-05] in tests/deep/journey.spec.ts,
+ * against the canonical POST /api/rfqs. HR's remaining RFQ role is payer — validating a quote —
+ * which needs a supplier to have answered and so is not reachable from this suite.
  */
 const API = process.env.E2E_API_URL || 'https://api.relopass.com';
 const RUNID = process.env.RUNID || `local-${Date.now()}`;
 const TAG = `_v2test_${RUNID}`;
-const VENDOR_ID = 'ed599b41-6c77-4675-9c98-6166c839c1ec'; // SIRVA Worldwide (Moving & Freight), is_active
 const AUTH_DIR = path.join(__dirname, '..', '..', 'playwright', '.auth');
 
 function token(key: string): string {
@@ -96,14 +99,4 @@ test.describe('write-flow lifecycle (TestCompany)', () => {
     if (j.id) created.messageId = j.id;
   });
 
-  test('[VND-05/MSG-05] HR sends an RFQ to a real vendor (SIRVA)', async ({}, info) => {
-    const r = await requestWithGatewayRetry(() => api.post(`${API}/api/hr/rfq-requests`, {
-      headers: { Authorization: `Bearer ${hr}` },
-      data: { case_id: created.caseId, vendor_id: VENDOR_ID, service_category: 'moving', special_requirements: TAG },
-    }));
-    await info.attach('rfq-resp', { body: JSON.stringify({ status: r.status(), body: (await r.text()).slice(0, 500) }), contentType: 'application/json' });
-    const j = await r.json().catch(() => ({} as { rfq_id?: string }));
-    if (j.rfq_id) created.rfqId = j.rfq_id;
-    expect([200, 201], 'RFQ created').toContain(r.status());
-  });
 });

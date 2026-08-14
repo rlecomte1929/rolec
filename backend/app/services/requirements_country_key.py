@@ -15,10 +15,27 @@ This module owns that mapping so neither path carries its own private copy.
 `to_iso` returns ``None`` for an unrecognised value on purpose: it lets callers
 fail closed (surface "not covered") instead of querying with a bad key and
 getting an empty result that reads as "nothing required" — the 1473c follow-up.
+
+Two functions, two different questions — do not conflate them:
+
+  * ``to_iso``        — "do we have requirement CATALOG data for this country?"
+                        Narrow by design. ``to_iso("Japan") is None`` is asserted by
+                        test_requirements_country_key.py, and requirements_builder.py:152
+                        uses it as a coverage gate. Widening it would make an uncovered
+                        destination silently claim coverage.
+  * ``to_iso_alpha2`` — "what is this country's ISO 3166-1 alpha-2 code?"
+                        Broad. Says nothing about catalog coverage. Use this when the job
+                        is to STORE a canonical country code.
+
+[AIQ-1778] ``to_iso_alpha2`` exists because `public.cases.origin_country_code` accumulated
+full country names — 22 rows of 'France', plus 'Germany', 'India' and one empty string. The
+column is plain `text` with no CHECK, and the readers are unforgiving: trigger_engine's EEA
+gate is exact ISO-2 set membership, so a case reading 'France' resolves visa_type
+'skilled_worker' instead of 'eea_registration' and is handed EU Blue Card paperwork.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Dict, Optional
 
 # Canonical ISO alpha-2 (UPPERCASE) → requirement catalog country_code
 # (FULL UPPERCASE name). The one place this mapping lives.
@@ -99,3 +116,106 @@ def normalize_corridor_code(raw: Optional[str]) -> str:
     if not raw:
         return ""
     return raw.strip().upper()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [AIQ-1778] General country-name → ISO 3166-1 alpha-2 resolution.
+#
+# Deliberately NOT merged into _ISO_TO_CATALOG_NAME above: that map answers
+# "have we got catalog data?" and must stay narrow. This one answers "what is the
+# ISO code?" and wants to be broad.
+#
+# Lifted from ops_analytics_service._COUNTRY_NAME_TO_ISO2, which had the widest
+# coverage of the five country maps already in the tree. That copy still exists;
+# collapsing the remaining four onto this one is follow-up work, not this fix.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_NAME_TO_ISO2: Dict[str, str] = {
+    # Europe
+    "norway": "NO", "germany": "DE", "france": "FR", "spain": "ES", "italy": "IT",
+    "netherlands": "NL", "the netherlands": "NL", "holland": "NL",
+    "united kingdom": "GB", "uk": "GB", "great britain": "GB", "britain": "GB",
+    "england": "GB", "scotland": "GB", "wales": "GB",
+    "ireland": "IE", "belgium": "BE", "luxembourg": "LU",
+    "switzerland": "CH", "austria": "AT", "denmark": "DK", "sweden": "SE",
+    "finland": "FI", "iceland": "IS", "poland": "PL", "portugal": "PT",
+    "greece": "GR", "czech republic": "CZ", "czechia": "CZ", "slovakia": "SK",
+    "hungary": "HU", "romania": "RO", "bulgaria": "BG", "croatia": "HR",
+    "slovenia": "SI", "estonia": "EE", "latvia": "LV", "lithuania": "LT",
+    "ukraine": "UA", "turkey": "TR", "türkiye": "TR", "russia": "RU",
+    "cyprus": "CY", "malta": "MT", "serbia": "RS", "liechtenstein": "LI",
+    "monaco": "MC",
+    # Localised spellings of the corridors we actually run — an HR user typing in
+    # their own language is exactly how 'France' got into the column.
+    "frankreich": "FR", "allemagne": "DE", "deutschland": "DE",
+    "norwegen": "NO", "norvège": "NO", "norge": "NO",
+    "pays-bas": "NL", "espagne": "ES", "italie": "IT", "autriche": "AT",
+    "belgique": "BE", "suisse": "CH", "danemark": "DK", "suède": "SE",
+    "royaume-uni": "GB", "irlande": "IE",
+    # Americas
+    "united states": "US", "united states of america": "US", "usa": "US",
+    "u.s.": "US", "u.s.a.": "US", "america": "US", "états-unis": "US",
+    "canada": "CA", "mexico": "MX", "brazil": "BR", "brésil": "BR",
+    "argentina": "AR", "chile": "CL", "colombia": "CO", "peru": "PE",
+    "uruguay": "UY", "costa rica": "CR", "panama": "PA",
+    # Asia / Pacific
+    "japan": "JP", "china": "CN", "south korea": "KR", "korea": "KR",
+    "republic of korea": "KR", "north korea": "KP", "india": "IN", "inde": "IN",
+    "pakistan": "PK", "bangladesh": "BD", "sri lanka": "LK", "singapore": "SG",
+    "singapour": "SG", "malaysia": "MY", "indonesia": "ID", "thailand": "TH",
+    "vietnam": "VN", "philippines": "PH", "hong kong": "HK", "taiwan": "TW",
+    "australia": "AU", "new zealand": "NZ", "israel": "IL",
+    "saudi arabia": "SA", "uae": "AE", "united arab emirates": "AE",
+    "qatar": "QA", "kuwait": "KW", "bahrain": "BH", "oman": "OM",
+    "jordan": "JO", "lebanon": "LB", "egypt": "EG",
+    # Africa
+    "south africa": "ZA", "morocco": "MA", "maroc": "MA", "tunisia": "TN",
+    "tunisie": "TN", "kenya": "KE", "nigeria": "NG", "ghana": "GH",
+    "ethiopia": "ET",
+}
+
+# Alpha-3 → alpha-2 for the codes we actually see. Not the full ISO table.
+_ALPHA3_TO_ISO2: Dict[str, str] = {
+    "deu": "DE", "fra": "FR", "esp": "ES", "ita": "IT", "gbr": "GB",
+    "usa": "US", "can": "CA", "mex": "MX", "bra": "BR", "nor": "NO",
+    "swe": "SE", "fin": "FI", "dnk": "DK", "nld": "NL", "che": "CH",
+    "aut": "AT", "bel": "BE", "irl": "IE", "prt": "PT", "pol": "PL",
+    "jpn": "JP", "chn": "CN", "kor": "KR", "ind": "IN", "sgp": "SG",
+    "aus": "AU", "nzl": "NZ", "are": "AE", "sau": "SA", "zaf": "ZA",
+}
+
+
+def to_iso_alpha2(raw: Optional[str]) -> Optional[str]:
+    """Coerce any country spelling to an ISO 3166-1 alpha-2 code, or ``None``.
+
+    Accepts a 2-letter code in any case, a full name in any case or a known
+    localisation, or a common alpha-3 code. Returns ``None`` only when the value is
+    empty or genuinely unresolvable.
+
+    A well-formed 2-letter code passes straight through, uppercased, even if it is
+    not a country we know — 'MC' must not be rejected just because our name map is
+    incomplete, and the DB CHECK this feeds is a SHAPE check (``^[A-Z]{2}$``), not a
+    membership check. ``None`` is reserved for input that is not a country code at
+    all, which is the case worth failing closed on: storing 'Frankreich' is the bug.
+
+    This says NOTHING about whether we hold requirement data for the country —
+    that is ``to_iso``.
+    """
+    if not raw:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    lower = s.lower()
+    # Name/alias map FIRST, before the 2-letter passthrough. Order matters: 'UK' is a
+    # 2-letter alpha string but is NOT an ISO 3166-1 alpha-2 code — GB is. Passing it
+    # through on shape alone would store an invalid code that satisfies a `^[A-Z]{2}$`
+    # CHECK while matching nothing. (ops_analytics_service._normalize_country_to_iso2
+    # checks length first and so still has this bug; it renders 'UK' to flagcdn.)
+    if lower in _NAME_TO_ISO2:
+        return _NAME_TO_ISO2[lower]
+    if len(s) == 2 and s.isalpha():
+        return s.upper()
+    if len(s) == 3 and lower in _ALPHA3_TO_ISO2:
+        return _ALPHA3_TO_ISO2[lower]
+    return None

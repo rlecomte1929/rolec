@@ -1,0 +1,334 @@
+# Corridor Agent — ES_IE_CSEP_2026  (Spain → Ireland, Critical Skills Employment Permit)
+#
+# ⚠️ REPRESENTATIVE / AUTHORING — indicative content, NOT SME-verified, NOT counsel-assured.
+# Nothing in this file may be rendered as legal advice in ReloPass's own voice.
+# Personalised immigration/tax determinations route to a regulated professional
+# (here: the mover's own relocation agent / immigration solicitor).
+#
+# PROFILE (the validation case): a NON-EEA third-country national (Venezuelan) who
+# has been legally resident in Spain for several years and is relocating to Dublin
+# to take a qualifying tech role (employer: a large multinational). This is NOT an
+# EU free-movement case — it is the third-country employment-permit path, and its
+# whole value is the pile of non-obvious traps that a mover who has "already lived
+# in the EU for years" will not expect.
+#
+# THREE LOAD-BEARING NON-OBVIOUS FACTS (the moat for this corridor):
+#   1. Spanish long-term residence does NOT transfer to Ireland. Ireland is not
+#      bound by the EU Long-Term Residents Directive 2003/109/EC, so an EU LTR /
+#      TIE held in Spain grants no entry or work right in Ireland.
+#   2. Ireland is outside Schengen (Common Travel Area with the UK only). A Spanish
+#      residence card does NOT give visa-free entry. A visa-required national
+#      (Venezuela is now visa-required) must obtain a long-stay 'D' Employment visa
+#      BEFORE travelling.
+#   3. The employment permit (DETE) is NOT immigration permission. It is a labour
+#      authorisation from a different authority; the person still needs the visa to
+#      enter and must register with immigration (IRP / Stamp 1) after arrival.
+#
+# Schema-versioning: bump `version` when any rule reference, threshold or step
+# ordering changes; earlier vN.yaml files coexist so historical cases keep their
+# captured ruleset. 2026 salary floors reflect the Employment Permits Act 2024
+# roadmap (MAR uplift effective 1 March 2026) and MUST be reconfirmed against DETE.
+
+corridor_agent:
+  corridor_id: ES_IE_CSEP_2026
+  version: "2026.01"
+  petitioning_party: EMPLOYEE   # either party may file the permit; the case centres on the employee.
+  origin_country_iso3: ESP
+  destination_country_iso3: IRL
+  description: >
+    Non-EEA national resident in Spain → Ireland on a Critical Skills Employment
+    Permit (Employment Permits Act 2024). No EU free-movement right applies:
+    Spanish long-term residence does not transfer (Ireland is outside the EU
+    Long-Term Residents Directive), Ireland is outside Schengen, and a
+    visa-required national needs a long-stay 'D' Employment visa before travel.
+    The journey is: permit decision → entry visa → arrival → immigration
+    registration (IRP/Stamp 1) → PPSN → tax/bank/health establishment.
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Applicable rules
+  # ─────────────────────────────────────────────────────────────────────
+  applicable_rules:
+    - legal_reference: "Employment Permits Act 2024"
+      rule_id: IE_EPA_2024
+      summary: "Governing statute for Irish employment permits; introduces the Minimum Annual Remuneration (MAR) roadmap."
+    - legal_reference: "Critical Skills Employment Permit (DETE)"
+      rule_id: IE_CSEP
+      summary: "Fast-track permit for in-demand occupations; 2-year permit, no labour market needs test, immediate family reunification, path to Stamp 4."
+    - legal_reference: "Critical Skills Occupations List (CSOL)"
+      rule_id: IE_CSOL
+      summary: "The occupation list that sets which roles qualify for CSEP at the lower salary floor."
+    - legal_reference: "General Employment Permit (DETE)"
+      rule_id: IE_GEP
+      summary: "Fallback permit when CSEP criteria are not met; lower salary floor, labour market needs test required, delayed family reunification."
+    - legal_reference: "Immigration Act 2004, s.9 (registration)"
+      rule_id: IE_IMMIGRATION_2004_S9
+      summary: "Duty of a non-national to register immigration permission (IRP / Stamp 1) after arrival."
+    - legal_reference: "Long-stay 'D' Employment visa (ISD)"
+      rule_id: IE_D_VISA
+      summary: "Entry visa a visa-required national must hold before travelling to take up employment for more than 90 days."
+    - legal_reference: "Directive 2003/109/EC — non-application to Ireland"
+      rule_id: EU_2003_109_IE_OPTOUT
+      summary: "Ireland is not bound by the EU Long-Term Residents Directive; EU LTR status held in Spain confers no mobility right to Ireland."
+    - legal_reference: "Common Travel Area / non-Schengen status"
+      rule_id: IE_CTA_NON_SCHENGEN
+      summary: "Ireland is outside Schengen; a Spanish residence permit does not grant visa-free entry."
+    - legal_reference: "Taxes Consolidation Act 1997 (PAYE / Revenue registration)"
+      rule_id: IE_TCA_1997_PAYE
+      summary: "Employment income taxed under PAYE; the employment must be registered with Revenue (RPN) to avoid emergency tax."
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Required documents
+  # ─────────────────────────────────────────────────────────────────────
+  required_documents:
+    - PASSPORT_TD3:employee
+    - PASSPORT_TD3:family.spouse?
+    - PASSPORT_TD3:family.children.*
+    - SPANISH_RESIDENCE_CARD_TIE:employee          # current legal status in Spain (evidence, NOT a transferable right)
+    - EMPLOYMENT_CONTRACT                            # 2-year minimum, direct employment
+    - DEGREE_OR_QUALIFICATION | RELEVANT_EXPERIENCE_EVIDENCE
+    - EMPLOYMENT_PERMIT_CSEP                         # issued by DETE before the visa
+    - LONG_STAY_D_EMPLOYMENT_VISA                    # issued before travel (visa-required national)
+    - PRIVATE_MEDICAL_INSURANCE_PROOF               # required for immigration registration
+    - PROOF_OF_ADDRESS_IE                           # needed for IRP registration and banking
+    - MARRIAGE_CERT?
+    - BIRTH_CERT:family.children.*
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Required data points
+  # ─────────────────────────────────────────────────────────────────────
+  required_data_points:
+    - key: nationality_non_eea
+      type: bool
+      source: USER_INPUT
+      validations:
+        - "== true"
+    - key: visa_required_nationality
+      type: bool
+      source: EXTERNAL_LOOKUP        # ISD visa-required list; Venezuela == true
+      lookup: isd_visa_required.{nationality_iso}
+    - key: occupation_on_csol
+      type: bool
+      source: EXTERNAL_LOOKUP
+      lookup: csol.{occupation_soc}
+    - key: gross_salary_annual
+      type: money
+      source: USER_INPUT
+      validations:
+        - ">= corridor.salary_threshold"
+        - "guaranteed_fixed_only"
+    - key: salary_threshold_eur
+      type: money
+      source: EXTERNAL_LOOKUP
+      lookup: IE_CSEP.current
+    - key: has_relevant_degree
+      type: bool
+      source: USER_INPUT
+    - key: contract_duration_months
+      type: int
+      source: USER_INPUT
+      validations:
+        - ">= 24"
+    - key: holds_eu_ltr_in_spain
+      type: bool
+      source: USER_INPUT             # drives the "does not transfer" advisory, never an eligibility gate
+    - key: intended_stay_months
+      type: int
+      source: USER_INPUT
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Salary thresholds (2026 — Employment Permits Act 2024 MAR roadmap,
+  # effective 1 March 2026). CONFIRM against DETE before authoritative use.
+  # ─────────────────────────────────────────────────────────────────────
+  salary_thresholds_eur:
+    csep_csol_with_degree: 40904.00        # occupation on CSOL + relevant degree
+    csep_non_csol_with_degree: 68911.00    # eligible occupation not on CSOL, degree/experience
+    csep_recent_graduate_csol: 36848.00    # graduated within the prior 12 months, CSOL role
+    gep_floor: 34000.00                    # General Employment Permit fallback floor (indicative)
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Eligibility logic
+  # ─────────────────────────────────────────────────────────────────────
+  eligibility_logic:
+    branches:
+      - id: BRANCH_CSEP_CSOL
+        label: "Critical Skills Employment Permit — CSOL occupation"
+        cite: IE_CSEP
+        requires_all:
+          - nationality_non_eea == true
+          - occupation_on_csol == true
+          - has_relevant_degree == true
+          - contract_duration_months >= 24
+          - gross_salary_annual >= salary_thresholds_eur.csep_csol_with_degree
+        verdict_on_pass: ELIGIBLE
+      - id: BRANCH_CSEP_HIGH_SALARY
+        label: "Critical Skills Employment Permit — high-salary route (non-CSOL eligible occupation)"
+        cite: IE_CSEP
+        requires_all:
+          - nationality_non_eea == true
+          - has_relevant_degree == true
+          - contract_duration_months >= 24
+          - gross_salary_annual >= salary_thresholds_eur.csep_non_csol_with_degree
+        verdict_on_pass: ELIGIBLE
+      - id: ALT_GENERAL_EMPLOYMENT_PERMIT
+        label: "General Employment Permit — fallback when CSEP floors/occupation not met"
+        cite: IE_GEP
+        requires_all:
+          - nationality_non_eea == true
+          - gross_salary_annual >= salary_thresholds_eur.gep_floor
+          - gross_salary_annual < salary_thresholds_eur.csep_csol_with_degree
+        verdict_on_pass: ALTERNATE_PATHWAY
+        annotation: "Labour market needs test required; family reunification delayed; no direct fast-track to Stamp 4. Confirm current GEP floor with DETE."
+    no_branch_verdict: NOT_ELIGIBLE
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Exception cases — surface as advisories/alternate pathways, never silently block
+  # ─────────────────────────────────────────────────────────────────────
+  exception_cases:
+    - id: VISA_REQUIRED_NATIONAL
+      condition: "visa_required_nationality == true"
+      cite: IE_D_VISA
+      action: SURFACE_AS_ALTERNATE_PATHWAY
+      hint: >
+        Visa-required national (e.g. Venezuela): a long-stay 'D' Employment visa
+        must be applied for and GRANTED before travelling to Ireland. The permit
+        alone does not permit entry.
+    - id: SPANISH_LTR_DOES_NOT_TRANSFER
+      condition: "holds_eu_ltr_in_spain == true"
+      cite: EU_2003_109_IE_OPTOUT
+      action: SURFACE_AS_ALTERNATE_PATHWAY
+      hint: >
+        EU long-term residence / TIE held in Spain confers NO entry or work right
+        in Ireland — Ireland is not bound by Directive 2003/109/EC. The full
+        permit + visa + registration sequence still applies.
+    - id: FAMILY_REUNIFICATION_CSEP
+      condition: "case.has_family_relocating == true"
+      cite: IE_CSEP
+      action: SPAWN_FAMILY_CASE
+      hint: >
+        Critical Skills advantage: spouse/de-facto partner may reside on Stamp 1G
+        with the right to work without a separate permit. Children 16+ register in
+        their own right.
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Step graph — permit → entry visa → arrival → registration → establishment
+  # ─────────────────────────────────────────────────────────────────────
+  step_graph:
+    - step_id: JOB_OFFER_CONTRACT
+      name: "Signed employment contract (2-year minimum, direct employment)"
+      responsible_party: EMPLOYER
+      expected_duration_days: 14
+      prerequisite_step_ids: []
+
+    - step_id: EMPLOYMENT_PERMIT_APPLICATION
+      name: "Critical Skills Employment Permit application to DETE (Employment Permits Online)"
+      responsible_party: EMPLOYER
+      expected_duration_days: 35
+      prerequisite_step_ids: [JOB_OFFER_CONTRACT]
+      cite: IE_CSEP
+
+    - step_id: EMPLOYMENT_PERMIT_GRANTED
+      name: "Employment permit granted by DETE"
+      responsible_party: AUTHORITY_IE_DETE
+      expected_duration_days: 7
+      prerequisite_step_ids: [EMPLOYMENT_PERMIT_APPLICATION]
+      # NON-OBVIOUS: the permit is a labour authorisation, NOT immigration
+      # permission. It does not by itself allow entry or residence.
+      non_obvious: true
+      advice_boundary: information_only
+      cite: IE_CSEP
+
+    - step_id: D_VISA_APPLICATION
+      name: "Long-stay 'D' Employment visa application (Irish visa facility in Spain)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 40
+      prerequisite_step_ids: [EMPLOYMENT_PERMIT_GRANTED]
+      # NON-OBVIOUS: required BECAUSE Ireland is outside Schengen and Venezuela is
+      # visa-required — a mover holding a Spanish TIE typically assumes free entry.
+      non_obvious: true
+      conditional_on: "visa_required_nationality == true"
+      cite: IE_D_VISA
+
+    - step_id: D_VISA_GRANTED
+      name: "'D' Employment visa granted (entry authorisation)"
+      responsible_party: AUTHORITY_IE_ISD
+      expected_duration_days: 7
+      prerequisite_step_ids: [D_VISA_APPLICATION]
+      conditional_on: "visa_required_nationality == true"
+
+    - step_id: TRAVEL_TO_IE
+      name: "Travel to Ireland"
+      # Everything above this point (permit + visa) must complete before the start
+      # date — the pre-arrival runway that makes a short-notice CSEP move infeasible.
+      arrival_anchor: true
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: [D_VISA_GRANTED]
+
+    - step_id: IRP_REGISTRATION
+      name: "Register immigration permission — IRP card / Stamp 1 (ISD, Burgh Quay for Dublin)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 21
+      prerequisite_step_ids: [TRAVEL_TO_IE]
+      # Duty to register within 90 days of arrival; €300 registration fee.
+      time_window_relative_to: TRAVEL_TO_IE
+      time_window_min_days: 0
+      time_window_max_days: 90
+      non_obvious: true
+      cite: IE_IMMIGRATION_2004_S9
+
+    - step_id: PPSN
+      name: "Obtain a PPSN (Personal Public Service Number) via the Dept. of Social Protection"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [TRAVEL_TO_IE]
+
+    - step_id: REVENUE_REGISTRATION
+      name: "Register the employment with Revenue (myAccount / RPN) to avoid emergency tax"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [PPSN]
+      # NON-OBVIOUS: without an RPN in place before the first pay run, PAYE is
+      # deducted at the emergency rate — the Irish analogue of the "tax card before
+      # first pay" trap.
+      non_obvious: true
+      cite: IE_TCA_1997_PAYE
+
+    - step_id: BANK_ACCOUNT
+      name: "Open an Irish bank account (proof of address + PPSN/IRP)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 10
+      prerequisite_step_ids: [PPSN, IRP_REGISTRATION]
+      # NON-OBVIOUS: proof-of-address is a chicken-and-egg barrier on arrival; most
+      # movers bridge with a digital account (Revolut/N26) until a traditional
+      # account can be opened.
+      non_obvious: true
+
+    - step_id: HEALTH_SETUP
+      name: "Register with a GP and arrange private health insurance"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [TRAVEL_TO_IE]
+      # NON-OBVIOUS: public healthcare eligibility hinges on an "ordinarily
+      # resident" test, and GP visits are normally paid out of pocket — a newcomer
+      # is effectively on private cover at first.
+      non_obvious: true
+
+    - step_id: FAMILY_REGISTRATION
+      name: "Register accompanying family (spouse/partner Stamp 1G; children 16+ register)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 21
+      prerequisite_step_ids: [IRP_REGISTRATION]
+      conditional_on: "case.has_family_relocating == true"
+      cite: IE_CSEP
+
+    - step_id: STAMP4_ELIGIBILITY
+      name: "Stamp 4 eligibility reached after 21 months on the Critical Skills permit"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: [IRP_REGISTRATION]
+      outcome_type: nothing_to_do
+      # A forward-looking positive: no permit renewal needed — after 21 months she
+      # can move to Stamp 4 and work without an employment permit.
+      non_obvious: true
+      advice_boundary: information_only
+      cite: IE_CSEP

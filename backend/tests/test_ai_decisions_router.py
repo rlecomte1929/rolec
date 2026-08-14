@@ -35,7 +35,7 @@ from backend.app.routers.ai_decisions import (  # noqa: E402
     create_ai_decision,
     list_ai_decisions,
 )
-from backend.app.auth_deps import require_admin_or_hr  # noqa: E402
+from backend.app.auth_deps import require_admin_or_hr, require_hr_or_employee  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
 
 
@@ -228,13 +228,37 @@ class AIDecisionsRouterTests(unittest.TestCase):
     # ------------------------------------------------------------------
     # Auth dependency — role gate
     # ------------------------------------------------------------------
-    def test_employee_blocked_by_role_dep(self) -> None:
-        """The router relies on require_admin_or_hr to 403 employees.
-        Unit-test the dep directly since the function body never sees the
-        request from an unauthorised role."""
+    def test_employee_is_allowed_and_override_persists(self) -> None:
+        """[AIQ-1653] The employee is the Art. 14 overseer in Services →
+        Recommendations (they override the top AI provider pick). The route now
+        gates on require_hr_or_employee, so the employee is admitted AND their
+        override persists — closing the 403 that made the UI's "Logged for human
+        oversight audit" claim false."""
         emp = _make_user(str(uuid.uuid4()), "EMPLOYEE", "company-a", is_admin=False)
+        # The role gate now admits the employee (require_hr_or_employee).
+        self.assertIs(require_hr_or_employee(user=emp), emp)
+
+        body = AIDecisionCreate(
+            feature="services_recommendations",
+            recommendation_id="rec-emp-1",
+            ai_output={"top_pick": "Vendor A", "score": 93.6},
+            decision="override",
+            reason="I picked the mover with the better lead time for my dates.",
+        )
+        result = create_ai_decision(body=body, user=emp)
+
+        self.assertEqual(result["decision"], "override")
+        self.assertEqual(result["actor_id"], emp["id"])
+        rows = self._rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["actor_id"], emp["id"])
+
+    def test_unknown_role_is_still_blocked(self) -> None:
+        """The gate still rejects a principal that is neither HR, Employee, nor
+        Admin — widening to the employee did not open the route to everyone."""
+        other = _make_user(str(uuid.uuid4()), "VENDOR", None, is_admin=False)
         with self.assertRaises(HTTPException) as ctx:
-            require_admin_or_hr(user=emp)
+            require_hr_or_employee(user=other)
         self.assertEqual(ctx.exception.status_code, 403)
 
     # ------------------------------------------------------------------

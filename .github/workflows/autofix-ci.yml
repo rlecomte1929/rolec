@@ -21,8 +21,6 @@ concurrency:
   group: autofix-ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  NODE_VERSION: '20'
 
 jobs:
   # ── Autofix-specific validation ─────────────────────────────────────────────
@@ -33,9 +31,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies

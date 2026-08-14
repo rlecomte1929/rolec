@@ -1,20 +1,23 @@
-"""Geospatial helpers for recommendations — keyless, no paid dependency.
+"""Geospatial helpers for recommendations.
 
-Straight-line commute estimation + Nominatim geocoding, ported from the
-frontend ``RichCommuteMap`` (SPEED table + geocodeAddress). The commute model
-is deliberately a cheap straight-line-plus-speed heuristic; the
-``commute_minutes`` seam lets a real routing provider (Google Distance Matrix /
-Mapbox / OSRM) replace it later without touching callers.
+Straight-line commute estimation (keyless heuristic) + forward geocoding through
+Geoapify, our registered EU sub-processor (PRIV-004). The commute model is
+deliberately a cheap straight-line-plus-speed heuristic; the ``commute_minutes``
+seam lets a real routing provider (Google Distance Matrix / Mapbox / OSRM)
+replace it later without touching callers.
+
+Geocoding is **disabled-until-keyed**: with no ``GEOAPIFY_API_KEY`` set,
+``geocode()`` returns ``None`` (no address leaves the platform) and housing
+recommendations degrade to the straight-line heuristic. AIQ-1661 removed a prior
+direct call to ``nominatim.openstreetmap.org`` (an unregistered sub-processor).
 """
 from __future__ import annotations
 
-import json
 import math
 import threading
-import time
-import urllib.parse
-import urllib.request
 from typing import Optional, Tuple
+
+from backend.app.services import geocoding_service
 
 Coord = Tuple[float, float]  # (lat, lng)
 
@@ -74,17 +77,74 @@ def straight_line_commute_minutes(
 commute_minutes = straight_line_commute_minutes
 
 
-# ── Nominatim geocoding: process cache + polite rate limit ──────────────────────
+# ── Multimodal enrichment (time + cost + carbon per mode) ───────────────────────
+# Built entirely on the local haversine + speed heuristic — NO routing/isochrone API,
+# so no new sub-processor. Factors are representative EU averages, refined in the
+# Neighbourhood Intelligence roadmap; a real routing provider swaps in behind the
+# same interface via the commute_minutes seam.
+MULTIMODAL_MODES: tuple[str, ...] = ("walk", "bike", "transit", "car")
+_CANONICAL_MODE: dict[str, str] = {
+    "walking": "walk", "walk": "walk",
+    "bike": "bike", "cycling": "bike",
+    "transit": "transit", "public_transit": "transit",
+    "car": "car", "driving": "car",
+}
+# grams CO2e per km (walk/bike = 0; transit ~ per-passenger; car ~ single-occupancy).
+CARBON_G_PER_KM: dict[str, float] = {"walk": 0.0, "bike": 0.0, "transit": 41.0, "car": 170.0}
+# Approximate out-of-pocket cost per km in the display currency's base unit.
+COST_PER_KM: dict[str, float] = {"walk": 0.0, "bike": 0.0, "transit": 0.20, "car": 0.35}
+
+
+def canonical_mode(mode: Optional[str]) -> str:
+    return _CANONICAL_MODE.get((mode or "").strip().lower(), "transit")
+
+
+def mode_profile(office: Optional[Coord], area: Optional[Coord], mode: str) -> Optional[dict]:
+    """Per-mode reachability for one leg: {mode, minutes, distance_km, cost, carbon_g}.
+
+    Returns ``None`` when either point is missing so callers can skip the mode.
+    """
+    minutes = straight_line_commute_minutes(office, area, mode)
+    if minutes is None:
+        return None
+    m = canonical_mode(mode)
+    dist_km = haversine_m(office[0], office[1], area[0], area[1]) * DEFAULT_ROAD_FACTOR / 1000.0
+    return {
+        "mode": m,
+        "minutes": int(round(minutes)),
+        "distance_km": round(dist_km, 1),
+        "cost": round(dist_km * COST_PER_KM.get(m, 0.0), 2),
+        "carbon_g": int(round(dist_km * CARBON_G_PER_KM.get(m, 0.0))),
+    }
+
+
+def multimodal_commute(
+    office: Optional[Coord],
+    area: Optional[Coord],
+    modes: tuple[str, ...] = MULTIMODAL_MODES,
+) -> list[dict]:
+    """All modes for a single leg (office → area), skipping any with no estimate."""
+    out = []
+    for m in modes:
+        p = mode_profile(office, area, m)
+        if p is not None:
+            out.append(p)
+    return out
+
+
+# ── Geoapify geocoding: process cache over the registered EU sub-processor ──────
+# Forward geocoding routes through geocoding_service (Geoapify, PRIV-004),
+# disabled-until-keyed. The process cache avoids repeat lookups for the same
+# address within a worker.
 _geo_cache: dict[str, Optional[Coord]] = {}
 _geo_lock = threading.Lock()
-_last_call = [0.0]
-_MIN_INTERVAL_S = 1.0  # Nominatim usage policy: <= 1 request/second
 
 
 def geocode(address: str, *, timeout: float = 8.0) -> Optional[Coord]:
-    """Geocode a free-text address to ``(lat, lng)`` via Nominatim (cached).
+    """Geocode a free-text address to ``(lat, lng)`` via Geoapify (cached).
 
-    Best-effort: returns ``None`` on empty input, no result, or any error.
+    Best-effort: returns ``None`` on empty input, when geocoding is disabled
+    (no ``GEOAPIFY_API_KEY``), on no result, or on any error.
     """
     key = (address or "").strip()
     if not key:
@@ -92,29 +152,7 @@ def geocode(address: str, *, timeout: float = 8.0) -> Optional[Coord]:
     with _geo_lock:
         if key in _geo_cache:
             return _geo_cache[key]
-    result: Optional[Coord] = None
-    try:
-        with _geo_lock:
-            wait = _MIN_INTERVAL_S - (time.monotonic() - _last_call[0])
-            if wait > 0:
-                time.sleep(wait)
-            _last_call[0] = time.monotonic()
-        url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
-            {"q": key, "format": "json", "limit": 1}
-        )
-        req = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": "ReloPass/1.0 (housing-recommendations)",
-                "Accept-Language": "en",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (trusted host)
-            data = json.loads(resp.read().decode("utf-8"))
-        if data:
-            result = (float(data[0]["lat"]), float(data[0]["lon"]))
-    except Exception:
-        result = None
+    result = geocoding_service.geocode_forward(key, timeout=timeout)
     with _geo_lock:
         _geo_cache[key] = result
     return result

@@ -1,0 +1,13 @@
+{
+  "enabled": false,
+  "provider": "stripe",
+  "mode": "platform",
+  "stripeAccountId": null,
+  "platformFeeBps": 500,
+  "currency": "USD",
+  "businessName": "ReloPass",
+  "supportEmail": "romain_lecomte@hotmail.com",
+  "defaultTrialDays": 7,
+  "defaultPriceCents": 500,
+  "defaultPriceId": null
+}

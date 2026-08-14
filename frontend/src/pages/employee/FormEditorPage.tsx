@@ -37,9 +37,10 @@ import { buildRoute } from '../../navigation/routes';
 import { formEditorAPI } from '../../api/formEditor';
 import { dossierAPI } from '../../api/dossier';
 import type { FieldValueItem } from '../../api/formEditor';
-import type { CaseFormSummary } from '../../api/dossier';
+import type { CaseFormSummary, DossierFormSection } from '../../api/dossier';
 import { PdfPanel } from '../../features/platform-v2/form-editor/PdfPanel';
 import { FieldRow } from '../../features/platform-v2/form-editor/FieldRow';
+import type { FieldLang } from '../../features/platform-v2/form-editor/FieldRow';
 import { ActionBar } from '../../features/platform-v2/form-editor/ActionBar';
 import { PrefillConfirmation } from '../../features/platform-v2/form-editor/PrefillConfirmation';
 import { OriginalPdfDrawer } from '../../features/platform-v2/dossier/OriginalPdfDrawer';
@@ -48,18 +49,84 @@ import { OriginalPdfDrawer } from '../../features/platform-v2/dossier/OriginalPd
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Group fields by their optional `section` property.
- *  Fields with no section fall into a single "Form fields" bucket. */
+/** Template `section` values are machine keys (`d_number`, `skattekort`), which were being
+ *  rendered to the employee verbatim as headings. Named ones get the authority that issues
+ *  them, so the sheet reads as the sequence of appointments it actually is. */
+const SECTION_LABELS: Record<string, string> = {
+  d_number: 'D-number (Skatteetaten)',
+  skattekort: 'Tax card / skattekort (Skatteetaten)',
+  eea_registration: 'EEA registration (Politiet)',
+  folkeregister: 'National registry / folkeregister (Skatteetaten)',
+  a1: 'A1 social-security certificate',
+};
+
+/** Endonyms for the label toggle — a German sheet offers "Deutsch", not "German".
+ *  Keys must match FieldLang; a template whose source_language is absent here gets no toggle
+ *  rather than an unlabelled button. */
+const LANG_LABELS: Record<FieldLang, string> = {
+  en: 'English',
+  nb: 'Norsk',
+  de: 'Deutsch',
+  fr: 'Français',
+};
+
+/** [S1] The bucket for fields with no section. Was 'Form fields' here and "Your details" in
+ *  backend/app/services/data_sheet_pdf.py — the same sheet used two different words depending
+ *  on whether you read it on screen or printed it. Reconciled on the PDF's wording, which
+ *  addresses the employee rather than describing the form. Keep the two in step. */
+const UNSECTIONED = 'Your details';
+
+/** `eea_registration` → `Eea registration`. The fallback for any section key we haven't
+ *  named, so a newly seeded corridor degrades to something readable instead of a raw key. */
+function humaniseSection(key: string): string {
+  const spaced = key.replace(/[_-]+/g, ' ').trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+export function sectionLabel(key: string): string {
+  if (key === UNSECTIONED) return key;
+  return SECTION_LABELS[key] ?? humaniseSection(key);
+}
+
+/** [S1] Group fields by the template's declared `sections` when it has them, else by their
+ *  optional `section` property.
+ *
+ *  When the template declares sections, that array IS the layout: its order is display order,
+ *  each entry supplies its own title, and its `field_ids` select the fields. Two consequences
+ *  the field-grouped path could not express — both needed by the DE/FR corridors:
+ *
+ *    * a section may reference NO fields (France has no arrival registration, and that absence
+ *      has to be stated or the employee assumes we forgot it);
+ *    * a field may appear in several sections, because each authority appointment needs its own
+ *      packet. The field is declared ONCE; duplicating it would write one stored value per copy.
+ *
+ *  Fields with no section fall into a single UNSECTIONED bucket. */
 function groupBySection(
   fields: FieldValueItem[],
-): Array<{ section: string; fields: FieldValueItem[] }> {
+  sections?: DossierFormSection[] | null,
+): Array<{ section: string; label: string; fields: FieldValueItem[]; meta?: DossierFormSection }> {
+  if (sections && sections.length > 0) {
+    const byId = new Map(fields.map((f) => [f.field_id, f]));
+    return sections.map((s) => ({
+      section: s.id,
+      label: s.title?.trim() || sectionLabel(s.id),
+      // An id with no matching field is skipped rather than crashing the page; the backend
+      // suite (test_data_sheet_sections.py) fails on it so a bad backfill is caught there.
+      fields: (s.field_ids ?? []).map((id) => byId.get(id)).filter((f): f is FieldValueItem => !!f),
+      meta: s,
+    }));
+  }
   const map = new Map<string, FieldValueItem[]>();
   for (const f of fields) {
-    const key = f.section?.trim() || 'Form fields';
+    const key = f.section?.trim() || UNSECTIONED;
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(f);
   }
-  return Array.from(map.entries()).map(([section, fields]) => ({ section, fields }));
+  return Array.from(map.entries()).map(([section, fields]) => ({
+    section,
+    label: sectionLabel(section),
+    fields,
+  }));
 }
 
 /** Compute local completion % from live values and field definitions. */
@@ -102,6 +169,19 @@ export const FormEditorPage: React.FC = () => {
   const [formSummary, setFormSummary] = useState<CaseFormSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // ── Label language toggle ─────────────────────────────────────────────────
+  // Switches LABELS only for comprehension; identifier VALUES stay verbatim.
+  const [lang, setLang] = useState<FieldLang>('en');
+  // [AIQ-1757] Offer the toggle when the form's official language isn't English.
+  // A seeded label renders instantly; labels without one translate via /api/translate
+  // (handled in FieldRow), degrading to the original on 503.
+  //
+  // [AIQ-1770] The second option is now the template's actual language rather than a
+  // hardcoded 'nb', so a German or French sheet gets its own toggle instead of offering
+  // "Norsk" — or silently offering nothing.
+  const sourceLanguage = (formSummary?.template.source_language ?? 'en') as FieldLang;
+  const showLangToggle = sourceLanguage !== 'en' && sourceLanguage in LANG_LABELS;
 
   // ── Live edit state ──────────────────────────────────────────────────────
   /** A map of field_id → current string value displayed in the form. */
@@ -318,7 +398,12 @@ export const FormEditorPage: React.FC = () => {
   }, [caseId, formId]);
 
   // ── Derived state ─────────────────────────────────────────────────────────
-  const sections = useMemo(() => groupBySection(fields), [fields]);
+  // [S1] The template's declared sections drive layout when present; otherwise fall back to
+  // grouping by fields[].section.
+  const sections = useMemo(
+    () => groupBySection(fields, formSummary?.template?.sections),
+    [fields, formSummary?.template?.sections],
+  );
   const completionPct = useMemo(
     () => computeCompletion(fields, liveValues),
     [fields, liveValues],
@@ -495,25 +580,63 @@ export const FormEditorPage: React.FC = () => {
           {/* Content-honesty disclaimer — this is the submission surface and the
               form template is representative, not legally verified, so remind the
               employee to confirm with the issuing authority before submitting. */}
-          <Alert variant="warning" className="mb-4">
-            Indicative — always confirm details with the issuing authority before you submit.
-            This form is representative and may differ from the latest official version.
-          </Alert>
+          {/* Label toggle — labels only; identifier values stay verbatim. */}
+          {showLangToggle && (
+            <div className="mb-4 flex items-center justify-end gap-2">
+              <span className="text-xs font-medium text-slate-500">Labels:</span>
+              <div className="inline-flex rounded-md border border-slate-300 overflow-hidden" role="group" aria-label="Label language">
+                {(['en', sourceLanguage] as FieldLang[]).map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => setLang(code)}
+                    aria-pressed={lang === code}
+                    className={`px-2.5 py-1 text-xs font-semibold transition-colors ${lang === code ? 'bg-[#0b2b43] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    {LANG_LABELS[code]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Driven by the template's content-maturity flag, like CaseFormCard. This used to
+              be hardcoded, so it kept asserting "representative" even for a form ops had
+              verified — which quietly drains the badge of meaning. */}
+          {formSummary?.template?.verification_status !== 'verified' && (
+            <Alert variant="warning" className="mb-4">
+              Indicative — always confirm details with the issuing authority before you submit.
+              This form is representative and may differ from the latest official version.
+            </Alert>
+          )}
           {sections.length === 0 ? (
             <div className="py-12 text-center text-slate-500 text-sm">
               No fields defined for this form yet.
             </div>
           ) : (
-            sections.map(({ section, fields: sectionFields }) => {
+            sections.map(({ section, label: sectionHeading, fields: sectionFields, meta }) => {
               const aiFieldsInSection = sectionFields.filter(
                 (f) => f.filled_by === 'ai' && !f.reviewed,
               );
+              const hasConsultFields = sectionFields.some(
+                (f) => f.consult_professional === true,
+              );
+              // [S1/E] FINDINGS Appendix A.3 — sections sharing a session_group are ONE portal
+              // visit, so say so instead of implying two separate appointments. Only shown when
+              // another section actually shares the key; a lone group is not a group.
+              const sharesSession = !!meta?.session_group
+                && sections.filter((o) => o.meta?.session_group === meta.session_group).length > 1;
+              const sessionPeers = sharesSession
+                ? sections
+                    .filter((o) => o.meta?.session_group === meta!.session_group
+                      && o.section !== section)
+                    .map((o) => o.label)
+                : [];
               return (
                 <div key={section} className="mb-8">
                   {/* Section header */}
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-xs font-semibold tracking-widest text-slate-500 uppercase">
-                      {section}
+                      {meta?.number ? `${meta.number} · ` : ''}{sectionHeading}
                     </h2>
                     {aiFieldsInSection.length > 0 && (
                       <Button unstyled
@@ -526,6 +649,53 @@ export const FormEditorPage: React.FC = () => {
                     )}
                   </div>
 
+                  {/* [S1/E] Authority + timing, from the section rather than from prose buried
+                      in a field note. */}
+                  {(meta?.authority || meta?.deadline_hint) && (
+                    <p className="mb-2 text-xs text-slate-500">
+                      {meta?.authority}
+                      {meta?.authority && meta?.deadline_hint ? ' · ' : ''}
+                      {meta?.deadline_hint}
+                      {meta?.portal_url && (
+                        <>
+                          {' · '}
+                          <a
+                            href={meta.portal_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#1f8e8b] hover:underline"
+                          >
+                            Open portal
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  )}
+
+                  {/* [S1/E] Appendix A.3: one portal visit, not two appointments. */}
+                  {sharesSession && (
+                    <Alert variant="info" className="mb-3">
+                      This and {sessionPeers.join(', ')} are completed in{' '}
+                      <strong>one {meta!.session_group} session</strong> — you do not need a
+                      second appointment.
+                    </Alert>
+                  )}
+
+                  {/* [S1/E] Section-level guidance, above the fields. */}
+                  {meta?.callout_top && (
+                    <Alert variant="info" className="mb-3">{meta.callout_top}</Alert>
+                  )}
+
+                  {/* Regulatory banner — these determinations are routed to a
+                      regulated professional and are never pre-filled. */}
+                  {hasConsultFields && (
+                    <Alert variant="warning" className="mb-3">
+                      These determinations must be made by a qualified advisor. ReloPass
+                      will not pre-fill them — your mobility team will route you to a
+                      regulated professional.
+                    </Alert>
+                  )}
+
                   {/* Fields */}
                   <div className="grid gap-3">
                     {sectionFields.map((field) => (
@@ -535,9 +705,18 @@ export const FormEditorPage: React.FC = () => {
                         liveValue={liveValues[field.field_id] ?? ''}
                         onValueChange={handleValueChange}
                         showMissing={showMissing}
+                        lang={lang}
                       />
                     ))}
                   </div>
+
+                  {/* [S1/E] Guidance that only makes sense AFTER the fields — the
+                      OUTPUT-vs-INPUT warnings especially. The FR→NO sheet used to bury this
+                      inside employer_name's note, where it read as a comment on one field
+                      rather than on the whole appointment. */}
+                  {meta?.callout_bottom && (
+                    <Alert variant="info" className="mt-3">{meta.callout_bottom}</Alert>
+                  )}
                 </div>
               );
             })

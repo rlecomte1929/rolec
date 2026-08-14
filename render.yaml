@@ -13,15 +13,19 @@
 # static site `headers` field. The CSP value matches the (now self-hosted, Google-Fonts-
 # free) policy on `main`.
 #
-# !! THIS FILE IS INERT UNTIL YOU ADOPT IT IN RENDER !!
-# A render.yaml committed to the repo does nothing to an existing dashboard-created
-# service on its own. To enforce these headers you must, in the Render dashboard, EITHER:
-#   (A) Create a Blueprint instance from this file and point it at the existing static
-#       site — confirm `name` below matches the live service so it UPDATES (not
-#       duplicates) it; OR
-#   (B) Skip the Blueprint and paste the 6 headers below into the static site's
-#       Settings -> Headers UI (zero-risk, no Blueprint adoption needed). Recommended
-#       if you don't want to convert the service to IaC.
+# !! THIS FILE IS LIVE — IT GOVERNS PRODUCTION FRONTEND ROUTING !!
+# (It was inert when first written. The Blueprint was adopted and verified in #518,
+# 45f6feb9 — "deep paths now 200 natively; all 6 headers served from render.yaml" —
+# and `frontend/public/_redirects` was deleted in the same commit because Render
+# ignores it once Blueprint/dashboard rules exist. The old "inert" warning survived
+# here for months and is why the ADS-3 shell defect was mis-diagnosed as a missing
+# `_redirects` file. Corrected 2026-08-10.)
+#
+# Practical consequences:
+#   - `routes:` below is the ONLY place the SPA fallback and any per-path rewrite can
+#     be changed. Adding `frontend/public/_redirects` will do nothing.
+#   - Changes here take effect on the next Blueprint sync, not on plain `git push`.
+#     Confirm in the Render dashboard that the sync ran before trusting a routing fix.
 #
 # CAUTION on Blueprint adoption: a Blueprint becomes the source of truth for the
 # services it defines. Verify the service `name`, build command, publish path, and
@@ -45,10 +49,90 @@ services:
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
     routes:
-      # SPA fallback — mirrors frontend/public/_redirects (/* -> /index.html 200).
+      # ── Prerendered ad landing pages — MUST stay above the SPA catch-all ──
+      #
+      # [AIQ-1783 / ADS-3] `npm run build` prerenders these to
+      # dist/<route>/index.html. Render resolves that file as a directory index only
+      # when the request carries a trailing slash. `/mobility-teams` (no slash) matches
+      # no file, falls through to the `/*` rewrite below, and returns index.html — whose
+      # <div id="root"> is empty until JS runs.
+      #
+      # Measured on prod 2026-08-10: `/mobility-teams` = 1,677 bytes (shell),
+      # `/mobility-teams/` = 12,049 bytes (prerendered). Identical for OAI-AdsBot and
+      # facebookexternalhit. Every ad crawler would have validated a blank page.
+      #
+      # Routes are first-match-wins, so these two must precede `/*`. The ad URLs in
+      # docs/gtm/ADS-4_destination_urls.md carry the slash and do not depend on these
+      # rules — these exist so the bare URL a human types or links to also works.
+      # Gate: `bash scripts/check_ad_landing_prerender.sh`.
+      - type: rewrite
+        source: /mobility-teams
+        destination: /mobility-teams/index.html
+      - type: rewrite
+        source: /relocation-checklist
+        destination: /relocation-checklist/index.html
+      # Published guides — same directory-index trap as the two pages above.
+      # `frontend/scripts/prerender-content.mjs` emits dist/blog/<slug>/index.html for every
+      # file in content/blog. Canonical URLs and sitemap.xml all carry the trailing slash, so
+      # these two rules only cover the bare form a human types or links to; if the `:slug`
+      # placeholder is not honoured, the slash form still resolves and nothing breaks.
+      - type: rewrite
+        source: /blog
+        destination: /blog/index.html
+      - type: rewrite
+        source: /blog/:slug
+        destination: /blog/:slug/index.html
+      # ── [AIQ-1797] Prerendered PUBLIC marketing routes ──────────────────────
+      #
+      # Same directory-index trap as everything above, and the reason this task's
+      # prerendered files alone would have bought nothing: measured on prod
+      # 2026-08-11, `/platform` AND `/platform/` both returned 1,677 bytes — the
+      # shell — because no rule existed for either form. All 8 routes did.
+      #
+      # `/` has NO rule, on purpose. dist/index.html IS the prerendered homepage, and Render
+      # serves it directly:
+      #
+      #   "Render does not apply redirect or rewrite rules to a path if a resource exists at
+      #    that path. Instead, Render simply serves the resource at that path."
+      #
+      # That sentence is also why the original `source: / -> /landing.html` rule never fired,
+      # despite sitting above `/*` with nothing shadowing it: index.html existed, so the rule
+      # was unreachable and prod served the 1,670-byte shell to every crawler on the homepage.
+      # The rules below DO fire because nothing exists at dist/platform — only
+      # dist/platform/index.html.
+      #
+      # Gate: `bash scripts/check_public_prerender.sh` (served-response, no JS).
+      - type: rewrite
+        source: /platform
+        destination: /platform/index.html
+      - type: rewrite
+        source: /why
+        destination: /why/index.html
+      - type: rewrite
+        source: /how-it-works
+        destination: /how-it-works/index.html
+      - type: rewrite
+        source: /get-started
+        destination: /get-started/index.html
+      - type: rewrite
+        source: /security
+        destination: /security/index.html
+      - type: rewrite
+        source: /privacy
+        destination: /privacy/index.html
+      - type: rewrite
+        source: /access
+        destination: /access/index.html
+      # SPA fallback — every other path renders client-side.
+      #
+      # /app.html, not /index.html: index.html now carries the prerendered homepage, and this
+      # is the document served to /auth and every authenticated route. Pointing it at the
+      # landing page would show an HR user opening /hr/dashboard the marketing homepage before
+      # createRoot wiped it. app.html is the pristine shell, written by prerender.mjs before it
+      # emits any route.
       - type: rewrite
         source: /*
-        destination: /index.html
+        destination: /app.html
     headers:
       - path: /*
         name: Strict-Transport-Security

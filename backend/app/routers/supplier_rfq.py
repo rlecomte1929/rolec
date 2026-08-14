@@ -24,7 +24,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import text
 
 from ...database import db
-from ..auth_deps import require_admin_or_hr
+from ..auth_deps import get_org_id_for_hr_user, require_admin_or_hr
 from ..services.rfq_brief import RESPONSE_EXPECTATIONS, RESPONSE_WINDOW_DAYS, render_brief_lines
 from ..services.supplier_jwt import hash_token, verify_supplier_token
 from ..services.supplier_link_dispatch import dispatch_supplier_links, resolve_rfq_targets
@@ -215,6 +215,7 @@ def send_supplier_links(
     rfq_id: str,
     payload: SendSupplierLinksPayload,
     user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
 ):
     """AIQ-1521: mint one magic link per recipient, and (optionally) email it.
 
@@ -229,6 +230,26 @@ def send_supplier_links(
     """
     rfq = db.get_rfq(rfq_id)
     if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+
+    # AIQ-1672: company-scope this dispatch — the RFQ's case must belong to the caller's org.
+    # Without it, any HR/admin could mint tokens (and, with send_email, email suppliers) on
+    # ANOTHER company's RFQ by enumerating rfq_ids — a cross-tenant IDOR on an external-contact
+    # action. Mirrors hr_coordination.dispatch_case_rfq. 404 (not 403) so RFQ existence is not
+    # leaked across tenants, and we bail BEFORE resolving targets or dispatching anything.
+    with db.engine.begin() as conn:
+        owned = conn.execute(
+            text(
+                "SELECT 1 FROM rfqs r WHERE CAST(r.id AS TEXT) = :rid AND ("
+                " EXISTS (SELECT 1 FROM relocation_cases c"
+                "         WHERE CAST(c.id AS TEXT) = CAST(r.case_id AS TEXT) AND CAST(c.company_id AS TEXT) = :org)"
+                " OR EXISTS (SELECT 1 FROM cases c"
+                "            WHERE CAST(c.id AS TEXT) = CAST(r.case_id AS TEXT) AND CAST(c.company_id AS TEXT) = :org)"
+                ") LIMIT 1"
+            ),
+            {"rid": rfq_id, "org": org_id},
+        ).first()
+    if not owned:
         raise HTTPException(status_code=404, detail="RFQ not found")
 
     # Recipients of THIS rfq, with the address we hold. Anything the caller names that is not a
@@ -258,7 +279,14 @@ def send_supplier_links(
             "supplier_name": target.supplier_name or base.get("supplier_name"),
         })
 
+    # `send_email` selects the dispatch mode: True -> email (guards + Resend), False -> inbox
+    # (mint + in-app link, no egress). Passing the mode explicitly keeps this HR path aligned with
+    # the employee-create path, where inbox is the default.
+    mode = "email" if payload.send_email else "inbox"
     results.extend(
-        dispatch_supplier_links(rfq_id=rfq_id, targets=targets, send_email=payload.send_email)
+        dispatch_supplier_links(
+            rfq_id=rfq_id, targets=targets, dispatch_mode=mode, send_email=payload.send_email,
+            actor_email=user.get("email"),
+        )
     )
     return {"ok": True, "rfq_ref": rfq.get("rfq_ref"), "results": results}

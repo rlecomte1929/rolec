@@ -324,10 +324,17 @@ const AddTaskForm: React.FC<AddTaskFormProps> = ({ caseId, employeeId, onAdded, 
 // ── HrCaseTasksPanel ──────────────────────────────────────────────────────────
 
 interface HrCaseTasksPanelProps {
+  /** The id this page's task endpoints key on (`/api/hr/cases/{id}/tasks`). */
   caseId: string;
+  /** The CANONICAL case id (`case_assignments.case_id`), a DIFFERENT id-space from
+   *  `caseId` above. Every hr_coordination endpoint the provider-coordination subtree
+   *  calls — providers, rfqs, assign-task, dispatch — validates against
+   *  `relocation_cases`/`cases` by this id and 404s on an assignment id. `null` when it
+   *  cannot be resolved, in which case that subtree is not rendered (fail closed). */
+  coordinationCaseId?: string | null;
 }
 
-export const HrCaseTasksPanel: React.FC<HrCaseTasksPanelProps> = ({ caseId }) => {
+export const HrCaseTasksPanel: React.FC<HrCaseTasksPanelProps> = ({ caseId, coordinationCaseId }) => {
   const queryClient = useQueryClient();
   const [showAddForm, setShowAddForm] = useState(false);
   const queryKey = ['hr', 'case-tasks', caseId] as const;
@@ -450,8 +457,11 @@ export const HrCaseTasksPanel: React.FC<HrCaseTasksPanelProps> = ({ caseId }) =>
         </div>
       )}
 
-      {/* Provider coordination — housing, immigration, shipping tasks */}
-      <ProviderCoordinationPanel caseId={caseId} />
+      {/* Provider coordination — housing, immigration, shipping tasks, and the HR-gated
+          RFQ dispatch. Keyed on the CANONICAL case id, not this panel's `caseId`: passing
+          the assignment id 404'd every read here, so the employee's RFQ never appeared and
+          its dispatch button was unreachable. Fail closed when it can't be resolved. */}
+      {coordinationCaseId && <ProviderCoordinationPanel caseId={coordinationCaseId} />}
     </Card>
   );
 };

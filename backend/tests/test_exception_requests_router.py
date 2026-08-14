@@ -692,10 +692,11 @@ class HrNotificationHelperTests(unittest.TestCase):
             self._notify()
         notify.assert_not_called()
 
-    def test_legacy_non_uuid_hr_is_skipped_not_faked(self) -> None:
-        """notifications.user_id is `uuid NOT NULL` while users.id is `text`. 27 of 239
-        prod assignments still carry a legacy hr_user_id (e.g. seed-hr-testingapril);
-        the INSERT would fail the uuid cast. Skip + warn — never pretend it was sent."""
+    def test_legacy_non_uuid_hr_gets_a_direct_email(self) -> None:
+        """[AIQ-1610 follow-up] notifications/outbox.user_id are `uuid NOT NULL` while users.id is
+        `text`. 27 of 239 prod assignments still carry a legacy hr_user_id (e.g. seed-hr-testingapril)
+        that can't get an in-app/outbox row — but must still be EMAILED the over-cap alert directly,
+        not silently skipped (the old behavior)."""
         with mock.patch.object(router_module, "_is_sqlite_engine", return_value=False), \
              mock.patch.object(
                  router_module.db,
@@ -703,13 +704,21 @@ class HrNotificationHelperTests(unittest.TestCase):
                  return_value={"id": "a1", "hr_user_id": "seed-hr-testingapril"},
              ), \
              mock.patch.object(
+                 router_module.db, "get_user_by_id",
+                 return_value={"email": "legacyhr@acme.com"},
+             ), \
+             mock.patch.object(
                  router_module.db, "create_notification_with_preferences"
              ) as notify, \
-             self.assertLogs(router_module.logger, level="WARNING") as logs:
+             mock.patch(
+                 "backend.app.services.assignment_invite_email._resend_send",
+                 return_value={"status": "sent"},
+             ) as resend:
             self._notify()
 
-        notify.assert_not_called()
-        self.assertIn("HR NOT NOTIFIED", "\n".join(logs.output))
+        notify.assert_not_called()  # legacy path never touches the uuid-constrained in-app/outbox
+        resend.assert_called_once()
+        self.assertEqual(resend.call_args.kwargs["to_email"], "legacyhr@acme.com")
 
     def test_uuid_hr_is_notified_on_postgres_tier(self) -> None:
         hr_id = str(uuid.uuid4())
@@ -727,10 +736,10 @@ class HrNotificationHelperTests(unittest.TestCase):
         notify.assert_called_once()
         self.assertEqual(notify.call_args.kwargs["user_id"], hr_id)
 
-    def test_legacy_non_uuid_employee_is_skipped_not_faked(self) -> None:
-        """Mirror of the HR guard, for the decision half. 244/245 prod employees are
-        uuid-castable; the legacy seed-emp-* account cannot receive an in-app notification
-        (notifications.user_id is uuid NOT NULL). Skip + warn — never pretend it was sent."""
+    def test_legacy_non_uuid_employee_gets_a_direct_email(self) -> None:
+        """[AIQ-1610 follow-up] Mirror of the HR side for the decision half. The legacy seed-emp-*
+        account can't receive an in-app/outbox row (uuid NOT NULL) but is now EMAILED the decision
+        directly instead of being silently skipped."""
         row = {
             "requested_by_user_id": "seed-emp-testingapril",
             "category": "housing",
@@ -740,15 +749,23 @@ class HrNotificationHelperTests(unittest.TestCase):
         }
         with mock.patch.object(router_module, "_is_sqlite_engine", return_value=False), \
              mock.patch.object(
+                 router_module.db, "get_user_by_id",
+                 return_value={"email": "legacyemp@acme.com"},
+             ), \
+             mock.patch.object(
                  router_module.db, "create_notification_with_preferences"
              ) as notify, \
-             self.assertLogs(router_module.logger, level="WARNING") as logs:
+             mock.patch(
+                 "backend.app.services.assignment_invite_email._resend_send",
+                 return_value={"status": "sent"},
+             ) as resend:
             router_module._notify_employee_of_decision(
                 request_id="req-1", existing=row, status="approved", hr_note=None
             )
 
         notify.assert_not_called()
-        self.assertIn("EMPLOYEE NOT NOTIFIED", "\n".join(logs.output))
+        resend.assert_called_once()
+        self.assertEqual(resend.call_args.kwargs["to_email"], "legacyemp@acme.com")
 
     def test_decision_notification_without_hr_note_says_so(self) -> None:
         """Silence is not an explanation — say plainly that no note was left rather than

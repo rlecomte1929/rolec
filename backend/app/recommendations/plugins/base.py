@@ -16,6 +16,11 @@ class BasePlugin(ABC):
 
     key: str = ""
     title: str = ""
+    # Advisory categories are informational content (e.g. neighbourhood overviews),
+    # not a vendor marketplace. The engine ranks them from the static/geo dataset
+    # only — it skips the supplier-registry override and bypasses HR curation — so
+    # they are never gated or shadowed by supplier rows. Default: gated (False).
+    advisory: bool = False
 
     @property
     @abstractmethod

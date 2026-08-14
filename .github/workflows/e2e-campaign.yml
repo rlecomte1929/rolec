@@ -11,7 +11,7 @@ on:
       projects:
         description: "Playwright projects to run"
         type: string
-        default: "--project=provision --project=readiness --project=core --project=write-flow --project=deep"
+        default: "--project=public --project=provision --project=readiness --project=core --project=write-flow --project=deep --project=r4x-provision --project=run004x"
 
 concurrency:
   group: e2e-sentinel-campaign
@@ -32,6 +32,11 @@ jobs:
       E2E_APP_URL: ${{ vars.E2E_APP_URL || 'https://relopass.com' }}
       RELOPASS_E2E_PASSWORD: ${{ secrets.RELOPASS_E2E_PASSWORD }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # [AIQ-1685] Lets the deep journey complete a test-mode roadmap payment (locally-signed
+      # checkout.session.completed) so [DEEP-ROADMAP-API] validates generation for a PAID case
+      # while the paywall (RELOPASS_ROADMAP_PAYWALL_ENABLED) is on. Must equal the value the
+      # backend verifies against; if unset, that check skips cleanly (no false P0).
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,9 +57,9 @@ jobs:
         env:
           E2E_DEPLOY_GRACE: ${{ vars.E2E_DEPLOY_GRACE }}
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: "20.18.1"
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: tests/e2e/package-lock.json
 
@@ -74,7 +79,7 @@ jobs:
         env:
           # via env (not inline ${{ }}) to avoid run-command injection from the dispatch input;
           # falls back to the default project set on a push (no dispatch input present)
-          PROJECTS: ${{ github.event.inputs.projects || '--project=provision --project=readiness --project=core --project=write-flow --project=deep' }}
+          PROJECTS: ${{ github.event.inputs.projects || '--project=public --project=provision --project=readiness --project=core --project=write-flow --project=deep --project=r4x-provision --project=run004x' }}
         run: |
           # shellcheck disable=SC2086  # PROJECTS is several flags; word-splitting is intended
           npx playwright test $PROJECTS
@@ -112,7 +117,7 @@ jobs:
         continue-on-error: true
         run: node relopass_api_runner_patched.js --api-only || true
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -154,14 +159,30 @@ jobs:
             echo "degraded=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Runs to completion and records the verdict; the gate below acts on it.
+      #
+      # This step used to carry `continue-on-error: true` ("Phase 1: known-open bugs keep it
+      # RED; don't fail the job yet"). That mask was the ONLY thing between a red test and a
+      # red run, so no test outcome could fail the campaign — and three crawler assertions
+      # plus [R4X-B] were failing into the void on 2026-08-11 while the run went green.
+      # `scripts/sentinel_baseline.json` removes the reason for the mask: known-open bugs are
+      # named there, everything else fails.
+      #
+      # Both commands must still run even when the first reports a problem — aborting here
+      # would skip scoring AND the Notion sync, which is worse than the silence it replaces.
       - name: Ingest + score
         id: score
-        continue-on-error: true   # Phase 1: known-open bugs (RFQ 500 etc.) keep it RED; don't fail the job yet
         run: |
+          set +e
           python3 scripts/ingest_playwright_results.py \
             --pw "tests/e2e/test-artifacts/${RUNID}/_results.json" \
             ${{ env.RELOPASS_E2E_PASSWORD != '' && '--api test_results.json' || '' }}
+          ingest_rc=$?
           python3 scripts/campaign_scorer.py --no-prev ${{ steps.healthgate.outputs.degraded == 'true' && '--degraded' || '' }} | tee /tmp/score.txt
+          score_rc=${PIPESTATUS[0]}
+          echo "ingest_rc=$ingest_rc" >> "$GITHUB_OUTPUT"
+          echo "score_rc=$score_rc"   >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Summary
         if: always()
@@ -196,17 +217,23 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           mkdir -p results
-          prev=$(gh run list --workflow=e2e-campaign.yml --branch=main --limit=10 \
-            --json databaseId --jq "[.[]|select((.databaseId|tostring) != env.RUN_ID)][0].databaseId" 2>/dev/null || true)
-          if [ -n "$prev" ] && [ "$prev" != "null" ]; then
+          # AIQ-1738: only COMPLETED runs have uploaded their sentinel-state artifact, and
+          # the most-recent one may not have it yet (near-simultaneous runs race). So walk
+          # the recent completed runs and take the FIRST that actually yields the artifact,
+          # rather than blindly resolving [0] and giving up. A missing baseline still fails
+          # open for new-task filing, but reopening a Done task stays fail-closed downstream.
+          loaded=""
+          for prev in $(gh run list --workflow=e2e-campaign.yml --branch=main --status=completed --limit=15 \
+              --json databaseId --jq ".[] | .databaseId | tostring" 2>/dev/null | grep -v "^${RUN_ID}$" || true); do
             if gh run download "$prev" -n sentinel-state -D results/ 2>/dev/null && [ -f results/last_failures.json ]; then
               mv results/last_failures.json results/prev_failures.json
               echo "loaded prev sentinel state from run $prev"
-            else
-              echo "no sentinel-state artifact on run $prev — confirm-twice fails open"
+              loaded=1
+              break
             fi
-          else
-            echo "no previous run found — confirm-twice fails open"
+          done
+          if [ -z "$loaded" ]; then
+            echo "no prior sentinel-state found in recent completed runs — confirm-twice fails open for new tasks (reopens stay held)"
           fi
 
       # Optional: sync P0/P1 failures + regressions into the Notion Work Queue (gated).
@@ -266,3 +293,28 @@ jobs:
         run: |
           pip install --quiet psycopg2-binary
           python3 scripts/e2e_purge.py --apply --min-age-hours "$MIN_AGE_HOURS"
+
+      # THE GATE. Deliberately last: every step above — scoring, artifact upload, the Notion
+      # sync, Slack, the purge — must run first, so a red result is fully recorded before the
+      # job is allowed to fail. Failing earlier would suppress the very reporting that makes
+      # the failure actionable.
+      #
+      # Fails when the scorer saw a failure that is NOT in scripts/sentinel_baseline.json, or
+      # when the ingester found a FAILING spec with no [TAG] (invisible to the scorer, so it
+      # would otherwise report to nobody). Known-open bugs live in the baseline and do not
+      # fail the run.
+      - name: Gate — fail on anything not already known-open
+        if: always()
+        env:
+          INGEST_RC: ${{ steps.score.outputs.ingest_rc }}
+          SCORE_RC: ${{ steps.score.outputs.score_rc }}
+        run: |
+          if [ "${SCORE_RC:-0}" != "0" ]; then
+            echo "::error::Campaign has a failure that is not in scripts/sentinel_baseline.json."
+            echo "See the 'Ingest + score' step for which test, and the run artifact for detail."
+          fi
+          if [ "${INGEST_RC:-0}" != "0" ]; then
+            echo "::error::A FAILING spec has no [TAG], so it cannot reach the scorer or Notion."
+            echo "Add a leading [TAG] to its title and an entry in scripts/scoring_map.json."
+          fi
+          [ "${SCORE_RC:-0}" = "0" ] && [ "${INGEST_RC:-0}" = "0" ]

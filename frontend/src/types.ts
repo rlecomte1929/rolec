@@ -184,6 +184,11 @@ export interface User {
   primary_role?: string | null;
   name?: string;
   company?: string;
+  // AIQ-1701: has this user already dismissed their role's first-login welcome page?
+  // Server-owned (profiles.welcome_seen_at) and mirrored into localStorage at login,
+  // which keeps the welcome redirect check synchronous. Optional so legacy
+  // callers/tests are unaffected.
+  welcome_seen?: boolean | null;
 }
 
 export interface AnswerRequest {
@@ -752,6 +757,8 @@ export interface AssignmentDetail {
   employeeLastName?: string | null;
   /** profiles.email for linked employee_user_id (same GET as assignment detail) */
   employeeEmail?: string | null;
+  /** [AIQ-1648] The HR account that owns the case (case_assignments.hr_user_id → users.email) */
+  hrOwnerEmail?: string | null;
   /** profiles.full_name when intake name not yet on RelocationProfile */
   linkedEmployeeFullName?: string | null;
   /** relocation_cases / draft relocationBasics: fallback when movePlan empty */

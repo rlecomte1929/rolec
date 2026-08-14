@@ -4,8 +4,8 @@
  * Copy ported verbatim from docs/test-drive-copy.md (brand voice: no "journey").
  * Corridor model from docs/beta-test-campaign-spec.md §2 — canonical underscore ids
  * (matches backend corridor_registry.normalize_corridor_id + test_sessions.corridor_id).
- * One page serves all five corridors via the `?corridor=` token; the Tier-B
- * early-coverage note renders only for the three Tier-B ids.
+ * One page serves all six corridors via the `?corridor=` token; the Tier-B
+ * early-coverage note renders only for the four Tier-B ids.
  */
 
 export type CorridorTier = 'A' | 'B';
@@ -24,6 +24,7 @@ export const TEST_DRIVE_CORRIDORS: Record<string, CorridorMeta> = {
   GB_US: { origin: 'London', destination: 'New York', tier: 'B' },
   NL_SG: { origin: 'Amsterdam', destination: 'Singapore', tier: 'B' },
   ES_AE: { origin: 'Madrid', destination: 'Dubai', tier: 'B' },
+  ES_IE: { origin: 'Madrid', destination: 'Dublin', tier: 'B' },
 };
 
 export const DEFAULT_CORRIDOR_ID = 'FR_NO';
@@ -80,6 +81,27 @@ export const testDriveContent = {
     // so this states the fact instead of asking the tester to set a route they have no
     // field for. Plain text.
     corridorInstruction: 'Your route is already set: {origin} → {destination}.',
+  },
+
+  // Payment step: reaching the employee roadmap goes through a one-time unlock. During the
+  // beta this is Stripe TEST mode — no real charge — so give testers the EXACT card values
+  // to type, with nothing left to guess. (The paywall screen repeats these in-context.)
+  paymentTest: {
+    header: 'Unlocking the roadmap (test payment)',
+    intro:
+      "When the employee reaches the roadmap there's a one-time €800 unlock. It runs in Stripe test mode — no real card is charged and no money moves. On the Stripe page, enter these exact details (any name and email are fine):",
+    card: [
+      { label: 'Card number', value: '4242 4242 4242 4242' },
+      { label: 'Expiry (MM / YY)', value: '12 / 34' },
+      { label: 'CVC', value: '123' },
+      { label: 'Postal code', value: '12345' },
+    ],
+    note: 'A real card would be declined here — only this test card works, and nothing is charged.',
+    // Compact restatement shown in the credentials block, so the card is right where the
+    // tester grabs their logins (they'll need it at the employee roadmap step).
+    reminderHeader: 'Test card for the roadmap unlock',
+    reminderIntro:
+      "When the employee reaches the roadmap there's a one-time €800 unlock in Stripe test mode. Use this card — nothing is charged:",
   },
 
   aboutData: {

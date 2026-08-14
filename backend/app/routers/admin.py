@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, List, Optional
 from datetime import datetime, timedelta
 import os
 import uuid
@@ -137,6 +137,101 @@ def get_country(country_code: str, user: dict = Depends(require_admin)):
             ) for source in sources],
             requirementGroups=[{"pillar": pillar, "items": items} for pillar, items in groups.items()],
         )
+
+
+_REVIEW_STATUSES = {"approved", "rejected"}
+
+
+def _review_dto(item: Any) -> schemas.AdminRequirementReviewDTO:
+    def _arr(raw: Optional[str]) -> Optional[List[str]]:
+        if not raw:
+            return None
+        try:
+            return json.loads(raw)
+        except (TypeError, ValueError):
+            return None
+
+    return schemas.AdminRequirementReviewDTO(
+        id=item.id,
+        purpose=item.purpose,
+        pillar=item.pillar,
+        title=item.title,
+        description=item.description,
+        severity=item.severity,
+        owner=item.owner,
+        verificationStatus=getattr(item, "verification_status", None),
+        reviewStatus=getattr(item, "review_status", "approved"),
+        reviewedBy=getattr(item, "reviewed_by", None),
+        reviewedAt=getattr(item, "reviewed_at", None),
+        appliesToNationalityClasses=_arr(getattr(item, "applies_to_nationality_classes_json", None)),
+        appliesToAssignmentTypes=_arr(getattr(item, "applies_to_assignment_types_json", None)),
+        citations=_arr(getattr(item, "citations_json", None)) or [],
+        lastVerifiedAt=getattr(item, "last_verified_at", None),
+    )
+
+
+@router.get("/countries/{country_code}/requirements", response_model=schemas.AdminRequirementListDTO)
+def list_country_requirements(country_code: str, user: dict = Depends(require_admin)):
+    """Every requirement for a country, INCLUDING the unapproved ones.
+
+    The only read path that passes `include_unapproved=True` — an admin cannot approve content
+    the serving filter has already hidden from him. Pending rows sort first: they are the work.
+    """
+    code = country_code.strip().upper()
+    with SessionLocal() as db:
+        items = crud.list_requirements(db, code, include_unapproved=True)
+        dtos = [_review_dto(i) for i in items]
+    order = {"pending": 0, "rejected": 1, "approved": 2}
+    dtos.sort(key=lambda d: (order.get(d.reviewStatus, 9), d.purpose, d.title))
+    return schemas.AdminRequirementListDTO(
+        countryCode=code,
+        pendingCount=sum(1 for d in dtos if d.reviewStatus == "pending"),
+        items=dtos,
+    )
+
+
+@router.post(
+    "/countries/{country_code}/requirements/{requirement_id}/review",
+    response_model=schemas.AdminRequirementReviewDTO,
+)
+def review_country_requirement(
+    country_code: str,
+    requirement_id: str,
+    body: schemas.AdminRequirementReviewRequest,
+    user: dict = Depends(require_admin),
+):
+    """Publish or withhold one requirement. This is the decision the gate exists for.
+
+    Approving is what makes content readable by employees and by the public corridor endpoint;
+    until then `crud.list_requirements` filters it out. Stamped and audited, because "who
+    published this immigration fact, and when" is the question that matters after the fact.
+    """
+    status = (body.status or "").strip().lower()
+    if status not in _REVIEW_STATUSES:
+        raise HTTPException(status_code=422, detail=f"status must be one of {sorted(_REVIEW_STATUSES)}")
+
+    actor = user.get("id") or user.get("sub") or user.get("email")
+    with SessionLocal() as db:
+        item = db.get(models.RequirementItem, requirement_id)
+        if item is None or (item.country_code or "").upper() != country_code.strip().upper():
+            raise HTTPException(status_code=404, detail="Requirement not found for this country")
+        before = item.review_status
+        item.review_status = status
+        item.reviewed_by = str(actor) if actor else None
+        item.reviewed_at = datetime.utcnow()
+        db.commit()
+        db.refresh(item)
+        dto = _review_dto(item)
+
+    _audit_postgres(
+        entity_type="requirement_item",
+        entity_id=requirement_id,
+        action_type=ACTION_UPDATE,
+        actor_id=actor,
+        old_value={"review_status": before},
+        new_value={"review_status": status, "title": dto.title, "country": dto.id},
+    )
+    return dto
 
 
 @router.post("/countries/{country_code}/research/rerun")

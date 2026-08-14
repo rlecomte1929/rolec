@@ -142,8 +142,11 @@ from .app.routers import cases_admin as cases_admin_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import case_forms_adhoc as case_forms_adhoc_router  # [P4-3]
 from .app.routers import ai_decisions as ai_decisions_router  # [AI-002] EU AI Act Art. 14 human oversight log
+from .app.routers import payment as payment_router  # Stripe roadmap paywall (TEST MODE) — POST /api/payment/checkout
+from .app.routers import stripe_webhook as stripe_webhook_router  # Stripe webhook Path A — POST /api/stripe/webhook
 from .app.routers import auth_page_config as auth_page_config_router  # GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 from .app.routers import requirement_facts as requirement_facts_router  # [AIQ-1091] P4-02 requirement-facts extract
+from .app.routers import admin_content_review as admin_content_review_router  # [AIQ-1821] content review queue
 from .app.routers import nlg as nlg_router  # [Parker-J] dual-layer registration (PR #207 §9)
 from .app.routers import predictions as predictions_router  # [Parker-A] dual-layer registration (PR #207 §9)
 from .app.routers import test_drive as test_drive_router  # [AIQ-1420] TD-2 — dual-layer registration per CLAUDE.md
@@ -225,7 +228,6 @@ from .app.routers import provider_ratings as provider_ratings_router
 from .app.routers import hr_vendor_performance as hr_vendor_performance_router
 from .app.routers import employee_steps as employee_steps_router
 from .app.routers import hr_vendors as hr_vendors_router
-from .app.routers import hr_rfq as hr_rfq_router
 from .app.routers import immigration_intake_consent as immigration_intake_consent_router
 from .app.routers import immigration_intake_profile as immigration_intake_profile_router
 from .app.routers import immigration_intake_interview as immigration_intake_interview_router
@@ -247,6 +249,7 @@ from .app.routers import relocation_profile as relocation_profile_router
 from .app.routers import rules as rules_router
 from .app.routers import marketplace as marketplace_router
 from .app.routers import hr_analytics as hr_analytics_router
+from .app.routers import hr_case_summary as hr_case_summary_router  # AIQ-1697 — AI case summary proxy (dual-layer per CLAUDE.md)
 from .app.routers import hr_onboarding as hr_onboarding_router  # AIQ-1223c — onboarding inference (dual-layer per CLAUDE.md)
 from .app.routers import setup_assistant as setup_assistant_router  # Setup & Help Assistant — read-only setup-status (dual-layer per CLAUDE.md)
 from .app.routers import hr_export as hr_export_router
@@ -482,6 +485,14 @@ def _run_runtime_startup_initialization() -> None:
 async def lifespan(app: FastAPI):
     from .app.posthog_client import init_posthog, shutdown_posthog
     init_posthog()
+    # [AIQ-1780] Install the vendor completers the relopass LLM router dispatches
+    # to. Without this every LLM-based extraction agent runs against an empty
+    # payload and emits zero fields, silently — the router raises LLMRoutingError
+    # for an unregistered model and call_llm_with_retry degrades to empty. Cheap,
+    # idempotent, no network, so it needs no startup-timeout wrapper. Registered
+    # per process, which is what --workers 4 requires.
+    from .app.services.llm_router_clients import install_router_completers
+    install_router_completers()
     await asyncio.to_thread(_run_runtime_startup_initialization)
     if not DISABLE_STARTUP_SEED:
         asyncio.create_task(_background_seed_task())
@@ -564,6 +575,9 @@ _RATE_LIMIT_EXEMPT_ENDPOINTS = (
     # Service-role / external-webhook routes live in the support router:
     "backend.app.routers.support.inbound_email_webhook",  # POST /webhooks/support-email (Postmark)
     "backend.app.routers.support.triage_ticket",          # POST /api/support/triage (Supabase trigger)
+    # Stripe webhook (Path A): Stripe bursts + retries must never be throttled, or a
+    # 429 becomes a dropped payment event. It verifies its own signature (spec §4).
+    "backend.app.routers.stripe_webhook.stripe_webhook",  # POST /api/stripe/webhook
 )
 for _exempt_name in _RATE_LIMIT_EXEMPT_ENDPOINTS:
     limiter._exempt_routes.add(_exempt_name)
@@ -820,8 +834,11 @@ app.include_router(cases_admin_router.router)  # [AUDIT-B9-cases-6] split 3/3 �
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(case_forms_adhoc_router.router)  # [P4-3] ad-hoc "Add document"
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
+app.include_router(payment_router.router)  # Stripe roadmap paywall (TEST MODE) — POST /api/payment/checkout
+app.include_router(stripe_webhook_router.router)  # Stripe webhook Path A — POST /api/stripe/webhook
 app.include_router(auth_page_config_router.router)  # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 app.include_router(requirement_facts_router.router)  # [AIQ-1091] P4-02 — POST /api/admin/requirement-facts/extract
+app.include_router(admin_content_review_router.router)  # [AIQ-1821] /api/admin/content-review
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
 app.include_router(rag_roadmap_router.router)  # [P1-01d] /api/internal/rag/generate-roadmap (dual-layer registration)
 app.include_router(compliance_router.router)  # [BL-Compliance.4] /api/compliance (dual-layer registration)
@@ -879,7 +896,6 @@ app.include_router(provider_ratings_router.router)  # CATALOG-3 employee provide
 app.include_router(hr_vendor_performance_router.router)  # NAV-SP-2 HR vendor performance dashboard
 app.include_router(employee_steps_router.router)  # [B11/AIQ-421] /api/employee/steps/4
 app.include_router(hr_vendors_router.router)
-app.include_router(hr_rfq_router.router)
 app.include_router(immigration_intake_consent_router.router)  # [AUDIT-B9-imm-6] 1/5 — consent + immigration-requirements (3 handlers)
 app.include_router(immigration_intake_profile_router.router)  # [AUDIT-B9-imm-6] 2/5 — HR/employee profile + OCR passport (5 handlers)
 app.include_router(immigration_intake_interview_router.router)  # [AUDIT-B9-imm-6] 3/5 — interview next/answer (2 handlers)
@@ -1838,54 +1854,12 @@ def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = No
     return target
 
 
-def _normalize_destination_country(value: Optional[str]) -> Optional[str]:
-    if not value:
-        return None
-    normalized = value.strip().upper()
-    if normalized in ("SG", "SINGAPORE"):
-        return "SG"
-    if normalized in ("US", "USA", "UNITED STATES", "NEW YORK", "NEW YORK CITY", "NYC"):
-        return "US"
-    if normalized in ("GB", "UK", "UNITED KINGDOM", "LONDON", "ENGLAND"):
-        return "GB"
-    if normalized in ("FR", "FRANCE", "PARIS"):
-        return "FR"
-    if normalized in ("DE", "GERMANY", "DEUTSCHLAND", "BERLIN", "MUNICH", "MÜNCHEN"):
-        return "DE"
-    if normalized in ("NO", "NORWAY", "NORGE", "OSLO"):
-        return "NO"
-    if normalized in ("BR", "BRAZIL", "BRASIL", "RIO DE JANEIRO", "RIO", "SÃO PAULO", "SAO PAULO"):
-        return "BR"
-    if normalized in ("IT", "ITALY", "ITALIA", "ROME", "ROMA", "MILAN", "MILANO"):
-        return "IT"
-    if normalized in ("ES", "SPAIN", "ESPAÑA", "ESPANA", "MADRID", "BARCELONA"):
-        return "ES"
-    if normalized in ("AU", "AUSTRALIA", "SYDNEY", "MELBOURNE", "BRISBANE", "PERTH",
-                      "ADELAIDE", "CANBERRA", "GOLD COAST", "NEWCASTLE", "SUNSHINE COAST", "WOLLONGONG"):
-        return "AU"
-    if normalized in ("CA", "CANADA", "TORONTO", "VANCOUVER", "MONTREAL", "CALGARY",
-                      "EDMONTON", "OTTAWA", "WINNIPEG", "HAMILTON", "KITCHENER", "QUEBEC CITY"):
-        return "CA"
-    if normalized in ("CH", "SWITZERLAND", "SCHWEIZ", "SUISSE", "ZURICH", "ZÜRICH",
-                      "GENEVA", "GENÈVE", "GENEVE", "BERN", "BERNE", "BASEL", "BIEL",
-                      "LAUSANNE", "LUCERNE", "LUGANO", "ST. GALLEN", "ST GALLEN", "WINTERTHUR"):
-        return "CH"
-    if normalized in ("HK", "HONG KONG", "KOWLOON", "NEW TERRITORIES"):
-        return "HK"
-    if normalized in ("JP", "JAPAN", "TOKYO", "OSAKA", "FUKUOKA", "NAGOYA", "SAPPORO",
-                      "KAWASAKI", "KOBE", "KYOTO", "SAITAMA", "YOKOHAMA"):
-        return "JP"
-    if normalized in ("NL", "NETHERLANDS", "NEDERLAND", "AMSTERDAM", "ROTTERDAM",
-                      "THE HAGUE", "DEN HAAG", "UTRECHT", "EINDHOVEN", "GRONINGEN",
-                      "ALMERE", "BREDA", "NIJMEGEN", "TILBURG"):
-        return "NL"
-    if normalized in ("AE", "UAE", "UNITED ARAB EMIRATES", "DUBAI", "ABU DHABI",
-                      "SHARJAH", "AJMAN", "FUJAIRAH", "RAS AL KHAIMAH", "UMM AL QUWAIN"):
-        return "AE"
-    if normalized in ("ZA", "SOUTH AFRICA", "JOHANNESBURG", "CAPE TOWN", "DURBAN",
-                      "PRETORIA", "BLOEMFONTEIN", "PORT ELIZABETH", "EAST LONDON", "PIETERMARITZBURG"):
-        return "ZA"
-    return None
+# [AIQ-1821] Moved to backend/app/services/destination_normalizer.py so services can use it
+# without importing this module. Re-exported under the original private name for the
+# existing call sites in this file.
+from .app.services.destination_normalizer import (  # noqa: E402
+    normalize_destination_country as _normalize_destination_country,
+)
 
 
 def _build_profile_snapshot(draft: Dict[str, Any]) -> Dict[str, Any]:
@@ -3965,6 +3939,46 @@ def get_dashboard(request: Request, user: Dict[str, Any] = Depends(get_current_u
     )
 
 
+def _enrich_case_identities(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Fill in who each case is about, for rows read from relocation_cases.
+
+    [AIQ-1803] That table's employee_id is null for all but 4 of 1,091 production rows,
+    so the HR list rendered a wall of anonymous cases. Resolution goes through
+    case_assignments — see Database.resolve_case_identities for why that is the right
+    source and public.cases is not.
+
+    ONE query for the whole page, not one per row. Only missing fields are filled, so a
+    row that was already correct is untouched, and a case whose identity cannot be
+    determined is left exactly as it was rather than given an invented name.
+    """
+    if not items:
+        return items
+    ids = [str(i.get("id")) for i in items if i.get("id")]
+    try:
+        resolved = db.resolve_case_identities(ids)
+    except Exception:
+        log.exception("list_cases: identity resolution failed")
+        return items
+    if not isinstance(resolved, dict):
+        # Never let this step break the page. Enrichment is additive by definition, so
+        # anything unexpected back from the resolver means "no enrichment", not "error".
+        return items
+    for item in items:
+        found = resolved.get(str(item.get("id") or ""))
+        if not isinstance(found, dict):
+            continue
+        if not item.get("employee_id") and found.get("employee_user_id"):
+            item["employee_id"] = found["employee_user_id"]
+        if found.get("employee_display_name"):
+            item.setdefault("employee_name", found["employee_display_name"])
+        if found.get("employee_email"):
+            item.setdefault("employee_email", found["employee_email"])
+        for key in ("origin_country_code", "dest_country_code"):
+            if not item.get(key) and found.get(key):
+                item[key] = found[key]
+    return items
+
+
 @app.get("/api/hr/cases")
 def list_cases(
     status: Optional[str] = Query(None),
@@ -3981,7 +3995,7 @@ def list_cases(
         company_id=None if is_admin else company_id,
         status=status,
     )
-    return {"cases": items}
+    return {"cases": _enrich_case_identities(items)}
 
 
 @app.post("/api/hr/cases", response_model=CreateCaseResponse)
@@ -4641,6 +4655,56 @@ def get_case(
     return case
 
 
+def _create_assignment_for_hr(
+    *,
+    case_id: str,
+    hr_company_id: str,
+    effective: Dict[str, Any],
+    employee_identifier_raw: str,
+    employee_first_name: Optional[str],
+    employee_last_name: Optional[str],
+    employee_user: Optional[Dict[str, Any]],
+    request_id: Optional[str],
+):
+    """Mint a new assignment for assign_case. Extracted verbatim (AIQ-1731) so the
+    endpoint can take a reuse-or-create shape without nesting creation inside a branch.
+
+    NOTE the 503 below is a *timeout*, not a rollback: the future is not cancelled and
+    the row still commits. Callers MUST consult
+    db.get_active_assignment_for_case_employee first, or the retry the copy asks for
+    creates a second assignment with a duplicate canonical_case_id.
+    """
+    try:
+        with timed("unified_assignment_creation", request_id):
+            _create_fut = _hr_assign_side_effects_executor.submit(
+                create_assignment_with_contact_and_invites,
+                db,
+                company_id=hr_company_id,
+                hr_user_id=effective["id"],
+                case_id=case_id,
+                employee_identifier_raw=employee_identifier_raw,
+                employee_first_name=employee_first_name,
+                employee_last_name=employee_last_name,
+                employee_user_id=employee_user["id"] if employee_user else None,
+                assignment_status=AssignmentStatus.ASSIGNED.value,
+                request_id=request_id,
+                observability_channel="hr",
+                defer_post_creation_hooks=True,
+            )
+            try:
+                # S5-fix: 8s matches the frontend axios timeout (12s) minus round-trip
+                # overhead, and is below the E2E test FAIL threshold (8s).
+                # The previous 20s value far exceeded both client caps, causing hung UX.
+                return _create_fut.result(timeout=8)
+            except concurrent.futures.TimeoutError:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Assignment creation timed out. Please retry in a moment.",
+                )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve)) from ve
+
+
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
 def assign_case(
     case_id: str,
@@ -4724,6 +4788,36 @@ def assign_case(
             td_route = resolve_test_drive_route(effective)
             if td_route:
                 db.set_relocation_case_route(case_id, **td_route)
+                # [AIQ-1651] set_relocation_case_route writes relocation_cases; but the
+                # recommendations engine (POST /api/recommendations/batch -> app_crud.get_case)
+                # reads the wizard_cases row (same id, different table), which has no destination
+                # until intake is submitted. Without a dest, CITY-SCOPED recs (housing/schools)
+                # return "unavailable" for the whole test-drive cohort. Stamp the corridor dest onto
+                # wizard_cases here (create-on-missing, mirroring cases_write.patch_case) so testers
+                # see the full marketplace without completing intake. Test-drive-only (td_route is
+                # None for real HR); preserves any existing purpose/target_move_date.
+                _basics = {
+                    "originCountry": td_route["home_country"],
+                    "originCity": td_route["home_city"],
+                    "destCountry": td_route["host_country"],
+                    "destCity": td_route["host_city"],
+                }
+                with SessionLocal() as _s:
+                    _wc = app_crud.get_case(_s, case_id)
+                    if not _wc:
+                        _wc = app_crud.create_case(_s, case_id, {"relocationBasics": _basics})
+                    _draft = json.loads(_wc.draft_json or "{}")
+                    _draft.setdefault("relocationBasics", {}).update(_basics)
+                    _derived = {
+                        "origin_country": td_route["home_country"],
+                        "origin_city": td_route["home_city"],
+                        "dest_country": td_route["host_country"],
+                        "dest_city": td_route["host_city"],
+                        "purpose": _wc.purpose,
+                        "target_move_date": _wc.target_move_date,
+                    }
+                    _flags = json.loads(_wc.flags_json or "{}")
+                    app_crud.update_case(_s, _wc, _draft, _derived, _flags)
                 log.info(
                     "assign_case: test-drive corridor locked case=%s route=%s->%s",
                     case_id, td_route["home_country"], td_route["host_country"],
@@ -4782,38 +4876,59 @@ def assign_case(
 
         # New assignments created by HR are immediately in the 'assigned' state.
         assert_canonical_status(AssignmentStatus.ASSIGNED.value)
+
+        # AIQ-1731: idempotency guard on (case, employee). Creation is dispatched to a
+        # thread pool and abandoned after 8s with a 503 that tells the user to "retry in
+        # a moment" — but the future is never cancelled, so the row still commits.
+        # Without this guard that retry mints a SECOND assignment carrying an identical
+        # canonical_case_id (the `7181b3a4…` group in
+        # docs/architecture/CASE_ID_UNIFICATION_AUDIT.md). Reuse the row instead, then
+        # fall through to the normal side-effect dispatch — the timed-out call raised
+        # before dispatching, so the retry is what actually completes the assignment.
+        # Fail-open: the guard must never be the reason an assignment can't be created.
+        _existing_assignment = None
         try:
-            with timed("unified_assignment_creation", request_id):
-                _create_fut = _hr_assign_side_effects_executor.submit(
-                    create_assignment_with_contact_and_invites,
-                    db,
-                    company_id=hr_company_id,
-                    hr_user_id=effective["id"],
-                    case_id=case_id,
-                    employee_identifier_raw=employee_identifier_raw,
-                    employee_first_name=employee_first_name,
-                    employee_last_name=employee_last_name,
-                    employee_user_id=employee_user["id"] if employee_user else None,
-                    assignment_status=AssignmentStatus.ASSIGNED.value,
-                    request_id=request_id,
-                    observability_channel="hr",
-                    defer_post_creation_hooks=True,
-                )
-                try:
-                    # S5-fix: 8s matches the frontend axios timeout (12s) minus round-trip
-                    # overhead, and is below the E2E test FAIL threshold (8s).
-                    # The previous 20s value far exceeded both client caps, causing hung UX.
-                    uar = _create_fut.result(timeout=8)
-                except concurrent.futures.TimeoutError:
-                    raise HTTPException(
-                        status_code=503,
-                        detail="Assignment creation timed out. Please retry in a moment.",
-                    )
-        except ValueError as ve:
-            raise HTTPException(status_code=400, detail=str(ve)) from ve
-        assignment_id = uar.assignment_id
-        invite_token = uar.invite_token
-        stored_identifier = uar.stored_identifier
+            _existing_assignment = db.get_active_assignment_for_case_employee(
+                case_id, employee_identifier_raw, request_id=request_id
+            )
+        except Exception:
+            log.warning(
+                "assign_case: idempotency lookup failed case=%s — proceeding with create",
+                case_id,
+                exc_info=True,
+            )
+
+        if _existing_assignment:
+            assignment_id = str(_existing_assignment.get("id"))
+            stored_identifier = (
+                _existing_assignment.get("employee_identifier")
+                or employee_identifier_raw.strip().lower()
+            )
+            try:
+                invite_token = db.get_pending_claim_invite_token_for_assignment(assignment_id)
+            except Exception:
+                invite_token = None
+            log.info(
+                "assign_case: reusing existing assignment=%s for case=%s (duplicate submit); "
+                "no new row created request_id=%s",
+                assignment_id,
+                case_id,
+                request_id,
+            )
+        else:
+            uar = _create_assignment_for_hr(
+                case_id=case_id,
+                hr_company_id=hr_company_id,
+                effective=effective,
+                employee_identifier_raw=employee_identifier_raw,
+                employee_first_name=employee_first_name,
+                employee_last_name=employee_last_name,
+                employee_user=employee_user,
+                request_id=request_id,
+            )
+            assignment_id = uar.assignment_id
+            invite_token = uar.invite_token
+            stored_identifier = uar.stored_identifier
 
         # Defer mobility/case-person/passport sync, case participant, case
         # event, the invitation-message draft, and (B3-perf) the employee
@@ -7433,6 +7548,21 @@ def get_hr_assignment(
                     e,
                 )
 
+        # [AIQ-1648] Resolve the HR OWNER of the case (not the employee) for the
+        # Package & limits "HR owner" chip. case_assignments.hr_user_id → users.email.
+        hr_owner_email = None
+        hr_uid = assignment.get("hr_user_id")
+        if hr_uid:
+            try:
+                urec = db.get_user_by_id(str(hr_uid))
+                if urec:
+                    hr_owner_email = urec.get("email")
+            except Exception as e:
+                log.warning(
+                    "request_id=%s assignment_id=%s hr owner lookup failed: %s",
+                    req_id, assignment_id, e,
+                )
+
         readiness_snap: Optional[Dict[str, Any]] = None
         try:
             readiness_snap = db.get_hr_readiness_summary(aid)
@@ -7493,6 +7623,7 @@ def get_hr_assignment(
             employeeFirstName=assignment.get("employee_first_name"),
             employeeLastName=assignment.get("employee_last_name"),
             employeeEmail=linked_email,
+            hrOwnerEmail=hr_owner_email,
             linkedEmployeeFullName=linked_full_name,
             caseOriginHint=case_origin_hint,
             caseDestinationHint=case_dest_hint,
@@ -8119,8 +8250,28 @@ def get_country_resources(
                 draft = {}
 
     profile = build_profile_context(draft)
+
+    # AIQ-1831: the wizard draft is only one of the places the route lives, and for a
+    # case bridged straight to relocation_cases it is empty — which rendered a resource
+    # pack with destination_country="" and, via the "NO" fallback below, silently served
+    # NORWAY content for a Dublin move. Overlay the authoritative route (same resolver
+    # the immigration surface uses) instead of writing back to the draft.
+    if not profile.get("destination_country") or not profile.get("destination_city"):
+        try:
+            from .app.services.immigration_service import _get_case_details
+
+            route = _get_case_details(assignment_id, "") or {}
+        except Exception:  # noqa: BLE001 - resources must degrade, never 500
+            route = {}
+        if not profile.get("destination_country") and route.get("dest_country"):
+            profile["destination_country"] = route["dest_country"]
+            profile["country_code"] = str(route["dest_country"]).upper()
+        if not profile.get("destination_city") and route.get("dest_city"):
+            profile["destination_city"] = route["dest_city"]
+
     hints = get_personalization_hints(profile)
-    country_code = (profile.get("country_code") or "NO").upper()
+    # No destination resolves to no country — an empty pack is honest, Norway is not.
+    country_code = (profile.get("country_code") or "").upper()
     city = (profile.get("destination_city") or "").strip()
 
     filter_dict = {}
@@ -8806,6 +8957,58 @@ def get_assignment_services(
     }
 
 
+def _services_case_context(case_id: str) -> "tuple[Dict[str, Any], Optional[str]]":
+    """Build the Services case_context (dest/origin city+country) + target start date.
+
+    AIQ-1649: destination/origin were derived ONLY from the intake wizard draft
+    (case.draft_json) + public.cases columns, so a case with no intake yet returned
+    an EMPTY context — which the Services Preferences step misreads as 'Destination
+    city/country is missing' and blocks the entire RFQ flow. Fall back to the
+    relocation_cases row (host_*=destination, home_*=origin — the same mapping used
+    at cases_write.py:179-182) so any case that already carries a destination resolves
+    without requiring intake. Precedence: wizard basics.* -> public.cases.* ->
+    relocation_cases.* (new fallback, last).
+    """
+    draft: Dict[str, Any] = {}
+    dest_city = dest_country = origin_city = origin_country = None
+    target_move_date = None
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if case:
+            try:
+                draft = json.loads(case.draft_json or "{}")
+            except Exception:
+                draft = {}
+            dest_city = getattr(case, "dest_city", None)
+            dest_country = getattr(case, "dest_country", None)
+            origin_city = getattr(case, "origin_city", None)
+            origin_country = getattr(case, "origin_country", None)
+            target_move_date = getattr(case, "target_move_date", None)
+    basics = draft.get("relocationBasics") or {}
+    ctx: Dict[str, Any] = {
+        "destCity": basics.get("destCity") or dest_city,
+        "destCountry": basics.get("destCountry") or dest_country,
+        "originCity": basics.get("originCity") or origin_city,
+        "originCountry": origin_country or basics.get("originCountry"),
+    }
+    # AIQ-1649: fill anything still missing from the relocation_cases row, so a case
+    # whose destination lives there (no intake yet) does not falsely read as missing.
+    if not all((ctx["destCity"], ctx["destCountry"], ctx["originCity"], ctx["originCountry"])):
+        try:
+            case_row = db.get_case_by_id(case_id)
+        except Exception:
+            case_row = None
+        if case_row:
+            ctx["destCity"] = ctx["destCity"] or case_row.get("host_city")
+            ctx["destCountry"] = ctx["destCountry"] or case_row.get("host_country")
+            ctx["originCity"] = ctx["originCity"] or case_row.get("home_city")
+            ctx["originCountry"] = ctx["originCountry"] or case_row.get("home_country")
+    # AIQ-1249d: canonical move date for the services banner — structured column first,
+    # then the wizard draft.
+    target_start_date = str(target_move_date) if target_move_date else (basics.get("targetMoveDate") or None)
+    return ctx, target_start_date
+
+
 @app.get("/api/services/context")
 def get_services_context(
     assignment_id: Optional[str] = Query(None, description="Assignment id (gate for access)"),
@@ -8836,34 +9039,10 @@ def get_services_context(
         valid = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
         selected_keys = [k for k in fallback if k in valid]
 
-    draft = {}
-    dest_city = dest_country = origin_city = origin_country = None
-    target_move_date = None
-    with SessionLocal() as session:
-        case = app_crud.get_case(session, case_id)
-        if case:
-            try:
-                draft = json.loads(case.draft_json or "{}")
-            except Exception:
-                draft = {}
-            dest_city = getattr(case, "dest_city", None)
-            dest_country = getattr(case, "dest_country", None)
-            origin_city = getattr(case, "origin_city", None)
-            origin_country = getattr(case, "origin_country", None)
-            target_move_date = getattr(case, "target_move_date", None)
-    basics = draft.get("relocationBasics") or {}
-    case_context = {
-        "destCity": basics.get("destCity") or dest_city,
-        "destCountry": basics.get("destCountry") or dest_country,
-        "originCity": basics.get("originCity") or origin_city,
-        "originCountry": origin_country or basics.get("originCountry"),
-    }
-    # AIQ-1249d: canonical move date for the services context banner. Prefer the
-    # structured case column (public.cases.target_move_date), fall back to the
-    # wizard draft.
-    target_start_date = (
-        str(target_move_date) if target_move_date else (basics.get("targetMoveDate") or None)
-    )
+    # AIQ-1649: case context (dest/origin) + target date via the shared helper, which
+    # falls back to the relocation_cases row so a case that carries a destination but
+    # has no intake yet is not misread as 'Destination city/country is missing'.
+    case_context, target_start_date = _services_case_context(case_id)
 
     saved_rows = db.list_case_service_answers(case_id)
     saved_flat: Dict[str, Any] = {}
@@ -8995,30 +9174,8 @@ def get_service_questions(
     if not selected_keys:
         return {"questions": [], "selected_services": []}
 
-    # Case context (draft + top-level) via app_crud
-    with SessionLocal() as session:
-        case = app_crud.get_case(session, case_id)
-    draft = {}
-    dest_city = None
-    dest_country = None
-    origin_city = None
-    origin_country = None
-    if case:
-        try:
-            draft = json.loads(case.draft_json or "{}")
-        except Exception:
-            draft = {}
-        dest_city = getattr(case, "dest_city", None)
-        dest_country = getattr(case, "dest_country", None)
-        origin_city = getattr(case, "origin_city", None)
-        origin_country = getattr(case, "origin_country", None)
-    basics = draft.get("relocationBasics") or {}
-    case_context = {
-        "destCity": basics.get("destCity") or dest_city,
-        "destCountry": basics.get("destCountry") or dest_country,
-        "originCity": basics.get("originCity") or origin_city,
-        "originCountry": origin_country or basics.get("originCountry"),
-    }
+    # AIQ-1649: case context via the shared helper (public.cases + relocation_cases fallback).
+    case_context, _ = _services_case_context(case_id)
 
     # Saved answers (flatten service_key -> answers into one dict)
     saved_rows = db.list_case_service_answers(case_id)
@@ -9243,31 +9400,40 @@ def create_rfq(
     # picks the suppliers (from HR's approved list) and reaches them directly; HR stays the payer
     # who validates the winning quote at the end.
     #
-    # Flag-gated OFF by default. Emailing a real company that has never heard of us must be a
-    # decision, never a side-effect of someone clicking a button in a dev environment.
+    # Dispatch runs in INBOX mode by default: it mints a magic link per recipient and surfaces it
+    # in the in-app inbox (a quote_messages row on the RFQ's thread), sending NO email. Inbox mode
+    # is safe to always run — nothing leaves the building — so the loop is live from the inbox
+    # without touching the Resend quota. Going live on email is a single config flip: set
+    # SUPPLIER_RFQ_EMAIL_ENABLED, which selects "email" mode (the address/verified/test-persona
+    # guards + Resend). Emailing a company that has never heard of us stays a deliberate decision.
     contacted: List[str] = []
     not_contacted: List[Dict[str, str]] = []
     try:
         from .app.services.feature_flags import resolve_flag_safe
+        from .app.services.supplier_link_dispatch import (
+            dispatch_supplier_links,
+            resolve_rfq_targets,
+        )
 
-        if resolve_flag_safe("SUPPLIER_RFQ_DISPATCH_ENABLED", env_default=False):
-            from .app.services.supplier_link_dispatch import (
-                dispatch_supplier_links,
-                resolve_rfq_targets,
-            )
-
-            targets = resolve_rfq_targets(str(result.get("id")))
-            for r in dispatch_supplier_links(
-                rfq_id=str(result.get("id")),
-                targets=targets,
-                send_email=True,
-                request_id=req_id,
-            ):
-                name = r.get("supplier_name") or r.get("recipient_id") or "A supplier"
-                if r.get("sent"):
-                    contacted.append(name)
-                else:
-                    not_contacted.append({"supplier": name, "reason": r.get("error") or "not sent"})
+        email_mode = resolve_flag_safe("SUPPLIER_RFQ_EMAIL_ENABLED", env_default=False)
+        mode = "email" if email_mode else "inbox"
+        targets = resolve_rfq_targets(str(result.get("id")))
+        for r in dispatch_supplier_links(
+            rfq_id=str(result.get("id")),
+            targets=targets,
+            dispatch_mode=mode,
+            send_email=email_mode,
+            actor_email=user.get("email"),
+            request_id=req_id,
+        ):
+            name = r.get("supplier_name") or r.get("recipient_id") or "A supplier"
+            if r.get("sent"):
+                # An email actually reached this supplier (email mode only).
+                contacted.append(name)
+            elif not r.get("ok"):
+                # A genuine failure — no address in email mode, or a mint error. Report it.
+                not_contacted.append({"supplier": name, "reason": r.get("error") or "not sent"})
+            # else: inbox-queued (ok, not emailed) — reached via the in-app inbox, neither list.
     except Exception:
         # The RFQ exists and is valid. A dispatch failure must never turn that into a 500 — the
         # employee would retry and create a duplicate. Report it instead.
@@ -15469,6 +15635,7 @@ app.include_router(rules_router.router)
 app.include_router(marketplace_router.router)  # [AUDIT-C2.3 restore]
 # GAP 3: HR policy compliance matrix (cross-case heatmap for S5c)
 app.include_router(hr_analytics_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(hr_case_summary_router.router)  # AIQ-1697 — AI case summary proxy
 app.include_router(hr_onboarding_router.router)  # AIQ-1223c — deterministic onboarding inference
 app.include_router(hr_export_router.router)  # W2-4 HR compliance export
 # GAP 4: Immigration advisor matching

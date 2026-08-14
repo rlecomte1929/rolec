@@ -16,6 +16,7 @@ Public API
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import os
 import uuid
@@ -23,7 +24,24 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from fastapi import HTTPException
+
 log = logging.getLogger(__name__)
+
+
+def _jsonb_bind(param: str) -> str:
+    """`CAST(:param AS jsonb)` on Postgres; bare `:param` on SQLite (column is TEXT).
+
+    [AIQ-1800b] Mirrors the helper in immigration_intake_profile. `field_sources` is jsonb
+    and was bound as a raw dict, which psycopg2 cannot adapt — so every write here failed
+    with `ProgrammingError: can't adapt type 'dict'`. `json.dumps()` on the value is the
+    half that fixes it; this cast is the house convention and the SQLite/Postgres split.
+    """
+    try:
+        from ...database import db as _db
+        return f"CAST(:{param} AS jsonb)" if _db.engine.dialect.name == "postgresql" else f":{param}"
+    except Exception:  # engine not configured (unit tests) — bare bind is correct for sqlite
+        return f":{param}"
 
 # ---------------------------------------------------------------------------
 # Result dataclasses
@@ -545,17 +563,12 @@ def save_ocr_to_vault(
         profile_id = row["id"]
         existing_sources: Dict[str, str] = dict(row["field_sources"] or {})
 
-        # Encrypt passport_number via pgcrypto if provided
+        # Encrypt passport_number via pgcrypto if provided. Fails closed —
+        # never writes the plaintext when encryption is unavailable.
         if extraction.passport_number:
-            enc_key = _get_enc_key()
-            if enc_key:
-                with db.engine.begin() as conn:
-                    enc_row = conn.execute(
-                        _text("SELECT pgp_sym_encrypt(:val, :key) AS encrypted"),
-                        {"val": extraction.passport_number, "key": enc_key},
-                    ).mappings().first()
-                if enc_row:
-                    raw_updates["passport_number"] = enc_row["encrypted"]
+            raw_updates["passport_number"] = _encrypt_passport_number(
+                extraction.passport_number
+            )
 
         # Build SET clauses, skipping hr_provided fields
         set_clauses = []
@@ -570,8 +583,8 @@ def save_ocr_to_vault(
         if not set_clauses:
             return profile_id
 
-        params["field_sources"] = existing_sources
-        set_clauses += ["field_sources = :field_sources", "updated_at = :now"]
+        params["field_sources"] = json.dumps(existing_sources)
+        set_clauses += [f"field_sources = {_jsonb_bind('field_sources')}", "updated_at = :now"]
 
         with db.engine.begin() as conn:
             conn.execute(
@@ -587,15 +600,9 @@ def save_ocr_to_vault(
         profile_id = str(uuid.uuid4())
 
         if extraction.passport_number:
-            enc_key = _get_enc_key()
-            if enc_key:
-                with db.engine.begin() as conn:
-                    enc_row = conn.execute(
-                        _text("SELECT pgp_sym_encrypt(:val, :key) AS encrypted"),
-                        {"val": extraction.passport_number, "key": enc_key},
-                    ).mappings().first()
-                if enc_row:
-                    raw_updates["passport_number"] = enc_row["encrypted"]
+            raw_updates["passport_number"] = _encrypt_passport_number(
+                extraction.passport_number
+            )
 
         field_sources = {col: "ocr" for col in raw_updates}
         params = {
@@ -603,7 +610,7 @@ def save_ocr_to_vault(
             "case_id": case_id,
             "employee_id": employee_id,
             "org_id": org_id,
-            "field_sources": field_sources,
+            "field_sources": json.dumps(field_sources),
             "created_at": now,
             "updated_at": now,
             **raw_updates,
@@ -613,7 +620,7 @@ def save_ocr_to_vault(
             conn.execute(
                 _text(
                     f"INSERT INTO public.imm_employee_profiles ({', '.join(cols)}) "
-                    f"VALUES ({', '.join(f':{c}' for c in cols)})"
+                    f"VALUES ({', '.join(_jsonb_bind(c) if c == 'field_sources' else f':{c}' for c in cols)})"
                 ),
                 params,
             )
@@ -624,3 +631,53 @@ def save_ocr_to_vault(
 def _get_enc_key() -> Optional[str]:
     key = os.environ.get("IMMIGRATION_ENCRYPTION_KEY", "")
     return key if key else None
+
+
+def _encrypt_passport_number(value: str) -> Any:
+    """Encrypt a passport number for vault storage, or raise. **Fails closed.**
+
+    [AIQ-1780] Both call sites in ``save_ocr_to_vault`` previously did::
+
+        enc_key = _get_enc_key()
+        if enc_key:                 # unset key -> silently skipped
+            ...encrypt...
+        # raw_updates["passport_number"] keeps the PLAINTEXT and is written
+
+    With ``IMMIGRATION_ENCRYPTION_KEY`` unset — which is the case in production —
+    that wrote a passport number to the database in the clear. It is an Article 9
+    special-category identifier; storing it unencrypted because a config value is
+    missing is the worst possible response to that condition.
+
+    Its sibling on the manual-update path already fails closed
+    (``immigration_intake_profile.update_profile_employee`` raises 500 rather than
+    write). The two paths disagreeing is the actual defect; this makes them agree.
+
+    Raising costs the rest of the OCR result for this request, which is the right
+    trade: the extraction is re-runnable from the same image, whereas a plaintext
+    passport number in the database is not un-leaked. The caller only reaches this
+    when a passport number was actually read, so OCR results without one still save.
+
+    Returns the pgcrypto ciphertext. Never returns, logs, or falls back to plaintext.
+    """
+    from sqlalchemy import text as _text
+
+    from ...database import db
+
+    key = _get_enc_key()
+    if not key:
+        raise HTTPException(
+            status_code=500,
+            detail="Cannot store passport number securely: encryption is not configured.",
+        )
+
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            _text("SELECT pgp_sym_encrypt(:val, :key) AS encrypted"),
+            {"val": value, "key": key},
+        ).mappings().first()
+
+    encrypted = row["encrypted"] if row else None
+    if encrypted is None:
+        # Do NOT fall through to the plaintext value.
+        raise HTTPException(status_code=500, detail="Failed to encrypt sensitive data.")
+    return encrypted

@@ -91,7 +91,7 @@ class SupabaseCanonicalStore:
                 FROM rce.canonical_entities
                 WHERE entity_type = 'PERSON'
                   AND canonical_form->>'case_id' = :cid
-                  AND canonical_form->'passport_doc_numbers' @> to_jsonb(:doc::text)
+                  AND canonical_form->'passport_doc_numbers' @> to_jsonb(CAST(:doc AS text))
                 LIMIT 1
                 """
             ),

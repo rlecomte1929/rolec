@@ -70,6 +70,7 @@ def build_data_export_pdf(
     consent_records: List[Dict[str, Any]],
     access_log: List[Dict[str, Any]],
     generated_at: Optional[datetime] = None,
+    withheld_fields: Optional[List[str]] = None,
 ) -> bytes:
     """Render the Article 15 data-access export as PDF bytes (nothing is persisted)."""
     generated_at = generated_at or datetime.now(timezone.utc)
@@ -107,6 +108,17 @@ def build_data_export_pdf(
         story.append(_kv_table(prof_rows, styles))
     else:
         story.append(Paragraph("No immigration profile on file for this case.", styles["BodyText"]))
+
+    # [AIQ-1802] Name anything we hold but could not return. Silently omitting it would
+    # be indistinguishable, to the subject, from holding no such data — which makes the
+    # response quietly inaccurate rather than merely incomplete.
+    for field in sorted(withheld_fields or []):
+        story.append(Paragraph(
+            f"<b>{field}</b>: withheld — this value is stored encrypted and could not be "
+            "decrypted for this export. It has not been omitted from our records. "
+            "Contact privacy@relopass.com to request it separately.",
+            styles["BodyText"],
+        ))
     story.append(Spacer(1, 6 * mm))
 
     # ── 2. Interview answers ─────────────────────────────────────────────────

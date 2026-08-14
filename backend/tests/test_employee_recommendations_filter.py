@@ -39,6 +39,7 @@ CREATE TABLE service_catalog_items (
     source TEXT NOT NULL DEFAULT 'manual',
     active INTEGER NOT NULL DEFAULT 1,
     external_id TEXT,
+    supplier_id TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by_user_id TEXT,
@@ -315,6 +316,79 @@ class EmployeeRecommendationsFilterTests(unittest.TestCase):
             category="movers", items=items, company_id=company, destination_city=None,
         )
         self.assertEqual([i.item_id for i in out], ["m-2", "m-1", "m-3"])
+
+    # ------------------------------------------------------------------
+    # AIQ-1688: registry items are keyed item_id=supplier UUID, but their masters
+    # are keyed external_id='m-N' with supplier_id=<that UUID>. Curation must resolve
+    # via supplier_id, else HR-approved movers render as an empty category.
+    # ------------------------------------------------------------------
+    def _insert_master_with_supplier(
+        self, *, external_id: str, supplier_id: str, name: str = "Asian Tigers"
+    ) -> str:
+        master_id = str(uuid.uuid4())
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO service_catalog_items "
+                    "(id, category, name, external_id, supplier_id, active) "
+                    "VALUES (:id, 'movers', :name, :ext, :sup, 1)"
+                ),
+                {"id": master_id, "name": name, "ext": external_id, "sup": supplier_id},
+            )
+        return master_id
+
+    def test_registry_item_resolves_to_master_via_supplier_id(self) -> None:
+        supplier_uuid = str(uuid.uuid4())
+        master_id = self._insert_master_with_supplier(
+            external_id="m-1", supplier_id=supplier_uuid
+        )
+        company = str(uuid.uuid4())
+        vendor_curation.upsert_master_selection(
+            company_id=company, category="movers",
+            master_item_id=master_id, selected=True,
+        )
+        # Engine serves the registry representation (item_id = supplier UUID).
+        items = [_rec(supplier_uuid, "Asian Tigers")]
+        out, status = flt.apply_hr_curation(
+            category="movers", items=items, company_id=company,
+            destination_city="Singapore",
+        )
+        self.assertIsNone(status)  # NOT hr_pending — the approved item resolved
+        self.assertEqual([i.item_id for i in out], [supplier_uuid])
+
+    def test_registry_and_static_twin_dedup_to_one(self) -> None:
+        # Both the registry item (item_id=UUID) and its legacy static twin (item_id='m-1')
+        # resolve to the SAME approved master → only ONE renders (the first/highest-ranked).
+        supplier_uuid = str(uuid.uuid4())
+        master_id = self._insert_master_with_supplier(
+            external_id="m-1", supplier_id=supplier_uuid
+        )
+        company = str(uuid.uuid4())
+        vendor_curation.upsert_master_selection(
+            company_id=company, category="movers",
+            master_item_id=master_id, selected=True,
+        )
+        items = [_rec(supplier_uuid, "Asian Tigers (registry)"), _rec("m-1", "Asian Tigers (static)")]
+        out, status = flt.apply_hr_curation(
+            category="movers", items=items, company_id=company,
+            destination_city="Singapore",
+        )
+        self.assertIsNone(status)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0].item_id, supplier_uuid)
+
+    def test_unapproved_master_still_hidden_via_supplier_id(self) -> None:
+        # Guard the allowlist: matching by supplier_id must NOT bypass HR approval.
+        supplier_uuid = str(uuid.uuid4())
+        self._insert_master_with_supplier(external_id="m-1", supplier_id=supplier_uuid)
+        company = str(uuid.uuid4())  # HR approves NOTHING
+        items = [_rec(supplier_uuid, "Asian Tigers")]
+        out, status = flt.apply_hr_curation(
+            category="movers", items=items, company_id=company,
+            destination_city="Singapore",
+        )
+        self.assertEqual(out, [])
+        self.assertEqual(status, "hr_pending")
 
 
 if __name__ == "__main__":

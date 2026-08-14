@@ -90,4 +90,16 @@ def attach_nearby_schools(response: Any, dest_city: str, max_minutes: float = 35
             continue
         lat, lng = meta.get("lat"), meta.get("lng")
         if isinstance(lat, (int, float)) and isinstance(lng, (int, float)):
-            meta["nearby_schools"] = _nearby(lat, lng, schools, max_minutes, limit)
+            nearby = _nearby(lat, lng, schools, max_minutes, limit)
+            meta["nearby_schools"] = nearby
+            # Multi-destination commute: a per-mode (walk/bike/transit/car) reachability
+            # to the NEAREST school, mirroring the office commute. Households weigh both
+            # the office and the school run; surface the school leg on the same card.
+            if nearby:
+                s0 = nearby[0]
+                s_lat, s_lng = s0.get("lat"), s0.get("lng")
+                if isinstance(s_lat, (int, float)) and isinstance(s_lng, (int, float)):
+                    modes = geo.multimodal_commute((lat, lng), (s_lat, s_lng))
+                    if modes:
+                        meta["school_commute_modes"] = modes
+                        meta["nearest_school_name"] = s0.get("name")

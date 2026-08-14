@@ -27,7 +27,10 @@ function caseToInitialAnswers(
   const basics = (draft?.relocationBasics || {}) as Record<string, unknown>;
   const destCity = (basics.destCity ?? caseTopLevel?.destCity ?? basics.destCountry ?? caseTopLevel?.destCountry ?? '') as string;
   const destCountry = (basics.destCountry ?? caseTopLevel?.destCountry ?? '') as string;
-  const originCity = (basics.originCity ?? caseTopLevel?.originCity ?? basics.originCountry ?? caseTopLevel?.originCountry ?? 'Oslo') as string;
+  // AIQ-1649: no hardcoded city fallback — origin now comes from the case context
+  // (relocation_cases home_city/home_country via getServicesContext), so a real origin
+  // renders (e.g. 'Paris' for FR_NO) instead of a fabricated 'Oslo'.
+  const originCity = (basics.originCity ?? caseTopLevel?.originCity ?? basics.originCountry ?? caseTopLevel?.originCountry ?? '') as string;
   const cityForCriteria = (destCity || destCountry || '').trim();
   return {
     dest_city: cityForCriteria,

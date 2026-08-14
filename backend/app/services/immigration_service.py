@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NamedTuple, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import text
@@ -62,12 +62,92 @@ def _get_encryption_key() -> str:
     return key
 
 
+class PassportDecryption(NamedTuple):
+    """Result of trying to read the stored passport number back.
+
+    `profile.passport_number` is plaintext or None. It is NEVER the ciphertext —
+    that is the entire contract.
+    """
+    profile: Dict[str, Any]
+    withheld: bool  # a value existed and could not be decrypted
+
+
+def decrypt_passport_for_display(profile: Dict[str, Any]) -> PassportDecryption:
+    """Return a copy of `profile` with passport_number decrypted, or WITHHELD.
+
+    [AIQ-1802] This replaces three near-identical copies that all failed OPEN — on a
+    decryption failure they left the ciphertext in place and handed it onward as though
+    it were the value. It was rendered into the Article 15 subject-access PDF, shown to
+    the employee as their own data, and pre-filled into an immigration form. That last
+    one is the sharp end: an unreadable blob submitted on a government application is a
+    different class of problem from a bad screen.
+
+    All three were the LIVE path, because IMMIGRATION_ENCRYPTION_KEY is unset in
+    production and `_get_encryption_key()` therefore raises on every call.
+
+    Returning ciphertext is not graceful degradation. It presents unreadable data as the
+    subject's real value, and every caller downstream treats it as one. So the failure
+    branch yields None and says so, and the caller decides how to be honest about it —
+    a blank form field, a "withheld" line in the PDF, a fallback to the value the
+    employee typed themselves.
+
+    The try/except stays: removing it would turn a display defect into a 500 on the whole
+    form fill. What changed is what the branch DOES.
+
+    The `CAST(:enc AS bytea)` form is deliberate and must survive edits — `:enc::bytea`
+    makes SQLAlchemy bind a truncated parameter name and leaves a literal `:enc` in the
+    SQL (AIQ-1780); it is guarded by backend/tests/test_jsonb_bind_cast.py.
+    """
+    p = dict(profile)
+    raw = p.get("passport_number")
+    if not raw:
+        return PassportDecryption(profile=p, withheld=False)
+
+    try:
+        enc_key = _get_encryption_key()
+        with db.engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT pgp_sym_decrypt(CAST(:enc AS bytea), :key) AS decrypted"),
+                {"enc": raw, "key": enc_key},
+            ).mappings().first()
+        decrypted = row["decrypted"] if row else None
+        if decrypted:
+            p["passport_number"] = decrypted
+            return PassportDecryption(profile=p, withheld=False)
+        # A NULL/absent result is a failure, not an empty passport number. Falling
+        # through to the input would put the ciphertext back.
+        log.warning("passport decryption returned no value; withholding")
+    except Exception as exc:
+        # NEVER exc_info=True here. SQLAlchemy builds its engine without
+        # hide_parameters, so a DBAPI error stringifies as
+        # "[parameters: ('<ciphertext>', '<encryption key>')]" — the traceback would
+        # write the key that unlocks EVERY stored passport into the application log.
+        # Verified against the pinned SQLAlchemy, not assumed. The exception type is
+        # enough to tell a missing key from a bad ciphertext from a dead connection.
+        log.warning("passport decryption failed (%s); withholding the value",
+                    type(exc).__name__)
+
+    p["passport_number"] = None
+    return PassportDecryption(profile=p, withheld=True)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Consent + audit primitives
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _check_consent(case_id: str, employee_id: str) -> bool:
-    """Return True if a valid immigration_processing consent exists for this case+employee.
+    """Return True if immigration_processing consent is CURRENTLY held for this case+employee.
+
+    Reads the latest ledger row and then judges it. The state test must not live in the
+    WHERE clause: ``consent_records`` is append-only (a trigger blocks UPDATE and DELETE),
+    so a withdrawal is a *new* row with ``consented=false``. Filtering on
+    ``consented = TRUE AND withdrawn_at IS NULL`` before ``ORDER BY ... LIMIT 1`` prunes that
+    withdrawal row out of the candidate set, leaving the older grant row to satisfy the
+    query — which is how this answered "has any grant ever existed?" instead of "is consent
+    held now?", and kept authorising processing after a withdrawal (AIQ-1803).
+
+    Ordering first also means a re-grant after a withdrawal works: the newest row wins,
+    whichever way it points.
 
     Degrades gracefully when ids don't parse: a legacy/seed account whose id is
     not a UUID (e.g. ReloPass-session text ids) can hit a uuid-typed column in
@@ -79,12 +159,11 @@ def _check_consent(case_id: str, employee_id: str) -> bool:
         with db.engine.begin() as conn:
             row = conn.execute(
                 text("""
-                    SELECT id FROM public.consent_records
+                    SELECT consented, withdrawn_at
+                    FROM public.consent_records
                     WHERE case_id    = :case_id
                       AND employee_id = :employee_id
                       AND purpose     = 'immigration_processing'
-                      AND consented   = TRUE
-                      AND withdrawn_at IS NULL
                     ORDER BY created_at DESC
                     LIMIT 1
                 """),
@@ -93,7 +172,9 @@ def _check_consent(case_id: str, employee_id: str) -> bool:
     except DataError:
         log.warning("immigration: consent check could not run for non-parseable id (case=%s)", case_id)
         return False
-    return row is not None
+    if row is None:
+        return False
+    return bool(row["consented"]) and row["withdrawn_at"] is None
 
 
 def _log_access(
@@ -142,16 +223,52 @@ def _get_case_details(case_id: str, org_id: str) -> Optional[Dict[str, Any]]:
     both so a wizard case (e.g. FR→NO demo 08b7280b) resolves its corridor instead of
     reporting covered=false/corridor=null — mirroring how exception-requests resolves
     geography (AIQ-863).
+
+    relocation_cases is the third arm (AIQ-1831). It is the HR case of record and the
+    table submit_assignment actually writes the route to (backend/main.py, via
+    sync_relocation_case_route_from_wizard_draft), but it was never consulted here — so
+    a case that exists ONLY in relocation_cases resolved to corridor=null even though its
+    origin/dest columns were correctly populated at submit. Measured in prod 2026-08-13:
+    3 of 498 submitted assignments, and zero disagreement between the three tables where
+    more than one is present. It is COALESCEd LAST deliberately: it can only fire where
+    the existing arms are already null, so it cannot change any answer that is correct
+    today.
+
+    It also returns origin_city / dest_city / employment_type (AIQ-1831). These are
+    additive keys — no existing caller reads them — and they exist so the non-immigration
+    corridor consumers can stop inventing their own resolution:
+
+      * marketplace.py read case_assignments.origin_country / dest_country, columns that
+        have never existed on that table, so its corridor was null for 100% of
+        assignments since inception;
+      * compat.py's missing_fields read flat origin_country / destination_country /
+        employment_type off relocation_cases.profile_json, which carries none of them
+        (prod: 1, 1 and 0 respectively, out of 1391 cases);
+      * /api/resources/country read only wizard_cases.draft_json.relocationBasics and
+        silently fell back to rendering Norway for a case with no destination.
+
+    employment_type maps to contract_type, not assignment_type: contract_type is the
+    nature of the employment contract ('permanent'), which is what compute_missing_fields
+    sits beside origin/destination to ask about. assignment_type (STA/LTA/PERMANENT) is
+    mobility duration and already has its own consumers.
     """
     with db.engine.begin() as conn:
         row = conn.execute(
             text("""
                 SELECT ca.id, ca.case_id, ca.employee_user_id,
-                       COALESCE(mc.destination_country, wc.dest_country)   AS dest_country,
-                       COALESCE(mc.origin_country,      wc.origin_country) AS origin_country
+                       COALESCE(mc.destination_country, wc.dest_country,
+                                rc.dest_country_code)    AS dest_country,
+                       COALESCE(mc.origin_country,      wc.origin_country,
+                                rc.origin_country_code)  AS origin_country,
+                       COALESCE(wc.dest_city,   rc.dest_city)    AS dest_city,
+                       COALESCE(wc.origin_city, rc.origin_city)  AS origin_city,
+                       COALESCE(wc.contract_type,
+                                (ca.intake_draft::jsonb ->> 'contract_type'))
+                                                          AS employment_type
                 FROM public.case_assignments ca
-                LEFT JOIN public.mobility_cases mc ON mc.id::text = ca.case_id
-                LEFT JOIN public.wizard_cases   wc ON wc.id::text = ca.case_id
+                LEFT JOIN public.mobility_cases   mc ON mc.id::text = ca.case_id
+                LEFT JOIN public.wizard_cases     wc ON wc.id::text = ca.case_id
+                LEFT JOIN public.relocation_cases rc ON rc.id::text = ca.case_id
                 WHERE ca.id = :case_id OR ca.case_id = :case_id
                 LIMIT 1
             """),

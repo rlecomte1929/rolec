@@ -121,6 +121,9 @@ const SECTIONS: NavSection[] = [
       { id: 'resources-cms', group: 'Content', label: 'Resources CMS', to: ROUTE_DEFS.adminResources.path },
       { id: 'form-templates', group: 'Content', label: 'Form templates', to: ROUTE_DEFS.adminFormTemplates.path, badge: { kind: 'static', variant: 'new' } },
       { id: 'policy-versions', group: 'Content', label: 'Policy versions', to: ROUTE_DEFS.adminPolicyVersions.path },
+      // The review surface for requirement_items — what employees, HR and the public corridor
+      // endpoint are actually served. It existed but was linked from nowhere.
+      { id: 'country-requirements', group: 'Content', label: 'Country requirements', to: ROUTE_DEFS.adminCountries.path },
       { id: 'requirement-facts', group: 'Content', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
 
       // ── Queues (day-to-day work queues) ──
@@ -147,6 +150,7 @@ const SECTIONS: NavSection[] = [
         to: ROUTE_DEFS.adminVettingQueue.path,
         badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_capabilities ?? 0 },
       },
+      { id: 'content-review', group: 'Queues', label: 'Content review', to: ROUTE_DEFS.adminContentReview.path },
       { id: 'supplier-submissions', group: 'Queues', label: 'Supplier submissions', to: ROUTE_DEFS.adminSupplierSubmissions.path },
       { id: 'research-requests', group: 'Queues', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
 

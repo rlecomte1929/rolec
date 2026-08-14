@@ -1,8 +1,13 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { FileInput } from '../components/antigravity/FileInput';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Input, Alert } from '../components/antigravity';
+import { Combobox } from '../components/Combobox';
+// AIQ-1656: catalogue-backed country/city fields + "request a destination" flow (shared
+// with the employee intake via api/destinations).
+import { COUNTRY_OPTIONS } from '../features/policy-config/countryList';
+import { listEmployeeDestinations, requestDestination, type AllowlistedDestination } from '../api/destinations';
 import { hrAPI } from '../api/client';
 import { trackAuthPerf } from '../perf/authPerf';
 import { trackRouteEntry, trackShellRender, trackFirstMeaningfulContent } from '../perf/pagePerf';
@@ -47,6 +52,24 @@ export const HrCompanyProfile: React.FC = () => {
   const [logoError, setLogoError] = useState('');
   const [logoUploading, setLogoUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  // AIQ-1656: supported-destination catalogue for the city typeahead + admin request.
+  const [destinations, setDestinations] = useState<AllowlistedDestination[]>([]);
+  const [destRequested, setDestRequested] = useState<string | null>(null);
+  const requestedRef = useRef<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+    listEmployeeDestinations()
+      .then((d) => { if (!cancelled) setDestinations(d); })
+      .catch(() => { /* fail-soft — country/city stay free-text-capable */ });
+    return () => { cancelled = true; };
+  }, []);
+  const countryNames = COUNTRY_OPTIONS.map((c) => c.name);
+  const citiesForCountry = (countryName: string): string[] => {
+    const n = (countryName || '').trim().toLowerCase();
+    if (!n || destinations.length === 0) return [];
+    return destinations.filter((d) => (d.country || '').toLowerCase() === n).map((d) => d.city);
+  };
 
   useEffect(() => {
     if (company) {
@@ -169,6 +192,18 @@ export const HrCompanyProfile: React.FC = () => {
         default_working_location: defaultWorkingLocation.trim() || undefined,
       };
       await hrAPI.saveCompanyProfile(payload);
+      // AIQ-1656: a default working location not in the supported catalogue is still saved,
+      // but ask an admin to validate it in (controlled scaling). Needs a country to scope the
+      // request; deduped per (city, country) so re-saving doesn't file duplicates.
+      const wl = defaultWorkingLocation.trim();
+      const dc = defaultDestinationCountry.trim();
+      if (wl && dc && !citiesForCountry(dc).some((c) => c.toLowerCase() === wl.toLowerCase())) {
+        const key = `${wl}|${dc}`.toLowerCase();
+        if (requestedRef.current !== key) {
+          requestedRef.current = key;
+          void requestDestination(wl, dc).then(() => setDestRequested(wl)).catch(() => { /* non-blocking */ });
+        }
+      }
       await refresh();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -201,6 +236,11 @@ export const HrCompanyProfile: React.FC = () => {
         )}
         {error && <Alert variant="error" className="mb-4">{error}</Alert>}
         {saved && <Alert variant="success" className="mb-4">Saved.</Alert>}
+        {destRequested && (
+          <Alert variant="info" className="mb-4" data-testid="company-dest-requested">
+            We&apos;ve asked the ReloPass team to add <strong>{destRequested}</strong> to the supported destinations.
+          </Alert>
+        )}
         <div className="space-y-4">
           {profileLoading ? (
             <>
@@ -220,8 +260,8 @@ export const HrCompanyProfile: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <Input label="Company name" value={name} onChange={setName} fullWidth />
           <Input label="Legal name" value={legalName} onChange={setLegalName} fullWidth placeholder="Optional" />
-          <Input label="Country" value={country} onChange={setCountry} fullWidth />
-          <Input label="HQ city" value={hqCity} onChange={setHqCity} fullWidth placeholder="Optional" />
+          <Combobox label="Country" value={country} onChange={setCountry} options={countryNames} testId="company-country" />
+          <Combobox label="HQ city" value={hqCity} onChange={setHqCity} options={citiesForCountry(country)} placeholder="Optional" testId="company-hq-city" />
           <Input label="Company size band" value={sizeBand} onChange={setSizeBand} placeholder="e.g. 50-200" fullWidth />
           <Input label="Industry" value={industry} onChange={setIndustry} fullWidth placeholder="Optional" />
           <Input label="Website" value={website} onChange={setWebsite} fullWidth placeholder="https://..." />
@@ -230,9 +270,9 @@ export const HrCompanyProfile: React.FC = () => {
             <Input label="Address" value={address} onChange={setAddress} fullWidth />
           </div>
           <Input label="HR contact" value={hrContact} onChange={setHrContact} placeholder="e.g. hr@company.com" fullWidth />
-          <Input label="Default destination country" value={defaultDestinationCountry} onChange={setDefaultDestinationCountry} fullWidth placeholder="Optional" />
+          <Combobox label="Default destination country" value={defaultDestinationCountry} onChange={setDefaultDestinationCountry} options={countryNames} placeholder="Optional" testId="company-default-dest-country" />
           <Input label="Support / HR contact email" value={supportEmail} onChange={setSupportEmail} fullWidth placeholder="Optional" />
-          <Input label="Default working location" value={defaultWorkingLocation} onChange={setDefaultWorkingLocation} fullWidth placeholder="Optional" />
+          <Combobox label="Default working location" value={defaultWorkingLocation} onChange={setDefaultWorkingLocation} options={citiesForCountry(defaultDestinationCountry)} placeholder="Optional" testId="company-default-working-location" />
           </div>
 
           <div className="pt-2">

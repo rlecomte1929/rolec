@@ -142,6 +142,11 @@ def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.Requ
             existing.applies_to_nationality_classes_json = payload["applies_to_nationality_classes_json"]
         if "verification_status" in payload:
             existing.verification_status = payload["verification_status"]
+        # review_status is deliberately NOT synced here. It is an admin decision about an
+        # existing row, not a property of the seed file, and re-running any YAML seed would
+        # otherwise silently un-approve live content — germany.yaml alone owns 16 rows. Set on
+        # insert (below), carried on update. Same rule as _CARRIED_COLUMNS in
+        # admin_form_templates.py.
         existing.last_verified_at = payload["last_verified_at"]
         db.commit()
         db.refresh(existing)
@@ -255,10 +260,24 @@ def list_requirements(
     purpose: Optional[str] = None,
     limit: int = _DEFAULT_LIST_LIMIT,
     offset: int = 0,
+    include_unapproved: bool = False,
 ) -> List[models.RequirementItem]:
+    """Requirements for a destination, filtered to what an admin has approved.
+
+    THE publication gate, and deliberately the only one. Both readers come through here —
+    `requirements_builder` (employee dossier) and `public_corridor` (unauthenticated) — so
+    withholding unreviewed content is one change rather than two, and there is no second seam
+    to forget. Before this filter existed, a row was live to anonymous internet traffic the
+    instant it was inserted.
+
+    `include_unapproved=True` is for the admin review surface, which must obviously see the
+    rows it is being asked to approve.
+    """
     query = db.query(models.RequirementItem).filter(models.RequirementItem.country_code == country_code)
     if purpose:
         query = query.filter(models.RequirementItem.purpose == purpose)
+    if not include_unapproved:
+        query = query.filter(models.RequirementItem.review_status == "approved")
     return (
         query.order_by(models.RequirementItem.id.desc())
         .offset(max(0, offset))

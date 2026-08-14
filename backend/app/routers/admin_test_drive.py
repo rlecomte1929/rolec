@@ -122,6 +122,57 @@ def _rows(sql: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
         return [dict(r) for r in conn.execute(text(sql), params).mappings().all()]
 
 
+# ── multi-referral read-out ───────────────────────────────────────────────────
+# A survey row carries its FULL referral list in `survey_responses.referrals` (jsonb) and
+# mirrors referrals[0] into the legacy referral_* scalars. Reading only the scalars — which
+# is what this module used to do — silently showed one intro per survey however many the
+# tester left. Expansion happens in Python, not SQL: psycopg2 hands jsonb back as a list and
+# SQLite as text, and a lateral jsonb_array_elements would be Postgres-only.
+_REFERRAL_SELECT = (
+    "SELECT referral_name, referral_contact, referral_company_role, referral_consent, "
+    "referrals, corridor_id, tester_name, created_at FROM survey_responses"
+)
+# Fallback for the window before the `referrals` migration is applied: same query without
+# the new column, so the panel degrades to the old one-per-survey view rather than to empty.
+_REFERRAL_SELECT_LEGACY = (
+    "SELECT referral_name, referral_contact, referral_company_role, referral_consent, "
+    "corridor_id, tester_name, created_at FROM survey_responses"
+)
+
+
+def _referral_rows(where_sql: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Survey rows carrying at least one referral, with `referrals` when the column exists."""
+    try:
+        return _rows(_REFERRAL_SELECT + where_sql + " ORDER BY created_at DESC", params)
+    except Exception as exc:  # noqa: BLE001 — pre-migration prod has no `referrals` column
+        logger.warning("test-drive referrals: falling back to legacy columns (%s)", exc)
+        return _rows(_REFERRAL_SELECT_LEGACY + where_sql + " ORDER BY created_at DESC", params)
+
+
+def _expand_referrals(row: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Every referral on one survey row, as {name, company_role, contact, consent}.
+
+    Falls back to the legacy scalars when `referrals` is absent, empty or unparseable —
+    which covers both historical rows written before multi-referral and the pre-migration
+    window. referrals[0] always mirrors the scalars, so the fallback never double-counts.
+    """
+    raw = row.get("referrals")
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw) if raw.strip() else None
+        except ValueError:
+            raw = None
+    items = [r for r in raw if isinstance(r, dict)] if isinstance(raw, list) else []
+    if items:
+        return items
+    return [{
+        "name": row.get("referral_name"),
+        "company_role": row.get("referral_company_role"),
+        "contact": row.get("referral_contact"),
+        "consent": row.get("referral_consent"),
+    }]
+
+
 @router.get("/test-drive/overview")
 def test_drive_overview(
     corridor: Optional[str] = Query(None),
@@ -418,13 +469,17 @@ def test_drive_contacts_csv(
         writer.writerow(["pilot", s(r["tester_name"]), s(r["tester_email"]), s(r["tester_company_role"]),
                          s(r["tester_sector"]), s(r["corridor_id"]), s(r["pilot_interest"]), s(r["pilot_note"])])
 
-    referrals = _safe(lambda: _rows(
-        "SELECT referral_name, referral_contact, referral_company_role, corridor_id FROM survey_responses"
-        + _where(clauses, "referral_consent = :consent AND " + _REFERRAL_PRESENT)
-        + " ORDER BY created_at DESC", {**params, "consent": True}), [])
-    for r in referrals:
-        writer.writerow(["referral", s(r["referral_name"]), s(r["referral_contact"]),
-                         s(r["referral_company_role"]), "", s(r["corridor_id"]), "", ""])
+    # One CSV line per referred PERSON. The consent filter moves from the row to the
+    # individual: `referral_consent` only reflects referrals[0], so filtering in SQL would
+    # drop a consented person #2 whose referrer left #1 unconsented (and vice versa).
+    # _REFERRAL_PRESENT still narrows the scan to survey rows that carry any referral.
+    referral_rows = _safe(lambda: _referral_rows(_where(clauses, _REFERRAL_PRESENT), params), [])
+    for r in referral_rows:
+        for ref in _expand_referrals(r):
+            if not ref.get("consent"):
+                continue  # consent gates outreach — this file is the outreach list
+            writer.writerow(["referral", s(ref.get("name")), s(ref.get("contact")),
+                             s(ref.get("company_role")), "", s(r["corridor_id"]), "", ""])
 
     testis = _safe(lambda: _rows(
         "SELECT tester_name, tester_email, tester_company_role, corridor_id, testimonial FROM survey_responses"
@@ -459,25 +514,27 @@ def test_drive_referrals(
     to contact. Consent gates OUTREACH, not visibility: nothing here messages anyone, and
     `consent=false` rows are labelled as such in the UI. This is the referrer's confirmation
     that the person is happy to be contacted; treat a false as "do not contact yet".
+
+    Returns ONE entry per referred person, not per survey: a tester who left three intros
+    yields three entries (see _expand_referrals). Consent is per person — a tester can vouch
+    for naming them to one contact and not another.
     """
     clauses, params = _slice(corridor, segment, _resolve_campaign(campaign))
-    rows = _safe(lambda: _rows(
-        "SELECT referral_name, referral_contact, referral_company_role, referral_consent, "
-        "corridor_id, tester_name, created_at FROM survey_responses"
-        + _where(clauses, _REFERRAL_PRESENT) + " ORDER BY created_at DESC", params), [])
+    rows = _safe(lambda: _referral_rows(_where(clauses, _REFERRAL_PRESENT), params), [])
     return {
         "referrals": [
             {
-                "referral_name": r.get("referral_name"),
-                "referral_contact": r.get("referral_contact"),
-                "referral_company_role": r.get("referral_company_role"),
+                "referral_name": ref.get("name"),
+                "referral_contact": ref.get("contact"),
+                "referral_company_role": ref.get("company_role"),
                 # Coerce to a real bool: NULL means "not answered", which is not consent.
-                "referral_consent": bool(r.get("referral_consent")),
+                "referral_consent": bool(ref.get("consent")),
                 "corridor_id": r.get("corridor_id"),
                 "referred_by": r.get("tester_name"),
                 # PG hands back a datetime, SQLite a string; FastAPI's encoder handles both.
                 "created_at": r.get("created_at"),
             }
             for r in rows
+            for ref in _expand_referrals(r)
         ],
     }

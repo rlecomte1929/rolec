@@ -36,7 +36,10 @@ from typing import Any, Dict, List, Optional
 from .dashboard_report import write_dashboard_report
 from .roadmap_metrics import aggregate_roadmap_scores, score_roadmap
 
-_DEFAULT_GOLD = Path("backend/tests/fixtures/eval/outcome_accuracy/us_l1b_gold.json")
+# Anchor to this source file (backend/eval/…), not the process cwd, so the gold
+# fixture loads whether pytest/python runs from the repo root or from backend/.
+# parents[1] = the backend/ dir. (AIQ-1665)
+_DEFAULT_GOLD = Path(__file__).resolve().parents[1] / "tests/fixtures/eval/outcome_accuracy/us_l1b_gold.json"
 
 
 def assemble_roadmap(profile: Dict[str, Any]) -> List[Dict[str, Any]]:

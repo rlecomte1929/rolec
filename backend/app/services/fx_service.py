@@ -36,6 +36,23 @@ USD_TO: Dict[str, float] = {
 DEFAULT_DISPLAY_CURRENCY = "USD"
 SUPPORTED_DISPLAY_CURRENCIES = tuple(USD_TO.keys())
 
+# ISO-3166 alpha-2 destination country → default display currency (AIQ-1327).
+# Mirror of COUNTRY_TO_CURRENCY in frontend/src/features/services/servicesCurrency.ts:
+# eurozone members all map to EUR; any country whose currency we don't display
+# falls through normalize_display_currency() to USD (the FX baseline).
+COUNTRY_TO_CURRENCY: Dict[str, str] = {
+    # Eurozone
+    "AT": "EUR", "BE": "EUR", "HR": "EUR", "CY": "EUR", "EE": "EUR", "FI": "EUR",
+    "FR": "EUR", "DE": "EUR", "GR": "EUR", "IE": "EUR", "IT": "EUR", "LV": "EUR",
+    "LT": "EUR", "LU": "EUR", "MT": "EUR", "NL": "EUR", "PT": "EUR", "SK": "EUR",
+    "SI": "EUR", "ES": "EUR",
+    # Other displayed currencies
+    "GB": "GBP", "US": "USD", "CH": "CHF", "CA": "CAD", "AU": "AUD", "NO": "NOK",
+    "SE": "SEK", "DK": "DKK", "JP": "JPY",
+    # utils/countries uses 'UK' for the United Kingdom while ISO is 'GB' — alias (AIQ-1620).
+    "UK": "GBP",
+}
+
 
 def normalize_display_currency(code: Optional[str]) -> str:
     """Normalize an incoming currency code; fall back to USD when unknown."""
@@ -43,6 +60,16 @@ def normalize_display_currency(code: Optional[str]) -> str:
         return DEFAULT_DISPLAY_CURRENCY
     cur = str(code).strip().upper()
     return cur if cur in USD_TO else DEFAULT_DISPLAY_CURRENCY
+
+
+def default_currency_for_country(country: Optional[str]) -> str:
+    """Default display currency for an ISO alpha-2 destination country.
+
+    Mirrors the frontend's getDefaultCurrencyForCountry: map the country to its
+    currency, then normalize (so an unknown/unsupported country degrades to USD).
+    """
+    code = COUNTRY_TO_CURRENCY.get(str(country or "").strip().upper())
+    return normalize_display_currency(code)
 
 
 def convert_usd_to_display(usd: Optional[float], display_currency: str) -> Optional[float]:

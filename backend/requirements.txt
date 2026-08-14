@@ -99,3 +99,7 @@ Werkzeug==3.0.4
 # (AI-I.3f) own adding the model download.
 presidio-analyzer>=2.2,<3
 posthog>=3.0.0
+# Stripe SDK — used ONLY for webhook signature verification (Webhook.construct_event,
+# timing-safe HMAC + timestamp tolerance) in backend/app/routers/stripe_webhook.py.
+# Checkout-session creation deliberately uses plain `requests`, not this SDK.
+stripe>=9,<12

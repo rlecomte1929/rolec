@@ -6,6 +6,12 @@
   "templateVersion": 1,
   "apps": [
     {
+      "id": "fr-no-pilot-landing",
+      "name": "Test Drive Access",
+      "icon": "Rocket",
+      "component": "apps/ReloPassLanding/App.tsx"
+    },
+    {
       "id": "move-roadmaps",
       "name": "Move Roadmaps",
       "icon": "Route",
@@ -42,6 +48,12 @@
       "name": "New App",
       "icon": "NotebookPen",
       "component": "apps/NewApp/App.tsx"
+    },
+    {
+      "id": "frno-data-sheet-prototype",
+      "name": "FR-NO Data Sheet Prototype",
+      "icon": "FileText",
+      "component": "apps/FRNODataSheet/App.tsx"
     }
   ],
   "terminology": {

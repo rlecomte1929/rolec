@@ -109,7 +109,8 @@ CREATE TABLE form_templates (
     country        TEXT NOT NULL DEFAULT 'NO',
     category       TEXT,
     version        TEXT NOT NULL DEFAULT '1.0.0',
-    fields         TEXT NOT NULL DEFAULT '[]'
+    fields         TEXT NOT NULL DEFAULT '[]',
+    source_language TEXT NOT NULL DEFAULT 'en'
 );
 CREATE TABLE case_forms (
     id               TEXT PRIMARY KEY,
@@ -138,6 +139,7 @@ CREATE TABLE case_form_field_values (
     value         TEXT,
     filled_by     TEXT NOT NULL DEFAULT 'ai',
     ai_confidence REAL,
+    source        TEXT,
     reviewed      INTEGER NOT NULL DEFAULT 0,
     overridden    INTEGER NOT NULL DEFAULT 0,
     updated_at    TEXT DEFAULT (datetime('now')),

@@ -1,6 +1,6 @@
 # Sub-Processor Register — ReloPass (GDPR Art. 28 & 44)
 
-**Task:** PRIV-004 (AIQ-472) · **Version:** v1.6 · **Last verified:** 2026-07-18 (against `main`)
+**Task:** PRIV-004 (AIQ-472) · **Version:** v1.8 · **Last verified:** 2026-07-22 (against `main`)
 **Owner:** Romain Lecomte · **Status:** register complete; DPA signatures pending (human action)
 
 > GDPR Art. 28 requires a signed Data Processing Agreement (DPA) with every sub-processor
@@ -20,7 +20,60 @@
 | **Mistral AI** | Document AI OCR — general document text extraction (rce pipeline; non-passport civil-status documents) | **EU (France)** ✅ | Data in EU — no transfer | ⬜ Confirm DPA on console | `MISTRAL_API_KEY`; `mistral_ocr_client.py`, `rce_ocr_parser.py` |
 | **Resend** | Transactional email | US entity | SCCs via Resend DPA | ⬜ Self-service DPA | `RESEND_API_KEY` / `EMAIL_PROVIDER=resend`; `dossier_notifications.py`, edge fn `send-notification-email` |
 | **PostHog** | Product analytics (frontend `posthog-js` + **backend server-side events**) + session replay (**replay gated to test-drive only**) | **EU host** (`eu.i.posthog.com`) ✅ | EU Cloud — no transfer | ⬜ Confirm DPA on EU project | `frontend/src/analytics.ts` (`posthog-js`); replay gate `frontend/src/components/TestDriveReplayGate.tsx`; backend `backend/app/posthog_client.py` (`posthog` Python SDK) |
-| **Geoapify** | Address autocomplete / geocoding proxy for the intake office-address field (AIQ-1607) | **EU (Germany)** ✅ | Data in EU — no transfer | ⬜ Confirm/sign DPA on console | `GEOAPIFY_API_KEY`; `geocoding_service.py`, `geocoding.py` |
+| **Geoapify** | Address autocomplete for the intake office-address field (AIQ-1607) **and** forward geocoding of the office address for housing recommendations (AIQ-1661) | **EU (Germany)** ✅ | Data in EU — no transfer | ⬜ Confirm/sign DPA on console | `GEOAPIFY_API_KEY`; `geocoding_service.py`, `geocoding.py`, `recommendations/geo.py` |
+| **Stripe** | Payment processing — Stripe Checkout (hosted) + webhook | US parent (Stripe, Inc.); EU contracting entity Stripe Payments Europe Ltd (Ireland) | Stripe DPA (auto-incorporated in the Stripe Services Agreement) + SCCs for US transfer | ⬜ Confirm DPA in Services Agreement — **before live keys** | `stripe>=9,<12`; `payment.py` (checkout), `stripe_webhook.py` (webhook). **On `main` (PR #1626), deployed in Stripe TEST mode** (`sk_test`); **live keys + DPA still human-gated** — no real payment PII processed yet |
+
+## Notes & corrections (v1.8)
+
+- **Stripe added (payments integration — WIP, 🔴 human-gated; not on `main`, not live).** The roadmap
+  paywall uses **Stripe Checkout hosted pages** (`payment.py` creates the session; `stripe_webhook.py`
+  verifies + fulfils), which keeps the personal-data surface deliberately small:
+  - **No card data ever touches ReloPass.** The card number/CVC are entered on Stripe's own hosted page,
+    never on a ReloPass form — PCI scope stays at SAQ-A. "Your card details never touch ReloPass" is the
+    substantiated claim shown on the paywall.
+  - **What ReloPass sends Stripe is minimal + pseudonymous:** the server-side price (€800, fixed) plus
+    `metadata` = internal identifiers only (`case_id` = a `relocation_cases` UUID, `assignmentId`, `tier`,
+    `source`). **No names, emails, addresses, or case contents** are sent in the checkout call. The
+    customer's email is collected by Stripe on its hosted page (Stripe↔customer), not forwarded by us.
+  - **Inbound (webhook):** the fulfilment brain (`stripe_fulfillment.py`) masks identifiers via
+    `safe_log_text()` and **never logs the raw event body** (which can carry customer email/name from
+    Stripe's `customer_details`).
+  - **Residency / transfer:** Stripe processes globally with a US parent (Stripe, Inc.); European customers
+    typically contract with **Stripe Payments Europe Ltd (Ireland)**. US transfer is covered by Stripe's
+    SCCs, and Stripe's **DPA is auto-incorporated into the Stripe Services Agreement** — so no separate
+    signature is usually required, but the account's DPA posture must be **confirmed before live keys**.
+  - **Status (superseded — see v1.9 below).** Originally documented as WIP on `feat/stripe-*` with
+    `RELOPASS_STRIPE_ENABLED` unset (503). That is no longer accurate: the integration merged (PR #1626)
+    and is deployed in **Stripe TEST mode**.
+
+## Notes & corrections (v1.9 — 2026-07-22)
+
+- **Stripe integration is now on `main` and deployed in TEST mode** (corrects the v1.8 "not on `main`,
+  gated off / 503" claim). Verified against prod (`rolec-eu`) on 2026-07-22:
+  - `STRIPE_SECRET_KEY` = `sk_test_…` (**test mode — no real charge is possible**); `RELOPASS_STRIPE_ENABLED=true`
+    (checkout + webhook are live, but test-mode only).
+  - **No real payment PII is processed.** The platform is pre-launch (no real customers), the keys are
+    test-mode, and card data never touches ReloPass regardless (hosted Checkout, PCI SAQ-A). The GDPR
+    posture is unchanged: the DPA confirmation (C1) and **live** keys (C4) remain the human gate before any
+    real payment PII — still ⬜ pending.
+  - **Two config items are out of the go-live sequence** (`docs/stripe-stage-c-go-live-checklist.md`),
+    tracked as ops fixes, not compliance issues: `STRIPE_WEBHOOK_SECRET` is set to the webhook URL rather
+    than a `whsec_…` signing secret (so test webhooks don't verify), and `RELOPASS_ROADMAP_PAYWALL_ENABLED=true`
+    was enabled ahead of step C7 (before the paid→unlock loop is proven at C6). Neither changes the
+    sub-processor/DPA posture; both are noted so this register matches reality.
+  - **Before live keys (unchanged human gate):** confirm the Stripe DPA + SCC posture (C1) and flip the row's
+    DPA status to confirmed at that point.
+
+## Notes & corrections (v1.7)
+
+- **Nominatim removed; housing-recs geocoding rerouted to Geoapify (AIQ-1661).** `recommendations/geo.py`
+  `geocode()` previously called `nominatim.openstreetmap.org` (OpenStreetMap's hosted geocoder) directly
+  with the employee's office address — an **unregistered** sub-processor and an ungated PII egress. It now
+  routes through the registered Geoapify path (`geocoding_service.geocode_forward()`), inheriting the same
+  **disabled-until-keyed** posture: with `GEOAPIFY_API_KEY` unset, `geocode()` returns `None`, **no address
+  leaves the platform**, and housing recommendations degrade to the keyless straight-line commute heuristic.
+  No OSM/Nominatim sub-processor is used anywhere. (The future real-routing API — Neighbourhood Intelligence
+  roadmap Phase D item #10 — remains a separate, DPA-gated addition.)
 
 ## Notes & corrections (v1.1 → v1.5)
 
@@ -127,7 +180,9 @@
 1. **Sign DPAs** — Supabase (dashboard/PandaDoc), Render (`render.com/privacy`),
    OpenAI (`openai.com/policies/data-processing-addendum`), Anthropic (confirm Commercial Terms),
    Resend (`resend.com/dpa`), Cloudflare (account Legal), PostHog (only if enabled),
-   **Geoapify** (console DPA — required before `GEOAPIFY_API_KEY` is set in prod, AIQ-1607).
+   **Geoapify** (console DPA — required before `GEOAPIFY_API_KEY` is set in prod, AIQ-1607),
+   **Stripe** (confirm the DPA is auto-incorporated in the Stripe Services Agreement + the account's
+   SCC posture — **required before live Stripe keys are enabled**).
 2. **Confirm Render deployment region** and whether EU hosting is available on the current plan.
 3. **Store signed DPA copies** in a durable legal/compliance location.
 4. **Re-run this register** whenever a sub-processor is added.

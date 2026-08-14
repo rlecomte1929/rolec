@@ -80,7 +80,8 @@ export const GROUP_LABELS: Record<ServiceGroup, { title: string; subtitle: strin
 
 /** Map backend keys to display labels for wizard results */
 export const CATEGORY_LABELS: Record<string, string> = {
-  living_areas: 'Living Areas',
+  living_areas: 'Neighbourhoods',
+  housing_agencies: 'Housing Agencies',
   schools: 'Schools',
   movers: 'Movers',
   banks: 'Banks',
@@ -99,9 +100,16 @@ export const CATEGORY_LABELS: Record<string, string> = {
  *
  * Derived from SERVICE_CONFIG so it cannot drift from the one table that owns the mapping.
  */
-const BACKEND_KEY_TO_CANONICAL: Record<string, string> = Object.fromEntries(
-  SERVICE_CONFIG.filter((s) => s.backendKey).map((s) => [s.backendKey as string, s.key]),
-);
+const BACKEND_KEY_TO_CANONICAL: Record<string, string> = {
+  ...Object.fromEntries(
+    SERVICE_CONFIG.filter((s) => s.backendKey).map((s) => [s.backendKey as string, s.key]),
+  ),
+  // housing_agencies is a fan-out sibling of living_areas (both surface under the
+  // "Housing" step), so it groups under the canonical 'housing' for caps/shortlist/
+  // exception matching. It is not a separately-selectable service, hence not in
+  // SERVICE_CONFIG.
+  housing_agencies: 'housing',
+};
 
 /** Canonical service key for a category that may be expressed as a backendKey.
  *  Unknown/already-canonical values pass through unchanged. */

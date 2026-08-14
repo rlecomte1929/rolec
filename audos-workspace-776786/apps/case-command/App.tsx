@@ -512,13 +512,13 @@ export default function CaseCommand() {
                 className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 transition-all ${
                   view === 'check' ? tw.button.primary : 'bg-[var(--space-surface-card)] text-[var(--space-text-secondary)] hover:bg-[var(--space-surface-muted)]'
                 }`}
-                title="France → Norway corridor check"
+                title="Corridor check (France → Norway · Norway → France)"
               >
                 <Route className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Corridor check</span>
               </button>
             </div>
             <span className="hidden md:inline px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--space-brand-highlight-100)] text-[var(--space-text-accent)]">
-              {view === 'check' ? 'FR → NO' : 'Live demo'}
+              {view === 'check' ? 'FR → NO · NO → FR' : 'Live demo'}
             </span>
           </div>
         </div>

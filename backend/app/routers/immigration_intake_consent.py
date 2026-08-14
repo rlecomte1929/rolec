@@ -22,10 +22,10 @@ from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_
 from ...database import db
 from ..services.audit_log_service import (
     ACTION_INSERT,
-    ACTION_UPDATE,
     ACTOR_HUMAN,
     insert_audit_log,
 )
+from ..services.immigration_regime import default_visa_type_for_destination
 from ..services.immigration_requirement_service import (
     RiskFlag,
     evaluate_risks,
@@ -61,7 +61,7 @@ router = APIRouter(prefix="/api", tags=["immigration-intake-consent"])
 def _uncovered_response(
     corridor_from: Optional[str],
     corridor_to: Optional[str],
-    visa_type: str,
+    visa_type: Optional[str],
 ) -> Dict[str, Any]:
     """
     Structured fail-closed payload for a corridor we cannot answer for —
@@ -114,7 +114,8 @@ def _log_view_access(case_id: str, hr_user: Dict[str, Any]) -> None:
 @router.get("/hr/cases/{case_id}/immigration-requirements")
 def get_immigration_requirements(
     case_id: str,
-    visa_type: str = "blue_card",
+    # [AIQ-1833] No default — resolved from the corridor below.
+    visa_type: Optional[str] = None,
     corridor_from: Optional[str] = None,
     corridor_to: Optional[str] = None,
     employee_type: str = "any",
@@ -135,8 +136,21 @@ def get_immigration_requirements(
             corridor_from = corridor_from or case.get("origin_country")
             corridor_to = corridor_to or case.get("dest_country")
 
+    # [AIQ-1833] Resolve the visa type from the destination instead of defaulting to
+    # blue_card. Ireland and Denmark are the two EU states outside Directive 2021/1883
+    # and issue no Blue Card; nor do non-EU destinations such as Norway. Reporting one
+    # anyway was a confident wrong answer about immigration.
+    if visa_type is None:
+        visa_type = default_visa_type_for_destination(corridor_to)
+
     # Fail closed: missing geography cannot be answered authoritatively.
     if not corridor_from or not corridor_to:
+        _log_view_access(case_id, hr_user)
+        return _uncovered_response(corridor_from, corridor_to, visa_type)
+
+    # Fail closed: no determinable visa type for this destination. Querying with None
+    # would match nothing regardless — say so explicitly rather than implying a permit.
+    if not visa_type:
         _log_view_access(case_id, hr_user)
         return _uncovered_response(corridor_from, corridor_to, visa_type)
 
@@ -439,49 +453,77 @@ def withdraw_consent_employee(
 ) -> Dict[str, Any]:
     """
     GDPR Art. 7(3) — employee withdraws consent for a given purpose.
-    Marks every active consent row for that purpose as withdrawn (consented=FALSE,
-    withdrawn_at=now). Returns 404 if no active consent exists for the purpose.
+
+    Appends a withdrawal row (consented=FALSE, withdrawn_at=now); it does NOT update the
+    original grant. `consent_records` is an append-only ledger and a trigger blocks UPDATE
+    and DELETE for every role including service_role, so the UPDATE this used to issue
+    raised for every caller — meaning withdrawal was impossible in production and the 404
+    branch below was unreachable (AIQ-1803). The trigger's own error message names the
+    required pattern; `outcome_consent.record_outcome_consent` is the in-repo reference.
+
+    Returns 404 if consent is not currently held for the purpose — read from the LATEST
+    ledger row, not from "any un-withdrawn row", so a re-grant after a withdrawal is
+    withdrawable again.
     """
     employee_id = current_user["id"]
     now = _now_iso()
 
     with db.engine.begin() as conn:
-        result = conn.execute(
+        # The latest row is the current state. Carry its version/hash onto the withdrawal
+        # so the ledger records which consent text was withdrawn — both columns are NOT
+        # NULL, and inventing a value here would corrupt the audit trail.
+        current = conn.execute(
             text("""
-                UPDATE public.consent_records
-                   SET consented = FALSE,
-                       withdrawn_at = :now,
-                       withdrawn_reason = :reason
+                SELECT consented, withdrawn_at, consent_version, consent_text_hash
+                FROM public.consent_records
                 WHERE case_id = :case_id
                   AND employee_id = :employee_id
                   AND purpose = :purpose
-                  AND withdrawn_at IS NULL
+                ORDER BY created_at DESC
+                LIMIT 1
             """),
-            {
-                "now": now,
-                "reason": body.reason,
-                "case_id": case_id,
-                "employee_id": employee_id,
-                "purpose": body.purpose,
-            },
-        )
-        affected = result.rowcount or 0
-        if affected > 0:
+            {"case_id": case_id, "employee_id": employee_id, "purpose": body.purpose},
+        ).mappings().first()
+
+        held = bool(current and current["consented"] and current["withdrawn_at"] is None)
+
+        if held:
+            record_id = str(uuid.uuid4())
+            conn.execute(
+                text("""
+                    INSERT INTO public.consent_records
+                        (id, employee_id, case_id, purpose, consented,
+                         consent_version, consent_text_hash, withdrawn_at, withdrawn_reason)
+                    VALUES
+                        (:id, :employee_id, :case_id, :purpose, FALSE,
+                         :version, :hash, :now, :reason)
+                """),
+                {
+                    "id": record_id,
+                    "employee_id": employee_id,
+                    "case_id": case_id,
+                    "purpose": body.purpose,
+                    "version": current["consent_version"],
+                    "hash": current["consent_text_hash"],
+                    "now": now,
+                    "reason": body.reason,
+                },
+            )
             try:
                 insert_audit_log(
                     conn,
                     entity_type="consent_record",
-                    entity_id=case_id,
-                    action_type=ACTION_UPDATE,
+                    entity_id=record_id,
+                    action_type=ACTION_INSERT,
                     actor_type=ACTOR_HUMAN,
                     actor_id=employee_id,
                     new_value={"event": "consent_withdrawn", "purpose": body.purpose,
-                               "records_withdrawn": affected},
+                               "case_id": case_id},
                 )
             except Exception:
                 log.exception("audit: withdraw_consent case=%s purpose=%s", case_id, body.purpose)
 
-    if affected == 0:
+    if not held:
         raise HTTPException(
             status_code=404,
             detail=f"No active consent on record for purpose '{body.purpose}'.",
@@ -499,7 +541,9 @@ def withdraw_consent_employee(
     return {
         "purpose": body.purpose,
         "withdrawn": True,
-        "records_withdrawn": affected,
+        # Always 1: the ledger is append-only, so a withdrawal is one new row that
+        # supersedes whatever came before it — not a count of rows mutated.
+        "records_withdrawn": 1,
         "withdrawn_at": now,
     }
 

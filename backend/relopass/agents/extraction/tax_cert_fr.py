@@ -40,6 +40,9 @@ logger = logging.getLogger(__name__)
 
 
 TAX_CERT_FR_AGENT_NAME = "tax_cert_fr"
+# [AIQ-1774] Its own document-type code — see tax_cert_de.py for the reasoning.
+TAX_CERT_FR_DOCUMENT_TYPE = "TAX_CERT_FR"
+TAX_CERT_FR_ISSUING_COUNTRY = "FRA"  # ISO-3166-1 alpha-3
 _COUNTRY_ISO3 = "FRA"
 
 

@@ -55,6 +55,13 @@ CREATE TABLE form_templates (
   -- isoformat string we used to pass — see admin_form_templates.create_form_template).
   created_at       TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  source_language  TEXT NOT NULL DEFAULT 'en',
+  -- [S3] These three were missing while prod had them, which is precisely how the
+  -- version-bump path came to drop them unnoticed: the fixture could not express the
+  -- loss. Keep this schema in step with public.form_templates.
+  source_url          TEXT,
+  verification_status TEXT NOT NULL DEFAULT 'representative',
+  sections            TEXT NOT NULL DEFAULT '[]',
   UNIQUE (code, version)
 );
 """
@@ -294,6 +301,80 @@ class AdminFormTemplatesRouterTests(unittest.TestCase):
         old = get_form_template(template_id=created["id"], user=self.user)
         self.assertEqual(old["name"], "v1 name")
         self.assertEqual(old["version"], "1.0.0")
+
+    def test_patch_version_bump_carries_the_columns_the_api_cannot_edit(self) -> None:
+        """[S3] The behavioural proof, not just the structural one.
+
+        A data sheet's whole value lives in columns the admin UI has no input for. Bumping
+        its version used to drop them — the five-section layout and the Norwegian labels
+        both gone, silently, because the INSERT's column list was hand-written and stale.
+
+        Seeded directly: these are not settable through FormTemplateCreate, which is the
+        point — an unsettable column is exactly the kind that gets forgotten.
+        """
+        created = create_form_template(
+            body=FormTemplateCreate(
+                code="RP-CARRY", name="Data sheet", country="NO", version="1.0.0",
+                fields=[{"id": "full_name", "label": "Full name", "section": "d_number"}],
+            ),
+            user=self.user,
+        )
+        sections = [{
+            "id": "d_number", "number": 1, "title": "D-number (Skatteetaten)",
+            "authority": "Skatteetaten", "session_group": "skatteetaten",
+            "field_ids": ["full_name"],
+        }]
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE form_templates SET sections = :s, source_language = 'nb', "
+                     "verification_status = 'verified', source_url = 'https://skatteetaten.no' "
+                     "WHERE id = :i"),
+                {"s": json.dumps(sections), "i": created["id"]},
+            )
+
+        bumped = update_form_template(
+            template_id=created["id"],
+            body=FormTemplateUpdate(version="2.0.0"),
+            user=self.user,
+        )
+
+        self.assertNotEqual(bumped["id"], created["id"], "expected a new row")
+        self.assertEqual(bumped["sections"], sections,
+                         "the section layout was lost by the version bump")
+        self.assertEqual(bumped["source_language"], "nb",
+                         "source_language was reset — C1's localised labels would vanish")
+        self.assertEqual(bumped["verification_status"], "verified",
+                         "verification_status was reset to the default, silently "
+                         "re-labelling verified content as representative")
+        self.assertEqual(bumped["source_url"], "https://skatteetaten.no")
+
+        # And the old row is untouched — a bump adds history, it does not rewrite it.
+        old = get_form_template(template_id=created["id"], user=self.user)
+        self.assertEqual(old["sections"], sections)
+        self.assertEqual(old["version"], "1.0.0")
+
+    def test_patch_in_place_update_does_not_reset_carried_columns(self) -> None:
+        """The other half: an in-place PATCH that omits them must leave them alone."""
+        created = create_form_template(
+            body=FormTemplateCreate(code="RP-INPLACE", name="n", country="NO",
+                                    version="1.0.0"),
+            user=self.user,
+        )
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE form_templates SET source_language = 'de', "
+                     "verification_status = 'verified' WHERE id = :i"),
+                {"i": created["id"]},
+            )
+        result = update_form_template(
+            template_id=created["id"],
+            body=FormTemplateUpdate(name="renamed"),
+            user=self.user,
+        )
+        self.assertEqual(result["id"], created["id"])
+        self.assertEqual(result["name"], "renamed")
+        self.assertEqual(result["source_language"], "de")
+        self.assertEqual(result["verification_status"], "verified")
 
     def test_patch_version_bump_409_when_target_version_exists(self) -> None:
         a = create_form_template(

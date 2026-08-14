@@ -49,14 +49,18 @@ export const recommendationsEngineAPI = {
     return res.data;
   },
 
-  /** Batch recommendations for selected services. Backend builds criteria from assignment, case, saved answers, and policy. */
+  /** Batch recommendations for selected services. Backend builds criteria from assignment, case, saved answers, and policy.
+   *  `shortlistedAreaIds` (living_areas item_ids the employee shortlisted) re-ranks housing
+   *  agencies to favour those serving the shortlisted neighbourhoods — a boost, never a filter. */
   recommendBatch: async (
     assignmentId: string,
-    selectedServices?: string[]
+    selectedServices?: string[],
+    shortlistedAreaIds?: string[]
   ): Promise<{ results: Record<string, RecommendationResponse> }> => {
     const res = await api.post<{ results: Record<string, RecommendationResponse> }>(`${BASE}/batch`, {
       assignment_id: assignmentId,
       selected_services: selectedServices ?? undefined,
+      shortlisted_area_ids: shortlistedAreaIds && shortlistedAreaIds.length ? shortlistedAreaIds : undefined,
     });
     return res.data;
   },

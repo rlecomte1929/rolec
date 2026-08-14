@@ -81,6 +81,68 @@ def _bank() -> List[ServiceQuestionDef]:
             default=45,
             criteria_key="commute_mins",
         ),
+        # Optional housing preferences — all default-off, so a case with no answers
+        # still scores on sensible defaults. These populate the LivingAreasCriteria
+        # fields (lifestyle_priorities / preferred_areas / avoid_areas / commute mode)
+        # and the housing-agency sub-type preference.
+        ServiceQuestionDef(
+            question_key="commute_mode",
+            label="Preferred way to commute",
+            type="select",
+            service_category="housing",
+            required=False,
+            options=[
+                QuestionOption(value="transit", label="Public transit"),
+                QuestionOption(value="walk", label="Walk"),
+                QuestionOption(value="bike", label="Bike"),
+                QuestionOption(value="car", label="Car"),
+            ],
+            criteria_key="commute_mode",
+        ),
+        ServiceQuestionDef(
+            question_key="housing_lifestyle",
+            label="What matters most in a neighbourhood?",
+            type="multiselect",
+            service_category="housing",
+            required=False,
+            options=[
+                QuestionOption(value="safety", label="Safety"),
+                QuestionOption(value="quiet", label="Quiet"),
+                QuestionOption(value="green", label="Green space"),
+                QuestionOption(value="nightlife", label="Nightlife"),
+            ],
+            criteria_key="housing_lifestyle",
+        ),
+        ServiceQuestionDef(
+            question_key="housing_subtype",
+            label="Type of housing to start with",
+            type="select",
+            service_category="housing",
+            required=False,
+            options=[
+                QuestionOption(value="", label="No preference"),
+                QuestionOption(value="temporary", label="Temporary (serviced apartments)"),
+                QuestionOption(value="permanent", label="Permanent (rental agency)"),
+            ],
+            criteria_key="housing_subtype",
+        ),
+        ServiceQuestionDef(
+            question_key="preferred_areas",
+            label="Neighbourhoods you'd prefer (comma-separated, optional)",
+            type="text",
+            service_category="housing",
+            required=False,
+            placeholder="e.g. Frogner, Grünerløkka",
+            criteria_key="preferred_areas",
+        ),
+        ServiceQuestionDef(
+            question_key="avoid_areas",
+            label="Neighbourhoods to avoid (comma-separated, optional)",
+            type="text",
+            service_category="housing",
+            required=False,
+            criteria_key="avoid_areas",
+        ),
         # [Phase 0] Office address is no longer asked here — it duplicated the
         # intake wizard's office field. Recommendations now source the office
         # address from the case's assignmentContext.workLocation (single source),

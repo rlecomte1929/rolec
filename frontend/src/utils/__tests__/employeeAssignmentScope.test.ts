@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   caseIdForAssignment,
+  persistableCaseId,
   assignmentIdForScopeId,
   resolveScopedAssignmentId,
 } from '../employeeAssignmentScope';
@@ -25,13 +26,46 @@ describe('caseIdForAssignment', () => {
     expect(caseIdForAssignment(rows, 'case-1')).toBe('case-1');
   });
 
-  it('falls back to the id itself when no linked row matches', () => {
-    expect(caseIdForAssignment(rows, 'unknown-id')).toBe('unknown-id');
-    expect(caseIdForAssignment([], 'assign-1')).toBe('assign-1');
+  it('returns null when no linked row matches (fail closed, AIQ-1704)', () => {
+    expect(caseIdForAssignment(rows, 'unknown-id')).toBeNull();
+    expect(caseIdForAssignment([], 'assign-1')).toBeNull();
   });
 
   it('returns null for a null id', () => {
     expect(caseIdForAssignment(rows, null)).toBeNull();
+  });
+});
+
+/**
+ * AIQ-1691: `caseIdForAssignment` falls back to the raw id on a miss. While the
+ * linked summaries are still loading (empty), that raw id is the ASSIGNMENT id,
+ * and persisting services-state against it 404s — the exact intermittent bug
+ * where early "Add to package" saves are dropped. `persistableCaseId` returns
+ * null until the summaries have loaded so the caller never persists a wrong id.
+ */
+describe('persistableCaseId', () => {
+  it('returns null while summaries are still loading (never the raw assignment id)', () => {
+    // AIQ-1704: caseIdForAssignment now returns null on a miss; the mid-load guard
+    // returns null regardless (never guesses while summaries are still loading).
+    expect(caseIdForAssignment([], 'assign-1')).toBeNull();
+    expect(persistableCaseId([], 'assign-1', false)).toBeNull();
+    // Even with summaries present, `loaded=false` means don't guess yet.
+    expect(persistableCaseId(rows, 'assign-1', false)).toBeNull();
+  });
+
+  it('resolves to the case_id once summaries have loaded', () => {
+    expect(persistableCaseId(rows, 'assign-2', true)).toBe('case-2');
+    expect(persistableCaseId(rows, 'case-1', true)).toBe('case-1');
+  });
+
+  it('falls back to the id after load only for a genuine legacy no-match', () => {
+    // Loaded + no linked row: a case_id URL still persists correctly against itself.
+    expect(persistableCaseId(rows, 'case-legacy', true)).toBe('case-legacy');
+  });
+
+  it('returns null for a null id regardless of load state', () => {
+    expect(persistableCaseId(rows, null, true)).toBeNull();
+    expect(persistableCaseId(rows, null, false)).toBeNull();
   });
 });
 
@@ -48,8 +82,8 @@ describe('assignmentIdForScopeId', () => {
   it('returns the id unchanged when it is already an assignment_id', () => {
     expect(assignmentIdForScopeId(rows, 'assign-1')).toBe('assign-1');
   });
-  it('falls back to the id itself when no row matches, and null for null', () => {
-    expect(assignmentIdForScopeId(rows, 'unknown')).toBe('unknown');
+  it('returns null when no row matches, and null for null (fail closed, AIQ-1704)', () => {
+    expect(assignmentIdForScopeId(rows, 'unknown')).toBeNull();
     expect(assignmentIdForScopeId(rows, null)).toBeNull();
   });
 });

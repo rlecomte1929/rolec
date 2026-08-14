@@ -54,3 +54,20 @@ def test_load_prev_ids_tolerates_garbage(tmp_path):
     p.write_text("not json{")
     ids, have_prev = nsc.load_prev_ids(str(p))
     assert ids == set() and have_prev is False  # fail-open on corrupt state
+
+
+def test_no_baseline_creates_new_but_holds_reopen():
+    """AIQ-1738 interaction: a missing baseline (have_prev False) fails OPEN for CREATE — a
+    genuinely new failure still files — but fails CLOSED for REOPEN — a human-closed (Done)
+    task is HELD, not resurrected on a single unverifiable flap (the AIQ-1375 recurrence).
+    main() computes ``confirmed = (not confirm_twice_active) or (test_id in prev_ids)``.
+    """
+    prev_ids, have_prev = set(), False
+    # CREATE path: filter_confirmed keeps everything (fail-open) so new tasks still file.
+    to_file, held = nsc.filter_confirmed(CANDS, prev_ids, have_prev)
+    assert to_file == CANDS and held == []
+    # REOPEN path: with an empty baseline a Done task on AMBER is unconfirmed → held.
+    confirmed = "CORE-HR-command-center" in prev_ids  # False — first-seen this campaign
+    assert nsc.terminal_action("Done", "AMBER", confirmed=confirmed) == "hold"
+    # …and a confirmed one (id present in the baseline) still reopens.
+    assert nsc.terminal_action("Done", "AMBER", confirmed="PER-H1" in {"PER-H1"}) == "reopen"
