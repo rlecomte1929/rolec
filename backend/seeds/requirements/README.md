@@ -82,12 +82,24 @@ Status per (country × purpose). `LT` = long-term-only types seeded; `U` = unive
 | UNITED STATES | U + LT | U + LT | — | U + LT |
 | FRANCE | grounded | grounded | — | — |
 | NETHERLANDS | grounded | grounded | — | — |
+| IRELAND | sourced | sourced | — | — |
 
 **France** is `corpus_grounded` (9 reqs, `US→FR` corpus, VLS-TS / Passeport Talent; only the multi-year
 residence-card renewal is long-term-only → LTA 9 / STA 8). **Netherlands** is `corpus_grounded` (8 reqs,
 `corpus/us_nl_corridor.json`, Highly Skilled Migrant / EU Blue Card; only permanent residence / extension
 is long-term-only → LTA 8 / STA 7), cited to ind.nl / government.nl / belastingdienst.nl. Both scoped to
 the non-EEA route (EEA nationals exempt) and pending human `expert_verified` (immigration-lawyer sign-off).
+
+**Ireland** (13 reqs, AIQ-1832) is the first country seeded **`sourced`**: every row was authored FROM a
+live official page rather than checked against one — the supporting sentence was located in the fetched
+page, quoted verbatim, and the requirement written around it. All 14 underlying claims carry a verbatim
+match recorded in `docs/evidence/ireland_requirements_evidence_2026-08-13.json`. Unlike the other
+countries it seeds BOTH nationality tracks: `[OWN_NATIONAL, EU_EEA]` gets the affirmative "immigration
+requires nothing" answer, `[THIRD_COUNTRY]` gets the Critical Skills permit chain (ES 8 rows / IN 10).
+No assignment-type scoping — the STA boundary is not sourced, and the engine's contract prefers
+over-showing. Three figures asserted elsewhere in the repo were refuted from source and deliberately
+omitted (€60,000 off-list threshold, a 12–16 week decision time, the PDF-only emergency-tax rates); a
+test fails if any reappears. Still `representative`, pending immigration-lawyer sign-off.
 Both resolve via `requirements_builder._ISO_TO_CATALOG_NAME`.
 
 Extend by drafting → reviewing → loading new countries/purposes; update this table per load.

@@ -23,7 +23,7 @@ from backend.app.services.requirements_country_key import (
 from backend.app.services.requirements_builder import _not_covered
 
 # Every country we hold catalog data for, in its various real-world spellings.
-KNOWN_COUNTRIES = ["DE", "NO", "SG", "GB", "US", "FR", "NL"]
+KNOWN_COUNTRIES = ["DE", "NO", "SG", "GB", "US", "FR", "NL", "IE"]
 ALIASES = {"UK": "GB", "USA": "US", "usa": "US"}
 
 

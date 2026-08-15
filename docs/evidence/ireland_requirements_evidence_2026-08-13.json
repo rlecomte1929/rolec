@@ -1,0 +1,133 @@
+{
+ "task": "AIQ-1832 / T18-02",
+ "generated": "2026-08-13",
+ "method": "authored-from-source: the supporting sentence was located in the live official page first, quoted verbatim, and the requirement written around it. fact_evidence.check_evidence then confirms each quote is a substring of the fetched page.",
+ "why_not_verified_against_archive": "All 14 Irish rows in immigration_facts_seed.json have evidence_quote=null, and the ES_IE rows in crawled_immigration_documents are our own hand-written synthesis stored under official source_urls. Checking claims against those would prove only that our text matches our own summary.",
+ "fetch_note": "enterprise.gov.ie needs a browser User-Agent and an <article> selector; the default immigration_page_parser returns only its 308-char cookie banner. revenue.ie is JS-only and unusable.",
+ "summary": {
+  "verified": 14,
+  "total": 14
+ },
+ "claims": [
+  {
+   "key": "csep_lodgement_12_weeks",
+   "branch": "TC",
+   "url": "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/",
+   "verdict": "VERIFIED",
+   "quote": "The application process An application for any employment permit must be received at least 12 weeks before the proposed employment start date."
+  },
+  {
+   "key": "csep_salary_csol",
+   "branch": "TC",
+   "url": "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/",
+   "verdict": "VERIFIED",
+   "quote": "The following are eligible: Occupations with a minimum annual remuneration of €40,904 for a restricted number of strategically important occupations contained in the Critical Skills Occupations List a relevant degree qualification or higher is required."
+  },
+  {
+   "key": "csep_salary_off_list",
+   "branch": "TC",
+   "url": "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/",
+   "verdict": "VERIFIED",
+   "quote": "All occupations with a minimum annual remuneration of over €68,911, other than those on the Ineligible List of Occupations for Employment Permits or which are contrary to the public interest."
+  },
+  {
+   "key": "csep_fee_1000",
+   "branch": "TC",
+   "url": "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/",
+   "verdict": "VERIFIED",
+   "quote": "Fee The processing fee for a Critical Skills Employment Permit is €1,000."
+  },
+  {
+   "key": "irp_within_90_days",
+   "branch": "TC",
+   "url": "https://www.irishimmigration.ie/registering-your-immigration-permission/information-on-registering/immigration-permission-stamps/",
+   "verdict": "VERIFIED",
+   "quote": "Once you have a permission to stay in Ireland you must register it with the Irish immigration authorities, known as Immigration Service Delivery (ISD) within 90 days."
+  },
+  {
+   "key": "irp_fee_300",
+   "branch": "TC",
+   "url": "https://www.citizensinformation.ie/en/moving-country/working-in-ireland/employment-permits/green-card-permits/",
+   "verdict": "VERIFIED",
+   "quote": "The fee for registering with immigration and getting an IRP is €300."
+  },
+  {
+   "key": "eu_no_registration",
+   "branch": "EU",
+   "url": "https://www.citizensinformation.ie/en/moving-country/moving-to-ireland/rights-of-residence-in-ireland/residence-rights-eu-national/",
+   "verdict": "VERIFIED",
+   "quote": "When you come to Ireland, you do not need to register with the immigration authorities and you do not need a residence card to live here."
+  },
+  {
+   "key": "eu_no_visa",
+   "branch": "EU",
+   "url": "https://www.citizensinformation.ie/en/moving-country/moving-to-ireland/rights-of-residence-in-ireland/residence-rights-eu-national/",
+   "verdict": "VERIFIED",
+   "quote": "Right to enter Ireland You do not need a visa or preclearance to come to Ireland if you are a citizen of the EEA or Switzerland."
+  },
+  {
+   "key": "revenue_avoid_emergency_tax",
+   "branch": "EU",
+   "url": "https://www.citizensinformation.ie/en/money-and-tax/tax/income-tax/how-your-tax-is-calculated/",
+   "verdict": "VERIFIED",
+   "quote": "To avoid paying emergency tax you should register the details of the new job with Revenue's Jobs and Pensions online service in myAccount ."
+  },
+  {
+   "key": "emergency_tax_when",
+   "branch": "EU",
+   "url": "https://www.citizensinformation.ie/en/money-and-tax/tax/income-tax/how-your-tax-is-calculated/",
+   "verdict": "VERIFIED",
+   "quote": "Temporary basis You may be taxed on a temporary basis called emergency tax if you are changing job or starting work for the first time."
+  },
+  {
+   "key": "ppsn_purpose",
+   "branch": "BOTH",
+   "url": "https://www.citizensinformation.ie/en/social-welfare/irish-social-welfare-system/personal-public-service-number/",
+   "verdict": "VERIFIED",
+   "quote": "PPS numbers are printed on the following documents: Public Services Card Tax Assessment PAYE Notice of Tax Credits Temporary Payment Card If you do not know your PPS number, contact your Intreo Centre or local Social Welfare Branch Office and staff there can find your number for you."
+  },
+  {
+   "key": "prsi_classes",
+   "branch": "BOTH",
+   "url": "https://www.citizensinformation.ie/en/social-welfare/irish-social-welfare-system/social-insurance-prsi/social-insurance-in-ireland/",
+   "verdict": "VERIFIED",
+   "quote": "The class and rate of contribution you pay is determined by the nature of your work."
+  },
+  {
+   "key": "healthcare_residency",
+   "branch": "BOTH",
+   "url": "https://www.citizensinformation.ie/en/health/medical-cards-and-gp-visit-cards/medical-card/",
+   "verdict": "VERIFIED",
+   "quote": "If you are ‘ ordinarily resident ’ in Ireland you can apply for a medical card."
+  },
+  {
+   "key": "bank_id_address",
+   "branch": "BOTH",
+   "url": "https://www.citizensinformation.ie/en/money-and-tax/personal-finance/banking/opening-a-bank-account/",
+   "verdict": "VERIFIED",
+   "quote": "If you are opening a joint account, you both need to fill in the application and show 2 sets of documents for proof of identity and proof of address."
+  }
+ ],
+ "omitted": [
+  {
+   "claim": "EUR 60,000 off-list CSEP threshold",
+   "reason": "contradicted by enterprise.gov.ie and citizensinformation.ie, both state EUR 68,911"
+  },
+  {
+   "claim": "GEP fee EUR 1,500 for 6-36 months",
+   "reason": "that is the renewal fee; a new GEP is EUR 500 or EUR 1,000"
+  },
+  {
+   "claim": "CSEP decision takes 12-16 weeks",
+   "reason": "appears on no live official page; only in our own synthetic corpus"
+  },
+  {
+   "claim": "emergency tax = 40% + 8% USC from week 5",
+   "reason": "rates live in a Revenue PDF, not the HTML page"
+  },
+  {
+   "claim": "PPSN processing time, D-visa time from Spain, named banks",
+   "reason": "never sourceable; T18 exception register"
+  }
+ ]
+}

@@ -1,0 +1,332 @@
+# Ireland inbound relocation — requirement catalog seed.        [AIQ-1832 / T18-02]
+#
+# REPRESENTATIVE — indicative content, NOT SME-verified. Every row below was authored FROM
+# a live official page, not checked against one: the supporting sentence was located in the
+# fetched page first, quoted, and the row written around it. 14 of 14 claims carry a verbatim
+# match confirmed by backend/app/services/fact_evidence.py (see
+# docs/evidence/ireland_requirements_evidence_2026-08-13.json).
+#
+# Why authored-from-source rather than verified-against-source: the pre-existing Irish
+# material could not support a verification gate. All 14 rows in
+# supabase/seed/obligations/immigration_facts_seed.json carry evidence_quote: null, and the
+# ES_IE rows in crawled_immigration_documents are our own hand-written synthesis stored under
+# official source_urls — checking our claims against those would have proven only that our
+# text matches our own summary.
+#
+# DELIBERATELY OMITTED — each was asserted somewhere in the repo and could not be sourced:
+#   * EUR 60,000 off-list CSEP threshold. Contradicted by enterprise.gov.ie AND
+#     citizensinformation.ie, which both state EUR 68,911. The seed row asserting 60,000 is
+#     confidence:high / auto_accepted and its own cited page does not support it.
+#   * "General Employment Permit fee is EUR 1,500 for 6-36 months". That is the RENEWAL fee;
+#     a new GEP is EUR 500 (<=6 months) or EUR 1,000 (6-24 months).
+#   * "CSEP decision takes 12-16 weeks". Appears on no live official page — only in our own
+#     synthetic corpus. The 12-week LODGEMENT deadline below is a different, sourced quantity:
+#     a rule about when you must apply, not an estimate of how long a decision takes.
+#   * "From week 5, emergency tax is 40% + 8% USC". The rates live in a Revenue PDF, not the
+#     HTML page, so the consequence is described without the unverified percentages.
+#   * PPSN processing time, D-visa processing time from Spain, named banks/mobile providers.
+#
+# NO assignment-type scoping anywhere (all null = applies to STA, LTA and PERMANENT). An
+# earlier draft scoped the permit and IRP rows to LTA/PERMANENT; that was an unsourced guess
+# and it was wrong in the dangerous direction. STA in this codebase means "typically < 12
+# months" (policy_template_service.py:131), not under 90 days — so a third-country national on
+# a 6-month STA still crosses the IRP's 90-day duty, and scoping it out would have told them
+# no immigration step applied. The public endpoint's own contract treats over-showing as the
+# safe failure ("can only ever over-show"), so where the distinction is unsourced, show it.
+# If someone later sources the STA boundary, scope these then — not before.
+#
+# Sources fetched 2026-08-13. Note enterprise.gov.ie requires a browser User-Agent and an
+# <article> selector — the default parser returns only its cookie banner.
+
+verification_status: representative
+default_applies_to_nationality_classes: null
+purposes_by_country:
+  IRELAND: [employment, other]
+
+requirements:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # EU / EEA / Swiss — the correct first message is that immigration requires
+  # NOTHING. Scoped [OWN_NATIONAL, EU_EEA]: an Irish national moving to Dublin
+  # classifies OWN_NATIONAL, and [EU_EEA] alone would silently drop them.
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - key: ie_eu_no_residence_registration
+    pillar: RESIDENCE
+    severity: INFO
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.citizensinformation.ie/en/moving-country/moving-to-ireland/rights-of-residence-in-ireland/residence-rights-eu-national/"
+    countries:
+      IRELAND:
+        title: "No residence registration and no residence card (EU/EEA/Swiss)"
+        description: >-
+          There is no immigration step to complete. Citizens Information states that when you
+          come to Ireland "you do not need to register with the immigration authorities and you
+          do not need a residence card to live here". Ireland has no residents' registration
+          office equivalent — unlike Norway or Germany, nothing has to be filed on arrival, and
+          the first genuinely blocking task is your PPSN, not a permit.
+
+  - key: ie_eu_no_entry_visa
+    pillar: IDENTITY
+    severity: INFO
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.citizensinformation.ie/en/moving-country/moving-to-ireland/rights-of-residence-in-ireland/residence-rights-eu-national/"
+    countries:
+      IRELAND:
+        title: "No entry visa or preclearance required (EU/EEA/Swiss)"
+        description: >-
+          "You do not need a visa or preclearance to come to Ireland if you are a citizen of the
+          EEA or Switzerland" (Citizens Information). Worth stating explicitly because Ireland is
+          outside Schengen, which leads people to assume an entry document is needed. Non-EEA
+          family members travelling with you are treated separately and may need a visa.
+
+  - key: ie_revenue_job_registration
+    pillar: EMPLOYMENT
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.citizensinformation.ie/en/money-and-tax/tax/income-tax/how-your-tax-is-calculated/"
+    countries:
+      IRELAND:
+        title: "Register the new job with Revenue to avoid emergency tax"
+        description: >-
+          This one is yours, not your employer's, and missing it costs money immediately.
+          Citizens Information: "You may be taxed on a temporary basis called emergency tax if
+          you are changing job or starting work for the first time", and "to avoid paying
+          emergency tax you should register the details of the new job with Revenue's Jobs and
+          Pensions online service in myAccount". Register as soon as you have a PPSN and a start
+          date — emergency tax is applied by default, not as an error anyone flags.
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Third-country nationals — Critical Skills Employment Permit route.
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - key: ie_permit_lodgement_12_weeks
+    pillar: TIMELINE
+    severity: BLOCKER
+    owner: HR
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [THIRD_COUNTRY]
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/"
+    countries:
+      IRELAND:
+        title: "Lodge the employment permit at least 12 weeks before the start date"
+        description: >-
+          This is the deadline that decides whether the move is feasible at all. DETE states that
+          "an application for any employment permit must be received at least 12 weeks before the
+          proposed employment start date". It is a rule about when you must apply, not an
+          estimate of how long a decision takes — a start date less than 12 weeks away cannot be
+          met by applying faster. Fix the start date backwards from this.
+
+  - key: ie_csep_salary_csol
+    pillar: EMPLOYMENT
+    severity: BLOCKER
+    owner: HR
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [THIRD_COUNTRY]
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/"
+      - "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/employment-permit-eligibility/highly-skilled-eligible-occupations-list/"
+    countries:
+      IRELAND:
+        title: "Critical Skills salary floor for a listed occupation"
+        description: >-
+          DETE lists as eligible "occupations with a minimum annual remuneration of €40,904 for a
+          restricted number of strategically important occupations contained in the Critical
+          Skills Occupations List". The salary floor and the occupation list are one test, not
+          two: the €40,904 figure only applies if the role is on the list, and a relevant degree
+          is required. Confirm the role appears on the current list before relying on it.
+
+  - key: ie_csep_salary_off_list
+    pillar: EMPLOYMENT
+    severity: WARN
+    owner: HR
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [THIRD_COUNTRY]
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/"
+    countries:
+      IRELAND:
+        title: "Higher salary route when the occupation is not on the list"
+        description: >-
+          A role that is not on the Critical Skills Occupations List can still qualify on salary
+          alone: DETE admits "all occupations with a minimum annual remuneration of over €68,911,
+          other than those on the Ineligible List of Occupations for Employment Permits". This is
+          the route to check before concluding a candidate is ineligible.
+
+  - key: ie_csep_fee
+    pillar: EMPLOYMENT
+    severity: INFO
+    owner: HR
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [THIRD_COUNTRY]
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/"
+    countries:
+      IRELAND:
+        title: "Critical Skills Employment Permit processing fee"
+        description: >-
+          "The processing fee for a Critical Skills Employment Permit is €1,000" (DETE). Budget it
+          as a real line item and agree in advance whether the employer or the employee carries
+          it, since either may lodge the application.
+
+  - key: ie_irp_registration_90_days
+    pillar: RESIDENCE
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [THIRD_COUNTRY]
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.irishimmigration.ie/registering-your-immigration-permission/information-on-registering/immigration-permission-stamps/"
+      - "https://www.irishimmigration.ie/registering-your-immigration-permission/"
+    countries:
+      IRELAND:
+        title: "Register your immigration permission within 90 days of arrival"
+        description: >-
+          An employment permit is not immigration permission — the two are separate, and holding
+          the permit does not discharge this. Immigration Service Delivery states that "once you
+          have a permission to stay in Ireland you must register it with the Irish immigration
+          authorities, known as Immigration Service Delivery (ISD)" within 90 days. Registration
+          produces the Irish Residence Permit (IRP) card, which is also one of the photo IDs a
+          bank will accept.
+
+  - key: ie_irp_registration_fee
+    pillar: RESIDENCE
+    severity: INFO
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [THIRD_COUNTRY]
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.citizensinformation.ie/en/moving-country/working-in-ireland/employment-permits/green-card-permits/"
+    countries:
+      IRELAND:
+        title: "Irish Residence Permit registration fee"
+        description: >-
+          "The fee for registering with immigration and getting an IRP is €300" (Citizens
+          Information). Payable at registration and separate from the employment permit fee.
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Everyone — the practical sequence that actually blocks people on arrival.
+  # No nationality scoping: these apply to every new arrival.
+  # ─────────────────────────────────────────────────────────────────────────
+
+  - key: ie_ppsn
+    pillar: IDENTITY
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: null
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.citizensinformation.ie/en/social-welfare/irish-social-welfare-system/personal-public-service-number/"
+    countries:
+      IRELAND:
+        title: "Personal Public Service (PPS) number"
+        description: >-
+          The PPS number gates almost everything else and is the first thing to start. Citizens
+          Information notes PPS numbers are printed on documents including the Public Services
+          Card and Revenue tax documents. Practical ordering that catches people out: you need
+          the PPSN before you can register the job with Revenue, and the Revenue document is
+          often what satisfies a bank's proof-of-address requirement — so PPSN first, Revenue
+          second, bank third.
+
+  - key: ie_prsi
+    pillar: SOCIAL_SECURITY
+    severity: INFO
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: null
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.citizensinformation.ie/en/social-welfare/irish-social-welfare-system/social-insurance-prsi/social-insurance-in-ireland/"
+    countries:
+      IRELAND:
+        title: "PRSI social insurance contributions"
+        description: >-
+          Employment in Ireland is insurable and PRSI is deducted from salary. Citizens
+          Information: "the class and rate of contribution you pay is determined by the nature of
+          your work". Most employees fall into Class A. Contributions build entitlement to
+          social-insurance benefits, so gaps matter if you later claim.
+
+  - key: ie_healthcare_residency
+    pillar: HEALTHCARE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: null
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.citizensinformation.ie/en/health/medical-cards-and-gp-visit-cards/medical-card/"
+    countries:
+      IRELAND:
+        title: "Healthcare entitlement is based on residency, not nationality"
+        description: >-
+          Entitlement follows residence, not citizenship or employment: "if you are 'ordinarily
+          resident' in Ireland you can apply for a medical card" (Citizens Information). A
+          medical card is means-tested, so a relocating professional will normally not qualify
+          and should plan for private GP charges and private health insurance. There is no
+          national GP registration system — you find a practice yourself, and some are closed to
+          new patients, so start early rather than on first need.
+
+  - key: ie_bank_account
+    pillar: IDENTITY
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: null
+    verification_status: representative
+    confidence: high
+    requires_expert_review: true
+    citations:
+      - "https://www.citizensinformation.ie/en/money-and-tax/personal-finance/banking/opening-a-bank-account/"
+    countries:
+      IRELAND:
+        title: "Irish bank account — proof of identity and a separate proof of address"
+        description: >-
+          Banks require two distinct things, and the second is the one that traps new arrivals.
+          Citizens Information notes an application needs "documents for proof of identity and
+          proof of address". A newly arrived employee typically has photo ID but no utility bill
+          yet; a Revenue document produced after registering the job is the usual way through,
+          which is why the PPSN → Revenue → bank order matters.

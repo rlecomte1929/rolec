@@ -47,6 +47,13 @@ _ISO_TO_CATALOG_NAME = {
     "US": "UNITED STATES",
     "FR": "FRANCE",
     "NL": "NETHERLANDS",
+    # [AIQ-1832] Ireland. This map is the switch that turns a destination on: without an
+    # entry, to_iso() returns None, so classify() cannot resolve a nationality class, every
+    # caller falls back to THIRD_COUNTRY, EU_EEA-scoped rows are silently dropped, and
+    # requirements_builder fails closed with covered=false. Added together with
+    # backend/seeds/requirements/ireland.yaml — an entry here with no catalog rows behind it
+    # would claim coverage we do not have.
+    "IE": "IRELAND",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.
