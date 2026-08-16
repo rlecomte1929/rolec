@@ -107,6 +107,12 @@ class RequirementItem(Base):
     review_status = Column(String, nullable=False, server_default="approved")
     reviewed_by = Column(String, nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    # A real obligation the person would not anticipate (emergency tax, skattekort,
+    # police registration). A display/ranking hint — no read path gates on it.
+    non_obvious = Column(Boolean, nullable=False, server_default="false", default=False)
+    # Free-text deadline, verbatim from the source ("within 8 days of arrival"). Text and
+    # not an interval on purpose: the rules are relative to events the engine doesn't model.
+    timing = Column(Text, nullable=True)
     last_verified_at = Column(DateTime, nullable=False)
 
 
