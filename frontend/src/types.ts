@@ -496,6 +496,15 @@ export interface RequirementItemDTO {
   outcomeType?: 'action' | 'nothing_to_do';
   /** Why nothing is required. The only human-readable payload of a nothing_to_do item. */
   reason?: string | null;
+  /**
+   * A real obligation the person would not anticipate (the skattekort needed before
+   * first pay, police registration). Optional rather than `boolean`: an item the rules
+   * engine synthesised has no catalog row behind it, and null ("not modeled") is a
+   * different claim from false ("modeled, and it is obvious").
+   */
+  nonObvious?: boolean | null;
+  /** Free-text deadline verbatim from the source ("within 3 months of arrival"). */
+  timing?: string | null;
 }
 
 export interface CountryProfileDTO {
