@@ -8,6 +8,21 @@ from .requirements_country_key import iso_to_catalog_name, to_iso
 
 
 def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, Any]]) -> Tuple[List[str], List[Dict[str, Any]], Dict[str, Any]]:
+    """Filter and expand a catalog's requirement dicts against one case draft.
+
+    **Pass-through contract — load-bearing.** A caller's item dicts are carried through
+    OPAQUELY: `expanded` is a shallow copy holding the *same* dict objects, and every
+    filter below is a comprehension over those objects. Keys this module has never heard
+    of (`non_obvious`, `timing`, `verificationStatus`, …) therefore survive untouched, and
+    a caller may add a field to its projection without editing this file.
+
+    Do not "tidy" this into a rebuild — `[{k: r[k] for k in KNOWN_KEYS} ...]` or a dataclass
+    round-trip would silently drop every such field, and the loss is invisible here: the
+    engine's own tests would still pass while the public corridor payload quietly went null.
+    Only items this module *synthesises* (`_requirement`, `_immigration_confirmation`) carry
+    the smaller key set they define, which is why callers must read with `.get()`.
+    Pinned by backend/tests/test_rules_engine_key_passthrough.py.
+    """
     required_fields: List[str] = []
     expanded = list(base_requirements)
     flags: Dict[str, Any] = {}

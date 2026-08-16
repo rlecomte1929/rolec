@@ -108,6 +108,15 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
 _SEMI_OFFICIAL_HOSTS: Tuple[str, ...] = (
     "campusfrance.org", "welcometofrance.com", "workinnorway.no",
     "newtonorway.no", "study.eu", "youreurope.europa.eu",
+    # Ireland. Both are statutory bodies whose domain does not end in `.gov.ie`, so the
+    # suffix rule alone read them as a relocation blog and REJECTED them outright. That
+    # cost us the facts nobody else publishes plainly: emergency tax until the Revenue
+    # job registration lands, RTB tenancy registration, and the non-Schengen consequence
+    # of an Irish permission. Citizens Information is run by the Citizens Information
+    # Board (a statutory agency under the Department of Social Protection); Revenue is
+    # the tax authority itself. Semi-official, not official: both restate rules published
+    # elsewhere, so a fact from here is worth keeping and belongs in the review queue.
+    "citizensinformation.ie", "revenue.ie",
 )
 
 
