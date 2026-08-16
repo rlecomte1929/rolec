@@ -7,13 +7,14 @@ import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, ProgressBar } from '../components/antigravity';
 import { hrAPI } from '../api/client';
 import { getCaseDetailsByAssignmentId } from '../api/caseDetails';
+import { getRequirements } from '../api/cases';
 import type { AssignmentDetail, AssignmentSummary, CaseDraftDTO, ComplianceReport } from '../types';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { blockerSummaryMessage } from '../features/cases/blockerSummaryCopy';
 import { HrAssignmentServicesCapPanel } from '../features/policy-config/HrAssignmentServicesCapPanel';
 import { AssignmentDebugPanel } from './AssignmentDebugPanel';
-import { destinationPermitLabel } from './hrAssignmentPermit';
+import { derivePathSummary } from './hrAssignmentPermit';
 
 type TabKey = 'timeline' | 'intake' | 'documents' | 'providers' | 'messages';
 
@@ -120,6 +121,17 @@ export const HrAssignmentReview: React.FC = () => {
     ? 'Assignment not found or not visible under RLS.'
     : intakeQuery.data?.errorMsg ?? '';
   const intakeLoading = intakeQuery.isLoading;
+
+  // The Path card's source of truth. The endpoint resolves an assignment id to the canonical
+  // case id itself (compat.py), so passing assignment.id is correct here. Failure is not
+  // surfaced as an error state: the card falls back to its static label rather than
+  // interrupting the page for a secondary read.
+  const requirementsQuery = useQuery({
+    queryKey: ['hr', 'case-requirements', assignment?.id],
+    queryFn: () => getRequirements(assignment!.id),
+    enabled: !!assignment?.id,
+    retry: false,
+  });
 
   const feedbackQuery = useQuery({
     queryKey: ['hr', 'feedback', assignment?.id],
@@ -238,7 +250,7 @@ export const HrAssignmentReview: React.FC = () => {
         year: 'numeric',
       })
     : '-';
-  const permitLabel = destinationPermitLabel(destination);
+  const pathSummary = derivePathSummary(destination, requirementsQuery.data ?? null);
   const stageLabel =
     assignment?.status === 'submitted'
       ? 'Stage: Intake - Profile Review'
@@ -516,15 +528,9 @@ export const HrAssignmentReview: React.FC = () => {
                       </div>
                     </div>
                     <div className="text-xl font-semibold text-navy-800">
-                      {permitLabel ?? 'To be determined'}
+                      {pathSummary.label ?? 'To be determined'}
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      {permitLabel
-                        ? 'Indicative — confirm with the relevant authority.'
-                        : destination
-                          ? 'No permit mapping for this destination yet.'
-                          : 'Awaiting destination from intake.'}
-                    </div>
+                    <div className="text-xs text-slate-500 mt-1">{pathSummary.detail}</div>
                   </Card>
                 </div>
 
