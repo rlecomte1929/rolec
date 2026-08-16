@@ -477,3 +477,46 @@ def test_no_code_path_updates_or_deletes_a_signature():
             if "corridorattestationsignature" in low and (".delete(" in low or ".update(" in low):
                 offenders.append(f"{path.relative_to(src)}:{lineno}: {line.strip()}")
     assert not offenders, "signature rows must be insert-only:\n" + "\n".join(offenders)
+
+
+# ── Postgres-shape regression ────────────────────────────────────────────────────────
+
+def test_multiple_items_insert_in_one_flush(corridor):
+    """A corridor with >1 item must create in a single request.
+
+    The regression this pins: `id`/`request_id` are `uuid` in Postgres but were declared
+    `Column(String)`, and `created_at` carries a server_default. That combination makes
+    SQLAlchemy use RETURNING for the multi-row INSERT and then match result rows back to
+    parameter sets by sentinel — which fails on Postgres with
+
+        InvalidRequestError: Can't match sentinel values in result set to parameter sets
+
+    SQLite has no real uuid type, so the whole suite stayed green while the FIRST live
+    Postgres call 500'd. Fixed by `_UUID = Uuid(as_uuid=False)` plus
+    `implicit_returning=False` on the three attestation tables.
+
+    This test cannot fail on SQLite for the original reason — it is a shape guard, and the
+    real proof was a live run against production Postgres (25/25). Kept so the intent is
+    recorded next to the code and a future single-row rewrite does not look harmless.
+    """
+    created = _create(corridor["country"])
+    assert created["request"]["item_count"] == 3, "multi-item insert must survive one flush"
+
+    with SessionLocal() as db:
+        rows = db.query(models.CorridorAttestationItem).filter_by(
+            request_id=created["request"]["id"]).all()
+        assert len(rows) == 3
+        assert all(r.id and r.request_id for r in rows)
+        # ids must be distinct — sentinel confusion would collapse or misassign them
+        assert len({r.id for r in rows}) == 3
+
+
+def test_attestation_tables_disable_implicit_returning():
+    """Static guard on the fix itself, since the behavioural one can't fail on SQLite."""
+    for model in (models.CorridorAttestationRequest,
+                  models.CorridorAttestationItem,
+                  models.CorridorAttestationSignature):
+        assert model.__table__.implicit_returning is False, (
+            f"{model.__tablename__} re-enabled implicit_returning — multi-row INSERT will "
+            "fail on Postgres with a sentinel-matching error"
+        )
