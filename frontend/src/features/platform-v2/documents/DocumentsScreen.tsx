@@ -975,11 +975,18 @@ export function DocumentsScreen({
         borderRadius: C.radLg, marginBottom: '14px', overflow: 'hidden',
       }}>
         {/* Stat cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        {/* 'Outstanding' used to be one tile showing missingCount + pendingCount, which
+            meant uploading a required document changed nothing the employee could see:
+            the row moved from 'required' to 'submitted', both of which the tile added
+            together, so the number sat still until an approval landed — work done, no
+            feedback. Missing and In review are separate tiles for that reason. The two
+            counts were already derived separately above; only the display combined them. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)' }}>
           {[
             { label: 'Total',        value: totalDocs,                         accent: C.accent,   bg: C.surface },
             { label: 'Approved',     value: approvedCount,                     accent: C.success,  bg: C.surface },
-            { label: 'Outstanding',  value: missingCount + pendingCount,        accent: missingCount + pendingCount > 0 ? C.warning : C.border, bg: C.surface },
+            { label: 'Missing',      value: missingCount,                      accent: missingCount > 0 ? C.warning : C.border, bg: C.surface },
+            { label: 'In review',    value: pendingCount,                      accent: pendingCount > 0 ? C.accent : C.border,  bg: C.surface },
             { label: 'Expiring soon',value: expiringCount,                     accent: expiringCount > 0 ? C.danger : C.border,  bg: C.surface },
           ].map(({ label, value, accent, bg }, i, arr) => (
             <div key={label} style={{

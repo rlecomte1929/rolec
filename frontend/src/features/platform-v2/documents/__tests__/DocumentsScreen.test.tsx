@@ -71,6 +71,43 @@ describe('DocumentsScreen', () => {
     expect(container.querySelectorAll('input[type="file"]')).toHaveLength(1);
   });
 
+  // Reads the number rendered next to a stat-tile label. Scoped to `p` because the
+  // row status pills use the same words ("Missing") in a <span>.
+  function statValue(label: string): string {
+    const labelEl = screen.getByText(label, { selector: 'p' });
+    const tile = labelEl.parentElement!;
+    return tile.querySelector('p')!.textContent!;
+  }
+
+  it('separates Missing from In review so an upload visibly moves the needle', () => {
+    // One uploaded-and-awaiting-review, one still required. Under the old single
+    // 'Outstanding' tile both landed in the same bucket, so uploading a document
+    // changed nothing on screen until an approval arrived.
+    const docs = [
+      makeDoc({ key: 'passport_copy', filename: 'Passport copy', status: 'submitted', uploaded_at: '2026-08-16T10:00:00Z' }),
+      makeDoc({ key: 'employment_letter', filename: 'Employment letter', status: 'required' }),
+    ];
+    render(<DocumentsScreen documents={docs} />);
+
+    expect(screen.queryByText('Outstanding')).not.toBeInTheDocument();
+    expect(statValue('Missing')).toBe('1');
+    expect(statValue('In review')).toBe('1');
+  });
+
+  it('a fully uploaded case reads Missing 0 / In review 2 with no approval', () => {
+    // The task's metric: with 2 required docs, uploading both → Missing 0, In review 2.
+    const docs = [
+      makeDoc({ key: 'passport_copy', filename: 'Passport copy', status: 'submitted', uploaded_at: '2026-08-16T10:00:00Z' }),
+      makeDoc({ key: 'employment_letter', filename: 'Employment letter', status: 'under_review', uploaded_at: '2026-08-16T10:05:00Z' }),
+    ];
+    render(<DocumentsScreen documents={docs} />);
+
+    expect(statValue('Missing')).toBe('0');
+    expect(statValue('In review')).toBe('2');
+    // Nothing is approved yet, so the progress figure must not move.
+    expect(statValue('Approved')).toBe('0');
+  });
+
   it('deep-links to the matching row and scrolls it into view', async () => {
     const docs = [
       makeDoc({ key: 'passport_copy', filename: 'Passport copy' }),
