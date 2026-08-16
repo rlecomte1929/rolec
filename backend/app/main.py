@@ -107,6 +107,7 @@ from .routers import (
     admin_product_metrics,
     public_corridor,
     geocoding,
+    attestation,
 )
 from .recommendations.router import router as recommendations_router
 from .recommendations.admin_debug import router as admin_recommendations_debug_router
@@ -220,6 +221,11 @@ def create_app() -> FastAPI:
     app.include_router(public_analytics.router)  # [audos-P2] public POST /api/public/track
     app.include_router(product_track.router)  # authenticated POST /api/track (product events → analytics_events)
     app.include_router(public_corridor.router)   # [audos] public GET /api/public/corridor-requirements
+    # Counsel attestation. TWO routers, deliberately separate: admin_router is behind
+    # require_admin, public_router is token-scoped with no auth. Keeping them distinct
+    # makes the two-key boundary visible at registration, not just inside the handlers.
+    app.include_router(attestation.admin_router)
+    app.include_router(attestation.public_router)
     app.include_router(geocoding.router)   # [AIQ-1607] GET /api/employee/geocode/autocomplete
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)

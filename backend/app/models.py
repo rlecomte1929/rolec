@@ -113,6 +113,18 @@ class RequirementItem(Base):
     # Free-text deadline, verbatim from the source ("within 8 days of arrival"). Text and
     # not an interval on purpose: the rules are relative to events the engine doesn't model.
     timing = Column(Text, nullable=True)
+    # Counsel-attestation axis, ORTHOGONAL to verification_status above. That one is the
+    # founder/corpus ladder (representative → corpus_grounded → verified); this one is
+    # external legal sign-off (NULL/none → requested → attested → stale). Sellable means
+    # BOTH: verification_status='verified' AND attestation_status='attested'.
+    #
+    # Only the admin promote endpoint may ever write 'attested' — the tokenized public
+    # reviewer path must never write to this table at all. That separation is the whole
+    # point of the two-key design; see routers/attestation.py.
+    attestation_status = Column(Text, nullable=True)
+    attested_at = Column(DateTime(timezone=True), nullable=True)
+    attested_by = Column(Text, nullable=True)
+    latest_attestation_request_id = Column(Text, nullable=True)
     last_verified_at = Column(DateTime, nullable=False)
 
 
@@ -566,3 +578,96 @@ class TranslationCache(Base):
     quality_score = Column(Numeric, nullable=True)
     cost_usd = Column(Numeric, nullable=True)
     translated_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Counsel attestation (Phase 1). Tables created by
+# supabase/migrations/20261104000000_counsel_attestation_phase1.sql.
+#
+# `JSON` and not postgresql.JSONB deliberately: the columns ARE jsonb in Postgres,
+# but the backend test fixture is SQLite and the generic type round-trips on both.
+# ─────────────────────────────────────────────────────────────────────────────
+class CorridorAttestationRequest(Base):
+    """One corridor attestation ask — the envelope sent to external counsel."""
+
+    __tablename__ = "corridor_attestation_requests"
+
+    id = Column(String, primary_key=True, index=True)
+    country_code = Column(String, nullable=False, index=True)
+    purpose = Column(String, nullable=False, server_default="employment")
+    scope = Column(Text, nullable=False, server_default="legal")
+    title = Column(Text, nullable=True)
+    # draft | sent | in_review | changes_requested | signed | revoked | superseded
+    status = Column(Text, nullable=False, server_default="draft")
+    requested_by = Column(Text, nullable=False)
+    reviewer_org = Column(Text, nullable=True)
+    reviewer_name = Column(Text, nullable=True)
+    reviewer_email = Column(Text, nullable=True)
+    reviewer_credential = Column(Text, nullable=True)
+    # SHA-256 of the raw token. The raw token is shown to the admin once and never stored,
+    # so a dump of this table does not yield working reviewer links.
+    link_token_hash = Column(Text, nullable=True, index=True)
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    content_snapshot_hash = Column(Text, nullable=False)
+    content_snapshot_json = Column(JSON, nullable=False)
+    disclaimer_version = Column(Text, nullable=True)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class CorridorAttestationItem(Base):
+    """One requirement inside an envelope, carrying the reviewer's decision.
+
+    The `*_snapshot` columns duplicate the catalog row on purpose: counsel signs what they
+    were SHOWN, so the evidence has to survive the requirement_items row being edited later.
+    """
+
+    __tablename__ = "corridor_attestation_items"
+
+    id = Column(String, primary_key=True, index=True)
+    request_id = Column(String, ForeignKey("corridor_attestation_requests.id", ondelete="CASCADE"), nullable=False, index=True)
+    # String, not a uuid type — requirement_items.id is `character varying` in Postgres.
+    # A uuid FK against it fails with 42804 (incompatible types); see the migration header.
+    requirement_item_id = Column(String, ForeignKey("requirement_items.id"), nullable=False, index=True)
+    item_title = Column(Text, nullable=False)
+    claim_snapshot = Column(Text, nullable=True)
+    source_url_snapshot = Column(Text, nullable=True)
+    evidence_snapshot = Column(Text, nullable=True)
+    # pending | approved | amended | rejected
+    decision = Column(Text, nullable=False, server_default="pending")
+    reviewer_comment = Column(Text, nullable=True)
+    proposed_amendment = Column(Text, nullable=True)
+    decided_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class CorridorAttestationSignature(Base):
+    """Append-only proof of sign-off. INSERT ONLY.
+
+    Never UPDATE or DELETE a row of this table. Revocation or re-issue is a NEW row
+    pointing at the prior one through `supersedes_signature_id` — the chain is the audit
+    trail, and a signature you can edit is not evidence of anything.
+    """
+
+    __tablename__ = "corridor_attestation_signatures"
+
+    id = Column(String, primary_key=True, index=True)
+    request_id = Column(String, ForeignKey("corridor_attestation_requests.id"), nullable=False, index=True)
+    signer_name = Column(Text, nullable=False)
+    signer_email = Column(Text, nullable=False)
+    signer_org = Column(Text, nullable=True)
+    signer_credential = Column(Text, nullable=True)
+    # typed_name | uploaded_pdf | esign (future — eIDAS upgrade path, no rewrite needed)
+    signature_method = Column(Text, nullable=False, server_default="typed_name")
+    # Must equal the request's content_snapshot_hash at signing time, or the signature
+    # attests to a checklist the reviewer never saw.
+    signed_content_hash = Column(Text, nullable=False)
+    signed_payload_json = Column(JSON, nullable=False)
+    disclaimer_version = Column(Text, nullable=False)
+    disclaimer_text = Column(Text, nullable=False)
+    signed_ip = Column(Text, nullable=True)
+    signed_user_agent = Column(Text, nullable=True)
+    supersedes_signature_id = Column(String, ForeignKey("corridor_attestation_signatures.id"), nullable=True)
+    signed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
