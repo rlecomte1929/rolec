@@ -5,6 +5,10 @@ Prepared 2026-08-16. Supersedes the brief's reference to
 anywhere in git history. The only file in this directory is `frno-integration-evaluation-2026-08-15.md`,
 and that itself lives only in unpushed local commit `564261a9`.
 
+**Status:** the nine Ireland requirements were promoted and approved on 2026-08-16 (PR #1860).
+`requirement_items` IRELAND is `9`, `review_status='approved'`, `verification_status='representative'`
+— live on the public corridor endpoint. §4 and §5 below are what remains.
+
 ## 1. Where the Ireland content actually lives
 
 The brief measured the wrong table. `import_otto_facts.py --promote` builds `requirement_items`
@@ -60,9 +64,17 @@ re-research worklist, not an accepted loss:
 All 9 surviving IE rows are `applies_to.nationality='non-EEA'` → `[THIRD_COUNTRY]`. A Spanish
 national relocating to Ireland is an **EU free mover who needs no employment permit at all**.
 
-Consequence: promoting these 9 does *not* light up ES→IE for its primary persona.
-`?nationality=ES` returns 0 items. It only looks fixed on the bare URL, because
-`/api/public/corridor-requirements` defaults to `THIRD_COUNTRY` when nationality is omitted.
+Consequence: promoting these 9 does *not* light up ES→IE for its primary persona. Verified
+against prod after the promote and approval: `?nationality=ES` returns exactly **one** item —
+the engine's synthesized *"No visa or residence permit required"* free-movement answer — while
+the bare URL returns all 9, because `/api/public/corridor-requirements` defaults to
+`THIRD_COUNTRY` when nationality is omitted. The nationality gate is working: none of the nine
+third-country permit requirements leak to an EU national.
+
+That single item still leaves the corridor thin. It tells a Spanish employee what they do *not*
+need and stops there — its own text promises *"Any other steps listed here (such as local
+registration) still apply"*, and for Ireland there are none, because we hold no EU/EEA-track
+Irish content.
 
 **Otto card needed:** Ireland EU/EEA free-movement track — right of residence, the fact that no
 permit or visa is required, address/PPSN registration, and what an EU national *does* still have
