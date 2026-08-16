@@ -233,27 +233,55 @@ def _seed_default_published_policy(company_id: str, created_by: Optional[str]) -
         )
 
 
-# [AIQ-1651] The engine's own candidate query: one selected=true CVS row per APPROVED supplier
-# whose registry capability serves the destination country (coverage 'global' OR country_code=dest)
-# and which has a service_catalog_items master. This is exactly the set the recommendations engine
-# would rank, so seeding it satisfies apply_hr_curation WITHOUT weakening the filter. destination_city
-# is left NULL (matches every city); idempotent via NOT EXISTS (the NULL city defeats the unique index).
+# [AIQ-1651] Seed one CVS row per catalog item that serves the destination.
+#
+# Originally this INNER JOINed suppliers + supplier_service_capabilities, which silently
+# required every catalog item to carry a `supplier_id` pointing at an approved supplier.
+# Measured 2026-08-16: all 29 active Ireland catalog rows have `supplier_id IS NULL`, so the
+# join dropped every one of them and the seed produced exactly 3 rows — SIRVA, Santa Fe and
+# Déménagements Delahaye, whose capability is `coverage_scope_type='global'` and therefore
+# matches *any* destination. That looked like a hardcoded three-mover default; it was the
+# join. A newly catalogued destination vendor could never become selectable.
+#
+# Both sources now qualify (LEFT JOIN + an OR):
+#   - a catalog row whose own `country` IS the destination, linked to a supplier or not, and
+#   - a globally-covering approved supplier's item, which is what kept the 3 movers working.
+#
+# The supplier registry stays the *vetting* signal, not the *existence* signal:
+# `employee_recommendations_filter` remains the security control that keeps unvetted suppliers
+# out of what an employee sees. This only populates the curation HR then decides on.
+#
+# destination_city is left NULL (matches every city); idempotent via NOT EXISTS (the NULL city
+# defeats the unique index).
+_COMPLIANCE_CATEGORIES = ("legal_admin", "tax_finance")
+
 _SEED_VENDOR_SELECTIONS_SQL = """
 INSERT INTO company_vendor_selections
     (company_id, category, master_item_id, selected, display_order, country, created_by_user_id)
-SELECT :company_id, sci.category, sci.id, true,
-       row_number() OVER (PARTITION BY sci.category ORDER BY s.name) - 1,
+SELECT :company_id, sci.category, sci.id,
+       -- Compliance-critical categories are never auto-approved on an unverified vendor: a
+       -- solicitor or tax adviser we have not accreditation-checked must be HR's explicit
+       -- decision, not a seed's. Other categories keep the pre-existing selected=true.
+       CASE WHEN sci.category IN ('legal_admin', 'tax_finance')
+            THEN COALESCE((sci.attributes_json ->> 'verified')::boolean, false)
+            ELSE true
+       END,
+       row_number() OVER (PARTITION BY sci.category ORDER BY sci.name) - 1,
        :dest_country, :created_by
 FROM service_catalog_items sci
-JOIN supplier_service_capabilities ssc
-      ON ssc.supplier_id = sci.supplier_id
-     AND ssc.service_category = sci.category
-JOIN suppliers s ON s.id = sci.supplier_id
-WHERE s.status = 'active'
-  AND sci.active = true
-  AND sci.supplier_id IS NOT NULL
-  AND ssc.platform_vetting_status = 'approved'
-  AND (ssc.coverage_scope_type = 'global' OR ssc.country_code = :dest_country)
+LEFT JOIN suppliers s
+       ON s.id = sci.supplier_id
+      AND s.status = 'active'
+LEFT JOIN supplier_service_capabilities ssc
+       ON ssc.supplier_id = sci.supplier_id
+      AND ssc.service_category = sci.category
+      AND ssc.platform_vetting_status = 'approved'
+      AND (ssc.coverage_scope_type = 'global' OR ssc.country_code = :dest_country)
+WHERE sci.active = true
+  AND (
+        sci.country = :dest_country
+     OR (s.id IS NOT NULL AND ssc.supplier_id IS NOT NULL)
+      )
   AND NOT EXISTS (
       SELECT 1 FROM company_vendor_selections cvs
       WHERE cvs.company_id = :company_id AND cvs.master_item_id = sci.id
