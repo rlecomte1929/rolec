@@ -35,6 +35,29 @@ const provenanceBadge = (status: RequirementItemDTO['verificationStatus']) => {
 };
 
 /**
+ * The whole point of the product: a requirement nobody warns you about, flagged
+ * inline so a week-seven ambush is visible in week one.
+ *
+ * Only `true` renders. `null`/`undefined` means the item was synthesised by the rules
+ * engine and has no catalog row to carry the flag — that is "not modeled", which is a
+ * different claim from `false` ("modeled, and it is obvious"). Neither earns a badge,
+ * but they must not be collapsed into one another.
+ *
+ * Amber matches the "Book early" pill in ImmigrationStatusPanel, which is the same idea
+ * on the other requirement surface — the two should not diverge visually.
+ */
+const nonObviousBadge = (nonObvious: RequirementItemDTO['nonObvious']) =>
+  nonObvious ? <Badge variant="warning" size="sm">Easy to miss</Badge> : null;
+
+/** Free text, not a date — the source phrases deadlines against events we do not model. */
+const timingLine = (timing: RequirementItemDTO['timing']) =>
+  timing ? (
+    <div data-testid="requirement-timing" className="text-xs text-[#7a5e2a] mt-1">
+      Due: {timing}
+    </div>
+  ) : null;
+
+/**
  * A `nothing_to_do` item is a POSITIVE ANSWER, not a pending task.
  *
  * "No visa or residence permit required" exists precisely so that a correct answer
@@ -76,6 +99,7 @@ export const RequirementList: React.FC<RequirementListProps> = ({ items, onActio
               <div>
                 <div className="text-sm font-semibold text-[#0b2b43]">{item.title}</div>
                 <div className="text-xs text-[#6b7280] mt-1">{item.description}</div>
+                {timingLine(item.timing)}
                 <div className="flex flex-wrap gap-2 mt-3">
                   <Badge variant={statusVariant(item.statusForCase)} size="sm">
                     {item.statusForCase}
@@ -83,6 +107,7 @@ export const RequirementList: React.FC<RequirementListProps> = ({ items, onActio
                   <Badge variant={ownerVariant(item.owner)} size="sm">
                     {item.owner}
                   </Badge>
+                  {nonObviousBadge(item.nonObvious)}
                   {provenanceBadge(item.verificationStatus)}
                 </div>
               </div>
