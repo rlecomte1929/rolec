@@ -244,6 +244,10 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     else None
                 ),
                 "verificationStatus": getattr(item, "verification_status", None),
+                # getattr-defaulted so a row read before the migration lands degrades to
+                # false/None instead of raising. apply_rules carries both through opaquely.
+                "nonObvious": bool(getattr(item, "non_obvious", False)),
+                "timing": getattr(item, "timing", None),
             }
             for item in requirements
         ]
@@ -277,6 +281,8 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     statusForCase=status,
                     citations=citations,
                     verificationStatus=item.get("verificationStatus"),
+                    nonObvious=item.get("nonObvious"),
+                    timing=item.get("timing"),
                     outcomeType=outcome_type,
                     reason=item.get("reason"),
                 )

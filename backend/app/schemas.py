@@ -124,6 +124,13 @@ class RequirementItemDTO(BaseModel):
     citations: List[SourceRecordDTO]
     # AIQ-1349: provenance level for this requirement.
     verificationStatus: Optional[str] = None
+    # A real obligation the person would not anticipate. Optional, not `bool = False`:
+    # an engine-synthesised item has no such data, and null ("not modeled") must stay
+    # distinguishable from false ("modeled, and it is obvious").
+    nonObvious: Optional[bool] = None
+    # Free-text deadline verbatim from the source ("within 8 days of arrival"). None
+    # when the source states no deadline.
+    timing: Optional[str] = None
     # 'action' (the default — something is required of someone) or
     # 'nothing_to_do' (a STATED positive confirmation that nothing is required).
     # A correct answer of "none" must be stated, never implied by an empty list.
