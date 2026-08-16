@@ -99,6 +99,15 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     "make-it-in-germany.com", "arbeitsagentur.de",
     # Portugal
     "aima.gov.pt", "seg-social.pt", "portaldasfinancas.gov.pt",
+    # Ireland. Immigration Service Delivery, the Department of Justice unit that operates
+    # registration and issues the IRP — it publishes the rule, it does not restate one, which
+    # is what separates it from citizensinformation.ie below. The `.ie` domain does not end in
+    # `gov.ie`, so the suffix rule alone rejected it and took the whole first-time
+    # registration entity with it: the 90-day deadline, the €300 fee, the 10-working-day card
+    # delivery. This repo's own Otto card contract already names the host as statutory
+    # (docs/audos/otto-batch-2026-08-13/otto-batch.json:699, otto_verify.py:56) — the
+    # importer's allowlist had simply never been told.
+    "irishimmigration.ie",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )

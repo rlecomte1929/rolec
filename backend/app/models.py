@@ -1,8 +1,28 @@
 import enum
 
-from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey, JSON
+from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey, JSON, Uuid
 from sqlalchemy.sql import func
 from .db import Base
+
+#: For columns that are genuinely `uuid` in Postgres.
+#:
+#: `Column(String)` against a real `uuid` column looks fine on SQLite and breaks on
+#: Postgres. SQLAlchemy's insertmanyvalues path matches inserted rows back to their
+#: parameter sets by primary key, and a Python `str` sent to a `uuid` column comes back
+#: from the driver as a `UUID`, so the match fails:
+#:
+#:     InvalidRequestError: Can't match sentinel values in result set to parameter sets;
+#:     key '3ccecc8d-…' was not found. There may be a mismatch between the datatype passed
+#:     to the DBAPI driver vs. that which it returns in a result row.
+#:
+#: It only fires on a MULTI-row insert, so a single-row test passes and inserting two
+#: children of one parent 500s — which is why the SQLite suite was green while the first
+#: live Postgres call failed (see reference: mocked/SQLite tests miss PG constraints).
+#:
+#: `Uuid(as_uuid=False)` is the portable fix: native `uuid` on Postgres, CHAR on SQLite,
+#: and plain `str` on the Python side so callers keep passing/comparing `str(uuid4())`.
+#: Use this for any new column declared `uuid` in a migration.
+_UUID = Uuid(as_uuid=False)
 
 
 class Case(Base):
@@ -124,7 +144,7 @@ class RequirementItem(Base):
     attestation_status = Column(Text, nullable=True)
     attested_at = Column(DateTime(timezone=True), nullable=True)
     attested_by = Column(Text, nullable=True)
-    latest_attestation_request_id = Column(Text, nullable=True)
+    latest_attestation_request_id = Column(_UUID, nullable=True)
     last_verified_at = Column(DateTime, nullable=False)
 
 
@@ -591,8 +611,15 @@ class CorridorAttestationRequest(Base):
     """One corridor attestation ask — the envelope sent to external counsel."""
 
     __tablename__ = "corridor_attestation_requests"
+    # implicit_returning=False: with a server_default on created_at, SQLAlchemy uses
+    # RETURNING for a multi-row INSERT and then matches result rows back to parameter sets
+    # by a "sentinel" — which fails on Postgres when the PK is a client-generated uuid
+    # ("Can't match sentinel values in result set to parameter sets"). We generate every id
+    # ourselves and never need a value echoed back at insert time, so turning RETURNING off
+    # removes the whole mechanism. SQLite never hit this, which is why the suite was green.
+    __table_args__ = {"implicit_returning": False}
 
-    id = Column(String, primary_key=True, index=True)
+    id = Column(_UUID, primary_key=True, index=True)
     country_code = Column(String, nullable=False, index=True)
     purpose = Column(String, nullable=False, server_default="employment")
     scope = Column(Text, nullable=False, server_default="legal")
@@ -625,9 +652,16 @@ class CorridorAttestationItem(Base):
     """
 
     __tablename__ = "corridor_attestation_items"
+    # implicit_returning=False: with a server_default on created_at, SQLAlchemy uses
+    # RETURNING for a multi-row INSERT and then matches result rows back to parameter sets
+    # by a "sentinel" — which fails on Postgres when the PK is a client-generated uuid
+    # ("Can't match sentinel values in result set to parameter sets"). We generate every id
+    # ourselves and never need a value echoed back at insert time, so turning RETURNING off
+    # removes the whole mechanism. SQLite never hit this, which is why the suite was green.
+    __table_args__ = {"implicit_returning": False}
 
-    id = Column(String, primary_key=True, index=True)
-    request_id = Column(String, ForeignKey("corridor_attestation_requests.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(_UUID, primary_key=True, index=True)
+    request_id = Column(_UUID, ForeignKey("corridor_attestation_requests.id", ondelete="CASCADE"), nullable=False, index=True)
     # String, not a uuid type — requirement_items.id is `character varying` in Postgres.
     # A uuid FK against it fails with 42804 (incompatible types); see the migration header.
     requirement_item_id = Column(String, ForeignKey("requirement_items.id"), nullable=False, index=True)
@@ -652,9 +686,16 @@ class CorridorAttestationSignature(Base):
     """
 
     __tablename__ = "corridor_attestation_signatures"
+    # implicit_returning=False: with a server_default on created_at, SQLAlchemy uses
+    # RETURNING for a multi-row INSERT and then matches result rows back to parameter sets
+    # by a "sentinel" — which fails on Postgres when the PK is a client-generated uuid
+    # ("Can't match sentinel values in result set to parameter sets"). We generate every id
+    # ourselves and never need a value echoed back at insert time, so turning RETURNING off
+    # removes the whole mechanism. SQLite never hit this, which is why the suite was green.
+    __table_args__ = {"implicit_returning": False}
 
-    id = Column(String, primary_key=True, index=True)
-    request_id = Column(String, ForeignKey("corridor_attestation_requests.id"), nullable=False, index=True)
+    id = Column(_UUID, primary_key=True, index=True)
+    request_id = Column(_UUID, ForeignKey("corridor_attestation_requests.id"), nullable=False, index=True)
     signer_name = Column(Text, nullable=False)
     signer_email = Column(Text, nullable=False)
     signer_org = Column(Text, nullable=True)
@@ -669,5 +710,5 @@ class CorridorAttestationSignature(Base):
     disclaimer_text = Column(Text, nullable=False)
     signed_ip = Column(Text, nullable=True)
     signed_user_agent = Column(Text, nullable=True)
-    supersedes_signature_id = Column(String, ForeignKey("corridor_attestation_signatures.id"), nullable=True)
+    supersedes_signature_id = Column(_UUID, ForeignKey("corridor_attestation_signatures.id"), nullable=True)
     signed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
