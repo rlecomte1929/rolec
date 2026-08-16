@@ -414,9 +414,12 @@ jobs:
           # providers_company_resolution), which is the signature of the shared
           # `db` singleton rather than of anything this file does wrong. Root-causing
           # that is the same deferred isolation fix the other three are waiting on.
+          # [AIQ-1852] `not postgres` — that lane needs a real uuid type and a
+          # migration-built schema; sqlite can provide neither. It runs in
+          # backend-tests-postgres below, not here.
           python -m pytest -q -c backend/pytest.ini --rootdir . \
             backend/tests scripts/tests \
-            -m "not integration and not policy_assistant_audit" \
+            -m "not integration and not policy_assistant_audit and not postgres" \
             --ignore=backend/tests/test_llm_client_text.py \
             --ignore=backend/tests/test_policy_propagation.py \
             --ignore=backend/tests/test_supabase_password_sync.py \
@@ -427,6 +430,72 @@ jobs:
             backend/tests/test_policy_propagation.py \
             backend/tests/test_supabase_password_sync.py \
             backend/tests/test_case_documents_rce_bridge.py
+
+  # [AIQ-1852] The sqlite lane above is evidence about sqlite, not about production.
+  # sqlite has no uuid type, so a model/migration type divergence is invisible to it:
+  # PR #1864 shipped a 500 on every multi-item corridor with 37 green tests, caught only
+  # by a live call and fixed in #1865.
+  #
+  # A `postgres:16` service alone would NOT have caught it. Measured against the pre-fix
+  # commit c35f696b on real Postgres: with the schema built by `Base.metadata.create_all`,
+  # 22/22 passed — `create_all` renders the model, so the table always agrees with the
+  # model that drew it, and a model-vs-migration disagreement cannot exist. Rebuilding the
+  # tables from the migration file made the same commit fail 16. That rebuild is what
+  # backend/tests/postgres/conftest.py does, and it is the load-bearing part of this job.
+  #
+  # Scope is the `postgres` marker, not the whole suite: most of the suite mocks the DB or
+  # assumes sqlite, so running all of it here would be noise. Add to the lane by marking a
+  # test `@pytest.mark.postgres` and, if it needs production DDL, listing its migration in
+  # that conftest's _AUTHORITATIVE_DDL.
+  backend-tests-postgres:
+    name: Backend tests (Postgres 16 parity)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: relopass_test
+        ports:
+          - 5432:5432
+        # Without a healthcheck the steps can start before the server accepts
+        # connections, which reads as a flaky suite rather than a slow container.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/relopass_test
+      RELOPASS_DISABLE_RATE_LIMITS: "1"
+      RELOPASS_QUERY_COUNTER_OFF: "1"
+      # Deliberately NOT setting RELOPASS_ALLOW_REMOTE_DB_IN_TESTS: backend/conftest.py's
+      # AIQ-1777 guard already treats `localhost` as local, so the service container is
+      # allowed on its own merits. Setting the opt-out would switch that guard off for the
+      # whole job and let a future misconfiguration point this suite at a real database.
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Pytest (postgres parity lane)
+        run: |
+          python -m pytest -q -c backend/pytest.ini --rootdir . \
+            backend/tests/postgres -m postgres
 
   # Supabase Edge Functions are Deno, so neither the Python nor the Node job
   # covers them: before AIQ-1702 a PR touching ONLY supabase/functions/** ran no
