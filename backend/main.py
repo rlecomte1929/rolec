@@ -268,6 +268,7 @@ from .app.routers import public_analytics as public_analytics_router  # [audos-P
 from .app.routers import product_track as product_track_router  # authenticated product-event sink → analytics_events
 from .app.routers import admin_product_metrics as admin_product_metrics_router  # admin Product-metrics tab
 from .app.routers import public_corridor as public_corridor_router  # [audos] public corridor requirements read model
+from .app.routers import attestation as attestation_router  # counsel attestation: admin + tokenized public
 from .app.routers import geocoding as geocoding_router  # [AIQ-1607] address autocomplete proxy
 from .app.routers import test_drive as test_drive_router  # TD-2 (AIQ-1420) test-drive provisioning
 from .app.services.question_engine import generate_questions
@@ -914,6 +915,11 @@ app.include_router(analytics_router.router)
 app.include_router(public_analytics_router.router)  # [audos-P2] public POST /api/public/track (no prefix)
 app.include_router(product_track_router.router)  # authenticated POST /api/track (no prefix)
 app.include_router(public_corridor_router.router)  # [audos] public GET /api/public/corridor-requirements
+# Counsel attestation — BOTH routers. This is the registration prod actually serves
+# (backend/app/main.py is the modular app, not the one uvicorn boots), so omitting either
+# line here 405s in production while every test stays green. CLAUDE.md, "405 rule".
+app.include_router(attestation_router.admin_router)  # authed admin: create/list/send/promote
+app.include_router(attestation_router.public_router)  # token-scoped reviewer: view/decide/sign
 app.include_router(geocoding_router.router)  # [AIQ-1607] GET /api/employee/geocode/autocomplete
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
 app.include_router(mobility_context_router.router)  # [AUDIT-C2.3 restore]
