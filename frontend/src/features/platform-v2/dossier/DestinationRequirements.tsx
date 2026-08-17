@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '../../../components/antigravity/Button';
 import { getRequirements } from '../../../api/cases';
 import { RequirementList } from '../../../components/requirements/RequirementList';
@@ -94,21 +94,40 @@ const COPY: Record<RequirementsAudience, CopyPack> = {
 export const DestinationRequirements: React.FC<{
   caseId: string;
   audience?: RequirementsAudience;
-}> = ({ caseId, audience = 'employee' }) => {
+  /**
+   * [AIQ-1902] Report the loaded dossier to the host page. The HR cockpit's Path tile
+   * needs to know whether any requirement survived, so it can stop saying "No permit
+   * mapping for this destination yet." above a list of fourteen of them.
+   *
+   * A callback rather than a second fetch in the caller: this component owns the
+   * four-state discipline documented above, and a parallel fetch would be a second
+   * copy of it that can disagree with this one. `null` means loading or failed —
+   * i.e. "no answer", never "no requirements".
+   */
+  onLoaded?: (data: CaseRequirementsDTO | null) => void;
+}> = ({ caseId, audience = 'employee', onLoaded }) => {
   const copy = COPY[audience];
   const [data, setData] = useState<CaseRequirementsDTO | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [reloadKey, setReloadKey] = useState(0);
 
+  // Held in a ref, and deliberately NOT in the effect's dependency array: callers pass
+  // an inline arrow, which is a new identity every render, so depending on it would
+  // refetch the dossier in a loop.
+  const onLoadedRef = useRef(onLoaded);
+  onLoadedRef.current = onLoaded;
+
   useEffect(() => {
     if (!caseId) return;
     let cancelled = false;
     setState('loading');
+    onLoadedRef.current?.(null);
     getRequirements(caseId)
       .then((res) => {
         if (cancelled) return;
         setData(res);
         setState('ready');
+        onLoadedRef.current?.(res);
       })
       .catch(() => {
         if (cancelled) return;
@@ -116,6 +135,7 @@ export const DestinationRequirements: React.FC<{
         // tell someone they have no legal obligations.
         setData(null);
         setState('failed');
+        onLoadedRef.current?.(null);
       });
     return () => {
       cancelled = true;
