@@ -3,6 +3,14 @@ import type { RecommendationResponse, CategoryInfo } from './types';
 
 const BASE = '/api/recommendations';
 
+// AIQ-1856: the batch endpoint legitimately runs several seconds — it fans out one
+// engine run per selected category, then applies HR curation. In production it was
+// measured at 11.9s for a 4-category case, and the 12s axios default aborted it 77ms
+// before the 200 landed: the work completed server-side, the employee saw "cannot
+// reach server" (a status-0 failed request with no response). Ceiling it well above
+// the real cost — the page already asks the user to keep it open while it works.
+const RECOMMEND_BATCH_TIMEOUT = 60_000;
+
 export interface ProviderRatingResult {
   ok: boolean;
   supplier_id: string;
@@ -57,11 +65,15 @@ export const recommendationsEngineAPI = {
     selectedServices?: string[],
     shortlistedAreaIds?: string[]
   ): Promise<{ results: Record<string, RecommendationResponse> }> => {
-    const res = await api.post<{ results: Record<string, RecommendationResponse> }>(`${BASE}/batch`, {
-      assignment_id: assignmentId,
-      selected_services: selectedServices ?? undefined,
-      shortlisted_area_ids: shortlistedAreaIds && shortlistedAreaIds.length ? shortlistedAreaIds : undefined,
-    });
+    const res = await api.post<{ results: Record<string, RecommendationResponse> }>(
+      `${BASE}/batch`,
+      {
+        assignment_id: assignmentId,
+        selected_services: selectedServices ?? undefined,
+        shortlisted_area_ids: shortlistedAreaIds && shortlistedAreaIds.length ? shortlistedAreaIds : undefined,
+      },
+      { timeout: RECOMMEND_BATCH_TIMEOUT },
+    );
     return res.data;
   },
 };
