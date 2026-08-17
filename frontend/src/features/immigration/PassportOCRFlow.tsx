@@ -11,16 +11,21 @@
  *   Step 2 — Processing
  *     Spinner with progress messages while waiting for the GPT-4o OCR call.
  *
- *   Step 3 — Confirm
- *     Two-column layout: extracted fields on the left (with confidence dot),
- *     current vault values on the right.
- *     "Save extracted data" → calls onSaved() and the extracted fields are now
- *     in the vault (the backend auto-saved them; this step just confirms).
- *     "Discard & enter manually" → calls onDiscard().
+ *   Step 3 — Confirm  [AIQ-1859: editable, and the only place anything is written]
+ *     Every extracted field is an editable input pre-filled with the scan's value, so
+ *     the employee corrects what OCR got wrong before it goes anywhere. The passport
+ *     number stays masked until they choose to reveal it — they cannot verify a number
+ *     they cannot see, and it is their own passport.
+ *     "Confirm & save to my profile" → PUT /api/employee/cases/:caseId/profile with
+ *       field_source='ocr_confirmed', then onSaved().
+ *     "Discard & enter manually" → onDiscard(). Writes nothing, because nothing has
+ *       been written: this used to be a lie. The OCR endpoint auto-saved to the vault
+ *       on upload, so Discard left the passport number, MRZ lines and date of birth in
+ *       the vault and merely advanced the wizard.
  *
- * API: POST /api/employee/cases/:caseId/profile/ocr-passport
+ * API: POST /api/employee/cases/:caseId/profile/ocr-passport   (extract only, no write)
  *   Body: multipart/form-data { file: File }
- *   Response: { extracted_fields, confidence, mrz_validation, conflicts, fields_saved }
+ *   Response: { extracted_fields, confidence, mrz_validation, conflicts }
  */
 
 import React, { useCallback, useRef, useState } from 'react';
@@ -390,13 +395,45 @@ const ProcessingStep: React.FC = () => (
 // ---------------------------------------------------------------------------
 
 interface ConfirmStepProps {
+  caseId: string;
   result: OcrResponse;
   onSaved: () => void;
   onDiscard: () => void;
 }
 
-const ConfirmStep: React.FC<ConfirmStepProps> = ({ result, onSaved, onDiscard }) => {
-  const { extracted_fields, confidence, mrz_validation, conflicts, fields_saved } = result;
+export const ConfirmStep: React.FC<ConfirmStepProps> = ({ caseId, result, onSaved, onDiscard }) => {
+  const { extracted_fields, confidence, mrz_validation, conflicts } = result;
+
+  // [AIQ-1859] Editable review. Nothing has been written yet — the scan is a proposal,
+  // and this local state is the employee's version of it until they press Confirm.
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      DISPLAY_FIELDS.filter((f) => extracted_fields[f]).map((f) => [f, String(extracted_fields[f])]),
+    ),
+  );
+  const [showPassportNumber, setShowPassportNumber] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const confirmAndSave = useCallback(async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      // The ONLY write in this flow. Consent-gated and passport_number-encrypting on
+      // the server; field_source records that a machine read these and a human checked
+      // them, which is neither raw 'ocr' nor hand-typed 'self_entered'.
+      await api.put(`/api/employee/cases/${caseId}/profile`, {
+        ...Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim() !== '')),
+        field_source: 'ocr_confirmed',
+      });
+      onSaved();
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setSaveError(detail || 'Could not save your details. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }, [caseId, values, onSaved]);
 
   return (
     <div className="space-y-5">
@@ -450,13 +487,32 @@ const ConfirmStep: React.FC<ConfirmStepProps> = ({ result, onSaved, onDiscard })
             const extracted = extracted_fields[field];
             const conf = confidence[field];
             if (!extracted) return null;
+            const isPassportNumber = field === 'passport_number';
             return (
               <div
                 key={field}
                 className="grid grid-cols-[1fr_auto_1fr] items-center px-3 py-2.5 border-b border-[#f1f5f9] last:border-b-0 hover:bg-[#fafbfc]"
               >
-                <span className="text-sm text-[#0f172a] font-medium">
-                  {field === 'passport_number' ? '••••••••' : extracted}
+                <span className="flex items-center gap-1.5">
+                  <input
+                    aria-label={FIELD_LABELS[field] || field}
+                    type={isPassportNumber && !showPassportNumber ? 'password' : 'text'}
+                    value={values[field] ?? ''}
+                    onChange={(e) => setValues((v) => ({ ...v, [field]: e.target.value }))}
+                    className="w-full rounded border border-[#e2e8f0] px-2 py-1 text-sm text-[#0f172a] font-medium focus:border-[#1f8e8b] focus:outline-none"
+                  />
+                  {isPassportNumber && (
+                    // Hidden by default as before, but revealable: the employee cannot
+                    // check a number they cannot see, and this is their own passport.
+                    <Button
+                      unstyled
+                      type="button"
+                      onClick={() => setShowPassportNumber((s) => !s)}
+                      className="text-[11px] text-[#1f8e8b] whitespace-nowrap"
+                    >
+                      {showPassportNumber ? 'Hide' : 'Show'}
+                    </Button>
+                  )}
                 </span>
                 <span className="w-8 text-center">
                   <ConfidenceDot score={conf} />
@@ -467,17 +523,19 @@ const ConfirmStep: React.FC<ConfirmStepProps> = ({ result, onSaved, onDiscard })
           })}
         </div>
         <p className="text-xs text-[#94a3b8] mt-1.5">
-          {fields_saved.length} field{fields_saved.length !== 1 ? 's' : ''} saved to your profile ·
-          passport number is masked above for display
+          Nothing is saved yet — check each value, correct anything the scan got wrong,
+          then confirm.
         </p>
       </div>
 
+      {saveError && <Alert variant="error">{saveError}</Alert>}
+
       <div className="flex items-center justify-between gap-3 border-t border-[#e2e8f0] pt-4">
-        <Button variant="outline" onClick={onDiscard}>
+        <Button variant="outline" onClick={onDiscard} disabled={saving}>
           Discard & enter manually
         </Button>
-        <Button variant="primary" onClick={onSaved}>
-          Looks good — continue to interview →
+        <Button variant="primary" onClick={confirmAndSave} disabled={saving}>
+          {saving ? 'Saving…' : 'Confirm & save to my profile →'}
         </Button>
       </div>
     </div>
@@ -546,6 +604,7 @@ export const PassportOCRFlow: React.FC<PassportOCRFlowProps> = ({ caseId, onComp
 
         {step === 'confirm' && result && (
           <ConfirmStep
+            caseId={caseId}
             result={result}
             onSaved={onComplete}
             onDiscard={onSkip}

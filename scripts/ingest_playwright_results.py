@@ -126,8 +126,14 @@ def summarize(results):
         s = r.get("status")
         if s == "PASS":
             c["pass"] += 1
-        elif s in ("FAIL", "BLOCKED"):
+        elif s == "FAIL":
             c["fail"] += 1
+        # BLOCKED falls through to skip. The API runner emits it only for a throttled
+        # or network-failed check and documents it as "excluded from the score
+        # denominator" (relopass_api_runner_patched.js:200-203) — counting it as a
+        # failure here contradicted the runner's own summary line, which reports the
+        # same run as "INCONCLUSIVE (rate-limited)". Matches POINTS["BLOCKED"] = None
+        # in campaign_scorer.py.
         elif s in ("WARN", "PARTIAL"):
             c["warn"] += 1
         elif s == "ENV":

@@ -42,7 +42,27 @@ POINTS = {
     "WARN":    0.5,
     "PARTIAL": 0.5,
     "FAIL":    0.0,
-    "BLOCKED": 0.0,
+    # BLOCKED is inconclusive, not bad. The API runner emits it for exactly one
+    # reason — `if (r && (r.throttled || r.netfail))` — and its own comment says the
+    # check is "excluded from the score denominator"
+    # (relopass_api_runner_patched.js:200-203). Scoring it 0.0 broke that contract:
+    # a throttled check was counted as a P0 FAILURE, and because `cur_bad` is
+    # `points == 0.0` it was also reported as a regression and auto-filed to the
+    # Notion Work Queue.
+    #
+    # Run 31974259630 is the worked example. The runner said:
+    #     ⊘ [AT3_FRESH] Fresh Employee registration smoke test → BLOCKED
+    #     Total: 9 | PASS: 8 FAIL: 0 WARN: 0 SKIP/BLOCKED: 1
+    #     RESULT: INCONCLUSIVE (rate-limited) — 1 check(s) throttled.
+    # and the scorer answered "[P0] AT3_FRESH NEW FAILURE", then opened a ticket for
+    # it — while AT2_FRESH, a fresh HR registration, PASSED in the same run. The
+    # throttle is self-inflicted: provisioning spends the auth rate-limit budget just
+    # before the smoke layer runs, which parse_preflight_wave2.py:29 already documents
+    # as "a self-inflicted harness artifact".
+    #
+    # None (like SKIP/ENV) leaves it out of the denominator, so a throttled run is
+    # scored on what it actually measured instead of being marked broken.
+    "BLOCKED": None,
     "SKIP":    None,   # excluded from denominator
     "ENV":     None,   # environmental / deploy-window transient — excluded, never 'bad'
 }
