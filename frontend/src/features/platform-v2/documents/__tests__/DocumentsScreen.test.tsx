@@ -52,6 +52,25 @@ describe('DocumentsScreen', () => {
     expect(onUpload).toHaveBeenCalledWith(file, 'passport_copy');
   });
 
+  it('exposes exactly one upload affordance, and it is the per-row one', () => {
+    // The header carried a primary "Upload" button wired to `onClick={() => {}}`.
+    // It cannot be implemented from this layer: it has no row, so it has no
+    // document_key, and GET /api/cases/{id}/documents only returns keys the case's
+    // relocation plan requires — a file stored under an invented key is never listed
+    // back, so the upload would silently vanish. It was removed rather than wired.
+    //
+    // This asserts the removal AND that we did not grow a second upload path: with a
+    // single row on screen there is exactly one Upload control and one file input.
+    const doc = makeDoc({ key: 'passport_copy', filename: 'Passport copy' });
+    const { container } = render(<DocumentsScreen documents={[doc]} />);
+
+    const uploadButtons = screen.getAllByRole('button', { name: /upload/i });
+    expect(uploadButtons).toHaveLength(1);
+    // The survivor is the row control — it carries the row's title, the header one did not.
+    expect(uploadButtons[0]).toHaveAttribute('title', 'Upload document');
+    expect(container.querySelectorAll('input[type="file"]')).toHaveLength(1);
+  });
+
   it('deep-links to the matching row and scrolls it into view', async () => {
     const docs = [
       makeDoc({ key: 'passport_copy', filename: 'Passport copy' }),
