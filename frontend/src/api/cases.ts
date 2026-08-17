@@ -188,3 +188,55 @@ export async function fetchCaseOverview(caseId: string): Promise<CaseOverview | 
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Visa Checklist — requirements + per-case completion state
+// ---------------------------------------------------------------------------
+
+export interface ChecklistItem {
+  id: string;
+  title: string;
+  pillar: string;
+  description: string;
+  severity: string | null;
+  owner: string | null;
+  /** A real obligation the person would not anticipate. null = not modeled. */
+  nonObvious: boolean | null;
+  /** Free-text deadline verbatim from the source ("within 90 days of arrival"). */
+  timing: string | null;
+  completed: boolean;
+  completedAt: string | null;
+}
+
+export interface ChecklistView {
+  caseId: string;
+  destCountry: string;
+  purpose: string;
+  /**
+   * false = we hold no requirements catalogue for this destination. Distinct from an empty
+   * `items`, which means we checked and nothing applies — collapsing the two is the
+   * AIQ-1473c failure where "nothing found" reads as "nothing required".
+   */
+  covered: boolean;
+  items: ChecklistItem[];
+  completedCount: number;
+  totalCount: number;
+  percentComplete: number;
+}
+
+export async function getCaseChecklist(caseId: string): Promise<ChecklistView> {
+  return apiGet(`/api/cases/${encodeURIComponent(caseId)}/requirements/checklist`);
+}
+
+/** Tick or untick one requirement. Returns the whole refreshed view, so the progress
+ *  counter stays honest without a second round trip. */
+export async function setCaseChecklistItem(
+  caseId: string,
+  requirementId: string,
+  completed: boolean,
+): Promise<ChecklistView> {
+  return apiPost(`/api/cases/${encodeURIComponent(caseId)}/requirements/checklist`, {
+    requirement_id: requirementId,
+    completed,
+  });
+}
