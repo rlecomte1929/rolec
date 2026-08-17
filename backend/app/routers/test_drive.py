@@ -46,6 +46,8 @@ from sqlalchemy import text
 
 from ... import db_config
 from ...database import db
+from ..services import vendor_proposal
+from ..services.vendor_proposal import COMPLIANCE_CATEGORIES
 from ...db.test_data_filter import looks_like_test_company
 from ...rate_limit import limiter
 from ..services.test_drive_corridor import LOCKED_CORRIDORS, TEST_DRIVE_CORRIDOR_ROUTES
@@ -233,60 +235,12 @@ def _seed_default_published_policy(company_id: str, created_by: Optional[str]) -
         )
 
 
-# [AIQ-1651] Seed one CVS row per catalog item that serves the destination.
-#
-# Originally this INNER JOINed suppliers + supplier_service_capabilities, which silently
-# required every catalog item to carry a `supplier_id` pointing at an approved supplier.
-# Measured 2026-08-16: all 29 active Ireland catalog rows have `supplier_id IS NULL`, so the
-# join dropped every one of them and the seed produced exactly 3 rows — SIRVA, Santa Fe and
-# Déménagements Delahaye, whose capability is `coverage_scope_type='global'` and therefore
-# matches *any* destination. That looked like a hardcoded three-mover default; it was the
-# join. A newly catalogued destination vendor could never become selectable.
-#
-# Both sources now qualify (LEFT JOIN + an OR):
-#   - a catalog row whose own `country` IS the destination, linked to a supplier or not, and
-#   - a globally-covering approved supplier's item, which is what kept the 3 movers working.
-#
-# The supplier registry stays the *vetting* signal, not the *existence* signal:
-# `employee_recommendations_filter` remains the security control that keeps unvetted suppliers
-# out of what an employee sees. This only populates the curation HR then decides on.
-#
-# destination_city is left NULL (matches every city); idempotent via NOT EXISTS (the NULL city
-# defeats the unique index).
-_COMPLIANCE_CATEGORIES = ("legal_admin", "tax_finance")
-
-_SEED_VENDOR_SELECTIONS_SQL = """
-INSERT INTO company_vendor_selections
-    (company_id, category, master_item_id, selected, display_order, country, created_by_user_id)
-SELECT :company_id, sci.category, sci.id,
-       -- Compliance-critical categories are never auto-approved on an unverified vendor: a
-       -- solicitor or tax adviser we have not accreditation-checked must be HR's explicit
-       -- decision, not a seed's. Other categories keep the pre-existing selected=true.
-       CASE WHEN sci.category IN ('legal_admin', 'tax_finance')
-            THEN COALESCE((sci.attributes_json ->> 'verified')::boolean, false)
-            ELSE true
-       END,
-       row_number() OVER (PARTITION BY sci.category ORDER BY sci.name) - 1,
-       :dest_country, :created_by
-FROM service_catalog_items sci
-LEFT JOIN suppliers s
-       ON s.id = sci.supplier_id
-      AND s.status = 'active'
-LEFT JOIN supplier_service_capabilities ssc
-       ON ssc.supplier_id = sci.supplier_id
-      AND ssc.service_category = sci.category
-      AND ssc.platform_vetting_status = 'approved'
-      AND (ssc.coverage_scope_type = 'global' OR ssc.country_code = :dest_country)
-WHERE sci.active = true
-  AND (
-        sci.country = :dest_country
-     OR (s.id IS NOT NULL AND ssc.supplier_id IS NOT NULL)
-      )
-  AND NOT EXISTS (
-      SELECT 1 FROM company_vendor_selections cvs
-      WHERE cvs.company_id = :company_id AND cvs.master_item_id = sci.id
-  )
-"""
+# [AIQ-1903] The seeding query moved to services/vendor_proposal.py so the real-company
+# case-finalisation path and this test-drive path cannot drift apart. That module documents
+# what qualifies as a destination vendor and why; this caller only supplies the POLICY:
+# a test-drive company is a DEMO, so its marketplace must arrive populated (default_selected
+# =True), whereas a real company gets the same list proposed but unapproved.
+_COMPLIANCE_CATEGORIES = COMPLIANCE_CATEGORIES
 
 
 def _seed_default_vendor_selections(
@@ -321,12 +275,14 @@ def _seed_default_vendor_selections(
         )
         return
     try:
-        with db.engine.begin() as conn:
-            result = conn.execute(
-                text(_SEED_VENDOR_SELECTIONS_SQL),
-                {"company_id": company_id, "dest_country": dest_country, "created_by": created_by},
-            )
-        seeded = getattr(result, "rowcount", None)
+        seeded = vendor_proposal.seed_destination_proposal(
+            company_id=company_id,
+            dest_country=dest_country,
+            created_by=created_by,
+            # A demo must show a populated marketplace on arrival. Compliance categories are
+            # still held back unless a HUMAN verified them — see vendor_proposal.
+            default_selected=True,
+        )
         if seeded == 0:
             # 0 selections → the tester sees an empty marketplace. Surface it LOUDLY + structured
             # (never a quiet INFO): a corridor whose destination has no approved suppliers with a

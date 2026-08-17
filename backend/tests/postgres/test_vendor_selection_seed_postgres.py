@@ -49,7 +49,7 @@ pytestmark = pytest.mark.postgres
 # `relation "public.requirement_items" does not exist` — a fixture failure that looks like a
 # failure of this test.
 from backend.app import models  # noqa: E402,F401
-from backend.app.routers.test_drive import _SEED_VENDOR_SELECTIONS_SQL  # noqa: E402
+from backend.app.services.vendor_proposal import _SEED_SQL  # noqa: E402
 
 _RAW_SQL_TABLES = """
 CREATE TABLE IF NOT EXISTS public.service_catalog_items (
@@ -141,20 +141,53 @@ def seeded(pg_schema):
                  "VALUES (:id, :s, 'movers', 'global', NULL, 'approved', false, false, false)"),
             {"id": str(uuid.uuid4()), "s": supplier_id},
         )
+        # Genuinely global: country IS NULL. This is the shape of the real SIRVA /
+        # Déménagements Delahaye rows, and the only shape that should follow a global
+        # capability onto any destination.
         conn.execute(
             text("INSERT INTO service_catalog_items "
                  "(category, country, name, attributes_json, source, active, external_id, supplier_id) "
-                 "VALUES ('movers', 'SG', 'SIRVA Worldwide', '{}'::jsonb, 'seed', true, 'gl-1', :s)"),
+                 "VALUES ('movers', NULL, 'SIRVA Worldwide', '{}'::jsonb, 'seed', true, 'gl-1', :s)"),
             {"s": supplier_id},
+        )
+        # [AIQ-1903] The Santa Fe case, modelled: a row tagged for ANOTHER country whose
+        # supplier capability is global. In production this is `Santa Fe Relocation`
+        # (country='AU', city='Sydney'), which seeded onto Irish moves beside the existing
+        # `Santa Fe Relocation Dublin` — a near-duplicate from the wrong hemisphere.
+        conn.execute(
+            text("INSERT INTO service_catalog_items "
+                 "(category, country, city, name, attributes_json, source, active, external_id, supplier_id) "
+                 "VALUES ('movers', 'AU', 'Sydney', 'Santa Fe Relocation', '{}'::jsonb, 'seed', true, 'au-1', :s)"),
+            {"s": supplier_id},
+        )
+        # [AIQ-1903] An untagged row with NO supplier link: the `Supplier Test` /
+        # `testsupplier` shape. Must never reach a real customer's list.
+        conn.execute(
+            text("INSERT INTO service_catalog_items "
+                 "(category, country, name, attributes_json, source, active, external_id) "
+                 "VALUES ('movers', NULL, 'testsupplier', '{}'::jsonb, 'seed', true, 'junk-1')")
+        )
+        # [AIQ-1903] A SCRAPER-verified solicitor. attributes_json says verified=true, but the
+        # research pipeline wrote it — 876 of 877 scraper rows claim to be verified. Must be
+        # proposed, never auto-approved.
+        conn.execute(
+            text("INSERT INTO service_catalog_items "
+                 "(category, country, name, attributes_json, source, active, external_id) "
+                 "VALUES ('legal_admin', 'IE', 'Otto Scraped Solicitors', "
+                 "'{\"verified\": true, \"provenance\": \"otto_research\"}'::jsonb, "
+                 "'scraper', true, 'ie-scraped')")
         )
     return engine, company_id
 
 
-def _seed(engine, company_id, dest="IE"):
+def _seed(engine, company_id, dest="IE", default_selected=True):
+    """`default_selected` is the caller POLICY: True for test-drive (a demo must arrive
+    populated), False for a real company (propose, let HR approve)."""
     with engine.begin() as conn:
         return conn.execute(
-            text(_SEED_VENDOR_SELECTIONS_SQL),
-            {"company_id": company_id, "dest_country": dest, "created_by": None},
+            text(_SEED_SQL),
+            {"company_id": company_id, "dest_country": dest, "created_by": None,
+             "default_selected": default_selected},
         ).rowcount
 
 
@@ -182,27 +215,95 @@ def test_unlinked_destination_catalog_rows_are_seeded(seeded):
     assert "Dublin Immigration Solicitors" in rows
     assert "Grafton Lettings" in rows
     assert "Bank of Ireland" in rows
-    # All 6 seeded items: 5 Ireland catalog rows + the global mover.
-    assert len(rows) == 6
+    # 7 seeded: 5 Ireland catalog rows + the genuinely-global mover + the scraper-verified
+    # solicitor (proposed, not approved). The AU-tagged Santa Fe row and the supplier-less
+    # `testsupplier` are excluded — each has its own test below.
+    assert len(rows) == 7
     # ...spanning real categories, not movers-only.
     assert {r["category"] for r in rows.values()} == {
         "legal_admin", "tax_finance", "housing_agencies", "banks", "movers",
     }
 
 
-def test_global_coverage_supplier_still_seeded(seeded):
-    """The pre-existing path must not regress: a global approved mover still qualifies even
-    though its catalog row's own country is SG, not the destination."""
+def test_genuinely_global_supplier_still_seeded(seeded):
+    """The pre-existing path must not regress: an untagged (country IS NULL) approved mover
+    still follows its global capability onto any destination."""
     engine, company_id = seeded
     _seed(engine, company_id)
     assert "SIRVA Worldwide" in _rows(engine, company_id)
+
+
+def test_a_row_tagged_for_another_country_is_never_seeded(seeded):
+    """[AIQ-1903] A global CAPABILITY does not license a foreign catalog row.
+
+    This test previously asserted the opposite — it accepted an 'SG'-tagged row onto an Irish
+    move because its supplier coverage was global. In production that rule seeded
+    `Santa Fe Relocation` (country='AU', city='Sydney') alongside the existing
+    `Santa Fe Relocation Dublin`: a near-duplicate, from the wrong country, on every Irish
+    move. Coverage says where a supplier CAN work; the catalog row's own country says which
+    destination this listing is FOR, and the second one wins.
+    """
+    engine, company_id = seeded
+    _seed(engine, company_id)
+    assert "Santa Fe Relocation" not in _rows(engine, company_id)
+
+
+def test_untagged_rows_without_a_supplier_are_never_seeded(seeded):
+    """[AIQ-1903] `country IS NULL` alone must not qualify, or the fixtures leak.
+
+    Production carries active, country-less catalog rows literally named `Supplier Test` and
+    `testsupplier`. Admitting every untagged row — which an earlier draft of this fix did —
+    proposes them as vendors to real customers. An untagged row must earn its place through
+    an approved supplier capability.
+    """
+    engine, company_id = seeded
+    _seed(engine, company_id)
+    assert "testsupplier" not in _rows(engine, company_id)
+
+
+def test_a_scraper_verified_solicitor_is_proposed_but_not_auto_approved(seeded):
+    """[AIQ-1903] `attributes_json.verified` is not, by itself, evidence of accreditation.
+
+    Measured 2026-08-17: the research pipeline sets verified=true on essentially everything it
+    writes — otto_research_backfill 338/338, otto_research_thin 293/293, otto_research 245/245;
+    876 of 877 scraper rows. Gating on the flag alone auto-approved 4 of 5 Irish solicitors and
+    all 11 French legal/tax firms. A regulated professional must be human-verified before
+    ReloPass pre-ticks them on HR's behalf, so the flag must be paired with a non-scraper
+    source.
+
+    The row is still SEEDED — HR can see and approve it. Only the auto-approval is withheld.
+    """
+    engine, company_id = seeded
+    _seed(engine, company_id)
+    rows = _rows(engine, company_id)
+    assert "Otto Scraped Solicitors" in rows, "must be proposed, not hidden"
+    assert rows["Otto Scraped Solicitors"]["selected"] is False
+
+
+def test_real_company_policy_proposes_everything_unselected(seeded):
+    """[AIQ-1903] The real-company caller seeds the same list, approved by nobody.
+
+    `hr_catalog.get_curation_view` treats an untouched master as selected=False and the
+    employee filter shows an empty curation as "HR is finalizing providers". Seeding a real
+    company's rows as approved would overturn that authority model, so the case-finalisation
+    caller passes default_selected=False: HR gets a full pre-filled list to tick, the employee
+    sees no change until they do.
+    """
+    engine, _ = seeded
+    company = str(uuid.uuid4())
+    inserted = _seed(engine, company, default_selected=False)
+    rows = _rows(engine, company)
+    assert inserted == len(rows) > 0
+    assert all(r["selected"] is False for r in rows.values()), (
+        "a real company must have nothing approved on its behalf"
+    )
 
 
 def test_compliance_categories_are_not_auto_selected_while_unverified(seeded):
     engine, company_id = seeded
     _seed(engine, company_id)
     rows = _rows(engine, company_id)
-    # legal_admin / tax_finance: selected only when verified.
+    # legal_admin / tax_finance: selected only when HUMAN-verified (source <> 'scraper').
     assert rows["Dublin Immigration Solicitors"]["selected"] is True
     assert rows["Dublin Tax Partners"]["selected"] is True
     assert rows["Unaccredited Legal Co"]["selected"] is False
@@ -215,9 +316,9 @@ def test_seed_is_idempotent(seeded):
     engine, company_id = seeded
     first = _seed(engine, company_id)
     second = _seed(engine, company_id)
-    assert first == 6
+    assert first == 7
     assert second == 0, "re-running the seed must insert nothing"
-    assert len(_rows(engine, company_id)) == 6
+    assert len(_rows(engine, company_id)) == 7
 
 
 def test_other_destination_does_not_pull_ireland(seeded):
