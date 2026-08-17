@@ -13,6 +13,7 @@ import { safeNavigate } from '../navigation/safeNavigate';
 import { blockerSummaryMessage } from '../features/cases/blockerSummaryCopy';
 import { HrAssignmentServicesCapPanel } from '../features/policy-config/HrAssignmentServicesCapPanel';
 import { AssignmentDebugPanel } from './AssignmentDebugPanel';
+import { VisaChecklistCard } from '../features/cases/VisaChecklistCard';
 import { destinationPermitLabel } from './hrAssignmentPermit';
 
 type TabKey = 'timeline' | 'intake' | 'documents' | 'providers' | 'messages';
@@ -553,6 +554,7 @@ export const HrAssignmentReview: React.FC = () => {
 
               {activeTab === 'timeline' && (
                 <div className="space-y-6">
+                  <VisaChecklistCard caseId={assignment?.id} />
                   {/* Attention/On-track → antigravity Alert; task rows → Card + Chip */}
                   {attentionItems.length > 0 ? (
                     <>
