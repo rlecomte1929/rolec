@@ -38,6 +38,24 @@ import { track } from '../../analytics';
 import { resolveRoadmapBuildVariant } from './roadmapBuildVariant';
 import { isRoadmapHeldForHrReview } from './roadmapReleaseGate';
 
+/**
+ * Tasks whose dossier target is a SET of forms, not one form → dossier `?forms=`.
+ *
+ * `confirm_family_details` is the case this exists for. It carries
+ * `required_inputs=()` (relocation_plan_task_library.py:112), so there is no key to
+ * derive a single `?form=` hint from — and its forms are corridor-specific pairs:
+ * FAM-SPOUSE + FAM-CHILD, DEP-PARTNER + DEP-CHILD, plus AE-FAM-*, CH-FAM-*, ES-FAM-*
+ * and JP-DEP-* variants. Matching on "family" alone would expand whichever sorted
+ * first and miss the Dependant-named corridors entirely, so both tokens are sent and
+ * the dossier scopes its list to every match.
+ *
+ * Keyed by task_code because that is what identifies the task across corridors;
+ * titles are display strings and the required_inputs are empty.
+ */
+const FORM_GROUP_BY_TASK_CODE: Record<string, string | undefined> = {
+  confirm_family_details: 'family,depend',
+};
+
 export const EmployeeCaseRoadmapPage: React.FC = () => {
   const caseId = useValidatedParams(caseParamsSchema, {
     redirectTo: ROUTE_DEFS.employeeDashboard.path,
@@ -83,7 +101,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     // [AIQ-1252] For document-upload tasks, pass the document key so the dossier
     // can deep-link to (auto-expand) the form whose required documents include it.
     const docKey = t.required_inputs?.find((ri) => ri.type === 'document')?.key;
-    runCta(t.cta ?? null, docKey);
+    runCta(t.cta ?? null, docKey, FORM_GROUP_BY_TASK_CODE[t.task_code]);
   };
 
   // Header meta (cities / employee / role / move date) — separate endpoint.

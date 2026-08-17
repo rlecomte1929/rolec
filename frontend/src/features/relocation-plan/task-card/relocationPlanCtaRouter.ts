@@ -17,6 +17,10 @@ import { relocationTaskCtaSemantic } from './relocationTaskCtaSemantic';
 // expected. An optional formHint focuses that form via the page's ?form=<key> param.
 function employeeCaseDossierTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigateTarget {
   const base = buildRoute('employeeCaseDossier', { caseId: ctx.routeCaseId.trim() });
+  // A group hint wins: it means the task's forms are a set, and ?form= could only ever
+  // expand one of them. See formGroupHint in relocationPlanCtaTypes.ts.
+  const group = (ctx.formGroupHint ?? '').trim();
+  if (group) return { kind: 'internal', to: `${base}?forms=${encodeURIComponent(group)}` };
   const hint = (ctx.formHint ?? '').trim();
   return { kind: 'internal', to: hint ? `${base}?form=${encodeURIComponent(hint)}` : base };
 }
