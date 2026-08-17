@@ -27,7 +27,58 @@ log = logging.getLogger(__name__)
 # two are documented as non-overlapping, not merged.
 
 
-def _is_in_country_move(draft: Dict[str, Any], case) -> bool:
+def _canonical_route_fallback(db, case_id: str):
+    """(origin, dest) ISO codes from `relocation_cases`, or (None, None).
+
+    [AIQ-1902] `crud.get_case` reads `wizard_cases` only. A case can be fully
+    populated in `relocation_cases` — the canonical, HR-facing table — and hold an
+    EMPTY `wizard_cases` row, in which case the destination resolved to "UNKNOWN" and
+    every requirement lookup fail-closed to `_not_covered`. Measured in production
+    2026-08-17 on case 6ecadafe-0fdb-43c5-b8dc-0284e323cf51 (Andrea, ES→IE):
+    `wizard_cases.dest_country` empty and `draft_json` `{"relocationBasics": {}, …}`,
+    while `relocation_cases.dest_country_code = 'IE'` and IRELAND has 14 approved
+    requirement_items. The HR cockpit showed "No permit mapping for this destination"
+    on a case whose destination is plainly known.
+
+    This only ADDS a source; it is consulted after the wizard row and the draft, and a
+    case with nothing in either table still fail-closes exactly as before.
+
+    Raw SQL because there is no ORM model for `relocation_cases` — the same shape
+    `roadmap_entitlement.lookup_entitlement` uses. A DB error is not an answer, so it
+    is logged and treated as "no fallback available" rather than as "no destination".
+    """
+    from sqlalchemy import text
+    from sqlalchemy.exc import SQLAlchemyError
+
+    cid = (case_id or "").strip()
+    if not cid:
+        return (None, None)
+    try:
+        row = db.execute(
+            # CAST(... AS TEXT), not the `id::text` shorthand used elsewhere: that is
+            # Postgres-only syntax and the backend test lane runs on SQLite, so the
+            # shorthand would make this path untestable there (and silently so — the
+            # except below would swallow the OperationalError as "no fallback").
+            text(
+                "SELECT origin_country_code, dest_country_code "
+                "FROM relocation_cases WHERE CAST(id AS TEXT) = :cid LIMIT 1"
+            ),
+            {"cid": cid},
+        ).mappings().first()
+    except SQLAlchemyError:
+        log.warning("requirements_builder: relocation_cases fallback failed for case %s", cid)
+        return (None, None)
+    if not row:
+        return (None, None)
+    return (
+        (row.get("origin_country_code") or None),
+        (row.get("dest_country_code") or None),
+    )
+
+
+def _is_in_country_move(
+    draft: Dict[str, Any], case, *, origin_override=None, dest_override=None
+) -> bool:
     """True when origin and destination are the same country.
 
     Keyed off a VERIFIABLE FACT, not off the purpose label. 53 production cases
@@ -43,8 +94,14 @@ def _is_in_country_move(draft: Dict[str, Any], case) -> bool:
     cannot positively know, we make no claim.
     """
     basics = draft.get("relocationBasics", {}) or {}
-    origin = to_iso(getattr(case, "origin_country", None) or basics.get("originCountry"))
-    dest = to_iso(getattr(case, "dest_country", None) or basics.get("destCountry"))
+    # The overrides are the [AIQ-1902] relocation_cases fallback, applied LAST so the
+    # wizard row and the draft keep precedence and existing callers are unaffected.
+    origin = to_iso(
+        getattr(case, "origin_country", None) or basics.get("originCountry") or origin_override
+    )
+    dest = to_iso(
+        getattr(case, "dest_country", None) or basics.get("destCountry") or dest_override
+    )
     return bool(origin and dest and origin == dest)
 
 
@@ -125,8 +182,22 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             raise ValueError("Case not found")
 
         draft = json.loads(case.draft_json)
-        dest_raw = case.dest_country or draft.get("relocationBasics", {}).get("destCountry") or "UNKNOWN"
-        purpose_raw = case.purpose or draft.get("relocationBasics", {}).get("purpose") or "employment"
+        _basics = draft.get("relocationBasics", {}) or {}
+        dest_raw = case.dest_country or _basics.get("destCountry")
+        origin_raw = case.origin_country or _basics.get("originCountry")
+
+        # [AIQ-1902] Last resort: the canonical `relocation_cases` row. A case whose
+        # wizard row is empty still has its route recorded there, and without this the
+        # destination resolved to "UNKNOWN" and the whole dossier fail-closed — the HR
+        # cockpit's "No permit mapping for this destination". Only consulted when the
+        # wizard row and the draft both came up empty, so precedence is unchanged.
+        if not dest_raw:
+            fallback_origin, fallback_dest = _canonical_route_fallback(db, case.id)
+            dest_raw = dest_raw or fallback_dest
+            origin_raw = origin_raw or fallback_origin
+
+        dest_raw = dest_raw or "UNKNOWN"
+        purpose_raw = case.purpose or _basics.get("purpose") or "employment"
 
         # The purpose key is matched with `==` against a catalog seeded with only
         # {employment, other, study, family}. Nothing validated the field, three
@@ -141,7 +212,9 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
         # verifiable fact — rather than off the `domestic`/`repatriation` labels,
         # which live in the same untrustworthy field. Answered explicitly rather
         # than by an empty list.
-        if _is_in_country_move(draft, case):
+        if _is_in_country_move(
+            draft, case, origin_override=origin_raw, dest_override=dest_raw
+        ):
             return _in_country_move(case.id, dest_raw, purpose or "employment")
 
         # AIQ-1473c: fail closed. If the destination doesn't resolve to a known
