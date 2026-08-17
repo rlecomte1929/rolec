@@ -130,10 +130,35 @@ export const EmployeeDossierPage: React.FC = () => {
   // only its triggered forms; otherwise the full list. The status tabs,
   // counts, and completion summary all derive from this scoped set so the
   // page stays internally consistent with the banner.
-  const scopedForms = useMemo(
-    () => (roadmapStep ? forms.filter((f) => f.roadmap_step_id === roadmapStep) : forms),
-    [forms, roadmapStep],
-  );
+  // [AIQ-1892] ?forms=<tok,tok> — a roadmap task whose dossier target is a SET of forms
+  // rather than one. "Confirm family / dependent details" has no required_inputs to
+  // build a single ?form= key from, and its forms are corridor-specific spouse/child
+  // pairs (FAM-SPOUSE + FAM-CHILD, DEP-PARTNER + DEP-CHILD, AE-FAM-*, JP-DEP-*, …), so
+  // ?form= could only ever expand one of them. Scope the list to every match instead.
+  // Matching mirrors the ?form= predicate below (id / template code / substring).
+  const formsGroupParam = searchParams.get('forms');
+  const groupMatchedForms = useMemo(() => {
+    const tokens = (formsGroupParam ?? '')
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+    if (tokens.length === 0) return null;
+    const hits = forms.filter((f) =>
+      tokens.some((v) => {
+        if (f.id.toLowerCase() === v) return true;
+        if ((f.template?.code ?? '').toLowerCase().includes(v)) return true;
+        return v.length >= 4 && (f.template?.name ?? '').toLowerCase().includes(v);
+      }),
+    );
+    // No match → null, so the employee sees the whole dossier rather than an empty
+    // page. Same fail-open stance as the stale-?form= cleanup below.
+    return hits.length > 0 ? hits : null;
+  }, [formsGroupParam, forms]);
+
+  const scopedForms = useMemo(() => {
+    if (roadmapStep) return forms.filter((f) => f.roadmap_step_id === roadmapStep);
+    return groupMatchedForms ?? forms;
+  }, [forms, roadmapStep, groupMatchedForms]);
 
   const clearRoadmapStep = useCallback(() => {
     const next = new URLSearchParams(searchParams);
@@ -194,13 +219,16 @@ export const EmployeeDossierPage: React.FC = () => {
     return hit?.id ?? null;
   }, [formParam, forms]);
 
-  // Scroll the matched card into view once forms have loaded.
+  // Scroll the matched card into view once forms have loaded. For a ?forms= group the
+  // list is already scoped to the matches, so bring the first one into view — every
+  // member is on screen, unlike ?form= where one card is singled out and expanded.
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const scrollTargetId = matchedFormId ?? groupMatchedForms?.[0]?.id ?? null;
   useEffect(() => {
-    if (!matchedFormId) return;
-    const el = cardRefs.current[matchedFormId];
+    if (!scrollTargetId) return;
+    const el = cardRefs.current[scrollTargetId];
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [matchedFormId, visible]);
+  }, [scrollTargetId, visible]);
 
   // [AIQ-1319] A roadmap "Start now" can deep-link ?form=<docKey> for a document
   // (e.g. a passport upload) that has no corresponding form in this corridor's
