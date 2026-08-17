@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request
 
 from ..auth_deps import get_current_user, require_assignment_visibility, require_hr_or_employee
 from ...database import db as _db
@@ -75,6 +75,7 @@ class _BatchRequest:
 @router.post("/batch")
 def post_recommendations_batch(
     request: Request,
+    background_tasks: BackgroundTasks,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
     body: Dict[str, Any] = Body(...),
 ):
@@ -249,8 +250,15 @@ def post_recommendations_batch(
         request_id, req.assignment_id, list(results.keys()), dur_ms,
     )
     # [P2] Persist each candidate slate for learned-ranking training data.
+    # AIQ-1856: this runs the engine a SECOND time per category (recommend_debug),
+    # entirely after the answer the caller is waiting for has been computed. On a
+    # 4-category case it added ~6.5s to a ~4.5s request — 55% of an 11.9s response,
+    # enough to push it past the client timeout and surface as "cannot reach server".
+    # It is best-effort training telemetry that nothing in the response depends on,
+    # so dispatch it after the response is sent instead of ahead of it.
     for backend_key in results:
-        _log_slate(
+        background_tasks.add_task(
+            _log_slate,
             backend_key,
             criteria_map.get(backend_key, {}),
             case_id=case_id,
