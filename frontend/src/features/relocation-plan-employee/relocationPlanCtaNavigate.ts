@@ -38,8 +38,9 @@ export function useRelocationPlanCtaHandler(
 
   return useCallback(
     // [AIQ-1252] optional per-call formHint → dossier ?form= deep-link.
-    (cta: RelocationPlanCtaDTO | null | undefined, formHint?: string | null) => {
-      const t = resolveRelocationTaskCtaTarget({ routeCaseId, resourceCaseId, role, formHint }, cta);
+    // formGroupHint → ?forms=, for a task whose forms are a set rather than one form.
+    (cta: RelocationPlanCtaDTO | null | undefined, formHint?: string | null, formGroupHint?: string | null) => {
+      const t = resolveRelocationTaskCtaTarget({ routeCaseId, resourceCaseId, role, formHint, formGroupHint }, cta);
       if (t.kind === 'internal') navigate(t.to);
       else if (t.kind === 'external') window.open(t.href, '_blank', 'noopener,noreferrer');
     },

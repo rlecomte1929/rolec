@@ -56,7 +56,6 @@ from ..services.ocr_passport_extractor import (
     _upload_passport_image,
     detect_conflicts,
     extract_passport,
-    save_ocr_to_vault,
     validate_mrz,
 )
 
@@ -102,6 +101,19 @@ class EmployeeProfileUpdate(BaseModel):
     institution: Optional[str] = None
     graduation_year: Optional[int] = None
     degree_anabin_status: Optional[str] = None
+
+    # [AIQ-1859] Provenance for THIS write. Not a column — popped before the update is
+    # built, so it must never reach the SQL (the handler iterates `updates` as column
+    # names). 'ocr_confirmed' is the passport flow: a machine read it, a human checked
+    # it. That is a different claim from 'ocr' (machine, unreviewed — what the old
+    # auto-save wrote) and from 'self_entered' (typed by hand), and the distinction is
+    # the whole point of keeping an audit trail.
+    field_source: Optional[str] = None
+
+
+#: Sources an employee-initiated write may claim. 'hr_provided' is deliberately absent —
+#: an employee cannot attribute their own edit to HR.
+_EMPLOYEE_FIELD_SOURCES = {"self_entered", "ocr_confirmed"}
 
 router = APIRouter(prefix="/api", tags=["immigration-intake-profile"])
 
@@ -390,6 +402,15 @@ def upsert_profile_employee(
         )
 
     updates = body.model_dump(exclude_none=True)
+    # [AIQ-1859] Pop before anything reads `updates` as column names — every branch
+    # below builds SQL from its keys, so leaving this in would emit `field_source = :…`
+    # against a column that does not exist.
+    field_source = updates.pop("field_source", None) or "self_entered"
+    if field_source not in _EMPLOYEE_FIELD_SOURCES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"field_source must be one of {sorted(_EMPLOYEE_FIELD_SOURCES)}.",
+        )
     if not updates:
         raise HTTPException(status_code=422, detail="No fields to update.")
 
@@ -416,7 +437,7 @@ def upsert_profile_employee(
         for f in updates:
             # Don't overwrite hr_provided fields
             if existing_sources.get(f) != "hr_provided":
-                existing_sources[f] = "self_entered"
+                existing_sources[f] = field_source
 
         set_clauses = []
         params: Dict[str, Any] = {"case_id": case_id, "employee_id": employee_id, "now": now}
@@ -457,7 +478,7 @@ def upsert_profile_employee(
     else:
         # Create new profile
         profile_id = str(uuid.uuid4())
-        field_sources = {f: "self_entered" for f in updates}
+        field_sources = {f: field_source for f in updates}
         params = {
             "id": profile_id,
             "case_id": case_id,
@@ -515,13 +536,24 @@ async def ocr_passport(
     current_user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
-    IMM-05 — Passport OCR upload, extract, validate MRZ, detect conflicts,
-    and auto-save extracted fields to imm_employee_profiles.
+    IMM-05 — Passport OCR upload, extract, validate MRZ, detect conflicts.
 
-    Returns extracted fields with per-field confidence, MRZ validation result,
-    conflict records, and the updated profile_id.
-    Does NOT require the employee to confirm — fields are saved immediately
-    with source='ocr' (can be overridden by a subsequent self_entered PUT).
+    Returns extracted fields with per-field confidence, MRZ validation result and
+    conflict records. **Extracting does not store anything in the vault.** The
+    employee reviews and edits the values, then confirms via
+    ``PUT /employee/cases/{case_id}/profile``, which is the only write path.
+
+    [AIQ-1859] This used to call ``save_ocr_to_vault`` right here, before the
+    employee had seen a single field — the docstring said so plainly: "Does NOT
+    require the employee to confirm — fields are saved immediately". The UI's
+    "Save extracted data" button was therefore decorative, and its "Discard & enter
+    manually" only advanced the wizard (ImmigrationPage sets stage='interview') while
+    the passport number, MRZ lines and date of birth stayed in the vault. With the
+    vault key live that is passport data written before the person agreed to save it,
+    and declining did not remove it.
+
+    The uploaded image is still stored — that is the document of record and is
+    governed by consent above. Only the extracted *field* write moved.
     """
     employee_id = current_user["id"]
 
@@ -571,12 +603,18 @@ async def ocr_passport(
             field_sources=existing_profile.get("field_sources") or {},
         )
 
-    # --- Auto-save to vault ---
-    org_id = current_user.get("org_id", "")
-    profile_id = save_ocr_to_vault(case_id, employee_id, extraction, org_id)
+    # --- NO vault write here ---
+    # [AIQ-1859] `save_ocr_to_vault(...)` used to run at this point. It does not any
+    # more: the employee confirms first, and PUT /employee/cases/{id}/profile performs
+    # the write. Do not reinstate a write here — a test asserts this endpoint performs
+    # none (backend/tests/test_ocr_passport_no_write_before_confirm.py).
+    profile_id = existing_profile.get("id") if existing_profile else None
 
     # --- Log access ---
-    saved_fields = [
+    # These are the fields the extraction READ off the passport, not fields written.
+    # The action name says so: an `ocr_extract` that persisted nothing must not leave
+    # an audit trail implying it did.
+    extracted_fields_present = [
         f for f in [
             "legal_first_name", "legal_last_name", "date_of_birth", "gender",
             "place_of_birth", "nationality", "passport_country", "passport_expiry",
@@ -591,11 +629,11 @@ async def ocr_passport(
     ]
     _log_access(
         case_id=case_id,
-        profile_id=profile_id or (existing_profile.get("id") if existing_profile else None),
+        profile_id=profile_id,
         user_id=employee_id,
         role="employee",
-        action="ocr_extract",
-        fields=saved_fields,
+        action="ocr_extract_preview",
+        fields=extracted_fields_present,
         purpose="immigration_processing",
     )
 
