@@ -43,21 +43,60 @@ const SPECS: Spec[] = [
 
 setup('provision is_test personas via API', async ({ request }) => {
   setup.skip(!PW, 'RELOPASS_E2E_PASSWORD not set — cannot provision (set it to run the headless path)');
-  setup.setTimeout(240_000); // a 429 retry can wait ~60s; allow headroom for up to 3 registrations
+  // A 429 retry can wait ~60s and a 5xx retry 10s; allow headroom for 3 registrations
+  // that each burn their retries. Raised from 240s when 5xx retries were added.
+  setup.setTimeout(300_000);
   fs.mkdirSync(AUTH_DIR, { recursive: true });
 
   // Registration is rate-limited; on 429 honor retry_after and retry (the API-smoke
   // layer + these 3 registrations can otherwise blow the per-window budget).
+  //
+  // 5xx is retried too. A deploy rolling underneath the run makes Cloudflare return a
+  // 502 HTML page for one registration, and passing that straight through fails the
+  // whole setup project — which is every downstream project's dependency. Run
+  // 31960190964 died exactly that way: `register emp_a → <title>relopass.com | 502:
+  // Bad gateway</title>`, taking 19 of 32 specs with it.
   async function registerWithRetry(data: Record<string, string>, key: string) {
     for (let attempt = 1; attempt <= 3; attempt++) {
       const resp = await request.post(`${API}/api/auth/register`, { data });
-      if (resp.status() !== 429) return resp;
-      let retryAfter = 60;
-      try { retryAfter = (JSON.parse(await resp.text()).retry_after as number) || 60; } catch { /* default */ }
-      console.log(`  ${key}: 429 rate-limited — waiting ${retryAfter + 3}s (attempt ${attempt}/3)`);
-      await new Promise((res) => setTimeout(res, (retryAfter + 3) * 1000));
+      if (resp.status() === 429) {
+        let retryAfter = 60;
+        try { retryAfter = (JSON.parse(await resp.text()).retry_after as number) || 60; } catch { /* default */ }
+        console.log(`  ${key}: 429 rate-limited — waiting ${retryAfter + 3}s (attempt ${attempt}/3)`);
+        await new Promise((res) => setTimeout(res, (retryAfter + 3) * 1000));
+        continue;
+      }
+      if (resp.status() >= 500) {
+        console.log(`  ${key}: ${resp.status()} from the origin — retrying in 10s (attempt ${attempt}/3)`);
+        await new Promise((res) => setTimeout(res, 10_000));
+        continue;
+      }
+      return resp;
     }
     return request.post(`${API}/api/auth/register`, { data });
+  }
+
+  /**
+   * Register, or adopt the persona a previous attempt already created.
+   *
+   * TAG is derived from RUNID (line 29), so it is STABLE for the whole run — which
+   * means a Playwright retry of this setup re-registers the same three emails and the
+   * API correctly answers 400 AUTH_EMAIL_TAKEN. Without this fallback the retry can
+   * never succeed, so one transient blip during the first attempt permanently fails
+   * the run. That is not a registration bug and it is what made run 31960190964 look
+   * like one: attempt 1 registered hr_a (200) then hit a 502 on emp_a; attempt 2 then
+   * died on `register hr_a → {"detail":{"code":"AUTH_EMAIL_TAKEN"...}}`.
+   *
+   * AUTH_EMAIL_TAKEN here means the persona exists with the password we just sent, so
+   * logging in yields the same token and the same user payload — including `company`,
+   * which the B18 guard below asserts on.
+   */
+  async function provision(data: Record<string, string>, key: string, email: string) {
+    const r = await registerWithRetry(data, key);
+    if (r.status() !== 400 || !(await r.text()).includes('AUTH_EMAIL_TAKEN')) return r;
+    console.log(`  ${key}: already registered by an earlier attempt of this run — logging in instead`);
+    // The login schema takes `identifier` (email OR username), not `email`.
+    return request.post(`${API}/api/auth/login`, { data: { identifier: email, password: PW! } });
   }
 
   const provisioned: Record<string, Provisioned> = {};
@@ -66,7 +105,7 @@ setup('provision is_test personas via API', async ({ request }) => {
     const data: Record<string, string> = { email, password: PW!, name: `E2E ${s.key} ${TAG}`, role: s.role };
     if (s.company_name) data.company_name = s.company_name;
 
-    const r = await registerWithRetry(data, s.key);
+    const r = await provision(data, s.key, email);
     expect(r.status(), `register ${s.key} → ${await r.text()}`).toBeLessThan(300);
     const j = await r.json();
     const user = j.user || {};

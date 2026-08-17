@@ -942,20 +942,26 @@ export function DocumentsScreen({
             </svg>
             Export all
           </Button>
-          <Button unstyled
-            onClick={() => {/* future: open upload modal */}}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              padding: '7px 14px', borderRadius: C.radMd,
-              border: `1px solid ${C.accent}`, background: C.accent,
-              color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
-            </svg>
-            Upload
-          </Button>
+          {/* There is deliberately no header "Upload" button.
+              It sat here with `onClick={() => {}}` and a "future: open upload modal"
+              comment — a primary-styled control that did nothing.
+
+              It cannot be wired from this layer. Uploading needs a `document_key`, and
+              a header button has no row to take one from, so it would have to invent an
+              ad-hoc key. GET /api/cases/{id}/documents builds its response by iterating
+              ONLY the document-type `required_inputs` of the case's relocation plan
+              (case_documents.py `list_case_documents` → `_document_keys_for_case`), so a
+              document stored under any other key is never returned. The upload would
+              succeed, the file would be billed to storage, and the user would never see
+              it in the vault or be able to delete it — strictly worse than a dead button.
+
+              Uploading against a key the plan DOES require is exactly what the per-row
+              Upload/Replace control (`RowUpload`) already does, and duplicating it here
+              would be the second upload code path this change exists to avoid.
+
+              Restoring a header upload needs a backend change first: have the list
+              endpoint return uploaded documents whose key is not a planned requirement.
+              Until then, the per-row control is the whole upload surface. */}
         </div>
       </div>
 
@@ -969,11 +975,18 @@ export function DocumentsScreen({
         borderRadius: C.radLg, marginBottom: '14px', overflow: 'hidden',
       }}>
         {/* Stat cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        {/* 'Outstanding' used to be one tile showing missingCount + pendingCount, which
+            meant uploading a required document changed nothing the employee could see:
+            the row moved from 'required' to 'submitted', both of which the tile added
+            together, so the number sat still until an approval landed — work done, no
+            feedback. Missing and In review are separate tiles for that reason. The two
+            counts were already derived separately above; only the display combined them. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)' }}>
           {[
             { label: 'Total',        value: totalDocs,                         accent: C.accent,   bg: C.surface },
             { label: 'Approved',     value: approvedCount,                     accent: C.success,  bg: C.surface },
-            { label: 'Outstanding',  value: missingCount + pendingCount,        accent: missingCount + pendingCount > 0 ? C.warning : C.border, bg: C.surface },
+            { label: 'Missing',      value: missingCount,                      accent: missingCount > 0 ? C.warning : C.border, bg: C.surface },
+            { label: 'In review',    value: pendingCount,                      accent: pendingCount > 0 ? C.accent : C.border,  bg: C.surface },
             { label: 'Expiring soon',value: expiringCount,                     accent: expiringCount > 0 ? C.danger : C.border,  bg: C.surface },
           ].map(({ label, value, accent, bg }, i, arr) => (
             <div key={label} style={{
