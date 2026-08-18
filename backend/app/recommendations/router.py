@@ -75,7 +75,10 @@ class _BatchRequest:
 @router.post("/batch")
 def post_recommendations_batch(
     request: Request,
-    background_tasks: BackgroundTasks,
+    # AIQ-1856 follow-up: defaulted, NOT required. FastAPI still injects a real
+    # BackgroundTasks for an HTTP request, but `test_drive.provision-staged` calls this
+    # function DIRECTLY as Python; a required parameter made that a TypeError -> 500.
+    background_tasks: BackgroundTasks = None,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
     body: Dict[str, Any] = Body(...),
 ):
@@ -97,6 +100,13 @@ def post_recommendations_batch(
     )
     request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
     start = time.perf_counter()
+
+    # A direct caller gets no FastAPI queue and nothing would ever drain one, so own it
+    # and run the tasks inline at the end — exactly what this code did before the slate
+    # writes moved off the response path. Never silently drop the telemetry.
+    _drain_inline = background_tasks is None
+    if _drain_inline:
+        background_tasks = BackgroundTasks()
 
     # Avoid circular imports
     from ...database import db
@@ -266,6 +276,12 @@ def post_recommendations_batch(
             company_id=company_id,
             request_id=request_id,
         )
+    if _drain_inline:
+        # Direct (non-FastAPI) caller: run the scheduled slate writes now. `_log_slate`
+        # swallows its own exceptions, so this cannot break the response.
+        for _task in background_tasks.tasks:
+            _task.func(*_task.args, **_task.kwargs)
+
     try:
         from ..services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED
         total_count = sum(len(r.recommendations) for r in results.values())
