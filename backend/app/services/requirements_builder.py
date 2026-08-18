@@ -325,6 +325,22 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             for item in requirements
         ]
 
+        # [AIQ-1880] `apply_rules` reads the route from the DRAFT only —
+        # `basics.get("destCountry")` — while the destination above may have come from
+        # the wizard COLUMN or from the [AIQ-1902] `relocation_cases` fallback. On a case
+        # whose draft is empty, the builder therefore knew the destination while the
+        # nationality gate did not, and `classify(nationality, None)` returns None: the
+        # gate could never fire, however well-known the nationality was. That is exactly
+        # the population AIQ-1902 exists to serve, so the fallback fixed the catalog
+        # lookup and left the gate blind.
+        #
+        # Reconcile onto a COPY, and only where the draft is silent — the draft keeps
+        # precedence, and no caller's dict is mutated.
+        if dest_raw and dest_raw != "UNKNOWN" and not _basics.get("destCountry"):
+            draft = {**draft, "relocationBasics": {**_basics, "destCountry": dest_raw}}
+            if origin_raw and not _basics.get("originCountry"):
+                draft["relocationBasics"]["originCountry"] = origin_raw
+
         required_fields, expanded, flags = apply_rules(draft, base_items)
 
         source_map = {record.id: record for record in sources}

@@ -30,6 +30,7 @@ from ..auth_deps import (
 from ...database import db
 from ..db import SessionLocal
 from ..services.relocation_plan_view_service import load_profile_draft_for_case
+from ..services.nationality_sync import sync_nationality_to_case
 from ..services.wizard_draft_mapper import extract_profile_from_wizard_draft
 from ..services.audit_log_service import (
     ACTION_INSERT,
@@ -510,6 +511,25 @@ def upsert_profile_employee(
                 )
             except Exception:
                 log.exception("audit: upsert_profile_employee(create) case=%s", case_id)
+
+    # [AIQ-1880] Confirm is the only point at which a nationality becomes real, so it is
+    # the only place worth propagating from. `imm_employee_profiles.nationality` is not
+    # what the requirements engine reads — `rules_engine` resolves the class solely from
+    # `wizard_cases.draft_json -> employeeProfile.nationality`, so without this the gate
+    # stays blind on a case whose passport is already on file and fail-safes to
+    # THIRD_COUNTRY without saying so.
+    #
+    # Deliberately NOT hooked to the OCR endpoint: extraction writes nothing by design
+    # (AIQ-1859) and the employee has not agreed to save anything at that point.
+    #
+    # Best-effort. A profile save that succeeded must not 500 because the mirror failed —
+    # the gate degrades to "unknown", which over-shows rather than making a false claim.
+    if updates.get("nationality"):
+        try:
+            with SessionLocal() as _s:
+                sync_nationality_to_case(_s, case_id, updates["nationality"])
+        except Exception:
+            log.exception("nationality_sync: mirror to wizard draft failed case=%s", case_id)
 
     _log_access(
         case_id=case_id,
