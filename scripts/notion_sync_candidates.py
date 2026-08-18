@@ -36,7 +36,7 @@ import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 
-QUEUE_DB_ID = "7adc643a-c448-4a1a-ba80-e27e417f42d6"
+QUEUE_DB_ID = "3bc887c6-4d48-8089-8188-fcf2dc3edc1b"
 NOTION_VERSION = "2022-06-28"
 API = "https://api.notion.com/v1"
 TERMINAL = {"Done", "Rejected", "Archived"}

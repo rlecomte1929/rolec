@@ -479,7 +479,7 @@ export function createRouterFromEnv(): SupportRouter {
     supabaseUrl: process.env.SUPABASE_URL ?? "",
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
     notionToken: process.env.NOTION_TOKEN ?? "",
-    notionDatabaseId: process.env.NOTION_DATABASE_ID ?? "75d7ed78-91f4-46b6-b805-12e43abbecce",
+    notionDatabaseId: process.env.NOTION_DATABASE_ID ?? "4e2887c6-4d48-82c1-931e-87b09fb5c4ed",
     postmarkToken: process.env.POSTMARK_SERVER_TOKEN,
     escalationEmailTo: process.env.ESCALATION_EMAIL ?? "romain_lecomte@hotmail.com",
     escalationEmailFrom: process.env.ESCALATION_EMAIL_FROM ?? "ai@relopass.com",

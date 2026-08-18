@@ -360,7 +360,7 @@ A multi-stage remediation plan lives at `audit/REMEDIATION_PLAN.md` with a rolli
 
 **Branch naming convention for audit remediation:** `audit/stage-N-<slug>` (e.g. `audit/stage-1-security`, `audit/stage-2-copy`). One branch per stage; one PR per stage; one re-audit doc per stage. Sub-stages use `audit/stage-Na-<slug>` (e.g. `audit/stage-8a-route-auth-ci`).
 
-**System of record:** Each finding has a Notion AI Work Queue entry (DB id `7adc643a-c448-4a1a-ba80-e27e417f42d6`) with Priority + Complexity + Validation Criteria + Context Links back to the originating `audit/02-expert-*.md` file. Update Status as the work moves through `Ready for AI → AI in Progress → Human Review → Done`.
+**System of record:** Each finding has a Notion AI Work Queue entry (DB id `3bc887c6-4d48-8089-8188-fcf2dc3edc1b`; the earlier `7adc643a…` is the database now titled *AI Work Queue (RETIRED)* — do not write to it) with Priority + Complexity + Validation Criteria + Context Links back to the originating `audit/02-expert-*.md` file. Update Status as the work moves through `Ready for AI → AI in Progress → Human Review → Done`.
 
 **Gate discipline:** No stage starts until the previous stage's PR is merged + canary clean. See `audit/REMEDIATION_PLAN.md` §"Universal stage protocol" for the per-stage checklist.
 
