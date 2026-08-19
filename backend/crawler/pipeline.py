@@ -18,6 +18,7 @@ from .extractors.event_extractor import extract_event_candidates
 from .extractors.llm_resource_extractor import extract_resource_candidates_llm
 from .extractors.models import StagedEventCandidate, StagedResourceCandidate
 from .extractors.resource_extractor import extract_resource_candidates
+from .fetchers.bot_block import detect_bot_block
 from .fetchers.http_fetcher import fetch_page, FetchResult
 from .parsers.html_parser import parse_html, ParsedDocument
 from .staging.writer import (
@@ -169,6 +170,23 @@ def _crawl_source(source: CrawlSource, config: CrawlConfig, run_id: str, report:
     if not fetch_result.success:
         report.documents_failed += 1
         report.errors.append(f"{source.source_name}: {fetch_result.error or fetch_result.http_status}")
+        return
+
+    # An anti-bot interstitial answers 200 with a body that parses cleanly, so it passes the
+    # `success` check above and used to be written as a legitimate source document — six of
+    # fifteen rows in production were exactly that. Treat it as a fetch FAILURE: counted in
+    # errors, never handed to write_document. See fetchers/bot_block.py for why detection is
+    # structural rather than vendor-matched, and why we report the block instead of evading it.
+    blocked_reason = detect_bot_block(
+        url=url,
+        final_url=fetch_result.final_url,
+        content=fetch_result.content,
+    )
+    if blocked_reason:
+        report.documents_failed += 1
+        report.errors.append(f"{source.source_name}: bot-block detected — {blocked_reason}")
+        log.warning("%s: bot-block detected at %s — %s", source.source_name,
+                    fetch_result.final_url, blocked_reason)
         return
 
     report.documents_fetched += 1
