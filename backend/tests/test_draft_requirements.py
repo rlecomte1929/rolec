@@ -8,8 +8,10 @@ import os
 
 os.environ.setdefault("RELOPASS_QUERY_COUNTER_OFF", "1")
 
+import pytest
 import yaml
 
+from backend.app.services.verification_guard import VerificationWriteError
 from backend.scripts.draft_requirements import build_context, draft_requirements, to_seed_yaml
 from backend.scripts.seed_requirements import build_payloads
 
@@ -59,13 +61,23 @@ def test_empty_corpus_yields_nothing():
     assert draft_requirements("GERMANY", "employment", [], _fake_complete) == []
 
 
-def test_yaml_is_draft_and_loader_compatible():
+def test_yaml_is_draft_and_the_loader_refuses_it_until_a_human_reviews():
+    """The draft script's contract is that its output "NEVER writes the database" — but
+    before the verified-write guardrail the loader would happily expand a still-draft file
+    and write verification_status='draft' into requirement_items, a label outside the
+    canonical ladder. Now the loader fails closed on an unreviewed draft; the human review
+    step (re-labelling to representative/corpus_grounded) is what makes it loadable."""
     out = draft_requirements("GERMANY", "employment", CHUNKS, _fake_complete)
     text = to_seed_yaml("GERMANY", "employment", out)
     doc = yaml.safe_load(text)
     assert doc["verification_status"] == "draft"
-    # the drafted YAML feeds straight into the loader's expansion
-    payloads = build_payloads(doc)
+
+    with pytest.raises(VerificationWriteError):
+        build_payloads(doc)  # still marked draft → refused before any DB session opens
+
+    # After human review, the same document is loader-compatible.
+    reviewed = dict(doc, verification_status="representative")
+    payloads = build_payloads(reviewed)
     assert len(payloads) == 2  # GERMANY×[employment] × 2 valid requirements
     assert {p["title"] for p in payloads} == {"Residence registration", "Work visa"}
 
