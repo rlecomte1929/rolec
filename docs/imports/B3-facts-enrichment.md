@@ -1,7 +1,8 @@
 # B3 — corridor compliance flags + destination enrichment
 
-**Status: artifacts landed in the repo. Nothing loaded into any database.**
-That is the finished state of this batch, not a step left undone — see
+**Status: artifacts landed in the repo. Nothing loaded into any database *yet*.**
+The batch's real target is `otto_staging`, via `backend/imports/otto/` — not the `kg_*` tables
+the originating task named, which do not exist. See
 [What was not done, and why](#what-was-not-done-and-why).
 
 | | |
@@ -136,17 +137,49 @@ at all**. It is 1018 lines with zero `fetch`, `supabase`, or `db.` references, a
 header says so: *"ALL requirements are hardcoded authored constants."*
 
 WorkspaceDB is real, but in this repo it is a **browser-side SDK** (`window.__workspaceDb`,
-`useWorkspaceDB`; see `AUDOS.md`). It is not reachable from a CLI checkout. The toolchain and
-the database both live in the Audos workspace where Otto runs.
+`useWorkspaceDB`; see `AUDOS.md`). It is not reachable from a CLI checkout, and the `kg_*`
+toolchain lives in the Audos workspace where Otto runs.
 
-This is the same conclusion `docs/runbooks/corridor-facts/README.md` reached independently on
-the same day, and its reasoning applies here unchanged: writing an importer against an
-imagined schema would mean inventing the row shape, the column names and the write contract —
-"the exact improvisation the runbook forbids, and worse than nothing for work whose entire
-purpose is auditability."
+Writing an importer against an imagined schema would mean inventing the row shape, the column
+names and the write contract — "the exact improvisation the runbook forbids, and worse than
+nothing for work whose entire purpose is auditability"
+(`docs/runbooks/corridor-facts/README.md`, same day).
 
-So the batch is landed as artifacts + a decision record, and the write is left to be run
-where the database actually is.
+### But the repo does have a home for this — it is just not the one the task named
+
+**Correction, 2026-08-19.** The finding above is about the *named* targets, and it stands: the
+`kg_*` tables and `tools/wave2-import-pipeline.mjs` are fictional. The conclusion originally
+drawn from it — "the write must run in Audos" — was wrong. This repo has a complete
+authoring→staging→serving pipeline that is the correct home for exactly this data. The first
+pass searched for the task's table names rather than for the capability, and missed it.
+
+```
+Otto research (JSONL in audos-workspace-776786/data/)
+  → backend/imports/otto/parsers.py     FactRow, source-domain tiering
+  → executor.stage()                    otto_staging.immigration_entities
+                                        otto_staging.immigration_fact_candidates
+  → executor.reconcile()                load_log, processing_queue
+  → executor.promote()   [opt-in]       public.requirement_items   ← human gate
+```
+
+`backend/imports/otto/__init__.py` describes itself as *"Read Otto research deliverables out of
+the synced Audos workspace into `otto_staging`"* — this batch's exact use case.
+`scripts/import_otto_facts.py` is the CLI and dry-run is its default. City content has a
+parallel path in `backend/imports/resources/` (`scripts/import_resources.py --bundle`,
+`draft_only` mode; `bundle_oslo.json` is the template).
+
+Staging there satisfies every layer-separation constraint in §6: rows land at `needs_review`,
+`promote()` is opt-in and reaches customers only through the existing `/admin/countries`
+approval gate, and research text can never reach `auto_accepted` without a human.
+
+**One gap must close first.** `classify_source()` rejects UNOFFICIAL sources outright, and
+scored against this batch's real URLs it rejects **9 of the 20 facts — every Danish- and
+German-destination direction** (NO→DK, DK→DE, DE→DK each score zero). The five rejected hosts
+are all statutory bodies: `skat.dk`, `bzst.de`, `service.berlin.de`, `rundfunkbeitrag.de`,
+`lifeindenmark.borger.dk`. That is the identical failure the parser's own comments record for
+Ireland, where the suffix rule *"read them as a relocation blog and REJECTED them outright"*.
+It is a standing bug affecting every future DK/DE batch, not a B3 inconvenience, and it is
+fixed separately from this batch.
 
 ### The one reachable loader will not ingest this batch as-is
 
@@ -317,17 +350,27 @@ them up.
 ## 10. How to re-run / how to finish this
 
 1. **Re-verify what is committed:** `python3 scripts/verify_b3_batch.py`
-2. **Do the write where the database is.** The toolchain (`tools/corridor-facts/`,
-   `wave2-import-pipeline.mjs`) and WorkspaceDB both live in the Audos workspace. Run the
-   import there, against `data/B3/` or the original GCS objects — the manifest records both.
-3. **Before writing, confirm the live schema.** Every target column in §5 is task-asserted,
-   not verified. Confirm `kg_corridors` / `kg_corridor_requirements` /
-   `kg_employee_types` / `geo_city_content` exist and hold these shapes.
-4. **Create the 6 parent `kg_corridors` rows first** (NO-GB, GB-NO, DK-NO, NO-DK, DK-DE,
-   DE-DK) in authoring/candidate state. None exist.
-5. **Resolve the `employee_type = "all"` question** (§5) with a human. Do not guess it.
-6. **Status must be `candidate`.** Update this document's Status line and the
-   `loaded_into_database` field in `validation_report.json` when the write lands.
+2. **Close the DK/DE source gap first** (§4). Without it `scripts/import_otto_facts.py`
+   rejects 9 of the 20 facts outright and the three DK/DE directions land nothing.
+3. **Convert to otto JSONL** and stage:
+   ```bash
+   python scripts/import_otto_facts.py B3-corridor-facts-2026-08-18            # dry run (default)
+   python scripts/import_otto_facts.py B3-corridor-facts-2026-08-18 --apply \
+       --source-label "B3 corridor compliance flags (Nordics/UK/DE)"
+   ```
+   Dry run takes the same code path as the real run, so its numbers are the numbers you get.
+   Do not reach for `--allow-rejections` — the reject list is the re-sourcing worklist.
+4. **City enrichment** goes through the resources bundle path, `draft_only`:
+   `python scripts/import_resources.py --bundle .../bundle_stavanger.json`
+5. **Do not promote.** No `--promote` in any of the above. Rows stay at `needs_review` and
+   reach customers only through the existing `/admin/countries` gate.
+6. **Update this document's Status line** and the `loaded_into_database` field in
+   `validation_report.json` when the write lands.
+
+The `employee_type = "all"` question from §5 is **closed**: `backend/imports/otto/mappings.py`
+states that NULL in the nationality column means *applies to everyone*, and explicitly notes
+that `"any"` is deliberately not a value. The wildcard therefore maps to an **omitted**
+`applies_to.nationality` — the correct representation, not a compromise.
 
 ### The general procedure
 

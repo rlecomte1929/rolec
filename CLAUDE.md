@@ -259,18 +259,37 @@ not a one-off. `docs/imports/B3-facts-enrichment.md` is the worked example.
    from delivered fields is fine and must be documented as derived; inventing a source, a
    number or a confidence score is fabrication.
 
-**Do not improvise a write path when the named one is absent.** Both B3 and the corridor
-promotion runbook (`docs/runbooks/corridor-facts/README.md`) hit this: the toolchain and
-WorkspaceDB live in the Audos workspace and are unreachable from a CLI checkout. Writing an
-importer against an imagined schema invents the row shape, the column names and the write
-contract — worse than nothing for work whose entire purpose is auditability. Land the
-artifacts and the decision record; run the write where the database is.
+**Search for the capability, not for the table name the task gave you.** This is the mistake
+B3 made and it cost a whole pass. The task named `kg_corridor_requirements` and
+`tools/wave2-import-pipeline.mjs`; both are fictional, and grepping for them concluded there
+was no home for the data. There is:
 
-The one proven GCS→database path that *does* run from here is the Supabase `otto-loader` edge
-function (`audos-workspace-776786/docs/otto-to-relopass-loading-playbook.md`). It routes on a
-per-record `target_table` key and loads to a fixed set of staging tables; a batch whose
-records lack that key loads **zero rows** and reports them all as `unrouted`. Always
-`dry_run=true` first.
+```
+Otto research (JSONL in audos-workspace-776786/data/)
+  → backend/imports/otto/parsers.py     FactRow, source-domain tiering
+  → executor.stage()                    otto_staging.immigration_*
+  → executor.reconcile()                load_log, processing_queue
+  → executor.promote()   [opt-in]       public.requirement_items   ← human gate
+```
+
+`scripts/import_otto_facts.py <batch-id>` is the CLI for requirement facts (dry-run by
+default); `scripts/import_resources.py --bundle` is the parallel path for city/destination
+content, in `draft_only` mode. Both land candidates only. **Check these before concluding a
+batch has nowhere to go.**
+
+**Source domain decides whether a fact is kept at all.** `classify_source()` rejects
+UNOFFICIAL outright, and its allowlist is a list of *hosts*, because statutory bodies
+routinely publish on a domain that is not a gov TLD. It has been too narrow three times now —
+`irishimmigration.ie`, `citizensinformation.ie`/`revenue.ie`, and the DK/DE set
+(`skat.dk`, `bzst.de`, `service.berlin.de`, `rundfunkbeitrag.de`, `borger.dk`) which silently
+rejected 9 of B3's 20 facts, being every Danish- and German-destination direction. When a
+batch's rejects cluster by country, suspect the allowlist before the research.
+
+**Only when there is genuinely no in-repo path**, land the artifacts plus a decision record
+and run the write where the database is — the `kg_*` corridor toolchain and WorkspaceDB do
+live in the Audos workspace and are unreachable from a CLI checkout. Writing an importer
+against an imagined schema invents the row shape, the column names and the write contract,
+which is worse than nothing for work whose entire purpose is auditability.
 
 ## Migration discipline (MANDATORY)
 
