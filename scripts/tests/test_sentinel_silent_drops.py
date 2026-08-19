@@ -162,9 +162,32 @@ def test_a_baselined_test_that_now_passes_is_reported_stale():
     assert stale == ["VND-05"]
 
 
-def test_blocked_counts_as_failing():
+def test_blocked_does_not_count_as_failing():
+    """REVERSED. This asserted `unexpected == ["CORE-RLS"]` — that a BLOCKED check fails
+    the run — which contradicted `test_blocked_is_inconclusive.py` in the same directory
+    and the runner that emits the status. The runner sets BLOCKED for exactly one reason,
+    `r.throttled || r.netfail` (relopass_api_runner_patched.js:200-203), and its own
+    comment says the check is "excluded from the score denominator".
+
+    The cost of the disagreement: the scorer printed `fail: 0` and GREEN while this gate
+    failed the same run on AT3_FRESH — a self-inflicted 429, not a bug — on every push
+    for months. A gate that contradicts its own scorer trains people to ignore it.
+
+    The original assertion carried no docstring and no reason, while every other test in
+    this file explains itself; it reads as a description of the code as-built rather than
+    a decision. The decision is in test_blocked_is_inconclusive.py, which cites the run it
+    cost. A real FAIL still fails the gate — see the test below.
+    """
     unexpected, _ = scorer.check_against_baseline([{"id": "CORE-RLS", "status": "BLOCKED"}], BASE)
-    assert unexpected == ["CORE-RLS"]
+    assert unexpected == [], "a throttled/unreachable check is inconclusive, not a failure"
+
+
+def test_a_real_failure_beside_a_blocked_one_still_fails_the_run():
+    """The reversal above must not blind the gate to genuine breakage in the same run."""
+    unexpected, _ = scorer.check_against_baseline(
+        [{"id": "CORE-RLS", "status": "BLOCKED"}, {"id": "CORE-AUTH", "status": "FAIL"}], BASE
+    )
+    assert unexpected == ["CORE-AUTH"]
 
 
 def test_missing_baseline_file_means_every_failure_is_unexpected(tmp_path):

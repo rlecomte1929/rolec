@@ -289,10 +289,22 @@ async function suiteAuth() {
     record('AT2b','Seeded HR company profile (B18)','Auth','200+company_id',`${cpR.status}/company_id=${!!cid}`, verdict(cpR.ok && cid, cpR), cpR.ms, cpR.error||`company_id=${cid}`);
   }
 
-  // ── AT2_FRESH: Fresh HR registration smoke test (not used for functional flows) ──
-  const freshHrR = await authReq('/api/auth/register', CONFIG.CREDS.newHR);
-  tokens.newHR = freshHrR.data?.token || null;
-  record('AT2_FRESH','Fresh HR registration smoke test','Auth','200 + token',`${freshHrR.status}/token=${!!tokens.newHR}`, verdict(freshHrR.ok && tokens.newHR, freshHrR), freshHrR.ms, freshHrR.error||`email=${CONFIG.CREDS.newHR.email}`);
+  // ── AT2_FRESH + AT2c share ONE registration ───────────────────────────────
+  // /api/auth/register is limited to 5/hour keyed on client IP (unauthenticated), and
+  // one campaign run spent 6: provisioning registers 3 personas, then AT2_FRESH, AT2c
+  // and AT3_FRESH registered one each. AT3_FRESH is last, so it ate the 429 on every
+  // run — reported for months as "fresh employee registration is broken" when the
+  // front door demonstrably worked (AT2_FRESH passed in the same run).
+  //
+  // AT2_FRESH asserted "a fresh HR registration returns 200 + a token" and its own
+  // comment said it was "not used for functional flows". AT2c proves that and more:
+  // it registers a fresh HR *with a new company_name* and then creates a case. So the
+  // separate AT2_FRESH call bought nothing and cost the slot AT3_FRESH needed. Both
+  // checks now report off the single AT2c registration — 5 registrations per run,
+  // inside the budget, and AT3_FRESH gets a real verdict instead of a throttle.
+  //
+  // If you add another registration to this suite, raise the limit or drop one here:
+  // the budget is exactly spent, and the next one to be added is the next to be blamed.
 
   // ── AT2c: B18b — fresh HR with a NEW company_name can immediately create a case ──
   // Regression guard for AIQ-542: register with company_name must create-or-link the
@@ -317,6 +329,13 @@ async function suiteAuth() {
     }
     const pass = !!b18bTok && !!b18bCompany && caseR.ok && !!caseId;
     record('AT2c','Fresh HR + new company_name can create a case (B18b)','Auth','register 200+company, then /hr/cases 200+id',`reg=${regR.status}/company=${!!b18bCompany}, case=${caseR.status}/id=${caseId||'null'}`, verdict(pass, regR.throttled ? regR : caseR), regR.ms + caseR.ms, caseR.error||'');
+
+    // AT2_FRESH reports off the SAME registration (see the note above). AT5 reads
+    // tokens.newHR to assert the registration token is a full 36-char UUID, so it is
+    // set from this response rather than a second call.
+    tokens.newHR = b18bTok;
+    tokens.newHR_email = b18bHR.email;
+    record('AT2_FRESH','Fresh HR registration smoke test','Auth','200 + token',`${regR.status}/token=${!!b18bTok}`, verdict(regR.ok && b18bTok, regR), regR.ms, regR.error||`email=${b18bHR.email}`);
   }
 
   // ── AT3: Seeded employee login ────────────────────────────────────────────
@@ -1219,7 +1238,10 @@ async function main() {
     performance_snapshot: perfSnapshot,
     test_credentials: {
       admin_email: CONFIG.CREDS.admin.identifier,
-      hr_email:    CONFIG.CREDS.newHR.email,
+      // The b18b account is the fresh HR actually registered this run (AT2c/AT2_FRESH
+      // share it). CONFIG.CREDS.newHR is now only a template — reporting it here would
+      // name an account that was never created.
+      hr_email:    tokens.newHR_email || CONFIG.CREDS.newHR.email,
       emp_email:   CONFIG.CREDS.newEmp.email,
       hr2_email:   CONFIG.CREDS.newHR2.email,
     },
