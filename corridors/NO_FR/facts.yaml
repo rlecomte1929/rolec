@@ -1,0 +1,40 @@
+# Which jurisdiction facts the Norway -> France corridor cites, and in which direction.
+#
+# This file BINDS facts; it does not own them. The facts themselves live in
+# backend/seeds/facts/<ISO2>.yaml, keyed by the authority that publishes them, because that
+# is what makes a fact true - not the corridor. See backend/seeds/facts/README.md.
+#
+# DIRECTION IS RECORDED HERE, NOT ON THE FACT. `NO:...:reg_883_via_eea` is origin-side for
+# this corridor and would be destination-side for FR_NO. Putting `role` on the fact would
+# mean duplicating it per corridor, and the copies would drift.
+#
+# Only `destination_facts` become requirement_items rows (country_code = destination).
+# `origin_facts` are served through the corridor surface: an obligation a Norwegian
+# authority imposes on someone LEAVING Norway is not a French requirement.
+#
+# `step_id` is optional and refers to a step in this corridor's pathway step_graph
+# (corridors/NO_FR/pathways/RETURNING_EEA_CITIZEN_2026/v1.yaml). Every id below was read
+# from that file; the gate re-checks them, so an invented id fails the build.
+
+corridor_id: NO_FR
+origin_iso: "NO"
+destination_iso: "FR"
+origin_facts:
+  - ref: "NO:social_security-folketrygdloven:reg_883_via_eea"
+    step_id: B1_APPLICABLE_LEGISLATION
+  - ref: "EU:social_security-posting:a1_posting"
+    step_id: B2_A1_FROM_FRANCE
+  - ref: "NO:social_security-posting:a1_issued_by_nav"
+    step_id: A5_FOLKETRYGDEN_EXIT
+  - ref: "NO:healthcare-posting:s1_during_posting"
+    step_id: A6_HELFO_EHIC
+
+destination_facts:
+  - ref: "FR:registration-dpae:dpae_before_start"
+    step_id: C1_CPAM
+  - ref: "FR:tax-withholding:prelevement_a_la_source"
+    step_id: B6_PAS_SETUP
+  - ref: "FR:tax-residence:residence_criteria"
+    step_id: C4_FRENCH_TAX_REGISTRATION
+  - ref: "FR:tax-residence:worldwide_income"
+    step_id: C4_FRENCH_TAX_REGISTRATION

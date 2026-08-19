@@ -55,6 +55,19 @@ jobs:
             backend:
               - 'backend/**'
               - 'scripts/**'
+            # Corridor fact packs. `corridors/**` was in NO filter, so a change to a
+            # corridor binding triggered nothing at all — the same shape as `.nvmrc` above.
+            # The guard script, its allowlist and parsers.py are listed alongside the data
+            # for the reason the `migrations` filter spells out: a gate whose own config can
+            # change while the gate is skipped reports green on an unchecked tree.
+            # parsers.py is here because check (a) reads its host tables — they ARE this
+            # guard's configuration, even though they live in the importer.
+            corridor_facts:
+              - 'backend/seeds/facts/**'
+              - 'corridors/**'
+              - 'scripts/check_corridor_facts.py'
+              - 'scripts/corridor_facts_allowlist.txt'
+              - 'backend/imports/otto/parsers.py'
             hr_dashboard:
               - 'apps/hr-dashboard/**'
               - '.nvmrc'
@@ -593,6 +606,50 @@ jobs:
       # PRESENT, and an OMITTED visa_type is the entire defect.
       - name: Check form-template honesty (no permit for free-movers)
         run: python scripts/check_form_template_honesty.py
+
+  corridor-facts:
+    # Provenance guard for customer-visible relocation facts. Every promoted fact in
+    # backend/seeds/facts/ must carry an OFFICIAL source, the publication date that page
+    # states about itself, and a verbatim evidence quote — and its dependencies must resolve
+    # without pointing at anything staged. Twice the evidence was gathered by hand and lost
+    # at the loading boundary (90 items with citations, 27 resolving, per
+    # 20261031000000_frno_source_records.sql; 27 rows reading "Stub content for <url>" per
+    # 20261032000000_remove_fake_evidence.sql). This makes those four checks a build failure.
+    #
+    # Exit 2 (also a failure) means the run itself was invalid — an unparseable pack, or
+    # ZERO facts examined, which must never read as a pass. The same checks are asserted
+    # from pytest by scripts/tests/test_check_corridor_facts.py in the backend-tests job,
+    # where every check is proven to go red against a planted violation.
+    # See backend/seeds/facts/README.md.
+    name: Corridor fact-pack gate
+    needs: changes
+    if: needs.changes.outputs.corridor_facts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      # PyYAML only. The guard is otherwise stdlib; it needs a real YAML parser because the
+      # evidence it protects is multi-line prose with significant punctuation.
+      - name: Install PyYAML
+        run: python -m pip install --quiet "PyYAML>=6.0"
+      # --run-date is passed explicitly so the freshness verdict is reproducible: a rerun of
+      # this commit next month must give the same answer as it does today.
+      - name: Check corridor fact provenance
+        run: |
+          python scripts/check_corridor_facts.py \
+            --root . \
+            --run-date "$(date -u +%F)" \
+            --json corridor-facts-gate.json
+      - name: Upload gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corridor-facts-gate
+          path: corridor-facts-gate.json
+          if-no-files-found: ignore
 
   serving-llm-isolation:
     # Trust-architecture guard: the generation/serving split as an ENFORCED invariant.

@@ -1,0 +1,16 @@
+{
+  "run_date": "2026-08-19",
+  "max_age_days": 365,
+  "canonical_facts": 25,
+  "gate_bearing": 21,
+  "status_counts": {
+    "representative": 17,
+    "staged": 4,
+    "active": 4
+  },
+  "bindings": 4,
+  "violations": [],
+  "suppressed": [],
+  "stale_allowlist": [],
+  "verdict": "PASS"
+}
