@@ -60,6 +60,10 @@ class DueAlert:
     step_name: str
     derivation: str
     cite: Optional[str]
+    # ISO3 owner of the rule set this alert states. Audit only — the invariant is
+    # checked at load time, but a ledger row that cannot say which country's rule
+    # it asserted is not much of an audit trail.
+    jurisdiction: Optional[str] = None
 
 
 def event_uid(case_ref: str, step_id: str, due_date: date) -> str:
@@ -79,6 +83,7 @@ def due_alerts(
     *,
     today: date,
     completed_step_ids: Optional[Set[str]] = None,
+    destination: Optional[str] = None,
 ) -> List[DueAlert]:
     """Alerts whose window ``[due - lead_days, due]`` contains ``today``.
 
@@ -122,6 +127,7 @@ def due_alerts(
                 step_name=step.name,
                 derivation=computed.derivation,
                 cite=step.cite,
+                jurisdiction=trigger.jurisdiction or destination,
             )
         )
 
