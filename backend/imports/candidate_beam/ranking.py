@@ -124,6 +124,18 @@ class Variant:
     action_required: str
     source: Optional[str]
     category: Optional[str]
+    # 1-based position in the pass's RAW item array, recorded at parse time.
+    #
+    # Clustering is greedy in arrival order, so the order items are fed in is part of the
+    # input, not presentation. An earlier exporter dropped within-pass order and the
+    # golden test had to reverse-engineer it — of 200 within-pass shuffles, 100 reproduce
+    # the reference and 100 do not, so guessing was a coin flip. Sorting stored variants
+    # by (pass_number, arrival_ordinal) now reconstructs the exact clustering input.
+    #
+    # Indexed against the RAW array rather than the kept variants, so a gap in the
+    # sequence is visible evidence that parse_variant dropped something, instead of being
+    # silently closed up.
+    arrival_ordinal: int = 0
 
     @property
     def body_length(self) -> int:
@@ -134,6 +146,7 @@ class Variant:
     def as_dict(self) -> Dict[str, Any]:
         return {
             "pass": self.pass_number,
+            "arrival_ordinal": self.arrival_ordinal,
             "framing": self.framing,
             "title": self.title,
             "official_guidance": self.official_guidance,
@@ -163,7 +176,12 @@ class Cluster:
         return len({v.pass_number for v in self.variants})
 
 
-def parse_variant(raw: Dict[str, Any], pass_number: int, framing: Optional[str] = None) -> Optional[Variant]:
+def parse_variant(
+    raw: Dict[str, Any],
+    pass_number: int,
+    framing: Optional[str] = None,
+    arrival_ordinal: int = 0,
+) -> Optional[Variant]:
     """Build a Variant, or None when the item is unusable.
 
     An item with no title cannot be reviewed and an item with no action cannot be acted
@@ -176,6 +194,7 @@ def parse_variant(raw: Dict[str, Any], pass_number: int, framing: Optional[str] 
         return None
     return Variant(
         pass_number=pass_number,
+        arrival_ordinal=arrival_ordinal,
         framing=framing or raw.get("framing"),
         title=title,
         official_guidance=str(raw.get("official_guidance") or "").strip(),
@@ -189,11 +208,21 @@ def parse_variant(raw: Dict[str, Any], pass_number: int, framing: Optional[str] 
 def parse_pass(items: Sequence[Dict[str, Any]], pass_number: int, framing: Optional[str] = None) -> List[Variant]:
     """Usable variants from one pass's parsed output, capped."""
     out: List[Variant] = []
-    for raw in list(items)[:MAX_ITEMS_PER_PASS]:
-        variant = parse_variant(raw, pass_number, framing)
+    for index, raw in enumerate(list(items)[:MAX_ITEMS_PER_PASS], start=1):
+        variant = parse_variant(raw, pass_number, framing, arrival_ordinal=index)
         if variant is not None:
             out.append(variant)
     return out
+
+
+def order_variants(variants: Iterable[Variant]) -> List[Variant]:
+    """Variants in true arrival order — (pass, arrival_ordinal).
+
+    The inverse of the problem E3 describes: given stored variants in any order, this
+    reproduces the sequence the clustering consumed, so a fixture never has to be
+    re-derived by guesswork again.
+    """
+    return sorted(variants, key=lambda v: (v.pass_number, v.arrival_ordinal))
 
 
 # ---------------------------------------------------------------------------
