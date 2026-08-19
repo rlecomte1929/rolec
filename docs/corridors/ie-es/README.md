@@ -10,7 +10,7 @@ Requirements are `review_status='pending'` and are therefore **not served**.
 | Non-obvious | 15 |
 | Needs lawyer review | 2 |
 | Data | `corridors/IE_ES/data/ie_es_requirement_facts.ndjson` (sha256-pinned) |
-| Load | `supabase/migrations/20261107000000_ie_es_requirement_items.sql` |
+| Load | `supabase/migrations/20261108000000_ie_es_requirement_items.sql` |
 | Generator | `scripts/gen_ie_es_corridor_load.py` |
 | Validation report | `corridors/IE_ES/data/validation_report.json` |
 | Tests | `backend/tests/test_corridor_ie_es.py` (25) |

@@ -41,7 +41,10 @@ REPO = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO / "corridors" / "IE_ES" / "data"
 NDJSON = DATA_DIR / "ie_es_requirement_facts.ndjson"
 MANIFEST = DATA_DIR / "manifest.json"
-MIGRATION = REPO / "supabase" / "migrations" / "20261107000000_ie_es_requirement_items.sql"
+#: Version must clear BOTH the repo max and the prod ledger max. On 2026-08-19 both were
+#: 20261107000000 — `candidate_beam`, already applied to prod — so this sits above it.
+#: Above-the-ledger alone is not enough: the repo routinely runs ahead of prod.
+MIGRATION = REPO / "supabase" / "migrations" / "20261108000000_ie_es_requirement_items.sql"
 REPORT = DATA_DIR / "validation_report.json"
 
 ALLOWED_DOMAINS = {

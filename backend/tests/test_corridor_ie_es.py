@@ -27,7 +27,7 @@ DATA = REPO / "corridors" / "IE_ES" / "data"
 NDJSON = DATA / "ie_es_requirement_facts.ndjson"
 MANIFEST = DATA / "manifest.json"
 REPORT = DATA / "validation_report.json"
-MIGRATION = REPO / "supabase" / "migrations" / "20261107000000_ie_es_requirement_items.sql"
+MIGRATION = REPO / "supabase" / "migrations" / "20261108000000_ie_es_requirement_items.sql"
 CORRIDOR_YAML = REPO / "corridors" / "IE_ES" / "corridor.yaml"
 PATHWAY_YAML = REPO / "corridors" / "IE_ES" / "pathways" / "ES_FREEMOVE_2026" / "v1.yaml"
 
