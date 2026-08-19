@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
-import { Alert, Badge, Button, Card, Textarea } from '../../components/antigravity';
+import { Alert, Badge, Button, Card, Modal, Textarea } from '../../components/antigravity';
 import {
   candidateBeamAPI,
   type BeamItem,
@@ -9,6 +9,8 @@ import {
   type BeamRun,
   type ConfidenceBand,
   type ImportPlan,
+  type ImportResult,
+  type VerifyReport,
 } from '../../api/candidateBeam';
 
 /**
@@ -34,6 +36,21 @@ import {
  * through the existing staging gate. Nothing on this page may describe a candidate as
  * verified, approved-by-counsel, or compliant — it is unreviewed drafting.
  */
+
+// The destination catalog an import stages into. Hardcoded before this change at the
+// preview call site; named here so the execute path cannot drift from the preview path and
+// stage into a different country than the one the reviewer was shown.
+const IMPORT_COUNTRY = 'FRANCE';
+
+// Verification outcomes, worst first. `verified` is the only healthy one; each of the others
+// names a distinct way a staged row stopped matching what was imported.
+const VERIFY_VARIANT: Record<string, 'success' | 'error' | 'warning'> = {
+  verified: 'success',
+  content_drift: 'warning',
+  pillar_mismatch: 'warning',
+  country_mismatch: 'warning',
+  vanished: 'error',
+};
 
 const BAND_VARIANT: Record<ConfidenceBand, 'success' | 'info' | 'warning' | 'neutral'> = {
   'near-certain': 'success',
@@ -61,12 +78,25 @@ export function AdminCandidateBeamPage(): React.ReactElement {
   const [plan, setPlan] = useState<ImportPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [verify, setVerify] = useState<VerifyReport | null>(null);
+  // category -> pillar. Items carry a category; the pillar grouping the reviewer needs is a
+  // server-owned mapping, so it is fetched rather than guessed from the category string.
+  const [pillarByCategory, setPillarByCategory] = useState<Record<string, string>>({});
 
   useEffect(() => {
     candidateBeamAPI
       .listRuns()
       .then(setRuns)
       .catch(() => setError('Could not load beam runs.'));
+    // Fail quiet: without the map every candidate falls into "Unmapped pillar", which is a
+    // degraded grouping but still a complete and truthful list. Losing the grouping must not
+    // cost the reviewer the queue.
+    candidateBeamAPI
+      .pillars()
+      .then((res) => setPillarByCategory(res.grounded_categories || {}))
+      .catch(() => setPillarByCategory({}));
   }, []);
 
   const loadItems = useCallback((id: string) => {
@@ -83,7 +113,11 @@ export function AdminCandidateBeamPage(): React.ReactElement {
 
   useEffect(() => {
     loadItems(runId);
+    // Every one of these describes the PREVIOUS run. Carrying any of them across would show
+    // a reviewer another run's import result beside this run's candidates.
     setPlan(null);
+    setImportResult(null);
+    setVerify(null);
   }, [runId, loadItems]);
 
   const selectRun = (id: string) => {
@@ -108,10 +142,82 @@ export function AdminCandidateBeamPage(): React.ReactElement {
     if (!runId) return;
     setBusy(true);
     try {
-      setPlan(await candidateBeamAPI.importPlan(runId, 'FRANCE'));
+      setPlan(await candidateBeamAPI.importPlan(runId, IMPORT_COUNTRY));
       setError(null);
     } catch {
       setError('Could not build the import preview.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Approve every near-certain candidate still awaiting review.
+   *
+   * Selects on `confidence_band`, NOT on `pass_frequency === 5`: the pass count is per-run
+   * (`passes_total`), so a frequency literal silently selects nothing on a 3-pass run. The
+   * band is the server's own normalisation of that ratio and holds whatever the run size.
+   *
+   * Unsourced candidates are included. Approval and importability are different questions —
+   * the import plan skips them with a stated reason, which is where that belongs. Filtering
+   * them out here would quietly narrow the reviewer's bulk action without saying so.
+   */
+  const approveNearCertain = async () => {
+    const targets = items.filter(
+      (i) => i.confidence_band === 'near-certain' && i.status === 'pending_review',
+    );
+    if (targets.length === 0) return;
+    setBusy(true);
+    try {
+      for (const item of targets) {
+        await candidateBeamAPI.review(item.id, 'approved');
+      }
+      loadItems(runId);
+      setError(null);
+    } catch {
+      // Partial application is possible and is reported as such. Claiming a clean failure
+      // would leave the reviewer's screen disagreeing with the server.
+      setError('Some near-certain candidates could not be approved. Reload to see current state.');
+      loadItems(runId);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Stage the approved candidates for real. Only reachable through the confirm modal. */
+  const executeImport = async () => {
+    if (!runId) return;
+    setConfirmOpen(false);
+    setBusy(true);
+    try {
+      setImportResult(await candidateBeamAPI.executeImport(runId, IMPORT_COUNTRY));
+      setVerify(null);
+      setError(null);
+      loadItems(runId);
+    } catch (err) {
+      const status = (err as { response?: { status?: number } }).response?.status;
+      if (status === 409) {
+        // Already imported, or a freeze conflict. Either way the run must not be retried:
+        // the endpoint wrote nothing, and a second attempt cannot change that.
+        setError('This run has already been imported.');
+      } else {
+        const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+        setError(detail || 'The import failed.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Post-import QA. A drifted report arrives as a 409 and is rendered, not thrown. */
+  const runVerify = async () => {
+    if (!runId) return;
+    setBusy(true);
+    try {
+      setVerify(await candidateBeamAPI.verifyImport(runId));
+      setError(null);
+    } catch {
+      setError('Could not verify the import.');
     } finally {
       setBusy(false);
     }
@@ -127,8 +233,40 @@ export function AdminCandidateBeamPage(): React.ReactElement {
 
   const selectedRun = useMemo(() => runs.find((r) => r.id === runId) || null, [runs, runId]);
 
+  /**
+   * Candidates grouped by pillar, each group keeping the server's rank order.
+   *
+   * A category with no grounded pillar lands in "Unmapped pillar" rather than being dropped
+   * or silently folded into a neighbour — that group IS the set the import will ask a human
+   * to map, so hiding it would hide the work.
+   */
+  const groups = useMemo(() => {
+    const byPillar = new Map<string, BeamItem[]>();
+    for (const item of items) {
+      const pillar = (item.category && pillarByCategory[item.category]) || 'Unmapped pillar';
+      const bucket = byPillar.get(pillar);
+      if (bucket) bucket.push(item);
+      else byPillar.set(pillar, [item]);
+    }
+    for (const bucket of byPillar.values()) bucket.sort((a, b) => a.rank - b.rank);
+    return [...byPillar.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [items, pillarByCategory]);
+
+  const nearCertainPending = useMemo(
+    () =>
+      items.filter((i) => i.confidence_band === 'near-certain' && i.status === 'pending_review')
+        .length,
+    [items],
+  );
+
   return (
     <AdminLayout title="Corridor candidate beam">
+      <Alert variant="warning" className="mb-4">
+        Candidate beams are research tools, not a source of truth. Every imported candidate must
+        be reviewed and signed off by a lawyer before it appears in any HR-facing output.
+        Importing here stages facts for legal review — it does not publish them.
+      </Alert>
+
       <Alert variant="info" className="mb-4">
         Unreviewed model drafting. Nothing here has been checked by a person, and sources are
         the model&apos;s own claims until someone verifies them. Approving a candidate queues
@@ -142,7 +280,10 @@ export function AdminCandidateBeamPage(): React.ReactElement {
       )}
 
       <Card padding="lg" className="mb-6">
-        <h2 className="text-sm font-semibold text-[#0b2b43] mb-3">Runs</h2>
+        <h2 className="text-sm font-semibold text-[#0b2b43] mb-1">Runs</h2>
+        <p className="text-xs text-slate-500 mb-3">
+          Active corridors only — /admin/countries controls which corridors appear here.
+        </p>
         {runs.length === 0 ? (
           <p className="text-sm text-slate-500">No beam runs yet.</p>
         ) : (
@@ -187,14 +328,74 @@ export function AdminCandidateBeamPage(): React.ReactElement {
               {counts.source_missing} with no source — research worklist, not importable
             </span>
           </div>
-          <div className="mt-4">
+          <p className="mt-3 text-sm font-medium text-[#0b2b43]">
+            {counts.approved} of {counts.total} approved
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={approveNearCertain}
+              disabled={busy || nearCertainPending === 0}
+            >
+              Select near-certain ({nearCertainPending})
+            </Button>
             <Button variant="outline" size="sm" onClick={previewImport} disabled={busy}>
               Preview import
             </Button>
-            <span className="ml-2 text-xs text-slate-500">
-              Shows what an import would do. Writes nothing.
-            </span>
+            <Button
+              size="sm"
+              onClick={() => setConfirmOpen(true)}
+              disabled={busy || counts.approved === 0}
+            >
+              Execute import
+            </Button>
+            {importResult && (
+              <Button variant="outline" size="sm" onClick={runVerify} disabled={busy}>
+                Verify import
+              </Button>
+            )}
           </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Preview shows what an import would do. Writes nothing.
+          </p>
+
+          {importResult && (
+            <Alert variant="success" className="mt-3">
+              Import complete — {importResult.imported} facts staged.
+            </Alert>
+          )}
+
+          {verify && (
+            <div className="mt-3">
+              <Alert variant={verify.ok ? 'success' : 'error'}>
+                {verify.ok
+                  ? `All ${verify.verified} staged facts verified.`
+                  : `${verify.failed} of ${verify.items.length} staged facts did not verify.`}
+              </Alert>
+              <ul className="mt-2 space-y-1 text-xs">
+                {verify.items.map((v) => (
+                  <li key={v.candidate_uid} className="flex flex-wrap items-baseline gap-2">
+                    <Badge variant={VERIFY_VARIANT[v.status] || 'neutral'}>{v.status}</Badge>
+                    <span className="text-slate-700">{v.title}</span>
+                    {v.status !== 'verified' && (
+                      <span className="text-slate-500">
+                        {v.detail}
+                        {v.expected != null && (
+                          <>
+                            {' '}
+                            expected <span className="font-mono">{v.expected}</span> · found{' '}
+                            <span className="font-mono">{v.found}</span>
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {plan && (
             <div className="mt-3 text-sm">
               <p>
@@ -215,7 +416,13 @@ export function AdminCandidateBeamPage(): React.ReactElement {
         </Card>
       )}
 
-      {items.map((item) => (
+      {groups.map(([pillar, groupItems]) => (
+        <section key={pillar} className="mb-6">
+          <h2 className="text-sm font-semibold text-[#0b2b43] mb-2">
+            {pillar}{' '}
+            <span className="font-normal text-slate-500">({groupItems.length})</span>
+          </h2>
+          {groupItems.map((item) => (
         <Card key={item.id} padding="lg" className="mb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -301,7 +508,27 @@ export function AdminCandidateBeamPage(): React.ReactElement {
             </p>
           )}
         </Card>
+          ))}
+        </section>
       ))}
+
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Import approved candidates?"
+      >
+        <p className="text-sm text-slate-700">
+          Import {counts?.approved ?? 0} candidates into the fact registry? This cannot be undone.
+        </p>
+        <div className="mt-4 flex gap-2">
+          <Button size="sm" onClick={executeImport} disabled={busy}>
+            Confirm
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setConfirmOpen(false)}>
+            Cancel
+          </Button>
+        </div>
+      </Modal>
     </AdminLayout>
   );
 }

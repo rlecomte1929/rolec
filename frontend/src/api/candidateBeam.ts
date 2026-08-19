@@ -163,7 +163,7 @@ export const candidateBeamAPI = {
   ): Promise<ImportPlan> => {
     const res = await api.post<ImportPlan>(
       `${BASE}/runs/${encodeURIComponent(runId)}/import-plan`,
-      { country, pillar_overrides: pillarOverrides },
+      { country, pillar_overrides: pillarOverrides, dry_run: false },
     );
     return res.data;
   },
