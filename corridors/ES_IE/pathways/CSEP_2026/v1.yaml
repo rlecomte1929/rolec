@@ -275,6 +275,11 @@ corridor_agent:
       time_window_max_days: 90
       non_obvious: true
       cite: IE_IMMIGRATION_2004_S9
+      deadline_trigger:
+        tag: "relopass-deadline-irp-registration-ie"
+        label: "Irish residence permission (IRP) registration"
+        channel: "email"
+        lead_days: 30
 
     - step_id: PPSN
       name: "Obtain a PPSN (Personal Public Service Number) via the Dept. of Social Protection"

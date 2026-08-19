@@ -104,6 +104,13 @@ corridor_agent:
       time_window_min_days: 0
       time_window_max_days: 14
       cite: DE_BMG_17
+      deadline_trigger:
+        tag: "relopass-deadline-anmeldung-de"
+        label: "Anmeldung — German address registration"
+        channel: "email"
+        # 14-day window; half of it is the practical booking lead time for a
+        # Bürgeramt slot in a large German city.
+        lead_days: 7
 
     - step_id: TAX_ID
       name: "Steuer-ID issued (auto-mailed after Anmeldung)"
