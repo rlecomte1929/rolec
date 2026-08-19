@@ -96,7 +96,9 @@ class AdminCandidateBeamRouterTests(unittest.TestCase):
 
     def test_every_route_is_mounted_in_the_app_render_boots(self):
         paths = {r.path for r in main.app.routes if "candidate-beam" in r.path}
-        self.assertEqual(len(paths), 7, f"expected 7 routes, got {sorted(paths)}")
+        # 9 unique PATHS, not 9 endpoints: /runs carries both the GET listing and the
+        # POST that opens a run.
+        self.assertEqual(len(paths), 9, f"expected 9 route paths, got {sorted(paths)}")
 
     # ── auth ────────────────────────────────────────────────────────────────
 

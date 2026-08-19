@@ -279,3 +279,47 @@ def test_framings_are_applied_in_the_reference_order():
     )
     assert [p["framing"] for p in out["pass_outputs"]] == list(pipeline.PASS_FRAMINGS)
     assert [p["pass"] for p in out["pass_outputs"]] == [1, 2, 3, 4, 5]
+
+
+# ─── framing cycling (2..7) ─────────────────────────────────────────────────
+
+
+def test_framings_cycle_past_the_fifth_pass():
+    """`PASS_FRAMINGS[:passes]` truncated, which quietly made 5 the ceiling. The schema
+    CHECK has always allowed `passes_requested BETWEEN 2 AND 7`, so a run asking for six
+    failed with an unexplained ValueError against a column that had agreed to store it."""
+    assert pipeline.framing_for(1) == pipeline.PASS_FRAMINGS[0]
+    assert pipeline.framing_for(5) == pipeline.PASS_FRAMINGS[4]
+    assert pipeline.framing_for(6) == pipeline.PASS_FRAMINGS[0]
+    assert pipeline.framing_for(7) == pipeline.PASS_FRAMINGS[1]
+
+
+def test_framing_for_is_one_based():
+    with pytest.raises(ValueError):
+        pipeline.framing_for(0)
+
+
+def test_a_seven_pass_run_actually_runs_seven_passes():
+    out = pipeline.run_beam(
+        corridor="FR-NO", employee_type="eea", passes=7, complete=_stub(ONE_ITEM)
+    )
+    assert len(out["pass_outputs"]) == 7
+    assert [p["pass"] for p in out["pass_outputs"]] == [1, 2, 3, 4, 5, 6, 7]
+    assert out["passes_requested"] == 7
+
+
+def test_the_repeated_framings_are_the_first_two():
+    out = pipeline.run_beam(
+        corridor="FR-NO", employee_type="eea", passes=7, complete=_stub(ONE_ITEM)
+    )
+    framings = [p["framing"] for p in out["pass_outputs"]]
+    assert framings[5] == pipeline.PASS_FRAMINGS[0]
+    assert framings[6] == pipeline.PASS_FRAMINGS[1]
+
+
+@pytest.mark.parametrize("passes", [1, 8])
+def test_the_clamp_still_rejects_outside_two_to_seven(passes):
+    with pytest.raises(ValueError, match="between 2 and 7"):
+        pipeline.run_beam(
+            corridor="FR-NO", employee_type="eea", passes=passes, complete=_stub(ONE_ITEM)
+        )

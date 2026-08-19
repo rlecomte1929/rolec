@@ -30,7 +30,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from ...imports.candidate_beam import importer
+from ...imports.candidate_beam import importer, pipeline, ranking, store
 from ..auth_deps import require_admin
 from ..db import SessionLocal
 
@@ -56,6 +56,26 @@ class ImportPlanRequest(BaseModel):
     #: candidate_uid -> pillar, for the categories that have no grounded mapping. The
     #: selector is a human act; the API will not invent one.
     pillar_overrides: Dict[str, str] = Field(default_factory=dict)
+
+
+class StartRunRequest(BaseModel):
+    corridor: str = Field(..., min_length=3, max_length=16, description="ORIGIN-DEST, ISO-2, e.g. FR-NO")
+    employee_type: str = Field(..., min_length=2, max_length=32)
+    context: Optional[str] = Field(None, max_length=4000)
+    #: 2..7. Every pass is a paid call, and below two there is no cross-pass agreement to
+    #: measure — the ranking's entire signal is undefined.
+    passes: int = Field(default=5, ge=store.MIN_PASSES, le=store.MAX_PASSES)
+    model: Optional[str] = Field(None, max_length=120)
+
+
+class RunPassRequest(BaseModel):
+    #: Omit to run the lowest slot not yet completed — which is also how a failed pass is
+    #: retried. Naming a slot explicitly re-runs exactly that one.
+    pass_number: Optional[int] = Field(None, ge=1, le=store.MAX_PASSES)
+
+
+class FinalizeRequest(BaseModel):
+    force: bool = False
 
 
 class ImportRequest(ImportPlanRequest):
@@ -394,3 +414,181 @@ def run_import_verify(
     if not report.ok:
         raise HTTPException(status_code=409, detail=payload)
     return payload
+
+# ---------------------------------------------------------------------------
+# Run lifecycle — start, one pass at a time, finalize
+# ---------------------------------------------------------------------------
+
+
+def _split_corridor(corridor: str) -> tuple:
+    parts = [p.strip().upper() for p in corridor.replace("_", "-").split("-") if p.strip()]
+    if len(parts) != 2:
+        raise HTTPException(status_code=422, detail="corridor must be ORIGIN-DEST, e.g. FR-NO")
+    return parts[0], parts[1]
+
+
+@router.post("/runs", status_code=201)
+def start_run(
+    body: StartRunRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Open a run. Executes no passes — the caller drives them one at a time."""
+    # Deliberately not "start the whole beam here". Five paid model calls behind one
+    # gateway timeout loses every completed pass when it trips, with nothing to resume
+    # from. The row opens as `generating` and each pass lands separately.
+    origin, dest = _split_corridor(body.corridor)
+    model = body.model or pipeline.default_model()
+
+    with SessionLocal() as session:
+        with session.begin():
+            run_id = store.create_run(
+                session.connection(),
+                corridor=f"{origin}-{dest}",
+                origin_country=origin,
+                dest_country=dest,
+                employee_type=body.employee_type,
+                context=body.context,
+                passes_requested=body.passes,
+                llm_provider="platform",
+                llm_model=model,
+                created_by=str(user.get("email") or user.get("id") or "admin"),
+            )
+
+    return {
+        "run_id": run_id,
+        "status": store.RUN_GENERATING,
+        "passes_requested": body.passes,
+        "passes_completed": 0,
+        "next_pass": 1,
+        "llm_model": model,
+    }
+
+
+@router.post("/runs/{run_id}/pass")
+def execute_pass(
+    run_id: str,
+    body: RunPassRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Execute exactly ONE pass. Also the resume mechanism."""
+    # The model call happens OUTSIDE the write transaction: it takes seconds and holding a
+    # row lock across it would serialise every other admin write behind an API call we do
+    # not control.
+    with SessionLocal() as session:
+        run = store.load_run(session.connection(), run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="run not found")
+
+    pass_number = body.pass_number or store.next_pass_number(run)
+    if pass_number is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"all {run['passes_requested']} passes already completed; finalize instead",
+        )
+    if pass_number > int(run["passes_requested"]):
+        raise HTTPException(status_code=422, detail="pass_number exceeds passes_requested")
+
+    framing = pipeline.framing_for(pass_number)
+    record = pipeline.run_pass(
+        corridor=run["corridor"],
+        employee_type=run["employee_type"],
+        framing=framing,
+        context=run.get("context"),
+        model=run.get("llm_model"),
+    )
+
+    items = [
+        {**item, "arrival_ordinal": ordinal}
+        for ordinal, item in enumerate(record.get("items") or [], start=1)
+    ]
+    meta = {k: v for k, v in record.items() if k != "items"}
+    meta["ok"] = bool(record.get("ok"))
+    meta["item_count"] = len(items)
+
+    with SessionLocal() as session:
+        with session.begin():
+            state = store.record_pass(
+                session.connection(),
+                run_id=run_id,
+                pass_number=pass_number,
+                framing=framing,
+                items=items,
+                meta=meta,
+            )
+            refreshed = store.load_run(session.connection(), run_id)
+
+    return {
+        "run_id": run_id,
+        "pass": pass_number,
+        "framing": framing,
+        "ok": meta["ok"],
+        "item_count": len(items),
+        "error": record.get("error"),
+        "passes_completed": state["passes_completed"],
+        "passes_requested": run["passes_requested"],
+        "next_pass": store.next_pass_number(refreshed or run),
+    }
+
+
+@router.post("/runs/{run_id}/finalize")
+def finalize_run(
+    run_id: str,
+    body: FinalizeRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Dedupe, rank and persist the run's candidates."""
+    # `passes_total` is what was ATTEMPTED, not what succeeded. A run that lost a pass must
+    # not report the survivors as unanimous — 4/4 reads as near-certain when the honest
+    # answer is 4/5.
+    with SessionLocal() as session:
+        run = store.load_run(session.connection(), run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="run not found")
+
+    completed = store.completed_pass_numbers(run)
+    if len(completed) < store.MIN_PASSES:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"only {len(completed)} pass(es) completed; cross-pass agreement is "
+                f"undefined below {store.MIN_PASSES}. Run another pass first."
+            ),
+        )
+    if run["status"] == store.RUN_PENDING_REVIEW and not body.force:
+        raise HTTPException(
+            status_code=409, detail="run already finalized; pass force=true to rebuild"
+        )
+
+    by_pass = {int(o["pass"]): o for o in run["pass_outputs"]}
+    ordered_passes, framings = [], []
+    for number in sorted(by_pass):
+        output = by_pass[number]
+        items = sorted(
+            output.get("items") or [], key=lambda i: i.get("arrival_ordinal") or 0
+        )
+        ordered_passes.append(items)
+        framings.append(output.get("framing"))
+
+    candidates = ranking.build_candidates(ordered_passes, framings)
+    for candidate in candidates:
+        candidate["passes_total"] = int(run["passes_requested"])
+        candidate["candidate_uid"] = store.candidate_uid_for(candidate["title"])
+
+    with SessionLocal() as session:
+        with session.begin():
+            written = store.persist_candidates(
+                session.connection(),
+                run_id=run_id,
+                candidates=candidates,
+                passes_total=int(run["passes_requested"]),
+            )
+
+    return {
+        "run_id": run_id,
+        "status": store.RUN_PENDING_REVIEW,
+        "candidate_count": written,
+        "passes_completed": len(completed),
+        "passes_requested": run["passes_requested"],
+        "flagged": sum(1 for c in candidates if c.get("flagged")),
+        "source_missing": sum(1 for c in candidates if c.get("source_missing")),
+    }

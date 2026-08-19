@@ -205,6 +205,28 @@ def _failed(framing: str, model: str, started: float, error: str) -> Dict[str, A
     }
 
 
+MIN_PASSES = 2
+#: 7, not len(PASS_FRAMINGS). The schema CHECK already allows `passes_requested BETWEEN 2
+#: AND 7`, so capping at five here made the database promise something the code refused —
+#: a run requesting six failed with an unexplained ValueError against a column that had
+#: agreed to store it.
+MAX_PASSES = 7
+
+
+def framing_for(pass_number: int) -> str:
+    """Framing for a 1-based pass number, CYCLING past the fifth.
+
+    `PASS_FRAMINGS[:passes]` truncated instead, which quietly made 5 the ceiling. Cycling
+    is what the method specifies for N != 5: a 7-pass run repeats the audit and gap-hunter
+    framings rather than being rejected, and two runs of the same framing at the same
+    temperature are still independent witnesses — which is the only property the
+    cross-pass agreement count depends on.
+    """
+    if pass_number < 1:
+        raise ValueError("pass_number is 1-based")
+    return PASS_FRAMINGS[(pass_number - 1) % len(PASS_FRAMINGS)]
+
+
 def run_beam(
     *,
     corridor: str,
@@ -224,14 +246,15 @@ def run_beam(
     ``candidates`` is built ONLY from the passes that succeeded, and ``passes_total``
     counts those, so ``pass_frequency`` stays honest when a pass dies.
     """
-    if not 2 <= passes <= len(PASS_FRAMINGS):
-        raise ValueError(f"passes must be between 2 and {len(PASS_FRAMINGS)}, got {passes}")
+    if not MIN_PASSES <= passes <= MAX_PASSES:
+        raise ValueError(f"passes must be between {MIN_PASSES} and {MAX_PASSES}, got {passes}")
 
     chosen_model = model or default_model()
     pass_outputs: List[Dict[str, Any]] = []
     pass_meta: List[Dict[str, Any]] = []
 
-    for index, framing in enumerate(PASS_FRAMINGS[:passes], start=1):
+    for index in range(1, passes + 1):
+        framing = framing_for(index)
         record = run_pass(
             corridor=corridor,
             employee_type=employee_type,
