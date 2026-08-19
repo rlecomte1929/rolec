@@ -154,6 +154,7 @@ const AdminAiControlsPage = lazy(() => import('./pages/admin/AdminAiControlsPage
 const AdminMobilityCaseInspectPage = lazy(() => import('./pages/admin/AdminMobilityCaseInspectPage').then((module) => ({ default: module.AdminMobilityCaseInspectPage })));
 const AdminPoliciesPage = lazy(() => import('./pages/admin/AdminPoliciesPage').then((module) => ({ default: module.AdminPoliciesPage })));
 const AdminCatalogQueuePage = lazy(() => import('./pages/admin/AdminCatalogQueuePage').then((module) => ({ default: module.AdminCatalogQueuePage })));
+const AdminCandidateBeamPage = lazy(() => import('./pages/admin/AdminCandidateBeamPage').then((module) => ({ default: module.AdminCandidateBeamPage })));
 const AdminRequirementFactsPage = lazy(() => import('./pages/admin/AdminRequirementFactsPage').then((module) => ({ default: module.AdminRequirementFactsPage })));
 const AdminResearchRequestsPage = lazy(() => import('./pages/admin/AdminResearchRequestsPage').then((module) => ({ default: module.AdminResearchRequestsPage })));
 // AdminPolicyConfigPage (/admin/policy-config) was retired: it duplicated the
@@ -468,6 +469,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminMissionControl.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminFeedback.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAiControls.path} element={<RequireAdminRoute><AdminAiControlsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCatalogQueue.path} element={<RequireAdminRoute><AdminCatalogQueuePage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCandidateBeam.path} element={<RequireAdminRoute><AdminCandidateBeamPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRequirementFacts.path} element={<RequireAdminRoute><AdminRequirementFactsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResearchRequests.path} element={<RequireAdminRoute><AdminResearchRequestsPage /></RequireAdminRoute>} />
         {/* platform-v2: companies promoted to default-on (2026-05-20).
