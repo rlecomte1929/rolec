@@ -42,6 +42,16 @@ _SUBJECT_TABLES: List[tuple] = [
     ("support_tickets", "user_id::text = :uid"),
     ("erasure_requests", "employee_id::text = :uid"),
     ("data_access_log", "accessed_by_user_id::text = :uid OR profile_id::text = :uid"),
+    # [AIQ-1842] Assignment-keyed, not subject-keyed — which is why it was missed. The
+    # whole row is the relocation profile: `profile_json` carries primaryApplicant
+    # nationality on all 511 prod rows. Resolved through the subject's assignments here
+    # rather than via :case_ids, because `assignment_id` matches `case_assignments.id`
+    # (505/511 in prod) and NOT `case_assignments.case_id` (0/511 — measured).
+    (
+        "wizard_employee_profiles",
+        "assignment_id IN (SELECT id::text FROM public.case_assignments "
+        "WHERE employee_user_id::text = :uid)",
+    ),
 ]
 
 # PII tables scoped via the subject's resolved case ids.
@@ -51,6 +61,12 @@ _CASE_TABLES: List[tuple] = [
     ("case_messages", "case_id::text = ANY(:case_ids)"),
     ("pets", "case_id::text = ANY(:case_ids)"),
     ("exception_requests", "case_id::text = ANY(:case_ids)"),
+    # [AIQ-1842] `wizard_cases.id` IS a case id — it matches all three sources
+    # `_resolve_case_ids` unions (cases 542, relocation_cases 640, case_assignments
+    # .case_id 634 in prod), so it belongs here rather than in _SUBJECT_TABLES. Its
+    # `draft_json` holds intake PII: full name, nationality, passport country/expiry,
+    # employer and family members (949 of 1455 rows carry a nationality).
+    ("wizard_cases", "id::text = ANY(:case_ids)"),
 ]
 
 
@@ -167,6 +183,8 @@ def _assert_export_access(caller: Dict[str, Any], subject_user_id: str) -> None:
 #   ("delete",)            hard-delete the matched rows (operational data)
 #   ("delete_authored",)   hard-delete only rows the subject authored
 #   ("anon", [cols])       NULL the listed PII columns, keep the row skeleton
+#   ("redact_json", [cols])overwrite the listed JSON blob columns with '{}' — for
+#                          NOT NULL blobs, where ("anon", …) cannot be used
 #   ("anon_imm",)          NULL the immigration PII block + stamp anonymised_at
 #   ("retain_null", [cols])keep the row (legal/accountability), NULL only the
 #                          listed network-PII columns
@@ -196,6 +214,10 @@ _ERASURE_ACTIONS: Dict[str, tuple] = {
     "quote_requests": ("delete",),
     "consent_records": ("retain_null", ["ip_address", "user_agent"]),
     "imm_employee_profiles": ("anon_imm",),
+    # [AIQ-1842] Deleted, not redacted: the table is (assignment_id, profile_json,
+    # updated_at) and profile_json IS the relocation profile, so there is no non-PII
+    # skeleton to preserve. Nothing FK-references it.
+    "wizard_employee_profiles": ("delete",),
     "support_tickets": ("anon", [
         "from_email", "from_name", "subject", "raw_content", "html_content",
     ]),
@@ -206,6 +228,13 @@ _ERASURE_ACTIONS: Dict[str, tuple] = {
     "case_forms": ("delete",),
     "case_messages": ("delete_authored",),
     "pets": ("delete",),
+    # [AIQ-1842] Redacted, not deleted: case_feedback, case_participants and
+    # case_evidence all FK-reference wizard_cases, and the row's non-PII skeleton
+    # (corridor, dates, status) is operational data. `anon` is unusable here —
+    # draft_json is NOT NULL, so `SET draft_json = NULL` raises 23502, the SAVEPOINT
+    # rolls it back and the table is reported in errors having erased nothing. That is
+    # the AIQ-1801 defect exactly, so this writes '{}' instead.
+    "wizard_cases": ("redact_json", ["draft_json", "family_details"]),
     # `ai_insight` was listed here and does not exist on the table — see
     # _erasable_columns. Its presence meant NOTHING on this table was ever erased.
     "exception_requests": ("anon", ["reason", "resolution_notes"]),
@@ -292,6 +321,18 @@ def _apply_erasure(conn, table, where, params, summary):
                 conn.execute(text(f"UPDATE public.{table} SET {sets} WHERE {where}"), params)
                 (summary["anonymised_tables"] if kind == "anon"
                  else summary["retained_tables"]).append(table)
+            elif kind == "redact_json":
+                # Same shape as "anon", but writes '{}' instead of NULL so it works on a
+                # NOT NULL blob. '{}' assigns cleanly to both `text` (wizard_cases
+                # .draft_json) and `jsonb` (family_details), so one statement covers both.
+                cols = _erasable_columns(conn, table, list(action[1]), summary)
+                if not cols:
+                    raise RuntimeError(
+                        f"{table}: none of the columns listed for redaction exist"
+                    )
+                sets = ", ".join(f"{c} = '{{}}'" for c in cols)
+                conn.execute(text(f"UPDATE public.{table} SET {sets} WHERE {where}"), params)
+                summary["anonymised_tables"].append(table)
             elif kind == "anon_imm":
                 cols = _erasable_columns(conn, table, list(_IMM_PII_COLS), summary)
                 if not cols:

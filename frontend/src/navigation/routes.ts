@@ -157,6 +157,7 @@ export const ROUTE_DEFS = {
   adminSuppliers: { path: '/admin/suppliers', roles: ['ADMIN'] as RouteRole[] },
   adminVettingQueue: { path: '/admin/vetting-queue', roles: ['ADMIN'] as RouteRole[] },
   adminContentReview: { path: '/admin/content-review', roles: ['ADMIN'] as RouteRole[] },
+  adminCandidateBeam: { path: '/admin/candidate-beam', roles: ['ADMIN'] as RouteRole[] },
   adminSupplierSubmissions: { path: '/admin/supplier-submissions', roles: ['ADMIN'] as RouteRole[] },
   adminPrompts: { path: '/admin/prompts', roles: ['ADMIN'] as RouteRole[] },
   adminRagQuality: { path: '/admin/rag-quality', roles: ['ADMIN'] as RouteRole[] },
