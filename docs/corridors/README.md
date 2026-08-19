@@ -19,6 +19,20 @@ corridor — most have no requirement records behind them yet.
 |---|---|---|---|---|
 | IE→ES (Dublin→Madrid) | 25 (15 non-obvious, 2 need counsel) | **no** — all `pending`, migration not applied | none | [`ie-es/`](ie-es/README.md) |
 
+## Researched but not landed
+
+Batches that exist as verified artifacts with no database rows behind them. They are not
+corridors yet — no profile under `corridors/`, no requirement records, nothing served.
+
+| batch | directions | records | docs |
+|---|---|---|---|
+| B3 (2026-08-18) | NO→GB, GB→NO, DK→NO, NO→DK, DK→DE, DE→DK | 20 compliance flags + 13 city-enrichment records | [`../imports/B3-facts-enrichment.md`](../imports/B3-facts-enrichment.md) |
+
+B3's target tables (`kg_corridors`, `kg_corridor_requirements`, `kg_employee_types`,
+`geo_city_content`) do not exist in this repo; the write belongs in the Audos workspace. See
+the batch doc, and `CLAUDE.md` § *Research batch intake (GCS → candidate)* for the general
+procedure.
+
 ## Conventions worth knowing before adding one
 
 **Pick the structural mirror, not the reverse corridor.** IE→ES mirrors `FR_ES`
