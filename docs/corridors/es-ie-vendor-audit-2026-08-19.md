@@ -174,4 +174,71 @@ category table does not mark it so. The requirement rule-engine was not touched,
 4. Resolve `SIRVA Worldwide` before any promotion into this corridor — it is uncountried, so it
    would surface here too.
 
-Nothing was written to the database or to any seed file.
+No seed file was touched. One database change was made — see the appendix.
+
+---
+
+## Appendix — dedupe pass executed 2026-08-19
+
+**Done.** 97 redundant `vendor_candidates` rows were marked `status = 'duplicate'`.
+
+**Nothing was deleted.** The repo's own convention is to mark rather than drop —
+`vendor_harvester.classify()` states it directly: *"Duplicates are INSERTED with
+status='duplicate' rather than dropped: a silently skipped row is invisible, and the run report
+has to be able to show what was."* This follows that, so the rows stay auditable and the change
+is reversible.
+
+### Survivor rule
+
+Within each `(service_category, country_code, normalised domain)` group:
+
+1. **a promoted row always survives** — it is referenced by a `suppliers` row downstream;
+2. otherwise the **most recently created** row survives — the later Otto run carries the
+   corrected key format and fresher source data;
+3. ties broken by `id`, so the outcome is deterministic and replayable.
+
+Only unpromoted, currently-`pending` rows were touched.
+
+### Result
+
+| | before | after |
+|---|---|---|
+| `pending` | 530 | **433** |
+| `duplicate` | 4 | **101** (97 added) |
+| promoted rows still `pending` | 50 | **50** — none demoted |
+| groups with >1 unpromoted pending row | 52 | **0** |
+| IE candidate rows pending | 10 | **5** — the 5 distinct entities |
+
+Validated inside `BEGIN … ROLLBACK` before applying. The first validation run **failed its own
+assertion**, revealing that 50 pending rows are already promoted — which forced the survivor rule
+to prefer promoted over newest. Applied blind, the update would have left promoted candidates
+competing with fresher unpromoted ones.
+
+### Reversal
+
+Every touched row carries a stamped note. To undo the whole pass:
+
+```sql
+UPDATE public.vendor_candidates
+   SET status = 'pending', updated_at = NOW()
+ WHERE status = 'duplicate'
+   AND notes LIKE '%corridor vendor audit%';   -- exactly the 97
+```
+
+### Still to do — the constraint
+
+With zero residual duplicate groups a partial unique index is now *possible*:
+
+```sql
+CREATE UNIQUE INDEX vendor_candidates_identity_uq
+    ON public.vendor_candidates (
+        service_category, country_code,
+        lower(regexp_replace(regexp_replace(website_url,'^https?://(www\.)?',''),'/.*$',''))
+    )
+ WHERE status = 'pending' AND website_url IS NOT NULL AND website_url <> '';
+```
+
+**Deliberately not applied.** It would make the next Otto harvest *fail* rather than duplicate —
+correct behaviour, but a behaviour change on a writer outside this repo, and that owner needs to
+adopt `ON CONFLICT DO NOTHING` first. The 83 domainless rows also need a second identity rule
+before coverage is complete. Sequence: tell the Otto-side owner, then apply.
