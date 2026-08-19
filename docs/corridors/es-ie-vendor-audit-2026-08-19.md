@@ -178,6 +178,68 @@ No seed file was touched. One database change was made — see the appendix.
 
 ---
 
+## 6. Customer readiness — the go/no-go for a waiting ES→IE case
+
+Added 2026-08-19 on hearing a real ES→IE customer is waiting. **No real ES→IE case exists in
+production** — every ES or IE case in `public.cases` belongs to an `@probe.test` E2E fixture,
+which the campaign purges on every push to `main`. So this is a readiness assessment, not a case
+review.
+
+### The binding constraint is the calendar, not the vendors
+
+Run through the product's own `assess_feasibility()`:
+
+| | |
+|---|---|
+| corridor | `ES_IE_CSEP_2026` |
+| arrival anchor | `TRAVEL_TO_IE` |
+| **pre-arrival lead time required** | **104 days (~15 weeks)** |
+| verdict at 88 days' runway | **`critical`** |
+
+The pre-arrival chain is serial and authority-gated:
+
+```
+JOB_OFFER_CONTRACT → EMPLOYMENT_PERMIT_APPLICATION → EMPLOYMENT_PERMIT_GRANTED (DETE)
+                   → D_VISA_APPLICATION → D_VISA_GRANTED (ISD) → TRAVEL_TO_IE
+```
+
+Nothing in it can be parallelised or bought — two of the six steps are decisions by Irish
+authorities. **If the employee is non-EEA and the move date is under ~15 weeks out, the CSEP route
+cannot make it**, whatever the vendor shortlist looks like.
+
+### Two questions decide everything, and both are free to ask
+
+1. **Is the employee an EEA national?** If yes, none of the permit chain applies — free movement,
+   and the corridor is feasible at any notice. If no, the 104-day floor binds.
+2. **What is the target move date?** Compare to today + 104 days. Inside that window, the honest
+   answer to the customer is that the date is not achievable on this route — and saying so early
+   is the product working, not the product failing.
+
+### What is genuinely missing, ranked for this customer
+
+| gap | state | impact |
+|---|---|---|
+| **SPAIN requirements** | **0** (IRELAND has 14 approved) | **largest hole.** This corridor is two-sided — Beckham exclusion on ceasing Spanish residence, modelo 030/247, exit-year IRPF. Half the compliance surface is invisible, and it is the half that surprises people months later |
+| ES→IE vendors | 0 both sides | shortlist is empty; the customer can be served manually |
+| `housing_agencies` for Dublin | 0 | PPSN needs an Irish address first, so bridge housing is a compliance dependency, not a comfort item |
+
+**Requirement coverage is the bigger gap than vendors.** A missing vendor means the customer finds
+their own mover. A missing Spanish exit requirement means nobody tells them about an exit-year tax
+exposure until it is too late to act on it.
+
+### Recommended sequence for this customer
+
+1. Ask the two questions above. They are a five-minute call and they determine whether anything
+   else matters.
+2. If non-EEA and inside 15 weeks: say so now, and discuss a later start date or an EEA-national
+   alternative. Do not let a shortlist gap hide a calendar problem.
+3. Source the **SPAIN exit requirements** before the vendor shortlist. Higher compliance value per
+   hour of research.
+4. Serve the first case with a manually assembled vendor list, and let it tell you which
+   categories actually got used before investing in all six.
+
+---
+
 ## Appendix — dedupe pass executed 2026-08-19
 
 **Done.** 97 redundant `vendor_candidates` rows were marked `status = 'duplicate'`.
