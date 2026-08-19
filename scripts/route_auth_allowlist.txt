@@ -218,6 +218,11 @@ backend/app/routers/crons.py:process_crawl_schedules
 backend/app/routers/crons.py:milestone_reminders
 # CRON (AIQ-656): _verify_cron_secret(request) inline (503 if unset, 401 on
 # mismatch). Hourly milestone D-7/D-3/D-0 reminder scan, invoked by pg_cron.
+backend/app/routers/crons.py:corridor_deadline_sweep
+# CRON: _verify_cron_secret(request) inline (503 if unset, 401 on mismatch).
+# Daily corridor deadline-alert sweep, invoked by the corridor-deadline-sweep
+# workflow (and by pg_cron). Reads open cases and writes notification_outbox +
+# corridor_deadline_events; exactly-once via that ledger's PK. Not an end-user route.
 backend/app/routers/crons.py:weekly_mobility_status
 # CRON (AIQ-1237): _verify_cron_secret(request) inline. Weekly (Mon 08:00 UTC)
 # overdue-steps digest to HR owners, invoked by the weekly-mobility-status workflow.
