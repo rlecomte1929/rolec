@@ -1,0 +1,75 @@
+name: Corridor deadline sweep
+
+# Daily corridor deadline-alert sweep. Calls POST /api/crons/corridor-deadline-sweep,
+# which resolves every open case through the corridor step graph and emits one
+# notification_outbox row per alert whose window [due - lead_days, due] contains today.
+#
+# Exactly-once lives in public.corridor_deadline_events, keyed (case, step, due_date),
+# so this cadence only bounds alert latency — a re-run, an overlap, or a manual
+# workflow_dispatch on the same day fires nothing extra.
+#
+# Runs at 06:00 UTC, an hour ahead of the outbox dispatcher's :07 tick, so alerts
+# queued by this job go out on the same morning rather than waiting a day.
+#
+# Gated behind `vars.CORRIDOR_DEADLINE_SWEEP_ENABLED` so this is a no-op until the
+# secrets/vars are configured. Required config to enable:
+#   vars.CORRIDOR_DEADLINE_SWEEP_ENABLED = 'true'
+#   vars.CORRIDOR_DEADLINE_SWEEP_API_BASE = https://api.relopass.com
+#   secrets.CRON_SECRET                   = (reused — same value the API checks)
+#
+# RUN IT DRY FIRST. workflow_dispatch defaults to dry_run=true: it plans everything,
+# writes nothing, and the job summary is the report to read before the first real
+# run — what would fire today, and every case that was skipped with its reason.
+
+on:
+  schedule:
+    # 06:00 UTC daily.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Plan only — write nothing (recommended for the first run)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: corridor-deadline-sweep
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  corridor-deadline-sweep:
+    name: Corridor deadline sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No-op unless explicitly enabled via repo vars.
+    if: ${{ vars.CORRIDOR_DEADLINE_SWEEP_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      API_BASE: ${{ vars.CORRIDOR_DEADLINE_SWEEP_API_BASE }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      # Scheduled runs are live; manual runs honour the input and default to dry.
+      DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
+    steps:
+      - name: POST /api/crons/corridor-deadline-sweep
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "API_BASE or CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d "{\"dry_run\": ${DRY_RUN}}" \
+            "${API_BASE}/api/crons/corridor-deadline-sweep")
+          echo "$response"
+          {
+            echo "## Corridor deadline sweep (dry_run=${DRY_RUN})"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
