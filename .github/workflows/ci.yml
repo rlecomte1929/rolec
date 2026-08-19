@@ -35,6 +35,7 @@ jobs:
       workflows: ${{ steps.filter.outputs.workflows }}
       edge_functions: ${{ steps.filter.outputs.edge_functions }}
       case_id_writers: ${{ steps.filter.outputs.case_id_writers }}
+      corridor_facts: ${{ steps.filter.outputs.corridor_facts }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
