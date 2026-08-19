@@ -17,7 +17,7 @@ from .transformers import (
 
 
 def _get_supabase():
-    from backend.services.supabase_client import get_supabase_admin_client
+    from backend.app.services.supabase_client import get_supabase_admin_client
     return get_supabase_admin_client()
 
 
