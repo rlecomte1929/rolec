@@ -60,7 +60,60 @@ because anyone researched the Madrid→Dublin corridor**. Two of the five Irish 
 US-based (Tampa, Chicago) and reach Ireland only as a destination market. For a Spain→Ireland
 move — two EU states — a US RoRo car shipper is not a corridor supplier in any useful sense.
 
-### A dedup defect worth fixing regardless
+### The dedup defect — root-caused, and it is table-wide
+
+> **Correction, twice.** I first reported this as "the `dedupe_key` is not preventing
+> duplicates", then as "the executor's pre-check is scoped `WHERE corridor = :corridor`, which is
+> NULL on these rows, so the check is dead". **Both were wrong**, and the second was wrong in a
+> way that would have produced a fix for a bug that does not exist. What follows is what the code
+> and the data actually show.
+
+**The in-repo dedup is sound.** `vendor_harvester.existing_dedupe_keys()` reads
+`SELECT dedupe_key FROM vendor_candidates` **unscoped** — it sees every prior key regardless of
+corridor. The corridor-scoped `_staged_keys()` in `imports/suppliers/executor.py` is a second,
+narrower guard added after a real incident (2026-08-11, `--apply` then `--promote` left 62
+candidates where there should have been 31); in that flow `corridor` is always populated, because
+the executor groups by `(corridor, category)`. Neither is broken.
+
+**The duplicates come from a writer outside this repo.** No in-repo code produces the observed
+key format. `vendor_harvester` emits a registrable domain, or `name:{slug}@{corridor}` as a
+fallback. The rows in the table are keyed `pet_relocation|IE|dublin|pets on board` — a fourth
+format, written by the Otto-side harvest that produced all 480 corridor-NULL rows on 2026-08-13.
+
+**And that writer's key changed between two runs on the same day**, six hours apart:
+
+```
+10:09   "|IE|dublin|pets on board"                ← category segment EMPTY
+16:51   "pet_relocation|IE|dublin|pets on board"  ← category segment populated
+```
+
+Same company, same website, same source — a different identity. No uniqueness constraint could
+have caught it, because the two keys genuinely differ. This is why the column's documented
+contract matters: it says *"Normalised registrable domain (lowercase, no scheme, no www)"*, and a
+domain key (`pets-on-board.ie`) would have been identical across both runs. The implementation
+that wrote these rows ignored the contract, and the instability followed.
+
+**Scale, measured across the whole table — not just this corridor:**
+
+| measure | value |
+|---|---|
+| rows in `vendor_candidates` | 534 |
+| duplicate groups by (category, country, normalised domain) | **52** |
+| redundant rows | **97** (18% of the table) |
+| rows with no website at all | 83 |
+| duplicate groups by the stored `dedupe_key` | 0 |
+
+The stored key catches **none** of it. A writer-agnostic identity catches 97 rows. The five Irish
+pairs are a visible slice of a table-wide problem.
+
+**Why the fix is not a constraint I can just add.** A `UNIQUE` on
+`(service_category, country_code, normalised_domain)` would reject all 97 today, so it cannot be
+applied before a dedupe pass — and that pass deletes production rows, which is a founder decision,
+not an audit one. The 83 domainless rows also need a second identity rule. Sequence:
+**agree the survivor rule → dedupe → then constrain**, so the constraint is what keeps it clean
+rather than what discovers the mess.
+
+### The corridor-level duplicates
 
 - **IE: 10 rows, 5 distinct entities.** Every Irish candidate is present exactly twice — Air
   Animal Pet Movers, K International Freight, Multi Cargo, Pets in Transit, Pets on Board. Every
@@ -111,8 +164,11 @@ category table does not mark it so. The requirement rule-engine was not touched,
 
 1. **Do not promote the 19.** They add zero coverage and would put US-outbound car shippers in a
    Madrid→Dublin shortlist.
-2. **Fix the candidate dedup.** Every Irish candidate is duplicated despite a populated
-   `dedupe_key`; the next harvest will repeat it.
+2. **Dedupe `vendor_candidates`, then constrain it.** 97 redundant rows (18%) table-wide. The
+   in-repo harvester is not the cause and needs no change; the durable fix is a writer-agnostic
+   uniqueness rule, which can only be added after a founder-approved dedupe pass. Raise the key
+   format with whoever owns the Otto-side writer — it ignores the column's documented
+   domain contract, which is what made its key unstable between runs.
 3. **Source ES→IE properly** against the six live categories. This is the real cost, and nothing
    in the data avoids it.
 4. Resolve `SIRVA Worldwide` before any promotion into this corridor — it is uncountried, so it
