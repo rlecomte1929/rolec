@@ -36,7 +36,10 @@ EXIT CODES
 
   0  invariant holds
   1  violation — every offending path is printed with its exact import chain
-  2  configuration error — a serving root no longer exists on disk or failed to parse.
+  2  configuration error — a serving root no longer exists on disk, OR any module
+     inside the serving closure failed to parse. An unparsed module contributes no
+     edges, so anything it imports is invisible; a clean verdict past one would be
+     meaningless. A parse error OUTSIDE the closure is a WARN and still exits 0.
      Deliberately a failure: the guard must never silently pass while protecting nothing.
 
 THERE IS NO ALLOWLIST. The invariant is "never", not "usually". Fix a violation by
@@ -98,6 +101,8 @@ LLM_SDK_MODULES: Tuple[str, ...] = (
     "mistralai",
     "litellm",
     "cohere",
+    "groq",
+    "together",
     "google.generativeai",
     "google.genai",
     "vertexai",
@@ -122,6 +127,12 @@ _BACKEND_PACKAGE = "backend"
 
 class ConfigError(RuntimeError):
     """A serving root is missing or unparseable — exit 2, never a silent pass."""
+
+
+def _dotted_prefixes(dotted: str) -> List[str]:
+    """`a.b.c` -> ['a', 'a.b', 'a.b.c'] — the module and every ancestor package."""
+    parts = dotted.split(".")
+    return [".".join(parts[: i + 1]) for i in range(len(parts))]
 
 
 def module_name_for(path: Path, root: Path) -> Optional[str]:
@@ -226,9 +237,17 @@ def build_graph(root: Path) -> Tuple[Dict[str, Set[str]], Dict[str, Set[str]], L
             continue
         imported = imports_of(tree, name)
         raw_imports[name] = imported
-        # Keep only edges to modules that actually exist in this repo. An import of
-        # `backend.app.services` (a package) resolves to its __init__ when present.
-        edges[name] = {m for m in imported if m in known and m != name}
+        # Keep only edges to modules that exist in this repo — AND to every ancestor
+        # package of each import, because importing `a.b.c` executes `a/__init__.py`
+        # and `a/b/__init__.py` on the way. A package __init__ that reaches an LLM is
+        # therefore reachable from anything importing any of its submodules; ignoring
+        # ancestors would let a gateway hide one level up.
+        resolved: Set[str] = set()
+        for target in imported:
+            for prefix in _dotted_prefixes(target):
+                if prefix in known:
+                    resolved.add(prefix)
+        edges[name] = {m for m in resolved if m != name}
 
     return edges, raw_imports, parse_errors
 
@@ -385,12 +404,42 @@ def check(root: Path) -> Tuple[int, str]:
         return 1, "\n".join(lines)
 
     closure = reachable_from(SERVING_ROOTS, edges)
+
+    # A module that failed to parse has NO recorded edges, so the graph beyond it is
+    # invisible. Outside the serving closure that is merely untidy; INSIDE it, the
+    # guard could print OK while an LLM import hides behind the syntax error. Fatal.
+    broken_by_module = {e.split(" ", 1)[0]: e for e in parse_errors}
+    reachable_broken = sorted(set(broken_by_module) & closure)
+    if reachable_broken:
+        lines = [
+            "[serving-llm-isolation] CONFIG ERROR — "
+            f"{len(reachable_broken)} module(s) inside the serving closure failed to parse.",
+            "",
+            "  Their imports could not be read, so any LLM call beyond them would be",
+            "  invisible to this guard. A clean result here would be meaningless.",
+            "",
+        ]
+        for module in reachable_broken:
+            reaching = sorted(
+                root for root in SERVING_ROOTS
+                if module in reachable_from([root], edges)
+            )
+            lines.append(f"    {broken_by_module[module]}")
+            for root in reaching:
+                lines.append(f"      reached from serving root {root}")
+            lines.append("")
+        lines.append("  Fix the syntax error — do not remove the module from the graph.")
+        return 2, "\n".join(lines)
+
     report = (
         f"[serving-llm-isolation] OK — {len(SERVING_ROOTS)} serving roots, "
         f"{len(closure)} reachable modules, no path to an LLM gateway or SDK."
     )
-    if parse_errors:
-        report += f"\n  note: {len(parse_errors)} non-serving module(s) failed to parse and were skipped."
+    for err in sorted(parse_errors):
+        report = (
+            f"[serving-llm-isolation] WARN — could not parse {err} "
+            f"(outside the serving closure)\n" + report
+        )
     return 0, report
 
 

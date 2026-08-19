@@ -88,8 +88,11 @@ the guard.
   change — there is deliberately **no allowlist**, because the invariant is "never",
   not "usually".
 - **exit 2** — configuration error (also fails the job): a `SERVING_ROOTS` module no
-  longer exists on disk (renamed/deleted), or a serving root failed to parse. This
-  guarantees the guard can never silently pass while protecting nothing.
+  longer exists on disk (renamed/deleted), or **any module inside the serving closure
+  failed to parse**. An unparsed module contributes no edges, so anything it imports is
+  invisible to the walk and a clean verdict past it would be meaningless. A parse error
+  *outside* the closure is a `WARN` and still exits 0. This guarantees the guard can
+  never silently pass while protecting nothing.
 
 ## Verified baseline
 

@@ -227,7 +227,8 @@ fails the PR with the exact import chain if any serving engine
 module or an LLM SDK import. There is no allowlist. Fix a violation by breaking the
 import (move the LLM use into authoring; serve reviewed data), never by editing the
 guard's lists. New serving engines must be registered in `SERVING_ROOTS`; a renamed
-root fails the build (exit 2) until re-registered. See
+root fails the build (exit 2) until re-registered, as does any module inside the serving
+closure that fails to parse — an unparsed module hides whatever it imports. See
 `docs/specs/serving-llm-isolation.md`.
 
 ## Migration discipline (MANDATORY)

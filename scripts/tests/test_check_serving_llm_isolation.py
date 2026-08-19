@@ -245,13 +245,13 @@ def test_missing_backend_directory_is_exit_2(tmp_path):
     assert "CONFIG ERROR" in report
 
 
-def test_unparseable_non_serving_module_is_noted_not_fatal(repo):
+def test_unparseable_module_OUTSIDE_the_closure_warns_but_passes(repo):
     """A broken script elsewhere in the tree must not fail the build — but it must be
     reported, because an unparsed module has no recorded edges."""
     make_module(repo, "backend.scripts.broken_tool", "def broken(:\n")
     code, report = guard.check(repo)
     assert code == 0, report
-    assert "failed to parse" in report
+    assert "WARN" in report and "broken_tool" in report
 
 
 # ─── unit: the guard defends itself ─────────────────────────────────────────
@@ -309,3 +309,79 @@ def test_real_repo_closure_is_not_suspiciously_small():
         f"serving closure collapsed to {len(closure)} modules — the import graph is "
         f"probably not resolving; a clean result here would be meaningless"
     )
+
+
+# ─── reconciliation vs the validated reference ──────────────────────────────
+#
+# Gaps found by semantically diffing this implementation against the reference
+# implementation (Part A of the reconciliation round). Each test below pins a gap that
+# was REAL — the branch version failed it before the fix.
+
+
+def test_groq_and_together_are_recognised_sdks():
+    """Both were missing from the branch's SDK set; the reference listed them."""
+    assert guard.imports_llm_sdk({"groq"}) == "groq"
+    assert guard.imports_llm_sdk({"together"}) == "together"
+
+
+def test_reference_sdk_set_is_fully_covered():
+    """The branch set must be a SUPERSET of the reference's. Extras are fine —
+    over-strict is the safe direction for a 'never' invariant."""
+    reference = {
+        "openai", "anthropic", "mistralai", "google.generativeai", "google.genai",
+        "litellm", "cohere", "groq", "together", "replicate", "ollama",
+        "langchain", "langchain_openai", "langchain_anthropic", "vertexai",
+    }
+    assert reference <= set(guard.LLM_SDK_MODULES), (
+        f"missing from LLM_SDK_MODULES: {sorted(reference - set(guard.LLM_SDK_MODULES))}"
+    )
+
+
+def test_importing_a_submodule_also_edges_its_ancestor_packages(repo):
+    """`import a.b.c` executes a/__init__.py and a/b/__init__.py. A gateway sitting in
+    a package __init__ was invisible before this: the branch reported OK."""
+    make_module(repo, "backend.app.services.serving_engine", "import backend.pkg.sub\n")
+    make_module(repo, "backend.pkg.sub", "x = 1\n")
+    (repo / "backend" / "pkg" / "__init__.py").write_text("import openai\n", encoding="utf-8")
+    code, report = guard.check(repo)
+    assert code == 1, f"a package __init__ importing openai must be reachable:\n{report}"
+    assert "backend.pkg" in report
+
+
+def test_ancestor_edges_do_not_fire_on_an_empty_init(repo):
+    """The ancestor rule must not manufacture violations — only reachability."""
+    make_module(repo, "backend.app.services.serving_engine", "import backend.pkg.sub\n")
+    make_module(repo, "backend.pkg.sub", "x = 1\n")
+    code, report = guard.check(repo)
+    assert code == 0, report
+
+
+# ─── Part B: a reachable unparseable module is fatal ────────────────────────
+
+
+def test_unparseable_module_INSIDE_the_closure_is_exit_2(repo):
+    """The blind spot both implementations shared. A module that fails to parse has no
+    recorded edges, so an LLM import hiding behind the syntax error would be invisible —
+    the guard would print OK while protecting nothing past that point."""
+    make_module(repo, "backend.app.services.serving_engine", "from . import mid\n")
+    make_module(repo, "backend.app.services.mid", "def broken(:\n")
+    code, report = guard.check(repo)
+    assert code == 2, f"expected CONFIG ERROR, got {code}:\n{report}"
+    assert "CONFIG ERROR" in report
+    assert "mid" in report
+
+
+def test_reachable_parse_error_names_the_serving_root_that_reaches_it(repo):
+    """The report has to say which root is compromised, or the fix is a guessing game."""
+    make_module(repo, "backend.app.services.serving_engine", "from . import mid\n")
+    make_module(repo, "backend.app.services.mid", "def broken(:\n")
+    _code, report = guard.check(repo)
+    assert "reached from serving root backend.app.services.serving_engine" in report
+
+
+def test_the_real_repo_parse_error_is_still_outside_the_closure():
+    """Pins the pre-existing backend/scripts/admin_reconcile_to_test_company.py as a WARN,
+    not a failure. If it ever becomes reachable, this test flips and the build fails —
+    which is the point."""
+    code, report = guard.check(REPO_ROOT)
+    assert code == 0, f"a parse error entered the serving closure:\n{report}"
