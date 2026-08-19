@@ -237,6 +237,83 @@ def test_admitting_the_irish_bodies_did_not_admit_the_whole_ie_tld(tmp_path):
     assert classify_source("https://not-irishimmigration.ie/permits") == UNOFFICIAL
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://skat.dk/en-us/businesses/employees-and-pay/non-danish-labour/",
+        "https://www.bzst.de/EN/Private_individuals/Tax_identification_number/",
+        "https://service.berlin.de/dienstleistung/120686/",
+        "https://www.rundfunkbeitrag.de/welcome/english",
+        # Bare host and http, to prove the match is on the hostname and not the full URL.
+        "skat.dk/en-us/individuals",
+        "http://bzst.de/EN/Home/home_node.html",
+    ],
+)
+def test_the_danish_and_german_tax_and_registration_bodies_are_official(url):
+    """Neither `.dk` nor `.de` has a governmental suffix in the allowlist, so all four of
+    these scored UNOFFICIAL and were rejected outright.
+
+    That is not a tidy default — it silently removed **9 of the 20 facts** in the B3
+    Nordics/UK/DE batch, and it removed them by country: NO->DK, DK->DE and DE->DK each
+    ended with zero surviving facts while the import reported success on the other 11. A
+    rejection list that clusters on a country is an allowlist bug, not a research failure.
+
+    All four publish their own rule rather than restating one, which is what puts them here
+    and not in `_SEMI_OFFICIAL_HOSTS`: SKAT is the Danish tax authority, the BZSt is the
+    Federal Central Tax Office that issues the German tax ID, service.berlin.de is the Land
+    of Berlin's own service catalogue for the Anmeldung, and Rundfunkbeitrag is the body
+    that levies the fee it describes.
+    """
+    assert classify_source(url) == OFFICIAL
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://lifeindenmark.borger.dk/apps-and-digital-services/mitid",
+        "https://borger.dk/",
+        "http://lifeindenmark.borger.dk/theme/when-you-arrive",
+    ],
+)
+def test_borger_dk_is_admitted_for_review_not_rejected(url):
+    """borger.dk is the Danish state's official citizen portal, run by the Agency for
+    Digital Government — so it belongs in, not out.
+
+    SEMI_OFFICIAL and not OFFICIAL for the same reason as citizensinformation.ie: it is a
+    portal that restates what SKAT, the CPR office and the regions publish elsewhere. A
+    fact sourced here is worth keeping and belongs in the review queue.
+    """
+    assert classify_source(url) == SEMI_OFFICIAL
+
+
+def test_a_danish_fact_reaches_the_review_queue_instead_of_the_rejection_list(tmp_path):
+    """End to end through `read_jsonl` — the gate has to admit the ROW, not just the URL."""
+    path = _write(tmp_path, [_record(
+        destination_country="DK",
+        entity_topic_key="registration_cpr",
+        fact_key="cprDeadline",
+        source_url="https://lifeindenmark.borger.dk/theme/when-you-arrive",
+    )])
+    rows, rejections = read_jsonl(path, batch_id="dk-1")
+
+    assert rejections == []
+    assert len(rows) == 1
+    assert rows[0].source_class == SEMI_OFFICIAL
+    # Kept, but never auto-accepted: a human still signs this off.
+    assert rows[0].accuracy_tier == TIER_REVIEW
+
+
+def test_admitting_the_dk_de_bodies_did_not_admit_the_whole_tld(tmp_path):
+    """The fix is named hostnames, not a `.dk`/`.de` suffix. Blogs and law firms stay out."""
+    assert classify_source("https://copenhagenrelocationblog.dk/guide") == UNOFFICIAL
+    assert classify_source("https://www.berlin-immigration-lawyers.de/permits") == UNOFFICIAL
+    assert classify_source("https://expat-guide.de/anmeldung") == UNOFFICIAL
+    # Nor a lookalike that merely ends with the string.
+    assert classify_source("https://notskat.dk/tax") == UNOFFICIAL
+    assert classify_source("https://not-rundfunkbeitrag.de/fee") == UNOFFICIAL
+    assert classify_source("https://fake-borger.dk/mitid") == UNOFFICIAL
+
+
 def test_a_fact_with_no_evidence_quote_cannot_be_auto_accepted(tmp_path):
     """All 24 rows in production have `evidence_quote IS NULL` — nothing in them can be
     re-checked without re-reading the source. Allowed in, never waved through."""
