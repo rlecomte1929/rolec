@@ -6,7 +6,7 @@
  * more finished than it is.
  */
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -374,34 +374,93 @@ describe('AdminCandidateBeamPage', () => {
   });
 
   it('keeps going when one pass fails, and still ranks what survived', async () => {
-    // Cross-pass agreement is the ranking signal, so four good passes are worth having.
-    // Aborting the beam on one failed call would throw away paid work the design keeps.
-    executePass.mockReset()
-      .mockResolvedValueOnce({
-        run_id: 'run-new', pass: 1, framing: 'baseline', ok: false, item_count: 0,
-        error: 'model timeout', passes_completed: 0, passes_requested: 2, next_pass: 2,
-      })
-      .mockResolvedValueOnce({
-        run_id: 'run-new', pass: 2, framing: 'adversarial', ok: true, item_count: 6,
-        error: null, passes_completed: 1, passes_requested: 2, next_pass: null,
-      });
+    // The mock answers by SLOT, the way the server does — a sequence-driven mock returns
+    // "pass 2 succeeded" however many times the loop re-asks for slot 1, which is exactly
+    // how a cursor-following loop passed this test while re-running one slot forever.
+    executePass.mockReset().mockImplementation((_runId: string, slot: number) =>
+      Promise.resolve(
+        slot === 1
+          ? {
+              run_id: 'run-new', pass: 1, framing: 'baseline', ok: false, item_count: 0,
+              error: 'model timeout', passes_completed: 0, passes_requested: 3,
+              next_pass: 1, // a failed slot points back at itself
+            }
+          : {
+              run_id: 'run-new', pass: slot, framing: 'adversarial', ok: true, item_count: 6,
+              error: null, passes_completed: slot - 1, passes_requested: 3,
+              next_pass: slot < 3 ? slot + 1 : null,
+            },
+      ),
+    );
+    startRun.mockResolvedValue({
+      run_id: 'run-new', status: 'generating', passes_requested: 3,
+      passes_completed: 0, next_pass: 1, llm_model: 'gpt-4o-mini',
+    });
+
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: /Launch beam/i }));
 
     await waitFor(() => expect(finalizeRun).toHaveBeenCalled());
+
+    // Every distinct slot attempted exactly once. A failed slot must not eat the budget.
+    expect(executePass.mock.calls.map((c) => c[1])).toEqual([1, 2, 3]);
     expect(await screen.findByText(/model timeout/)).toBeInTheDocument();
   });
 
   it('does not rank a beam whose every pass failed, and says the run is retriable', async () => {
-    executePass.mockReset().mockResolvedValue({
-      run_id: 'run-new', pass: 1, framing: 'baseline', ok: false, item_count: 0,
-      error: 'boom', passes_completed: 0, passes_requested: 2, next_pass: null,
-    });
+    executePass.mockReset().mockImplementation((_r: string, slot: number) =>
+      Promise.resolve({
+        run_id: 'run-new', pass: slot, framing: 'baseline', ok: false, item_count: 0,
+        error: 'boom', passes_completed: 0, passes_requested: 2, next_pass: slot,
+      }),
+    );
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: /Launch beam/i }));
 
-    expect(await screen.findByText(/Every pass failed/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Only 0 of 2 passes succeeded/i)).toBeInTheDocument();
     expect(finalizeRun).not.toHaveBeenCalled();
+  });
+
+  it('will not rank a single surviving pass — one opinion is not consensus', async () => {
+    // The lower edge of finalize's 409. Ranking 1/2 would print a lone pass as agreement.
+    executePass.mockReset().mockImplementation((_r: string, slot: number) =>
+      Promise.resolve({
+        run_id: 'run-new', pass: slot, framing: 'f', ok: slot === 1, item_count: slot === 1 ? 5 : 0,
+        error: slot === 1 ? null : 'boom', passes_completed: 1, passes_requested: 2,
+        next_pass: slot === 1 ? 2 : 2,
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /Launch beam/i }));
+
+    expect(await screen.findByText(/Only 1 of 2 passes succeeded/i)).toBeInTheDocument();
+    expect(finalizeRun).not.toHaveBeenCalled();
+  });
+
+  it('ranks as soon as two passes survive — the upper edge of the same rule', async () => {
+    executePass.mockReset().mockImplementation((_r: string, slot: number) =>
+      Promise.resolve({
+        run_id: 'run-new', pass: slot, framing: 'f', ok: true, item_count: 5,
+        error: null, passes_completed: slot, passes_requested: 2,
+        next_pass: slot < 2 ? slot + 1 : null,
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /Launch beam/i }));
+
+    await waitFor(() => expect(finalizeRun).toHaveBeenCalledWith('run-new'));
+  });
+
+  it('caps the context at the length the API accepts, instead of 422ing', async () => {
+    // StartRunRequest.context is max_length=4000. Sent over, the request 422s and the reader
+    // sees a generic failure rather than "your note is too long".
+    renderPage();
+    const box = await screen.findByLabelText(/Additional context for this beam run/i);
+    fireEvent.change(box, { target: { value: 'x'.repeat(5000) } });
+    await userEvent.click(screen.getByRole('button', { name: /Launch beam/i }));
+
+    await waitFor(() => expect(startRun).toHaveBeenCalled());
+    expect(startRun.mock.calls[0][0].context).toHaveLength(4000);
   });
 
   it('surfaces a start failure inline instead of leaving the button spinning', async () => {

@@ -46,6 +46,14 @@ const IMPORT_COUNTRY = 'FRANCE';
 // The corridors a beam may be launched for. Hardcoded because no endpoint lists the active
 // set; the label beside the picker says where that set is actually controlled, so the
 // hardcoding is visible to the reviewer rather than implied to be dynamic.
+// Mirrors store.MIN_PASSES. Below two there is no cross-pass agreement to measure, and
+// finalize refuses with a 409 rather than rank a single opinion as consensus.
+const MIN_SUCCESSFUL_PASSES = 2;
+
+// StartRunRequest.context is max_length=4000; over that the request 422s and the reader sees
+// a generic failure instead of "your note is too long".
+const MAX_CONTEXT = 4000;
+
 const DEFAULT_CORRIDOR = 'FR-NO';
 const DEFAULT_EMPLOYEE_TYPE = 'permanent';
 
@@ -236,27 +244,40 @@ export function AdminCandidateBeamPage(): React.ReactElement {
       const parts = [moveDate ? `Planned move date: ${moveDate}` : '', context.trim()].filter(
         Boolean,
       );
+      const payloadContext = parts.join('\n').slice(0, MAX_CONTEXT);
       const started = await candidateBeamAPI.startRun({
         corridor,
         employee_type: employeeType,
-        context: parts.length ? parts.join('\n') : undefined,
+        context: payloadContext || undefined,
       });
 
-      let next = started.next_pass;
       const log: PassResult[] = [];
-      // Bounded by passes_requested rather than `while (next)`: a server that kept returning
-      // the same slot would otherwise bill model calls forever.
-      for (let i = 0; i < started.passes_requested && next; i += 1) {
-        const result = await candidateBeamAPI.executePass(started.run_id, next);
+      // Explicit slots, NOT the server's next_pass cursor.
+      //
+      // next_pass is "the lowest slot not SUCCESSFULLY completed", so a failed slot points
+      // back at itself. Following it on a fresh launch re-runs that one slot until the
+      // budget is gone and never runs the other framings — five paid calls, one framing, and
+      // no cross-pass agreement, which is the entire ranking signal. Naming a slot runs
+      // exactly that slot, so each framing gets its one attempt. Retrying a failure is a
+      // separate, deliberate act (see Resume), not something a launch should spend the
+      // budget on silently.
+      for (let slot = 1; slot <= started.passes_requested; slot += 1) {
+        const result = await candidateBeamAPI.executePass(started.run_id, slot);
         log.push(result);
         setPassLog([...log]);
-        next = result.next_pass;
       }
 
-      if (log.some((r) => r.ok)) {
+      // finalize 409s below MIN_PASSES successful passes: cross-pass agreement is undefined
+      // with fewer than two, so ranking one pass would present a lone opinion as consensus.
+      // Gating on "at least one succeeded" turns that 409 into a failed-looking beam.
+      const succeeded = log.filter((r) => r.ok).length;
+      if (succeeded >= MIN_SUCCESSFUL_PASSES) {
         await candidateBeamAPI.finalizeRun(started.run_id);
       } else {
-        setLaunchError('Every pass failed — nothing to rank. The run is kept so it can be retried.');
+        setLaunchError(
+          `Only ${succeeded} of ${started.passes_requested} passes succeeded — ranking needs at ` +
+            `least ${MIN_SUCCESSFUL_PASSES}. The run is kept, so the failed passes can be retried.`,
+        );
       }
 
       candidateBeamAPI.listRuns().then(setRuns).catch(() => undefined);
