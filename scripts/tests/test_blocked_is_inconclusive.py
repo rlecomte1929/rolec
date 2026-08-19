@@ -73,3 +73,63 @@ def test_a_real_failure_is_still_reported():
     current = {"AT9_REAL": {"points": cs.POINTS["FAIL"], "status": "FAIL"}}
     _, _, new_failures, _ = cs.diff_tests(current, {})
     assert new_failures == ["AT9_REAL"]
+
+
+# ── The gate, added after the scorer ─────────────────────────────────────────
+#
+# The three tests above pinned the SCORING path. AIQ-1820 then armed a second,
+# independent path — `check_against_baseline`, which fails the job on any failure not
+# named in sentinel_baseline.json — and it kept BLOCKED in its failing set. So one run
+# printed `fail: 0`, verdict GREEN, "No new Notion tasks needed", and then failed the
+# job on "✖ 1 FAILING test(s) are not in the baseline: AT3_FRESH". Two paths in one
+# file, disagreeing about the same status, for months.
+#
+# The baseline is a ratchet of KNOWN BUGS. A throttled check is not a bug, so there is
+# nothing to write down — baselining it would have documented a fiction and hidden the
+# real registration coverage behind a permanent excuse.
+
+
+def test_baseline_gate_does_not_fail_the_run_on_a_throttled_check():
+    """The exact run-32166812901 shape: everything passes, AT3_FRESH is throttled."""
+    results = [
+        {"id": "AT2_FRESH", "status": "PASS"},
+        {"id": "AT3_FRESH", "status": "BLOCKED"},   # self-inflicted 429
+    ]
+    unexpected, stale = cs.check_against_baseline(results, {})
+    assert unexpected == [], (
+        "a throttled check must not fail the gate — the scorer calls the same run GREEN, "
+        "and a gate that disagrees with its own scorer teaches everyone to ignore it"
+    )
+    assert stale == []
+
+
+def test_baseline_gate_still_fails_the_run_on_a_real_failure():
+    """Guard the guard: the gate must keep doing the job AIQ-1820 armed it for."""
+    results = [
+        {"id": "AT3_FRESH", "status": "BLOCKED"},
+        {"id": "AT9_REAL", "status": "FAIL"},
+    ]
+    unexpected, _ = cs.check_against_baseline(results, {})
+    assert unexpected == ["AT9_REAL"], (
+        f"a genuine FAIL outside the baseline must still fail the run, got {unexpected}"
+    )
+
+
+def test_baseline_gate_still_honours_a_known_open_failure():
+    results = [{"id": "KNOWN_BUG", "status": "FAIL"}]
+    unexpected, stale = cs.check_against_baseline(results, {"KNOWN_BUG": "ticket AIQ-x"})
+    assert unexpected == [] and stale == []
+
+
+def test_baseline_gate_still_reports_a_stale_entry():
+    """A baselined failure that now passes must be surfaced so the ratchet tightens."""
+    results = [{"id": "KNOWN_BUG", "status": "PASS"}]
+    unexpected, stale = cs.check_against_baseline(results, {"KNOWN_BUG": "ticket AIQ-x"})
+    assert unexpected == [] and stale == ["KNOWN_BUG"]
+
+
+def test_untagged_blocked_check_does_not_fail_the_run():
+    """`report_unmapped` had the same defect: an untagged BLOCKED check failed the run
+    for being untagged-and-failing, when it had simply not been measured."""
+    assert cs.report_unmapped([{"id": "UNTAGGED_X", "status": "BLOCKED"}], {}) is False
+    assert cs.report_unmapped([{"id": "UNTAGGED_Y", "status": "FAIL"}], {}) is True

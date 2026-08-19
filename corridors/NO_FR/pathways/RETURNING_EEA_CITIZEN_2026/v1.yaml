@@ -153,6 +153,16 @@ corridor_agent:
       time_window_max_days: 8
       cite: NO_FOLKEREG_MOVE
       assertion: HARD
+      deadline_trigger:
+        tag: "relopass-deadline-folkeregister-move-abroad-no"
+        label: "Report your move abroad to Folkeregisteret"
+        channel: "email"
+        # An 8-day window. 5 days' notice is most of it, deliberately: this is the
+        # step whose miss is unrecoverable and invisible until a Norwegian tax
+        # assessment arrives months later.
+        lead_days: 5
+        # A Norwegian exit obligation, in a corridor bound for France.
+        jurisdiction: "NOR"
 
     # THE CORRECTION. An external draft implied Norwegian tax residence ceases at
     # departure. It does not: emigration is a strict test, and for someone resident
@@ -311,6 +321,11 @@ corridor_agent:
       time_window_min_days: 0
       time_window_max_days: 90
       assertion: HARD
+      deadline_trigger:
+        tag: "relopass-deadline-cpam-registration-fr"
+        label: "CPAM registration for French health cover"
+        channel: "email"
+        lead_days: 30
 
     # --- The stated nothing-to-do items. These are NOT omissions. A correct
     # --- answer of "none" must be spoken, with its reason, or the screen reads

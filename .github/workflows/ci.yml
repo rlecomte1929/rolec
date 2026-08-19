@@ -594,6 +594,32 @@ jobs:
       - name: Check form-template honesty (no permit for free-movers)
         run: python scripts/check_form_template_honesty.py
 
+  serving-llm-isolation:
+    # Trust-architecture guard: the generation/serving split as an ENFORCED invariant.
+    # The deterministic requirement-serving path (requirements_builder, rules_engine,
+    # requirement_evaluation_service, immigration_requirement_service,
+    # hr_policy_resolver) must NEVER be able to reach an LLM call at request time —
+    # transformers belong in the authoring/drafting layer only. The script builds the
+    # full backend import graph via AST (pure stdlib, no deps, catches lazy function-
+    # local imports too) and FAILS with the exact import chain if any serving path can
+    # reach an LLM gateway module or an LLM SDK import. Exit 2 (also a failure) means
+    # the guard itself is misconfigured — a serving root was renamed/deleted without
+    # re-registering it. The same invariant is asserted from pytest by
+    # scripts/tests/test_check_serving_llm_isolation.py in the backend-tests job.
+    # See docs/specs/serving-llm-isolation.md.
+    name: Serving/LLM isolation guard
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Run serving/LLM isolation check
+        run: python scripts/check_serving_llm_isolation.py --root .
+
   rls-coverage:
     # AUDIT-A3: lists `public.*` + `rce.*` tables with zero RLS policies and asserts
     # each one is on the supabase/rls_allowlist.txt allowlist. Drains over time.

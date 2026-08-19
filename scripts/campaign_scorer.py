@@ -586,7 +586,12 @@ def check_against_baseline(results_list, baseline):
     """
     by_id = {r["id"]: r.get("status") for r in results_list
              if isinstance(r, dict) and r.get("id")}
-    failing = {tid for tid, st in by_id.items() if st in ("FAIL", "BLOCKED")}
+    # BLOCKED is inconclusive, not failing — same contract as POINTS["BLOCKED"] = None
+    # above and ingest_playwright_results. This gate was the last place that still
+    # disagreed: it red every run on AT3_FRESH, whose "failure" is a self-inflicted 429,
+    # while the scorer printed fail:0 and GREEN for the same run. A baseline entry is a
+    # record of a KNOWN BUG; a throttled check is not a bug and has nothing to baseline.
+    failing = {tid for tid, st in by_id.items() if st == "FAIL"}
     unexpected = sorted(failing - set(baseline))
     stale = sorted(tid for tid in baseline if by_id.get(tid) == "PASS")
     return unexpected, stale
@@ -632,7 +637,9 @@ def report_unmapped(results_list, score_map):
     if not unmapped:
         return False
 
-    failing = [r for r in unmapped if r.get("status") in ("FAIL", "BLOCKED")]
+    # Same contract as check_against_baseline: an untagged BLOCKED check is
+    # inconclusive, so it must not fail the run for being untagged-and-failing.
+    failing = [r for r in unmapped if r.get("status") == "FAIL"]
 
     print(f"  ⚠️  {len(unmapped)} test id(s) ran but are not in scoring_map.json:")
     for r in unmapped:

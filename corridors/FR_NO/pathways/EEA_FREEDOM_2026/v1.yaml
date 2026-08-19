@@ -98,6 +98,13 @@ corridor_agent:
       time_window_min_days: 0
       time_window_max_days: 90
       cite: NO_UTL_110
+      deadline_trigger:
+        tag: "relopass-deadline-eea-police-registration-no"
+        label: "EEA police registration in Norway"
+        channel: "email"
+        # 90-day statutory window; open the alert with a third of it left, which
+        # is comfortably more than the police appointment lead time.
+        lead_days: 30
 
     - step_id: NATIONAL_REGISTRY
       name: "Register with the tax office — D-number / personnummer (Folkeregister)"
