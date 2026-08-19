@@ -85,6 +85,35 @@ export interface ImportSkip {
   reason: string;
 }
 
+/** One candidate's verdict from a post-import verification sweep. */
+export interface VerifyItem {
+  candidate_uid: string;
+  title: string;
+  /** `verified` is the only healthy value; the rest each name a distinct way it drifted. */
+  status: 'verified' | 'content_drift' | 'pillar_mismatch' | 'country_mismatch' | 'vanished';
+  detail?: string | null;
+  expected?: string | null;
+  found?: string | null;
+}
+
+export interface VerifyReport {
+  run_id: string;
+  /** False when ANY item drifted. The endpoint also signals this with a 409. */
+  ok: boolean;
+  items: VerifyItem[];
+  verified: number;
+  failed: number;
+  approved_not_imported?: number;
+}
+
+export interface ImportResult {
+  run_id: string;
+  imported: number;
+  skipped: ImportSkip[];
+  /** True only when dry_run was false and rows were actually staged. */
+  written: boolean;
+}
+
 export interface ImportPlan {
   importable: number;
   skipped: ImportSkip[];
@@ -137,6 +166,52 @@ export const candidateBeamAPI = {
       { country, pillar_overrides: pillarOverrides },
     );
     return res.data;
+  },
+
+  /**
+   * Actually stage the run's approved candidates.
+   *
+   * `dry_run: false` is passed EXPLICITLY and must stay that way. The backend's
+   * `ImportRequest.dry_run` defaults to TRUE so that a forgotten flag previews rather than
+   * writes — which means an "execute" call that omits it reports success and stages
+   * nothing. The safe default on the server is a silent no-op on the client.
+   *
+   * There is no `approved_ids` parameter: approval already lives on each item as a
+   * server-side status, set through `review()`. The import reads that.
+   */
+  executeImport: async (
+    runId: string,
+    country: string,
+    pillarOverrides: Record<string, string> = {},
+  ): Promise<ImportResult> => {
+    const res = await api.post<ImportResult>(
+      `${BASE}/runs/${encodeURIComponent(runId)}/import`,
+      { country, pillar_overrides: pillarOverrides, dry_run: false },
+    );
+    return res.data;
+  },
+
+  /**
+   * Read-only QA of an import that already happened.
+   *
+   * Returns 200 with the report when every staged row is intact and 409 with THE SAME
+   * report when something drifted. A 409 here is a finding, not a failure — it carries the
+   * evidence, so it is unwrapped and returned rather than thrown. Treating it as an error
+   * would hide exactly the case this endpoint exists to surface.
+   */
+  verifyImport: async (runId: string): Promise<VerifyReport> => {
+    try {
+      const res = await api.get<VerifyReport>(
+        `${BASE}/runs/${encodeURIComponent(runId)}/import-verify`,
+      );
+      return res.data;
+    } catch (err) {
+      const conflict = err as { response?: { status?: number; data?: VerifyReport } };
+      if (conflict.response?.status === 409 && conflict.response.data) {
+        return conflict.response.data;
+      }
+      throw err;
+    }
   },
 
   pillars: async (): Promise<{ pillars: string[]; grounded_categories: Record<string, string> }> => {
