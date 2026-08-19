@@ -231,6 +231,47 @@ root fails the build (exit 2) until re-registered, as does any module inside the
 closure that fails to parse — an unparsed module hides whatever it imports. See
 `docs/specs/serving-llm-isolation.md`.
 
+## Research batch intake (GCS → candidate)
+
+Otto researches in the Audos workspace and its real deliverable is **NDJSON files on Google
+Cloud Storage plus a manifest**, not the chat text. Bringing one in is a repeatable procedure,
+not a one-off. `docs/imports/B3-facts-enrichment.md` is the worked example.
+
+1. **Get untruncated URLs.** Otto's chat renderer truncates the anchor *text* while leaving
+   the `href` intact — read the page's accessibility tree rather than asking Otto to re-paste.
+2. **Fetch the manifest first.** It declares each artifact's schema, record count and full
+   GCS URL. Counts must reconcile against it exactly, and any discrepancy is the batch's
+   problem to explain, not yours to reconcile away.
+3. **Verify the manifest's claims against the live schema before writing anything.** A
+   manifest names a target table and key; that is a claim, and it has been wrong. B3 named
+   four tables (`kg_corridors`, `kg_corridor_requirements`, `kg_employee_types`,
+   `geo_city_content`) that **do not exist in this repo at all**, alongside a
+   `tools/wave2-import-pipeline.mjs` that exists on no ref. Confirm the table, then map the
+   fields.
+4. **Commit the artifacts + a batch doc under `docs/imports/`,** with a gate script that
+   re-hashes each file and reconciles counts. A GCS object with no repo record is one bucket
+   cleanup away from gone, and a "verified" fact nobody can diff is not verified.
+5. **Load as candidates only.** `status='pending'` / `'candidate'` / `'new'`, never `live`,
+   `verified`, `lawyer_verified` or `approved`. Idempotent on the batch's own uid, and an
+   `ON CONFLICT` must never overwrite a reviewer's decision.
+6. **Never fill a gap.** A field the artifact does not carry stays NULL. A record with
+   `source_missing=true` keeps the flag and gets no invented citation. Deriving a slug key
+   from delivered fields is fine and must be documented as derived; inventing a source, a
+   number or a confidence score is fabrication.
+
+**Do not improvise a write path when the named one is absent.** Both B3 and the corridor
+promotion runbook (`docs/runbooks/corridor-facts/README.md`) hit this: the toolchain and
+WorkspaceDB live in the Audos workspace and are unreachable from a CLI checkout. Writing an
+importer against an imagined schema invents the row shape, the column names and the write
+contract — worse than nothing for work whose entire purpose is auditability. Land the
+artifacts and the decision record; run the write where the database is.
+
+The one proven GCS→database path that *does* run from here is the Supabase `otto-loader` edge
+function (`audos-workspace-776786/docs/otto-to-relopass-loading-playbook.md`). It routes on a
+per-record `target_table` key and loads to a fixed set of staging tables; a batch whose
+records lack that key loads **zero rows** and reports them all as `unrouted`. Always
+`dry_run=true` first.
+
 ## Migration discipline (MANDATORY)
 
 NEVER apply a migration to production via MCP `apply_migration` or by manually
