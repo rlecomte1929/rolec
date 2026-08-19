@@ -18,6 +18,9 @@ const importPlan = vi.fn();
 const pillars = vi.fn();
 const executeImport = vi.fn();
 const verifyImport = vi.fn();
+const startRun = vi.fn();
+const executePass = vi.fn();
+const finalizeRun = vi.fn();
 
 vi.mock('../../../api/candidateBeam', () => ({
   candidateBeamAPI: {
@@ -28,6 +31,9 @@ vi.mock('../../../api/candidateBeam', () => ({
     pillars: (...a: unknown[]) => pillars(...a),
     executeImport: (...a: unknown[]) => executeImport(...a),
     verifyImport: (...a: unknown[]) => verifyImport(...a),
+    startRun: (...a: unknown[]) => startRun(...a),
+    executePass: (...a: unknown[]) => executePass(...a),
+    finalizeRun: (...a: unknown[]) => finalizeRun(...a),
   },
 }));
 
@@ -105,6 +111,24 @@ beforeEach(() => {
   pillars.mockReset().mockResolvedValue({ pillars: [], grounded_categories: {} });
   executeImport.mockReset();
   verifyImport.mockReset();
+  startRun.mockReset().mockResolvedValue({
+    run_id: 'run-new', status: 'generating', passes_requested: 2,
+    passes_completed: 0, next_pass: 1, llm_model: 'gpt-4o-mini',
+  });
+  executePass
+    .mockReset()
+    .mockResolvedValueOnce({
+      run_id: 'run-new', pass: 1, framing: 'baseline', ok: true, item_count: 7,
+      error: null, passes_completed: 1, passes_requested: 2, next_pass: 2,
+    })
+    .mockResolvedValueOnce({
+      run_id: 'run-new', pass: 2, framing: 'adversarial', ok: true, item_count: 6,
+      error: null, passes_completed: 2, passes_requested: 2, next_pass: null,
+    });
+  finalizeRun.mockReset().mockResolvedValue({
+    run_id: 'run-new', status: 'pending_review', candidate_count: 11,
+    passes_completed: 2, passes_requested: 2, flagged: 1, source_missing: 2,
+  });
 });
 
 describe('AdminCandidateBeamPage', () => {
@@ -317,4 +341,76 @@ describe('AdminCandidateBeamPage', () => {
     await waitFor(() => expect(review).toHaveBeenCalledTimes(1));
     expect(review).toHaveBeenCalledWith('i1', 'approved');
   });
+  // ── Action 4: launch console ──────────────────────────────────────────────
+
+  it('drives start then each pass then finalize, following the server cursor', async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /Launch beam/i }));
+
+    await waitFor(() => expect(finalizeRun).toHaveBeenCalledWith('run-new'));
+    expect(startRun).toHaveBeenCalledWith(
+      expect.objectContaining({ corridor: 'FR-NO', employee_type: 'permanent' }),
+    );
+    // Slots come from next_pass, not from an assumed 1..N.
+    expect(executePass.mock.calls.map((c) => c[1])).toEqual([1, 2]);
+  });
+
+  it('sends the move date as labelled context, since the beam has no date field', async () => {
+    renderPage();
+    await userEvent.type(await screen.findByLabelText(/Move date/i), '2026-12-01');
+    await userEvent.click(screen.getByRole('button', { name: /Launch beam/i }));
+
+    await waitFor(() => expect(startRun).toHaveBeenCalled());
+    expect(startRun.mock.calls[0][0].context).toContain('Planned move date: 2026-12-01');
+  });
+
+  it('shows each pass as it lands rather than one opaque spinner', async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /Launch beam/i }));
+
+    expect(await screen.findByText('pass 1')).toBeInTheDocument();
+    expect(await screen.findByText('pass 2')).toBeInTheDocument();
+    expect(screen.getByText(/7 candidates/)).toBeInTheDocument();
+  });
+
+  it('keeps going when one pass fails, and still ranks what survived', async () => {
+    // Cross-pass agreement is the ranking signal, so four good passes are worth having.
+    // Aborting the beam on one failed call would throw away paid work the design keeps.
+    executePass.mockReset()
+      .mockResolvedValueOnce({
+        run_id: 'run-new', pass: 1, framing: 'baseline', ok: false, item_count: 0,
+        error: 'model timeout', passes_completed: 0, passes_requested: 2, next_pass: 2,
+      })
+      .mockResolvedValueOnce({
+        run_id: 'run-new', pass: 2, framing: 'adversarial', ok: true, item_count: 6,
+        error: null, passes_completed: 1, passes_requested: 2, next_pass: null,
+      });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /Launch beam/i }));
+
+    await waitFor(() => expect(finalizeRun).toHaveBeenCalled());
+    expect(await screen.findByText(/model timeout/)).toBeInTheDocument();
+  });
+
+  it('does not rank a beam whose every pass failed, and says the run is retriable', async () => {
+    executePass.mockReset().mockResolvedValue({
+      run_id: 'run-new', pass: 1, framing: 'baseline', ok: false, item_count: 0,
+      error: 'boom', passes_completed: 0, passes_requested: 2, next_pass: null,
+    });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /Launch beam/i }));
+
+    expect(await screen.findByText(/Every pass failed/i)).toBeInTheDocument();
+    expect(finalizeRun).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a start failure inline instead of leaving the button spinning', async () => {
+    startRun.mockRejectedValue({ response: { data: { detail: 'corridor not authored' } } });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /Launch beam/i }));
+
+    expect(await screen.findByText(/corridor not authored/i)).toBeInTheDocument();
+    expect(executePass).not.toHaveBeenCalled();
+  });
+
 });

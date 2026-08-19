@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
-import { Alert, Badge, Button, Card, Modal, Textarea } from '../../components/antigravity';
+import { Alert, Badge, Button, Card, Input, Modal, Select, Textarea } from '../../components/antigravity';
 import {
   candidateBeamAPI,
   type BeamItem,
@@ -10,6 +10,7 @@ import {
   type ConfidenceBand,
   type ImportPlan,
   type ImportResult,
+  type PassResult,
   type VerifyReport,
 } from '../../api/candidateBeam';
 
@@ -41,6 +42,24 @@ import {
 // preview call site; named here so the execute path cannot drift from the preview path and
 // stage into a different country than the one the reviewer was shown.
 const IMPORT_COUNTRY = 'FRANCE';
+
+// The corridors a beam may be launched for. Hardcoded because no endpoint lists the active
+// set; the label beside the picker says where that set is actually controlled, so the
+// hardcoding is visible to the reviewer rather than implied to be dynamic.
+const DEFAULT_CORRIDOR = 'FR-NO';
+const DEFAULT_EMPLOYEE_TYPE = 'permanent';
+
+const CORRIDORS = [
+  { value: 'FR-NO', label: 'France → Norway' },
+  { value: 'ES-IE', label: 'Spain → Ireland' },
+  { value: 'NO-FR', label: 'Norway → France' },
+];
+
+const EMPLOYEE_TYPES = [
+  { value: 'permanent', label: 'Permanent' },
+  { value: 'secondment', label: 'Secondment' },
+  { value: 'posted_worker', label: 'Posted worker' },
+];
 
 // Verification outcomes, worst first. `verified` is the only healthy one; each of the others
 // names a distinct way a staged row stopped matching what was imported.
@@ -84,6 +103,17 @@ export function AdminCandidateBeamPage(): React.ReactElement {
   // category -> pillar. Items carry a category; the pillar grouping the reviewer needs is a
   // server-owned mapping, so it is fetched rather than guessed from the category string.
   const [pillarByCategory, setPillarByCategory] = useState<Record<string, string>>({});
+
+  // Launch console.
+  const [corridor, setCorridor] = useState(DEFAULT_CORRIDOR);
+  const [employeeType, setEmployeeType] = useState(DEFAULT_EMPLOYEE_TYPE);
+  const [moveDate, setMoveDate] = useState('');
+  const [context, setContext] = useState('');
+  const [launching, setLaunching] = useState(false);
+  // Per-pass, not a single spinner: the beam is five paid calls and a reader watching one
+  // opaque spinner cannot tell a slow pass from a dead run.
+  const [passLog, setPassLog] = useState<PassResult[]>([]);
+  const [launchError, setLaunchError] = useState<string | null>(null);
 
   useEffect(() => {
     candidateBeamAPI
@@ -184,6 +214,61 @@ export function AdminCandidateBeamPage(): React.ReactElement {
     }
   };
 
+  /**
+   * Run a whole beam: open the run, drive each pass, finalize, then open its review panel.
+   *
+   * Sequential on purpose. Each pass is a paid model call and the server hands back
+   * `next_pass`, so the client follows the server's own cursor rather than assuming the
+   * slots are 1..N — which is also what makes a resumed run land on the right slot.
+   *
+   * A pass that fails does NOT abort the beam. It resolves with `ok: false`, its slot is
+   * kept, and the remaining passes still run: the ranking's signal is cross-pass agreement,
+   * so four good passes are worth having and the fifth can be retried. Losing the run
+   * because one call 500'd is exactly the failure the resumable design exists to prevent.
+   */
+  const launchBeam = async () => {
+    setLaunching(true);
+    setLaunchError(null);
+    setPassLog([]);
+    try {
+      // The backend has no move-date field, so it travels as context — labelled, because a
+      // date silently folded into free text is a date the reviewer cannot see was sent.
+      const parts = [moveDate ? `Planned move date: ${moveDate}` : '', context.trim()].filter(
+        Boolean,
+      );
+      const started = await candidateBeamAPI.startRun({
+        corridor,
+        employee_type: employeeType,
+        context: parts.length ? parts.join('\n') : undefined,
+      });
+
+      let next = started.next_pass;
+      const log: PassResult[] = [];
+      // Bounded by passes_requested rather than `while (next)`: a server that kept returning
+      // the same slot would otherwise bill model calls forever.
+      for (let i = 0; i < started.passes_requested && next; i += 1) {
+        const result = await candidateBeamAPI.executePass(started.run_id, next);
+        log.push(result);
+        setPassLog([...log]);
+        next = result.next_pass;
+      }
+
+      if (log.some((r) => r.ok)) {
+        await candidateBeamAPI.finalizeRun(started.run_id);
+      } else {
+        setLaunchError('Every pass failed — nothing to rank. The run is kept so it can be retried.');
+      }
+
+      candidateBeamAPI.listRuns().then(setRuns).catch(() => undefined);
+      selectRun(started.run_id);
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      setLaunchError(detail || 'The beam could not be started.');
+    } finally {
+      setLaunching(false);
+    }
+  };
+
   /** Stage the approved candidates for real. Only reachable through the confirm modal. */
   const executeImport = async () => {
     if (!runId) return;
@@ -280,10 +365,75 @@ export function AdminCandidateBeamPage(): React.ReactElement {
       )}
 
       <Card padding="lg" className="mb-6">
+        <h2 className="text-sm font-semibold text-[#0b2b43] mb-3">Launch a beam</h2>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <Select
+              value={corridor}
+              onChange={setCorridor}
+              options={CORRIDORS}
+              label="Corridor"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Active corridors only — /admin/countries controls which corridors appear here.
+            </p>
+          </div>
+          <Select
+            value={employeeType}
+            onChange={setEmployeeType}
+            options={EMPLOYEE_TYPES}
+            label="Employee type"
+          />
+          <Input type="date" value={moveDate} onChange={setMoveDate} label="Move date" />
+        </div>
+
+        <div className="mt-3">
+          <Textarea
+            rows={2}
+            value={context}
+            onChange={setContext}
+            label="Additional context for this beam run — do not include names or contact details"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            The move date is sent with this context — the beam has no separate date field.
+          </p>
+        </div>
+
+        <div className="mt-3">
+          <Button onClick={launchBeam} disabled={launching}>
+            {launching ? 'Running beam…' : 'Launch beam'}
+          </Button>
+        </div>
+
+        {launching && passLog.length === 0 && (
+          <p className="mt-3 text-sm text-slate-600">Running beam… opening the run.</p>
+        )}
+
+        {passLog.length > 0 && (
+          <ul className="mt-3 space-y-1 text-xs">
+            {passLog.map((pass) => (
+              <li key={pass.pass} className="flex flex-wrap items-baseline gap-2">
+                <Badge variant={pass.ok ? 'success' : 'error'}>pass {pass.pass}</Badge>
+                <span className="text-slate-500">{pass.framing}</span>
+                <span className="text-slate-700">
+                  {pass.ok ? `${pass.item_count} candidates` : pass.error || 'failed'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {launchError && (
+          <Alert variant="error" className="mt-3">
+            {launchError}
+          </Alert>
+        )}
+      </Card>
+
+      <Card padding="lg" className="mb-6">
         <h2 className="text-sm font-semibold text-[#0b2b43] mb-1">Runs</h2>
-        <p className="text-xs text-slate-500 mb-3">
-          Active corridors only — /admin/countries controls which corridors appear here.
-        </p>
+
         {runs.length === 0 ? (
           <p className="text-sm text-slate-500">No beam runs yet.</p>
         ) : (

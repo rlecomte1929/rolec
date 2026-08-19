@@ -79,6 +79,39 @@ export interface BeamItemCounts {
   source_missing: number;
 }
 
+export interface StartRunResult {
+  run_id: string;
+  status: BeamRunStatus;
+  passes_requested: number;
+  passes_completed: number;
+  /** The slot to run next, or null when every pass is done. Drives the launch loop. */
+  next_pass: number | null;
+  llm_model: string | null;
+}
+
+export interface PassResult {
+  run_id: string;
+  pass: number;
+  framing: string | null;
+  /** False when this pass failed. The slot is kept so it can be retried by number. */
+  ok: boolean;
+  item_count: number;
+  error: string | null;
+  passes_completed: number;
+  passes_requested: number;
+  next_pass: number | null;
+}
+
+export interface FinalizeResult {
+  run_id: string;
+  status: BeamRunStatus;
+  candidate_count: number;
+  passes_completed: number;
+  passes_requested: number;
+  flagged: number;
+  source_missing: number;
+}
+
 export interface ImportSkip {
   candidate_uid: string;
   title: string;
@@ -153,6 +186,49 @@ export const candidateBeamAPI = {
       status,
       review_note: reviewNote || undefined,
     });
+  },
+
+  /**
+   * Open a run. Executes NO passes — it returns immediately with `next_pass: 1`.
+   *
+   * The beam is deliberately resumable rather than atomic: five paid model calls behind one
+   * request is a single gateway timeout that loses every completed pass with nothing to
+   * resume from. The caller drives the passes.
+   */
+  startRun: async (body: {
+    corridor: string;
+    employee_type: string;
+    context?: string;
+    passes?: number;
+    model?: string;
+  }): Promise<StartRunResult> => {
+    const res = await api.post<StartRunResult>(`${BASE}/runs`, body);
+    return res.data;
+  },
+
+  /**
+   * Run exactly ONE pass, and the retry mechanism for a failed one.
+   *
+   * Omitting `passNumber` runs the lowest slot not yet completed; naming a slot re-runs
+   * exactly that one. A pass that fails resolves with `ok: false` rather than throwing — the
+   * slot survives so the beam can carry on and the pass be retried, which is the whole
+   * reason the run is resumable.
+   */
+  executePass: async (runId: string, passNumber?: number): Promise<PassResult> => {
+    const res = await api.post<PassResult>(
+      `${BASE}/runs/${encodeURIComponent(runId)}/pass`,
+      passNumber ? { pass_number: passNumber } : {},
+    );
+    return res.data;
+  },
+
+  /** Cluster, rank and persist the candidates once the passes are in. */
+  finalizeRun: async (runId: string, force = false): Promise<FinalizeResult> => {
+    const res = await api.post<FinalizeResult>(
+      `${BASE}/runs/${encodeURIComponent(runId)}/finalize`,
+      { force },
+    );
+    return res.data;
   },
 
   /** Ask what an import WOULD do. Writes nothing — show it before staging. */
