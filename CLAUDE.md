@@ -209,6 +209,27 @@ The product sends user-supplied text to third-party LLM sub-processors (OpenAI a
 
 Sub-processor DPA coverage and EU-residency status are tracked in `docs/security/PRIV-004_sub-processor_register.md` (GDPR Art. 28 register). Update it whenever a new sub-processor (LLM, email, analytics, hosting, CDN) is added to the stack.
 
+## Generation/serving split (HARD GATE)
+
+**The deterministic requirement-serving path must NEVER be able to call an LLM at
+request time.** Served requirements come from rule engines over curated, cited catalog
+data; LLMs live only in the authoring/drafting layer, whose output is human-reviewed
+before it becomes served data. This is the trust architecture the whole "why not just
+use ChatGPT" story rests on.
+
+CI enforces it: **`scripts/check_serving_llm_isolation.py`** (job: *Serving/LLM
+isolation guard*; also asserted from pytest via
+`scripts/tests/test_check_serving_llm_isolation.py` in the backend-tests job) builds
+the full backend import graph via AST — lazy function-local imports included — and
+fails the PR with the exact import chain if any serving engine
+(`requirements_builder`, `rules_engine`, `requirement_evaluation_service`,
+`immigration_requirement_service`, `hr_policy_resolver`) can reach an LLM gateway
+module or an LLM SDK import. There is no allowlist. Fix a violation by breaking the
+import (move the LLM use into authoring; serve reviewed data), never by editing the
+guard's lists. New serving engines must be registered in `SERVING_ROOTS`; a renamed
+root fails the build (exit 2) until re-registered. See
+`docs/specs/serving-llm-isolation.md`.
+
 ## Migration discipline (MANDATORY)
 
 NEVER apply a migration to production via MCP `apply_migration` or by manually
