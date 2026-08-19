@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from . import models
+from .services import verification_guard
 
 
 def get_case(db: Session, case_id: str) -> Optional[models.Case]:
@@ -140,12 +141,27 @@ def _has_citations(value: Any) -> bool:
 
 
 def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.RequirementItem:
+    """Upsert on the natural key (country_code, purpose, title).
+
+    Every caller of this funnel is an automated producer (Otto promote, YAML
+    seed, research stub), so the generator/verifier separation guard runs on
+    BOTH branches: a payload claiming 'expert_verified', carrying the
+    guard-owned verified_by/verified_at columns, or rewriting a human-verified
+    row's provenance is rejected (VerificationWriteError) before anything is
+    written. Flipping a row to 'expert_verified' has exactly one path:
+    services/verification_guard.mark_expert_verified, behind the admin router.
+    """
     existing = (
         db.query(models.RequirementItem)
         .filter(models.RequirementItem.country_code == payload["country_code"])
         .filter(models.RequirementItem.purpose == payload["purpose"])
         .filter(models.RequirementItem.title == payload["title"])
         .first()
+    )
+    verification_guard.assert_generator_verification_write(
+        payload,
+        existing_status=existing.verification_status if existing else None,
+        context="create_requirement_item",
     )
     if existing:
         existing.description = payload["description"]

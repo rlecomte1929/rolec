@@ -121,7 +121,17 @@ class RequirementItem(Base):
     # AIQ-1349: provenance level (representative / corpus_grounded / expert_verified).
     # Describes how well-sourced the content is. It is a DISPLAY BADGE, not a gate — no read
     # path filters on it. Use review_status below to decide what is served.
+    # Generator/verifier separation: 'expert_verified' is a human signature. Only
+    # services/verification_guard.mark_expert_verified may write it (stamping verified_by +
+    # verified_at below); crud.create_requirement_item — the funnel every automated producer
+    # uses — refuses it outright and refuses to rewrite it once set.
     verification_status = Column(String, nullable=True)
+    # The human behind verification_status='expert_verified'. Guard-owned: writable only via
+    # verification_guard.mark_expert_verified; a generator payload carrying either column is
+    # rejected. Mirrors reviewed_by/reviewed_at (publication) and attested_by/attested_at
+    # (counsel) — three axes, each stamped with its own accountable actor.
+    verified_by = Column(Text, nullable=True)
+    verified_at = Column(DateTime(timezone=True), nullable=True)
     # Admin publication gate: pending | approved | rejected. Only 'approved' is served, by
     # employees and by the public corridor endpoint alike. Set on insert, carried on update.
     review_status = Column(String, nullable=False, server_default="approved")

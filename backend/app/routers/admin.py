@@ -14,6 +14,7 @@ from .. import crud, schemas, models
 from ..services.research import run_country_research
 from ..services import requirements_builder
 from ..services.official_ingest_service import ingest_url_to_knowledge_doc
+from ..services import verification_guard
 from ..services.audit_log_service import (
     ACTION_INSERT,
     ACTION_UPDATE,
@@ -209,6 +210,8 @@ def _review_dto(
         attestationStatus=getattr(item, "attestation_status", None),
         attestedBy=getattr(item, "attested_by", None),
         attestedAt=getattr(item, "attested_at", None),
+        verifiedBy=getattr(item, "verified_by", None),
+        verifiedAt=getattr(item, "verified_at", None),
         reviewStatus=getattr(item, "review_status", "approved"),
         reviewedBy=getattr(item, "reviewed_by", None),
         reviewedAt=getattr(item, "reviewed_at", None),
@@ -287,6 +290,58 @@ def review_country_requirement(
         actor_id=actor,
         old_value={"review_status": before},
         new_value={"review_status": status, "title": dto.title, "country": dto.id},
+    )
+    return dto
+
+
+@router.post(
+    "/countries/{country_code}/requirements/{requirement_id}/verify",
+    response_model=schemas.AdminRequirementReviewDTO,
+)
+def verify_country_requirement(
+    country_code: str,
+    requirement_id: str,
+    user: dict = Depends(require_admin),
+):
+    """Flip one requirement to verification_status='expert_verified'. Human-only.
+
+    This is the ONLY route into 'expert_verified' — the verified-write guardrail
+    (services/verification_guard). Every automated producer writes through
+    crud.create_requirement_item, which structurally cannot set it; this endpoint
+    records the human signature (verified_by + verified_at) via
+    mark_expert_verified, which itself refuses a missing or automated-looking
+    actor. Stamped and audited, same as the review gate above: "who signed off
+    this immigration fact, and when" must always have an answer.
+    """
+    actor = user.get("id") or user.get("sub") or user.get("email")
+    with SessionLocal() as db_session:
+        item = db_session.get(models.RequirementItem, requirement_id)
+        if item is None or (item.country_code or "").upper() != country_code.strip().upper():
+            raise HTTPException(status_code=404, detail="Requirement not found for this country")
+        before = item.verification_status
+        try:
+            verification_guard.mark_expert_verified(
+                item, verified_by=str(actor) if actor else None
+            )
+        except verification_guard.VerificationWriteError as exc:
+            # Fail closed: no actor / automated-looking actor never becomes a signature.
+            raise HTTPException(status_code=422, detail=str(exc))
+        db_session.commit()
+        db_session.refresh(item)
+        dto = _review_dto(item)
+
+    _audit_postgres(
+        entity_type="requirement_item",
+        entity_id=requirement_id,
+        action_type=ACTION_UPDATE,
+        actor_id=actor,
+        old_value={"verification_status": before},
+        new_value={
+            "verification_status": verification_guard.EXPERT_VERIFIED,
+            "verified_by": dto.verifiedBy,
+            "title": dto.title,
+            "country": dto.id,
+        },
     )
     return dto
 
