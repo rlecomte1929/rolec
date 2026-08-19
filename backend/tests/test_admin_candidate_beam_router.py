@@ -96,7 +96,7 @@ class AdminCandidateBeamRouterTests(unittest.TestCase):
 
     def test_every_route_is_mounted_in_the_app_render_boots(self):
         paths = {r.path for r in main.app.routes if "candidate-beam" in r.path}
-        self.assertEqual(len(paths), 5, f"expected 5 routes, got {sorted(paths)}")
+        self.assertEqual(len(paths), 7, f"expected 7 routes, got {sorted(paths)}")
 
     # ── auth ────────────────────────────────────────────────────────────────
 

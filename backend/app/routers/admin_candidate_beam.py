@@ -58,6 +58,12 @@ class ImportPlanRequest(BaseModel):
     pillar_overrides: Dict[str, str] = Field(default_factory=dict)
 
 
+class ImportRequest(ImportPlanRequest):
+    #: Defaults TRUE. Executing an import must be something the caller asked for in so
+    #: many words — a forgotten flag should preview, never write.
+    dry_run: bool = True
+
+
 # ---------------------------------------------------------------------------
 # Reads
 # ---------------------------------------------------------------------------
@@ -252,3 +258,139 @@ def pillars(user: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
         "pillars": list(importer.CANONICAL_PILLARS),
         "grounded_categories": dict(importer.PILLAR_BY_CATEGORY),
     }
+
+
+_ITEM_SELECT = """
+    SELECT candidate_uid, title, official_guidance, actual_reality,
+           action_required, source, category, status, flagged,
+           pass_frequency, confidence_band,
+           import_country, import_requirement_type, imported_ref, imported_at
+      FROM public.candidate_beam_items
+     WHERE run_id = CAST(:run_id AS uuid)
+     ORDER BY rank ASC
+"""
+
+
+@router.post("/runs/{run_id}/import")
+def run_import(
+    run_id: str,
+    body: ImportRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Stage this run's approved candidates into otto_staging."""
+    # Staging only. `promote()` writes the customer-facing served table, and this router
+    # must never reach it — rows land at `review_status='pending'` and get to a customer
+    # solely through the existing /admin/countries gate. Nothing here can set a verified
+    # state; the table's CHECK refuses it even if a future edit tried.
+    #
+    # (Said in a comment rather than the docstring on purpose: the router's own guard test
+    # scans string literals, and a docstring is one.)
+    #
+    # One transaction owns both the staging insert and the audit stamp. Splitting them
+    # would allow an item marked `imported` whose staging row was rolled back — the one
+    # state `import-verify` cannot tell apart from tampering.
+    #
+    # A freeze conflict returns 409 and writes NOTHING, including for the candidates that
+    # would have succeeded: the caller asked for one thing, and half-applying it is not
+    # that.
+    with SessionLocal() as session:
+        with session.begin():
+            conn = session.connection()
+            rows = conn.execute(text(_ITEM_SELECT), {"run_id": run_id}).mappings().all()
+            if not rows:
+                raise HTTPException(status_code=404, detail="run not found or has no candidates")
+
+            result = importer.execute_import(
+                conn,
+                run_id=run_id,
+                candidates=[dict(r) for r in rows],
+                country=body.country,
+                batch_id=f"beam-{run_id}",
+                imported_by=str(user.get("email") or user.get("id") or "admin"),
+                pillar_overrides=body.pillar_overrides,
+                dry_run=body.dry_run,
+            )
+
+            if not result.ok:
+                # Raise inside the transaction so the context manager rolls back — belt and
+                # braces, since execute_import already returns before writing on a conflict.
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": "import_frozen",
+                        "conflicts": [
+                            {
+                                "candidate_uid": c.candidate_uid,
+                                "title": c.title,
+                                "field": c.field,
+                                "already": c.already,
+                                "requested": c.requested,
+                                "reason": c.reason,
+                            }
+                            for c in result.conflicts
+                        ],
+                    },
+                )
+
+    return {
+        "written": not result.dry_run,
+        "dry_run": result.dry_run,
+        "batch_id": result.batch_id,
+        "staged": result.staged,
+        "already_present": result.already_present,
+        "stamped": result.stamped,
+        "skipped": [
+            {"candidate_uid": s.candidate_uid, "title": s.title, "reason": s.reason}
+            for s in result.skipped
+        ],
+        "rejections": result.rejections,
+        # Said in the payload as well as the UI: the import is not the approval.
+        "notice": "Imported rows still require /admin/countries approval before they serve.",
+    }
+
+
+@router.get("/runs/{run_id}/import-verify")
+def run_import_verify(
+    run_id: str,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Read-only QA: does every imported candidate still have its staging row, unchanged?
+
+    Returns 200 with the report when intact and 409 with the same report when not, so a
+    caller cannot mistake a drifted import for a healthy one by ignoring a field.
+    """
+    with SessionLocal() as session:
+        rows = session.execute(text(_ITEM_SELECT), {"run_id": run_id}).mappings().all()
+        if not rows:
+            raise HTTPException(status_code=404, detail="run not found or has no candidates")
+
+        items = [dict(r) for r in rows]
+        imported = [i for i in items if i.get("status") == "imported"]
+        approved_not_imported = sum(1 for i in items if i.get("status") == "approved")
+
+        report = importer.verify_import(
+            session.connection(),
+            run_id=run_id,
+            imported_items=imported,
+            approved_not_imported=approved_not_imported,
+        )
+
+    payload = {
+        "run_id": report.run_id,
+        "ok": report.ok,
+        "checked": report.checked,
+        "intact": report.intact,
+        "approved_not_imported": report.approved_not_imported,
+        "findings": [
+            {
+                "candidate_uid": f.candidate_uid,
+                "title": f.title,
+                "problem": f.problem,
+                "detail": f.detail,
+            }
+            for f in report.findings
+        ],
+    }
+    if not report.ok:
+        raise HTTPException(status_code=409, detail=payload)
+    return payload
