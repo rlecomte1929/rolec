@@ -53,6 +53,9 @@
 | Pain Points | `11ef02cf-6ad5-45a1-b709-877e3f56e37f` | 25+ shown | Severity + Strategic Importance + Affected Persona multi-select. Filter views exist for HR Director, Employee, High-Severity, Most-Frequent. |
 | AI Work Queue | `75d7ed78-91f4-46b6-b805-12e43abbecce` | 25+ shown | Has UX Constraints + Validation Criteria fields — perfect for known-vs-new cross-ref |
 
+> **Superseded 2026-08-18.** _(that database is now titled “AI Work Queue (RETIRED)”; the live queue is `3bc887c6-4d48-8089-8188-fcf2dc3edc1b` / data source `4e2887c6-4d48-82c1-931e-87b09fb5c4ed`.)_ The id above is left as the record of what was true when this baseline was taken.
+
+
 ## Real (non-sample) customer interviews — sorted by recency
 
 | Date | Person | Buyer type | Mom Test | Pain | WTP | Top quote |

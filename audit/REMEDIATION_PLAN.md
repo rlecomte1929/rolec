@@ -30,6 +30,9 @@ Every stage runs this exact pipeline. Treat it as a checklist.
 | 1. Mark chapter | `mcp__ccd_session__mark_chapter` | Visible chapter in transcript |
 | 2. Create branch | Bash `git checkout -b audit/stage-N-<slug>` | Branch off `main` |
 | 3. Create or update Notion work-queue entries | `mcp__notion-create-pages` against AI Work Queue DB (`75d7ed78-...`) | One row per finding, with Priority + Complexity + Validation Criteria fields populated |
+
+> **Superseded 2026-08-18.** _(that database is now titled “AI Work Queue (RETIRED)”; the live queue is `3bc887c6-4d48-8089-8188-fcf2dc3edc1b` / data source `4e2887c6-4d48-82c1-931e-87b09fb5c4ed`.)_ New entries go to the live queue; the id above records the plan as originally written.
+
 | 4. Spawn task tree | `TaskCreate` per atomic action; `TaskUpdate` in_progress / completed as we go | Visible in harness UI |
 | 5. Implement | `Read` / `Edit` / `Write` | Code changes |
 | 6. Sanity check | `Bash` — `npm run build` (frontend) + `pytest` (backend) + `tsc --noEmit` | All green |
