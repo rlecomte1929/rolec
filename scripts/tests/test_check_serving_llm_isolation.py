@@ -110,6 +110,43 @@ def test_function_local_import_is_still_recorded():
     assert "backend.app.services.llm_client" in found
 
 
+def test_relative_from_package_import_submodule_records_the_SUBMODULE():
+    """Regression. `from ...pkg import submodule` used to record only the PACKAGE.
+
+    The alias expansion was gated on `node.module is None`, so it fired for
+    `from . import sibling` and not for `from ...imports.candidate_beam import passes`.
+    A serving root could then import an LLM-calling module and the walk would reach only
+    the package `__init__`, find no boundary, and exit 0.
+
+    Found live: the candidate beam's `passes.py` calls a model, and importing it from
+    `requirements_builder` in this spelling left the guard green. The absolute spelling of
+    the identical import failed correctly, which is what made it hard to see — and
+    relative imports are the dominant convention inside backend/app/services/, so the
+    missed form was the likelier one.
+    """
+    found = guard.imports_of(
+        ast.parse("from ...imports.candidate_beam import passes"),
+        "backend.app.services.requirements_builder",
+    )
+    assert "backend.imports.candidate_beam.passes" in found
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from ...imports.candidate_beam import passes",
+        "from ...imports.candidate_beam.passes import run_pass",
+        "from backend.imports.candidate_beam import passes",
+        "import backend.imports.candidate_beam.passes",
+    ],
+)
+def test_every_spelling_of_the_same_import_is_recorded(source):
+    """Four ways to import one module. A guard that catches three of them is a guard you
+    can defeat by rephrasing an import."""
+    found = guard.imports_of(ast.parse(source), "backend.app.services.requirements_builder")
+    assert "backend.imports.candidate_beam.passes" in found
+
+
 def test_deeply_nested_import_is_recorded():
     """Inside a method, inside a try, inside a class — ast.walk sees all of it."""
     tree = ast.parse(

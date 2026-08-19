@@ -194,10 +194,25 @@ def imports_of(tree: ast.AST, importer: str) -> Set[str]:
                 resolved = _resolve_relative(node.module, node.level, importer)
                 if resolved:
                     found.add(resolved)
-                    # `from . import sibling` — each name may itself be a module.
-                    if node.module is None:
-                        for alias in node.names:
-                            found.add(f"{resolved}.{alias.name}")
+                    # Each imported name may itself be a submodule, so expand every
+                    # alias — exactly as the absolute branch below does.
+                    #
+                    # This expansion used to be gated on `node.module is None`, i.e. only
+                    # `from . import sibling`. That left the guard blind to
+                    # `from ...imports.candidate_beam import passes`, which recorded the
+                    # PACKAGE and never the submodule — so a serving root could import an
+                    # LLM-calling module and the walk would reach only the package
+                    # `__init__`, find nothing, and report OK. Caught when the candidate
+                    # beam's `passes.py` (which calls a model) was reached from
+                    # `requirements_builder` and the guard still exited 0.
+                    #
+                    # The absolute form was always caught, which is what made this hard to
+                    # see: `from backend.imports.x import y` failed correctly while the
+                    # relative spelling of the same import passed. Relative imports are the
+                    # dominant convention inside backend/app/services/, so the missed form
+                    # was the likelier one.
+                    for alias in node.names:
+                        found.add(f"{resolved}.{alias.name}")
             elif node.module:
                 found.add(node.module)
                 # `from backend.app import services` — the target may be a module.
