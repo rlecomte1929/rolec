@@ -15,25 +15,31 @@ DB-free. Everything here is a property of the conversion.
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
 import sys
 import unittest
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(REPO))
+from backend.imports.otto.parsers import read_jsonl
 
-from scripts.convert_b3_to_otto_jsonl import (  # noqa: E402
-    BATCH_ID,
-    OUT,
-    SOURCE,
-    build,
-    compose_fact_text,
-    split_corridor,
-)
+# `scripts/` is not a package, so import the converter by path — the idiom the rest of
+# backend/tests already uses for script modules (see test_synth_passport.py).
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_SCRIPT = _REPO_ROOT / "scripts" / "convert_b3_to_otto_jsonl.py"
+_spec = importlib.util.spec_from_file_location("convert_b3_to_otto_jsonl", _SCRIPT)
+assert _spec and _spec.loader
+convert = importlib.util.module_from_spec(_spec)
+sys.modules["convert_b3_to_otto_jsonl"] = convert
+_spec.loader.exec_module(convert)
 
-from backend.imports.otto.parsers import read_jsonl  # noqa: E402
+REPO = _REPO_ROOT
+BATCH_ID = convert.BATCH_ID
+OUT = convert.OUT
+SOURCE = convert.SOURCE
+build = convert.build
+split_corridor = convert.split_corridor
 
 
 def source_records() -> list[dict]:
