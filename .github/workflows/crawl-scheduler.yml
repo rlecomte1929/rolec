@@ -23,19 +23,40 @@ jobs:
     name: Process due crawl schedules
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # No-op unless explicitly enabled via repo vars.
-    if: ${{ vars.CRAWL_CRON_ENABLED == 'true' }}
+    # The gate deliberately sits on the STEP, not the job. With `if:` on the job the
+    # whole run was skipped, and a skipped run renders as "completed" in the Actions
+    # UI — identical to a successful one. This workflow had fired daily and done
+    # nothing since it was created; nobody could have seen that from the run list.
+    # Audited 2026-08-19: seven of twelve *_CRON_ENABLED workflows are in this state.
     env:
       # Quoted env (not inlined into run:) per workflow-injection guidance.
       API_BASE: ${{ vars.CRAWL_API_BASE }}        # e.g. https://api.relopass.com
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
+      - name: Report gate state
+        env:
+          ENABLED: ${{ vars.CRAWL_CRON_ENABLED }}
+        run: |
+          set -euo pipefail
+          if [ "${ENABLED:-}" != "true" ]; then
+            {
+              echo "## Source-monitoring scheduler: DISABLED"
+              echo ''
+              echo "\`vars.CRAWL_CRON_ENABLED\` is \`${ENABLED:-<unset>}\` — no crawl was"
+              echo "processed. Due schedules are accumulating and sources are NOT being"
+              echo "monitored. Set the repo variable to \`true\` (and \`CRAWL_API_BASE\`)"
+              echo "to enable."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Crawl scheduler disabled::CRAWL_CRON_ENABLED is '${ENABLED:-<unset>}'; no schedules processed."
+          fi
+
       - name: POST /api/crons/process-crawl-schedules
+        if: ${{ vars.CRAWL_CRON_ENABLED == 'true' }}
         run: |
           set -euo pipefail
           if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
-            echo "API_BASE or CRON_SECRET not configured; skipping."
-            exit 0
+            echo "::error title=Crawl scheduler misconfigured::CRAWL_CRON_ENABLED is true but API_BASE or CRON_SECRET is missing."
+            exit 1
           fi
           response=$(curl -fsS -X POST \
             -H "Authorization: Bearer ${CRON_SECRET}" \
