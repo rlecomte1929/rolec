@@ -594,6 +594,42 @@ jobs:
       - name: Check form-template honesty (no permit for free-movers)
         run: python scripts/check_form_template_honesty.py
 
+  serving-llm-isolation:
+    # The serving engines answer "what must this person do to move?" from a
+    # human-approved catalog, deterministically. If one of them can reach a module that
+    # calls a language model, a compliance requirement can be INVENTED mid-request and
+    # shown to a real person as though it had been drafted, reviewed and approved.
+    #
+    # The rule is structural rather than behavioural — "we only call it in the authoring
+    # path" is a property of today's control flow, not of the code, and does not survive
+    # a refactor. The guard walks the transitive import graph from the five serving roots
+    # and fails if any LLM-calling module is reachable at all, printing the whole chain.
+    # The transitive case is the point: a direct `from .llm_client import …` inside
+    # rules_engine.py is caught in review, whereas rules_engine → explainer → summariser
+    # → llm_client is four innocuous diffs.
+    #
+    # LLM modules are DISCOVERED (any module importing a provider SDK), never listed, so
+    # adding a provider cannot silently disarm it. The guard also fails when it scanned
+    # nothing, when a serving root no longer resolves, or when it detects zero LLM
+    # modules in a repo that certainly makes model calls — an unresolvable root is
+    # silently unguarded, which is worse than a noisy failure.
+    #
+    # Unfiltered, like the compliance guard: any import anywhere under backend/ can
+    # create a violation, and it needs no DB and no secret.
+    # Behaviour pinned by backend/tests/test_serving_llm_isolation_guard.py, which drives
+    # it red on a direct import, a three-hop transitive one, each provider SDK, and each
+    # way the scan can be structurally unable to check anything.
+    name: Serving/LLM isolation guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Assert no serving engine can reach an LLM
+        run: python scripts/check_serving_llm_isolation.py --root .
+
   rls-coverage:
     # AUDIT-A3: lists `public.*` + `rce.*` tables with zero RLS policies and asserts
     # each one is on the supabase/rls_allowlist.txt allowlist. Drains over time.
