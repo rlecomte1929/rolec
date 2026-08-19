@@ -209,6 +209,28 @@ The product sends user-supplied text to third-party LLM sub-processors (OpenAI a
 
 Sub-processor DPA coverage and EU-residency status are tracked in `docs/security/PRIV-004_sub-processor_register.md` (GDPR Art. 28 register). Update it whenever a new sub-processor (LLM, email, analytics, hosting, CDN) is added to the stack.
 
+## Generation/serving split (HARD GATE)
+
+**The deterministic requirement-serving path must NEVER be able to call an LLM at
+request time.** Served requirements come from rule engines over curated, cited catalog
+data; LLMs live only in the authoring/drafting layer, whose output is human-reviewed
+before it becomes served data. This is the trust architecture the whole "why not just
+use ChatGPT" story rests on.
+
+CI enforces it: **`scripts/check_serving_llm_isolation.py`** (job: *Serving/LLM
+isolation guard*; also asserted from pytest via
+`scripts/tests/test_check_serving_llm_isolation.py` in the backend-tests job) builds
+the full backend import graph via AST — lazy function-local imports included — and
+fails the PR with the exact import chain if any serving engine
+(`requirements_builder`, `rules_engine`, `requirement_evaluation_service`,
+`immigration_requirement_service`, `hr_policy_resolver`) can reach an LLM gateway
+module or an LLM SDK import. There is no allowlist. Fix a violation by breaking the
+import (move the LLM use into authoring; serve reviewed data), never by editing the
+guard's lists. New serving engines must be registered in `SERVING_ROOTS`; a renamed
+root fails the build (exit 2) until re-registered, as does any module inside the serving
+closure that fails to parse — an unparsed module hides whatever it imports. See
+`docs/specs/serving-llm-isolation.md`.
+
 ## Migration discipline (MANDATORY)
 
 NEVER apply a migration to production via MCP `apply_migration` or by manually
@@ -360,7 +382,7 @@ A multi-stage remediation plan lives at `audit/REMEDIATION_PLAN.md` with a rolli
 
 **Branch naming convention for audit remediation:** `audit/stage-N-<slug>` (e.g. `audit/stage-1-security`, `audit/stage-2-copy`). One branch per stage; one PR per stage; one re-audit doc per stage. Sub-stages use `audit/stage-Na-<slug>` (e.g. `audit/stage-8a-route-auth-ci`).
 
-**System of record:** Each finding has a Notion AI Work Queue entry (DB id `7adc643a-c448-4a1a-ba80-e27e417f42d6`) with Priority + Complexity + Validation Criteria + Context Links back to the originating `audit/02-expert-*.md` file. Update Status as the work moves through `Ready for AI → AI in Progress → Human Review → Done`.
+**System of record:** Each finding has a Notion AI Work Queue entry (DB id `3bc887c6-4d48-8089-8188-fcf2dc3edc1b`; the earlier `7adc643a…` is the database now titled *AI Work Queue (RETIRED)* — do not write to it) with Priority + Complexity + Validation Criteria + Context Links back to the originating `audit/02-expert-*.md` file. Update Status as the work moves through `Ready for AI → AI in Progress → Human Review → Done`.
 
 **Gate discipline:** No stage starts until the previous stage's PR is merged + canary clean. See `audit/REMEDIATION_PLAN.md` §"Universal stage protocol" for the per-stage checklist.
 

@@ -43,7 +43,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 # AI Work Queue (Notion). Database id from references/notion-schema.md.
-_DEFAULT_DATABASE_ID = "7adc643a-c448-4a1a-ba80-e27e417f42d6"
+_DEFAULT_DATABASE_ID = "3bc887c6-4d48-8089-8188-fcf2dc3edc1b"
 _NOTION_VERSION = "2022-06-28"
 
 _READY_STATUS = "Ready for AI"

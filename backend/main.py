@@ -135,6 +135,7 @@ from .app.services.events_tracker import track as track_event  # FOUNDATION-1C
 from .app.routers import auth as auth_router
 from .app.routers import cases as cases_router  # noqa: F401 — kept for backwards-compat re-exports; router itself no longer wired (AUDIT-B9-cases-6)
 from .app.routers import cases_read as cases_read_router
+from .app.routers import case_requirement_checklist as case_requirement_checklist_router
 from .app.routers import case_integrations as case_integrations_router
 from .app.routers import cases_write as cases_write_router
 from .app.routers import case_documents as case_documents_router
@@ -147,6 +148,7 @@ from .app.routers import stripe_webhook as stripe_webhook_router  # Stripe webho
 from .app.routers import auth_page_config as auth_page_config_router  # GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 from .app.routers import requirement_facts as requirement_facts_router  # [AIQ-1091] P4-02 requirement-facts extract
 from .app.routers import admin_content_review as admin_content_review_router  # [AIQ-1821] content review queue
+from .app.routers import admin_candidate_beam as admin_candidate_beam_router  # corridor candidate beam review
 from .app.routers import nlg as nlg_router  # [Parker-J] dual-layer registration (PR #207 §9)
 from .app.routers import predictions as predictions_router  # [Parker-A] dual-layer registration (PR #207 §9)
 from .app.routers import test_drive as test_drive_router  # [AIQ-1420] TD-2 — dual-layer registration per CLAUDE.md
@@ -827,6 +829,7 @@ app.add_middleware(QueryCountMiddleware, threshold=10)
 
 app.include_router(auth_router.router)  # [AUDIT-C2.3] re-added — auth routes must be in deployed main.py
 app.include_router(compat_router.router)
+app.include_router(case_requirement_checklist_router.router)
 app.include_router(cases_read_router.router)  # [AUDIT-B9-cases-6] split 1/3 — 20 GET handlers (formerly cases.router)
 app.include_router(case_integrations_router.router)  # I-4 — email plan + calendar .ics
 app.include_router(cases_write_router.router)  # [AUDIT-B9-cases-6] split 2/3 — 14 POST/PATCH/PUT mutation handlers
@@ -840,6 +843,7 @@ app.include_router(stripe_webhook_router.router)  # Stripe webhook Path A — PO
 app.include_router(auth_page_config_router.router)  # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 app.include_router(requirement_facts_router.router)  # [AIQ-1091] P4-02 — POST /api/admin/requirement-facts/extract
 app.include_router(admin_content_review_router.router)  # [AIQ-1821] /api/admin/content-review
+app.include_router(admin_candidate_beam_router.router)  # /api/admin/candidate-beam
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
 app.include_router(rag_roadmap_router.router)  # [P1-01d] /api/internal/rag/generate-roadmap (dual-layer registration)
 app.include_router(compliance_router.router)  # [BL-Compliance.4] /api/compliance (dual-layer registration)

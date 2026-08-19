@@ -39,6 +39,92 @@ log = logging.getLogger(__name__)
 # treat as "good fit" baseline; UX adds an "HR preferred" badge.
 _HR_CUSTOM_SCORE = 80.0
 
+# AIQ-1857: same idea for an HR-approved master the engine never ranked. The engine
+# only produces registry suppliers (item_id = supplier uuid) or static-dataset rows;
+# a catalog row with no supplier_id belongs to neither id space, so it can never be
+# scored. Slightly below the HR-custom baseline so an explicitly hand-added vendor
+# still leads on a score tie. `unscored: true` in metadata marks it as a synthesized
+# figure rather than an engine result.
+_HR_APPROVED_UNRANKED_SCORE = 75.0
+
+
+def _canon_country(value: Optional[str]) -> str:
+    """ISO-2 country code, or "" when the input is not confidently a code.
+
+    Destination country reaches this module as whatever intake captured — sometimes
+    "FR", sometimes "France". Only compare when BOTH sides are two-letter codes; a
+    name-vs-code comparison would silently mismatch ("Germany"[:2] == "GE" != "DE")
+    and hide a vendor HR explicitly approved. Unknown → don't block.
+    """
+    v = (value or "").strip()
+    return v.upper() if len(v) == 2 else ""
+
+
+def _serves_destination(
+    master: Dict[str, Any],
+    destination_city: Optional[str],
+    destination_country: Optional[str],
+) -> bool:
+    """Whether an HR-approved master may be surfaced for this destination.
+
+    Engine candidates are already destination-scoped by the registry query, so this
+    gate exists only for masters synthesized straight from HR's approvals — without
+    it, a city-agnostic selection row pointing at a Madrid vendor would surface on a
+    Paris case. City is the decisive signal (canonicalised the same way HR's curation
+    rows are, per AIQ-1457); country is a fallback; when neither side can be compared
+    confidently, HR's explicit approval stands.
+    """
+    m_city = vendor_curation._canon_city(master.get("city"))
+    d_city = vendor_curation._canon_city(destination_city)
+    if m_city and d_city:
+        return m_city == d_city
+    m_country = _canon_country(master.get("country"))
+    d_country = _canon_country(destination_country)
+    if m_country and d_country:
+        return m_country == d_country
+    return True
+
+
+def _master_to_recommendation(master: Dict[str, Any]) -> RecommendationItem:
+    """Synthesize an employee-facing item from an HR-approved catalog master.
+
+    ``item_id`` is the master's ``external_id`` — the shape the downstream RFQ path
+    already documents for a master vendor (see ``employee_quotes.VendorPick``), so a
+    synthesized card shortlists and requests quotes like any other.
+    """
+    attrs = master.get("attributes_json") or {}
+    verified = bool(attrs.get("verified"))
+    name = str(master.get("name") or "(unnamed)")
+    metadata: Dict[str, Any] = {
+        "company_preferred": True,
+        "hr_approved_catalog": True,
+        # The score below is a baseline, not an engine result — say so, so the UI can
+        # avoid presenting it as a computed match.
+        "unscored": True,
+        "verified": verified,
+    }
+    if master.get("city"):
+        metadata["city"] = str(master["city"])
+    website = attrs.get("website") or attrs.get("url")
+    if website:
+        metadata["website"] = str(website)
+    return RecommendationItem(
+        item_id=str(master.get("external_id") or master.get("id")),
+        name=name,
+        score=_HR_APPROVED_UNRANKED_SCORE,
+        tier=RecommendationTier.GOOD_FIT,
+        summary="Approved by your HR team",
+        rationale="Your HR team approved this provider for your destination.",
+        breakdown={},
+        pros=["HR-approved for your company"],
+        cons=[],
+        metadata=metadata,
+        explanation=RecommendationExplanation(
+            match_reasons=["HR-approved vendor"],
+            explanation_summary="HR-approved vendor for your company",
+        ),
+    )
+
 
 def _custom_to_recommendation(row: Dict[str, Any]) -> RecommendationItem:
     payload = row.get("custom_item_json") or {}
@@ -88,6 +174,11 @@ def apply_hr_curation(
       - None              → curation applied (or no company context — pass through)
       - "hr_pending"      → company exists but HR hasn't approved anything in
                             this category × city; UI should render placeholder.
+      - "hr_destination_gap" → AIQ-1857: HR HAS approved vendors in this category,
+                            but none of them is usable for this destination. Telling
+                            this employee "HR is finalizing" would be false — HR has
+                            decided; the decision just doesn't cover where they're
+                            going. Distinct so the UI can say the true thing.
     """
     if not company_id:
         # No tenant context (admin debug calls, unauth flows): pass through.
@@ -153,7 +244,39 @@ def apply_hr_curation(
             seen_master_ids.add(master["id"])
             kept.append((order_by_master.get(master["id"], 0), rec))
 
-    # Order by HR's display_order (stable: engine order breaks ties within the same rank).
+    # 2b. AIQ-1857: surface the approved masters NO engine candidate resolved to.
+    #
+    # The curation catalog and the engine rank different vendor populations. HR curates
+    # `service_catalog_items` (crowdsourced/scraped: no supplier_id, slug external_ids);
+    # the engine emits registry suppliers (item_id = supplier uuid) or static-dataset
+    # rows. Neither predicate in find_masters_by_supplier_or_external_ids can match a
+    # row that is in neither id space, so HR's picks silently became ([], "hr_pending")
+    # and the employee was told HR was still deciding — measured on 2026-08-17 for a
+    # Paris case where HR had approved 4 housing agencies, 9 schools and 4 movers, and
+    # for housing_agencies the engine had produced ZERO candidates to match against.
+    #
+    # Product decision (2026-08-17): the catalog is authoritative for curation, so an
+    # approved master is shown on HR's say-so even when the engine cannot score it.
+    # The gate is unchanged — only ids already in `approved_master_ids` get here, and
+    # _serves_destination re-imposes the destination scoping the engine would have.
+    unmatched_ids = approved_master_ids - seen_master_ids
+    catalog_read_ok = True
+    if unmatched_ids:
+        try:
+            for master in service_catalog.find_masters_by_ids(sorted(unmatched_ids)):
+                if not _serves_destination(master, destination_city, destination_country):
+                    continue
+                mid = str(master.get("id"))
+                seen_master_ids.add(mid)
+                kept.append((order_by_master.get(mid, 0), _master_to_recommendation(master)))
+        except Exception:
+            # Never break the employee's recommendations over the catalog read — the
+            # pre-AIQ-1857 behaviour (engine-matched masters only) is the fallback.
+            catalog_read_ok = False
+            log.exception("hr_curation_filter: approved-master fallback read failed")
+
+    # Order by HR's display_order (stable: engine order breaks ties within the same rank,
+    # and an engine-scored item precedes a synthesized one at the same rank).
     kept.sort(key=lambda pair: pair[0])
     ordered: List[RecommendationItem] = [rec for _, rec in kept]
 
@@ -167,12 +290,19 @@ def apply_hr_curation(
         # latter is a real defect (e.g. a service_catalog_items external_id backfill gap) worth
         # surfacing loudly instead of silently showing the same empty state.
         if approved_master_ids:
+            # AIQ-1857: this used to assert "likely a service_catalog_items external_id
+            # mismatch". That was a guess, and it was wrong — the two sides held
+            # different vendors, so there was no id to match. Since approved masters are
+            # now surfaced directly, reaching here means every one of them was either
+            # missing/inactive in the catalog or scoped to another destination. State
+            # only that, and name the ids so the next reader can check rather than guess.
             log.warning(
-                "hr_curation_filter: company=%s has %d approved %s master(s) (city=%s) but NONE "
-                "matched the engine candidates — likely a service_catalog_items external_id "
-                "mismatch. approved_master_ids=%s",
+                "hr_curation_filter: company=%s has %d approved %s master(s) but none is "
+                "usable for city=%s country=%s — each was inactive, absent from "
+                "service_catalog_items, or scoped to a different destination. "
+                "approved_master_ids=%s",
                 company_id, len(approved_master_ids), category, destination_city,
-                sorted(approved_master_ids),
+                destination_country, sorted(approved_master_ids),
             )
         # Record the demand signal so HR can see who's waiting on what.
         # Best-effort — never raise on the filter path.
@@ -186,5 +316,12 @@ def apply_hr_curation(
             )
         except Exception:
             log.exception("record_demand dispatch failed")
-        return [], "hr_pending"
+        # AIQ-1857: "HR is finalizing" is only true when HR has decided nothing. When
+        # they have approved vendors that simply don't cover this destination, say that
+        # instead of implying they are still choosing. Only claim the destination gap
+        # when the catalog read actually succeeded — if it failed we did not check, and
+        # asserting a gap we never measured is the kind of confident-and-wrong message
+        # this task exists to remove.
+        gap = bool(approved_master_ids) and catalog_read_ok
+        return [], ("hr_destination_gap" if gap else "hr_pending")
     return ordered, None

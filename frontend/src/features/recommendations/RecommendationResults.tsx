@@ -732,6 +732,18 @@ export const RecommendationResults: React.FC<Props> = ({
               </React.Suspense>
             )}
             {res.recommendations.length === 0 &&
+            (res.criteria_echo as Record<string, unknown> | undefined)?.hr_curation_status === 'hr_destination_gap' ? (
+              // [AIQ-1857] HR HAS chosen providers for this category — none of them
+              // covers this destination. Saying "finalizing" here would be untrue and
+              // leaves the employee waiting for a decision that has already been made.
+              <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
+                <strong className="block text-[#0b2b43] mb-1">
+                  Your HR&apos;s approved providers for this category don&apos;t cover your destination yet.
+                </strong>
+                They&apos;ve chosen providers, but none of them serves where you&apos;re moving. Ask your HR
+                contact to add one for your destination — meanwhile you can build the rest of your package.
+              </div>
+            ) : res.recommendations.length === 0 &&
             (res.criteria_echo as Record<string, unknown> | undefined)?.hr_curation_status === 'hr_pending' ? (
               <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
                 <strong className="block text-[#0b2b43] mb-1">Your HR is finalizing providers for this category.</strong>
