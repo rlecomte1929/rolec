@@ -74,7 +74,12 @@ would believe the research was captured.
 
 ## Unrelated defect found during the audit
 
-`supabase/migrations/20261106000000_candidate_beam.sql` collides with
+**RESOLVED** — this branch's file was restamped to `20261107000000_candidate_beam.sql`, above
+both the repo and ledger max. The corridor migration keeps its existing ledger row, so nothing
+is orphaned; the ledger still needs a `migration repair --status applied 20261107000000` because
+these tables were already applied to prod out-of-band. Original finding follows.
+
+`supabase/migrations/20261106000000_candidate_beam.sql` collided with
 `20261106000000_corridor_deadline_events.sql` on PR #1885. The prod ledger was repaired to
 version `20261106000000` naming `corridor_deadline_events`, so the ledger can no longer
 distinguish the two — it is keyed by version and tracks only one file per version. Both
