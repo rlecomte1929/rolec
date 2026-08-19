@@ -101,6 +101,15 @@ class CorridorDeadlineTrigger:
     label: str
     channel: str
     lead_days: int
+    # The country whose rule set this alert states, ISO3. Defaults to the
+    # corridor's destination, which is right for every entry obligation.
+    #
+    # It exists for EXIT obligations, which are owed to the origin: NO_FR's
+    # "report the move abroad to Folkeregisteret" is a Norwegian rule inside a
+    # corridor bound for France. Keyed on the corridor destination it would be
+    # labelled French, and a second Norway-exit corridor would then look like a
+    # cross-destination tag conflict when the two rule sets are in fact identical.
+    jurisdiction: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -500,7 +509,7 @@ def _deadline_trigger(step: Any, step_id: str) -> Optional[CorridorDeadlineTrigg
             f"step {step_id}: deadline_trigger must be a mapping, got {type(raw).__name__}"
         )
 
-    unknown = set(raw) - {"tag", "label", "channel", "lead_days"}
+    unknown = set(raw) - {"tag", "label", "channel", "lead_days", "jurisdiction"}
     if unknown:
         raise CorridorLoadError(
             f"step {step_id}: unknown deadline_trigger key(s) {sorted(unknown)}"
@@ -531,8 +540,21 @@ def _deadline_trigger(step: Any, step_id: str) -> Optional[CorridorDeadlineTrigg
     if not label.strip():
         raise CorridorLoadError(f"step {step_id}: deadline_trigger.label must not be empty")
 
+    jurisdiction = raw.get("jurisdiction")
+    if jurisdiction is not None:
+        jurisdiction = str(jurisdiction)
+        if not re.fullmatch(r"[A-Z]{3}", jurisdiction):
+            raise CorridorLoadError(
+                f"step {step_id}: deadline_trigger.jurisdiction must be an ISO 3166-1 "
+                f"alpha-3 code in uppercase, got {jurisdiction!r}"
+            )
+
     return CorridorDeadlineTrigger(
-        tag=tag, label=label, channel=channel, lead_days=raw_lead
+        tag=tag,
+        label=label,
+        channel=channel,
+        lead_days=raw_lead,
+        jurisdiction=jurisdiction,
     )
 
 
