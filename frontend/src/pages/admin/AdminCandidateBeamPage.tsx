@@ -251,7 +251,35 @@ export function AdminCandidateBeamPage(): React.ReactElement {
         context: payloadContext || undefined,
       });
 
-      const log: PassResult[] = [];
+      await drivePasses(started.run_id, started.passes_requested, 'fresh', started.next_pass);
+      selectRun(started.run_id);
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      setLaunchError(detail || 'The beam could not be started.');
+    } finally {
+      setLaunching(false);
+    }
+  };
+
+  /**
+   * Run the outstanding passes of a run, then rank them.
+   *
+   * Two modes, because a fresh launch and a resume want opposite things from the same
+   * endpoint:
+   *
+   * - `fresh` walks slots 1..N explicitly. Every framing gets exactly one attempt and a
+   *   failing slot cannot eat the budget.
+   * - `resume` follows the server's `next_pass` cursor, which is what it is FOR: it names the
+   *   lowest slot not yet successfully completed, so resuming re-runs the failures and skips
+   *   the passes already paid for. Walking 1..N here would re-run and re-bill succeeded slots.
+   */
+  const drivePasses = async (
+    runId: string,
+    passesRequested: number,
+    mode: 'fresh' | 'resume',
+    firstCursor: number | null,
+  ) => {
+    const log: PassResult[] = [];
       // Explicit slots, NOT the server's next_pass cursor.
       //
       // next_pass is "the lowest slot not SUCCESSFULLY completed", so a failed slot points
@@ -261,30 +289,60 @@ export function AdminCandidateBeamPage(): React.ReactElement {
       // exactly that slot, so each framing gets its one attempt. Retrying a failure is a
       // separate, deliberate act (see Resume), not something a launch should spend the
       // budget on silently.
-      for (let slot = 1; slot <= started.passes_requested; slot += 1) {
-        const result = await candidateBeamAPI.executePass(started.run_id, slot);
+    if (mode === 'fresh') {
+      for (let slot = 1; slot <= passesRequested; slot += 1) {
+        const result = await candidateBeamAPI.executePass(runId, slot);
         log.push(result);
         setPassLog([...log]);
       }
+    } else {
+      // Cursor-driven, and bounded: a slot that keeps failing keeps being returned, so an
+      // unbounded `while (next)` would bill model calls until the tab was closed. One attempt
+      // per outstanding slot, then stop and let the operator decide.
+      let next = firstCursor;
+      const attempted = new Set<number>();
+      while (next !== null && next !== undefined && !attempted.has(next)) {
+        attempted.add(next);
+        const result = await candidateBeamAPI.executePass(runId, next);
+        log.push(result);
+        setPassLog([...log]);
+        next = result.next_pass;
+      }
+    }
 
       // finalize 409s below MIN_PASSES successful passes: cross-pass agreement is undefined
       // with fewer than two, so ranking one pass would present a lone opinion as consensus.
       // Gating on "at least one succeeded" turns that 409 into a failed-looking beam.
-      const succeeded = log.filter((r) => r.ok).length;
-      if (succeeded >= MIN_SUCCESSFUL_PASSES) {
-        await candidateBeamAPI.finalizeRun(started.run_id);
-      } else {
-        setLaunchError(
-          `Only ${succeeded} of ${started.passes_requested} passes succeeded — ranking needs at ` +
-            `least ${MIN_SUCCESSFUL_PASSES}. The run is kept, so the failed passes can be retried.`,
-        );
-      }
+    // finalize 409s below MIN_PASSES successful passes: cross-pass agreement is undefined
+    // with fewer than two, so ranking one pass would present a lone opinion as consensus.
+    // On resume the count that matters is the run's total, not this session's — a resumed run
+    // may already hold successes from before.
+    const last = log[log.length - 1];
+    const succeeded =
+      mode === 'resume' && last ? last.passes_completed : log.filter((r) => r.ok).length;
+    if (succeeded >= MIN_SUCCESSFUL_PASSES) {
+      await candidateBeamAPI.finalizeRun(runId);
+    } else {
+      setLaunchError(
+        `Only ${succeeded} of ${passesRequested} passes succeeded — ranking needs at ` +
+          `least ${MIN_SUCCESSFUL_PASSES}. The run is kept, so the failed passes can be retried.`,
+      );
+    }
 
-      candidateBeamAPI.listRuns().then(setRuns).catch(() => undefined);
-      selectRun(started.run_id);
+    candidateBeamAPI.listRuns().then(setRuns).catch(() => undefined);
+  };
+
+  /** Finish a run that was interrupted — a closed tab, or passes that failed. */
+  const resumeRun = async (run: BeamRun) => {
+    setLaunching(true);
+    setLaunchError(null);
+    setPassLog([]);
+    try {
+      await drivePasses(run.id, run.passes_requested, 'resume', run.passes_completed + 1);
+      selectRun(run.id);
     } catch (err) {
       const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
-      setLaunchError(detail || 'The beam could not be started.');
+      setLaunchError(detail || 'The run could not be resumed.');
     } finally {
       setLaunching(false);
     }
@@ -460,11 +518,11 @@ export function AdminCandidateBeamPage(): React.ReactElement {
         ) : (
           <ul className="space-y-2">
             {runs.map((run) => (
-              <li key={run.id}>
+              <li key={run.id} className="flex items-center gap-2">
                 <Button
                   unstyled
                   onClick={() => selectRun(run.id)}
-                  className={`w-full text-left text-sm px-3 py-2 rounded-lg border ${
+                  className={`flex-1 text-left text-sm px-3 py-2 rounded-lg border ${
                     run.id === runId ? 'border-[#1f8e8b] bg-[#f0fbfa]' : 'border-slate-200'
                   }`}
                 >
@@ -478,7 +536,24 @@ export function AdminCandidateBeamPage(): React.ReactElement {
                       <Badge variant="error">failed</Badge>
                     </span>
                   )}
+                  {/* Badged, because an unfinished run is otherwise identical to a finished
+                      one in this list — and its completed passes are already paid for. */}
+                  {run.status === 'generating' && (
+                    <span className="ml-2">
+                      <Badge variant="warning">unfinished</Badge>
+                    </span>
+                  )}
                 </Button>
+                {run.status === 'generating' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={launching}
+                    onClick={() => resumeRun(run)}
+                  >
+                    Resume
+                  </Button>
+                )}
               </li>
             ))}
           </ul>

@@ -472,4 +472,74 @@ describe('AdminCandidateBeamPage', () => {
     expect(executePass).not.toHaveBeenCalled();
   });
 
+  // ── Phase 2: resume ───────────────────────────────────────────────────────
+
+  const UNFINISHED = {
+    ...RUN, id: 'run-half', status: 'generating' as const,
+    passes_requested: 3, passes_completed: 2, candidate_count: 0,
+  };
+
+  it('marks an unfinished run instead of letting it look finished', async () => {
+    listRuns.mockResolvedValue([UNFINISHED]);
+    renderPage();
+    expect(await screen.findByText('unfinished')).toBeInTheDocument();
+  });
+
+  it('offers Resume only on an unfinished run', async () => {
+    listRuns.mockResolvedValue([RUN]);
+    renderPage();
+    await screen.findByText(/FR-NO/);
+    expect(screen.queryByRole('button', { name: /^Resume$/ })).not.toBeInTheDocument();
+  });
+
+  it('resumes from the cursor, so passes already paid for are not re-run', async () => {
+    // This is where following next_pass is CORRECT: it names the lowest slot not yet
+    // successfully completed. Walking 1..N here would re-bill the two that succeeded.
+    listRuns.mockResolvedValue([UNFINISHED]);
+    executePass.mockReset().mockImplementation((_r: string, slot: number) =>
+      Promise.resolve({
+        run_id: 'run-half', pass: slot, framing: 'f', ok: true, item_count: 4,
+        error: null, passes_completed: 3, passes_requested: 3, next_pass: null,
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /^Resume$/ }));
+
+    await waitFor(() => expect(finalizeRun).toHaveBeenCalledWith('run-half'));
+    expect(executePass.mock.calls.map((c) => c[1])).toEqual([3]);
+  });
+
+  it('stops rather than re-billing a slot that keeps failing on resume', async () => {
+    // A failed slot is returned again by next_pass. An unbounded cursor loop would call the
+    // model until the tab closed.
+    listRuns.mockResolvedValue([UNFINISHED]);
+    executePass.mockReset().mockImplementation((_r: string, slot: number) =>
+      Promise.resolve({
+        run_id: 'run-half', pass: slot, framing: 'f', ok: false, item_count: 0,
+        error: 'still failing', passes_completed: 2, passes_requested: 3, next_pass: slot,
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /^Resume$/ }));
+
+    await waitFor(() => expect(executePass).toHaveBeenCalled());
+    expect(executePass).toHaveBeenCalledTimes(1);
+  });
+
+  it('ranks a resumed run on its total successes, not just this session\'s', async () => {
+    // The run already held 2 successes; one more resumed pass must be rankable even though
+    // only a single pass ran in this session.
+    listRuns.mockResolvedValue([UNFINISHED]);
+    executePass.mockReset().mockImplementation((_r: string, slot: number) =>
+      Promise.resolve({
+        run_id: 'run-half', pass: slot, framing: 'f', ok: true, item_count: 4,
+        error: null, passes_completed: 3, passes_requested: 3, next_pass: null,
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /^Resume$/ }));
+
+    await waitFor(() => expect(finalizeRun).toHaveBeenCalled());
+  });
+
 });
