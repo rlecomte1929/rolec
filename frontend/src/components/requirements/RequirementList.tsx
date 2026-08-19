@@ -26,12 +26,52 @@ const PROVENANCE: Record<string, { label: string; variant: 'neutral' | 'info' | 
   representative: { label: 'Representative', variant: 'neutral' },
   corpus_grounded: { label: 'Source-grounded', variant: 'info' },
   expert_verified: { label: 'Expert-verified', variant: 'success' },
+  // Production stores `verified`, not `expert_verified` — 10 approved rows, every one of
+  // them rendering NO badge at all, because this map had never heard of the value the
+  // database actually holds. There is no translation layer: the backend passes
+  // verification_status straight through. Both keys are honoured until the two are
+  // normalised, because silently dropping the badge on verified content is the worse bug.
+  verified: { label: 'Expert-verified', variant: 'success' },
 };
 
 const provenanceBadge = (status: RequirementItemDTO['verificationStatus']) => {
   const p = status ? PROVENANCE[status] : undefined;
   if (!p) return null;
   return <Badge variant={p.variant} size="sm">{p.label}</Badge>;
+};
+
+/**
+ * Counsel attestation — a SEPARATE axis from provenance, deliberately not folded into
+ * PROVENANCE above.
+ *
+ * That map is our own sourcing ladder (representative -> corpus_grounded -> verified).
+ * This is external legal sign-off. models.py states the relationship: "Sellable means
+ * BOTH". Merging them would let "Expert-verified" read as counsel-assured, which is a
+ * claim we do not hold and must not imply.
+ *
+ * `requested` and null render NOTHING. An attestation that has been asked for is not an
+ * attestation, and an absent one must never appear as reassurance — the same rule the
+ * non-obvious badge follows, where only `true` earns a pill. Today every production row
+ * is null, so this renders nothing at all; that is the honest state, and it is what makes
+ * the first real attestation visible when it lands.
+ */
+const ATTESTATION: Record<string, { label: string; variant: 'neutral' | 'success' }> = {
+  attested: { label: 'Counsel-attested', variant: 'success' },
+  stale: { label: 'Attestation stale', variant: 'neutral' },
+};
+
+const attestationBadge = (
+  status: RequirementItemDTO['attestationStatus'],
+  by?: string | null,
+) => {
+  const a = status ? ATTESTATION[status] : undefined;
+  if (!a) return null;
+  const label = status === 'attested' && by ? `${a.label} · ${by}` : a.label;
+  return (
+    <Badge variant={a.variant} size="sm" data-testid="attestation-badge">
+      {label}
+    </Badge>
+  );
 };
 
 /**
@@ -78,8 +118,12 @@ const ConfirmationCard: React.FC<{ item: RequirementItemDTO }> = ({ item }) => (
       <div>
         <div className="text-sm font-semibold text-[#14532d]">{item.title}</div>
         <div className="text-xs text-[#166534] mt-1">{item.reason || item.description}</div>
-        {provenanceBadge(item.verificationStatus) && (
-          <div className="mt-3">{provenanceBadge(item.verificationStatus)}</div>
+        {(provenanceBadge(item.verificationStatus) ||
+          attestationBadge(item.attestationStatus, item.attestedBy)) && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {provenanceBadge(item.verificationStatus)}
+            {attestationBadge(item.attestationStatus, item.attestedBy)}
+          </div>
         )}
       </div>
     </div>
@@ -109,6 +153,7 @@ export const RequirementList: React.FC<RequirementListProps> = ({ items, onActio
                   </Badge>
                   {nonObviousBadge(item.nonObvious)}
                   {provenanceBadge(item.verificationStatus)}
+                  {attestationBadge(item.attestationStatus, item.attestedBy)}
                 </div>
               </div>
               {/* These four were rendered unconditionally, but no caller has ever

@@ -317,6 +317,11 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     else None
                 ),
                 "verificationStatus": getattr(item, "verification_status", None),
+                # getattr-defaulted like its neighbours: test_public_corridor.py feeds
+                # SimpleNamespace rows that carry none of these columns.
+                "attestationStatus": getattr(item, "attestation_status", None),
+                "attestedBy": getattr(item, "attested_by", None),
+                "attestedAt": getattr(item, "attested_at", None),
                 # getattr-defaulted so a row read before the migration lands degrades to
                 # false/None instead of raising. apply_rules carries both through opaquely.
                 "nonObvious": bool(getattr(item, "non_obvious", False)),
@@ -354,6 +359,9 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     statusForCase=status,
                     citations=citations,
                     verificationStatus=item.get("verificationStatus"),
+        attestationStatus=item.get("attestationStatus"),
+        attestedBy=item.get("attestedBy"),
+        attestedAt=item.get("attestedAt"),
                     nonObvious=item.get("nonObvious"),
                     timing=item.get("timing"),
                     outcomeType=outcome_type,
