@@ -99,6 +99,15 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     "make-it-in-germany.com", "arbeitsagentur.de",
     # Portugal
     "aima.gov.pt", "seg-social.pt", "portaldasfinancas.gov.pt",
+    # Ireland. Immigration Service Delivery, the Department of Justice unit that operates
+    # registration and issues the IRP — it publishes the rule, it does not restate one, which
+    # is what separates it from citizensinformation.ie below. The `.ie` domain does not end in
+    # `gov.ie`, so the suffix rule alone rejected it and took the whole first-time
+    # registration entity with it: the 90-day deadline, the €300 fee, the 10-working-day card
+    # delivery. This repo's own Otto card contract already names the host as statutory
+    # (docs/audos/otto-batch-2026-08-13/otto-batch.json:699, otto_verify.py:56) — the
+    # importer's allowlist had simply never been told.
+    "irishimmigration.ie",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )
@@ -108,6 +117,15 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
 _SEMI_OFFICIAL_HOSTS: Tuple[str, ...] = (
     "campusfrance.org", "welcometofrance.com", "workinnorway.no",
     "newtonorway.no", "study.eu", "youreurope.europa.eu",
+    # Ireland. Both are statutory bodies whose domain does not end in `.gov.ie`, so the
+    # suffix rule alone read them as a relocation blog and REJECTED them outright. That
+    # cost us the facts nobody else publishes plainly: emergency tax until the Revenue
+    # job registration lands, RTB tenancy registration, and the non-Schengen consequence
+    # of an Irish permission. Citizens Information is run by the Citizens Information
+    # Board (a statutory agency under the Department of Social Protection); Revenue is
+    # the tax authority itself. Semi-official, not official: both restate rules published
+    # elsewhere, so a fact from here is worth keeping and belongs in the review queue.
+    "citizensinformation.ie", "revenue.ie",
 )
 
 

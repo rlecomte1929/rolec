@@ -90,6 +90,61 @@ def test_fr_no_lta_returns_generic_requirements_no_auth(monkeypatch):
         assert forbidden not in full, f"PII/case field '{forbidden}' leaked"
 
 
+def test_non_obvious_and_timing_are_carried_from_the_catalog_row(monkeypatch):
+    """A POPULATED value must reach the payload, not just the key.
+
+    Every row in production has `non_obvious=false` / `timing IS NULL` today, so a live
+    check against prod proves only that the keys exist — it cannot tell "carried through
+    correctly" apart from "still hardcoded to None", which is what this endpoint did
+    before. So seed values that could only have come from the row.
+
+    This is also the regression test for the `apply_rules` pass-through contract seen from
+    the caller's side: a rebuild inside the engine would null both of these while
+    test_rules_engine_*.py stayed green.
+    """
+    seeded = _norway_seed()
+    seeded[0].non_obvious = True
+    seeded[0].timing = "within 8 days of arrival"
+    monkeypatch.setattr(
+        public_corridor.crud, "list_requirements",
+        lambda db, country, purpose: seeded if country == "NORWAY" else [],
+    )
+
+    resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
+    assert resp.status_code == 200, resp.text
+    reqs = resp.json()["requirements"]
+
+    carried = next(r for r in reqs if r["key"] == "residence_registration_folkeregister")
+    assert carried["non_obvious"] is True
+    assert carried["timing"] == "within 8 days of arrival"
+
+    # The other seeded rows carry the column defaults, and must not inherit the neighbour's.
+    others = [r for r in reqs if r["key"] != "residence_registration_folkeregister"]
+    assert others, "expected more than one requirement in the NO/LTA set"
+    assert all(r["non_obvious"] is False and r["timing"] is None for r in others)
+
+
+def test_a_row_predating_the_columns_degrades_rather_than_raising(monkeypatch):
+    """A row object with neither attribute must yield false/None, not a 500.
+
+    `_base_items` reads both with `getattr(..., default)` precisely so the endpoint
+    survives a row shape that predates the migration.
+    """
+    bare = _norway_seed()
+    for row in bare:
+        assert not hasattr(row, "non_obvious") and not hasattr(row, "timing")
+    monkeypatch.setattr(
+        public_corridor.crud, "list_requirements",
+        lambda db, country, purpose: bare if country == "NORWAY" else [],
+    )
+
+    resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
+    assert resp.status_code == 200, resp.text
+    reqs = resp.json()["requirements"]
+    assert reqs
+    assert all(r["non_obvious"] is False and r["timing"] is None for r in reqs)
+
+
 def test_cors_wildcard_header(monkeypatch):
     _patch_seed(monkeypatch)
     resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")

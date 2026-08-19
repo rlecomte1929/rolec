@@ -31,8 +31,10 @@ Honesty / scope (what this exposes = exactly what the engine produces):
     not a silent `[]`). Known non-obvious NO items (tax card/skattekort, police
     registration, EEA registration) are NOT yet modeled in this engine — that's a
     separate Phase-1 accuracy task, not this endpoint's job.
-  * `key`/`timing`/`non_obvious` are not modeled by the engine: `key` is slugified
-    from the title; `timing` and `non_obvious` are `null` (do not fabricate).
+  * `key` is not modeled by the engine — it is slugified from the title.
+  * `timing`/`non_obvious` ARE now columns on `requirement_items` and are carried
+    through verbatim. They stay `null` until a fact populates them, and stay `null`
+    for engine-synthesised items, which have no such data. Never fabricate either.
 
 CORS: must be callable cross-origin from the Audos surface. The global
 CORSMiddleware uses an allowlist with `allow_credentials=True` that won't include
@@ -107,6 +109,11 @@ def _base_items(requirements: List[Any]) -> List[Dict[str, Any]]:
                 else None
             ),
             "verificationStatus": getattr(item, "verification_status", None),
+            # getattr-defaulted, not `item.non_obvious`: the canned SimpleNamespace rows in
+            # backend/tests/test_public_corridor.py don't carry these, and a row read before
+            # the migration lands must degrade to false/None rather than raise.
+            "non_obvious": bool(getattr(item, "non_obvious", False)),
+            "timing": getattr(item, "timing", None),
         }
         for item in requirements
     ]
@@ -161,8 +168,12 @@ def corridor_requirements(
             "key": _slug(item.get("title") or item.get("id") or ""),
             "label": item.get("title"),
             "description": item.get("description"),
-            "timing": None,       # not modeled in the engine (Phase-1 gap; do not fabricate)
-            "non_obvious": None,  # not modeled in the engine (Phase-1 gap; do not fabricate)
+            # Carried from the catalog row. Still `null` for an item the ENGINE synthesised
+            # (_requirement / _immigration_confirmation) rather than read from the catalog —
+            # those have no such data, and null ("not modeled") is a different claim from
+            # false ("modeled, and it is obvious"). Do not collapse them.
+            "timing": item.get("timing"),
+            "non_obvious": item.get("non_obvious"),
             "category": item.get("pillar"),
             "source": item.get("citations") or [],
         }

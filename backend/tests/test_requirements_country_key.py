@@ -47,6 +47,20 @@ def test_iso_to_catalog_name():
     assert iso_to_catalog_name(None) is None
 
 
+def test_ireland_is_covered():
+    """IE resolves, so Otto's Ireland research can reach `requirement_items`.
+
+    Before this entry existed, `mappings.resolve()` refused every staged IE entity with
+    "no requirement catalog coverage for 'IE'" and `--promote` wrote 0 rows — which is why
+    `requirement_items` held nothing for IRELAND while `otto_staging` held ready facts.
+    This test fails against that state.
+    """
+    assert to_iso("IE") == "IE"
+    assert to_iso("Ireland") == "IE"
+    assert iso_to_catalog_name("IE") == "IRELAND"
+    assert resolve_catalog_country("IE") == "IRELAND"
+
+
 def test_same_canonical_key_across_representations():
     # Criterion: 'SG', 'SINGAPORE', 'Singapore' must resolve identically.
     assert to_iso("SG") == to_iso("SINGAPORE") == to_iso("Singapore") == "SG"

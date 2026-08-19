@@ -47,6 +47,7 @@ _ISO_TO_CATALOG_NAME = {
     "US": "UNITED STATES",
     "FR": "FRANCE",
     "NL": "NETHERLANDS",
+    "IE": "IRELAND",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.

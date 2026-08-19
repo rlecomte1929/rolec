@@ -312,6 +312,29 @@ def find_masters_by_supplier_or_external_ids(
     return out
 
 
+def find_masters_by_ids(ids: List[str]) -> List[Dict[str, Any]]:
+    """Active master rows for the given ``service_catalog_items.id`` values.
+
+    AIQ-1857: the employee path needs to read an HR-approved master directly, rather
+    than only reaching it via an engine candidate's external_id/supplier_id. Most
+    catalog rows carry no ``supplier_id`` (measured 2026-08-17: 905 of 967 active
+    rows, and 46 of 46 for Paris), so a vendor HR approved is otherwise unreachable
+    for the employee no matter how it is scored.
+
+    ``active = true`` still applies — a deactivated master must not resurface.
+    """
+    wanted = [str(i) for i in ids if i]
+    if not wanted:
+        return []
+    stmt = text(
+        "SELECT * FROM service_catalog_items "
+        "WHERE active = true AND CAST(id AS TEXT) IN :ids"
+    ).bindparams(bindparam("ids", expanding=True))
+    with db.engine.begin() as conn:
+        rows = conn.execute(stmt, {"ids": wanted}).mappings().all()
+    return [_row_to_item(r) for r in rows]
+
+
 def external_ids_for_supplier_ids(category: str, supplier_ids: List[str]) -> set:
     """
     Return the ``external_id``s of active masters in ``category`` whose ``supplier_id``

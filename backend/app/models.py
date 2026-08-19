@@ -1,8 +1,28 @@
 import enum
 
-from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey, JSON
+from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey, JSON, Uuid
 from sqlalchemy.sql import func
 from .db import Base
+
+#: For columns that are genuinely `uuid` in Postgres.
+#:
+#: `Column(String)` against a real `uuid` column looks fine on SQLite and breaks on
+#: Postgres. SQLAlchemy's insertmanyvalues path matches inserted rows back to their
+#: parameter sets by primary key, and a Python `str` sent to a `uuid` column comes back
+#: from the driver as a `UUID`, so the match fails:
+#:
+#:     InvalidRequestError: Can't match sentinel values in result set to parameter sets;
+#:     key '3ccecc8d-…' was not found. There may be a mismatch between the datatype passed
+#:     to the DBAPI driver vs. that which it returns in a result row.
+#:
+#: It only fires on a MULTI-row insert, so a single-row test passes and inserting two
+#: children of one parent 500s — which is why the SQLite suite was green while the first
+#: live Postgres call failed (see reference: mocked/SQLite tests miss PG constraints).
+#:
+#: `Uuid(as_uuid=False)` is the portable fix: native `uuid` on Postgres, CHAR on SQLite,
+#: and plain `str` on the Python side so callers keep passing/comparing `str(uuid4())`.
+#: Use this for any new column declared `uuid` in a migration.
+_UUID = Uuid(as_uuid=False)
 
 
 class Case(Base):
@@ -107,6 +127,24 @@ class RequirementItem(Base):
     review_status = Column(String, nullable=False, server_default="approved")
     reviewed_by = Column(String, nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    # A real obligation the person would not anticipate (emergency tax, skattekort,
+    # police registration). A display/ranking hint — no read path gates on it.
+    non_obvious = Column(Boolean, nullable=False, server_default="false", default=False)
+    # Free-text deadline, verbatim from the source ("within 8 days of arrival"). Text and
+    # not an interval on purpose: the rules are relative to events the engine doesn't model.
+    timing = Column(Text, nullable=True)
+    # Counsel-attestation axis, ORTHOGONAL to verification_status above. That one is the
+    # founder/corpus ladder (representative → corpus_grounded → verified); this one is
+    # external legal sign-off (NULL/none → requested → attested → stale). Sellable means
+    # BOTH: verification_status='verified' AND attestation_status='attested'.
+    #
+    # Only the admin promote endpoint may ever write 'attested' — the tokenized public
+    # reviewer path must never write to this table at all. That separation is the whole
+    # point of the two-key design; see routers/attestation.py.
+    attestation_status = Column(Text, nullable=True)
+    attested_at = Column(DateTime(timezone=True), nullable=True)
+    attested_by = Column(Text, nullable=True)
+    latest_attestation_request_id = Column(_UUID, nullable=True)
     last_verified_at = Column(DateTime, nullable=False)
 
 
@@ -560,3 +598,117 @@ class TranslationCache(Base):
     quality_score = Column(Numeric, nullable=True)
     cost_usd = Column(Numeric, nullable=True)
     translated_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Counsel attestation (Phase 1). Tables created by
+# supabase/migrations/20261104000000_counsel_attestation_phase1.sql.
+#
+# `JSON` and not postgresql.JSONB deliberately: the columns ARE jsonb in Postgres,
+# but the backend test fixture is SQLite and the generic type round-trips on both.
+# ─────────────────────────────────────────────────────────────────────────────
+class CorridorAttestationRequest(Base):
+    """One corridor attestation ask — the envelope sent to external counsel."""
+
+    __tablename__ = "corridor_attestation_requests"
+    # implicit_returning=False: with a server_default on created_at, SQLAlchemy uses
+    # RETURNING for a multi-row INSERT and then matches result rows back to parameter sets
+    # by a "sentinel" — which fails on Postgres when the PK is a client-generated uuid
+    # ("Can't match sentinel values in result set to parameter sets"). We generate every id
+    # ourselves and never need a value echoed back at insert time, so turning RETURNING off
+    # removes the whole mechanism. SQLite never hit this, which is why the suite was green.
+    __table_args__ = {"implicit_returning": False}
+
+    id = Column(_UUID, primary_key=True, index=True)
+    country_code = Column(String, nullable=False, index=True)
+    purpose = Column(String, nullable=False, server_default="employment")
+    scope = Column(Text, nullable=False, server_default="legal")
+    title = Column(Text, nullable=True)
+    # draft | sent | in_review | changes_requested | signed | revoked | superseded
+    status = Column(Text, nullable=False, server_default="draft")
+    requested_by = Column(Text, nullable=False)
+    reviewer_org = Column(Text, nullable=True)
+    reviewer_name = Column(Text, nullable=True)
+    reviewer_email = Column(Text, nullable=True)
+    reviewer_credential = Column(Text, nullable=True)
+    # SHA-256 of the raw token. The raw token is shown to the admin once and never stored,
+    # so a dump of this table does not yield working reviewer links.
+    link_token_hash = Column(Text, nullable=True, index=True)
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    content_snapshot_hash = Column(Text, nullable=False)
+    content_snapshot_json = Column(JSON, nullable=False)
+    disclaimer_version = Column(Text, nullable=True)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class CorridorAttestationItem(Base):
+    """One requirement inside an envelope, carrying the reviewer's decision.
+
+    The `*_snapshot` columns duplicate the catalog row on purpose: counsel signs what they
+    were SHOWN, so the evidence has to survive the requirement_items row being edited later.
+    """
+
+    __tablename__ = "corridor_attestation_items"
+    # implicit_returning=False: with a server_default on created_at, SQLAlchemy uses
+    # RETURNING for a multi-row INSERT and then matches result rows back to parameter sets
+    # by a "sentinel" — which fails on Postgres when the PK is a client-generated uuid
+    # ("Can't match sentinel values in result set to parameter sets"). We generate every id
+    # ourselves and never need a value echoed back at insert time, so turning RETURNING off
+    # removes the whole mechanism. SQLite never hit this, which is why the suite was green.
+    __table_args__ = {"implicit_returning": False}
+
+    id = Column(_UUID, primary_key=True, index=True)
+    request_id = Column(_UUID, ForeignKey("corridor_attestation_requests.id", ondelete="CASCADE"), nullable=False, index=True)
+    # String, not a uuid type — requirement_items.id is `character varying` in Postgres.
+    # A uuid FK against it fails with 42804 (incompatible types); see the migration header.
+    requirement_item_id = Column(String, ForeignKey("requirement_items.id"), nullable=False, index=True)
+    item_title = Column(Text, nullable=False)
+    claim_snapshot = Column(Text, nullable=True)
+    source_url_snapshot = Column(Text, nullable=True)
+    evidence_snapshot = Column(Text, nullable=True)
+    # pending | approved | amended | rejected
+    decision = Column(Text, nullable=False, server_default="pending")
+    reviewer_comment = Column(Text, nullable=True)
+    proposed_amendment = Column(Text, nullable=True)
+    decided_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class CorridorAttestationSignature(Base):
+    """Append-only proof of sign-off. INSERT ONLY.
+
+    Never UPDATE or DELETE a row of this table. Revocation or re-issue is a NEW row
+    pointing at the prior one through `supersedes_signature_id` — the chain is the audit
+    trail, and a signature you can edit is not evidence of anything.
+    """
+
+    __tablename__ = "corridor_attestation_signatures"
+    # implicit_returning=False: with a server_default on created_at, SQLAlchemy uses
+    # RETURNING for a multi-row INSERT and then matches result rows back to parameter sets
+    # by a "sentinel" — which fails on Postgres when the PK is a client-generated uuid
+    # ("Can't match sentinel values in result set to parameter sets"). We generate every id
+    # ourselves and never need a value echoed back at insert time, so turning RETURNING off
+    # removes the whole mechanism. SQLite never hit this, which is why the suite was green.
+    __table_args__ = {"implicit_returning": False}
+
+    id = Column(_UUID, primary_key=True, index=True)
+    request_id = Column(_UUID, ForeignKey("corridor_attestation_requests.id"), nullable=False, index=True)
+    signer_name = Column(Text, nullable=False)
+    signer_email = Column(Text, nullable=False)
+    signer_org = Column(Text, nullable=True)
+    signer_credential = Column(Text, nullable=True)
+    # typed_name | uploaded_pdf | esign (future — eIDAS upgrade path, no rewrite needed)
+    signature_method = Column(Text, nullable=False, server_default="typed_name")
+    # Must equal the request's content_snapshot_hash at signing time, or the signature
+    # attests to a checklist the reviewer never saw.
+    signed_content_hash = Column(Text, nullable=False)
+    signed_payload_json = Column(JSON, nullable=False)
+    disclaimer_version = Column(Text, nullable=False)
+    disclaimer_text = Column(Text, nullable=False)
+    signed_ip = Column(Text, nullable=True)
+    signed_user_agent = Column(Text, nullable=True)
+    supersedes_signature_id = Column(_UUID, ForeignKey("corridor_attestation_signatures.id"), nullable=True)
+    signed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

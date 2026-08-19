@@ -238,6 +238,13 @@ export const ROUTE_DEFS = {
   // AIQ-1521 — supplier answers an RFQ by magic link. PUBLIC by design: a moving company will
   // not create an account to give us a price.
   supplierQuote: { path: '/supplier/quote', roles: ['PUBLIC'] as RouteRole[] },
+  // Counsel attestation reviewer view. PUBLIC by design and intentionally OUTSIDE the auth
+  // guard: the reader is a lawyer at another firm with no ReloPass account, and the token in
+  // the URL is the only credential. The backend returns an identical 404 for unknown,
+  // expired and not-yet-sent tokens, so the route itself leaks nothing.
+  attestationReview: { path: '/attest/:token', roles: ['PUBLIC'] as RouteRole[] },
+  /** Admin → counsel attestations: request a corridor review, track it, promote the result. */
+  adminAttestations: { path: '/admin/attestations', roles: ['ADMIN'] as RouteRole[] },
   /** [AIQ-633] Specialist review — admin reviews AI-generated roadmap steps per case */
   adminSpecialistReview: { path: '/admin/specialist-review/:case_id', roles: ['ADMIN'] as RouteRole[] },
   /** Auth Page Design — live-tune the /auth page's GlobeNetwork canvas (platform-wide, admin-only). */

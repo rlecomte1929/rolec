@@ -124,6 +124,13 @@ class RequirementItemDTO(BaseModel):
     citations: List[SourceRecordDTO]
     # AIQ-1349: provenance level for this requirement.
     verificationStatus: Optional[str] = None
+    # A real obligation the person would not anticipate. Optional, not `bool = False`:
+    # an engine-synthesised item has no such data, and null ("not modeled") must stay
+    # distinguishable from false ("modeled, and it is obvious").
+    nonObvious: Optional[bool] = None
+    # Free-text deadline verbatim from the source ("within 8 days of arrival"). None
+    # when the source states no deadline.
+    timing: Optional[str] = None
     # 'action' (the default — something is required of someone) or
     # 'nothing_to_do' (a STATED positive confirmation that nothing is required).
     # A correct answer of "none" must be stated, never implied by an empty list.
@@ -491,3 +498,144 @@ class QueryAuditLogRead(BaseModel):
     retrieved_chunk_ids: List[str] = Field(default_factory=list)
     answer_preview: Optional[str] = None
     created_at: datetime
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Counsel attestation (Phase 1). See routers/attestation.py.
+#
+# The public-facing DTOs below are a PII BOUNDARY, not merely a response shape. They are
+# whitelists: a field reaches an external reviewer only by being named here. Do not add a
+# passthrough dict, and do not widen one of these to `Dict[str, Any]`.
+# ─────────────────────────────────────────────────────────────────────────────
+class AttestationChecklistItemDTO(BaseModel):
+    """One requirement as external counsel sees it. No case, employee or company fields."""
+
+    id: str                                   # corridor_attestation_items.id
+    title: str
+    claim: Optional[str] = None
+    source_url: Optional[str] = None
+    evidence: Optional[str] = None
+    pillar: Optional[str] = None
+    validity: Optional[str] = None            # requirement_items.timing
+    confidence: Optional[str] = None          # requirement_items.verification_status
+    decision: str = "pending"                 # pending | approved | amended | rejected
+    reviewer_comment: Optional[str] = None
+    proposed_amendment: Optional[str] = None
+
+
+class AttestationPublicViewDTO(BaseModel):
+    """The entire payload the tokenized reviewer receives."""
+
+    corridor_label: str
+    purpose: str
+    scope: str
+    status: str
+    title: Optional[str] = None
+    disclaimer_version: str
+    disclaimer_text: str
+    # Echoed so the client can send it back on sign; the server re-derives and compares.
+    content_hash: str
+    expires_at: Optional[datetime] = None
+    items: List[AttestationChecklistItemDTO] = Field(default_factory=list)
+    signed_at: Optional[datetime] = None
+
+
+class AttestationDecisionIn(BaseModel):
+    decision: str                             # approved | amended | rejected
+    reviewer_comment: Optional[str] = None
+    proposed_amendment: Optional[str] = None
+
+    @field_validator("decision")
+    @classmethod
+    def _known_decision(cls, v: str) -> str:
+        allowed = {"approved", "amended", "rejected"}
+        norm = (v or "").strip().lower()
+        if norm not in allowed:
+            raise ValueError(f"decision must be one of {sorted(allowed)}")
+        return norm
+
+
+class AttestationSignIn(BaseModel):
+    signer_name: str = Field(min_length=1, max_length=200)
+    signer_email: str = Field(min_length=3, max_length=320)
+    signer_org: Optional[str] = Field(default=None, max_length=200)
+    signer_credential: Optional[str] = Field(default=None, max_length=200)
+    signature_method: str = "typed_name"
+    # The hash the reviewer was shown. Compared against the stored snapshot hash; a
+    # mismatch is a 409, because the checklist changed under them.
+    content_hash: str = Field(min_length=64, max_length=64)
+    # Must be explicitly true. A signature without recorded agreement to the disclaimer
+    # is not evidence that the disclaimer was agreed to.
+    agreed_to_disclaimer: bool
+
+
+class AttestationSignatureDTO(BaseModel):
+    id: str
+    signer_name: str
+    signer_org: Optional[str] = None
+    signer_credential: Optional[str] = None
+    signature_method: str
+    signed_content_hash: str
+    disclaimer_version: str
+    signed_at: datetime
+    supersedes_signature_id: Optional[str] = None
+
+
+class AttestationCreateIn(BaseModel):
+    country_code: str = Field(min_length=2, max_length=64)
+    purpose: str = "employment"
+    title: Optional[str] = None
+    reviewer_org: Optional[str] = None
+    reviewer_name: Optional[str] = None
+    reviewer_email: Optional[str] = None
+    reviewer_credential: Optional[str] = None
+    # Explicit scope. Omitted ⇒ every approved item for the corridor except the pillars
+    # that are operational rather than legal (see routers/attestation.py OPERATIONAL_PILLARS).
+    requirement_item_ids: Optional[List[str]] = None
+    ttl_days: Optional[int] = Field(default=None, ge=1, le=90)
+
+
+class AttestationAdminDTO(BaseModel):
+    """Admin-side view. Carries reviewer contact details, which the public view must not."""
+
+    id: str
+    country_code: str
+    purpose: str
+    scope: str
+    title: Optional[str] = None
+    status: str
+    requested_by: str
+    reviewer_org: Optional[str] = None
+    reviewer_name: Optional[str] = None
+    reviewer_email: Optional[str] = None
+    reviewer_credential: Optional[str] = None
+    content_snapshot_hash: str
+    disclaimer_version: Optional[str] = None
+    token_expires_at: Optional[datetime] = None
+    sent_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    item_count: int = 0
+    items: List[AttestationChecklistItemDTO] = Field(default_factory=list)
+    signature: Optional[AttestationSignatureDTO] = None
+
+
+class AttestationCreatedDTO(BaseModel):
+    """Creation response — the ONLY time the raw token is ever returned."""
+
+    request: AttestationAdminDTO
+    review_token: str
+    review_url: str
+    token_expires_at: Optional[datetime] = None
+    warning: str = (
+        "This link is shown once and cannot be recovered. Only its SHA-256 hash is stored. "
+        "Send it to the reviewer now; if it is lost, issue a new request."
+    )
+
+
+class AttestationPromoteResultDTO(BaseModel):
+    request_id: str
+    promoted_item_ids: List[str] = Field(default_factory=list)
+    promoted_count: int = 0
+    attested_by: Optional[str] = None
+    skipped_not_approved: List[str] = Field(default_factory=list)

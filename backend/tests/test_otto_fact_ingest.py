@@ -160,6 +160,83 @@ def test_a_public_agency_is_kept_but_never_auto_accepted(tmp_path):
     assert rows[0].confidence_score <= 0.6
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.citizensinformation.ie/en/moving-country/moving-to-ireland/",
+        "https://www.revenue.ie/en/jobs-and-pensions/emergency-tax/index.aspx",
+        # Bare host and http, to prove the match is on the hostname and not the full URL.
+        "revenue.ie/en/starting-work",
+        "http://citizensinformation.ie/en/money-and-tax/tax/",
+    ],
+)
+def test_the_irish_statutory_bodies_are_admitted_for_review_not_rejected(url):
+    """`.ie` is not `.gov.ie`, so the suffix rule alone read both as a relocation blog.
+
+    That is a real loss, not a tidy default: these two publish the Irish realities nobody
+    else states plainly — emergency tax until the Revenue job registration lands, RTB
+    tenancy registration, and the non-Schengen consequence of an Irish permission. The
+    Citizens Information Board is a statutory agency under the Department of Social
+    Protection; Revenue is the tax authority itself.
+
+    SEMI_OFFICIAL and not OFFICIAL on purpose: both restate rules published elsewhere, so
+    a fact from here belongs in the review queue rather than being waved through.
+    """
+    assert classify_source(url) == SEMI_OFFICIAL
+
+
+def test_an_irish_fact_reaches_the_review_queue_instead_of_the_rejection_list(tmp_path):
+    """End to end through `read_jsonl` — the gate has to admit the ROW, not just the URL."""
+    path = _write(tmp_path, [_record(
+        destination_country="IE",
+        entity_topic_key="emergency_tax",
+        fact_key="emergencyTaxRate",
+        source_url="https://www.revenue.ie/en/jobs-and-pensions/emergency-tax/index.aspx",
+    )])
+    rows, rejections = read_jsonl(path, batch_id="ie-1")
+
+    assert rejections == []
+    assert len(rows) == 1
+    assert rows[0].source_class == SEMI_OFFICIAL
+    # Kept, but never auto-accepted: a human still signs this off.
+    assert rows[0].accuracy_tier == TIER_REVIEW
+    assert rows[0].confidence_score <= 0.6
+    assert any("not a statutory source" in d for d in rows[0].downgrades)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.irishimmigration.ie/registering-your-immigration-permission/",
+        "irishimmigration.ie/registering-your-immigration-permission/required-documents/",
+        "http://irishimmigration.ie/",
+    ],
+)
+def test_immigration_service_delivery_is_official_not_merely_semi(url):
+    """ISD publishes the rule; Citizens Information restates it. That is the whole line.
+
+    Immigration Service Delivery is the Department of Justice unit that runs registration
+    and issues the IRP, so it is the primary source for first-time registration even though
+    the host is `irishimmigration.ie` and not `gov.ie`. Left unlisted, the suffix rule scored
+    it UNOFFICIAL and rejected the entire entity — the 90-day registration deadline, the €300
+    fee and the 10-working-day card delivery all vanished from a 20-fact deliverable while
+    the import still reported success on the other 16.
+
+    OFFICIAL, unlike revenue.ie/citizensinformation.ie above, because a fact here needs no
+    human to confirm it against a further source; it is already at the publisher.
+    """
+    assert classify_source(url) == OFFICIAL
+
+
+def test_admitting_the_irish_bodies_did_not_admit_the_whole_ie_tld(tmp_path):
+    """The fix is named hostnames, not a `.ie` suffix. An Irish relocation blog stays out."""
+    assert classify_source("https://dublinrelocationblog.ie/moving-guide") == UNOFFICIAL
+    assert classify_source("https://www.irish-immigration-lawyers.ie/permits") == UNOFFICIAL
+    # Nor a lookalike that merely ends with the string.
+    assert classify_source("https://notrevenue.ie/tax") == UNOFFICIAL
+    assert classify_source("https://not-irishimmigration.ie/permits") == UNOFFICIAL
+
+
 def test_a_fact_with_no_evidence_quote_cannot_be_auto_accepted(tmp_path):
     """All 24 rows in production have `evidence_quote IS NULL` — nothing in them can be
     re-checked without re-reading the source. Allowed in, never waved through."""

@@ -37,6 +37,7 @@ from .routers import (
     cases,
     cases_admin,
     case_integrations,
+    case_requirement_checklist,
     cases_read,
     cases_write,
     case_documents,
@@ -107,6 +108,7 @@ from .routers import (
     admin_product_metrics,
     public_corridor,
     geocoding,
+    attestation,
 )
 from .recommendations.router import router as recommendations_router
 from .recommendations.admin_debug import router as admin_recommendations_debug_router
@@ -145,6 +147,7 @@ def create_app() -> FastAPI:
     # Original cases.py is retained as a support module for Pydantic models + private
     # helpers that cases_write.py still imports from. Its router is no longer wired.
     app.include_router(cases_read.router)
+    app.include_router(case_requirement_checklist.router)
     app.include_router(case_integrations.router)  # I-4 — email plan + calendar .ics
     app.include_router(cases_write.router)
     app.include_router(case_documents.router)  # [DOCFLOW P1] case-scoped document upload/status
@@ -220,6 +223,11 @@ def create_app() -> FastAPI:
     app.include_router(public_analytics.router)  # [audos-P2] public POST /api/public/track
     app.include_router(product_track.router)  # authenticated POST /api/track (product events → analytics_events)
     app.include_router(public_corridor.router)   # [audos] public GET /api/public/corridor-requirements
+    # Counsel attestation. TWO routers, deliberately separate: admin_router is behind
+    # require_admin, public_router is token-scoped with no auth. Keeping them distinct
+    # makes the two-key boundary visible at registration, not just inside the handlers.
+    app.include_router(attestation.admin_router)
+    app.include_router(attestation.public_router)
     app.include_router(geocoding.router)   # [AIQ-1607] GET /api/employee/geocode/autocomplete
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
