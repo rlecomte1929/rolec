@@ -1,16 +1,31 @@
 """Candidate Beam — the dedupe/ranking port must reproduce the validated run exactly.
 
-`backend/tests/fixtures/candidate_beam_fr_no_eea.json` is the reference implementation's
-FR-NO / eea run: 5 passes, 35 ranked candidates, 25 flagged, 10 unsourced. Each candidate
-carries its raw per-pass `variants`, so flattening them by pass number reconstructs the
-inputs the ranker saw. Feeding those back through this port must land on the same 35
-clusters, the same flags and the same bands.
+Two fixtures, and the distinction between them is the point:
 
-This is the test that makes the port a port rather than a rewrite. The algorithm has a
-dozen places where a defensible-looking choice changes the output — whether cluster token
-sets grow on join, whether the 1.1 weighting applies to the full set or the title set,
-whether ties break on title before or after sourcedness — and every one of them is
-invisible in isolation. Only the fixture catches them.
+* `candidate_beam_fr_no_eea_pass_outputs.json` — the INPUT. The exact ordered material the
+  reference finalizer consumed: raw per-pass parsed items, ascending pass order, array
+  order preserved within each pass. Storage shape, snake_case.
+* `candidate_beam_fr_no_eea.json` — the EXPECTED OUTPUT. The 35 persisted candidates of
+  the reference FR-NO/eea run. Export shape, camelCase presentation keys
+  (`passFrequency` is the string `"5/5"`).
+
+Feeding the first through this port must land on the second at every rank — title,
+frequency, band, flags and joined source string. Not a count check: counts coincide, a
+35-row field-by-field identity does not.
+
+**Why the input fixture is separate.** The published candidate payload groups variants by
+candidate in RANK order, which is not the order any pass emitted them, and the clustering
+is greedy in arrival order with cluster token sets that grow on join — so order decides
+membership, not just presentation. Reconstructing passes by walking that payload gives 26
+flagged instead of 25: "Employer Registration in Norway" (pass 4) scores 0.4654 against
+the "Employer's Obligation to Register Workplace in Norway" cluster but 0.50 against "Tax
+Registration in Norway", so best-fit sends it to the wrong home. Across 200 random
+within-pass shuffles, 100 reproduce the reference and 100 do not. That is the algorithm's
+order sensitivity, and it is why the true ordering had to be exported rather than inferred.
+
+Best-fit joining is the specified rule and is confirmed here: first-fit also produces
+35/25/10 and the same bands, and only the representative-title set separates the two.
+Every number in the original spec was blind to that difference.
 """
 from __future__ import annotations
 
@@ -31,47 +46,31 @@ from backend.imports.candidate_beam.ranking import (
     parse_variant,
 )
 
-FIXTURE = Path(__file__).resolve().parent / "fixtures" / "candidate_beam_fr_no_eea.json"
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+INPUT_FIXTURE = FIXTURES / "candidate_beam_fr_no_eea_pass_outputs.json"
+EXPECTED_FIXTURE = FIXTURES / "candidate_beam_fr_no_eea.json"
 
 
 @pytest.fixture(scope="module")
-def reference() -> dict:
-    return json.loads(FIXTURE.read_text())
+def pass_outputs() -> list:
+    """The canonical ordered input, ascending by pass."""
+    payload = json.loads(INPUT_FIXTURE.read_text())
+    return sorted(payload["passOutputs"], key=lambda p: p["pass"])
 
 
 @pytest.fixture(scope="module")
-def flattened_passes(reference) -> list:
-    """Reconstruct per-pass inputs from the published candidates' variants.
-
-    **Why the reversal.** The published payload groups variants by CANDIDATE in rank
-    order, not by the order each pass emitted them, and the clustering is greedy in
-    arrival order with cluster token sets that grow on join — so the input order is not
-    merely cosmetic, it decides membership. Walking the payload top-to-bottom yields an
-    order that is approximately rank-ascending, which is not the order the reference saw.
-
-    Measured: as-published gives 26 flagged and two clusters that differ from the
-    reference ("Employer Registration in Norway" splitting off "Employer's Obligation to
-    Register Workplace in Norway", which score 0.4654 together while the newcomer scores
-    0.50 against "Tax Registration in Norway"). Reversing within each pass reproduces the
-    reference EXACTLY — 35 clusters, 25 flagged, 10 unsourced, every band, and all 35
-    titles. Across 200 random within-pass shuffles, 100 reproduce the reference and 100
-    do not, which is the order-sensitivity made visible rather than a coincidence about
-    reversal.
-
-    So the fixture pins the ALGORITHM, and this fixture cannot pin the original arrival
-    order because the payload does not carry it. The order-invariant properties are
-    asserted separately below and hold under every ordering tried.
-    """
-    by_pass: dict = {}
-    for candidate in reference["candidates"]:
-        for variant in candidate.get("variants") or []:
-            by_pass.setdefault(variant["pass"], []).append(variant)
-    return [list(reversed(by_pass[p])) for p in sorted(by_pass)]
+def expected() -> list:
+    """The 35 persisted candidates, ascending by rank."""
+    payload = json.loads(EXPECTED_FIXTURE.read_text())
+    return sorted(payload["candidates"], key=lambda c: c["rank"])
 
 
 @pytest.fixture(scope="module")
-def ported(flattened_passes) -> list:
-    return build_candidates(flattened_passes)
+def ported(pass_outputs) -> list:
+    return build_candidates(
+        [p["items"] for p in pass_outputs],
+        [p["framing"] for p in pass_outputs],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -79,17 +78,38 @@ def ported(flattened_passes) -> list:
 # ---------------------------------------------------------------------------
 
 
-def test_input_reconstruction_is_what_the_reference_saw(flattened_passes):
-    """Guards the test itself: 5 passes, 57 variants, in the published distribution."""
-    assert len(flattened_passes) == 5
-    assert [len(p) for p in flattened_passes] == [14, 10, 11, 12, 10]
+def test_input_fixture_is_the_run_it_claims_to_be(pass_outputs):
+    """Guards the fixture itself, so a swapped or truncated export fails loudly here
+    rather than as a confusing ranking mismatch twenty assertions later."""
+    assert [p["pass"] for p in pass_outputs] == [1, 2, 3, 4, 5]
+    assert [len(p["items"]) for p in pass_outputs] == [14, 10, 11, 12, 10]
+    assert [p["framing"] for p in pass_outputs] == [
+        "zero_shot_official_audit",
+        "few_shot_gap_hunter",
+        "lived_experience",
+        "professional_advisor",
+        "red_team_gap_finder",
+    ]
 
 
-def test_reproduces_thirty_five_clusters(ported):
+def test_reproduces_the_reference_run_field_by_field(ported, expected):
+    """THE gate. Every rank, every field the reference persisted."""
+    assert len(ported) == len(expected) == 35
+    for mine, ref in zip(ported, expected):
+        context = f"rank {ref['rank']} — {ref['title']}"
+        assert mine["rank"] == ref["rank"], context
+        assert mine["title"] == ref["title"], context
+        assert f"{mine['pass_frequency']}/{mine['passes_total']}" == ref["passFrequency"], context
+        assert mine["confidence_band"] == ref["confidenceBand"], context
+        assert bool(mine["flagged"]) is bool(ref["flagged"]), context
+        assert bool(mine["source_missing"]) is bool(ref["source_missing"]), context
+        assert mine["source"] == ref["source"], context
+
+
+def test_headline_counts_from_the_spec(ported):
+    """The 35 / 25 / 10 the brief names, kept as their own assertion so a regression
+    reports the familiar number rather than only a per-rank diff."""
     assert len(ported) == 35
-
-
-def test_reproduces_the_flagged_and_unsourced_counts(ported):
     assert sum(1 for c in ported if c["flagged"]) == 25
     assert sum(1 for c in ported if c["source_missing"]) == 10
 
@@ -98,29 +118,24 @@ def test_rank_one_is_the_digital_identity_item(ported):
     top = ported[0]
     assert top["rank"] == 1
     assert top["title"] == "Preserving Digital Identity"
-    assert top["pass_frequency"] == 5
-    assert top["passes_total"] == 5
+    assert (top["pass_frequency"], top["passes_total"]) == (5, 5)
     assert top["confidence_band"] == BAND_NEAR_CERTAIN
     assert top["flagged"] is True
     assert top["source_missing"] is True
 
 
-def test_band_distribution_matches_the_reference(ported, reference):
-    expected = Counter(c["confidenceBand"] for c in reference["candidates"])
-    actual = Counter(c["confidence_band"] for c in ported)
-    assert actual == expected
+def test_framings_are_carried_onto_every_variant(ported, pass_outputs):
+    """A reviewer auditing divergence needs to know which persona produced a variant;
+    losing the framing turns the variants panel into anonymous duplicates."""
+    by_pass = {p["pass"]: p["framing"] for p in pass_outputs}
+    for candidate in ported:
+        for variant in candidate["variants"]:
+            assert variant["framing"] == by_pass[variant["pass"]]
 
 
-def test_every_representative_title_matches_the_reference(ported, reference):
-    """The strongest gate here: not just the counts but the same 35 clusters, each
-    resolving to the same representative text. Counts can coincide; titles cannot.
-
-    This is also what distinguishes best-fit from first-fit joining. Both produce
-    35/25/10 and the same bands under this ordering, and only the title set separates
-    them — first-fit misplaces a cluster. The prompt specifies best-matching, and this
-    is the assertion that proves the port honours it.
-    """
-    assert {c["title"] for c in ported} == {c["title"] for c in reference["candidates"]}
+# ---------------------------------------------------------------------------
+# Order-invariant properties — true under every ordering tried.
+# ---------------------------------------------------------------------------
 
 
 def test_ranks_are_contiguous_and_one_based(ported):
@@ -140,11 +155,20 @@ def test_no_candidate_is_dropped_for_being_rare(ported):
     assert all(c["confidence_band"] == BAND_LOW for c in singletons)
 
 
-def test_every_variant_survives_into_some_cluster(ported, flattened_passes):
+def test_every_variant_survives_into_some_cluster(ported, pass_outputs):
     """Clustering regroups; it never discards. The union is persisted."""
-    fed = sum(len(p) for p in flattened_passes)
+    fed = sum(len(p["items"]) for p in pass_outputs)
     kept = sum(len(c["variants"]) for c in ported)
     assert kept == fed
+
+
+def test_headline_counts_hold_under_a_different_arrival_order(pass_outputs):
+    """Clustering is order-sensitive by construction, so the cluster COUNT and the
+    unsourced count are asserted to survive reordering while exact membership is not.
+    This pins what the algorithm guarantees and refuses to over-claim the rest."""
+    reordered = build_candidates([list(reversed(p["items"])) for p in pass_outputs])
+    assert len(reordered) == 35
+    assert sum(1 for c in reordered if c["source_missing"]) == 10
 
 
 # ---------------------------------------------------------------------------
@@ -153,11 +177,11 @@ def test_every_variant_survives_into_some_cluster(ported, flattened_passes):
 
 
 @pytest.mark.parametrize(
-    "frequency,expected",
+    "frequency,expected_band",
     [(5, BAND_NEAR_CERTAIN), (4, BAND_STRONG), (3, BAND_STRONG), (2, BAND_MODERATE), (1, BAND_LOW)],
 )
-def test_band_boundaries_at_five_passes(frequency, expected):
-    assert confidence_band(frequency, 5) == expected
+def test_band_boundaries_at_five_passes(frequency, expected_band):
+    assert confidence_band(frequency, 5) == expected_band
 
 
 @pytest.mark.parametrize("junk", ["n/a", "N/A", "none", "None", "example.com", "  ", "", "tbd", "-"])
@@ -167,7 +191,7 @@ def test_junk_sources_become_null(junk):
 
 @pytest.mark.parametrize("real", ["udi.no", "skatteetaten.no", "service-public.fr"])
 def test_real_sources_are_stored_verbatim(real):
-    """Never URL-ified, never 'cleaned' — the string is the model's claim, and a human
+    """Never URL-ified, never 'cleaned' — the string is the model's CLAIM and a human
     verifies it later. Rewriting it asserts something the model never said."""
     assert normalise_source(f"  {real} ") == real
 
