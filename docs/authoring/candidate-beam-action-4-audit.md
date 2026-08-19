@@ -30,7 +30,14 @@ produced a button that silently does nothing.
 
 ## Missing and BLOCKED — no backend exists
 
-**1. The launch console cannot be built.**
+> **SUPERSEDED for item 1, same day.** Commit `7d48945e` ("give the beam an entry point")
+> landed on this branch *while this audit was being written* and adds the missing writer
+> (`imports/candidate_beam/store.py`) plus `POST /runs`, `POST /runs/{id}/pass`,
+> `POST /runs/{id}/finalize`. The launch console is no longer blocked — but it is also not
+> the shape the spec assumes. See "Launch console, after 7d48945e" below. Item 2 (the
+> Source URL field) still stands.
+
+**1. The launch console cannot be built.** *(true when audited; see the note above)*
 
 There is no `POST /runs` endpoint. The router exposes exactly: `GET /runs`,
 `GET /runs/{id}/items`, `POST /items/{id}/review`, `POST /runs/{id}/import-plan`,
@@ -73,3 +80,28 @@ version `20261106000000` naming `corridor_deadline_events`, so the ledger can no
 distinguish the two — it is keyed by version and tracks only one file per version. Both
 tables exist in prod; only one is recorded. One of the two migrations needs restamping
 above the ledger max before either PR merges.
+
+
+## Launch console, after `7d48945e`
+
+The endpoint exists now, so the console is buildable — but the spec's single call does not
+match what shipped, and building to the spec literally would hang the browser on five paid
+model calls.
+
+The backend is deliberately **resumable, not atomic**:
+
+| Spec assumes | Backend provides |
+|---|---|
+| `POST /runs/` returns a finished run | `POST /runs` opens a row at status `generating` and returns immediately |
+| one call runs the beam | `POST /runs/{id}/pass` runs **exactly one** pass, called N times; omitting `pass_number` runs the lowest incomplete slot, which is also how a failed pass is retried |
+| — | `POST /runs/{id}/finalize` clusters and ranks once the passes are in |
+| spinner while `status: running` | the status vocabulary is `generating \| pending_review \| failed`; there is no `running` |
+
+So the console has to drive `start → pass × N → finalize` from the client, showing per-pass
+progress rather than one opaque spinner. That is a better screen than the spec describes —
+a five-pass beam behind a single request is a gateway timeout that loses every completed
+pass — but it is a different screen, and the difference is the reason it was left for a
+decision rather than guessed at.
+
+`StartRunRequest` also takes `passes` (2–7, default 5) and an optional `model`, neither of
+which the spec's form mentions.
