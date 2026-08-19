@@ -1,0 +1,76 @@
+{
+  "corridor": "IE-ES",
+  "generated_at": "2026-08-19T18:27:49.920922+00:00",
+  "source_ndjson": "corridors/IE_ES/data/ie_es_requirement_facts.ndjson",
+  "sha256": "ba53fd1242a25c7db4aff7816ead9661a9b721f51546b7786a540d34a4810de1",
+  "record_count": 25,
+  "non_obvious_count": 15,
+  "domain_breakdown": {
+    "healthcare": 3,
+    "housing": 3,
+    "immigration": 1,
+    "other": 2,
+    "registration": 8,
+    "social_security": 4,
+    "tax": 4
+  },
+  "needs_lawyer_review": [
+    "tax_ie_es_double_taxation",
+    "tax_residency_183_days"
+  ],
+  "target_table": "public.requirement_items",
+  "upsert_key": "id (= fact_uid)",
+  "all_pass": true,
+  "gates": [
+    {
+      "gate": "structural",
+      "pass": true,
+      "detail": "all 25 records well-formed"
+    },
+    {
+      "gate": "fact_uid_unique",
+      "pass": true,
+      "detail": "25 unique of 25"
+    },
+    {
+      "gate": "count",
+      "pass": true,
+      "detail": "25 records, expected 25"
+    },
+    {
+      "gate": "domain_profile",
+      "pass": true,
+      "detail": "{'healthcare': 3, 'housing': 3, 'immigration': 1, 'other': 2, 'registration': 8, 'social_security': 4, 'tax': 4}"
+    },
+    {
+      "gate": "non_obvious_count",
+      "pass": true,
+      "detail": "15 flagged non_obvious, expected 15"
+    },
+    {
+      "gate": "non_obvious_note_present",
+      "pass": true,
+      "detail": "every non_obvious record carries its note"
+    },
+    {
+      "gate": "trust_lawyer_review",
+      "pass": true,
+      "detail": "flagged needs_lawyer_review: ['tax_ie_es_double_taxation', 'tax_residency_183_days']"
+    },
+    {
+      "gate": "serving_status_pending",
+      "pass": true,
+      "detail": "all rows land review_status='pending'; requirements_builder serves only 'approved'"
+    },
+    {
+      "gate": "idempotency",
+      "pass": true,
+      "detail": "migration applied TWICE inside BEGIN…ROLLBACK against production: 25 rows, not 50 (psql, 2026-08-19). Also verified 25 pending / 15 non_obvious / 2 lawyer-flagged / 6 pillars, then rolled back."
+    },
+    {
+      "gate": "engine_target",
+      "pass": true,
+      "detail": "public.requirement_items is the table requirements_builder reads; SPAIN held 0 rows before this load, so the corridor is additive and cannot displace another."
+    }
+  ]
+}
