@@ -6,6 +6,13 @@ constraints) and reports completeness / noise-precision / ordering + a composite
 outcome_accuracy. Produced roadmaps come from either a JSON file or the replay-record
 DB (feature_key='rag_roadmap'), so it grades exactly what the live AI path emitted.
 
+RETIRED: this runner no longer emits the 'roadmap_completeness' dashboard report
+(the aggregate corridor completeness %). An aggregate average hides rare-slice
+failures (Ng MLOps C1 W2-3); the health dashboard now plots sliced non-obvious
+recall vs the lawyer-verified HLP baseline instead \u2014 see
+backend.eval.run_nonobvious_recall_eval. For the same reason the --gate here now
+judges the WORST produced roadmap, not the mean across roadmaps.
+
 Usage
 ─────
     # Grade a sample produced roadmap against the IN->DE gold:
@@ -59,9 +66,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--corridor", default=None, help="Corridor scope for --from-db (e.g. IN_DE).")
     parser.add_argument("--min-completeness", type=float, default=0.9)
     parser.add_argument("--min-ordering", type=float, default=1.0)
-    parser.add_argument("--gate", action="store_true", help="Exit non-zero if below thresholds.")
-    parser.add_argument("--out", type=Path, default=None,
-                        help="Dir to write roadmap_completeness_<date>.json (rag-eval dashboard).")
+    parser.add_argument("--gate", action="store_true",
+                        help="Exit non-zero if the WORST produced roadmap is below thresholds.")
     args = parser.parse_args(argv)
 
     gold = json.loads(args.gold.read_text())
@@ -75,16 +81,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     report = grade_roadmaps(produced, gold)
     print(json.dumps(report, indent=2))
 
-    if args.out:
-        from .dashboard_report import write_dashboard_report
-        dest = write_dashboard_report(args.out, "roadmap_completeness", report["completeness"], report)
-        print(f"wrote {dest}", file=sys.stderr)
-
-    if args.gate and (report["completeness"] < args.min_completeness
-                      or report["ordering"] < args.min_ordering):
+    # Gate on the WORST produced roadmap: a mean would let one badly incomplete
+    # roadmap hide behind many good ones \u2014 the exact rare-slice failure mode the
+    # sliced non-obvious recall metric exists to surface.
+    per = report.get("per_roadmap") or []
+    worst_completeness = min((r["completeness"] for r in per), default=report["completeness"])
+    worst_ordering = min((r["ordering"] for r in per), default=report["ordering"])
+    if args.gate and (worst_completeness < args.min_completeness
+                      or worst_ordering < args.min_ordering):
         print(
-            f"GATE FAILED: completeness {report['completeness']} (min {args.min_completeness}), "
-            f"ordering {report['ordering']} (min {args.min_ordering})",
+            f"GATE FAILED (worst roadmap): completeness {worst_completeness} (min {args.min_completeness}), "
+            f"ordering {worst_ordering} (min {args.min_ordering})",
             file=sys.stderr,
         )
         return 1

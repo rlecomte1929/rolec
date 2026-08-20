@@ -47,11 +47,23 @@ METRIC_SPECS: List[MetricSpec] = [
     MetricSpec("context_precision", "Context precision", 0.85),
     MetricSpec("factual_consistency", "Factual consistency", 0.95),
     MetricSpec("outcome_accuracy", "Outcome accuracy", 0.90),
-    # Phase 2 evals surfaced on the dashboard (emitted by run_structuring_eval /
-    # run_roadmap_outcome_eval). structuring_accuracy = per-profile requirement
-    # matching accuracy; roadmap_completeness = recall of required roadmap steps.
+    # Phase 2 eval surfaced on the dashboard (emitted by run_structuring_eval):
+    # structuring_accuracy = per-profile requirement matching accuracy.
     MetricSpec("structuring_accuracy", "Structuring accuracy", 0.95),
-    MetricSpec("roadmap_completeness", "Roadmap completeness", 0.90),
+    # RETIRED: the aggregate 'roadmap_completeness' (corridor completeness %) spec.
+    # An aggregate average hides rare-slice failures (Ng MLOps C1 W2-3), and the
+    # rare missed non-obvious requirement is exactly the failure the product
+    # exists to kill. Replaced by the sliced metric below; old
+    # roadmap_completeness_*.json reports are no longer read.
+    #
+    # nonobvious_recall = non-obvious requirement recall per
+    # (corridor x employee_type) slice vs the lawyer-verified HLP baseline
+    # (backend/eval/hlp_nonobvious_baseline.json), emitted by
+    # run_nonobvious_recall_eval. The plotted aggregate is the WORST slice's
+    # recall (a minimum, never a mean), and the report carries per-slice detail
+    # sorted worst-first. Threshold 1.0: a single missed non-obvious requirement
+    # in any one slice must alert.
+    MetricSpec("nonobvious_recall", "Non-obvious recall (worst corridor \u00d7 employee-type slice)", 1.0),
     # Mission Control demand-triage accuracy (emitted by run_triage_eval): fraction
     # of demands classified to the right kind (bug/idea/quality/task).
     MetricSpec("triage_accuracy", "Demand triage accuracy", 0.85),
@@ -146,13 +158,18 @@ def load_live_reports(reports_dir: Path) -> Dict[str, List[Dict[str, Any]]]:
             logger.warning("rag_eval: skipping report %s (missing date or aggregate)", path.name)
             continue
         threshold = _SPEC_BY_KEY[metric_key].threshold
-        grouped.setdefault(metric_key, []).append(
-            {
-                "date": report_date.isoformat(),
-                "aggregate": round(float(aggregate), 4),
-                "passes_threshold": float(aggregate) >= threshold,
-            }
-        )
+        point: Dict[str, Any] = {
+            "date": report_date.isoformat(),
+            "aggregate": round(float(aggregate), 4),
+            "passes_threshold": float(aggregate) >= threshold,
+        }
+        # Sliced metrics (nonobvious_recall) carry per-slice detail worst-first
+        # plus the worst slice's identity; pass it through so the dashboard can
+        # show WHICH (corridor x employee_type) slice is failing, not a mean.
+        if isinstance(report.get("slices"), list):
+            point["slices"] = report["slices"]
+            point["worst_slice"] = report.get("worst_slice")
+        grouped.setdefault(metric_key, []).append(point)
 
     for points in grouped.values():
         points.sort(key=lambda p: p["date"])
@@ -169,7 +186,11 @@ _MOCK_VALUES: Dict[str, List[float]] = {
     "factual_consistency": [0.95, 0.96, 0.96, 0.97, 0.97, 0.96, 0.98, 0.97, 0.98, 0.98, 0.97, 0.98, 0.97],
     "outcome_accuracy": [0.88, 0.89, 0.91, 0.92, 0.93, 0.94, 0.95, 0.94, 0.95, 0.96, 0.95, 0.94, 0.93],
     "structuring_accuracy": [0.96, 0.97, 0.97, 0.98, 0.98, 0.99, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-    "roadmap_completeness": [0.82, 0.84, 0.85, 0.87, 0.88, 0.90, 0.91, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95],
+    # Worst-slice non-obvious recall. Ends below the 1.0 threshold on purpose:
+    # the mock demonstrates the exact story this metric exists for \u2014 one missed
+    # non-obvious requirement in one slice (see _MOCK_NONOBVIOUS_SLICES) pulls
+    # the worst slice, and only that slice, below target.
+    "nonobvious_recall": [0.75, 0.75, 0.8571, 0.8571, 0.8571, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.8571],
     "triage_accuracy": [0.86, 0.88, 0.89, 0.90, 0.92, 0.93, 0.95, 0.96, 0.97, 1.0, 1.0, 1.0, 1.0],
     "routing_accuracy": [0.92, 0.94, 0.94, 0.95, 0.97, 0.97, 0.97, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
     "answer_grounding": [0.90, 0.91, 0.92, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95, 0.95, 0.96, 0.96, 0.96],
@@ -188,6 +209,42 @@ _MOCK_VALUES: Dict[str, List[float]] = {
     "requirement_extraction_recall": [0.82, 0.84, 0.85, 0.86, 0.88, 0.89, 0.90, 0.91, 0.91, 0.92, 0.91, 0.91, 0.91],
 }
 _MOCK_WEEKS = 13
+
+# Deterministic per-slice detail for the mock nonobvious_recall metric: the six
+# active (corridor x employee_type) slices, sorted WORST-FIRST. One slice \u2014 the
+# priority ES\u2192IE non-EU passport holder (Madrid\u2192Dublin) \u2014 misses exactly one
+# non-obvious requirement, so its recall (6/7) is the worst-slice aggregate
+# while every other slice stays at 1.0.
+_MOCK_NONOBVIOUS_SLICES: List[Dict[str, Any]] = [
+    {"corridor": "ES_IE", "employee_type": "non_eu_passport_holder",
+     "label": "Spain \u2192 Ireland \u00b7 non-EU passport holder (priority \u2014 Madrid\u2192Dublin case)",
+     "recall": 0.8571, "served": 6, "total": 7,
+     "missing": ["d_visa_before_travel"], "n_roadmaps": 3, "hlp_status": "pending_lawyer_signoff"},
+    {"corridor": "ES_IE", "employee_type": "eu_national",
+     "label": "Spain \u2192 Ireland \u00b7 EU national",
+     "recall": 1.0, "served": 3, "total": 3, "missing": [], "n_roadmaps": 2,
+     "hlp_status": "pending_lawyer_signoff"},
+    {"corridor": "FR_NO", "employee_type": "eu_national",
+     "label": "France \u2192 Norway \u00b7 EU national",
+     "recall": 1.0, "served": 3, "total": 3, "missing": [], "n_roadmaps": 4,
+     "hlp_status": "pending_lawyer_signoff"},
+    {"corridor": "FR_NO", "employee_type": "non_eu_eea_national",
+     "label": "France \u2192 Norway \u00b7 non-EU EEA national",
+     "recall": 1.0, "served": 3, "total": 3, "missing": [], "n_roadmaps": 1,
+     "hlp_status": "pending_lawyer_signoff"},
+    {"corridor": "FR_NO", "employee_type": "non_eea_national",
+     "label": "France \u2192 Norway \u00b7 non-EEA national",
+     "recall": 1.0, "served": 3, "total": 3, "missing": [], "n_roadmaps": 1,
+     "hlp_status": "pending_lawyer_signoff"},
+    {"corridor": "NO_FR", "employee_type": "norwegian_national",
+     "label": "Norway \u2192 France \u00b7 Norwegian national (repatriation, SLB case)",
+     "recall": 1.0, "served": 8, "total": 8, "missing": [], "n_roadmaps": 1,
+     "hlp_status": "pending_lawyer_signoff"},
+]
+_MOCK_NONOBVIOUS_WORST: Dict[str, Any] = {
+    "corridor": "ES_IE", "employee_type": "non_eu_passport_holder",
+    "recall": 0.8571, "missing": ["d_visa_before_travel"],
+}
 
 
 def generate_mock_reports(end_date: date) -> Dict[str, List[Dict[str, Any]]]:
@@ -250,15 +307,23 @@ def build_dashboard(
     for spec in METRIC_SPECS:
         points = grouped.get(spec.key, [])
         latest = points[-1]["aggregate"] if points else None
-        metrics.append(
-            {
-                "metric": spec.key,
-                "label": spec.label,
-                "threshold": spec.threshold,
-                "points": points,
-                "latest": latest,
-                "alert": evaluate_alert(points, spec.threshold),
-            }
-        )
+        metric: Dict[str, Any] = {
+            "metric": spec.key,
+            "label": spec.label,
+            "threshold": spec.threshold,
+            "points": points,
+            "latest": latest,
+            "alert": evaluate_alert(points, spec.threshold),
+        }
+        # Surface per-slice detail (worst-first) for sliced metrics so the UI
+        # names the failing (corridor x employee_type) slice instead of hiding
+        # it behind an average.
+        if points and isinstance(points[-1].get("slices"), list):
+            metric["slices"] = points[-1]["slices"]
+            metric["worst_slice"] = points[-1].get("worst_slice")
+        elif source == "mock" and spec.key == "nonobvious_recall":
+            metric["slices"] = _MOCK_NONOBVIOUS_SLICES
+            metric["worst_slice"] = _MOCK_NONOBVIOUS_WORST
+        metrics.append(metric)
 
     return {"source": source, "metrics": metrics}

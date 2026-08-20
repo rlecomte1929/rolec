@@ -25,6 +25,30 @@ export interface RagEvalPoint {
   passes_threshold: boolean;
 }
 
+/**
+ * One (corridor x employee_type) slice of a sliced metric (nonobvious_recall).
+ * recall = non-obvious requirements correctly served / lawyer-verified HLP
+ * total for the slice; null means the slice has no produced roadmaps yet.
+ */
+export interface RagEvalSlice {
+  corridor: string;
+  employee_type: string;
+  label?: string | null;
+  recall: number | null;
+  served: number;
+  total: number;
+  missing: string[];
+  n_roadmaps: number;
+  hlp_status: string;
+}
+
+export interface RagEvalWorstSlice {
+  corridor: string;
+  employee_type: string;
+  recall: number;
+  missing?: string[];
+}
+
 export interface RagEvalMetric {
   metric: string;
   label: string;
@@ -32,6 +56,13 @@ export interface RagEvalMetric {
   points: RagEvalPoint[];
   latest: number | null;
   alert: RagEvalAlert;
+  /**
+   * Sliced metrics only (nonobvious_recall): per-slice recall sorted
+   * WORST-FIRST, plus the worst slice's identity. The plotted aggregate is the
+   * worst slice's recall \u2014 a minimum, never an average.
+   */
+  slices?: RagEvalSlice[];
+  worst_slice?: RagEvalWorstSlice | null;
 }
 
 export interface RagEvalDashboard {
