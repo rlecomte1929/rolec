@@ -275,3 +275,136 @@ def test_missing_migrations_dir_fails(monkeypatch, tmp_path):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setattr(sys, "argv", ["check_migration_drift.py", "--no-db"])
     assert cmd.main() == 1
+
+
+# ── --strict-unapplied — merged but never applied ──────────────────────────────
+#
+# The gap the scoped hard failures leave open. dead_fail and dup_fail only ever look at
+# the files a change ADDS, so nothing re-examines a migration after it merges. On
+# 2026-08-20 that hid 20261110000000 (#1902) and 20261111000000 (#1894): merged, never
+# applied, every check green, while an open PR read one of them in 51 places.
+#
+# `age_hours` is injected by monkeypatching git_added_at — these tests must not depend on
+# the real git history of the checkout they run in.
+
+import json  # noqa: E402
+import pytest  # noqa: E402
+
+
+def _baseline(tmp_path, versions: dict) -> str:
+    p = tmp_path / "baseline.json"
+    p.write_text(json.dumps({"versions": versions}))
+    return str(p)
+
+
+def _age(monkeypatch, hours):
+    """Pin every migration's apparent age. None = git could not answer."""
+    from datetime import datetime, timedelta, timezone
+    if hours is None:
+        monkeypatch.setattr(cmd, "git_added_at", lambda v, n: None)
+    else:
+        stamp = datetime.now(timezone.utc) - timedelta(hours=hours)
+        monkeypatch.setattr(cmd, "git_added_at", lambda v, n: stamp)
+
+
+def test_unapplied_migration_past_grace_fails(monkeypatch, tmp_path):
+    """The #1902/#1894 case: merged, unapplied, not parked, older than the grace window."""
+    _age(monkeypatch, 72)
+    rc = _run_main(
+        monkeypatch, tmp_path,
+        applied={"20261009000000": "winner"},
+        files=["20261009000000_winner.sql", "20261110000000_services_state_tenant_policies.sql"],
+        argv=["--strict-unapplied", "--baseline", _baseline(tmp_path, {})],
+    )
+    assert rc == 1
+
+
+def test_unapplied_migration_in_baseline_passes(monkeypatch, tmp_path):
+    """Same tree, but the version is consciously parked → excused."""
+    _age(monkeypatch, 72)
+    rc = _run_main(
+        monkeypatch, tmp_path,
+        applied={"20261009000000": "winner"},
+        files=["20261009000000_winner.sql", "20261110000000_services_state_tenant_policies.sql"],
+        argv=["--strict-unapplied", "--baseline",
+              _baseline(tmp_path, {"20261110000000": "parked for pre-launch triage"})],
+    )
+    assert rc == 0
+
+
+def test_unapplied_migration_inside_grace_passes(monkeypatch, tmp_path):
+    """Merged an hour ago: legitimately not applied yet, must not redden the job."""
+    _age(monkeypatch, 1)
+    rc = _run_main(
+        monkeypatch, tmp_path,
+        applied={"20261009000000": "winner"},
+        files=["20261009000000_winner.sql", "20261110000000_brand_new.sql"],
+        argv=["--strict-unapplied", "--baseline", _baseline(tmp_path, {}),
+              "--grace-hours", "24"],
+    )
+    assert rc == 0
+
+
+def test_unknown_age_is_not_a_silent_exemption(monkeypatch, tmp_path):
+    """git could not date the file. Unknown must fail, not quietly excuse."""
+    _age(monkeypatch, None)
+    rc = _run_main(
+        monkeypatch, tmp_path,
+        applied={"20261009000000": "winner"},
+        files=["20261009000000_winner.sql", "20261110000000_undatable.sql"],
+        argv=["--strict-unapplied", "--baseline", _baseline(tmp_path, {})],
+    )
+    assert rc == 1
+
+
+def test_missing_baseline_is_a_hard_error(monkeypatch, tmp_path):
+    """A guard that cannot find its baseline must stop, not assume nothing is parked."""
+    _age(monkeypatch, 72)
+    with pytest.raises(SystemExit) as exc:
+        _run_main(
+            monkeypatch, tmp_path,
+            applied={"20261009000000": "winner"},
+            files=["20261009000000_winner.sql", "20261110000000_thing.sql"],
+            argv=["--strict-unapplied", "--baseline", str(tmp_path / "nope.json")],
+        )
+    assert exc.value.code != 0
+
+
+def test_baseline_without_versions_key_is_a_hard_error(monkeypatch, tmp_path):
+    """An empty/garbage baseline must not read as 'nothing is parked'."""
+    _age(monkeypatch, 72)
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"oops": True}))
+    with pytest.raises(SystemExit) as exc:
+        _run_main(
+            monkeypatch, tmp_path,
+            applied={"20261009000000": "winner"},
+            files=["20261009000000_winner.sql", "20261110000000_thing.sql"],
+            argv=["--strict-unapplied", "--baseline", str(bad)],
+        )
+    assert exc.value.code != 0
+
+
+def test_without_the_flag_an_unapplied_migration_still_passes(monkeypatch, tmp_path):
+    """Existing behaviour is untouched: Direction B stays a warning by default."""
+    _age(monkeypatch, 72)
+    rc = _run_main(
+        monkeypatch, tmp_path,
+        applied={"20261009000000": "winner"},
+        files=["20261009000000_winner.sql", "20261110000000_services_state_tenant_policies.sql"],
+        argv=[],
+    )
+    assert rc == 0
+
+
+def test_write_baseline_captures_the_current_unapplied_set(monkeypatch, tmp_path):
+    """--write-baseline snapshots what is unapplied today, and exits 0."""
+    out = tmp_path / "generated.json"
+    rc = _run_main(
+        monkeypatch, tmp_path,
+        applied={"20261009000000": "winner"},
+        files=["20261009000000_winner.sql", "20261110000000_parked.sql"],
+        argv=["--strict-unapplied", "--write-baseline", str(out)],
+    )
+    assert rc == 0
+    assert json.loads(out.read_text())["versions"] == {"20261110000000": "parked"}
