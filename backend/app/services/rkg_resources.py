@@ -279,6 +279,14 @@ def resources_to_sections(
             content["topics"] = default_content["topics"]
         if key in ("housing", "daily_life", "community") and default_content.get("platforms"):
             content["platforms"] = default_content.get("platforms", [])
+        # [AIQ-1746] Carry the curated neighbourhood list through too. Without this
+        # the key vanishes the moment a country has ANY country_resources row: the
+        # legacy fallback path returns the default content whole (neighbourhoods
+        # included), while this path rebuilt `content` field by field and simply
+        # never copied it. Seeding a country therefore made its housing section
+        # LESS informative than leaving it empty.
+        if key == "housing" and default_content.get("neighborhoods"):
+            content["neighborhoods"] = default_content["neighborhoods"]
         if key == "schools" and default_content.get("school_types"):
             content["school_types"] = default_content["school_types"]
         if key == "cost_of_living" and default_content.get("items"):
