@@ -121,6 +121,24 @@ def list_sources(db: Session, country_code: str, limit: int = _DEFAULT_LIST_LIMI
     )
 
 
+def _has_citations(value: Any) -> bool:
+    """True when `value` carries at least one citation.
+
+    citations_json is stored as a JSON string but callers pass lists too, and prod holds
+    three interchangeable citation FORMATS (raw URLs, source_records uuids,
+    immigration_rule.* corpus refs) — so this deliberately counts entries and never
+    inspects their shape.
+    """
+    if value is None:
+        return False
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (ValueError, TypeError):
+            return bool(value.strip())
+    return bool(value)
+
+
 def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.RequirementItem:
     existing = (
         db.query(models.RequirementItem)
@@ -134,7 +152,21 @@ def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.Requ
         existing.severity = payload["severity"]
         existing.owner = payload["owner"]
         existing.required_fields_json = payload["required_fields_json"]
-        existing.citations_json = payload["citations_json"]
+        # citations_json follows the SAME rule as review_status below: curated provenance is
+        # an editorial fact about the row, not a property of the seed file. Never replace a
+        # citation with nothing.
+        #
+        # run_country_research() rebuilds these rows on every backend startup — so on every
+        # Render deploy — with citations_json = json.dumps(source_ids[:1]). source_ids is
+        # EMPTY whenever the StubResearchProvider returns nothing that passes
+        # _is_official_domain for that country, which is every SINGAPORE and UNITED STATES
+        # run. On 2026-08-20 that silently blanked a verified ICA citation applied hours
+        # earlier, and only the requirement-provenance guard caught it.
+        #
+        # An incoming citation still wins — this exempts nothing from legitimate updates, it
+        # only refuses the downgrade to empty.
+        if _has_citations(payload["citations_json"]) or not _has_citations(existing.citations_json):
+            existing.citations_json = payload["citations_json"]
         # AIQ-1349: keep the assignment-type applicability in sync on re-load.
         if "applies_to_assignment_types_json" in payload:
             existing.applies_to_assignment_types_json = payload["applies_to_assignment_types_json"]
