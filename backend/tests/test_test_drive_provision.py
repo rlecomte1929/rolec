@@ -218,37 +218,38 @@ class TestTestDriveProvision(unittest.TestCase):
         self.assertEqual(seed.call_args.args[0], "company-1")  # company_id
         self.assertEqual(seed.call_args.args[1], "NO")  # FR_NO → host_country
 
-    def test_seed_vendor_selections_issues_cvs_insert(self):
-        # [AIQ-1651] The helper INSERTs selected=true rows into company_vendor_selections,
-        # scoped to the destination country. (The mock harness has no live DB, so we assert the
-        # write is issued; the real rows are verified live in Phase 5.)
+    def test_seed_vendor_selections_delegates_with_the_testdrive_policy(self):
+        """[AIQ-1651/1903] The helper delegates to the shared seeder with default_selected=True.
+
+        The query itself moved to services/vendor_proposal.py so the real-company path cannot
+        drift from this one; what this caller still OWNS is the policy. A test-drive company is
+        a demo and must arrive with a populated marketplace, so it passes True — the real-company
+        caller passes False. What the query actually SELECTS is asserted against real Postgres in
+        backend/tests/postgres/test_vendor_selection_seed_postgres.py, which is the only place
+        jsonb and LEFT JOIN semantics can be checked honestly.
+        """
         from backend.app.routers import test_drive as td
-        db = MagicMock()
-        with patch.object(td, "db", db):
+        with patch.object(td.vendor_proposal, "seed_destination_proposal", return_value=3) as seed:
             td._seed_default_vendor_selections("company-1", "NO", "hr-1")
-        conn = db.engine.begin.return_value.__enter__.return_value
-        cvs_inserts = [
-            c for c in conn.execute.call_args_list
-            if "INSERT INTO company_vendor_selections" in str(c.args[0])
-        ]
-        self.assertEqual(len(cvs_inserts), 1)
-        self.assertEqual(cvs_inserts[0].args[1]["company_id"], "company-1")
-        self.assertEqual(cvs_inserts[0].args[1]["dest_country"], "NO")
+        seed.assert_called_once()
+        kwargs = seed.call_args.kwargs
+        self.assertEqual(kwargs["company_id"], "company-1")
+        self.assertEqual(kwargs["dest_country"], "NO")
+        self.assertEqual(kwargs["created_by"], "hr-1")
+        self.assertIs(kwargs["default_selected"], True)
 
     def test_seed_vendor_selections_skips_without_destination(self):
         # No destination country → no INSERT attempted, no raise.
         from backend.app.routers import test_drive as td
-        db = MagicMock()
-        with patch.object(td, "db", db):
+        with patch.object(td.vendor_proposal, "seed_destination_proposal") as seed:
             td._seed_default_vendor_selections("company-1", None, "hr-1")
-        db.engine.begin.assert_not_called()
+        seed.assert_not_called()
 
     def test_seed_vendor_selections_never_raises(self):
         # Best-effort: a seed failure must never break provisioning (logged loudly, not swallowed).
         from backend.app.routers import test_drive as td
-        db = MagicMock()
-        db.engine.begin.side_effect = RuntimeError("boom")
-        with patch.object(td, "db", db):
+        with patch.object(td.vendor_proposal, "seed_destination_proposal",
+                          side_effect=RuntimeError("boom")):
             td._seed_default_vendor_selections("company-1", "NO", "hr-1")  # must not raise
 
     def test_seed_vendor_selections_zero_rows_logs_loud_error(self):
@@ -256,9 +257,7 @@ class TestTestDriveProvision(unittest.TestCase):
         # seed prevents. It must be a LOUD structured ERROR naming company + corridor + destination,
         # never a quiet INFO (a silent empty marketplace becomes a false "no providers" verdict).
         from backend.app.routers import test_drive as td
-        db = MagicMock()
-        db.engine.begin.return_value.__enter__.return_value.execute.return_value.rowcount = 0
-        with patch.object(td, "db", db), \
+        with patch.object(td.vendor_proposal, "seed_destination_proposal", return_value=0), \
                 self.assertLogs("backend.app.routers.test_drive", level="ERROR") as logs:
             td._seed_default_vendor_selections("company-1", "ZZ", "hr-1", corridor="XX_ZZ")
         joined = "\n".join(logs.output)
@@ -269,9 +268,7 @@ class TestTestDriveProvision(unittest.TestCase):
     def test_seed_vendor_selections_success_log_names_corridor(self):
         # A successful seed logs the corridor too (structured observability).
         from backend.app.routers import test_drive as td
-        db = MagicMock()
-        db.engine.begin.return_value.__enter__.return_value.execute.return_value.rowcount = 9
-        with patch.object(td, "db", db), \
+        with patch.object(td.vendor_proposal, "seed_destination_proposal", return_value=9), \
                 self.assertLogs("backend.app.routers.test_drive", level="INFO") as logs:
             td._seed_default_vendor_selections("company-1", "NO", "hr-1", corridor="FR_NO")
         joined = "\n".join(logs.output)
