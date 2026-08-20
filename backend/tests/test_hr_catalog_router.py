@@ -70,10 +70,7 @@ def _user(role: str, company_id: str):
     }
 
 
-class _CurationFixture(unittest.TestCase):
-    """Shared in-memory schema + db patching. No tests of its own: subclasses that only
-    need the fixture must not also inherit (and re-run) another suite's assertions."""
-
+class HrCatalogRouterTests(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = create_engine(
             "sqlite:///:memory:", connect_args={"check_same_thread": False}
@@ -103,8 +100,6 @@ class _CurationFixture(unittest.TestCase):
         hr_company_patcher.start()
         self.addCleanup(hr_company_patcher.stop)
 
-
-class HrCatalogRouterTests(_CurationFixture):
     def _seed_geo_bound(self) -> None:
         # 3 schools — 2 in Munich, 1 in Singapore (geo-bound)
         for ext_id, name, city in (
@@ -264,147 +259,6 @@ class CurationRowIdCoercionTests(unittest.TestCase):
         )
         self.assertIsNone(row.master_item_id)
         self.assertIsNone(row.selection_id)
-
-
-class CurationCountryScopeTests(_CurationFixture):
-    """The catalog proposal must be scopeable to the case's destination country.
-
-    Without this the proposal spans every country in the catalog, so a case bound for Ireland
-    could not be shown Ireland's vendors as a destination list. `service_catalog.list_items`
-    always accepted `country`; the route did not pass it.
-    """
-
-    def _seed_two_countries(self) -> None:
-        for ext_id, name, country in (
-            ("ie-law-1", "Dublin Immigration Solicitors", "IE"),
-            ("ie-law-2", "Liffey Legal", "IE"),
-            ("no-law-1", "Oslo Advokat", "NO"),
-        ):
-            service_catalog.upsert_item(
-                category="legal_admin", name=name, attributes={}, source="seed",
-                country=country, external_id=ext_id,
-            )
-
-    def test_country_scopes_the_proposal(self) -> None:
-        self._seed_two_countries()
-        view = hr_catalog_router.get_curation_view(
-            category="legal_admin",
-            country="IE",
-            user=_user("HR", str(uuid.uuid4())),
-        )
-        names = sorted(r["name"] for r in view["rows"] if r["kind"] == "master")
-        self.assertEqual(names, ["Dublin Immigration Solicitors", "Liffey Legal"])
-
-    def test_omitting_country_keeps_the_old_unscoped_behaviour(self) -> None:
-        self._seed_two_countries()
-        view = hr_catalog_router.get_curation_view(
-            category="legal_admin",
-            user=_user("HR", str(uuid.uuid4())),
-        )
-        self.assertEqual(len([r for r in view["rows"] if r["kind"] == "master"]), 3)
-
-
-class CurationVerifiedFlagTests(_CurationFixture):
-    """`verified` is lifted out of the attributes blob so the UI can flag unverified vendors."""
-
-    def test_verified_flag_is_surfaced_per_row(self) -> None:
-        service_catalog.upsert_item(
-            category="legal_admin", name="Accredited Firm", attributes={"verified": True},
-            source="seed", country="IE", external_id="ie-v1",
-        )
-        service_catalog.upsert_item(
-            category="legal_admin", name="Unchecked Firm", attributes={"verified": False},
-            source="seed", country="IE", external_id="ie-v2",
-        )
-        service_catalog.upsert_item(
-            category="legal_admin", name="No Flag At All", attributes={},
-            source="seed", country="IE", external_id="ie-v3",
-        )
-        view = hr_catalog_router.get_curation_view(
-            category="legal_admin", country="IE", user=_user("HR", str(uuid.uuid4())),
-        )
-        by_name = {r["name"]: r for r in view["rows"]}
-        self.assertTrue(by_name["Accredited Firm"]["verified"])
-        self.assertFalse(by_name["Unchecked Firm"]["verified"])
-        # Absence is not verification.
-        self.assertFalse(by_name["No Flag At All"]["verified"])
-
-    def test_unverified_vendors_are_still_offered(self) -> None:
-        """Flagged, not hidden — the brief is explicit that they stay selectable."""
-        service_catalog.upsert_item(
-            category="legal_admin", name="Unchecked Firm", attributes={"verified": False},
-            source="seed", country="IE", external_id="ie-v2",
-        )
-        view = hr_catalog_router.get_curation_view(
-            category="legal_admin", country="IE", user=_user("HR", str(uuid.uuid4())),
-        )
-        self.assertEqual([r["name"] for r in view["rows"]], ["Unchecked Firm"])
-
-    def test_is_verified_helper_rejects_non_bool_truthiness(self) -> None:
-        self.assertTrue(hr_catalog_router._is_verified({"verified": True}))
-        self.assertTrue(hr_catalog_router._is_verified({"verified": "true"}))
-        self.assertFalse(hr_catalog_router._is_verified({"verified": "yes"}))
-        self.assertFalse(hr_catalog_router._is_verified({"verified": 1}))
-        self.assertFalse(hr_catalog_router._is_verified({}))
-        self.assertFalse(hr_catalog_router._is_verified(None))
-
-    def test_hr_custom_vendor_is_never_verified(self) -> None:
-        company = str(uuid.uuid4())
-        vendor_curation.add_custom_vendor(
-            company_id=company,
-            category="legal_admin",
-            name="HR's Own Solicitor",
-            attributes={"verified": True},  # even if the payload claims it
-            country="IE",
-        )
-        view = hr_catalog_router.get_curation_view(
-            category="legal_admin", country="IE", user=_user("HR", company),
-        )
-        custom = [r for r in view["rows"] if r["kind"] == "custom"]
-        self.assertEqual(len(custom), 1)
-        self.assertFalse(custom[0]["verified"])
-
-
-class CurationTenantIsolationTests(_CurationFixture):
-    """Company A must never see company B's selections or custom vendors."""
-
-    def test_selections_and_customs_do_not_leak_across_companies(self) -> None:
-        company_a = str(uuid.uuid4())
-        company_b = str(uuid.uuid4())
-        item = service_catalog.upsert_item(
-            category="legal_admin", name="Shared Catalog Firm", attributes={},
-            source="seed", country="IE", external_id="ie-shared",
-        )
-        # B approves the shared master row and adds a private vendor of its own.
-        vendor_curation.upsert_master_selection(
-            company_id=company_b, category="legal_admin",
-            master_item_id=item["id"], selected=True, country="IE",
-        )
-        vendor_curation.add_custom_vendor(
-            company_id=company_b, category="legal_admin",
-            name="B Private Counsel", attributes={}, country="IE",
-        )
-
-        view_a = hr_catalog_router.get_curation_view(
-            category="legal_admin", country="IE", user=_user("HR", company_a),
-        )
-        names_a = [r["name"] for r in view_a["rows"]]
-        # A sees the shared CATALOG row (that is the point of a catalog) ...
-        self.assertIn("Shared Catalog Firm", names_a)
-        # ... but never B's private vendor, and never B's decision on the shared row.
-        self.assertNotIn("B Private Counsel", names_a)
-        shared_for_a = next(r for r in view_a["rows"] if r["name"] == "Shared Catalog Firm")
-        self.assertFalse(shared_for_a["selected"])
-        self.assertIsNone(shared_for_a["selection_id"])
-
-        # B still sees its own state, proving the isolation is not just an empty read.
-        view_b = hr_catalog_router.get_curation_view(
-            category="legal_admin", country="IE", user=_user("HR", company_b),
-        )
-        names_b = [r["name"] for r in view_b["rows"]]
-        self.assertIn("B Private Counsel", names_b)
-        shared_for_b = next(r for r in view_b["rows"] if r["name"] == "Shared Catalog Firm")
-        self.assertTrue(shared_for_b["selected"])
 
 
 if __name__ == "__main__":

@@ -46,8 +46,6 @@ from sqlalchemy import text
 
 from ... import db_config
 from ...database import db
-from ..services import vendor_proposal
-from ..services.vendor_proposal import COMPLIANCE_CATEGORIES
 from ...db.test_data_filter import looks_like_test_company
 from ...rate_limit import limiter
 from ..services.test_drive_corridor import LOCKED_CORRIDORS, TEST_DRIVE_CORRIDOR_ROUTES
@@ -235,12 +233,32 @@ def _seed_default_published_policy(company_id: str, created_by: Optional[str]) -
         )
 
 
-# [AIQ-1903] The seeding query moved to services/vendor_proposal.py so the real-company
-# case-finalisation path and this test-drive path cannot drift apart. That module documents
-# what qualifies as a destination vendor and why; this caller only supplies the POLICY:
-# a test-drive company is a DEMO, so its marketplace must arrive populated (default_selected
-# =True), whereas a real company gets the same list proposed but unapproved.
-_COMPLIANCE_CATEGORIES = COMPLIANCE_CATEGORIES
+# [AIQ-1651] The engine's own candidate query: one selected=true CVS row per APPROVED supplier
+# whose registry capability serves the destination country (coverage 'global' OR country_code=dest)
+# and which has a service_catalog_items master. This is exactly the set the recommendations engine
+# would rank, so seeding it satisfies apply_hr_curation WITHOUT weakening the filter. destination_city
+# is left NULL (matches every city); idempotent via NOT EXISTS (the NULL city defeats the unique index).
+_SEED_VENDOR_SELECTIONS_SQL = """
+INSERT INTO company_vendor_selections
+    (company_id, category, master_item_id, selected, display_order, country, created_by_user_id)
+SELECT :company_id, sci.category, sci.id, true,
+       row_number() OVER (PARTITION BY sci.category ORDER BY s.name) - 1,
+       :dest_country, :created_by
+FROM service_catalog_items sci
+JOIN supplier_service_capabilities ssc
+      ON ssc.supplier_id = sci.supplier_id
+     AND ssc.service_category = sci.category
+JOIN suppliers s ON s.id = sci.supplier_id
+WHERE s.status = 'active'
+  AND sci.active = true
+  AND sci.supplier_id IS NOT NULL
+  AND ssc.platform_vetting_status = 'approved'
+  AND (ssc.coverage_scope_type = 'global' OR ssc.country_code = :dest_country)
+  AND NOT EXISTS (
+      SELECT 1 FROM company_vendor_selections cvs
+      WHERE cvs.company_id = :company_id AND cvs.master_item_id = sci.id
+  )
+"""
 
 
 def _seed_default_vendor_selections(
@@ -275,14 +293,12 @@ def _seed_default_vendor_selections(
         )
         return
     try:
-        seeded = vendor_proposal.seed_destination_proposal(
-            company_id=company_id,
-            dest_country=dest_country,
-            created_by=created_by,
-            # A demo must show a populated marketplace on arrival. Compliance categories are
-            # still held back unless a HUMAN verified them — see vendor_proposal.
-            default_selected=True,
-        )
+        with db.engine.begin() as conn:
+            result = conn.execute(
+                text(_SEED_VENDOR_SELECTIONS_SQL),
+                {"company_id": company_id, "dest_country": dest_country, "created_by": created_by},
+            )
+        seeded = getattr(result, "rowcount", None)
         if seeded == 0:
             # 0 selections → the tester sees an empty marketplace. Surface it LOUDLY + structured
             # (never a quiet INFO): a corridor whose destination has no approved suppliers with a
