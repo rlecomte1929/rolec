@@ -1,0 +1,80 @@
+{
+ "table": "evidence_types",
+ "sqlName": "app_evidence_types",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 6,
+ "rows": [
+  {
+   "id": 1,
+   "code": "document_submission",
+   "name": "Document Submission",
+   "description": "The applicant uploads a scanned or photographed copy of a physical document. Satisfied when the document is accepted by a GlobeIQ coordinator.",
+   "requires_document_upload": true,
+   "requires_authority_confirmation": false,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:37:22.055Z",
+   "updated_at": "2026-07-01T21:37:22.055Z"
+  },
+  {
+   "id": 2,
+   "code": "appointment_completion",
+   "name": "Appointment Completion",
+   "description": "The applicant attends a scheduled appointment at an authority office (police station, tax office, etc.). Satisfied when the appointment record is confirmed complete.",
+   "requires_document_upload": false,
+   "requires_authority_confirmation": true,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:37:22.087Z",
+   "updated_at": "2026-07-01T21:37:22.087Z"
+  },
+  {
+   "id": 3,
+   "code": "authority_confirmation",
+   "name": "Authority Confirmation",
+   "description": "The authority issues a formal confirmation letter or digital record. Satisfied when the confirmation document is received and uploaded.",
+   "requires_document_upload": true,
+   "requires_authority_confirmation": true,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:37:22.118Z",
+   "updated_at": "2026-07-01T21:37:22.118Z"
+  },
+  {
+   "id": 4,
+   "code": "online_form_submission",
+   "name": "Online Form Submission",
+   "description": "The applicant completes and submits an online form through an authority portal. Satisfied when a submission reference number is recorded.",
+   "requires_document_upload": false,
+   "requires_authority_confirmation": false,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:37:22.149Z",
+   "updated_at": "2026-07-01T21:37:22.149Z"
+  },
+  {
+   "id": 5,
+   "code": "payment_receipt",
+   "name": "Payment Receipt",
+   "description": "Proof that a required fee has been paid (visa fee, registration fee, etc.). Satisfied when a payment receipt is uploaded.",
+   "requires_document_upload": true,
+   "requires_authority_confirmation": false,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:37:22.180Z",
+   "updated_at": "2026-07-01T21:37:22.180Z"
+  },
+  {
+   "id": 6,
+   "code": "biometric_capture",
+   "name": "Biometric Capture",
+   "description": "The applicant attends an appointment for fingerprints, photo, or other biometric data collection. Satisfied when the authority confirms capture is complete.",
+   "requires_document_upload": false,
+   "requires_authority_confirmation": true,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:37:22.211Z",
+   "updated_at": "2026-07-01T21:37:22.211Z"
+  }
+ ]
+}

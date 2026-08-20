@@ -1,0 +1,37 @@
+{
+ "table": "kg_case_verification_reports",
+ "sqlName": "app_kg_case_verification_reports",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 1,
+ "rows": [
+  {
+   "id": "2026-07-15-fr-no-f",
+   "corridor_id": "FR-NO",
+   "employee_type_id": "eu-national",
+   "session_date": "2026-07-15T00:00:00.000Z",
+   "user_name": "Founder",
+   "user_role": "Founder / Internal Verification",
+   "user_company_size": "1-10",
+   "requirements_correct": [
+    "FR-NO-eu-national-immigration-001",
+    "FR-NO-eu-national-tax-001",
+    "FR-NO-eu-national-banking-001",
+    "FR-NO-eu-national-employer_compliance-001"
+   ],
+   "requirements_missed": [],
+   "requirements_wrong": [],
+   "non_obvious_items_confirmed": [
+    "FR-NO-eu-national-immigration-001",
+    "FR-NO-eu-national-banking-001"
+   ],
+   "relief_moment_yes": true,
+   "relief_moment_quote": "I had no idea the police registration slots fill up weeks in advance. I would have tried to book it after settling in and missed the window entirely.",
+   "practical_realities_gaps": "Bank account opening timelines vary significantly by branch and individual advisor. Some branches require a second appointment.",
+   "corrections_to_apply": "Add note that some banks (e.g. Handelsbanken) require an employer introduction letter, not just an employment contract.",
+   "gold_exemplar": true,
+   "session_id": null,
+   "created_at": "2026-08-18T08:47:52.969Z",
+   "updated_at": "2026-08-18T08:47:52.969Z"
+  }
+ ]
+}
