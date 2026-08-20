@@ -56,9 +56,15 @@ class TestEvaluate:
 
 
 class TestBaselineFile:
-    def test_baseline_parses_and_is_the_frozen_29(self):
+    def test_baseline_parses_and_only_shrinks(self):
+        """No hard-coded count: the baseline SHRINKS as rows are cited or demoted (29 on
+        2026-08-20, 18 once 20261112000000 was applied). Asserting an exact number would
+        force a test edit on every prune and tempt someone to grow it instead. Assert the
+        shape and the direction of travel instead."""
         ids = guard.load_baseline()
-        assert len(ids) == 29, "baseline should hold the 29 rows measured on prod 2026-08-20"
+        assert ids, "baseline should not be empty while known debt remains"
+        assert len(ids) <= 29, "baseline must never grow beyond the 2026-08-20 measurement"
+        assert all(len(i) == 36 and i.count("-") == 4 for i in ids), "ids must be uuids"
         assert BASELINE_ID in ids
 
     def test_baseline_ignores_comments_and_blanks(self, tmp_path):

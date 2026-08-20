@@ -1,41 +1,30 @@
 # Served requirement_items that carry NO citation, as measured on prod 2026-08-20.
 #
 # scripts/check_requirement_provenance.py fails on any served-but-uncited row whose id is
-# NOT in this list. These 29 are the pre-existing debt; the guard exists to stop the set
+# NOT in this list. These are the pre-existing debt; the guard exists to stop the set
 # GROWING while they are worked off.
 #
 # Remove an id when the row is cited or demoted. The guard reports ids here that no longer
 # violate, so this file cannot silently rot.
 #
-# 20261112000000_cite_served_requirement_items.sql cites 8 of these and demotes 3; their
-# ids stay listed until that migration is APPLIED to prod (merging is not applying here).
+# Pruned 2026-08-20 after 20261112000000_cite_served_requirement_items.sql was applied to
+# prod: 8 rows cited, 3 demoted, so 11 ids left this list. 29 -> 18.
 #
 # format: <id>  # <country> — <title>
 
 e1d0a1c0-0001-5000-8000-000000000001  # GERMANY — Employment letter
 e1d0a1c0-0001-5000-8000-000000000005  # GERMANY — Long-term rental contract (Mietvertrag)
-e1d0a1c0-0001-5000-8000-000000000002  # GERMANY — Minimum lead time
-e1d0a1c0-0001-5000-8000-000000000003  # GERMANY — Residence registration (Anmeldung)
 e1d0a1c0-0001-5000-8000-000000000004  # GERMANY — Social security registration (Sozialversicherung)
 e1d0a1c0-0001-5000-8000-000000000006  # GERMANY — Valid passport (6+ months)
-e1d0a1c0-0001-5000-8000-000000000007  # GERMANY — Work visa / residence permit (Aufenthaltstitel)
 eddd79a9-efb9-5667-82b6-88de2aff6443  # NORWAY — Long-term housing contract
 893b7866-15bb-4d25-8830-a8027724b8b4  # SINGAPORE — Employment letter
-03d796ee-9f56-5a13-bf77-e09f66c414c5  # SINGAPORE — Long-term pass registration (ICA)
-24c19002-b9a7-5de5-bf76-d067d53ff504  # SINGAPORE — Long-term pass registration (ICA)
-f179d500-fd03-493b-ba4b-d5e4d35377da  # SINGAPORE — Minimum lead time
 4f68a589-f70b-5e89-8442-f86686d6b176  # SINGAPORE — Tax reference registration (IRAS)
 e31605c2-d94a-55ea-8197-32d9ecd8bb12  # SINGAPORE — Tax reference registration (IRAS)
 e01ea767-1656-5c04-b3fe-ecaf993e2a29  # SINGAPORE — Tenancy agreement (12-month+)
 2bd170a3-e7c3-516b-ba55-caa56056cc01  # SINGAPORE — Tenancy agreement (12-month+)
-259515dd-cb55-4c58-95b1-6d568cf3ece9  # SINGAPORE — Valid passport (6+ months)
-2a3e4f76-da81-5452-8622-2253207898c0  # UNITED KINGDOM — Long-term tenancy agreement (AST)
-f1d1800c-ba32-573e-90f9-7d8431a744b1  # UNITED KINGDOM — National Insurance number registration
-bfbb2f05-ab0f-5cad-91be-bca41ece28d6  # UNITED KINGDOM — Residence permit / eVisa activation
 05f267da-f763-468f-be37-40f8b60aecb2  # UNITED STATES — Employment letter
 48682196-4ee6-5349-ac1a-5cfaeb689c58  # UNITED STATES — Long-term lease agreement
 14f8bfd7-b7fc-512a-a906-57ed92a9f832  # UNITED STATES — Long-term lease agreement
-bdfa3247-3570-4681-972d-a0a8b0df675a  # UNITED STATES — Minimum lead time
 42878466-59df-519e-8067-b4d4a00c858f  # UNITED STATES — Social Security Number (SSN) registration
 7f79ffd2-9403-593f-bd67-2641b81b5ea7  # UNITED STATES — Social Security Number (SSN) registration
 1582245b-0f52-5554-8e60-426c01c63aeb  # UNITED STATES — State residency registration
