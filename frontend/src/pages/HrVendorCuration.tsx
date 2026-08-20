@@ -1052,23 +1052,6 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
                           {tag}
                         </span>
                       ))}
-                      {row.verified ? (
-                        <span
-                          className="ml-2 inline-flex items-center rounded-full bg-[#eaf5f4] px-2 py-0.5 text-[11px] font-semibold text-[#1f8e8b]"
-                          title="ReloPass has confirmed this provider's accreditation."
-                        >
-                          Verified
-                        </span>
-                      ) : (
-                        // Flagged, never hidden: an unverified provider stays selectable, but HR
-                        // must be able to see that nobody has checked its accreditation yet.
-                        <span
-                          className="ml-2 inline-flex items-center rounded-full border border-[#fde68a] bg-[#fef9c3] px-2 py-0.5 text-[11px] font-medium text-[#854d0e]"
-                          title="Pending ReloPass verification — confirm accreditation before relying on this provider."
-                        >
-                          Pending verification
-                        </span>
-                      )}
                       {row.source === 'hr_promoted' && (
                         <span className="ml-2 text-xs text-[#94a3b8]">Added by your team</span>
                       )}
