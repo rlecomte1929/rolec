@@ -1,0 +1,78 @@
+{
+ "table": "programs",
+ "sqlName": "app_programs",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 7,
+ "rows": [
+  {
+   "id": 1,
+   "code": "WORK",
+   "name": "Work",
+   "description": "Immigration for the purpose of employment or self-employment. Covers skilled worker visas, intra-company transfers, EEA free movement for employment, and EU Blue Card routes.",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:30.998Z",
+   "updated_at": "2026-07-01T21:36:30.998Z"
+  },
+  {
+   "id": 2,
+   "code": "STUDY",
+   "name": "Study",
+   "description": "Immigration for the purpose of full-time education. Covers university enrollment, research, and vocational training.",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:31.031Z",
+   "updated_at": "2026-07-01T21:36:31.031Z"
+  },
+  {
+   "id": 3,
+   "code": "FAMILY",
+   "name": "Family Reunification",
+   "description": "Immigration to join a family member who is a national of or legally resident in the destination country.",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:31.062Z",
+   "updated_at": "2026-07-01T21:36:31.062Z"
+  },
+  {
+   "id": 4,
+   "code": "INVESTOR",
+   "name": "Investor / Golden Visa",
+   "description": "Immigration based on significant investment in the destination country's economy.",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:31.094Z",
+   "updated_at": "2026-07-01T21:36:31.094Z"
+  },
+  {
+   "id": 5,
+   "code": "DIGITAL_NOMAD",
+   "name": "Digital Nomad",
+   "description": "Immigration for remote workers employed by companies outside the destination country.",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:31.125Z",
+   "updated_at": "2026-07-01T21:36:31.125Z"
+  },
+  {
+   "id": 6,
+   "code": "PERM_RESIDENCE",
+   "name": "Permanent Residence",
+   "description": "Application for permanent residency status after satisfying qualifying period requirements.",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:31.157Z",
+   "updated_at": "2026-07-01T21:36:31.157Z"
+  },
+  {
+   "id": 7,
+   "code": "CITIZENSHIP",
+   "name": "Citizenship / Naturalisation",
+   "description": "Application for citizenship through naturalisation after meeting residency, language, and integration requirements.",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:31.188Z",
+   "updated_at": "2026-07-01T21:36:31.188Z"
+  }
+ ]
+}
