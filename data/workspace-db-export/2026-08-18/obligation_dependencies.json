@@ -1,0 +1,105 @@
+{
+ "table": "obligation_dependencies",
+ "sqlName": "app_obligation_dependencies",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 7,
+ "rows": [
+  {
+   "id": 1,
+   "obligation_id": 2,
+   "depends_on_obligation_id": 1,
+   "edge_type": "informs",
+   "condition": null,
+   "notes": "Police registration requires the employment contract as a supporting document. The contract informs the registration but does not technically block it at the legal level — however best practice is to have it in hand.",
+   "session_id": null,
+   "created_at": "2026-07-01T21:39:05.655Z",
+   "updated_at": "2026-07-01T21:39:05.655Z"
+  },
+  {
+   "id": 2,
+   "obligation_id": 3,
+   "depends_on_obligation_id": 2,
+   "edge_type": "blocks",
+   "condition": {
+    "op": "AND",
+    "conditions": [
+     {
+      "field": "case.expected_duration_days",
+      "value": 90,
+      "operator": "gt",
+      "description": "D-number via police registration route only applies for stays >3 months requiring police registration"
+     }
+    ]
+   },
+   "notes": "For stays >3 months: police registration completion is required before D-number application via the police-route process. For shorter stays, D-number can be applied for directly at Skatteetaten without police registration.",
+   "session_id": null,
+   "created_at": "2026-07-01T21:39:05.692Z",
+   "updated_at": "2026-07-01T21:39:05.692Z"
+  },
+  {
+   "id": 3,
+   "obligation_id": 4,
+   "depends_on_obligation_id": 3,
+   "edge_type": "blocks",
+   "condition": null,
+   "notes": "Tax card application requires a D-number. Skatteetaten will not issue a tax card without a valid D-number or permanent fødselsnummer. This is a hard system block.",
+   "session_id": null,
+   "created_at": "2026-07-01T21:39:05.725Z",
+   "updated_at": "2026-07-01T21:39:05.725Z"
+  },
+  {
+   "id": 4,
+   "obligation_id": 5,
+   "depends_on_obligation_id": 3,
+   "edge_type": "blocks",
+   "condition": null,
+   "notes": "Norwegian banks require a D-number as KYC identification for non-resident account opening. This is a hard requirement enforced by all major Norwegian banks under AML regulations.",
+   "session_id": null,
+   "created_at": "2026-07-01T21:39:05.757Z",
+   "updated_at": "2026-07-01T21:39:05.757Z"
+  },
+  {
+   "id": 5,
+   "obligation_id": 6,
+   "depends_on_obligation_id": 2,
+   "edge_type": "informs",
+   "condition": {
+    "op": "AND",
+    "conditions": [
+     {
+      "field": "case.expected_duration_days",
+      "value": 183,
+      "operator": "gte",
+      "description": "National registry only applies for stays >= 6 months"
+     }
+    ]
+   },
+   "notes": "National registry registration is an extension of the police registration process for long-term residents. Police registration certificate (registreringsbevis) is required as a supporting document for Folkeregisteret registration.",
+   "session_id": null,
+   "created_at": "2026-07-01T21:39:05.789Z",
+   "updated_at": "2026-07-01T21:39:05.789Z"
+  },
+  {
+   "id": 6,
+   "obligation_id": 4,
+   "depends_on_obligation_id": 1,
+   "edge_type": "informs",
+   "condition": null,
+   "notes": "Employment contract is required as documentation when applying for the tax card — demonstrates to Skatteetaten the basis of income and expected salary for withholding rate calculation.",
+   "session_id": null,
+   "created_at": "2026-07-01T21:39:05.820Z",
+   "updated_at": "2026-07-01T21:39:05.820Z"
+  },
+  {
+   "id": 7,
+   "obligation_id": 5,
+   "depends_on_obligation_id": 4,
+   "edge_type": "parallel",
+   "condition": null,
+   "notes": "Bank account opening and tax card can be pursued in parallel once D-number is obtained. Tax card is the higher priority — the bank account can be opened after the tax card application is submitted but before it arrives.",
+   "session_id": null,
+   "created_at": "2026-07-01T21:39:05.852Z",
+   "updated_at": "2026-07-01T21:39:05.852Z"
+  }
+ ]
+}

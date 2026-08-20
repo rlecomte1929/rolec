@@ -1,0 +1,99 @@
+{
+ "table": "kg_requirement_sources",
+ "sqlName": "app_kg_requirement_sources",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 7,
+ "rows": [
+  {
+   "id": 1,
+   "requirement_id": "FR-NO-eu-national-immigration-001",
+   "source_type": "government",
+   "url": "https://www.politiet.no/en/services/passports-and-id/eu-eea-registration/",
+   "title": "Norwegian Police — EU/EEA Registration Requirements",
+   "accessed_date": "2026-08-01T00:00:00.000Z",
+   "excerpt": "EU/EEA nationals who intend to stay in Norway for more than three months must register with the police.",
+   "is_primary": true,
+   "session_id": null,
+   "created_at": "2026-08-18T08:47:51.683Z",
+   "updated_at": "2026-08-18T08:47:51.683Z"
+  },
+  {
+   "id": 2,
+   "requirement_id": "FR-NO-eu-national-immigration-001",
+   "source_type": "user_case",
+   "url": null,
+   "title": "Founder case verification — Internal FR-NO walkthrough",
+   "accessed_date": "2026-07-15T00:00:00.000Z",
+   "excerpt": "Appointment slots at Oslo police were fully booked 7 weeks out when we checked on July 10. Booked on Day 1 of arrival to secure a slot within the 3-month window.",
+   "is_primary": false,
+   "session_id": null,
+   "created_at": "2026-08-18T08:47:51.683Z",
+   "updated_at": "2026-08-18T08:47:51.683Z"
+  },
+  {
+   "id": 3,
+   "requirement_id": "FR-NO-eu-national-tax-001",
+   "source_type": "government",
+   "url": "https://www.skatteetaten.no/en/person/foreign/d-number/",
+   "title": "Skatteetaten — D-number for foreign nationals",
+   "accessed_date": "2026-08-01T00:00:00.000Z",
+   "excerpt": "A D-number is a temporary identification number that is assigned to foreign nationals who are not required to be registered in the National Registry.",
+   "is_primary": true,
+   "session_id": null,
+   "created_at": "2026-08-18T08:47:51.683Z",
+   "updated_at": "2026-08-18T08:47:51.683Z"
+  },
+  {
+   "id": 4,
+   "requirement_id": "FR-NO-eu-national-banking-001",
+   "source_type": "industry",
+   "url": "https://www.dnb.no/en/personal/become-a-customer.html",
+   "title": "DNB Bank — Become a customer (English)",
+   "accessed_date": "2026-08-01T00:00:00.000Z",
+   "excerpt": "To open an account with DNB, you will need: valid ID, Norwegian D-number or national identity number, and Norwegian address.",
+   "is_primary": true,
+   "session_id": null,
+   "created_at": "2026-08-18T08:47:51.683Z",
+   "updated_at": "2026-08-18T08:47:51.683Z"
+  },
+  {
+   "id": 5,
+   "requirement_id": "FR-NO-non-eu-national-immigration-001",
+   "source_type": "government",
+   "url": "https://www.udi.no/en/want-to-apply/work-immigration/skilled-workers/",
+   "title": "UDI — Skilled Workers Permit",
+   "accessed_date": "2026-08-01T00:00:00.000Z",
+   "excerpt": "Processing time for skilled worker applications is normally 1-4 months. Applications from employers with approved fast-track schemes are typically decided within 3-5 weeks.",
+   "is_primary": true,
+   "session_id": null,
+   "created_at": "2026-08-18T08:47:51.683Z",
+   "updated_at": "2026-08-18T08:47:51.683Z"
+  },
+  {
+   "id": 6,
+   "requirement_id": "FR-NO-non-eu-national-immigration-002",
+   "source_type": "government",
+   "url": "https://www.norway.no/en/france/services-info/visas-residence/",
+   "title": "Norwegian Embassy Paris — Visas and Residence Permits",
+   "accessed_date": "2026-08-01T00:00:00.000Z",
+   "excerpt": "Once your permit has been approved by the UDI, you must collect your residence card at this embassy before travelling to Norway.",
+   "is_primary": true,
+   "session_id": null,
+   "created_at": "2026-08-18T08:47:51.683Z",
+   "updated_at": "2026-08-18T08:47:51.683Z"
+  },
+  {
+   "id": 7,
+   "requirement_id": "FR-NO-eu-national-employer_compliance-001",
+   "source_type": "government",
+   "url": "https://www.nav.no/en/home/work-and-stay-in-norway/employer",
+   "title": "NAV — Employer obligations in Norway",
+   "accessed_date": "2026-08-01T00:00:00.000Z",
+   "excerpt": "Employers must report all employment relationships to the Norwegian Tax Administration via the A-melding scheme before the employee's first working day.",
+   "is_primary": true,
+   "session_id": null,
+   "created_at": "2026-08-18T08:47:51.683Z",
+   "updated_at": "2026-08-18T08:47:51.683Z"
+  }
+ ]
+}
