@@ -933,6 +933,45 @@ jobs:
           fi
           echo "OK — no added version collides with origin/main."
 
+  requirement-provenance:
+    # Trust-architecture guard, data side. requirements_builder serves rows with
+    # review_status='approved'; on 2026-08-20 that was 89 rows, 29 of them with NO
+    # citation, every one marked verification_status='representative' — a status
+    # backend/app/services/disclaimers.py defines as "curated + CITED". They advertised
+    # a provenance they did not have, and a German employee saw 8 requirements of which
+    # 7 cited nothing.
+    #
+    # Unlike the form-template honesty guard, this one queries the DATABASE rather than
+    # parsing migrations, and for the reason that guard gives for doing the opposite:
+    # the authoring surface decides. Exactly ONE migration in the tree inserts into
+    # requirement_items — the rows arrive via scripts/import_otto_facts.py,
+    # ingest_immigration_seed.py, seed_additional_countries.py and operator-run loads.
+    # So a static check would cover almost nothing.
+    #
+    # Gated on the same read-only secret as the RLS-coverage and migration-drift jobs;
+    # a no-op where that secret is not configured. The pure diff logic is unit-tested on
+    # every PR by backend/tests/test_requirement_provenance_guard.py, which proves a new
+    # uncited served row FAILS and a baseline row does not.
+    #
+    # KNOWN LIMIT: prod data also changes out-of-band, which no PR-triggered job sees.
+    # A scheduled run would close that gap and is the natural next step.
+    name: Requirement provenance guard
+    needs: changes
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install --quiet psycopg2-binary==2.9.9
+      - name: Check served requirements carry a citation
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/check_requirement_provenance.py
+
   canonical-case-id-drift:
     # AIQ-1731: fail when prod grows a NEW bad case_assignments.canonical_case_id
     # (NULL/blank, dangling, or duplicate). The column is nullable with no FK and
