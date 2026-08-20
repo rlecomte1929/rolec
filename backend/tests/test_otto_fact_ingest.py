@@ -312,6 +312,95 @@ def test_admitting_the_dk_de_bodies_did_not_admit_the_whole_tld(tmp_path):
     assert classify_source("https://notskat.dk/tax") == UNOFFICIAL
     assert classify_source("https://not-rundfunkbeitrag.de/fee") == UNOFFICIAL
     assert classify_source("https://fake-borger.dk/mitid") == UNOFFICIAL
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.boe.es/buscar/act.php?id=BOE-A-2000-544",
+        "https://www.seg-social.es/wps/portal/wss/internet/Trabajadores",
+        "https://www.agenciatributaria.es/AEAT.internet/Inicio.shtml",
+        "https://www.policia.es/_es/extranjeria_documentacion.php",
+        "https://www.sepe.es/HomeSepe/en/Personas.html",
+        # Bare host and http, to prove the match is on the hostname and not the full URL.
+        "seg-social.es/wps/portal/wss/internet/Inicio",
+        "http://boe.es/diario_boe/",
+    ],
+)
+def test_the_spanish_statutory_bodies_are_official(url):
+    """Spain was recognised only through the `gob.es` suffix, so every statutory body that
+    does not sit under `gob.es` scored UNOFFICIAL and was rejected outright.
+
+    Two of these are worth naming individually. `boe.es` is the Boletín Oficial del Estado,
+    which publishes the law itself — the direct counterpart of `legifrance.gouv.fr` and
+    `lovdata.no`, both of which were already allowlisted; Spain's state gazette being scored
+    as a relocation blog is the starkest gap in the set. And the AEAT was *half* admitted:
+    `agenciatributaria.gob.es` (the sede) passed on the suffix while `agenciatributaria.es`
+    did not, so whether a tax fact survived depended on which of the agency's own two domains
+    the researcher happened to cite.
+
+    All five publish their own rule rather than restating one, which is what puts them here
+    and not in `_SEMI_OFFICIAL_HOSTS`: the BOE is the gazette of record, the Seguridad Social
+    administers and publishes social security registration, the AEAT is the tax authority,
+    the Policía Nacional issues the NIE and TIE, and the SEPE is the state employment service.
+    """
+    assert classify_source(url) == OFFICIAL
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.madrid.es/portales/munimadrid/es/Inicio/El-Ayuntamiento/Padron",
+        "https://sede.madrid.es/portal/site/tramites",
+        "https://www.barcelona.cat/es/canals-window/padro-municipal",
+        "http://barcelona.cat/",
+    ],
+)
+def test_the_spanish_municipal_padron_offices_are_official(url):
+    """The padrón is a core relocation step and the town hall is the body that runs it.
+
+    Same call as `service.berlin.de` above: a municipality publishing its own registration
+    procedure is the publisher of that procedure, not a portal restating someone else's rule.
+    Left unlisted, `.es` and `.cat` carry no governmental suffix, so both town halls scored
+    UNOFFICIAL and the padrón vanished from any ES-side deliverable.
+
+    Named hosts only — Madrid and Barcelona. A third city is a decision, not a silent
+    addition.
+    """
+    assert classify_source(url) == OFFICIAL
+
+
+def test_admitting_the_spanish_bodies_did_not_admit_the_whole_es_tld():
+    """The fix is named hostnames, not an `.es`/`.cat` suffix.
+
+    `.es` is an open commercial TLD and `.cat` is a *linguistic* one — neither says anything
+    about who published the page, which is the whole basis of the gate.
+    """
+    assert classify_source("https://madrid-relocation.es/guide") == UNOFFICIAL
+    assert classify_source("https://www.spanish-immigration-lawyers.es/nie") == UNOFFICIAL
+    assert classify_source("https://barcelona-relocation.cat/guide") == UNOFFICIAL
+    # Nor a lookalike that merely ends with the string.
+    assert classify_source("https://fake-madrid.es/padron") == UNOFFICIAL
+    assert classify_source("https://notseg-social.es/afiliacion") == UNOFFICIAL
+    assert classify_source("https://not-policia.es/nie") == UNOFFICIAL
+    assert classify_source("https://notboe.es/diario") == UNOFFICIAL
+
+
+def test_a_spanish_fact_reaches_the_staging_rows_instead_of_the_rejection_list(tmp_path):
+    """End to end through `read_jsonl` — the gate has to admit the ROW, not just the URL."""
+    path = _write(tmp_path, [_record(
+        destination_country="ES",
+        entity_topic_key="social_security_registration",
+        fact_key="ssNumberWhereToApply",
+        source_url="https://www.seg-social.es/wps/portal/wss/internet/Trabajadores",
+    )])
+    rows, rejections = read_jsonl(path, batch_id="es-1")
+
+    assert rejections == []
+    assert len(rows) == 1
+    assert rows[0].source_class == OFFICIAL
+    # Official publisher AND a quotable line of evidence, so this one clears the bar.
+    assert rows[0].accuracy_tier == TIER_AUTO
+
+
 
 
 def test_a_fact_with_no_evidence_quote_cannot_be_auto_accepted(tmp_path):
