@@ -142,6 +142,15 @@ def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.Requ
             existing.applies_to_nationality_classes_json = payload["applies_to_nationality_classes_json"]
         if "verification_status" in payload:
             existing.verification_status = payload["verification_status"]
+        # non_obvious / timing were added by 20261103000000 and this update branch never
+        # learned about them: they were set on INSERT and silently dropped on every re-load,
+        # so correcting a deadline in a seed file changed nothing for an existing row.
+        # Guarded with `in payload` like the two above, so a caller that does not manage
+        # these columns cannot blank them.
+        if "non_obvious" in payload:
+            existing.non_obvious = payload["non_obvious"]
+        if "timing" in payload:
+            existing.timing = payload["timing"]
         # review_status is deliberately NOT synced here. It is an admin decision about an
         # existing row, not a property of the seed file, and re-running any YAML seed would
         # otherwise silently un-approve live content — germany.yaml alone owns 16 rows. Set on
