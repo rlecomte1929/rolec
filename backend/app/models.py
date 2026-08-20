@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey, JSON, Uuid
+from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey, JSON, UniqueConstraint, Uuid
 from sqlalchemy.sql import func
 from .db import Base
 
@@ -99,6 +99,23 @@ class SourceRecord(Base):
 
 class RequirementItem(Base):
     __tablename__ = "requirement_items"
+    # Corridor-import idempotency (the 2026-08-15 FR→NO double-import incident): the
+    # natural key the crud.create_requirement_item upsert matches on is enforced by the
+    # DATABASE, not just by application code. Two racing imports both pre-select nothing
+    # and would both insert; a writer that bypasses the funnel duplicates freely; and
+    # once duplicates exist, .first() serves an arbitrary one of them. With this
+    # constraint a duplicate import physically cannot insert a second row for the same
+    # (country_code, purpose, title) — crud inserts with ON CONFLICT DO NOTHING pinned
+    # to this key. Production Postgres gets the same index (after a dedupe) from
+    # migration 20261117000000; SQLite test databases get it from this declaration.
+    __table_args__ = (
+        UniqueConstraint(
+            "country_code",
+            "purpose",
+            "title",
+            name="uq_requirement_items_country_purpose_title",
+        ),
+    )
 
     id = Column(String, primary_key=True, index=True)
     country_code = Column(String, index=True)

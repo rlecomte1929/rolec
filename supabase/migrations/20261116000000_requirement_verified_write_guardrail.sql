@@ -20,7 +20,7 @@
 -- requirement_items already exists with RLS; new columns need no policy. Idempotent.
 --
 -- guard: column-read-ok this migration is applied to production by the operator BEFORE the
--- PR is merged (psql -f + `supabase migration repair --status applied 20261108000000`),
+-- PR is merged (psql -f + `supabase migration repair --status applied 20261116000000`),
 -- same procedure as 20261103000000 / 20261104000000. The DTO readers are additionally
 -- getattr-defaulted and degrade to NULL rather than raising. Do NOT merge the PR until
 -- the apply is confirmed.
