@@ -486,7 +486,15 @@ export interface RequirementItemDTO {
   statusForCase: 'PROVIDED' | 'MISSING' | 'NEEDS_REVIEW' | 'CONFIRMED';
   citations: SourceRecordDTO[];
   /** AIQ-1349: provenance level. */
-  verificationStatus?: 'representative' | 'corpus_grounded' | 'expert_verified' | null;
+  // `verified` is what production actually stores (10 approved rows); `expert_verified` is
+  // what the backend constants and every doc comment say. Both are accepted until the two
+  // are normalised — see the PROVENANCE map in RequirementList.tsx.
+  verificationStatus?: 'representative' | 'corpus_grounded' | 'expert_verified' | 'verified' | null;
+  // Counsel attestation. A SEPARATE axis from verificationStatus, not a further rung on it:
+  // ours is provenance, this is external legal sign-off. null = no counsel has looked.
+  attestationStatus?: 'requested' | 'attested' | 'stale' | null;
+  attestedBy?: string | null;
+  attestedAt?: string | null;
   /**
    * 'action' (something is required of someone) or 'nothing_to_do' (a STATED
    * confirmation that nothing is required — e.g. "No visa or residence permit

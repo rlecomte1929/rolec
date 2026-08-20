@@ -35,13 +35,14 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from backend.imports.otto.executor import (          # noqa: E402
     PASS,
+    PromoteResult,
     promote,
     queue_expected,
     reconcile,
@@ -70,6 +71,18 @@ def resolve(arg: str) -> Optional[Path]:
         if path.is_file():
             return path
     return None
+
+
+def destinations_for(rows: List[Any]) -> List[str]:
+    """Every destination country the deliverable carries, sorted.
+
+    Named and tested rather than inlined because the expression it replaces —
+    `rows[0].destination_country` — silently scoped a whole promotion to one country and
+    still printed a success line. Every batch before B3 was single-destination, so the bug
+    could not show itself; B3 spans DE, DK, GB and NO, promoted only GB, and reported
+    "promote: 4" as if that were all of it.
+    """
+    return sorted({r.destination_country for r in rows})
 
 
 def main() -> int:
@@ -172,12 +185,29 @@ def main() -> int:
     from sqlalchemy.orm import sessionmaker
 
     with sessionmaker(bind=engine)() as session:
-        promoted = promote(
-            session,
-            country=(rows[0].destination_country if rows else None),
-            dry_run=not args.promote,
-        )
+        # Every destination the deliverable actually carries, not just the first row's.
+        #
+        # This used to pass `rows[0].destination_country`, which silently scoped promotion to
+        # one country. Harmless while every batch was single-destination — and then the B3
+        # corridor batch spanned DE, DK, GB and NO, promoted only the 4 GB entities because
+        # its first record happened to be NO->GB, and reported "promote: 4" as though that
+        # were the whole batch. The other 16 facts were never even looked at.
+        #
+        # Still per-country rather than `country=None`: None means "every ready fact in the
+        # schema", which would sweep other batches into a run the operator asked to be about
+        # this one.
+        destinations = destinations_for(rows)
+        promoted = PromoteResult()
+        for dest in destinations:
+            part = promote(session, country=dest, dry_run=not args.promote)
+            promoted.promoted += part.promoted
+            promoted.skipped_verified += part.skipped_verified
+            promoted.unmapped += part.unmapped
+            promoted.drafts += part.drafts
         print()
+        if len(destinations) > 1:
+            print(f"promoting across {len(destinations)} destination(s): "
+                  f"{', '.join(destinations)}")
         print(summarise_promotion(promoted))
         if not args.promote:
             print("\n  (preview — pass --promote to write these)")

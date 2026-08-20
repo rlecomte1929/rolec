@@ -108,6 +108,30 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # (docs/audos/otto-batch-2026-08-13/otto-batch.json:699, otto_verify.py:56) — the
     # importer's allowlist had simply never been told.
     "irishimmigration.ie",
+    # Denmark. Denmark uses no governmental suffix at all, so the suffix rule scored the
+    # national tax authority itself as a relocation blog and rejected it.
+    "skat.dk",
+    # Germany. `bund.de` covers the federal portal, but the bodies that actually publish the
+    # rule mostly do not sit under it: the BZSt issues the tax ID, service.berlin.de is the
+    # Land of Berlin's own service catalogue for the Anmeldung, and Rundfunkbeitrag is the
+    # body that levies the broadcasting fee it describes.
+    "bzst.de", "service.berlin.de", "rundfunkbeitrag.de",
+    # Spain. Only the `gob.es` suffix was recognised, so every statutory body that does not
+    # sit under it scored UNOFFICIAL and was rejected outright — which is every Spain-side
+    # fact in an ES->IE deliverable. `boe.es` is the starkest: the Boletín Oficial del Estado
+    # publishes the law itself, exactly as `legifrance.gouv.fr` and `lovdata.no` do, and both
+    # of those were already listed. The AEAT was *half* admitted, because
+    # `agenciatributaria.gob.es` (the sede) passes on the suffix while `agenciatributaria.es`
+    # does not — so a tax fact survived or died on which of the agency's own two domains the
+    # researcher happened to cite. All five publish their own rule rather than restating one.
+    "boe.es", "seg-social.es", "agenciatributaria.es", "policia.es", "sepe.es",
+    # Spain — municipal (padrón). Same call as `service.berlin.de` above: the town hall runs
+    # and publishes its own registration procedure, so it is the publisher, not a portal
+    # restating someone else's rule. Neither `.es` nor `.cat` carries a governmental suffix
+    # (`.cat` is a *linguistic* TLD), so both councils were scored as relocation blogs and the
+    # padrón vanished from any ES-side deliverable. Named hosts only — a third city is a
+    # decision, not a silent addition.
+    "madrid.es", "barcelona.cat",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )
@@ -126,6 +150,11 @@ _SEMI_OFFICIAL_HOSTS: Tuple[str, ...] = (
     # the tax authority itself. Semi-official, not official: both restate rules published
     # elsewhere, so a fact from here is worth keeping and belongs in the review queue.
     "citizensinformation.ie", "revenue.ie",
+    # Denmark. borger.dk is the Danish state's official citizen portal, run by the Agency
+    # for Digital Government — so it belongs in, not out. Semi-official for the same reason
+    # as citizensinformation.ie: it is a portal that restates what SKAT, the CPR office and
+    # the regions publish elsewhere, so a fact from here belongs in the review queue.
+    "borger.dk",
 )
 
 

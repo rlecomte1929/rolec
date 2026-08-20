@@ -62,7 +62,7 @@ For each company, confirm the **entire** chain happened:
 ### Bug → queue mirroring process
 
 1. File a **GitHub Issue**: title `[pilot-p6-1] <short symptom>`, label `pilot-p6-1`, body = steps to reproduce + which company + severity.
-2. Mirror to the **AI Work Queue** (Notion, collection `75d7ed78-91f4-46b6-b805-12e43abbecce`): create a task, set Priority by severity, link the GitHub Issue in Context Links, set Status `Ready for AI` (or `Needs Decomposition` if large).
+2. Mirror to the **AI Work Queue** (Notion, collection `4e2887c6-4d48-82c1-931e-87b09fb5c4ed`): create a task, set Priority by severity, link the GitHub Issue in Context Links, set Status `Ready for AI` (or `Needs Decomposition` if large).
 3. Tag the originating pilot in the task body (`Source: P6-1 pilot, Company X`).
 
 ---

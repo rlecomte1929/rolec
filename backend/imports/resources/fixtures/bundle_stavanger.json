@@ -1,0 +1,156 @@
+{
+  "categories": [
+    {
+      "key": "schools_childcare",
+      "label": "Schools & Childcare",
+      "description": "Public, international, kindergartens",
+      "icon_name": "schools",
+      "sort_order": 3,
+      "is_active": true
+    }
+  ],
+  "tags": [],
+  "sources": [
+    {
+      "source_name": "Expat Arrivals — Best areas and suburbs in Stavanger",
+      "publisher": "Expat Arrivals",
+      "source_type": "commercial",
+      "url": "https://www.expatarrivals.com/europe/norway/stavanger/areas-and-suburbs-stavanger",
+      "trust_tier": "T2",
+      "retrieved_at": "2026-08-18"
+    },
+    {
+      "source_name": "Kolumbus AS — public transport in Rogaland (official)",
+      "publisher": "Kolumbus AS (Rogaland county)",
+      "source_type": "institutional",
+      "url": "https://www.kolumbus.no/en/",
+      "trust_tier": "T0",
+      "retrieved_at": "2026-08-18"
+    },
+    {
+      "source_name": "International School of Stavanger — Admissions",
+      "publisher": "International School of Stavanger",
+      "source_type": "institutional",
+      "url": "https://www.isstavanger.no/admissions",
+      "trust_tier": "T1",
+      "retrieved_at": "2026-08-18"
+    },
+    {
+      "source_name": "Skatteetaten — Move to Norway (national registry / ID number)",
+      "publisher": "Norwegian Tax Administration",
+      "source_type": "official",
+      "url": "https://www.skatteetaten.no/en/person/national-registry/moving/to-norway/",
+      "trust_tier": "T0",
+      "retrieved_at": "2026-08-18"
+    },
+    {
+      "source_name": "Skatteetaten — Move to Norway (national registry)",
+      "publisher": "Norwegian Tax Administration",
+      "source_type": "official",
+      "url": "https://www.skatteetaten.no/en/person/national-registry/moving/to-norway/",
+      "trust_tier": "T0",
+      "retrieved_at": "2026-08-18"
+    },
+    {
+      "source_name": "Expat Arrivals — Stavanger areas and suburbs",
+      "publisher": "Expat Arrivals",
+      "source_type": "commercial",
+      "url": "https://www.expatarrivals.com/europe/norway/stavanger/areas-and-suburbs-stavanger",
+      "trust_tier": "T2",
+      "retrieved_at": "2026-08-18"
+    }
+  ],
+  "resources": [
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "city_name": "Stavanger",
+      "category_key": "housing",
+      "title": "Where relocating families and energy expats live",
+      "body": "Stavanger is divided into seven boroughs: Eiganes/Vaaland, Hillevaag, Hinna, Hundvaag, Madla, Storhaug and Tasta. Expats commonly favour Stavanger Sentrum (central, walkable, restaurants/harbour) and areas near the international schools; Eiganes/Vaaland is a popular, well-regarded family area. The city is compact, so most areas are within easy reach. Energy-sector families also cluster toward the Sola/Forus/Sandnes side near the business parks and airport.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "source_url": "https://www.expatarrivals.com/europe/norway/stavanger/areas-and-suburbs-stavanger",
+      "source_name": "Expat Arrivals — Best areas and suburbs in Stavanger",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "b3-no-stavanger-neighborhoods"
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "city_name": "Stavanger",
+      "category_key": "transport",
+      "title": "Public transport is buses (Kolumbus), no metro/tram",
+      "body": "Regional public transport in Stavanger and the wider Rogaland county is run by Kolumbus (buses, plus regional boat/ferry links); there is no metro or tram. Tickets are bought via the Kolumbus app or a Kolumbus travel card, with a travel planner and travel guarantee. Stavanger Airport is at Sola, southwest of the city. Many energy commuters drive to the Forus/Sola business parks.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "source_url": "https://www.kolumbus.no/en/",
+      "source_name": "Kolumbus AS — public transport in Rogaland (official)",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "b3-no-stavanger-transport"
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "city_name": "Stavanger",
+      "category_key": "schools_childcare",
+      "title": "International schooling: two active options; French school closed",
+      "body": "The International School of Stavanger (ISS) offers an English-language programme through the IB Diploma and is the main international option; apply early via its admissions process as places and tuition schedules are managed per grade. The British International School of Stavanger (BISS) offers a British-curriculum alternative. IMPORTANT: the French School of Stavanger / Lycee francais de Stavanger closed permanently in summer 2019 and is no longer an option.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "source_url": "https://www.isstavanger.no/admissions",
+      "source_name": "International School of Stavanger — Admissions",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "b3-no-stavanger-schools"
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "city_name": "Stavanger",
+      "category_key": "admin_essentials",
+      "title": "A local bank account needs a Norwegian ID number first",
+      "body": "SpareBank 1 Sor-Norge (headquartered in Stavanger, formerly SpareBank 1 SR-Bank) and DNB are the main local banks. Opening an account requires a Norwegian identity number (national ID or D-number) and identity verification; foreigners generally cannot complete onboarding or obtain BankID until they are registered and have that number, so bank set-up sits downstream of tax-office registration.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "source_url": "https://www.skatteetaten.no/en/person/national-registry/moving/to-norway/",
+      "source_name": "Skatteetaten — Move to Norway (national registry / ID number)",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "b3-no-stavanger-banking"
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "city_name": "Stavanger",
+      "category_key": "healthcare",
+      "title": "GP (fastlege) access follows population registration",
+      "body": "Access to Norway's public health system and assignment of a regular GP (fastlege) follow from being registered as a resident in the National Population Register with a national identity number. A stay of more than six months triggers the move-registration (in person, with an ID check for non-Nordic movers), which is the gateway to healthcare entitlement and a family doctor.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "source_url": "https://www.skatteetaten.no/en/person/national-registry/moving/to-norway/",
+      "source_name": "Skatteetaten — Move to Norway (national registry)",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "b3-no-stavanger-healthcare"
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "city_name": "Stavanger",
+      "category_key": "daily_life",
+      "title": "Energy-capital rhythms and a wet climate",
+      "body": "Stavanger is Norway's oil & energy capital; the workforce around SLB, Equinor and Aker BP includes rotational/offshore schedules and heavy activity at the Forus business park and Sola. Housing demand and rents concentrate near the centre and international schools. The climate is notably wet and mild for its latitude, so plan arrival logistics and school runs accordingly.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "source_url": "https://www.expatarrivals.com/europe/norway/stavanger/areas-and-suburbs-stavanger",
+      "source_name": "Expat Arrivals — Stavanger areas and suburbs",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "b3-no-stavanger-practicalities"
+    }
+  ],
+  "events": []
+}

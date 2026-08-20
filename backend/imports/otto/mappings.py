@@ -150,10 +150,20 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
         return Unmapped(topic, f"no requirement catalog coverage for "
                                f"{entity.destination_country!r} — see requirements_country_key")
 
-    nationality = _one_value(facts, "nationality")
-    if nationality is None:
-        return Unmapped(topic, "facts disagree on applies_to.nationality, so this is not one "
+    # Absent and conflicting are different problems with different fixes, and both used to
+    # report "facts disagree" — which sends the reader hunting for a disagreement that is not
+    # there. The B3 batch staged 20 facts with no nationality at all and every one of them
+    # blamed a conflict.
+    nationality_values = _distinct([(f.applies_to or {}).get("nationality") for f in facts])
+    if not nationality_values:
+        return Unmapped(topic, "no fact carries applies_to.nationality — the audience is "
+                               "unscoped, and NULL here would serve a visa track to free "
+                               "movers. Derive it from the corridor before staging")
+    if len(nationality_values) > 1:
+        return Unmapped(topic, f"facts disagree on applies_to.nationality "
+                               f"({', '.join(sorted(nationality_values))}), so this is not one "
                                "requirement")
+    nationality = nationality_values[0]
     classes = NATIONALITY_CLASSES.get(nationality)
     if classes is None:
         return Unmapped(

@@ -1,7 +1,7 @@
 # Dev-queue brief — three tasks before the cohort wave
 
 **For:** a single Claude Code session (repo mounted) · **Date:** 2026-07-06
-**Queue:** AI Work Queue · DB `7adc643ac4484a1aba80e27e417f42d6`
+**Queue:** AI Work Queue · DB `3bc887c64d4880898188fcf2dc3edc1b`
 **All three tasks are 🟡 Yellow** — no Red gates, no plan-approval pauses. Each self-validates against its Test Command, lands in Human Review, and `review-validator` closes it out.
 
 ---

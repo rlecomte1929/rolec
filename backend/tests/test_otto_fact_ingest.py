@@ -237,6 +237,172 @@ def test_admitting_the_irish_bodies_did_not_admit_the_whole_ie_tld(tmp_path):
     assert classify_source("https://not-irishimmigration.ie/permits") == UNOFFICIAL
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://skat.dk/en-us/businesses/employees-and-pay/non-danish-labour/",
+        "https://www.bzst.de/EN/Private_individuals/Tax_identification_number/",
+        "https://service.berlin.de/dienstleistung/120686/",
+        "https://www.rundfunkbeitrag.de/welcome/english",
+        # Bare host and http, to prove the match is on the hostname and not the full URL.
+        "skat.dk/en-us/individuals",
+        "http://bzst.de/EN/Home/home_node.html",
+    ],
+)
+def test_the_danish_and_german_tax_and_registration_bodies_are_official(url):
+    """Neither `.dk` nor `.de` has a governmental suffix in the allowlist, so all four of
+    these scored UNOFFICIAL and were rejected outright.
+
+    That is not a tidy default — it silently removed **9 of the 20 facts** in the B3
+    Nordics/UK/DE batch, and it removed them by country: NO->DK, DK->DE and DE->DK each
+    ended with zero surviving facts while the import reported success on the other 11. A
+    rejection list that clusters on a country is an allowlist bug, not a research failure.
+
+    All four publish their own rule rather than restating one, which is what puts them here
+    and not in `_SEMI_OFFICIAL_HOSTS`: SKAT is the Danish tax authority, the BZSt is the
+    Federal Central Tax Office that issues the German tax ID, service.berlin.de is the Land
+    of Berlin's own service catalogue for the Anmeldung, and Rundfunkbeitrag is the body
+    that levies the fee it describes.
+    """
+    assert classify_source(url) == OFFICIAL
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://lifeindenmark.borger.dk/apps-and-digital-services/mitid",
+        "https://borger.dk/",
+        "http://lifeindenmark.borger.dk/theme/when-you-arrive",
+    ],
+)
+def test_borger_dk_is_admitted_for_review_not_rejected(url):
+    """borger.dk is the Danish state's official citizen portal, run by the Agency for
+    Digital Government — so it belongs in, not out.
+
+    SEMI_OFFICIAL and not OFFICIAL for the same reason as citizensinformation.ie: it is a
+    portal that restates what SKAT, the CPR office and the regions publish elsewhere. A
+    fact sourced here is worth keeping and belongs in the review queue.
+    """
+    assert classify_source(url) == SEMI_OFFICIAL
+
+
+def test_a_danish_fact_reaches_the_review_queue_instead_of_the_rejection_list(tmp_path):
+    """End to end through `read_jsonl` — the gate has to admit the ROW, not just the URL."""
+    path = _write(tmp_path, [_record(
+        destination_country="DK",
+        entity_topic_key="registration_cpr",
+        fact_key="cprDeadline",
+        source_url="https://lifeindenmark.borger.dk/theme/when-you-arrive",
+    )])
+    rows, rejections = read_jsonl(path, batch_id="dk-1")
+
+    assert rejections == []
+    assert len(rows) == 1
+    assert rows[0].source_class == SEMI_OFFICIAL
+    # Kept, but never auto-accepted: a human still signs this off.
+    assert rows[0].accuracy_tier == TIER_REVIEW
+
+
+def test_admitting_the_dk_de_bodies_did_not_admit_the_whole_tld(tmp_path):
+    """The fix is named hostnames, not a `.dk`/`.de` suffix. Blogs and law firms stay out."""
+    assert classify_source("https://copenhagenrelocationblog.dk/guide") == UNOFFICIAL
+    assert classify_source("https://www.berlin-immigration-lawyers.de/permits") == UNOFFICIAL
+    assert classify_source("https://expat-guide.de/anmeldung") == UNOFFICIAL
+    # Nor a lookalike that merely ends with the string.
+    assert classify_source("https://notskat.dk/tax") == UNOFFICIAL
+    assert classify_source("https://not-rundfunkbeitrag.de/fee") == UNOFFICIAL
+    assert classify_source("https://fake-borger.dk/mitid") == UNOFFICIAL
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.boe.es/buscar/act.php?id=BOE-A-2000-544",
+        "https://www.seg-social.es/wps/portal/wss/internet/Trabajadores",
+        "https://www.agenciatributaria.es/AEAT.internet/Inicio.shtml",
+        "https://www.policia.es/_es/extranjeria_documentacion.php",
+        "https://www.sepe.es/HomeSepe/en/Personas.html",
+        # Bare host and http, to prove the match is on the hostname and not the full URL.
+        "seg-social.es/wps/portal/wss/internet/Inicio",
+        "http://boe.es/diario_boe/",
+    ],
+)
+def test_the_spanish_statutory_bodies_are_official(url):
+    """Spain was recognised only through the `gob.es` suffix, so every statutory body that
+    does not sit under `gob.es` scored UNOFFICIAL and was rejected outright.
+
+    Two of these are worth naming individually. `boe.es` is the Boletín Oficial del Estado,
+    which publishes the law itself — the direct counterpart of `legifrance.gouv.fr` and
+    `lovdata.no`, both of which were already allowlisted; Spain's state gazette being scored
+    as a relocation blog is the starkest gap in the set. And the AEAT was *half* admitted:
+    `agenciatributaria.gob.es` (the sede) passed on the suffix while `agenciatributaria.es`
+    did not, so whether a tax fact survived depended on which of the agency's own two domains
+    the researcher happened to cite.
+
+    All five publish their own rule rather than restating one, which is what puts them here
+    and not in `_SEMI_OFFICIAL_HOSTS`: the BOE is the gazette of record, the Seguridad Social
+    administers and publishes social security registration, the AEAT is the tax authority,
+    the Policía Nacional issues the NIE and TIE, and the SEPE is the state employment service.
+    """
+    assert classify_source(url) == OFFICIAL
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.madrid.es/portales/munimadrid/es/Inicio/El-Ayuntamiento/Padron",
+        "https://sede.madrid.es/portal/site/tramites",
+        "https://www.barcelona.cat/es/canals-window/padro-municipal",
+        "http://barcelona.cat/",
+    ],
+)
+def test_the_spanish_municipal_padron_offices_are_official(url):
+    """The padrón is a core relocation step and the town hall is the body that runs it.
+
+    Same call as `service.berlin.de` above: a municipality publishing its own registration
+    procedure is the publisher of that procedure, not a portal restating someone else's rule.
+    Left unlisted, `.es` and `.cat` carry no governmental suffix, so both town halls scored
+    UNOFFICIAL and the padrón vanished from any ES-side deliverable.
+
+    Named hosts only — Madrid and Barcelona. A third city is a decision, not a silent
+    addition.
+    """
+    assert classify_source(url) == OFFICIAL
+
+
+def test_admitting_the_spanish_bodies_did_not_admit_the_whole_es_tld():
+    """The fix is named hostnames, not an `.es`/`.cat` suffix.
+
+    `.es` is an open commercial TLD and `.cat` is a *linguistic* one — neither says anything
+    about who published the page, which is the whole basis of the gate.
+    """
+    assert classify_source("https://madrid-relocation.es/guide") == UNOFFICIAL
+    assert classify_source("https://www.spanish-immigration-lawyers.es/nie") == UNOFFICIAL
+    assert classify_source("https://barcelona-relocation.cat/guide") == UNOFFICIAL
+    # Nor a lookalike that merely ends with the string.
+    assert classify_source("https://fake-madrid.es/padron") == UNOFFICIAL
+    assert classify_source("https://notseg-social.es/afiliacion") == UNOFFICIAL
+    assert classify_source("https://not-policia.es/nie") == UNOFFICIAL
+    assert classify_source("https://notboe.es/diario") == UNOFFICIAL
+
+
+def test_a_spanish_fact_reaches_the_staging_rows_instead_of_the_rejection_list(tmp_path):
+    """End to end through `read_jsonl` — the gate has to admit the ROW, not just the URL."""
+    path = _write(tmp_path, [_record(
+        destination_country="ES",
+        entity_topic_key="social_security_registration",
+        fact_key="ssNumberWhereToApply",
+        source_url="https://www.seg-social.es/wps/portal/wss/internet/Trabajadores",
+    )])
+    rows, rejections = read_jsonl(path, batch_id="es-1")
+
+    assert rejections == []
+    assert len(rows) == 1
+    assert rows[0].source_class == OFFICIAL
+    # Official publisher AND a quotable line of evidence, so this one clears the bar.
+    assert rows[0].accuracy_tier == TIER_AUTO
+
+
+
+
 def test_a_fact_with_no_evidence_quote_cannot_be_auto_accepted(tmp_path):
     """All 24 rows in production have `evidence_quote IS NULL` — nothing in them can be
     re-checked without re-reading the source. Allowed in, never waved through."""
