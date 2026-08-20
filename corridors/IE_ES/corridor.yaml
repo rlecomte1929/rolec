@@ -15,7 +15,7 @@
 #
 # Requirement data: corridors/IE_ES/data/ie_es_requirement_facts.ndjson (sha256-pinned in
 # manifest.json), loaded to public.requirement_items by
-# supabase/migrations/20261107000000_ie_es_requirement_items.sql. Rows land
+# supabase/migrations/20261108000000_ie_es_requirement_items.sql. Rows land
 # review_status='pending' and are NOT served until a human approves them.
 
 corridor:
