@@ -18,12 +18,23 @@ const item = (over: Partial<RequirementItemDTO> = {}): RequirementItemDTO => ({
  * requirement_items holds `verified` on 10 approved (therefore served) rows, while every
  * frontend map only knew `expert_verified` — so those ten rendered NO provenance badge at
  * all. There is no translation layer in the backend; verification_status is passed
- * straight through. This test fails against the unfixed map.
+ * straight through. That original defect is still pinned here.
+ *
+ * The expected LABEL was corrected on 2026-08-20. Honouring `verified` by aliasing it onto
+ * "Expert-verified" fixed the blank badge by asserting a status we do not hold: all ten of
+ * those rows are reviewed_by='romain' with attestation_status=null, and `expert_verified`
+ * is 0 catalog-wide, while disclaimers.py reserves that word for sign-off by a licensed
+ * immigration lawyer. The badge must render AND must be true.
  */
 describe('RequirementList provenance — the value production stores', () => {
-  it('renders the badge for `verified`, not only `expert_verified`', () => {
+  it('renders a badge for `verified` rather than blanking it', () => {
     render(<RequirementList items={[item({ verificationStatus: 'verified' })]} />);
-    expect(screen.getByText('Expert-verified')).toBeTruthy();
+    expect(screen.getByText('Reviewed')).toBeTruthy();
+  });
+
+  it('does not dress an internal review as counsel sign-off', () => {
+    render(<RequirementList items={[item({ verificationStatus: 'verified' })]} />);
+    expect(screen.queryByText('Expert-verified')).toBeNull();
   });
 });
 
