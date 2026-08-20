@@ -231,6 +231,26 @@ root fails the build (exit 2) until re-registered, as does any module inside the
 closure that fails to parse — an unparsed module hides whatever it imports. See
 `docs/specs/serving-llm-isolation.md`.
 
+## Corridor requirement data
+
+A corridor's requirement records are the product's core asset. Two rules, both learned by
+nearly getting them wrong on IE→ES (`docs/corridors/README.md` has the full set):
+
+**`requirement_items.review_status` DEFAULTS to `'approved'`, and `requirements_builder`
+serves only approved rows.** A corridor load that omits the column therefore publishes
+unreviewed, representative facts to real users the moment it applies. Set `'pending'`
+explicitly, and never let an `ON CONFLICT` update overwrite it — re-running a load must not
+un-approve what a reviewer has since approved.
+
+**Verify the live table before writing the load.** A batch manifest names a target table and
+key; that is a claim, not a schema. The IE→ES manifest named `requirement_facts` keyed on
+`fact_uid` — a table with no `fact_uid` column and two NOT NULL uuid FKs the batch could not
+supply. Corridor requirement data lands in `public.requirement_items`, whose varchar `id`
+carries the batch's own uid verbatim.
+
+Corridor registry profiles and pathway step graphs live in `corridors/<ID>/`; docs, metrics
+and the Case Verification Report live in `docs/corridors/<id>/`.
+
 ## Research batch intake (GCS → candidate)
 
 Otto researches in the Audos workspace and its real deliverable is **NDJSON files on Google
