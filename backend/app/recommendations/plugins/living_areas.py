@@ -34,6 +34,12 @@ _CITY_ALIASES: dict[str, str] = {
     "münchen": "Munich",
     "germany": "Munich",
     "de": "Munich",
+    # [AIQ-1882] Dublin. Without these a Madrid->Dublin case resolved to the literal
+    # string "Dublin", matched no dataset row and returned [] — the T18 finding.
+    "dublin": "Dublin",
+    "baile átha cliath": "Dublin",
+    "ireland": "Dublin",
+    "ie": "Dublin",
 }
 
 
@@ -52,6 +58,7 @@ _CITY_CURRENCY: dict[str, str] = {
     "New York": "USD",
     "San Francisco": "USD",
     "Munich": "EUR",
+    "Dublin": "EUR",
 }
 
 # Approx conversion to USD for metadata (for display/comparison)
@@ -282,6 +289,12 @@ class LivingAreasPlugin(BasePlugin):
                 "estimated_cost_local": rent,
                 "currency": currency,
                 "cost_type": "monthly",
+                # [AIQ-1882] Where the rent figure comes from, verbatim from the
+                # dataset row. Daft publishes SUB-REGION bands for Dublin, not
+                # per-neighbourhood figures, so the band and its basis travel
+                # together — a number on screen without its basis is the failure
+                # mode this ticket calls out. None for rows that predate the field.
+                "rent_basis": item.get("rent_basis"),
                 "map_query": f"{item.get('name', '')}, {item.get('city', 'Singapore')}",
                 # Coords for the neighborhood map (Phase 2); null until geocoded.
                 "lat": item.get("lat"),
