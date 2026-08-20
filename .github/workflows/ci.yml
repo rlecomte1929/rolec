@@ -768,22 +768,30 @@ jobs:
         run: pip install psycopg2-binary==2.9.9
       - name: Collect migrations added by this PR
         id: added
-        env:
-          # Never interpolate ${{ }} straight into run: — filenames come from the PR
-          # author and would be shell-injected. Pass through env and quote.
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          # No fallback to an empty list. This workflow is pull_request-only, so an
-          # absent base SHA means the step cannot work out its own scope — and an empty
-          # --added puts check_migration_drift.py into audit mode, where the dead and
-          # duplicate checks degrade to warnings and it exits 0. A guard that silently
-          # stops checking must go red, not green. Same for a failing git diff: `|| true`
-          # here used to convert it into "this PR added no migrations".
+          # Derive the base from LIVE origin/main, not github.event.pull_request.base.sha.
+          # That field records the base tip when the PR was opened and GitHub never
+          # refreshes it as the base branch moves. HEAD here is the PR *merge ref*
+          # (base + PR), so a three-dot diff from the stale SHA spans every commit merged
+          # to main since — and attributes THEIR migrations to this PR. On 2026-08-19
+          # that failed #1894 with "adds a migration at a version already used on
+          # origin/main: 20261108000000" — a file #1901 had merged minutes earlier and
+          # that #1894 does not contain. The guard written to survive a moving base was
+          # itself reading a stale one.
+          #
+          # No fallback to an empty list. An undeterminable scope means the step cannot
+          # do its job — and an empty --added puts check_migration_drift.py into audit
+          # mode, where the dead and duplicate checks degrade to warnings and it exits 0.
+          # A guard that silently stops checking must go red, not green. Same for a
+          # failing git diff: `|| true` here used to convert it into "this PR added no
+          # migrations".
+          git fetch --quiet origin main
+          BASE_SHA=$(git merge-base origin/main HEAD || true)
           if [ -z "$BASE_SHA" ]; then
-            echo "::error::No PR base SHA — cannot determine which migrations this PR adds."
-            echo "The dead-version and duplicate-version checks would silently degrade to"
-            echo "warnings. Failing instead. (ci.yml is pull_request-only; base.sha should"
-            echo "always be set — if a new trigger was added, scope this step to PRs.)"
+            echo "::error::No merge base with origin/main — cannot determine which"
+            echo "migrations this PR adds. The dead-version and duplicate-version checks"
+            echo "would silently degrade to warnings. Failing instead. (Needs the full"
+            echo "history: this job must keep actions/checkout fetch-depth: 0.)"
             exit 1
           fi
           # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
@@ -827,13 +835,14 @@ jobs:
         with:
           python-version: "3.11"
       - name: Check for a column read shipped with its own migration
-        env:
-          # Never interpolate ${{ }} straight into run:.
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
+          # Live origin/main, not pull_request.base.sha — see the duplicate-version job
+          # for why that field goes stale and mis-attributes another PR's migrations.
+          git fetch --quiet origin main
+          BASE_SHA=$(git merge-base origin/main HEAD || true)
           if [ -z "$BASE_SHA" ]; then
-            echo "No PR base SHA (not a pull_request event) — skipping."
-            exit 0
+            echo "::error::No merge base with origin/main — cannot scope this check."
+            exit 1
           fi
           python scripts/check_column_read_before_apply.py --base "$BASE_SHA"
 
@@ -857,22 +866,30 @@ jobs:
           python-version: "3.11"
       - name: Collect migrations added by this PR
         id: added
-        env:
-          # Never interpolate ${{ }} straight into run: — filenames come from the PR
-          # author and would be shell-injected. Pass through env and quote.
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          # No fallback to an empty list. This workflow is pull_request-only, so an
-          # absent base SHA means the step cannot work out its own scope — and an empty
-          # --added puts check_migration_drift.py into audit mode, where the dead and
-          # duplicate checks degrade to warnings and it exits 0. A guard that silently
-          # stops checking must go red, not green. Same for a failing git diff: `|| true`
-          # here used to convert it into "this PR added no migrations".
+          # Derive the base from LIVE origin/main, not github.event.pull_request.base.sha.
+          # That field records the base tip when the PR was opened and GitHub never
+          # refreshes it as the base branch moves. HEAD here is the PR *merge ref*
+          # (base + PR), so a three-dot diff from the stale SHA spans every commit merged
+          # to main since — and attributes THEIR migrations to this PR. On 2026-08-19
+          # that failed #1894 with "adds a migration at a version already used on
+          # origin/main: 20261108000000" — a file #1901 had merged minutes earlier and
+          # that #1894 does not contain. The guard written to survive a moving base was
+          # itself reading a stale one.
+          #
+          # No fallback to an empty list. An undeterminable scope means the step cannot
+          # do its job — and an empty --added puts check_migration_drift.py into audit
+          # mode, where the dead and duplicate checks degrade to warnings and it exits 0.
+          # A guard that silently stops checking must go red, not green. Same for a
+          # failing git diff: `|| true` here used to convert it into "this PR added no
+          # migrations".
+          git fetch --quiet origin main
+          BASE_SHA=$(git merge-base origin/main HEAD || true)
           if [ -z "$BASE_SHA" ]; then
-            echo "::error::No PR base SHA — cannot determine which migrations this PR adds."
-            echo "The dead-version and duplicate-version checks would silently degrade to"
-            echo "warnings. Failing instead. (ci.yml is pull_request-only; base.sha should"
-            echo "always be set — if a new trigger was added, scope this step to PRs.)"
+            echo "::error::No merge base with origin/main — cannot determine which"
+            echo "migrations this PR adds. The dead-version and duplicate-version checks"
+            echo "would silently degrade to warnings. Failing instead. (Needs the full"
+            echo "history: this job must keep actions/checkout fetch-depth: 0.)"
             exit 1
           fi
           # AR, not A: git reports a restamp as a RENAME, and restamping to a bad

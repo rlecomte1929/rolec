@@ -18,12 +18,19 @@ from .feedback_task_engineer import _TIER_LABELS
 
 _NOTION_PAGES_API = "https://api.notion.com/v1/pages"
 _NOTION_VERSION = "2022-06-28"
-# AI Work Queue. NOTE (DB-id reconciliation): this database id `7adc643a…` and the
-# `75d7ed78…` the autofix Edge Function uses as NOTION_DATABASE_ID are the SAME database —
-# `75d7ed78…` is this database's data-source/collection id. Page-create (parent.database_id
-# = 7adc643a…) and the edge fn's /databases/75d7ed78…/query both resolve to one queue, so
-# tasks the backend dispatches ARE the tasks the pipeline fixes. Keep both ids pointing here.
-_DEFAULT_DB = "7adc643a-c448-4a1a-ba80-e27e417f42d6"
+# AI Work Queue — the LIVE database.
+#
+# DB-id reconciliation, and why there are two ids at all: Notion gives a database an id and its
+# collection a separate data-source id. This module page-creates with parent.database_id
+# (`3bc887c6…`); the autofix Edge Function, support-router and morning-digest query
+# /databases/<data-source>/query and so use `4e2887c6…`. Both resolve to ONE queue, which is why
+# tasks the backend dispatches are the tasks the pipeline fixes. Change them together or the two
+# halves drift onto different databases.
+#
+# The previous pair — database `7adc643a…` / data source `75d7ed78…` — is the database now titled
+# "AI Work Queue (RETIRED)" in Notion. It is superseded, not deleted, so a stale id keeps writing
+# successfully into a queue nobody reads: a silent failure, not a loud one. Do not restore it.
+_DEFAULT_DB = "3bc887c6-4d48-8089-8188-fcf2dc3edc1b"
 _MAX_CHUNK = 1900  # Notion caps a single text object at 2000 chars
 
 # Final Validation Result select options (must match the Notion DB exactly).
@@ -73,7 +80,10 @@ def build_properties(task: Dict[str, Any], *, failure_evidence: str, context_lin
         "Layer": _select(task.get("layer")),
         "Product Area": _select(task.get("product_area")),
         "Status": _select(task.get("status") or "Ready for AI"),
-        "Definition of Ready": _select("Vetted — ready"),
+        # Overridable, default unchanged. A feedback-born task is queued as
+        # "Needs Decomposition", and calling that "Vetted — ready" in the same row would
+        # assert two contradictory things about the same task.
+        "Definition of Ready": _select(task.get("definition_of_ready") or "Vetted — ready"),
         "Autonomy Tier": _select(_TIER_LABELS.get(task.get("autonomy_tier"))),
     }
 

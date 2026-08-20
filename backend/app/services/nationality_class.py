@@ -21,7 +21,7 @@ fabricated "nothing required".
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Sequence
 
 from .requirements_country_key import to_iso
 
@@ -151,6 +151,43 @@ def classify(nationality: Optional[str], dest_country: Optional[str]) -> Optiona
     if dest in _EEA and nat in _FREE_MOVEMENT:
         return EU_EEA
     return THIRD_COUNTRY
+
+
+#: Best-to-worst. A dual national holds the UNION of their rights, so when two
+#: nationalities disagree the more favourable class is the true one.
+_CLASS_RANK = {OWN_NATIONAL: 0, EU_EEA: 1, THIRD_COUNTRY: 2}
+
+
+def classify_best(
+    nationalities: Sequence[Optional[str]], dest_country: Optional[str]
+) -> Optional[str]:
+    """The most favourable class across every nationality a person holds.
+
+    A dual national does not have to choose which passport to be judged by: rights
+    are cumulative. A Venezuelan/Italian citizen moving to Ireland exercises Italian
+    free movement, and classifying them on the Venezuelan nationality alone produces
+    the exact opposite answer — a permit track they must not apply for, plus a
+    "not enough lead time" verdict that is false because the 104-day permit chain
+    does not apply to them at all.
+
+    That is not hypothetical. Intake ASKS for a second nationality
+    (`q_has_second_nationality` → `second_nationality`), stores it, and exports it
+    under GDPR — and nothing consulted it at the gate, so whichever nationality
+    happened to be captured first decided the whole journey.
+
+    Returns ``None`` only when NO nationality could be recognised, preserving
+    `classify`'s rule: suppress a requirement only when we positively know free
+    movement applies. One unrecognised nationality alongside one recognised one
+    yields the recognised answer rather than discarding it.
+    """
+    best: Optional[str] = None
+    for nat in nationalities:
+        got = classify(nat, dest_country)
+        if got is None:
+            continue
+        if best is None or _CLASS_RANK[got] < _CLASS_RANK[best]:
+            best = got
+    return best
 
 
 def is_free_movement_national(nationality: Optional[str]) -> bool:

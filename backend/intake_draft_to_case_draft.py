@@ -61,6 +61,13 @@ def intake_draft_to_case_draft(data: Optional[Dict[str, Any]]) -> Dict[str, Any]
         {
             "fullName": _s(data.get("full_name")),
             "nationality": _s(data.get("nationality")),
+            # Carried because the requirements gate now classifies on BOTH: a dual national
+            # holds the union of their rights, and judging a Venezuelan/Italian citizen on
+            # whichever nationality intake recorded first puts them on a permit track they
+            # must not apply for. The interview has always asked for this
+            # (`q_has_second_nationality`) and stored it; the draft simply dropped it, so the
+            # answer never reached the only place it mattered.
+            "second_nationality": _s(data.get("second_nationality")),
             "passportCountry": _s(data.get("passport_country")),
             "passportExpiry": _s(data.get("passport_expiry")),
             "email": _s(data.get("email")),
