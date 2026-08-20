@@ -31,6 +31,7 @@ from ..db import SessionLocal
 from ..services.admin_audit import record_admin_event
 from ..services.feedback_triage import classify
 from ..services.feedback_task_engineer import (
+    _IMPL_TASK_TYPES,
     engineer_task,
     extract_confirmed_signals,
     format_diagnostics,
@@ -617,6 +618,41 @@ class PreviewBody(BaseModel):
     category: str = "bug"
 
 
+
+# ── AI Work Queue defaults for feedback-originated tasks ──────────────────────────────
+#: `feedback.category` is 'bug' or 'idea' (verified in production: 64 / 2).
+_FEEDBACK_QUEUE_STATUS = "Needs Decomposition"
+
+
+def _apply_feedback_queue_defaults(task: Dict[str, Any], *, category: Optional[str]) -> None:
+    """Stamp the queue lane + task type for a task that came from user feedback.
+
+    Mutates `task` in place, immediately before dispatch and AFTER the eval gate — the gate
+    must judge the ENGINEER's own task_type choice, not one we rewrote underneath it.
+
+    STATUS. Feedback lands in 'Needs Decomposition', not the shared 'Ready for AI' default in
+    notion_work_queue.build_properties. Raw user feedback is an unreviewed input; a human triages
+    it before an agent executes against it. Set here rather than on the shared default because
+    admin_work_items and autopilot_ingest use the same builder and must keep landing 'Ready for AI'.
+
+    TASK TYPE. 'idea' -> Research, always. 'bug' -> 'Bug Fix', but ONLY when the engineer already
+    chose an implementation type. That condition is the whole point: the task engineer's
+    prompt sends anything uncertain ("I cannot see X", a question, "I think") to Research, because
+    "a wrong impl task silently ships a broken change". Forcing every bug report to 'Bug Fix'
+    would relabel exactly those uncertain reports as a confident fix and defeat that rule. A
+    report we are not sure about stays Research whatever the reporter filed it as.
+    """
+    task["status"] = _FEEDBACK_QUEUE_STATUS
+    # Keep the row self-consistent: a task queued for decomposition is not "Vetted — ready".
+    task["definition_of_ready"] = "Draft"
+
+    kind = (category or "").strip().lower()
+    if kind == "idea":
+        task["task_type"] = "Research"
+    elif kind == "bug" and task.get("task_type") in _IMPL_TASK_TYPES:
+        task["task_type"] = "Bug Fix"
+
+
 def _load_product_fields(db: Session, item_id: str) -> Dict[str, Any]:
     """Enrich a product-stream item from public.feedback (page_url/screenshot/reporter/report_id)."""
     row = db.execute(
@@ -899,6 +935,8 @@ def dispatch_create(
         f"Original message:\n{message or '(see admin console)'}"
     )
     context_links = f"https://relopass.com/admin/feedback  (report_id={report_id})"
+
+    _apply_feedback_queue_defaults(task, category=(pf or {}).get("category"))
 
     try:
         url = notion_work_queue.create_work_queue_task(

@@ -2623,14 +2623,21 @@ def list_case_vendors(
         with main_db.engine.begin() as conn:
             rows = conn.execute(
                 _sql_text(
-                    # AIQ-1646 — public.vendors was DROPPED (platform redesign,
-                    # 20260520000000), so the old `JOIN public.vendors` 500'd on every
-                    # HR case-summary load. Repoint the vendor-identity join at
-                    # public.suppliers: suppliers.vendor_id still references the old
-                    # vendors.id, the same key case_vendor_shortlist.vendor_id holds, so
-                    # the join key is s.vendor_id = cvs.vendor_id. Vendor name/website
-                    # come from suppliers (col is `website`, not `website_url`); the
-                    # per-case contact + status live on the shortlist row (verified prod).
+                    # AIQ-1896 — vendor identity comes from public.vendors_legacy, the
+                    # same registry the HR browse directory lists (hr_vendors.py). The
+                    # previous AIQ-1646 join at public.suppliers resolved only 6 of the 9
+                    # prod shortlist rows: suppliers.vendor_id is populated on just 6 of
+                    # 116 rows, so all three `housing` rows rendered a blank supplier
+                    # name. vendors_legacy.id is uuid — the same type and the same value
+                    # case_vendor_shortlist.vendor_id holds — and resolves 9/9.
+                    #
+                    # AIQ-1646 history: public.vendors was DROPPED (platform redesign,
+                    # 20260520000000), which is why the original `JOIN public.vendors`
+                    # 500'd; vendors_legacy IS that table, renamed (AIQ-1638).
+                    #
+                    # Column note: vendors_legacy exposes `website_url` (suppliers used
+                    # the bare `website`). The per-case contact + status live on the
+                    # shortlist row.
                     """
                     SELECT
                         cvs.id            AS shortlist_id,
@@ -2639,15 +2646,14 @@ def list_case_vendors(
                         cvs.contact_name  AS contact_name,
                         cvs.contact_email AS contact_email,
                         cvs.selected      AS selected,
-                        s.name            AS vendor_name,
-                        s.website         AS vendor_website
+                        v.name            AS vendor_name,
+                        v.website_url     AS vendor_website
                     FROM public.case_vendor_shortlist cvs
-                    -- AIQ-1646: cvs.vendor_id is uuid, suppliers.vendor_id is varchar on
-                    -- prod, so a bare `=` raises 42883 (character varying = uuid). CAST both
-                    -- to TEXT — works on Postgres AND SQLite (the `::text` operator does not).
-                    LEFT JOIN public.suppliers s ON CAST(s.vendor_id AS TEXT) = CAST(cvs.vendor_id AS TEXT)
+                    -- Both sides are uuid on prod, but CAST to TEXT keeps the statement
+                    -- runnable on SQLite too (the `::text` operator does not port).
+                    LEFT JOIN public.vendors_legacy v ON CAST(v.id AS TEXT) = CAST(cvs.vendor_id AS TEXT)
                     WHERE cvs.case_id = :case_id
-                    ORDER BY cvs.service_key, s.name
+                    ORDER BY cvs.service_key, v.name
                     """
                 ),
                 {"case_id": case_id},

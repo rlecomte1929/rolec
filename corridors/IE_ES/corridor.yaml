@@ -1,0 +1,42 @@
+# Corridor registry profile — Ireland → Spain (free movement).
+#
+# REPRESENTATIVE — indicative content, NOT SME-verified. Authored from the EU free
+# movement framework (TFEU Art. 45; Directive 2004/38/EC; RD 240/2007) and backed by 25
+# source-attributed requirement records in corridors/IE_ES/data/. Confirm specifics with
+# the destination authority before any authoritative use. Matches the platform
+# content-provenance model.
+#
+# MIRRORS FR_ES, NOT ES_IE. The reverse corridor ES_IE models a third-country national on
+# an Irish employment permit — salary floors, permit windows, a visa gate. An Irish
+# national moving to Spain is an EU free mover: no visa, no permit, no salary floor, and
+# the whole journey is the Spanish administrative registration sequence. FR_ES already
+# models exactly that shape into the same destination, so it is the structural template.
+# Copying ES_IE would have imported permit-track assumptions that do not apply.
+#
+# Requirement data: corridors/IE_ES/data/ie_es_requirement_facts.ndjson (sha256-pinned in
+# manifest.json), loaded to public.requirement_items by
+# supabase/migrations/20261107000000_ie_es_requirement_items.sql. Rows land
+# review_status='pending' and are NOT served until a human approves them.
+
+corridor:
+  id: "IE_ES"
+  origin_iso: "IE"
+  destination_iso: "ES"
+  display_name: "Ireland → Spain"
+  aliases: ["IE→ES", "IE-ES", "Dublin→Madrid"]
+
+  retrieval:
+    trust_tiers: [1, 2, 3]
+    min_similarity: 0.25
+
+  prompt:
+    task_key: "immigration_answer"
+
+  sla:
+    at_risk_window_days: 30
+    at_risk_pct: 80
+
+  # Eligibility Corridor Agent pathways (REPRESENTATIVE content).
+  pathways:
+    - id: "ES_FREEMOVE_2026"
+      file: "pathways/ES_FREEMOVE_2026/v1.yaml"

@@ -1,0 +1,74 @@
+{
+  "all_pass": true,
+  "batch": "B3-facts-enrichment",
+  "files": {
+    "city_copenhagen.ndjson": {
+      "artifact": "city_copenhagen",
+      "manifest_record_count": 7,
+      "record_count": 7,
+      "sha256": "80b393ae7617acfefe95ead41dc4fb70e19092bb3033d25bad3a002b5d2504a7"
+    },
+    "city_stavanger.ndjson": {
+      "artifact": "city_stavanger",
+      "manifest_record_count": 6,
+      "record_count": 6,
+      "sha256": "86018dc5b7251577a59dc755d6e9e755741cd53c532a5f586a3191298633fce2"
+    },
+    "corridor_facts.ndjson": {
+      "artifact": "corridor_facts",
+      "manifest_record_count": 20,
+      "record_count": 20,
+      "sha256": "9827bd94ac8c551ba191672550ca3473e58ba825729cd3dba40cfdb43ef709b3"
+    }
+  },
+  "gates": [
+    {
+      "detail": "20 records, manifest declares 20",
+      "gate": "count:corridor_facts",
+      "pass": true
+    },
+    {
+      "detail": "6 records, manifest declares 6",
+      "gate": "count:city_stavanger",
+      "pass": true
+    },
+    {
+      "detail": "7 records, manifest declares 7",
+      "gate": "count:city_copenhagen",
+      "pass": true
+    },
+    {
+      "detail": "0 facts with neither source_url nor source_missing=true",
+      "gate": "no_fabrication",
+      "pass": true
+    },
+    {
+      "detail": "{'DE->DK': 3, 'DK->DE': 3, 'DK->NO': 3, 'GB->NO': 4, 'NO->DK': 3, 'NO->GB': 4} vs manifest {'NO->GB': 4, 'GB->NO': 4, 'DK->NO': 3, 'NO->DK': 3, 'DK->DE': 3, 'DE->DK': 3}",
+      "gate": "direction_breakdown",
+      "pass": true
+    },
+    {
+      "detail": "employee_type values present: ['all']",
+      "gate": "employee_type_unambiguous",
+      "pass": true
+    },
+    {
+      "detail": "0 records carry a served status",
+      "gate": "candidate_only",
+      "pass": true
+    }
+  ],
+  "loaded_into_database": false,
+  "manifest_sha256": "33a58e4abcd200885d6a16ed5f95432eb70b6cebb0b319a8db7a63c46879080d",
+  "provenance": {
+    "distinct_source_urls": 16,
+    "flagged": 0,
+    "source_missing": 0
+  },
+  "target_table": null,
+  "totals": {
+    "corridor_facts": 20,
+    "directions": 6,
+    "enrichment_records": 13
+  }
+}

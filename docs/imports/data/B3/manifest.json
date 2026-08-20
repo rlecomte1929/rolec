@@ -1,0 +1,71 @@
+{
+  "batch": "B3-facts-enrichment",
+  "project": "ReloPass corridor compliance flags + destination enrichment",
+  "workspace": "d0c29613-9cb5-4652-9c6a-494eeed352e5",
+  "date": "2026-08-18",
+  "no_fabrication_policy": "Every fact carries a real fetched source_url + source_name + retrieved_at. No invented sources, phones, numbers, or facts. Unverifiable items were omitted rather than guessed (see honesty_notes).",
+  "files": [
+    {
+      "artifact": "corridor_facts",
+      "kind": "non_obvious_compliance_flags",
+      "schema": "corridor, employee_type, category, official_guidance, actual_reality, action_required, source_url, source_name, retrieved_at, source_missing, flagged",
+      "record_count": 20,
+      "by_direction": {
+        "NO->GB": 4,
+        "GB->NO": 4,
+        "DK->NO": 3,
+        "NO->DK": 3,
+        "DK->DE": 3,
+        "DE->DK": 3
+      },
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1787075042973_10yl24nl.ndjson"
+    },
+    {
+      "artifact": "city_stavanger",
+      "kind": "geo_city_content",
+      "city": "Stavanger",
+      "country": "NO",
+      "topics": [
+        "neighborhoods",
+        "transport",
+        "schools",
+        "banking",
+        "healthcare",
+        "practicalities"
+      ],
+      "record_count": 6,
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1787075044525_85fmzvpu.ndjson"
+    },
+    {
+      "artifact": "city_copenhagen",
+      "kind": "geo_city_content",
+      "city": "Copenhagen",
+      "country": "DK",
+      "topics": [
+        "neighborhoods",
+        "transport",
+        "cost_of_living",
+        "schools",
+        "banking",
+        "healthcare",
+        "practicalities"
+      ],
+      "record_count": 7,
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1787075045987_zqhtecds.ndjson"
+    }
+  ],
+  "totals": {
+    "corridor_facts": 20,
+    "directions": 6,
+    "enrichment_records": 13,
+    "cities": 2,
+    "files": 3
+  },
+  "honesty_notes": [
+    "EU/EEA A1 / posted-worker certificate flags were NOT included: authoritative Your Europe / europa.eu registration pages are JS-rendered and returned no static text to verify cleanly. Continental-shelf social-security coverage is covered instead via the fetched NAV (NO->GB) and HMRC (GB->NO) certificate-of-coverage pages.",
+    "No DK<->DE Oresund commuter flag: the Oresund cross-border region is DK<->SE (Copenhagen-Malmo), not DK<->DE, so no such flag applies to these directions.",
+    "Germany Rundfunkbeitrag amount (EUR 18.36/month): the official rundfunkbeitrag.de amount page is JS-rendered; the figure was corroborated against an institutional (Uni Kiel) page and the fetched welcome page.",
+    "Copenhagen neighborhoods: expatarrivals.com areas page returned HTTP 403, so the neighborhoods record is anchored on verified international-school cluster locations (CIS Nordhavn; Rygaards/ISH Hellerup) rather than unsourced area claims.",
+    "Stavanger schools: Lycee francais de Stavanger closed permanently summer 2019 and is NOT listed as active; ISS + BISS retained."
+  ]
+}

@@ -15,6 +15,7 @@ import { CaseFeasibilityPanel } from '../components/case/CaseFeasibilityPanel';
 import { statusLabel } from '../lib/statusLabel';
 import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
 import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
+import { CaseVendorsPanel } from '../components/case/CaseVendorsPanel';
 import type { ImmigrationContext } from '../components/case/immigrationContext';
 import { PendingRfqsPanel } from '../components/case/PendingRfqsPanel';
 import { ImmigrationStatusPanel } from '../components/case/ImmigrationStatusPanel';
@@ -411,6 +412,16 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
               404-and-render-as-empty, which is the very failure being fixed. Null instead,
               so the panel fails closed and says so. */}
           <PendingRfqsPanel caseId={detail.caseId ?? null} />
+
+          {/* [AIQ-1896] The vendors HR assigned via "Find a vendor", on the same
+              page as the button — otherwise the only surface showing them is
+              /hr/cases/:caseId and an assignment here looks like it did nothing.
+              Renders null while empty, so the card is unchanged until used. */}
+          {detail.caseId && (
+            <div className="mt-4">
+              <CaseVendorsPanel caseId={detail.caseId} />
+            </div>
+          )}
         </Card>
 
         <Button variant="outline" onClick={() => navigate(buildRoute('hrCommandCenter'))}>
@@ -419,12 +430,18 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
       </div>
 
       {/* ── AIQ-40-B: Vendor browse slide-over ── */}
+      {/* [AIQ-1896] caseId turns the directory into an assign surface. Same
+          canonical id PendingRfqsPanel uses — case_vendor_shortlist.case_id is
+          the canonical case id, never this route's assignment PK. Null when
+          absent, so the panel falls back to read-only browse rather than
+          POSTing against an id the shortlist is not keyed on. */}
       <VendorBrowsePanel
         isOpen={vendorPanelOpen}
         onClose={() => { setVendorPanelOpen(false); setVendorPanelInitialCategory(''); setVendorImmigrationContext(null); }}
         destCountry={detail.destCountry}
         initialCategory={vendorPanelInitialCategory}
         immigrationContext={vendorImmigrationContext}
+        caseId={detail.caseId ?? null}
       />
 
       {/* ── NAV-HR-2: case-level escalate ── */}

@@ -231,6 +231,86 @@ root fails the build (exit 2) until re-registered, as does any module inside the
 closure that fails to parse — an unparsed module hides whatever it imports. See
 `docs/specs/serving-llm-isolation.md`.
 
+## Corridor requirement data
+
+A corridor's requirement records are the product's core asset. Two rules, both learned by
+nearly getting them wrong on IE→ES (`docs/corridors/README.md` has the full set):
+
+**`requirement_items.review_status` DEFAULTS to `'approved'`, and `requirements_builder`
+serves only approved rows.** A corridor load that omits the column therefore publishes
+unreviewed, representative facts to real users the moment it applies. Set `'pending'`
+explicitly, and never let an `ON CONFLICT` update overwrite it — re-running a load must not
+un-approve what a reviewer has since approved.
+
+**Verify the live table before writing the load.** A batch manifest names a target table and
+key; that is a claim, not a schema. The IE→ES manifest named `requirement_facts` keyed on
+`fact_uid` — a table with no `fact_uid` column and two NOT NULL uuid FKs the batch could not
+supply. Corridor requirement data lands in `public.requirement_items`, whose varchar `id`
+carries the batch's own uid verbatim.
+
+Corridor registry profiles and pathway step graphs live in `corridors/<ID>/`; docs, metrics
+and the Case Verification Report live in `docs/corridors/<id>/`.
+
+## Research batch intake (GCS → candidate)
+
+Otto researches in the Audos workspace and its real deliverable is **NDJSON files on Google
+Cloud Storage plus a manifest**, not the chat text. Bringing one in is a repeatable procedure,
+not a one-off. `docs/imports/B3-facts-enrichment.md` is the worked example.
+
+1. **Get untruncated URLs.** Otto's chat renderer truncates the anchor *text* while leaving
+   the `href` intact — read the page's accessibility tree rather than asking Otto to re-paste.
+2. **Fetch the manifest first.** It declares each artifact's schema, record count and full
+   GCS URL. Counts must reconcile against it exactly, and any discrepancy is the batch's
+   problem to explain, not yours to reconcile away.
+3. **Verify the manifest's claims against the live schema before writing anything.** A
+   manifest names a target table and key; that is a claim, and it has been wrong. B3 named
+   four tables (`kg_corridors`, `kg_corridor_requirements`, `kg_employee_types`,
+   `geo_city_content`) that **do not exist in this repo at all**, alongside a
+   `tools/wave2-import-pipeline.mjs` that exists on no ref. Confirm the table, then map the
+   fields.
+4. **Commit the artifacts + a batch doc under `docs/imports/`,** with a gate script that
+   re-hashes each file and reconciles counts. A GCS object with no repo record is one bucket
+   cleanup away from gone, and a "verified" fact nobody can diff is not verified.
+5. **Load as candidates only.** `status='pending'` / `'candidate'` / `'new'`, never `live`,
+   `verified`, `lawyer_verified` or `approved`. Idempotent on the batch's own uid, and an
+   `ON CONFLICT` must never overwrite a reviewer's decision.
+6. **Never fill a gap.** A field the artifact does not carry stays NULL. A record with
+   `source_missing=true` keeps the flag and gets no invented citation. Deriving a slug key
+   from delivered fields is fine and must be documented as derived; inventing a source, a
+   number or a confidence score is fabrication.
+
+**Search for the capability, not for the table name the task gave you.** This is the mistake
+B3 made and it cost a whole pass. The task named `kg_corridor_requirements` and
+`tools/wave2-import-pipeline.mjs`; both are fictional, and grepping for them concluded there
+was no home for the data. There is:
+
+```
+Otto research (JSONL in audos-workspace-776786/data/)
+  → backend/imports/otto/parsers.py     FactRow, source-domain tiering
+  → executor.stage()                    otto_staging.immigration_*
+  → executor.reconcile()                load_log, processing_queue
+  → executor.promote()   [opt-in]       public.requirement_items   ← human gate
+```
+
+`scripts/import_otto_facts.py <batch-id>` is the CLI for requirement facts (dry-run by
+default); `scripts/import_resources.py --bundle` is the parallel path for city/destination
+content, in `draft_only` mode. Both land candidates only. **Check these before concluding a
+batch has nowhere to go.**
+
+**Source domain decides whether a fact is kept at all.** `classify_source()` rejects
+UNOFFICIAL outright, and its allowlist is a list of *hosts*, because statutory bodies
+routinely publish on a domain that is not a gov TLD. It has been too narrow three times now —
+`irishimmigration.ie`, `citizensinformation.ie`/`revenue.ie`, and the DK/DE set
+(`skat.dk`, `bzst.de`, `service.berlin.de`, `rundfunkbeitrag.de`, `borger.dk`) which silently
+rejected 9 of B3's 20 facts, being every Danish- and German-destination direction. When a
+batch's rejects cluster by country, suspect the allowlist before the research.
+
+**Only when there is genuinely no in-repo path**, land the artifacts plus a decision record
+and run the write where the database is — the `kg_*` corridor toolchain and WorkspaceDB do
+live in the Audos workspace and are unreachable from a CLI checkout. Writing an importer
+against an imagined schema invents the row shape, the column names and the write contract,
+which is worse than nothing for work whose entire purpose is auditability.
+
 ## Migration discipline (MANDATORY)
 
 NEVER apply a migration to production via MCP `apply_migration` or by manually
@@ -382,7 +462,7 @@ A multi-stage remediation plan lives at `audit/REMEDIATION_PLAN.md` with a rolli
 
 **Branch naming convention for audit remediation:** `audit/stage-N-<slug>` (e.g. `audit/stage-1-security`, `audit/stage-2-copy`). One branch per stage; one PR per stage; one re-audit doc per stage. Sub-stages use `audit/stage-Na-<slug>` (e.g. `audit/stage-8a-route-auth-ci`).
 
-**System of record:** Each finding has a Notion AI Work Queue entry (DB id `7adc643a-c448-4a1a-ba80-e27e417f42d6`) with Priority + Complexity + Validation Criteria + Context Links back to the originating `audit/02-expert-*.md` file. Update Status as the work moves through `Ready for AI → AI in Progress → Human Review → Done`.
+**System of record:** Each finding has a Notion AI Work Queue entry (DB id `3bc887c6-4d48-8089-8188-fcf2dc3edc1b`; the earlier `7adc643a…` is the database now titled *AI Work Queue (RETIRED)* — do not write to it) with Priority + Complexity + Validation Criteria + Context Links back to the originating `audit/02-expert-*.md` file. Update Status as the work moves through `Ready for AI → AI in Progress → Human Review → Done`.
 
 **Gate discipline:** No stage starts until the previous stage's PR is merged + canary clean. See `audit/REMEDIATION_PLAN.md` §"Universal stage protocol" for the per-stage checklist.
 

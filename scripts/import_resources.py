@@ -34,7 +34,7 @@ from backend.imports.resources.validators import validate_bundle
 
 def _load_existing_keys():
     """Load existing category/tag keys from DB for validation."""
-    from backend.services.supabase_client import get_supabase_admin_client
+    from backend.app.services.supabase_client import get_supabase_admin_client
     supabase = get_supabase_admin_client()
     cat_r = supabase.table("resource_categories").select("key").execute()
     tag_r = supabase.table("resource_tags").select("key").execute()
@@ -103,8 +103,11 @@ def main() -> int:
         print("Validation errors:")
         for e in errors:
             print(f"  {e['entity_type']} row {e['row_num']} [{e['field']}]: {e['message']}")
-        if not args.validate_only:
-            return 1
+        # A validation error is a failure whether or not a write was going to follow.
+        # This used to `return 1` only when importing, so --validate-only printed the
+        # errors and then announced "Validation passed" and exited 0 — a check that
+        # reports success while displaying its own failures.
+        return 1
 
     if args.validate_only:
         print("Validation passed. Use without --validate-only to import.")

@@ -108,6 +108,14 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # (docs/audos/otto-batch-2026-08-13/otto-batch.json:699, otto_verify.py:56) — the
     # importer's allowlist had simply never been told.
     "irishimmigration.ie",
+    # Denmark. Denmark uses no governmental suffix at all, so the suffix rule scored the
+    # national tax authority itself as a relocation blog and rejected it.
+    "skat.dk",
+    # Germany. `bund.de` covers the federal portal, but the bodies that actually publish the
+    # rule mostly do not sit under it: the BZSt issues the tax ID, service.berlin.de is the
+    # Land of Berlin's own service catalogue for the Anmeldung, and Rundfunkbeitrag is the
+    # body that levies the broadcasting fee it describes.
+    "bzst.de", "service.berlin.de", "rundfunkbeitrag.de",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )
@@ -126,6 +134,11 @@ _SEMI_OFFICIAL_HOSTS: Tuple[str, ...] = (
     # the tax authority itself. Semi-official, not official: both restate rules published
     # elsewhere, so a fact from here is worth keeping and belongs in the review queue.
     "citizensinformation.ie", "revenue.ie",
+    # Denmark. borger.dk is the Danish state's official citizen portal, run by the Agency
+    # for Digital Government — so it belongs in, not out. Semi-official for the same reason
+    # as citizensinformation.ie: it is a portal that restates what SKAT, the CPR office and
+    # the regions publish elsewhere, so a fact from here belongs in the review queue.
+    "borger.dk",
 )
 
 
