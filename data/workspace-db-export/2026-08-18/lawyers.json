@@ -1,0 +1,23 @@
+{
+ "table": "lawyers",
+ "sqlName": "app_lawyers",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 1,
+ "rows": [
+  {
+   "id": 1,
+   "name": "[PLACEHOLDER — DO NOT USE: France counsel not yet identified/confirmed]",
+   "firm": null,
+   "jurisdiction": "France",
+   "specialty": "consultation_juridique",
+   "engagement_types_covered": [
+    "launch_signoff"
+   ],
+   "contact": null,
+   "status": "prospect",
+   "session_id": null,
+   "created_at": "2026-07-10T21:42:14.885Z",
+   "updated_at": "2026-07-10T21:42:14.885Z"
+  }
+ ]
+}
