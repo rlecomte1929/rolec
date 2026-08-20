@@ -18,6 +18,12 @@ const PROVENANCE: Record<string, { label: string; variant: 'neutral' | 'info' | 
   representative: { label: 'Representative', variant: 'neutral' },
   corpus_grounded: { label: 'Source-grounded', variant: 'info' },
   expert_verified: { label: 'Expert-verified', variant: 'success' },
+  // Production stores `verified`, not `expert_verified` — 10 approved rows, every one of
+  // them rendering NO badge at all, because this map had never heard of the value the
+  // database actually holds. There is no translation layer: the backend passes
+  // verification_status straight through. Both keys are honoured until the two are
+  // normalised, because silently dropping the badge on verified content is the worse bug.
+  verified: { label: 'Expert-verified', variant: 'success' },
 };
 
 const REVIEW: Record<ReviewStatus, { label: string; variant: 'warning' | 'success' | 'error' }> = {

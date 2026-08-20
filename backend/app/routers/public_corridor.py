@@ -109,6 +109,9 @@ def _base_items(requirements: List[Any]) -> List[Dict[str, Any]]:
                 else None
             ),
             "verificationStatus": getattr(item, "verification_status", None),
+            "attestationStatus": getattr(item, "attestation_status", None),
+            "attestedBy": getattr(item, "attested_by", None),
+            "attestedAt": getattr(item, "attested_at", None),
             # getattr-defaulted, not `item.non_obvious`: the canned SimpleNamespace rows in
             # backend/tests/test_public_corridor.py don't carry these, and a row read before
             # the migration lands must degrade to false/None rather than raise.
