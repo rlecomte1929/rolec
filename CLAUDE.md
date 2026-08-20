@@ -231,6 +231,26 @@ root fails the build (exit 2) until re-registered, as does any module inside the
 closure that fails to parse — an unparsed module hides whatever it imports. See
 `docs/specs/serving-llm-isolation.md`.
 
+## Corridor requirement data
+
+A corridor's requirement records are the product's core asset. Two rules, both learned by
+nearly getting them wrong on IE→ES (`docs/corridors/README.md` has the full set):
+
+**`requirement_items.review_status` DEFAULTS to `'approved'`, and `requirements_builder`
+serves only approved rows.** A corridor load that omits the column therefore publishes
+unreviewed, representative facts to real users the moment it applies. Set `'pending'`
+explicitly, and never let an `ON CONFLICT` update overwrite it — re-running a load must not
+un-approve what a reviewer has since approved.
+
+**Verify the live table before writing the load.** A batch manifest names a target table and
+key; that is a claim, not a schema. The IE→ES manifest named `requirement_facts` keyed on
+`fact_uid` — a table with no `fact_uid` column and two NOT NULL uuid FKs the batch could not
+supply. Corridor requirement data lands in `public.requirement_items`, whose varchar `id`
+carries the batch's own uid verbatim.
+
+Corridor registry profiles and pathway step graphs live in `corridors/<ID>/`; docs, metrics
+and the Case Verification Report live in `docs/corridors/<id>/`.
+
 ## Research batch intake (GCS → candidate)
 
 Otto researches in the Audos workspace and its real deliverable is **NDJSON files on Google
@@ -308,20 +328,43 @@ The ONLY permitted workflow for schema changes:
 ### ⛔ Never run `supabase db push` against prod
 
 `db push` applies **every** pending migration, and the repo/prod ledgers have drifted far
-apart. Measured 2026-08-03: 572 distinct repo versions vs 425 in the prod ledger —
-**147 pending versions (153 files), reaching back to 2026-04-27**. Two confirmed landmines
-in that set:
+apart. Measured **2026-08-19**: **614 distinct repo versions vs 466 in the prod ledger —
+148 pending versions (148 files), 0 orphans**, reaching back to 2026-04-27.
 
-- `20261004000000_cleanup_living_areas_supplier_shells.sql` — destructive `DELETE`s against
-  `company_vendor_selections` and `service_catalog_items`.
-- `20260605950000_rfq_requests.sql` — creates `public.rfq_requests`, a **superseded** design.
+**The danger is not mass deletion — it is resurrection of reverted state.** Earlier
+revisions of this file named two `DELETE`-carrying "landmines"; both were re-measured on
+2026-08-19 and each now deletes **0 rows** (the cleanups were applied out-of-band long ago).
+Of the 148 pending files, 14 contain a `DELETE`/`TRUNCATE`/`DROP TABLE`, mostly as
+commented-out rollback notes; the only live row-deleter is
+`20260605800000_imm11_form_field_mappings_seed.sql`, a scoped idempotent reseed. The
+`DROP TABLE ... CASCADE` block in `20260520000000_platform_redesign_schema.sql` is a
+**verified no-op**: all six of its discriminator guards evaluate `false` against prod.
+
+The real hazard is ordering. The 148 pending files are *interleaved* with 363 already-applied
+later ones, so replaying an old migration runs it **after its own reversal**, and the
+reversal will not re-run. Two confirmed instances:
+
+- `20260427110000_services_state.sql` re-creates `trg_audit_services_state`, which
+  `20260731000000` — already applied — deliberately dropped for writing a duplicate
+  `audit_logs` row per save carrying the whole `state_json` blob (up to 256 KB) attributed
+  to `system`. The table has 334 live rows.
+- `20260605950000_rfq_requests.sql` creates `public.rfq_requests`, a **superseded** design.
   Prod renamed that table to `rfq_requests_legacy`; the live RFQ system is `rfqs` /
   `rfq_items` / `rfq_recipients`. Applying it resurrects dead schema beside the live tables.
 
-Most of the drift is bookkeeping (the migration was applied out-of-band and the ledger never
-recorded it), but it is **not uniformly so**, which is why there is no safe bulk action.
-A full triage — classify each pending migration as applied / superseded / genuinely-missing —
-is parked until the pre-launch data reset, when migrations must become authoritative.
+**The applier has been jammed since 2026-04-22.** The Supabase↔GitHub integration's
+sequential applier stops on `20260427110000_services_state.sql` with `operator does not
+exist: text = uuid` (42883) — that migration was written for a uuid-keyed table, but prod's
+`services_state` is text-keyed on all three columns and was created out-of-band. This is why
+the default branch sits at `MIGRATIONS_FAILED` and every preview branch fails. Note
+`Supabase Preview` is **not** a required check (only backend-tests and frontend-build gate
+merges), so the red X blocks nothing — do not treat it as a real failure signal.
+
+**Never "fix" the failing migration to un-jam the applier** while the integration is
+connected: that releases all 148 behind it, with the ordering hazard above. Retire the
+integration first, or baseline the ledger. A full triage — classify each pending migration
+as applied / superseded / genuinely-missing — is parked until the pre-launch data reset,
+when migrations must become authoritative.
 
 **To record an out-of-band apply, reconcile the ledger instead:**
 

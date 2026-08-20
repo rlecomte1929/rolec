@@ -1,0 +1,131 @@
+# Corridor Agent — IE_ES_2026  (Ireland → Spain, free movement)
+#
+# REPRESENTATIVE — indicative content, NOT SME-verified. Grounded in the EU free movement
+# framework (TFEU Art. 45; Directive 2004/38/EC; RD 240/2007). An EU/EEA/EFTA national
+# needs NO visa and NO salary floor; the journey is the Spanish administrative
+# registration sequence. Confirm details with the destination authority before any
+# authoritative use.
+#
+# The step graph below is the sequence the 25 verified IE→ES requirement records describe.
+# Two orderings in it are the corridor's actual traps and are modelled deliberately:
+#   * EMPADRONAMIENTO before NIE_CERTIFICADO_REGISTRO — the padrón certificate is an input
+#     to the Extranjería appointment, and the dependency is not stated on either page.
+#   * NIE before HOUSING_LEASE — Spanish landlords require an NIE to sign a lease, while
+#     the padrón normally expects a registered address. That circularity is the single
+#     most-reported IE→ES surprise and is carried as a non_obvious record.
+
+corridor_agent:
+  corridor_id: IE_ES_2026
+  version: "2026.01"
+  petitioning_party: EMPLOYEE
+  origin_country_iso3: IRL
+  destination_country_iso3: ESP
+  description: >
+    Ireland (EU/EEA/EFTA) national → Spain under free movement.
+    No visa or residence-permit gate; the pathway models the administrative
+    registration sequence and its interlocking deadlines.
+
+  applicable_rules:
+    - legal_reference: "TFEU Art. 45"
+      rule_id: EU_TFEU_45
+      summary: "Free movement of workers within the Union."
+    - legal_reference: "Directive 2004/38/EC"
+      rule_id: EU_2004_38
+      summary: "Union citizens' right to move and reside freely."
+    - legal_reference: "Real Decreto 240/2007"
+      rule_id: ES_RD_240_2007
+      summary: "Entry/residence of EU/EEA citizens — certificado de registro de ciudadano de la UE."
+    - legal_reference: "Ley 7/1985 (empadronamiento)"
+      rule_id: ES_PADRON
+      summary: "Municipal register — the padrón is the gateway to healthcare and schooling."
+    - legal_reference: "Regulation (EC) 883/2004"
+      rule_id: EU_883_2004
+      summary: "Single-state social security rule; A1 for posted workers."
+    - legal_reference: "Ley 29/1994 (LAU)"
+      rule_id: ES_LAU
+      summary: "Urban tenancy law — the fianza (deposit) regime."
+
+  required_documents:
+    - PASSPORT_OR_NATIONAL_ID:employee
+    - PASSPORT_OR_NATIONAL_ID:family.spouse?
+    - EMPLOYMENT_CONTRACT?
+
+  required_data_points:
+    - key: eu_eea_nationality
+      type: bool
+      source: USER_INPUT
+      validations:
+        - "== true"
+
+  # No salary floor applies to free movement.
+  salary_thresholds_eur: {}
+
+  eligibility_logic:
+    branches:
+      - id: BRANCH_FREE_MOVEMENT
+        label: "EU freedom of movement (TFEU Art. 45)"
+        cite: EU_TFEU_45
+        requires_all:
+          - eu_eea_nationality == true
+        verdict_on_pass: ELIGIBLE
+    no_branch_verdict: NOT_ELIGIBLE
+
+  exception_cases: []
+
+  step_graph:
+    - step_id: TRAVEL_TO_ES
+      name: "Travel to Spain (no visa for EU nationals)"
+      # Free movement: the graph roots at arrival, so pre-arrival runway is ~0.
+      arrival_anchor: true
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: []
+
+    - step_id: EMPADRONAMIENTO
+      name: "Municipal registration (empadronamiento / padrón)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [TRAVEL_TO_ES]
+      cite: ES_PADRON
+
+    - step_id: NIE_CERTIFICADO_REGISTRO
+      name: "NIE + certificado de registro UE (EX-18 + tasa 790-012) at Extranjería"
+      # The cita previa queue, not the decision, is the critical path here.
+      responsible_party: EMPLOYEE
+      expected_duration_days: 30
+      prerequisite_step_ids: [TRAVEL_TO_ES, EMPADRONAMIENTO]
+      cite: ES_RD_240_2007
+
+    - step_id: SOCIAL_SECURITY_NUSS
+      name: "Social security number (NUSS) + employer alta"
+      responsible_party: EMPLOYER
+      expected_duration_days: 7
+      prerequisite_step_ids: [NIE_CERTIFICADO_REGISTRO]
+      cite: EU_883_2004
+
+    - step_id: HEALTHCARE_TSI
+      name: "SNS registration and tarjeta sanitaria individual (TSI)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 21
+      prerequisite_step_ids: [EMPADRONAMIENTO, SOCIAL_SECURITY_NUSS]
+
+    - step_id: HOUSING_LEASE
+      name: "Long-term lease and fianza (deposit) lodgement"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 30
+      prerequisite_step_ids: [NIE_CERTIFICADO_REGISTRO]
+      cite: ES_LAU
+
+    - step_id: TAX_MODELO_030
+      name: "Tax census registration (Modelo 030); Beckham election if eligible"
+      # The Beckham election has a 6-month window from the alta — a deadline that expires
+      # silently, which is why it is modelled as its own step rather than a note.
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [NIE_CERTIFICADO_REGISTRO, SOCIAL_SECURITY_NUSS]
+
+    - step_id: DRIVING_LICENCE
+      name: "EU licence remains valid; DGT registration where required"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 30
+      prerequisite_step_ids: [NIE_CERTIFICADO_REGISTRO]
