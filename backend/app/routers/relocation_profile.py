@@ -13,7 +13,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..auth_deps import get_current_user
 from ...database import db as main_db
@@ -113,6 +113,16 @@ class FinancialProfile(BaseModel):
 
 
 class RelocationProfilePayload(BaseModel):
+    # [AIQ-1885] Every field is optional, and pydantic ignores unknown keys by
+    # default — so an unrecognised body validated as an all-None payload, was
+    # stored, and came back 200 with completion_pct 0 and last_updated_at null.
+    # Accepted and discarded, with no way for the caller to tell.
+    #
+    # `forbid` turns that into a 422 naming the offending key. Safe for the real
+    # caller: frontend/src/api/relocationProfile.ts sends exactly these six fields
+    # and no others.
+    model_config = ConfigDict(extra="forbid")
+
     origin_housing: Optional[OriginHousing] = None
     housing_preferences: Optional[HousingPreferences] = None
     household: Optional[HouseholdMembers] = None
