@@ -1,0 +1,52 @@
+# European Union (union-level instruments) jurisdiction fact pack.
+#
+# Authored from the 2026-08-19 human provenance pass. Every url, publication date and
+# evidence quote below is a verbatim capture from the cited official page; `fact_text` and
+# `title` are ours. See backend/seeds/facts/README.md for why this format exists and why
+# facts are keyed by the AUTHORITY THAT PUBLISHES THEM rather than by corridor.
+#
+# Nothing here is published by loading it: rows land review_status='pending'.
+# `representative` means visible-but-awaiting-counsel-attestation.
+# SUPRANATIONAL. Published by the Union, not by a member state, so it has no catalog
+# country and never becomes a requirement_items row. Corridors bind it origin-side.
+
+jurisdiction: "EU"
+catalog_country: null
+pack_version: "2026-08-19"
+
+default_purposes: [employment]
+default_owner: EMPLOYEE
+default_severity: WARN
+
+facts:
+  - fact_key: a1_posting
+    topic: social_security-posting
+    kind: obligation
+    status: representative
+    pillar: SOCIAL_SECURITY
+    title: "The PD A1 certifies home-country social security during a posting, for at most 24 months"
+    fact_text: >-
+      The Portable Document A1 confirms that a posted employee remains registered under the social
+      security system of the home country and owes no contributions in the country of posting. The
+      request must state the start and end date of the posting; the maximum period the form can
+      carry is 24 months.
+    timing: "before the posting starts"
+    non_obvious: true
+    source:
+      url: "https://europa.eu/youreurope/business/human-resources/cross-border-posted-workers/posting-staff-abroad/index_en.htm"
+      publisher_domain: "europa.eu"
+      published_date: 2026-03-12
+      source_version: "Your Europe, “Posting staff abroad” — Last checked 12/03/2026, retrieved 2026-08-19"
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        The PD A1 confirms that the posted employee is registered under the social security system
+        in their home country and does not need to pay contributions in the country of posting.
+        When requesting the PD A1, you need to specify the start and end date of the posting in
+        the other EU country. The maximum period you can indicate on the form is 24 months.
+      quote_sha256: "776591f7727a1ffb3aa4a38b7988e845a731925b197e3751a228312255bfe990"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "NO:social_security-folketrygdloven:reg_883_via_eea"
+    pack_keys:
+      - "NO-FR:social_security-a1-posting:a1_posting"
+

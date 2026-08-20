@@ -1,0 +1,20 @@
+# Which jurisdiction facts the France -> Norway corridor cites, and in which direction.
+# See corridors/NO_FR/facts.yaml for the format rationale.
+#
+# NO step_id ANYWHERE, DELIBERATELY. This corridor's only pathway
+# (pathways/EEA_FREEDOM_2026/v1.yaml) is a six-step destination-only graph - TRAVEL_TO_NO,
+# EEA_POLICE_REGISTRATION, NATIONAL_REGISTRY, TAX_DEDUCTION_CARD, HEALTH_REGISTRATION,
+# BANK_ACCOUNT. It has no housing step and no origin-side phase at all, so the two tenancy
+# facts and the French exit tax have no host step. Inventing three steps to hold three facts
+# would be authoring an immigration sequence nobody verified; the facts render corridor-level
+# instead, which is why `step_id` is optional.
+
+corridor_id: FR_NO
+origin_iso: "FR"
+destination_iso: "NO"
+origin_facts:
+  - ref: "FR:tax-exit:exit_tax"
+
+destination_facts:
+  - ref: "NO:housing-husleieloven:deposit_cap_6_months"
+  - ref: "NO:housing-husleieloven:lease_terms"
