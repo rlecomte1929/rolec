@@ -28,10 +28,11 @@ import hashlib
 import logging
 import sys
 import time
+import urllib.robotparser
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -47,7 +48,6 @@ from backend.app.services.fact_evidence import (  # noqa: E402
     VERIFIED,
     check_evidence,
 )
-from backend.crawler.jobs.immigration_crawl_job import RobotsTxtCache  # noqa: E402
 from backend.crawler.parsers import immigration_page_parser  # noqa: E402
 
 log = logging.getLogger("backfill_fact_evidence")
@@ -57,24 +57,35 @@ log = logging.getLogger("backfill_fact_evidence")
 MAX_EXCERPT_CHARS = 24_000
 FETCH_TIMEOUT_S = 30.0
 
-# Measured 2026-08-20 across the 112 sources behind the approved facts: 16 returned 403 and a dry
-# run wanted to record 122 `no_source` verdicts. Eight of those 403s were citizensinformation.ie
-# alone — the corridor under active build, scored against pages that serve fine to a browser.
-# `ReloPassBot/1.0 (evidence-backfill)` was refused, and so was a self-identifying
-# `Mozilla/5.0 (compatible; ReloPassBot/1.0; +url)`. A real browser token is the only thing these
-# publishers answer. We only ever fetch public pages we already cite as sources, and we ask
-# robots.txt first (below) rather than treating the token as licence.
-USER_AGENT = (
+# Measured 2026-08-20 across the sources behind the approved facts. There is NO single
+# User-Agent that works everywhere, which is why this is a chain rather than a constant:
+#
+#   citizensinformation.ie   bot UA -> 403          browser UA -> 200
+#   immi.homeaffairs.gov.au  bot UA -> 403          browser UA -> 200
+#   canada.ca                bot UA -> 200          browser UA -> connection reset in 0.15s
+#   travel.state.gov         403 to everything (Cloudflare)
+#
+# Order is deliberate and is the whole ethical point: we identify as ourselves FIRST, and only
+# present as a browser to a publisher that has actually refused our own name. A first pass that
+# led with the browser token dropped Canada from 13.6% evidenced to 0%.
+UA_HONEST = "ReloPassBot/1.0 (evidence-backfill)"
+UA_BROWSER = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
+#: Tried in order until one returns a usable page. `None` sends no User-Agent header at all,
+#: which is the only thing some anti-bot front ends accept.
+USER_AGENTS: Tuple[Optional[str], ...] = (UA_HONEST, UA_BROWSER, None)
+
+#: Kept for callers and tests that ask "what do we identify as by default".
+USER_AGENT = UA_HONEST
 
 #: One request per second per host.
 HOST_DELAY_S = 1.0
 
 
 class HostRateLimiter:
-    """Space requests to the same host. Politeness is the other half of using a browser token."""
+    """Space requests to the same host. Politeness is the other half of a UA fallback chain."""
 
     def __init__(self, delay_s: float = HOST_DELAY_S) -> None:
         self.delay_s = delay_s
@@ -89,6 +100,68 @@ class HostRateLimiter:
             if remaining > 0:
                 time.sleep(remaining)
         self._last[host] = time.monotonic()
+
+
+class RobotsPolicy:
+    """robots.txt per host, fetched through the same UA chain as the pages.
+
+    `urllib.robotparser.RobotFileParser.read()` fetches with urllib's own `Python-urllib/3.x`
+    User-Agent and treats a 403 on robots.txt as *disallow everything*. On 2026-08-20 that
+    silently blocked every citizensinformation.ie, travel.state.gov and france-visas.gouv.fr
+    URL — the robots check defeated the very UA fallback it was paired with, and Ireland went
+    from 6.8% evidenced to 0%. So fetch robots ourselves and only then parse it.
+
+    A 4xx is treated as "no policy published" and allows, matching the conventional reading
+    (and citizensinformation.ie really does 404 its robots.txt). A 5xx disallows: the server
+    has a policy and cannot currently tell us what it is.
+    """
+
+    def __init__(self) -> None:
+        self._cache: Dict[str, Optional[urllib.robotparser.RobotFileParser]] = {}
+
+    def _load(self, origin: str) -> Optional[urllib.robotparser.RobotFileParser]:
+        body, status = None, None
+        for ua in USER_AGENTS:
+            headers = {"User-Agent": ua} if ua else {}
+            try:
+                with httpx.Client(timeout=FETCH_TIMEOUT_S, follow_redirects=True,
+                                  headers=headers) as client:
+                    resp = client.get(origin + "/robots.txt")
+                status = resp.status_code
+                if resp.status_code == 200:
+                    body = resp.text
+                    break
+            except Exception:
+                continue
+        if body is None:
+            if status is not None and 500 <= status < 600:
+                rp = urllib.robotparser.RobotFileParser()
+                rp.disallow_all = True
+                return rp
+            return None  # no readable policy -> allow
+        # A soft 404 serves an HTML page as robots.txt. Parsing that yields no directives, but
+        # be explicit rather than relying on the parser shrugging.
+        if "user-agent" not in body.lower():
+            return None
+        rp = urllib.robotparser.RobotFileParser()
+        rp.parse(body.splitlines())
+        return rp
+
+    def allowed(self, url: str) -> bool:
+        parsed = urlsplit(url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        if origin not in self._cache:
+            try:
+                self._cache[origin] = self._load(origin)
+            except Exception:
+                self._cache[origin] = None
+        rp = self._cache[origin]
+        if rp is None:
+            return True
+        try:
+            return rp.can_fetch(UA_HONEST, url)
+        except Exception:
+            return True
 
 
 def fetch_status_for(res: Dict[str, Any]) -> str:
@@ -118,34 +191,55 @@ def fetch_and_parse(
 ) -> Dict[str, Any]:
     """Fetch one source and return its readable article text. Never raises.
 
-    `blocked` distinguishes "the publisher refused us" from "there is nothing there". The
-    evidence checker cannot tell them apart — it only ever sees empty text — so the difference
-    has to be preserved here or a live page reads as a missing source.
+    Walks `USER_AGENTS` in order, stopping at the first identity that yields a usable page, and
+    reports which one worked. `blocked` distinguishes "every identity was refused" from "there
+    is nothing there": the evidence checker only ever sees empty text, so if that difference is
+    not preserved here, a live page reads as a missing source and a fact gets a verdict it never
+    earned.
     """
     if robots is not None and not robots.allowed(url):
         log.warning("robots.txt disallows %s — skipping", url)
-        return {"ok": False, "reason": "robots_disallowed", "text": "", "blocked": False}
-    if limiter is not None:
-        limiter.wait(url)
-    try:
-        with httpx.Client(timeout=FETCH_TIMEOUT_S, follow_redirects=True,
-                          headers={"User-Agent": USER_AGENT}) as client:
-            resp = client.get(url)
+        return {"ok": False, "reason": "robots_disallowed", "text": "", "blocked": False,
+                "ua": None}
+
+    last: Dict[str, Any] = {"ok": False, "reason": "no_attempt", "text": "", "blocked": False,
+                            "ua": None}
+    for ua in USER_AGENTS:
+        if limiter is not None:
+            limiter.wait(url)
+        headers = {"User-Agent": ua} if ua else {}
+        try:
+            with httpx.Client(timeout=FETCH_TIMEOUT_S, follow_redirects=True,
+                              headers=headers) as client:
+                resp = client.get(url)
+        except Exception as exc:
+            # A connection reset is how some anti-bot front ends refuse a UA they dislike —
+            # canada.ca resets the browser token in 0.15s but serves the page with no UA header.
+            last = {"ok": False, "reason": f"error_{type(exc).__name__}", "text": "",
+                    "blocked": False, "ua": ua}
+            continue
+
         if resp.status_code != 200:
-            # 401/403/429 are the publisher turning us away; anything else is the page itself.
             blocked = resp.status_code in (401, 403, 429)
-            return {"ok": False, "reason": f"http_{resp.status_code}", "text": "",
-                    "blocked": blocked}
+            last = {"ok": False, "reason": f"http_{resp.status_code}", "text": "",
+                    "blocked": blocked, "ua": ua}
+            if not blocked:
+                # Not a refusal — a 404 or 5xx will say the same thing to every identity.
+                return last
+            continue
+
         parsed = (immigration_page_parser.parse(resp.text).get("text") or "").strip()
         if not parsed:
             # A JS-only shell. Recording this is the point — it tells a reviewer why there is
-            # no evidence, instead of leaving them to guess.
-            return {"ok": False, "reason": "js_shell_or_empty", "text": "", "blocked": False}
+            # no evidence, instead of leaving them to guess. Another UA will not render it.
+            return {"ok": False, "reason": "js_shell_or_empty", "text": "", "blocked": False,
+                    "ua": ua}
         return {"ok": True, "reason": "fetched", "text": parsed[:MAX_EXCERPT_CHARS],
-                "blocked": False}
-    except Exception as exc:
-        return {"ok": False, "reason": f"error_{type(exc).__name__}", "text": "",
-                "blocked": False}
+                "blocked": False, "ua": ua}
+
+    # Every identity refused. That is a block, whatever the last status line said.
+    last["blocked"] = True
+    return last
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -199,7 +293,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     dead_sources: List[str] = []
     blocked_sources: List[str] = []
 
-    robots = RobotsTxtCache(user_agent=USER_AGENT)
+    robots = RobotsPolicy()
     limiter = HostRateLimiter()
 
     for i, doc_id in enumerate(doc_ids, 1):

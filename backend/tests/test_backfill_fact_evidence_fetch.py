@@ -4,17 +4,25 @@
 for NO_SOURCE so "we could not look" never becomes "the quote is not there". The bug is one layer
 out, in the fetcher that feeds it.
 
-Measured on 2026-08-20 against the 112 sources behind the approved facts: 16 of them returned
-HTTP 403 and 11 returned a JS shell. A dry run reported 122 `no_source` verdicts. But
-`citizensinformation.ie` and `immi.homeaffairs.gov.au` both serve those pages fine — they were
-refusing `ReloPassBot/1.0`, and eight of the sixteen 403s were Citizens Information alone, which
-is why Ireland sat at 6.8% evidenced against pages that are alive.
+Measured 2026-08-20 over the sources behind the approved facts, and the reason this is a chain
+rather than a constant — no single identity works everywhere:
 
-Recording "no source" against a live government page is the same class of error the ticket
-exists to remove, so these tests pin the fetch layer's obligations:
+    citizensinformation.ie   bot UA -> 403          browser UA -> 200
+    immi.homeaffairs.gov.au  bot UA -> 403          browser UA -> 200
+    canada.ca                bot UA -> 200          browser UA -> connection reset in 0.15s
+    travel.state.gov         403 to everything (Cloudflare)
 
-  * identify as a browser, because that is what these publishers serve;
-  * ask robots.txt first, and skip what it disallows;
+Two passes got this wrong before it got it right. The first ran as `ReloPassBot/1.0` and wanted
+to write 122 `no_source` verdicts, eight of the sixteen 403s being Citizens Information alone.
+The second led with a browser token, fixed Ireland's 403s — and took Canada from 13.6% evidenced
+to 0%, while a robots check fetched through urllib's own UA got 403 and disallowed every Irish
+URL outright, dropping Ireland to 0% too.
+
+Recording "no source" against a live government page is the same class of error the ticket exists
+to remove, so these tests pin the fetch layer's obligations:
+
+  * identify as ourselves first, and fall back only where a publisher has actually refused;
+  * fetch robots.txt through that same chain, and respect what it really says;
   * do not hammer a host;
   * when a fetch fails, say the fetch failed — never let it read as "never fetched".
 """
@@ -23,17 +31,22 @@ from __future__ import annotations
 import backend.scripts.backfill_fact_evidence as bf
 
 
-def test_the_fetcher_identifies_as_a_browser_because_publishers_refuse_the_bot():
-    """`citizensinformation.ie` and `immi.homeaffairs.gov.au` 403 a bot token and 200 a browser.
+def test_we_identify_as_ourselves_first_and_only_fall_back_when_refused():
+    """No single UA works everywhere, and the ORDER is the ethical point.
 
-    A self-identifying `Mozilla/5.0 (compatible; ReloPassBot/1.0; +url)` was measured and is
-    ALSO refused, so a real browser token is the only thing that reaches the page.
+    Measured: citizensinformation.ie and immi.homeaffairs.gov.au 403 the bot token and 200 a
+    browser one; canada.ca does the opposite, resetting the browser token in 0.15s while
+    serving the page with no UA header at all. A first pass that led with the browser token
+    took Canada from 13.6% evidenced to 0%.
+
+    So we announce our own name first, and only present as a browser to a publisher that has
+    actually refused it.
     """
-    ua = bf.USER_AGENT
-    assert "Mozilla/5.0" in ua
-    assert "AppleWebKit" in ua or "Gecko" in ua
-    # The bare bot token is what was being refused; it must not be the default any more.
-    assert ua != "ReloPassBot/1.0 (evidence-backfill)"
+    assert bf.USER_AGENTS[0] == bf.UA_HONEST
+    assert "ReloPassBot" in bf.UA_HONEST
+    assert "Mozilla/5.0" in bf.UA_BROWSER
+    assert bf.USER_AGENTS.index(bf.UA_BROWSER) > 0
+    assert None in bf.USER_AGENTS, "some anti-bot front ends only accept no UA header at all"
 
 
 def test_a_disallowed_url_is_skipped_rather_than_fetched():
@@ -53,28 +66,56 @@ def test_a_disallowed_url_is_skipped_rather_than_fetched():
     assert calls == ["https://example.gov/secret"]
 
 
-def test_a_403_is_recorded_as_a_block_not_as_a_missing_source(monkeypatch):
-    """The distinction the whole ticket turns on.
+def _client_returning(statuses, body=""):
+    """httpx.Client stub yielding one status per successive call."""
+    seq = list(statuses)
 
-    A publisher refusing us says nothing about whether the quote is in the page. It must not be
-    collapsed into the same bucket as "there is no archived text".
-    """
     class _Resp:
-        status_code = 403
-        text = ""
+        def __init__(self, code): self.status_code, self.text = code, body
 
     class _Client:
         def __init__(self, *a, **k): pass
         def __enter__(self): return self
         def __exit__(self, *a): return False
-        def get(self, url): return _Resp()
+        def get(self, url): return _Resp(seq.pop(0))
 
-    monkeypatch.setattr(bf.httpx, "Client", _Client)
+    return _Client
+
+
+def test_a_403_to_every_identity_is_recorded_as_a_block_not_a_missing_source(monkeypatch):
+    """The distinction the whole ticket turns on.
+
+    A publisher refusing us says nothing about whether the quote is in the page. It must not be
+    collapsed into the same bucket as "there is no archived text". travel.state.gov 403s every
+    identity we have.
+    """
+    monkeypatch.setattr(bf.httpx, "Client", _client_returning([403, 403, 403]))
     res = bf.fetch_and_parse("https://travel.state.gov/x")
 
     assert res["ok"] is False
     assert res["reason"] == "http_403"
     assert res["blocked"] is True, "a 403 is the publisher blocking us, not an absent source"
+
+
+def test_a_refusal_of_the_honest_ua_retries_with_the_browser_one(monkeypatch):
+    """citizensinformation.ie: 403 to ReloPassBot, 200 to a browser token."""
+    monkeypatch.setattr(bf.httpx, "Client",
+                        _client_returning([403, 200], body="<p>" + "x " * 300 + "</p>"))
+    monkeypatch.setattr(bf.immigration_page_parser, "parse", lambda html: {"text": "y " * 300})
+
+    res = bf.fetch_and_parse("https://www.citizensinformation.ie/en/x")
+
+    assert res["ok"] is True
+    assert res["ua"] == bf.UA_BROWSER, "must have fallen back after the refusal"
+
+
+def test_a_404_is_not_retried_against_every_identity(monkeypatch):
+    """A missing page says the same thing to everyone; retrying it is just noise on the host."""
+    monkeypatch.setattr(bf.httpx, "Client", _client_returning([404]))
+    res = bf.fetch_and_parse("https://example.gov/gone")
+
+    assert res["reason"] == "http_404"
+    assert res["blocked"] is False
 
 
 def test_a_failed_fetch_writes_fetch_failed_not_not_fetched():
@@ -107,3 +148,32 @@ def test_the_fetcher_waits_between_requests_to_the_same_host(monkeypatch):
     slept.clear()
     limiter.wait("https://other.gov/a")     # different host -> no wait
     assert slept == []
+
+
+def test_robots_is_fetched_through_the_same_ua_chain_not_urllibs_own(monkeypatch):
+    """The bug that took Ireland from 6.8% to 0%.
+
+    `RobotFileParser.read()` fetches robots.txt with urllib's `Python-urllib/3.x` UA and treats
+    a 403 on it as *disallow everything*. Measured: citizensinformation.ie, travel.state.gov and
+    france-visas.gouv.fr all 403 urllib, so every URL on them was skipped — the robots check
+    defeated the UA fallback it was paired with.
+
+    A 4xx means no policy was published, which allows. Only a 5xx disallows: the server has a
+    policy and cannot currently tell us what it is.
+    """
+    monkeypatch.setattr(bf.httpx, "Client", _client_returning([404, 404, 404]))
+    assert bf.RobotsPolicy().allowed("https://www.citizensinformation.ie/en/x") is True
+
+    monkeypatch.setattr(bf.httpx, "Client", _client_returning([503, 503, 503]))
+    assert bf.RobotsPolicy().allowed("https://flaky.gov/x") is False
+
+
+def test_a_real_disallow_is_still_respected(monkeypatch):
+    """Falling back to a browser token is not licence to ignore a published policy."""
+    monkeypatch.setattr(
+        bf.httpx, "Client",
+        _client_returning([200], body="User-agent: *\nDisallow: /private/\n"))
+    policy = bf.RobotsPolicy()
+
+    assert policy.allowed("https://example.gov/private/thing") is False
+    assert policy.allowed("https://example.gov/public/thing") is True
