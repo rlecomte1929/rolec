@@ -1,0 +1,83 @@
+{
+ "table": "kg_prompt_passes",
+ "sqlName": "app_kg_prompt_passes",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 5,
+ "rows": [
+  {
+   "id": 1,
+   "corridor_id": "FR-NO",
+   "employee_type_id": "eu-national",
+   "pass_number": 1,
+   "pass_framing": "official_gov",
+   "prompt_used": "You are a Norwegian government official. List all formal legal obligations for an EU/EEA national relocating from France to Norway for employment. Cite each obligation with its legal basis and responsible authority.",
+   "raw_output": "1. EU/EEA Registration (Police): Under EEA Agreement Art. 7, nationals staying >3 months must register with local police within 3 months of arrival. Authority: Politiet/UDI. 2. D-number (Tax): Skatteetaten issues D-numbers to foreign workers. Required before tax deduction can be calculated correctly. 3. NAV Registration: Employer must file A-melding via Altinn. 4. National Identity Number: After 6 months, employee may apply for permanent personnummer. 5. Social Security: Automatic enrollment via NAV upon employment registration.",
+   "items_extracted": 5,
+   "run_date": "2026-07-01T00:00:00.000Z",
+   "model_used": "gpt-4o",
+   "session_id": null,
+   "created_at": "2026-08-18T08:48:36.027Z",
+   "updated_at": "2026-08-18T08:48:36.027Z"
+  },
+  {
+   "id": 2,
+   "corridor_id": "FR-NO",
+   "employee_type_id": "eu-national",
+   "pass_number": 2,
+   "pass_framing": "immigration_advisor",
+   "prompt_used": "You are an experienced immigration advisor specializing in Nordic relocations. A French EU national is relocating to Oslo for a permanent role. Walk through every administrative step they and their employer must complete, including practical timelines and common failure points.",
+   "raw_output": "Critical path: D-number FIRST (60 days before start), then bank account, then NAV. Most dangerous failure: payroll team runs salary without D-number and tax is withheld at emergency rate (50%+). Police registration: tell employees to book Day 1 — appointments at Oslo police gone within days of posting. Bank: DNB is most reliable for new arrivals with D-number. Sbanken no longer accepts passport alone. Healthcare: HELFO registration within 3 months, bring proof of work registration. Family: spouse needs separate D-number application even if not working.",
+   "items_extracted": 8,
+   "run_date": "2026-07-01T00:00:00.000Z",
+   "model_used": "gpt-4o",
+   "session_id": null,
+   "created_at": "2026-08-18T08:48:36.027Z",
+   "updated_at": "2026-08-18T08:48:36.027Z"
+  },
+  {
+   "id": 3,
+   "corridor_id": "FR-NO",
+   "employee_type_id": "eu-national",
+   "pass_number": 3,
+   "pass_framing": "employee_experience",
+   "prompt_used": "You are a French employee who relocated to Oslo 3 months ago. Describe every administrative hurdle you encountered, what surprised you, what took longer than expected, and what you wish your HR team had told you before you moved.",
+   "raw_output": "Nobody told me the police registration was time-sensitive! I thought I had 3 months so I relaxed. Then I found out slots were 8 weeks out and I nearly missed the window. The D-number took 3 weeks and I couldn't open a bank account without it — I was living off cash for a month. My company didn't know they needed to file NAV paperwork before Day 1. The local tax office in Gronland was much faster than the main Oslo office for D-number verification. HELFO was easy once I had the D-number. Getting a phone contract without a bank account was impossible.",
+   "items_extracted": 7,
+   "run_date": "2026-07-01T00:00:00.000Z",
+   "model_used": "gpt-4o",
+   "session_id": null,
+   "created_at": "2026-08-18T08:48:36.027Z",
+   "updated_at": "2026-08-18T08:48:36.027Z"
+  },
+  {
+   "id": 4,
+   "corridor_id": "FR-NO",
+   "employee_type_id": "eu-national",
+   "pass_number": 4,
+   "pass_framing": "hr_walkthrough",
+   "prompt_used": "You are an experienced HR manager at a multinational who has managed 15 France-to-Norway relocations. Walk through your internal HR checklist for this corridor, step by step, including every employer-side obligation and the timeline you use.",
+   "raw_output": "HR Timeline FR-NO: T-90: Confirm move date and role. T-60: Initiate D-number process via Skatteetaten digital portal. T-30: Confirm D-number received. T-14: Send police registration booking instructions. T-7: Confirm NAV A-melding submitted. T-0: Confirm bank account open and payroll routing set. T+30: Confirm HELFO card received. T+90: Confirm police registration completed. Employer obligations: A-melding monthly, pay Norwegian employer NIC (14.1% for Oslo), withhold income tax at correct bracket. Watch out: if employee has family, child benefit (barnetrygd) application via NAV — many HR teams miss this.",
+   "items_extracted": 9,
+   "run_date": "2026-07-01T00:00:00.000Z",
+   "model_used": "gpt-4o",
+   "session_id": null,
+   "created_at": "2026-08-18T08:48:36.027Z",
+   "updated_at": "2026-08-18T08:48:36.027Z"
+  },
+  {
+   "id": 5,
+   "corridor_id": "FR-NO",
+   "employee_type_id": "eu-national",
+   "pass_number": 5,
+   "pass_framing": "failure_mode",
+   "prompt_used": "You are a relocation compliance auditor. Describe the 5 most common and costly failure modes for France-to-Norway EU national relocations, the exact consequences, and what should have been done to prevent each.",
+   "raw_output": "1. PAYROLL WITHOUT D-NUMBER: Consequence: Employee taxed at emergency rate (47%), requires payroll rerun + employee rebate. Fix: D-number before any payroll run. 2. POLICE REGISTRATION MISSED: Consequence: Illegal stay status after 3 months, potential fine, complications for future NIN application. Fix: Book police registration on Day 1 of arrival. 3. NO NAV REGISTRATION BEFORE DAY 1: Consequence: Employee uninsured for sickness/parental leave during gap, employer liable. Fix: Submit A-melding before employee starts. 4. BANK ACCOUNT DELAY: Consequence: Employee cannot receive salary, must be paid via manual transfer (slower, taxed differently). Fix: Parallel-track D-number and bank account applications. 5. HELFO MISSED: Consequence: Employee pays full cost for GP visits and prescriptions for months. Fix: Register with HELFO within first week using D-number.",
+   "items_extracted": 5,
+   "run_date": "2026-07-01T00:00:00.000Z",
+   "model_used": "gpt-4o",
+   "session_id": null,
+   "created_at": "2026-08-18T08:48:36.027Z",
+   "updated_at": "2026-08-18T08:48:36.027Z"
+  }
+ ]
+}
