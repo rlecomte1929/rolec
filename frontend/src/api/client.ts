@@ -599,6 +599,20 @@ export interface HrVendor {
   is_approved: boolean;
 }
 
+/** A row of a case's assigned-vendor shortlist.
+ *  Returned by GET /api/cases/:caseId/vendors and, identically shaped, by the
+ *  POST that creates one — so an assign result can go straight into the panel's
+ *  query cache. Rendered by CaseVendorsPanel. */
+export interface CaseVendorRow {
+  shortlist_id: string | null;
+  category: string | null;
+  status: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  vendor_name: string | null;
+  vendor_website: string | null;
+}
+
 export interface ImmigrationRequirementsResponse {
   covered: boolean;
   coverage_reason: string | null;
@@ -1108,6 +1122,32 @@ export const hrAPI = {
   },
 
   // ── AIQ-40-A/B: Vendor directory ─────────────────────────────────────────
+
+  // ── AIQ-1896: case vendor assignment ─────────────────────────────────────
+  //
+  // These are the write path public.case_vendor_shortlist never had. They live on
+  // /api/cases (cases_write.py), not /api/hr, because the shortlist is keyed on the
+  // canonical case id — the backend resolves whichever id form the caller passes.
+
+  /** POST /api/cases/:caseId/vendors — attach a browsed vendor to a case.
+   *  Idempotent: re-assigning the same vendor+service returns the existing row. */
+  assignVendorToCase: async (
+    caseId: string,
+    payload: {
+      vendor_id: string;
+      service_key?: string;
+      contact_name?: string;
+      contact_email?: string;
+    },
+  ): Promise<CaseVendorRow> => {
+    const response = await api.post<CaseVendorRow>(`/api/cases/${caseId}/vendors`, payload);
+    return response.data;
+  },
+
+  /** DELETE /api/cases/:caseId/vendors/:shortlistId — detach a vendor from a case. */
+  unassignVendorFromCase: async (caseId: string, shortlistId: string): Promise<void> => {
+    await api.delete(`/api/cases/${caseId}/vendors/${shortlistId}`);
+  },
 
   /** GET /api/hr/vendors?corridor=X&category=Y */
   getVendors: async (params?: {
