@@ -479,6 +479,27 @@ git config core.hooksPath .githooks
 
 **Emergency bypass:** `git push --no-verify` skips the hook. Use sparingly — every avoided round-trip with Render is faster than every emergency bypass.
 
+## Working from the Notion task board
+
+Work arrives as cards on the **AI Work Queue** board (`3bc887c6-4d48-8089-8188-fcf2dc3edc1b`,
+data source `collection://4e2887c6-4d48-82c1-931e-87b09fb5c4ed`). A card's `Execution Prompt` is
+handed to the executing agent **verbatim**, so it must stand alone.
+
+Two lanes route to different places, and picking the wrong one strands the card:
+
+- **`Ready for AI`** → a repo-attached session (Claude Code / Cursor) that can read the codebase
+  and commit. Any card whose deliverable is a commit belongs here.
+- **`Otto ready`** → the Audos bridge / Otto research lane. **The bridge cannot push to GitHub** —
+  it writes back only the `Status` flip to `In progress`, and results land in WorkspaceDB and task
+  reports, never in Notion fields.
+
+Fetch and update cards **by page URL, not by `AIQ-nnnn`** — the id is a display field and MCP
+search matches body text, so an id search returns every card that merely mentions it.
+
+Full reference — card schema, the five-step loop, the card-quality checklist, and the known
+limits: **[docs/notion-otto-workflow.md](docs/notion-otto-workflow.md)**. The lane-hygiene rules
+that keep the board honest are in *Work Queue hygiene* below.
+
 ## Audit remediation workflow
 
 A multi-stage remediation plan lives at `audit/REMEDIATION_PLAN.md` with a rolling log at `audit/STAGES.md` and per-stage re-audit docs at `audit/re-audit-stage-N-*.md`.
