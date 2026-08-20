@@ -1,0 +1,50 @@
+{
+ "table": "kg_maintenance_queue",
+ "sqlName": "app_kg_maintenance_queue",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 3,
+ "rows": [
+  {
+   "id": 1,
+   "requirement_id": "FR-NO-eu-national-banking-001",
+   "trigger_type": "scheduled_review",
+   "trigger_description": "Banking requirement flagged high decay risk at creation. DNB and Nordea policies on D-number requirements change frequently. Verify current accepted documents and branch procedures.",
+   "due_date": "2026-12-01T00:00:00.000Z",
+   "assigned_to": "qa-owner-fr-no",
+   "status": "open",
+   "resolution_notes": null,
+   "resolved_at": null,
+   "session_id": null,
+   "created_at": "2026-08-18T08:48:38.784Z",
+   "updated_at": "2026-08-18T08:48:38.784Z"
+  },
+  {
+   "id": 2,
+   "requirement_id": "FR-NO-non-eu-national-immigration-001",
+   "trigger_type": "scheduled_review",
+   "trigger_description": "UDI processing times and fast-track certification eligibility criteria subject to annual review. High decay risk — verify current timelines and fee schedule.",
+   "due_date": "2026-12-01T00:00:00.000Z",
+   "assigned_to": "qa-owner-fr-no",
+   "status": "open",
+   "resolution_notes": null,
+   "resolved_at": null,
+   "session_id": null,
+   "created_at": "2026-08-18T08:48:38.784Z",
+   "updated_at": "2026-08-18T08:48:38.784Z"
+  },
+  {
+   "id": 3,
+   "requirement_id": "FR-NO-eu-national-tax-001",
+   "trigger_type": "law_change",
+   "trigger_description": "Norway 2026 Finance Act updated certain D-number application procedures for digital-first processing. Verify whether in-person ID verification requirement still applies for all cases.",
+   "due_date": "2026-10-01T00:00:00.000Z",
+   "assigned_to": "lawyer-fr-no",
+   "status": "in_progress",
+   "resolution_notes": "Contacted Skatteetaten helpline. Digital verification now available for employees whose employer is registered in Altinn. In-person still required for self-employed. Updating requirement text.",
+   "resolved_at": null,
+   "session_id": null,
+   "created_at": "2026-08-18T08:48:38.784Z",
+   "updated_at": "2026-08-18T08:48:38.784Z"
+  }
+ ]
+}

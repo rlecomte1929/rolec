@@ -1,0 +1,49 @@
+{
+ "table": "case_verification_reports",
+ "sqlName": "app_case_verification_reports",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 1,
+ "rows": [
+  {
+   "id": 1,
+   "cvr_uid": "cvr:ES-IE:2026-08-15:andrea",
+   "corridor_key": "ES-IE",
+   "corridor_id": 2,
+   "employee_type": "non-eea",
+   "case_ref": "andrea-es-ie",
+   "case_id": null,
+   "real_case": true,
+   "reviewer": null,
+   "session_date": "2026-08-15T00:00:00.000Z",
+   "requirements_correct": 9,
+   "requirements_missed": 3,
+   "requirements_wrong": 3,
+   "non_obvious_confirmed": 3,
+   "relief_moment": true,
+   "relief_moment_quote": "Nobody told me I would be taxed at 40% while waiting — and I had no idea I would need payslips I could not possibly have yet.",
+   "score": "60",
+   "verdict": "fail",
+   "failed_rules": [
+    {
+     "id": "has_reviewer_and_case_ref",
+     "reason": "The report must name a reviewer and the case it was run against, so the evidence is auditable."
+    },
+    {
+     "id": "no_missed_requirements",
+     "reason": "The case hit no requirement the corridor failed to surface (requirements_missed = 0). A missed requirement is a content gap: fix the blocks, then re-verify."
+    },
+    {
+     "id": "no_wrong_requirements",
+     "reason": "No requirement was surfaced with the wrong timing, owner or content (requirements_wrong = 0)."
+    }
+   ],
+   "corrections": null,
+   "report_path": "docs/case-verification-reports/2026-08-15-andrea-es-ie.md",
+   "notes": "Counts transcribed from the filed report: 9 requirements confirmed correct, 3 missed (Irish rental-market reality, real PPS timeline, pet relocation), 3 wrong (PPS issuance, Dublin accommodation, EU-status implication), 3 non-obvious items the mover confirmed she did not know. Reviewer is not named in the report.",
+   "submitted_by": "cs50-architecture-migration",
+   "session_id": null,
+   "created_at": "2026-08-17T17:11:46.068Z",
+   "updated_at": "2026-08-17T17:11:46.068Z"
+  }
+ ]
+}
