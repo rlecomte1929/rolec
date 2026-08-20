@@ -476,7 +476,15 @@ def get_immigration_case_employee(
             )
     # HR/Admin: skip ownership check — they can view any case's checklist
 
-    # Look up immigration case by relocation case_id
+    # [AIQ-1881] immigration_cases.case_id holds the CANONICAL case id — all 4
+    # production rows join on case_assignments.case_id and none on the assignment
+    # id — but this route's path param may carry either form (the ownership check
+    # directly above matches `id = :case_id OR case_id = :case_id`). Keying the
+    # lookup on the raw path id therefore 404s an employee arriving from an
+    # assignment-id URL even when their immigration case exists. Same failure as
+    # AIQ-1704. Resolve once, then query on the resolved value.
+    lookup_id = _canonical_case_id(case_id)
+
     with db.engine.begin() as conn:
         row = conn.execute(
             text("""
@@ -485,16 +493,154 @@ def get_immigration_case_employee(
                 ORDER BY created_at DESC
                 LIMIT 1
             """),
-            {"case_id": case_id},
+            {"case_id": lookup_id},
         ).mappings().first()
 
-    if not row:
-        raise HTTPException(
-            status_code=404,
-            detail="No immigration case found for this relocation. Contact your HR team.",
-        )
+    if row:
+        result = _serialize_imm_case(row)
+        result["state"] = "open"
+        return result
 
-    return _serialize_imm_case(row)
+    # [AIQ-1881] No immigration case. This used to 404 with "Contact your HR
+    # team" — a dead end pointing at someone who had nothing to give: HR's own
+    # available-forms and milestones come back empty for the same case, and
+    # nothing in the product ever calls POST /api/hr/immigration/cases. Both
+    # roles terminated with no next action.
+    #
+    # Return 200 with the honest state instead. Note we deliberately do NOT
+    # create an immigration case implicitly: `permit_type` is mandatory and
+    # validated against VALID_PERMIT_TYPES, and a free-movement national has no
+    # permit to track. Auto-opening a permit file for someone who needs none
+    # asserts a process that does not exist — the same class of error as
+    # offering Ireland an EU Blue Card.
+    return _absent_immigration_case_state(lookup_id)
+
+
+# ---------------------------------------------------------------------------
+# [AIQ-1881] Absent-immigration-case state
+# ---------------------------------------------------------------------------
+
+def _canonical_case_id(case_id: str) -> str:
+    """Resolve any id form this route may carry to the canonical case id.
+
+    Falls back to the argument when resolution fails: a best-effort resolver
+    must never turn a readable page into an error.
+    """
+    try:
+        ids = db.resolve_case_ids(case_id)
+        if ids is not None and getattr(ids, "canonical_case_id", None):
+            return str(ids.canonical_case_id)
+    except Exception:  # noqa: BLE001 - resolution is best-effort
+        log.exception("immigration: case-id resolution failed case=%s", case_id)
+    return case_id
+
+
+def _absent_immigration_case_state(case_id: str) -> Dict[str, Any]:
+    """What to tell an employee who has no immigration case yet.
+
+    Three honest answers, never a dead end:
+
+    * ``no_permit_required`` — they hold free movement to this destination, so
+      the absence of a permit file is the CORRECT and COMPLETE answer, not a
+      gap. Saying "contact HR" to a Spanish national moving to Dublin invents a
+      problem she does not have.
+    * ``awaiting_hr`` — a permit really is needed and nobody has opened the
+      file. Names who acts next instead of bouncing her to a person who, today,
+      has no create action in the product either.
+    * ``coverage_gap`` — we cannot categorise her (no nationality or no
+      destination on the case). We say we do not know rather than guessing;
+      an unknown nationality must never be silently treated as free movement.
+
+    Nationality is categorised through ``nationality_class.classify`` — the
+    single source of truth for "does this person have free movement?" — never by
+    matching on country names, per the EEA permit-gating invariant.
+    """
+    from ..services.nationality_class import classify
+    from ..services.relocation_plan_view_service import load_profile_draft_for_case
+    from ..services.wizard_draft_mapper import extract_profile_from_wizard_draft
+    from ..db import SessionLocal
+
+    nationality: Optional[str] = None
+    dest_country: Optional[str] = None
+
+    try:
+        with SessionLocal() as session:
+            draft = load_profile_draft_for_case(session, case_id)
+        nationality = (extract_profile_from_wizard_draft(draft or {}) or {}).get("nationality")
+    except Exception:  # noqa: BLE001 - degrade to coverage_gap, never 500
+        log.exception("immigration: nationality lookup failed case=%s", case_id)
+
+    try:
+        details = _get_case_details(case_id, "") or {}
+        dest_country = details.get("dest_country")
+    except Exception:  # noqa: BLE001
+        log.exception("immigration: destination lookup failed case=%s", case_id)
+
+    base: Dict[str, Any] = {
+        "state": "coverage_gap",
+        "immigration_case": None,
+        "case_id": case_id,
+        "nationality_class": None,
+        "destination_country": dest_country,
+    }
+
+    if not nationality or not dest_country:
+        missing = "your nationality" if not nationality else "your destination"
+        base.update({
+            "headline": "We need one more detail before we can confirm your immigration steps",
+            "detail": (
+                f"Your relocation case does not yet record {missing}, and that is the "
+                "single field that decides whether you need a permit at all. We will not "
+                "guess it."
+            ),
+            "next_action": "Complete your intake so we can confirm what applies to you.",
+        })
+        return base
+
+    klass = classify(nationality, dest_country)
+    base["nationality_class"] = klass
+
+    if klass is None:
+        # The classifier could not place this nationality — it returns None for
+        # forms outside its lookup tables (e.g. "Venezuelan" today, though "VE"
+        # and "Indian" both resolve). Saying "a permit is needed" would assert a
+        # requirement we have not established, and "no permit needed" would be
+        # far worse. Say we do not know.
+        base.update({
+            "headline": "We could not confirm what your nationality requires for this move",
+            "detail": (
+                "Your nationality is recorded but we cannot yet match it to an immigration "
+                "route for this destination, so we are not going to guess. Your HR team can "
+                "confirm your permit position."
+            ),
+            "next_action": "Ask your HR team to confirm your permit requirement.",
+        })
+        return base
+
+    if klass in ("OWN_NATIONAL", "EU_EEA"):
+        base.update({
+            "state": "no_permit_required",
+            "headline": "You do not need a work permit or visa for this move",
+            "detail": (
+                "You have freedom of movement to this destination, so there is no permit "
+                "application to track and no immigration file to open. This is the complete "
+                "answer, not a missing one — the rest of your setup is in your relocation plan."
+            ),
+            "next_action": None,
+        })
+        return base
+
+    base.update({
+        "state": "awaiting_hr",
+        "headline": "Your immigration file has not been opened yet",
+        "detail": (
+            "This move needs a permit, and your HR team opens the file that tracks it. "
+            "Nothing is required from you until they do — you will see your document "
+            "checklist here as soon as it exists."
+        ),
+        "next_action": "Your HR team opens your immigration file. No action needed from you yet.",
+    })
+    return base
 
 
 # ---------------------------------------------------------------------------

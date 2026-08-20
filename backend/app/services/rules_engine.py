@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Tuple, Optional
 
-from .nationality_class import EU_EEA, OWN_NATIONAL, THIRD_COUNTRY, classify
+from .nationality_class import EU_EEA, OWN_NATIONAL, THIRD_COUNTRY, classify, classify_best
 from .requirements_country_key import iso_to_catalog_name, to_iso
 
 
@@ -118,7 +118,16 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
     # the full French work-visa track. Drop requirements that don't apply to the
     # case's nationality class — and, critically, STATE the resulting "nothing
     # required" rather than leaving an empty pillar (see _immigration_confirmation).
-    nationality_class = classify(profile.get("nationality"), basics.get("destCountry"))
+    # BOTH nationalities, because rights are cumulative. A Venezuelan/Italian dual
+    # moving to Ireland exercises Italian free movement; judging them on whichever
+    # nationality intake happened to record first hands them a permit track they
+    # must not apply for. Intake already asks for and stores `second_nationality` —
+    # this is the consumer it never had. Absent from the draft, behaviour is
+    # identical to classifying on `nationality` alone.
+    nationality_class = classify_best(
+        (profile.get("nationality"), profile.get("second_nationality")),
+        basics.get("destCountry"),
+    )
 
     # An unknown nationality must still be FILTERED, and this is subtle enough to
     # be worth spelling out.

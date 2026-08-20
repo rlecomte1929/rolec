@@ -1,0 +1,196 @@
+# France jurisdiction fact pack.
+#
+# Authored from the 2026-08-19 human provenance pass. Every url, publication date and
+# evidence quote below is a verbatim capture from the cited official page; `fact_text` and
+# `title` are ours. See backend/seeds/facts/README.md for why this format exists and why
+# facts are keyed by the AUTHORITY THAT PUBLISHES THEM rather than by corridor.
+#
+# Nothing here is published by loading it: rows land review_status='pending'.
+# `representative` means visible-but-awaiting-counsel-attestation.
+# MIXED DIRECTION. `exit_tax` binds a person LEAVING France (origin-side for FR_NO); the
+# other four bind a person ARRIVING in France (destination-side for NO_FR). Which is which
+# is recorded on the corridor binding, never here - the same fact can be either.
+
+jurisdiction: "FR"
+catalog_country: FRANCE
+pack_version: "2026-08-19"
+
+default_purposes: [employment]
+default_owner: EMPLOYEE
+default_severity: WARN
+
+facts:
+  - fact_key: exit_tax
+    topic: tax-exit
+    kind: obligation
+    status: representative
+    pillar: EMPLOYMENT
+    title: "Exit tax can apply when moving tax domicile out of France"
+    fact_text: >-
+      Exit tax concerns a person who was French tax resident for at least six of the ten years
+      preceding the transfer of domicile abroad and who holds corporate rights, securities or
+      entitlements worth at least EUR 800,000 in total, or representing at least 50% of a
+      company's profits. Payment of the resulting tax may be deferred, either automatically or on
+      request via form 2074 ETD with a proposed guarantee.
+    timing: "in the year the tax domicile is transferred"
+    non_obvious: true
+    source:
+      url: "https://www.impots.gouv.fr/particulier/questions/je-quitte-la-france-suis-je-concerne-par-lexit-tax"
+      publisher_domain: "impots.gouv.fr"
+      published_date: 2026-03-10
+      source_version: "impots.gouv.fr (French Tax Administration) — page visible date « modifié le 10/03/2026 », retrieved 2026-08-19"
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        Vous êtes concerné si vous avez été résident fiscal français pendant au moins six ans au
+        cours des dix années précédant le transfert de votre domicile à l'étranger et si vous
+        détenez des droits sociaux, titres ou droits atteignant une valeur globale d’au moins 800
+        000 € ou représentant au moins 50 % des bénéfices sociaux d’une société. Le contribuable
+        transférant son domicile hors de France peut bénéficier d’un sursis de paiement des
+        impositions établies à ce titre. Ce sursis est soit automatique, soit accordé sur demande
+        faite via le formulaire n° 2074 ETD accompagné d’une proposition de garantie.
+      quote_sha256: "22bc16105ae24b4320404c4fc755d0f8f3bf4752ce55875667e78b1ce9d51d82"
+    last_verified_date: 2026-08-19
+    depends_on: []
+    pack_keys:
+      - "FR-NO:tax-france-exit-tax:france_exit_tax"
+
+  - fact_key: dpae_before_start
+    topic: registration-dpae
+    kind: obligation
+    status: representative
+    pillar: RESIDENCE
+    owner: HR
+    severity: BLOCKER
+    title: "The employer must file the DPAE before the employee starts work"
+    fact_text: >-
+      Before a private-sector employee starts work in France, the employer must submit the
+      déclaration préalable à l'embauche (DPAE) to Urssaf or MSA. The DPAE handles the employee's
+      registration with the primary health-insurance fund or agricultural fund, and includes the
+      employee's social-security number if they are already registered. It must be transmitted
+      before the employee starts work or the trial period begins, no earlier than eight days
+      before the hiring date.
+    timing: "before the employee starts work, and at most 8 days before the hiring date"
+    non_obvious: true
+    source:
+      url: "https://entreprendre.service-public.gouv.fr/vosdroits/F23107"
+      publisher_domain: "entreprendre.service-public.gouv.fr"
+      published_date: 2026-06-01
+      source_version: "Entreprendre Service-Public, « Procédure et formalités d'embauche d'un salarié du secteur privé » — Vérifié le 01 juin 2026, retrieved 2026-08-19"
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        La DPAE permet à l'employeur d'accomplir les déclarations et demandes suivantes :
+        Immatriculation du salarié à la caisse primaire d'assurance maladie ou de la MSA pour les
+        salariés agricoles. La déclaration doit être transmise à l’organisme de sécurité sociale
+        compétente avant la prise de fonction ou le début de la période d’essai, au plus tôt dans
+        les 8 jours précédant la date de l’embauche.
+      quote_sha256: "d1dad3e8b003a5d02403c33e2d3af021bc600e6d28af206a2a137d8642caa3f7"
+    last_verified_date: 2026-08-19
+    depends_on: []
+    pack_keys:
+      - "NO-FR:registration-french-social-security-number:french_social_security_number"
+
+  - fact_key: prelevement_a_la_source
+    topic: tax-withholding
+    kind: obligation
+    status: representative
+    pillar: EMPLOYMENT
+    title: "Income tax is withheld at source by the employer, at a default rate until a return is filed"
+    fact_text: >-
+      For an employee or pensioner, income tax is collected by the employer or pension fund and
+      deducted directly from income at a rate set by the tax authorities. Where no tax return has
+      yet been filed, no personalised rate can be calculated and a default rate from the annual
+      scale applies, ranging from 0% to 43%.
+    timing: "from the first payroll run in France"
+    non_obvious: true
+    source:
+      url: "https://www.service-public.gouv.fr/particuliers/vosdroits/F34009?lang=en"
+      publisher_domain: "service-public.gouv.fr"
+      published_date: 2026-01-01
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        If you are employee or pensioner, the tax is collected by your employer or pension fund.
+        The tax is deducted directly from your income by the collector according to a levy rate
+        calculated by the tax authorities. If you have not yet filed a tax return, the
+        administration cannot calculate a personalized rate. In this case, it applies you a
+        default rate. The rate is applied on the basis of annual scale. It ranges from 0% to 43%.
+      quote_sha256: "00cef48cda81dec92b137ac2a1d9e5cd0144e74fce12a1fa934ce60d04d588cd"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "FR:registration-dpae:dpae_before_start"
+    pack_keys:
+      - "NO-FR:tax-prelevement-a-la-source:prelevement_a_la_source"
+
+  - fact_key: residence_criteria
+    topic: tax-residence
+    kind: obligation
+    status: representative
+    pillar: EMPLOYMENT
+    title: "Any one of three criteria establishes French tax domicile"
+    fact_text: >-
+      French tax domicile is established if any one of the following is met: the household, or
+      failing that the principal place of stay, is in France; a professional activity, employed or
+      not, is carried on there other than as a secondary activity; or the centre of economic
+      interests is there.
+    timing: "on arrival, and reassessed each tax year"
+    non_obvious: true
+    source:
+      url: "https://www.impots.gouv.fr/resident-de-france"
+      publisher_domain: "impots.gouv.fr"
+      published_date: 2026-01-27
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        Vous disposez de votre domicile fiscal en France si un des critères suivants est rempli :
+        Vous y avez votre foyer ou, à défaut de foyer, le lieu de votre séjour principal; Vous y
+        exercez une activité professionnelle salariée ou non, à moins que cette activité y soit
+        exercée à titre accessoire; Vous y avez le centre de vos intérêts économiques.
+      quote_sha256: "3b0c39b2dc8dd35f8c44078e9a615cec53f888faad70e69ee04c62899a765ac6"
+    last_verified_date: 2026-08-19
+    depends_on: []
+    pack_keys:
+      - "NO-FR:tax-french-residence-criteria:french_residence_criteria"
+
+  - fact_key: worldwide_income
+    topic: tax-residence
+    kind: obligation
+    status: representative
+    pillar: EMPLOYMENT
+    title: "French tax residents are taxable on worldwide income, subject to treaties"
+    fact_text: >-
+      A French tax resident is taxable on income from both French and foreign sources, subject to
+      the applicable international tax treaties.
+    timing: "each tax year while French tax resident"
+    non_obvious: true
+    source:
+      url: "https://www.impots.gouv.fr/resident-de-france"
+      publisher_domain: "impots.gouv.fr"
+      published_date: 2026-01-27
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        Si vous êtes résident fiscal de France, vous êtes alors imposable sur vos revenus de
+        sources française et étrangère, sous réserve des conventions internationales.
+      quote_sha256: "58f2b5315f34b2d8739679d832498f5d53ee380cada1acaf568ae6e2af323848"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "FR:tax-residence:residence_criteria"
+    pack_keys:
+      - "NO-FR:tax-worldwide-income-taxation:worldwide_income_taxation"
+
+
+  # ── Preparation item: staged, provenance-free by design ───────────────────────────────
+  # See the note in backend/seeds/facts/NO.yaml.
+  - fact_key: dossier_and_guarantor
+    topic: housing-dossier
+    kind: preparation_item
+    status: staged
+    pillar: HOUSING
+    title: "French landlords expect a dossier and often a French-resident guarantor"
+    fact_text: >-
+      A French rental application is assembled as a dossier, and landlords frequently require
+      a garant resident in France or a paid guarantor service. Neither the dossier contents
+      nor the guarantor expectation is set by statute, which is why no authority publishes
+      them.
+    timing: "before viewing properties"
+    non_obvious: true
+    depends_on: []
+    pack_keys:
+      - "NO-FR:housing-dossier-and-guarantor"

@@ -21,6 +21,7 @@ _CITY_CURRENCY: dict[str, str] = {
     "New York": "USD",
     "San Francisco": "USD",
     "Munich": "EUR",
+    "Dublin": "EUR",
 }
 
 # Approx annual tuition in local currency by level and city (for display)
@@ -30,6 +31,11 @@ _TUITION_LOCAL: dict[str, dict[str, int]] = {
     "New York": {"high": 45000, "medium": 28000, "low": 15000},
     "San Francisco": {"high": 45000, "medium": 28000, "low": 15000},
     "Munich": {"high": 24000, "medium": 16000, "low": 0},
+    # [AIQ-1882] Indicative annual EUR brackets for Dublin fee-paying schools. Without
+    # a Dublin row this fell through to the Singapore-shaped default (45000/28000/15000)
+    # and rendered it as EUR — a Dublin international school quoted at EUR 45,000/yr.
+    # These are brackets for ranking, not per-school fees; each school publishes its own.
+    "Dublin": {"high": 22000, "medium": 12000, "low": 6000},
 }
 
 _CURRENCY_TO_USD: dict[str, float] = {"SGD": 0.74, "NOK": 0.09, "USD": 1.0, "EUR": 1.09}
@@ -54,6 +60,11 @@ _CITY_ALIASES: dict[str, str] = {
     "münchen": "Munich",
     "germany": "Munich",
     "de": "Munich",
+    # [AIQ-1882] Dublin — see the living_areas plugin for the same fix.
+    "dublin": "Dublin",
+    "baile átha cliath": "Dublin",
+    "ireland": "Dublin",
+    "ie": "Dublin",
 }
 
 
