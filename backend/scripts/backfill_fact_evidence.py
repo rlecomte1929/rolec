@@ -27,10 +27,12 @@ import argparse
 import hashlib
 import logging
 import sys
+import time
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
@@ -45,6 +47,7 @@ from backend.app.services.fact_evidence import (  # noqa: E402
     VERIFIED,
     check_evidence,
 )
+from backend.crawler.jobs.immigration_crawl_job import RobotsTxtCache  # noqa: E402
 from backend.crawler.parsers import immigration_page_parser  # noqa: E402
 
 log = logging.getLogger("backfill_fact_evidence")
@@ -53,29 +56,96 @@ log = logging.getLogger("backfill_fact_evidence")
 # the article before the requirement in a long page.
 MAX_EXCERPT_CHARS = 24_000
 FETCH_TIMEOUT_S = 30.0
-USER_AGENT = "ReloPassBot/1.0 (evidence-backfill)"
+
+# Measured 2026-08-20 across the 112 sources behind the approved facts: 16 returned 403 and a dry
+# run wanted to record 122 `no_source` verdicts. Eight of those 403s were citizensinformation.ie
+# alone — the corridor under active build, scored against pages that serve fine to a browser.
+# `ReloPassBot/1.0 (evidence-backfill)` was refused, and so was a self-identifying
+# `Mozilla/5.0 (compatible; ReloPassBot/1.0; +url)`. A real browser token is the only thing these
+# publishers answer. We only ever fetch public pages we already cite as sources, and we ask
+# robots.txt first (below) rather than treating the token as licence.
+USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
+#: One request per second per host.
+HOST_DELAY_S = 1.0
+
+
+class HostRateLimiter:
+    """Space requests to the same host. Politeness is the other half of using a browser token."""
+
+    def __init__(self, delay_s: float = HOST_DELAY_S) -> None:
+        self.delay_s = delay_s
+        self._last: Dict[str, float] = {}
+
+    def wait(self, url: str) -> None:
+        host = (urlsplit(url).hostname or "").lower()
+        prev = self._last.get(host)
+        now = time.monotonic()
+        if prev is not None:
+            remaining = self.delay_s - (now - prev)
+            if remaining > 0:
+                time.sleep(remaining)
+        self._last[host] = time.monotonic()
+
+
+def fetch_status_for(res: Dict[str, Any]) -> str:
+    """`knowledge_docs.fetch_status` for one fetch outcome.
+
+    `not_fetched` means nobody ever tried, so a failure must never be written as that — on
+    2026-08-20 exactly that conflation left 140 docs claiming `not_fetched` while holding a real
+    archived excerpt. `fetch_failed` is the existing third value (official_ingest_service.py:168)
+    and is what a refusal or an unparseable shell deserves. A robots skip really is "not
+    fetched": we chose not to ask.
+    """
+    if res.get("ok"):
+        return "fetched"
+    if res.get("reason") == "robots_disallowed":
+        return "not_fetched"
+    return "fetch_failed"
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def fetch_and_parse(url: str) -> Dict[str, Any]:
-    """Fetch one source and return its readable article text. Never raises."""
+def fetch_and_parse(
+    url: str,
+    robots: Optional[Any] = None,
+    limiter: Optional[HostRateLimiter] = None,
+) -> Dict[str, Any]:
+    """Fetch one source and return its readable article text. Never raises.
+
+    `blocked` distinguishes "the publisher refused us" from "there is nothing there". The
+    evidence checker cannot tell them apart — it only ever sees empty text — so the difference
+    has to be preserved here or a live page reads as a missing source.
+    """
+    if robots is not None and not robots.allowed(url):
+        log.warning("robots.txt disallows %s — skipping", url)
+        return {"ok": False, "reason": "robots_disallowed", "text": "", "blocked": False}
+    if limiter is not None:
+        limiter.wait(url)
     try:
         with httpx.Client(timeout=FETCH_TIMEOUT_S, follow_redirects=True,
                           headers={"User-Agent": USER_AGENT}) as client:
             resp = client.get(url)
         if resp.status_code != 200:
-            return {"ok": False, "reason": f"http_{resp.status_code}", "text": ""}
+            # 401/403/429 are the publisher turning us away; anything else is the page itself.
+            blocked = resp.status_code in (401, 403, 429)
+            return {"ok": False, "reason": f"http_{resp.status_code}", "text": "",
+                    "blocked": blocked}
         parsed = (immigration_page_parser.parse(resp.text).get("text") or "").strip()
         if not parsed:
             # A JS-only shell. Recording this is the point — it tells a reviewer why there is
             # no evidence, instead of leaving them to guess.
-            return {"ok": False, "reason": "js_shell_or_empty", "text": ""}
-        return {"ok": True, "reason": "fetched", "text": parsed[:MAX_EXCERPT_CHARS]}
+            return {"ok": False, "reason": "js_shell_or_empty", "text": "", "blocked": False}
+        return {"ok": True, "reason": "fetched", "text": parsed[:MAX_EXCERPT_CHARS],
+                "blocked": False}
     except Exception as exc:
-        return {"ok": False, "reason": f"error_{type(exc).__name__}", "text": ""}
+        return {"ok": False, "reason": f"error_{type(exc).__name__}", "text": "",
+                "blocked": False}
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -83,7 +153,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(description="Archive requirement-fact sources and verify quotes")
     p.add_argument("--apply", action="store_true", help="Write. Omit for a dry run.")
     p.add_argument("--dest", help="Limit to one destination_country, e.g. NO")
-    p.add_argument("--status", default="pending", help="Fact status to process (default pending)")
+    p.add_argument("--status", default="pending",
+                   help="Fact status to process. DEFAULTS TO 'pending' — pass --status approved "
+                        "to touch the served cohort, which is a different set of facts.")
     p.add_argument("--limit-urls", type=int, help="Process at most N source URLs (for a smoke run)")
     args = p.parse_args(argv)
 
@@ -114,6 +186,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     mode = "APPLY" if args.apply else "DRY RUN — nothing will be written"
     print(f"{mode}")
+    # Say which cohort this is. The default is 'pending', and a run aimed at the served surface
+    # needs --status approved — silently processing the wrong set is how a remediation reports
+    # success while the facts it was meant to fix stay untouched.
+    print(f"status={args.status!r}" + (f"  dest={args.dest}" if args.dest else ""))
     print(f"{len(facts)} facts across {len(by_doc)} source documents"
           f"{f' (processing {len(doc_ids)})' if args.limit_urls else ''}\n")
 
@@ -121,29 +197,46 @@ def main(argv: Optional[List[str]] = None) -> int:
     verdicts: Counter = Counter()
     per_dest: Dict[str, Counter] = {}
     dead_sources: List[str] = []
+    blocked_sources: List[str] = []
+
+    robots = RobotsTxtCache(user_agent=USER_AGENT)
+    limiter = HostRateLimiter()
 
     for i, doc_id in enumerate(doc_ids, 1):
         url = doc_urls[doc_id]
         rows = by_doc[doc_id]
-        res = fetch_and_parse(url)
+        res = fetch_and_parse(url, robots=robots, limiter=limiter)
         fetch_reasons[res["reason"]] += 1
         if not res["ok"]:
-            dead_sources.append(f"{res['reason']:<22} {url}")
+            (blocked_sources if res.get("blocked") else dead_sources).append(
+                f"{res['reason']:<22} {url}")
 
         source_text = res["text"]
         sha = hashlib.sha256(source_text.encode("utf-8")).hexdigest() if source_text else None
 
-        if args.apply and res["ok"]:
-            with db.engine.begin() as conn:
-                conn.execute(text("""
-                    UPDATE knowledge_docs
-                       SET content_excerpt = :excerpt,
-                           content_sha256 = :sha,
-                           fetch_status = 'fetched',
-                           fetched_at = :now,
-                           last_verified_at = :now
-                     WHERE id = :id
-                """), {"excerpt": source_text, "sha": sha, "now": _now(), "id": doc_id})
+        if args.apply:
+            # Record the failure too. Writing fetch_status only on success let the column drift
+            # from reality — a doc whose URL now refuses us kept whatever it last claimed.
+            if res["ok"]:
+                with db.engine.begin() as conn:
+                    conn.execute(text("""
+                        UPDATE knowledge_docs
+                           SET content_excerpt = :excerpt,
+                               content_sha256 = :sha,
+                               fetch_status = 'fetched',
+                               fetched_at = :now,
+                               last_verified_at = :now
+                         WHERE id = :id
+                    """), {"excerpt": source_text, "sha": sha, "now": _now(), "id": doc_id})
+            else:
+                # Leave content_excerpt alone: a previously archived excerpt is still the best
+                # evidence we hold, and a refusal today is no reason to discard it.
+                with db.engine.begin() as conn:
+                    conn.execute(text("""
+                        UPDATE knowledge_docs
+                           SET fetch_status = :status, fetched_at = :now
+                         WHERE id = :id
+                    """), {"status": fetch_status_for(res), "now": _now(), "id": doc_id})
 
         for fid, _doc, _url, quote, dest in rows:
             check = check_evidence(quote, source_text)
@@ -180,6 +273,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         tot = sum(c.values())
         print(f"   {dest}  {c.get(VERIFIED,0):>3} verified / {tot:>3}"
               f"   ({100*c.get(VERIFIED,0)/tot:5.1f}%)")
+
+    if blocked_sources:
+        print(f"\nPUBLISHER REFUSED US ({len(blocked_sources)}) — 401/403/429. This says NOTHING"
+              f"\nabout whether the quote is on the page; do not read these as missing sources:")
+        for line in blocked_sources[:25]:
+            print(f"   {line}")
+        if len(blocked_sources) > 25:
+            print(f"   … and {len(blocked_sources)-25} more")
 
     if dead_sources:
         print(f"\nSOURCES WITH NO USABLE TEXT ({len(dead_sources)}) — these are the facts whose"
