@@ -26,12 +26,22 @@ const PROVENANCE: Record<string, { label: string; variant: 'neutral' | 'info' | 
   representative: { label: 'Representative', variant: 'neutral' },
   corpus_grounded: { label: 'Source-grounded', variant: 'info' },
   expert_verified: { label: 'Expert-verified', variant: 'success' },
-  // Production stores `verified`, not `expert_verified` — 10 approved rows, every one of
-  // them rendering NO badge at all, because this map had never heard of the value the
-  // database actually holds. There is no translation layer: the backend passes
-  // verification_status straight through. Both keys are honoured until the two are
-  // normalised, because silently dropping the badge on verified content is the worse bug.
-  verified: { label: 'Expert-verified', variant: 'success' },
+  // Production stores `verified` for INTERNALLY reviewed rows. The backend passes
+  // verification_status straight through — there is no translation layer — so this map
+  // must honour the value the database actually holds, or the badge silently disappears.
+  //
+  // It must NOT, however, borrow the expert label. Measured 2026-08-20: all ten `verified`
+  // rows are Norway, reviewed_by='romain', attestation_status=null, and `expert_verified`
+  // is 0 across the entire catalog. disclaimers.py reserves "expert_verified" for content
+  // "signed off by a licensed immigration lawyer" — no lawyer has seen these. Rendering
+  // them as "Expert-verified" asserted a status we do not hold, to the reader least able
+  // to check it. Missing provenance is a gap; a false provenance claim is a liability, and
+  // it is the same mistake as the "EU AI Act Ready" badge (AIQ-1513).
+  //
+  // 'info', not 'success': the green rung stays reserved for genuine external sign-off, so
+  // the first real counsel attestation is visibly distinct rather than lost among ten rows
+  // already wearing the strongest badge we have.
+  verified: { label: 'Reviewed', variant: 'info' },
 };
 
 const provenanceBadge = (status: RequirementItemDTO['verificationStatus']) => {
