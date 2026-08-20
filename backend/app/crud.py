@@ -122,8 +122,78 @@ def list_sources(db: Session, country_code: str, limit: int = _DEFAULT_LIST_LIMI
     )
 
 
+#: The natural key every requirement-item import matches on. The database enforces it
+#: too (uq_requirement_items_country_purpose_title — models.RequirementItem /
+#: migration 20261109000000), so the ON CONFLICT insert below is pinned to exactly
+#: this index and a duplicate corridor import inserts ZERO rows.
+REQUIREMENT_ITEM_NATURAL_KEY = ("country_code", "purpose", "title")
+
+
+def _find_requirement_item(db: Session, payload: Dict[str, Any]) -> Optional[models.RequirementItem]:
+    return (
+        db.query(models.RequirementItem)
+        .filter(models.RequirementItem.country_code == payload["country_code"])
+        .filter(models.RequirementItem.purpose == payload["purpose"])
+        .filter(models.RequirementItem.title == payload["title"])
+        .first()
+    )
+
+
+def _apply_requirement_item_update(db: Session, existing: models.RequirementItem, payload: Dict[str, Any]) -> models.RequirementItem:
+    existing.description = payload["description"]
+    existing.severity = payload["severity"]
+    existing.owner = payload["owner"]
+    existing.required_fields_json = payload["required_fields_json"]
+    existing.citations_json = payload["citations_json"]
+    # AIQ-1349: keep the assignment-type applicability in sync on re-load.
+    if "applies_to_assignment_types_json" in payload:
+        existing.applies_to_assignment_types_json = payload["applies_to_assignment_types_json"]
+    if "applies_to_nationality_classes_json" in payload:
+        existing.applies_to_nationality_classes_json = payload["applies_to_nationality_classes_json"]
+    if "verification_status" in payload:
+        existing.verification_status = payload["verification_status"]
+    # review_status is deliberately NOT synced here. It is an admin decision about an
+    # existing row, not a property of the seed file, and re-running any YAML seed would
+    # otherwise silently un-approve live content — germany.yaml alone owns 16 rows. Set on
+    # insert (below), carried on update. Same rule as _CARRIED_COLUMNS in
+    # admin_form_templates.py.
+    existing.last_verified_at = payload["last_verified_at"]
+    db.commit()
+    db.refresh(existing)
+    return existing
+
+
+def _insert_requirement_item_ignore_conflict(db: Session, payload: Dict[str, Any]) -> int:
+    """INSERT ... ON CONFLICT (country_code, purpose, title) DO NOTHING. Returns rows inserted.
+
+    THE corridor-import idempotency guard (the 2026-08-15 FR→NO double-import
+    incident): re-importing a requirement that already exists — including one a
+    concurrent import committed after this session's pre-select ran — inserts ZERO
+    rows instead of a duplicate. The conflict target is pinned to the natural-key
+    unique index, so a genuine primary-key collision still fails loudly rather than
+    being swallowed. Dialect-aware because production runs Postgres and the CI suite
+    runs SQLite; both compile a native ON CONFLICT DO NOTHING clause.
+    """
+    table = models.RequirementItem.__table__
+    dialect = db.get_bind().dialect.name
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert as dialect_insert
+    elif dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert as dialect_insert
+    else:
+        # No ON CONFLICT support known for this dialect: plain insert. The unique
+        # constraint still refuses a duplicate loudly rather than storing it.
+        return db.execute(table.insert().values(**payload)).rowcount or 0
+    stmt = (
+        dialect_insert(table)
+        .values(**payload)
+        .on_conflict_do_nothing(index_elements=list(REQUIREMENT_ITEM_NATURAL_KEY))
+    )
+    return db.execute(stmt).rowcount or 0
+
+
 def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.RequirementItem:
-    """Upsert on the natural key (country_code, purpose, title).
+    """Upsert on the natural key (country_code, purpose, title). Fully idempotent.
 
     Every caller of this funnel is an automated producer (Otto promote, YAML
     seed, research stub), so the generator/verifier separation guard runs on
@@ -132,46 +202,47 @@ def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.Requ
     row's provenance is rejected (VerificationWriteError) before anything is
     written. Flipping a row to 'expert_verified' has exactly one path:
     services/verification_guard.mark_expert_verified, behind the admin router.
+
+    Idempotency is enforced in the DATABASE, not just here: the insert runs
+    ON CONFLICT (country_code, purpose, title) DO NOTHING against the natural-key
+    unique index, so running the same corridor import N times — sequentially or
+    concurrently — produces the same row set as running it once. A duplicate
+    import inserts zero new rows (see test_corridor_import_idempotency.py; the
+    2026-08-15 FR→NO corridor import ran twice and duplicated requirement rows
+    because nothing below the application-level pre-select enforced the key).
     """
-    existing = (
-        db.query(models.RequirementItem)
-        .filter(models.RequirementItem.country_code == payload["country_code"])
-        .filter(models.RequirementItem.purpose == payload["purpose"])
-        .filter(models.RequirementItem.title == payload["title"])
-        .first()
-    )
+    existing = _find_requirement_item(db, payload)
     verification_guard.assert_generator_verification_write(
         payload,
         existing_status=existing.verification_status if existing else None,
         context="create_requirement_item",
     )
     if existing:
-        existing.description = payload["description"]
-        existing.severity = payload["severity"]
-        existing.owner = payload["owner"]
-        existing.required_fields_json = payload["required_fields_json"]
-        existing.citations_json = payload["citations_json"]
-        # AIQ-1349: keep the assignment-type applicability in sync on re-load.
-        if "applies_to_assignment_types_json" in payload:
-            existing.applies_to_assignment_types_json = payload["applies_to_assignment_types_json"]
-        if "applies_to_nationality_classes_json" in payload:
-            existing.applies_to_nationality_classes_json = payload["applies_to_nationality_classes_json"]
-        if "verification_status" in payload:
-            existing.verification_status = payload["verification_status"]
-        # review_status is deliberately NOT synced here. It is an admin decision about an
-        # existing row, not a property of the seed file, and re-running any YAML seed would
-        # otherwise silently un-approve live content — germany.yaml alone owns 16 rows. Set on
-        # insert (below), carried on update. Same rule as _CARRIED_COLUMNS in
-        # admin_form_templates.py.
-        existing.last_verified_at = payload["last_verified_at"]
-        db.commit()
-        db.refresh(existing)
-        return existing
-    item = models.RequirementItem(**payload)
-    db.add(item)
+        return _apply_requirement_item_update(db, existing, payload)
+
+    inserted = _insert_requirement_item_ignore_conflict(db, payload)
     db.commit()
-    db.refresh(item)
-    return item
+    if inserted:
+        item = _find_requirement_item(db, payload)
+        assert item is not None  # just inserted and committed
+        return item
+
+    # ON CONFLICT DO NOTHING fired: a concurrent import of the same requirement won the
+    # race between our pre-select and our insert. Zero rows were inserted — re-read the
+    # row that won, re-run the guard against its actual status, and converge on the
+    # update branch so N imports end in exactly the state one import produces.
+    raced = _find_requirement_item(db, payload)
+    if raced is None:  # pragma: no cover — the conflicting row must exist
+        raise RuntimeError(
+            "requirement_items insert conflicted on (country_code, purpose, title) but "
+            "the winning row could not be re-read; refusing to guess."
+        )
+    verification_guard.assert_generator_verification_write(
+        payload,
+        existing_status=raced.verification_status,
+        context="create_requirement_item",
+    )
+    return _apply_requirement_item_update(db, raced, payload)
 
 
 def create_research_candidate(db: Session, payload: Dict[str, Any]) -> models.ResearchSourceCandidate:
