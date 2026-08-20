@@ -11,18 +11,13 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../api/client';
+import type { CaseVendorRow } from '../../api/client';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface VendorRow {
-  shortlist_id: string | null;
-  category: string | null;
-  status: string;
-  contact_name: string | null;
-  contact_email: string | null;
-  vendor_name: string | null;
-  vendor_website: string | null;
-}
+// The row contract lives in api/client.ts (AIQ-1896) — the assign endpoint returns
+// the same shape, so both producers share one definition.
+type VendorRow = CaseVendorRow;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -31,6 +26,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   housing:           'Housing',
   moving:            'Moving & Freight',
   tax:               'Tax Advisory',
+  banking:           'Banking setup',
   school:            'School search',
   destination:       'Destination services',
 };

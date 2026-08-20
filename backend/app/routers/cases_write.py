@@ -53,11 +53,18 @@ from ..services.research import run_country_research
 from ..services.test_drive_corridor import resolve_test_drive_route
 from ..services.trigger_engine import fire_roadmap_events
 from ...database import db as main_db
+from ..services import vendor_proposal
+from ...schemas import UserRole  # NB: backend.schemas, not the app.schemas imported above
 
 # Pydantic models + private helpers borrowed from cases.py.
 # cases.py remains the canonical source of these definitions until cases-6,
 # so importing keeps the two routers in lock-step instead of diverging.
-from .cases_read import FormDocumentItem
+from pydantic import BaseModel
+
+# Import the READER's id resolver, not a local copy: the write and the read must
+# key case_vendor_shortlist on the identical value or a row is written under one
+# id form and listed under another (the AIQ-1704 / post_case_message failure).
+from .cases_read import FormDocumentItem, _canonical_case_id_or_404
 from .cases import (
     BulkFieldUpdatePayload,
     CaseFormSummary,
@@ -343,6 +350,53 @@ def validate_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
     }
 
 
+def _seed_vendor_proposal_for_case(
+    user: Dict[str, Any], dest_country: Optional[str], case_id: str
+) -> None:
+    """[AIQ-1903] Give a REAL company its destination vendor list the first time a case for that
+    destination is finalised.
+
+    Nothing used to do this. Measured 2026-08-17: the only automatic seeder was the test-drive
+    provisioner, so 27 of 32 non-test companies had ZERO rows in `company_vendor_selections`.
+    `SLB_Denis` had 46 only because a human typed them in, and that manual step is the bug this
+    closes.
+
+    Seeded UNSELECTED (`default_selected=False`), which is the whole point of doing it here.
+    `hr_catalog.get_curation_view` treats an untouched master as `selected=False` — "the employee
+    can only pick from the list pre-selected and validated by HR" — and the employee filter shows
+    an empty curation as "HR is finalizing providers". Seeding rows as approved would overturn
+    that authority model and put vendors in front of employees no HR user ever ticked. So HR
+    gains a full pre-filled list to work through; the employee sees no change until HR approves.
+
+    Best-effort but never silent: a seed failure must not fail case creation (the case is already
+    committed by the time we get here), yet a swallowed exception on a seeding path has caused a
+    P0 before, so failures log with a stack.
+
+    Tenant scope comes from the CALLER's profile, not from any request field — the company is
+    never client-supplied.
+    """
+    try:
+        profile = main_db.get_profile_record(user.get("id")) or {}
+        company_id = profile.get("company_id") or main_db.get_hr_company_id(user.get("id"))
+        if not company_id:
+            # An employee with no company link is a real state (self-serve wizard users). No
+            # tenant to seed, so nothing to do — INFO, not an error.
+            logger.info(
+                "vendor proposal: no company for user on case %s — skipping seed", case_id
+            )
+            return
+        vendor_proposal.seed_destination_proposal(
+            company_id=str(company_id),
+            dest_country=dest_country,
+            created_by=user.get("id"),
+            default_selected=False,
+        )
+    except Exception:  # noqa: BLE001 - must not break case creation; must not be silent
+        logger.exception(
+            "vendor proposal: seed failed for case %s (destination %s)", case_id, dest_country
+        )
+
+
 @router.post("/{case_id}/create")
 def create_case(
     case_id: str,
@@ -408,6 +462,8 @@ def create_case(
         )
     except Exception:
         pass
+
+    _seed_vendor_proposal_for_case(user, basics.get("destCountry"), case_id)
 
     return {"createdCaseId": case_id, "requirementsSnapshotId": snapshot_id}
 
@@ -1698,3 +1754,237 @@ def post_case_message(
         "content": d["content"],
         "created_at": d["created_at"],
     }
+
+
+# ---------------------------------------------------------------------------
+# AIQ-1896 — case vendor assignment (the missing write path)
+# ---------------------------------------------------------------------------
+#
+# public.case_vendor_shortlist had NO writer anywhere in the codebase: its 9 prod
+# rows are seeded demo data, newest 2026-05-27. HR could browse the vendor
+# directory (hr_vendors.py, reading public.vendors_legacy) but had no way to
+# attach a browsed vendor to a case, so the case panel could only ever show that
+# stale seed. These two handlers are that write path.
+#
+# Registration note: this router already ships in BOTH backend/main.py and
+# backend/app/main.py (prefix /api/cases), so these routes need no new wiring —
+# see CLAUDE.md "Routers must be registered in BOTH".
+
+
+class _VendorAssignBody(BaseModel):
+    """Body for POST /api/cases/{case_id}/vendors.
+
+    ``vendor_id`` is a public.vendors_legacy id — the same id the HR browse
+    directory (GET /api/hr/vendors) returns for each row.
+    """
+    vendor_id: str
+    service_key: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+
+
+# vendors_legacy.category carries display labels ("Housing Search"); the shortlist
+# keys on the slug the case panel renders ("housing"). Derived from the live
+# catalog — those six labels are the complete set across all 38 vendors.
+_VENDOR_CATEGORY_TO_SERVICE_KEY = {
+    "housing search": "housing",
+    "immigration legal": "immigration",
+    "moving & freight": "moving",
+    "tax advisory": "tax",
+    "banking setup": "banking",
+    "school search": "school",
+}
+
+
+def _service_key_for(category: Optional[str]) -> str:
+    """Map a vendors_legacy category label to a shortlist service_key.
+
+    An unmapped label degrades to a slug rather than raising: a new catalog
+    category should still be assignable, and the panel renders an unknown key
+    verbatim. Returns "other" only when the vendor carries no category at all.
+    """
+    raw = (category or "").strip()
+    if not raw:
+        return "other"
+    return _VENDOR_CATEGORY_TO_SERVICE_KEY.get(
+        raw.lower(), raw.lower().replace(" & ", "_").replace(" ", "_")
+    )
+
+
+def _require_hr_or_admin(user: Dict[str, Any]) -> None:
+    """Assigning a vendor is an HR action.
+
+    _assert_case_access alone is NOT sufficient here: it also admits the employee
+    who owns the case (that is correct for reads and for posting a message), which
+    would let an employee attach vendors to their own relocation. Reads stay open
+    to the employee; these mutations do not.
+    """
+    role = (user.get("role") or "").upper()
+    if role not in (UserRole.HR.value, UserRole.ADMIN.value) and not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="HR or Admin only")
+
+
+def _vendor_row_dto(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Shape a shortlist row exactly like cases_read.list_case_vendors returns it,
+    so the client can drop the POST result straight into the panel's cache."""
+    return {
+        "shortlist_id": str(row["shortlist_id"]) if row.get("shortlist_id") else None,
+        "category": row.get("category"),
+        "status": row.get("status") or "Assigned",
+        "contact_name": row.get("contact_name"),
+        "contact_email": row.get("contact_email"),
+        "vendor_name": row.get("vendor_name"),
+        "vendor_website": row.get("vendor_website"),
+    }
+
+
+@router.post("/{case_id}/vendors", status_code=201)
+def assign_case_vendor(
+    case_id: str,
+    body: _VendorAssignBody,
+    response: Response,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Attach a vendor from the browse directory to this case.
+
+    Idempotent: re-posting the same (case, vendor, service_key) returns the
+    existing row with 200 instead of creating a duplicate. The table has no
+    unique index on that triple and adding one would need a migration against a
+    table that already holds unverified seed rows, so the guard lives here.
+    """
+    _assert_case_access(user, case_id)
+    _require_hr_or_admin(user)
+    resolved_case_id = _canonical_case_id_or_404(case_id)
+
+    vendor_id = (body.vendor_id or "").strip()
+    if not vendor_id:
+        raise HTTPException(status_code=422, detail="vendor_id must not be empty")
+
+    try:
+        with main_db.engine.begin() as conn:
+            # Compare as TEXT: a malformed vendor_id must 404, not raise
+            # "invalid input syntax for type uuid" and surface as a 500.
+            vendor = conn.execute(
+                _sql_text(
+                    """
+                    SELECT id, name, category, website_url
+                    FROM public.vendors_legacy
+                    WHERE CAST(id AS TEXT) = :vid
+                      AND is_active = true
+                    """
+                ),
+                {"vid": vendor_id},
+            ).mappings().first()
+            if vendor is None:
+                raise HTTPException(status_code=404, detail="Vendor not found")
+
+            service_key = (body.service_key or "").strip() or _service_key_for(vendor["category"])
+
+            existing = conn.execute(
+                _sql_text(
+                    """
+                    SELECT id, service_key, status, contact_name, contact_email
+                    FROM public.case_vendor_shortlist
+                    WHERE case_id = :case_id
+                      AND CAST(vendor_id AS TEXT) = :vid
+                      AND service_key = :sk
+                    """
+                ),
+                {"case_id": resolved_case_id, "vid": vendor_id, "sk": service_key},
+            ).mappings().first()
+
+            if existing is not None:
+                response.status_code = 200
+                return _vendor_row_dto({
+                    "shortlist_id": existing["id"],
+                    "category": existing["service_key"],
+                    "status": existing["status"],
+                    "contact_name": existing["contact_name"],
+                    "contact_email": existing["contact_email"],
+                    "vendor_name": vendor["name"],
+                    "vendor_website": vendor["website_url"],
+                })
+
+            new_id = str(uuid.uuid4())
+            conn.execute(
+                _sql_text(
+                    """
+                    INSERT INTO public.case_vendor_shortlist
+                        (id, case_id, service_key, vendor_id, selected, status,
+                         contact_name, contact_email)
+                    VALUES
+                        (:id, :case_id, :sk, :vid, :selected, :status, :cn, :ce)
+                    """
+                ),
+                {
+                    "id": new_id,
+                    "case_id": resolved_case_id,
+                    "sk": service_key,
+                    "vid": vendor_id,
+                    "selected": True,
+                    # 'Assigned' is the only entry value the table's status CHECK
+                    # constraint allows for a fresh row.
+                    "status": "Assigned",
+                    "cn": body.contact_name,
+                    "ce": body.contact_email,
+                },
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("vendors: assign failed case_id=%s", case_id)
+        raise HTTPException(status_code=500, detail="Failed to assign vendor")
+
+    return _vendor_row_dto({
+        "shortlist_id": new_id,
+        "category": service_key,
+        "status": "Assigned",
+        "contact_name": body.contact_name,
+        "contact_email": body.contact_email,
+        "vendor_name": vendor["name"],
+        "vendor_website": vendor["website_url"],
+    })
+
+
+@router.delete("/{case_id}/vendors/{shortlist_id}", status_code=204)
+def unassign_case_vendor(
+    case_id: str,
+    shortlist_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Response:
+    """Detach a vendor from this case.
+
+    A hard DELETE, deliberately. The soft-delete column (`selected`) cannot express
+    "removed" end-to-end: `status` is NOT NULL DEFAULT 'Assigned' and its CHECK
+    constraint admits only Assigned/Briefed/In Progress/Complete, so a row with
+    selected=false still reads back as "Assigned" in the panel (the reader's
+    selected-based "Removed" fallback is unreachable for that reason).
+    """
+    _assert_case_access(user, case_id)
+    _require_hr_or_admin(user)
+    resolved_case_id = _canonical_case_id_or_404(case_id)
+
+    try:
+        with main_db.engine.begin() as conn:
+            # Scope the DELETE by case_id as well as id, so a shortlist id belonging
+            # to another case can never be removed through this case's route.
+            result = conn.execute(
+                _sql_text(
+                    """
+                    DELETE FROM public.case_vendor_shortlist
+                    WHERE CAST(id AS TEXT) = :sid
+                      AND case_id = :case_id
+                    """
+                ),
+                {"sid": shortlist_id, "case_id": resolved_case_id},
+            )
+    except Exception:
+        logger.exception(
+            "vendors: unassign failed case_id=%s shortlist_id=%s", case_id, shortlist_id
+        )
+        raise HTTPException(status_code=500, detail="Failed to unassign vendor")
+
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Vendor assignment not found")
+
+    return Response(status_code=204)

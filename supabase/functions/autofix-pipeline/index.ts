@@ -14,7 +14,7 @@
  *   GITHUB_OWNER         — Repo owner
  *   GITHUB_REPO          — Repo name
  *   NOTION_TOKEN         — Notion integration secret
- *   NOTION_DATABASE_ID   — AI Work Queue database ID (75d7ed78-91f4-46b6-b805-12e43abbecce)
+ *   NOTION_DATABASE_ID   — AI Work Queue data-source ID (4e2887c6-4d48-82c1-931e-87b09fb5c4ed)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -487,7 +487,7 @@ Deno.serve(async (req: Request) => {
   const githubOwner = Deno.env.get("GITHUB_OWNER");
   const githubRepo = Deno.env.get("GITHUB_REPO");
   const notionToken = Deno.env.get("NOTION_TOKEN");
-  const notionDbId = Deno.env.get("NOTION_DATABASE_ID") ?? "75d7ed78-91f4-46b6-b805-12e43abbecce";
+  const notionDbId = Deno.env.get("NOTION_DATABASE_ID") ?? "4e2887c6-4d48-82c1-931e-87b09fb5c4ed";
 
   if (!anthropicKey || !githubToken || !githubOwner || !githubRepo || !notionToken) {
     return Response.json(
