@@ -49,23 +49,39 @@ figures are unchanged; the fact figures drifted, and the serving-critical cohort
 | AU | 0 | 7 | 0 | 0% |
 | PT | 0 | 5 | 0 | 0% |
 
-## The finding that reordered the work
+## Correction: the verdicts were genuine (this supersedes an earlier claim)
 
-**58% of "disproved" verdicts were never actually tested.** Of the 85 approved-and-disproved
-facts, **50** have a `source_doc_id` whose entire `text_content` is the string
-`"Otto bridge capture, unverified — see source_url"`. The evidence checker compared the quote
-against that placeholder and returned FALSE. Only **35** were checked against real text.
-Across all 495 disproved facts: 286 placeholder-checked, 209 real-text-checked.
+An earlier revision of this document asserted that 58% of the "disproved" verdicts had never
+been tested, because 286 of the 495 disproved facts have a `source_doc_id` whose
+`text_content` is the string `"Otto bridge capture, unverified — see source_url"`.
 
-Every one of the 85 is flagged `fetch_status='fetched'`. The false flag is what let a
-placeholder masquerade as an archived source, so the flag **caused** the verdicts.
+**That inference was wrong, and it is retracted.** Nothing reads `text_content` when checking
+evidence:
 
-Founder decision (2026-08-20): move all 85 off `approved` regardless, prioritising the serving
-surface over verdict precision. Recorded here because the 50 are *unjudged*, not disproved, and
-the distinction must survive.
+- the review queue reads `knowledge_docs.content_excerpt` (`admin_content_review.py:117,130`);
+- the only writer of `evidence_verified` (`backfill_fact_evidence.py:149`) checks against text
+  it has just re-fetched over the network.
 
-Implementation choice: they move to **`pending`**, not `rejected`. `pending` means "in the
-review queue", which is true. `rejected` would assert a verdict on 50 facts nobody examined.
+`text_content` is a separate, stale column holding Otto's original capture. Measured: **all 495
+disproved facts have a `content_excerpt` of ≥200 chars** (range 308–24,000), which is above
+`fact_evidence.MIN_USABLE_SOURCE_CHARS`. So every FALSE verdict was a real test against real
+archived text.
+
+`EvidenceCheck.verified` is tri-state and already models this correctly: `None` for `NO_SOURCE`
+and `TRANSLATED`, `False` reserved for "source in hand, same language, quote not there". A
+placeholder-backed check would have produced NULL, not FALSE — which is the clue that should
+have been followed before writing.
+
+### What this changes
+
+- **D1 stands.** The 85 were genuinely disproved, so removing them from the served surface was
+  correct on its own merits. Only the reasoning was wrong, not the outcome.
+- **D2 over-reached and has been corrected.** Of the 163 docs it set to `not_fetched`, **140
+  hold a real fetched excerpt** — `fetched` was accurate for them. Only 23 were right. All 140
+  were restored to `fetched` in the same session (see *Correction applied*).
+
+`fetch_status` is read only by admin/ops display (`backend/app/routers/admin.py`) and by ingest
+logic. It is not on the serving path, so no employee-facing output was affected.
 
 ## Statements applied
 
@@ -86,7 +102,9 @@ row (no verdict is invented or erased); the #1851 reader guard.
 ## Rollback
 
 The 85 cannot be re-derived after the fact — 408 other rows already match
-`status='pending' AND evidence_verified IS FALSE`. Hence the explicit id lists below.
+`status='pending' AND evidence_verified IS FALSE`. Hence the explicit id lists below. (The JSON
+splits them by whether `text_content` is a placeholder. Keep the lists; ignore that labelling —
+per the correction above it does not indicate anything about the verdict.)
 
 ```sql
 UPDATE requirement_facts SET status='approved' WHERE id IN (<d1_all_85>);
@@ -169,3 +187,32 @@ government pages — the same class of error this ticket exists to remove.
 - **D4** — decision on a provenance FK from `requirement_items` back to `requirement_facts`.
 - The refetch, once unblocked, should run `--status approved` first (112 sources) and only then
   the full `pending` population (699 sources).
+
+
+---
+
+## Correction applied — D2 partially reverted
+
+The D2 statement was too broad. Restored, keyed on the committed id list:
+
+```sql
+UPDATE knowledge_docs SET fetch_status = 'fetched'
+ WHERE id IN (<the 163 ids>) AND length(coalesce(content_excerpt,'')) >= 200;   -- 140 rows
+```
+
+`fetch_status` and `content_excerpt` now agree for every one of the 222 placeholder docs:
+
+| | has real excerpt | no excerpt |
+|---|---|---|
+| `fetched` | **140** | 0 |
+| `not_fetched` | 0 | **82** |
+
+This is a better state than before any of today's work: the original 163 `fetched` included 23
+docs with no excerpt at all, which now correctly read `not_fetched`.
+
+**Lesson, recorded because it nearly shipped a false finding into the audit trail:** two columns
+on `knowledge_docs` look like "the source text" and only one of them is. `text_content` is
+Otto's original capture; `content_excerpt` is what the fetcher archived and what every evidence
+path actually reads. Check which column a consumer reads before drawing a conclusion from the
+other — the tri-state `verified` property was the available tell, since a placeholder-backed
+check yields NULL and never FALSE.
