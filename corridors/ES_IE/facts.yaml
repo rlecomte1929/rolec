@@ -1,0 +1,32 @@
+# Which jurisdiction facts the Spain -> Ireland corridor cites, and in which direction.
+# See corridors/NO_FR/facts.yaml for the format rationale.
+#
+# ALL DESTINATION-SIDE. Nothing in the reviewed set is published by a Spanish authority, so
+# there are no origin_facts. That is an accurate reflection of the 2026-08-19 provenance
+# pass, not an omission: the Spain-side obligations were among the 100 facts left staged.
+#
+# The last three carry no step_id on purpose. PPSN and REVENUE_REGISTRATION are real hosts
+# for the first six; tax residence, split-year treatment and contribution aggregation are
+# not steps anyone performs on a date, and pinning them to a step would misrepresent them.
+
+corridor_id: ES_IE
+origin_iso: "ES"
+destination_iso: "IE"
+origin_facts: []
+
+destination_facts:
+  - ref: "IE:registration-pps:pps_number"
+    step_id: PPSN
+  - ref: "IE:registration-pps:pps_proof_of_address"
+    step_id: PPSN
+  - ref: "IE:tax-paye:revenue_myaccount"
+    step_id: REVENUE_REGISTRATION
+  - ref: "IE:tax-paye:emergency_tax"
+    step_id: REVENUE_REGISTRATION
+  - ref: "IE:tax-paye:paye_system"
+    step_id: REVENUE_REGISTRATION
+  - ref: "IE:social_security-prsi:prsi_once_employed"
+    step_id: REVENUE_REGISTRATION
+  - ref: "IE:social_security-prsi:combining_contributions"
+  - ref: "IE:tax-residence:tax_residence"
+  - ref: "IE:tax-residence:split_year_treatment"

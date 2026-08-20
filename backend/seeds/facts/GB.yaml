@@ -1,0 +1,52 @@
+# United Kingdom jurisdiction fact pack.
+#
+# Authored from the 2026-08-19 human provenance pass. Every url, publication date and
+# evidence quote below is a verbatim capture from the cited official page; `fact_text` and
+# `title` are ours. See backend/seeds/facts/README.md for why this format exists and why
+# facts are keyed by the AUTHORITY THAT PUBLISHES THEM rather than by corridor.
+#
+# Nothing here is published by loading it: rows land review_status='pending'.
+# `representative` means visible-but-awaiting-counsel-attestation.
+# ORIGIN-SIDE ONLY. The single fact here binds a person LEAVING the UK. It is bound
+# origin-side by GB_NO and never enters requirement_items, whose country_code is the
+# DESTINATION - a UK residence-test obligation is not a Norwegian requirement.
+
+jurisdiction: "GB"
+catalog_country: UNITED_KINGDOM
+pack_version: "2026-08-19"
+
+default_purposes: [employment]
+default_owner: EMPLOYEE
+default_severity: WARN
+
+facts:
+  - fact_key: statutory_residence_test
+    topic: tax-residence
+    kind: obligation
+    status: representative
+    pillar: EMPLOYMENT
+    title: "UK residence for tax is decided year by year by the Statutory Residence Test"
+    fact_text: >-
+      UK tax residence is determined separately for each tax year by the Statutory Residence Test,
+      which weighs time spent and worked in the UK against the connections held there. A person is
+      resident for a whole tax year, but that year may be split into a UK part and an overseas
+      part.
+    timing: "in the tax year of departure"
+    non_obvious: true
+    source:
+      url: "https://www.gov.uk/government/publications/rdr3-statutory-residence-test-srt/guidance-note-for-statutory-residence-test-srt-rdr3"
+      publisher_domain: "gov.uk"
+      published_date: 2026-06-11
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        The test allows you to work out your residence status for a tax year. Each tax year is
+        looked at separately, so you may be resident in the UK in one year but not the next, or
+        vice versa. The SRT takes into account: the amount of time you spend and, where relevant,
+        work in the UK; the connections you have with the UK. You’ll be resident in the UK for the
+        whole of a tax year, but that year may be split into a UK and an overseas part.
+      quote_sha256: "c0ea590f8998a24b747fa56474e9bda6a5d8254c50530f6f2b77e9e4e14b8a3f"
+    last_verified_date: 2026-08-19
+    depends_on: []
+    pack_keys:
+      - "GB-NO:tax-uk-statutory-residence-test-exit:uk_statutory_residence_test_exit"
+

@@ -1,0 +1,247 @@
+# Norwegian jurisdiction fact pack.
+#
+# WHY THIS FILE EXISTS. A human provenance pass on 2026-08-19 checked 22 corridor
+# knowledge-pack facts against their official sources and captured, for each, a publication
+# date and a verbatim quote. The same thing had been done once before for France->Norway and
+# the evidence was LOST AT THE LOADING BOUNDARY: backend/seeds/requirements/norway.yaml's own
+# header says its source report checked 9 items "each with an exact official quote and URL",
+# yet `citations:` in that file is a bare list of URLs. seed_requirements.py passes those
+# straight into citations_json, requirements_builder resolves each citation against a
+# source_records map, and silently drops what does not resolve. Measured by
+# 20261031000000_frno_source_records.sql: 90 items carried citations, 27 resolved.
+# This format exists so a quote and a date cannot be dropped again.
+#
+# KEYED BY JURISDICTION, NOT BY CORRIDOR. The pack keys were `CORRIDOR:entity:fact_key`, but
+# the corridor is not what makes a fact true - the authority that publishes it is. Lovdata
+# section 3-5 is a Norwegian fact whether the mover comes from London or Lyon, which is why
+# `GB-NO:housing-husleieloven-deposit-cap` and `FR-NO:housing-deposit-cap-6-months` are ONE
+# fact here, carrying both original keys in `pack_keys`. Corridors bind facts (see
+# corridors/<ID>/facts.yaml); they do not own them.
+#
+# DIRECTION IS NOT A PROPERTY OF THE FACT. `reg_883_via_eea` is origin-side for NO->FR and
+# would be destination-side for FR->NO. It is recorded on the binding, never here.
+#
+# NOTHING HERE IS PUBLISHED BY LOADING IT. Rows land review_status='pending' and are released
+# by an admin. `representative` means visible-but-awaiting-counsel-attestation; passing the
+# deterministic gate is necessary and not sufficient. No corridor is sellable on this work.
+
+jurisdiction: "NO"
+catalog_country: NORWAY
+pack_version: "2026-08-19"
+
+# These are corporate-relocation facts, so they seed the `employment` purpose only.
+# Broadening to `other` would double every row and is a separate, deliberate decision.
+default_purposes: [employment]
+default_owner: EMPLOYEE
+# WARN unless the SOURCE TEXT ITSELF states a hard precondition. Severity is a judgement
+# the runbook does not make, so it is made conservatively and visibly rather than inferred.
+default_severity: WARN
+
+facts:
+  # ── Housing: the Tenancy Act ──────────────────────────────────────────────────────────
+  - fact_key: deposit_cap_6_months
+    topic: housing-husleieloven
+    kind: obligation
+    status: active
+    pillar: HOUSING
+    title: "Rental deposit is capped at six months' rent"
+    fact_text: >-
+      A Norwegian tenancy deposit may not exceed the sum of six months' rent. It must be
+      placed in a separate account in the tenant's own name, on ordinary interest terms, at a
+      financial institution entitled to offer that service in Norway. The landlord pays the
+      cost of opening the deposit account.
+    timing: "before signing the lease"
+    non_obvious: true
+    source:
+      url: "https://lovdata.no/lov/1999-03-26-17/%C2%A73-5"
+      publisher_domain: "lovdata.no"
+      published_date: 2026-06-12
+      source_version: "Lovdata - Husleieloven (Tenancy Act) § 3-5, consolidated text, Sist endret LOV-2026-06-12-22, retrieved 2026-08-19"
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        Det kan avtales at leieren til sikkerhet for skyldig leie, skader på husrommet,
+        utgifter ved fraviking og for andre krav som reiser seg av leieavtalen, skal deponere
+        et beløp oppad begrenset til summen av seks måneders leie. Det deponerte beløp skal
+        settes på særskilt konto i leierens navn med vanlige rentevilkår i finansinstitusjon
+        som har rett til å tilby slik tjeneste i Norge. Utleieren dekker kostnadene med å
+        opprette depositumskonto.
+      quote_sha256: "2f5d119525992056e2f557aa57438af26ad52edcd08fd3750efe50e4c6a630b8"
+    last_verified_date: 2026-08-19
+    depends_on: []
+    # The FR-NO capture is the superset: it carries the closing sentence on who pays to open
+    # the account, which the GB-NO capture omits. The superset is retained verbatim; the two
+    # were NOT merged by paraphrase.
+    pack_keys:
+      - "GB-NO:housing-husleieloven-deposit-cap:husleieloven_deposit_cap"
+      - "FR-NO:housing-deposit-cap-6-months:deposit_cap_6_months"
+
+  - fact_key: lease_terms
+    topic: housing-husleieloven
+    kind: obligation
+    status: active
+    pillar: HOUSING
+    title: "Fixed-term residential leases cannot run shorter than three years"
+    fact_text: >-
+      A fixed-term residential tenancy may not be agreed for less than three years. The
+      minimum may be set to one year where the lease is for a loft or basement flat in a
+      detached house, or a flat in a two-family house, and the landlord lives in the same
+      building.
+    timing: "before signing the lease"
+    non_obvious: true
+    source:
+      url: "https://lovdata.no/lov/1999-03-26-17/%C2%A79-3"
+      publisher_domain: "lovdata.no"
+      published_date: 2026-06-12
+      source_version: "Lovdata - Husleieloven (Tenancy Act) § 9-3, consolidated text, Sist endret LOV-2026-06-12-22, retrieved 2026-08-19"
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        Det er ikke adgang til å inngå tidsbestemt leieavtale for bolig for kortere tid enn
+        tre år. Minstetiden kan likevel settes til ett år hvis avtalen gjelder lofts- eller
+        sokkelbolig i enebolig eller bolig i tomannsbolig, og utleieren bor i samme hus.
+      quote_sha256: "f5a4063fa58af81882035e584ca3bb23ab71ac6144c78944aba8f872d2c62e2a"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "NO:housing-husleieloven:deposit_cap_6_months"
+    pack_keys:
+      - "FR-NO:housing-lease-terms:lease_terms"
+
+  # ── Social security and healthcare on the way OUT of Norway ───────────────────────────
+  # Published by Norwegian authorities, but they bind a person LEAVING Norway. They are
+  # bound origin-side by NO_FR and never enter requirement_items, whose country_code is the
+  # destination. A Norwegian exit obligation is not a French requirement.
+  - fact_key: reg_883_via_eea
+    topic: social_security-folketrygdloven
+    kind: obligation
+    status: representative
+    pillar: SOCIAL_SECURITY
+    title: "EU social-security coordination applies in Norway through the EEA Agreement"
+    fact_text: >-
+      Regulation (EC) No 883/2004 on the coordination of social security systems applies as
+      Norwegian law through Annex VI to the EEA Agreement, with the adaptations that follow
+      from that annex, Protocol 1 and the agreement generally. Coordination between Norway
+      and an EU member state therefore runs through the EEA Agreement rather than through
+      the EU treaties directly.
+    timing: "when determining which country's social security applies"
+    non_obvious: true
+    source:
+      url: "https://lovdata.no/lov/1997-02-28-19/§1-3a"
+      publisher_domain: "lovdata.no"
+      published_date: 2026-06-23
+      source_version: "Folketrygdloven (LOV-1997-02-28-19) § 1-3 a, lovdata consolidated text - Sist endret LOV-2026-06-19-45 / LOV-2026-06-23-65, re-read 2026-08-19"
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        EØS-avtalen vedlegg VI nr. 1 (forordning (EF) nr. 883/2004 om koordinering av
+        trygdeordninger ...) (trygdeforordningen) gjelder som lov med de tilpasningene som
+        følger av vedlegg VI, protokoll 1 og avtalen for øvrig. (§ 1-3 a første ledd)
+      quote_sha256: "97d9f376f0b27e2e41b00e55435ce88a84182b9063da463837ffa7156487abe6"
+    last_verified_date: 2026-08-19
+    depends_on: []
+    pack_keys:
+      - "NO-FR:social_security-reg-883-via-eea:reg_883_via_eea"
+
+  - fact_key: a1_issued_by_nav
+    topic: social_security-posting
+    kind: obligation
+    status: representative
+    pillar: SOCIAL_SECURITY
+    title: "NAV issues the A1 that keeps Norwegian National Insurance membership during a posting"
+    fact_text: >-
+      Mandatory membership of the Norwegian National Insurance Scheme is retained for a
+      posting of up to two years to another EU/EEA country or Switzerland, for a Norwegian
+      employer, by a citizen of Norway, another EU/EEA country or Switzerland. The
+      application must be accompanied by the employment contract, confirmation of the
+      posting, and certificate A1 from NAV.
+    timing: "before leaving Norway"
+    non_obvious: true
+    source:
+      url: "https://www.helsenorge.no/en/health-rights-living-abroad/posted-workers-in-the-eu-eea-and-switzerland/"
+      publisher_domain: "helsenorge.no"
+      published_date: 2026-03-03
+      source_version: "Helsenorge, \"Posted workers in the EU/EEA and Switzerland\", retrieved 2026-08-19"
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        You will retain your mandatory membership of the Norwegian National Insurance Scheme
+        if you work for up to two years in another EU/EEA country or Switzerland for your
+        Norwegian employer and are a citizen of Norway, another EU/EEA country or
+        Switzerland. You must attach the following: employment contract; confirmation of the
+        assignment/posting to another EEA country or Switzerland; certificate A1 from the
+        Norwegian Labour and Welfare Administration (NAV).
+      quote_sha256: "c5b68c23010f4116a41fc8885a35ba28fe4e2074db6c047f0486b76a096d37a7"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "EU:social_security-posting:a1_posting"
+    pack_keys:
+      - "NO-FR:social_security-a1-issued-by-nav:a1_issued_by_nav"
+
+  - fact_key: s1_during_posting
+    topic: healthcare-posting
+    kind: obligation
+    status: representative
+    pillar: HEALTHCARE
+    title: "Apply to Helfo for the S1 certificate before leaving Norway"
+    fact_text: >-
+      Before leaving Norway a posted worker must apply to Helfo for certificate S1, which
+      confirms healthcare rights in the country of work. The application must attach the
+      employment contract, confirmation of the posting, and certificate A1 from NAV. Helfo's
+      processing time is normally up to four weeks.
+    timing: "before leaving Norway - allow up to 4 weeks"
+    non_obvious: true
+    source:
+      url: "https://www.helsenorge.no/en/health-rights-living-abroad/posted-workers-in-the-eu-eea-and-switzerland/"
+      publisher_domain: "helsenorge.no"
+      published_date: 2026-03-03
+      source_version: "Helsenorge, \"Posted workers in the EU/EEA and Switzerland\", retrieved 2026-08-19"
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        Before you leave Norway, you must apply to Helfo for certificate S1. This certificate
+        confirms your healthcare rights in the country in which you are going to work. You
+        must attach the following: employment contract; confirmation of the assignment/posting
+        to another EEA country or Switzerland; certificate A1 from the Norwegian Labour and
+        Welfare Administration (NAV). Helfo’s processing time for applications for certificate
+        S1 is normally up to 4 weeks.
+      quote_sha256: "efef96749c0e0f2f6dc57367197129529efb4e9fdeb8091b92c7ced395507315"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "NO:social_security-posting:a1_issued_by_nav"
+    pack_keys:
+      - "NO-FR:healthcare-s1-during-posting:s1_during_posting"
+
+  # ── Preparation items: staged, and deliberately provenance-free ───────────────────────
+  # Reclassified from process_step on 2026-08-19 because NO AUTHORITY PUBLISHES THEM. They
+  # describe real preparation and real friction, but there is no page to cite, no
+  # publication date and no quote — so they carry no `source:` block at all. Absence, not a
+  # nulled-out block: there is nothing here for someone to quietly fill in later. The gate
+  # enforces the INVERSE of completeness on these — growing a source is a failure, not a fix.
+  # They stay `staged`, are never seeded, and nothing may depend on them.
+  - fact_key: bankid_electronic_id_friction
+    topic: registration-bankid
+    kind: preparation_item
+    status: staged
+    pillar: RESIDENCE
+    title: "Losing Norwegian BankID on departure cuts off most online public services"
+    fact_text: >-
+      Norwegian BankID is the de facto key to public and banking services, and it is tied to
+      an active Norwegian bank relationship. Closing that relationship on departure can
+      remove access to services still needed to finish the exit. Plan what has to be done
+      while the electronic ID still works.
+    timing: "before closing Norwegian bank accounts"
+    non_obvious: true
+    depends_on: []
+    pack_keys:
+      - "GB-NO:registration-bankid-electronic-id-friction"
+
+  - fact_key: interim_private_health_cover_gap
+    topic: healthcare-interim-cover
+    kind: preparation_item
+    status: staged
+    pillar: HEALTHCARE
+    title: "There can be a cover gap between leaving one health system and joining the next"
+    fact_text: >-
+      Entitlement in the destination system rarely begins on the day cover in the origin
+      system ends. Interim private cover is a commercial decision, not a published legal
+      requirement, which is why no authority states it.
+    timing: "before the move date"
+    non_obvious: true
+    depends_on: []
+    pack_keys:
+      - "GB-NO:healthcare-interim-private-health-cover-gap"

@@ -1,0 +1,317 @@
+# Ireland jurisdiction fact pack.
+#
+# Authored from the 2026-08-19 human provenance pass. Every url, publication date and
+# evidence quote below is a verbatim capture from the cited official page; `fact_text` and
+# `title` are ours. See backend/seeds/facts/README.md for why this format exists and why
+# facts are keyed by the AUTHORITY THAT PUBLISHES THEM rather than by corridor.
+#
+# Nothing here is published by loading it: rows land review_status='pending'.
+# `representative` means visible-but-awaiting-counsel-attestation.
+# ALL DESTINATION-SIDE. Every fact here binds a person ARRIVING in Ireland, so all nine
+# become requirement_items rows for IRELAND once a corridor binds them.
+#
+# Two of these sit on revenue.ie and one on citizensinformation.ie, which classify_source
+# grades SEMI_OFFICIAL - statutory bodies restating rules published elsewhere. That is why
+# they are `representative` and not `active`: the gate permits semi_official at
+# representative and refuses it at active.
+
+jurisdiction: "IE"
+catalog_country: IRELAND
+pack_version: "2026-08-19"
+
+default_purposes: [employment]
+default_owner: EMPLOYEE
+default_severity: WARN
+
+facts:
+  - fact_key: pps_number
+    topic: registration-pps
+    kind: obligation
+    status: active
+    pillar: RESIDENCE
+    severity: BLOCKER
+    title: "A PPS number is required for employment and tax administration"
+    fact_text: >-
+      A Personal Public Service (PPS) Number helps a person access public services and is used for
+      employment and tax administration in Ireland. An adult can apply online through MyWelfare
+      using a basic or verified MyGovID account; the service is available both to people resident
+      in Ireland and to customers resident abroad. The application requires evidence of identity,
+      evidence of address and evidence of the reason the number is needed, such as taking up
+      employment.
+    timing: "as early as possible - before the first payroll run"
+    non_obvious: true
+    source:
+      url: "https://www.gov.ie/en/department-of-social-protection/services/get-a-personal-public-service-pps-number/"
+      publisher_domain: "gov.ie"
+      published_date: 2026-01-30
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        If you are aged 18 years or older you can apply for a PPS Number for yourself and your
+        child online at MyWelfare. This service is available to customers resident on the island
+        of Ireland and customers resident abroad. To apply for a PPS Number, you must provide:
+        evidence of your identity; evidence of your address; The reason why you need a PPSN.
+      quote_sha256: "6b8a99535c3156cebddda3f716bd6815b6839a4931c94e9f3ada03d396b20d7e"
+    last_verified_date: 2026-08-19
+    depends_on: []
+    pack_keys:
+      - "ES-IE:registration-pps-number:pps_number"
+
+  - fact_key: pps_proof_of_address
+    topic: registration-pps
+    kind: obligation
+    status: active
+    pillar: RESIDENCE
+    title: "Proof of address for a PPS application must be under three months old"
+    fact_text: >-
+      The address document supporting a PPS number application must show the applicant's name and
+      address and be no more than three months old. A household utility bill, official letter or
+      document, bank statement, property lease or tenancy agreement, official letter from a
+      government department or agency, or official third-party confirmation of address are all
+      accepted.
+    timing: "gathered before applying for the PPS number"
+    non_obvious: true
+    source:
+      url: "https://www.gov.ie/en/department-of-social-protection/services/get-a-personal-public-service-pps-number/"
+      publisher_domain: "gov.ie"
+      published_date: 2026-01-30
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        The document must show your name and address and not be older than 3 months. You can use
+        any of the following documents to do this: household utility bill; an official letter or
+        document; a bank statement; property lease or tenancy agreement; official letter from a
+        Government department or agency; official confirmation of address by a third party.
+      quote_sha256: "d71a659817b3a63446833ae06fed34b2ae7370a2ea988626655de12de1d05664"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "IE:registration-pps:pps_number"
+    pack_keys:
+      - "ES-IE:registration-pps-proof-of-address:pps_proof_of_address"
+
+  - fact_key: revenue_myaccount
+    topic: tax-paye
+    kind: obligation
+    status: representative
+    pillar: EMPLOYMENT
+    title: "Register the job with Revenue through myAccount to avoid emergency tax"
+    fact_text: >-
+      A first job should be notified to Revenue as soon as possible, or emergency tax may apply.
+      This is done by registering for myAccount and adding the job under 'Add Job or Pension
+      Details' in PAYE Services. Revenue then makes a Revenue Payroll Notification available to
+      the new employer.
+    timing: "immediately on starting the job"
+    non_obvious: true
+    source:
+      url: "https://www.revenue.ie/en/jobs-and-pensions/starting-your-first-job/index.aspx"
+      publisher_domain: "revenue.ie"
+      published_date: 2026-03-19
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        When you start your first job, you should notify Revenue as soon as possible, or you may
+        have to pay Emergency Tax. To do this, you need to register for myAccount. Once registered
+        for myAccount you can register your job by clicking 'Add Job or Pension Details' under the
+        'PAYE Services' tab. When you have registered your first job, Revenue will make a Revenue
+        Payroll Notification (RPN) available to your new employer.
+      quote_sha256: "685af66ca29433f7ddbe5bb7db57cbc611358895b07cc717a2ff906a84d8d57d"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "IE:registration-pps:pps_number"
+    pack_keys:
+      - "ES-IE:tax-revenue-myaccount:revenue_myaccount"
+
+  - fact_key: emergency_tax
+    topic: tax-paye
+    kind: obligation
+    status: representative
+    pillar: EMPLOYMENT
+    title: "Emergency tax applies until the job is registered, rising to 40% from week five"
+    fact_text: >-
+      Where a PPSN has been given to the employer but the job is not registered with Revenue, the
+      employer cannot obtain an RPN and must apply emergency tax. With a PPSN supplied, a single
+      person's rate band applies for the first four weeks of employment; from week five onwards
+      all income is taxed at the higher 40% rate.
+    timing: "from the first payroll run until the job is registered"
+    non_obvious: true
+    source:
+      url: "https://www.revenue.ie/en/jobs-and-pensions/emergency-tax/emergency-tax-rules.aspx"
+      publisher_domain: "revenue.ie"
+      published_date: 2026-02-24
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        If you have provided your PPSN to your employer, but your job has not been registered with
+        Revenue, your employer will be unable to obtain an RPN for you. Your employer will be
+        obliged to apply the below Emergency Tax rules on your gross pay. Where you have provided
+        your PPSN, you are allowed a single person’s rate band for the first four weeks of
+        employment. From Week 5 onwards, your full income will be taxed at the higher rate (40%).
+      quote_sha256: "de6951dd78c70a2fae193c2505cbd2ed4ee6afa92ba4f7ce0e34e615cea3241d"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "IE:tax-paye:revenue_myaccount"
+    pack_keys:
+      - "ES-IE:tax-emergency-tax:emergency_tax"
+
+  - fact_key: paye_system
+    topic: tax-paye
+    kind: obligation
+    status: representative
+    pillar: EMPLOYMENT
+    title: "The employer's RPN drives Income Tax, USC and PRSI deductions"
+    fact_text: >-
+      Once the job is registered with Revenue, Revenue makes a Revenue Payroll Notification
+      available to the employer. With the RPN the employer can calculate the correct deductions of
+      Income Tax, Universal Social Charge and Pay Related Social Insurance.
+    timing: "from the first payroll run after registration"
+    non_obvious: true
+    source:
+      url: "https://www.revenue.ie/en/jobs-and-pensions/starting-your-first-job/how-your-tax-is-calculated.aspx"
+      publisher_domain: "revenue.ie"
+      published_date: 2026-03-19
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        Revenue will make a Revenue Payroll Notification (RPN) available to your employer when you
+        have registered your job with Revenue. When your employer obtains the RPN they can
+        calculate the correct deductions of: Income Tax; Universal Social Charge (USC); and Pay
+        Related Social Insurance (PRSI).
+      quote_sha256: "6090031189457dbd696d67dc9b2a1750142035b9e78d87e2ab00057c69cba719"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "IE:tax-paye:revenue_myaccount"
+    pack_keys:
+      - "ES-IE:tax-paye-system:paye_system"
+
+  - fact_key: prsi_once_employed
+    topic: social_security-prsi
+    kind: obligation
+    status: representative
+    pillar: SOCIAL_SECURITY
+    title: "PRSI is compulsory for most employees between 16 and pensionable age"
+    fact_text: >-
+      Most employers and employees between the age of 16 and pensionable age, currently 66, pay
+      social insurance (PRSI) contributions into the Social Insurance Fund. Payment of PRSI is in
+      general compulsory, and most employees are liable at Class A.
+    timing: "from the start of employment"
+    non_obvious: true
+    source:
+      url: "https://www.gov.ie/en/department-of-social-protection/publications/prsi-pay-related-social-insurance/"
+      publisher_domain: "gov.ie"
+      published_date: 2026-07-23
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        Most employers and employees (between the ages of 16 and pensionable age, currently 66*
+        years) pay social insurance (PRSI) contributions into the SIF. In general, the payment of
+        PRSI is compulsory. Most employees are liable to pay Class A PRSI.
+      quote_sha256: "4080eda51f4740b4e941b941810fc933c1760e9707f8b74b2ac0957c8a7f559c"
+    last_verified_date: 2026-08-19
+    depends_on: []
+    pack_keys:
+      - "ES-IE:social_security-prsi-once-employed:prsi_once_employed"
+
+  - fact_key: combining_contributions
+    topic: social_security-prsi
+    kind: obligation
+    status: representative
+    pillar: SOCIAL_SECURITY
+    title: "Contributions paid abroad can be combined with Irish contributions"
+    fact_text: >-
+      Ireland has social security arrangements with other countries that allow social insurance
+      contributions paid in Ireland to be combined with contributions paid in another country.
+      Combining them can help qualify for a social insurance payment in Ireland or in the other
+      country.
+    timing: "when claiming a social insurance payment"
+    non_obvious: true
+    source:
+      url: "https://www.citizensinformation.ie/en/social-welfare/irish-social-welfare-system/claiming-a-social-welfare-payment/social-insurance-contributions-from-abroad/"
+      publisher_domain: "citizensinformation.ie"
+      published_date: 2026-02-03
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        Ireland has social security arrangements with other countries that allow you to combine
+        social insurance contributions that you have paid in Ireland with social insurance
+        contributions that you have paid in another country. This can help you to qualify for a
+        social insurance payment in Ireland or in a country with whom Ireland has a social
+        security arrangement.
+      quote_sha256: "d74715903112c2c69833f90870a6f1e842c902e39ad5053ed89b9bf07c2c5d13"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "IE:social_security-prsi:prsi_once_employed"
+    pack_keys:
+      - "ES-IE:social_security-combining-contributions:combining_contributions"
+
+  - fact_key: tax_residence
+    topic: tax-residence
+    kind: obligation
+    status: representative
+    pillar: EMPLOYMENT
+    title: "Irish tax residence turns on 183 days in a year, or 280 across two"
+    fact_text: >-
+      A person is resident in Ireland for tax purposes if present for 183 days or more in a tax
+      year, or 280 days or more in total across the current and preceding tax years together.
+      Presence of 30 days or less in a tax year does not make a person resident.
+    timing: "assessed per tax year"
+    non_obvious: true
+    source:
+      url: "https://www.revenue.ie/en/jobs-and-pensions/tax-residence/resident-for-tax-purposes.aspx"
+      publisher_domain: "revenue.ie"
+      published_date: 2025-11-24
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        You are resident in Ireland for tax purposes if you are present in Ireland for: 183 days
+        or more in a tax year; or 280 days or more in total, taking the current tax year plus the
+        preceding tax year together. You will not be resident in Ireland if you are here for 30
+        days or less in a tax year.
+      quote_sha256: "3051ac96c2d6bbd7f2dc2a515e115a57ebd65dc8218c8ce0ec884c5b24333cb8"
+    last_verified_date: 2026-08-19
+    depends_on: []
+    pack_keys:
+      - "ES-IE:tax-tax-residence:tax_residence"
+
+  - fact_key: split_year_treatment
+    topic: tax-residence
+    kind: obligation
+    status: representative
+    pillar: EMPLOYMENT
+    title: "Split-year treatment can be requested for the year of arrival"
+    fact_text: >-
+      Split-year treatment on employment income may be requested for the year of the move where
+      the person is resident in Ireland that year, was not resident the previous year, and will be
+      resident the following year. It applies to employment income only; employment income earned
+      abroad earlier in the year of arrival is ignored for Irish tax purposes.
+    timing: "requested for the tax year of arrival"
+    non_obvious: true
+    source:
+      url: "https://www.revenue.ie/en/life-events-and-personal-circumstances/moving-to-or-from-ireland/moving-or-returning-to-ireland/split-year-treatment-in-your-year-of-arrival.aspx"
+      publisher_domain: "revenue.ie"
+      published_date: 2026-01-20
+      retrieved_at: 2026-08-19
+      evidence_quote: >-
+        You can request split-year treatment on your employment income for the year you move to
+        Ireland if: you are resident in Ireland in that year; you are not resident in Ireland in
+        the previous year; and you are going to be resident in Ireland in the year following your
+        arrival here. Split-year treatment applies to employment income only. Employment income
+        you earned abroad in that year before you arrived in Ireland is ignored for Irish tax
+        purposes.
+      quote_sha256: "fb6bd5145df60b567882309563516fecf495b4646e4f03fa8bf167b6e5325cc3"
+    last_verified_date: 2026-08-19
+    depends_on:
+      - "IE:tax-residence:tax_residence"
+    pack_keys:
+      - "ES-IE:tax-split-year-treatment:split_year_treatment"
+
+
+  # ── Preparation item: staged, provenance-free by design ───────────────────────────────
+  # See the note in backend/seeds/facts/NO.yaml. No authority publishes this, so it carries
+  # no `source:` block and the gate refuses to let it grow one.
+  - fact_key: payslip_catch22
+    topic: housing-payslip
+    kind: preparation_item
+    status: staged
+    pillar: HOUSING
+    title: "Landlords ask for Irish payslips that a new arrival cannot yet have"
+    fact_text: >-
+      Irish letting agents commonly ask for recent Irish payslips and an Irish bank account,
+      both of which follow from starting work — which in turn needs an address. The loop is
+      real and widely reported, but it is market practice, not a published rule.
+    timing: "while searching for housing"
+    non_obvious: true
+    depends_on: []
+    pack_keys:
+      - "ES-IE:housing-payslip-catch22"
