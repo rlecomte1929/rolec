@@ -288,7 +288,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
   const notionToken     = Deno.env.get("NOTION_TOKEN");
-  const notionDbId      = Deno.env.get("NOTION_DATABASE_ID") ?? "75d7ed78-91f4-46b6-b805-12e43abbecce";
+  const notionDbId      = Deno.env.get("NOTION_DATABASE_ID") ?? "4e2887c6-4d48-82c1-931e-87b09fb5c4ed";
   const overviewPageId  = Deno.env.get("NOTION_OVERVIEW_PAGE") ?? "35c887c64d4881ac9b40eb253c86cf29";
   const postmarkToken   = Deno.env.get("POSTMARK_SERVER_TOKEN");
   const emailTo         = Deno.env.get("DIGEST_EMAIL_TO") ?? "romain_lecomte@hotmail.com";

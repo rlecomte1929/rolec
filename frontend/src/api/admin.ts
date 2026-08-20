@@ -21,7 +21,9 @@ export async function rerunCountryResearch(
 }
 
 /** How well-sourced a requirement is. A badge — it does not decide what is served. */
-export type VerificationStatus = 'representative' | 'corpus_grounded' | 'expert_verified';
+// 'verified' is the value production stores; 'expert_verified' is the value the backend
+// constants use. Both are listed until they are normalised.
+export type VerificationStatus = 'representative' | 'corpus_grounded' | 'expert_verified' | 'verified';
 /** Whether a requirement is served. Only 'approved' reaches employees or the public endpoint. */
 export type ReviewStatus = 'pending' | 'approved' | 'rejected';
 

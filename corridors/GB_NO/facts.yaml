@@ -1,0 +1,26 @@
+# Which jurisdiction facts the United Kingdom -> Norway corridor cites.
+# See corridors/NO_FR/facts.yaml for the format rationale.
+#
+# THIS DIRECTORY HAS NO corridor.yaml AND NO PATHWAY, ON PURPOSE. corridor_registry.py
+# enumerates corridors as "every subdirectory holding a corridor.yaml", so GB_NO stays
+# invisible to the registry and nothing renders - which is the honest state. The intake
+# dropdown already offers GB as an origin, and closing that gap needs a registry profile
+# plus a coverage notice; that is filed separately.
+#
+# Post-Brexit a UK national is a THIRD-COUNTRY national for Norway. Copying FR_NO's EEA
+# free-movement pathway would ship an invented immigration sequence for exactly the wrong
+# legal basis, so no pathway is authored here. Two verified facts do not license fifteen
+# authored steps.
+#
+# The deposit cap is bound here as well as by FR_NO and adds NO second row: both corridors
+# cite one Norwegian law, and jurisdiction-keying is what collapses them. That collapse
+# working is the point of the format.
+
+corridor_id: GB_NO
+origin_iso: "GB"
+destination_iso: "NO"
+origin_facts:
+  - ref: "GB:tax-residence:statutory_residence_test"
+
+destination_facts:
+  - ref: "NO:housing-husleieloven:deposit_cap_6_months"

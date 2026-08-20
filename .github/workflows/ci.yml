@@ -35,6 +35,7 @@ jobs:
       workflows: ${{ steps.filter.outputs.workflows }}
       edge_functions: ${{ steps.filter.outputs.edge_functions }}
       case_id_writers: ${{ steps.filter.outputs.case_id_writers }}
+      corridor_facts: ${{ steps.filter.outputs.corridor_facts }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -55,6 +56,19 @@ jobs:
             backend:
               - 'backend/**'
               - 'scripts/**'
+            # Corridor fact packs. `corridors/**` was in NO filter, so a change to a
+            # corridor binding triggered nothing at all — the same shape as `.nvmrc` above.
+            # The guard script, its allowlist and parsers.py are listed alongside the data
+            # for the reason the `migrations` filter spells out: a gate whose own config can
+            # change while the gate is skipped reports green on an unchecked tree.
+            # parsers.py is here because check (a) reads its host tables — they ARE this
+            # guard's configuration, even though they live in the importer.
+            corridor_facts:
+              - 'backend/seeds/facts/**'
+              - 'corridors/**'
+              - 'scripts/check_corridor_facts.py'
+              - 'scripts/corridor_facts_allowlist.txt'
+              - 'backend/imports/otto/parsers.py'
             hr_dashboard:
               - 'apps/hr-dashboard/**'
               - '.nvmrc'
@@ -594,6 +608,50 @@ jobs:
       - name: Check form-template honesty (no permit for free-movers)
         run: python scripts/check_form_template_honesty.py
 
+  corridor-facts:
+    # Provenance guard for customer-visible relocation facts. Every promoted fact in
+    # backend/seeds/facts/ must carry an OFFICIAL source, the publication date that page
+    # states about itself, and a verbatim evidence quote — and its dependencies must resolve
+    # without pointing at anything staged. Twice the evidence was gathered by hand and lost
+    # at the loading boundary (90 items with citations, 27 resolving, per
+    # 20261031000000_frno_source_records.sql; 27 rows reading "Stub content for <url>" per
+    # 20261032000000_remove_fake_evidence.sql). This makes those four checks a build failure.
+    #
+    # Exit 2 (also a failure) means the run itself was invalid — an unparseable pack, or
+    # ZERO facts examined, which must never read as a pass. The same checks are asserted
+    # from pytest by scripts/tests/test_check_corridor_facts.py in the backend-tests job,
+    # where every check is proven to go red against a planted violation.
+    # See backend/seeds/facts/README.md.
+    name: Corridor fact-pack gate
+    needs: changes
+    if: needs.changes.outputs.corridor_facts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      # PyYAML only. The guard is otherwise stdlib; it needs a real YAML parser because the
+      # evidence it protects is multi-line prose with significant punctuation.
+      - name: Install PyYAML
+        run: python -m pip install --quiet "PyYAML>=6.0"
+      # --run-date is passed explicitly so the freshness verdict is reproducible: a rerun of
+      # this commit next month must give the same answer as it does today.
+      - name: Check corridor fact provenance
+        run: |
+          python scripts/check_corridor_facts.py \
+            --root . \
+            --run-date "$(date -u +%F)" \
+            --json corridor-facts-gate.json
+      - name: Upload gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corridor-facts-gate
+          path: corridor-facts-gate.json
+          if-no-files-found: ignore
+
   serving-llm-isolation:
     # Trust-architecture guard: the generation/serving split as an ENFORCED invariant.
     # The deterministic requirement-serving path (requirements_builder, rules_engine,
@@ -710,22 +768,30 @@ jobs:
         run: pip install psycopg2-binary==2.9.9
       - name: Collect migrations added by this PR
         id: added
-        env:
-          # Never interpolate ${{ }} straight into run: — filenames come from the PR
-          # author and would be shell-injected. Pass through env and quote.
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          # No fallback to an empty list. This workflow is pull_request-only, so an
-          # absent base SHA means the step cannot work out its own scope — and an empty
-          # --added puts check_migration_drift.py into audit mode, where the dead and
-          # duplicate checks degrade to warnings and it exits 0. A guard that silently
-          # stops checking must go red, not green. Same for a failing git diff: `|| true`
-          # here used to convert it into "this PR added no migrations".
+          # Derive the base from LIVE origin/main, not github.event.pull_request.base.sha.
+          # That field records the base tip when the PR was opened and GitHub never
+          # refreshes it as the base branch moves. HEAD here is the PR *merge ref*
+          # (base + PR), so a three-dot diff from the stale SHA spans every commit merged
+          # to main since — and attributes THEIR migrations to this PR. On 2026-08-19
+          # that failed #1894 with "adds a migration at a version already used on
+          # origin/main: 20261108000000" — a file #1901 had merged minutes earlier and
+          # that #1894 does not contain. The guard written to survive a moving base was
+          # itself reading a stale one.
+          #
+          # No fallback to an empty list. An undeterminable scope means the step cannot
+          # do its job — and an empty --added puts check_migration_drift.py into audit
+          # mode, where the dead and duplicate checks degrade to warnings and it exits 0.
+          # A guard that silently stops checking must go red, not green. Same for a
+          # failing git diff: `|| true` here used to convert it into "this PR added no
+          # migrations".
+          git fetch --quiet origin main
+          BASE_SHA=$(git merge-base origin/main HEAD || true)
           if [ -z "$BASE_SHA" ]; then
-            echo "::error::No PR base SHA — cannot determine which migrations this PR adds."
-            echo "The dead-version and duplicate-version checks would silently degrade to"
-            echo "warnings. Failing instead. (ci.yml is pull_request-only; base.sha should"
-            echo "always be set — if a new trigger was added, scope this step to PRs.)"
+            echo "::error::No merge base with origin/main — cannot determine which"
+            echo "migrations this PR adds. The dead-version and duplicate-version checks"
+            echo "would silently degrade to warnings. Failing instead. (Needs the full"
+            echo "history: this job must keep actions/checkout fetch-depth: 0.)"
             exit 1
           fi
           # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
@@ -769,13 +835,14 @@ jobs:
         with:
           python-version: "3.11"
       - name: Check for a column read shipped with its own migration
-        env:
-          # Never interpolate ${{ }} straight into run:.
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
+          # Live origin/main, not pull_request.base.sha — see the duplicate-version job
+          # for why that field goes stale and mis-attributes another PR's migrations.
+          git fetch --quiet origin main
+          BASE_SHA=$(git merge-base origin/main HEAD || true)
           if [ -z "$BASE_SHA" ]; then
-            echo "No PR base SHA (not a pull_request event) — skipping."
-            exit 0
+            echo "::error::No merge base with origin/main — cannot scope this check."
+            exit 1
           fi
           python scripts/check_column_read_before_apply.py --base "$BASE_SHA"
 
@@ -799,22 +866,30 @@ jobs:
           python-version: "3.11"
       - name: Collect migrations added by this PR
         id: added
-        env:
-          # Never interpolate ${{ }} straight into run: — filenames come from the PR
-          # author and would be shell-injected. Pass through env and quote.
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          # No fallback to an empty list. This workflow is pull_request-only, so an
-          # absent base SHA means the step cannot work out its own scope — and an empty
-          # --added puts check_migration_drift.py into audit mode, where the dead and
-          # duplicate checks degrade to warnings and it exits 0. A guard that silently
-          # stops checking must go red, not green. Same for a failing git diff: `|| true`
-          # here used to convert it into "this PR added no migrations".
+          # Derive the base from LIVE origin/main, not github.event.pull_request.base.sha.
+          # That field records the base tip when the PR was opened and GitHub never
+          # refreshes it as the base branch moves. HEAD here is the PR *merge ref*
+          # (base + PR), so a three-dot diff from the stale SHA spans every commit merged
+          # to main since — and attributes THEIR migrations to this PR. On 2026-08-19
+          # that failed #1894 with "adds a migration at a version already used on
+          # origin/main: 20261108000000" — a file #1901 had merged minutes earlier and
+          # that #1894 does not contain. The guard written to survive a moving base was
+          # itself reading a stale one.
+          #
+          # No fallback to an empty list. An undeterminable scope means the step cannot
+          # do its job — and an empty --added puts check_migration_drift.py into audit
+          # mode, where the dead and duplicate checks degrade to warnings and it exits 0.
+          # A guard that silently stops checking must go red, not green. Same for a
+          # failing git diff: `|| true` here used to convert it into "this PR added no
+          # migrations".
+          git fetch --quiet origin main
+          BASE_SHA=$(git merge-base origin/main HEAD || true)
           if [ -z "$BASE_SHA" ]; then
-            echo "::error::No PR base SHA — cannot determine which migrations this PR adds."
-            echo "The dead-version and duplicate-version checks would silently degrade to"
-            echo "warnings. Failing instead. (ci.yml is pull_request-only; base.sha should"
-            echo "always be set — if a new trigger was added, scope this step to PRs.)"
+            echo "::error::No merge base with origin/main — cannot determine which"
+            echo "migrations this PR adds. The dead-version and duplicate-version checks"
+            echo "would silently degrade to warnings. Failing instead. (Needs the full"
+            echo "history: this job must keep actions/checkout fetch-depth: 0.)"
             exit 1
           fi
           # AR, not A: git reports a restamp as a RENAME, and restamping to a bad

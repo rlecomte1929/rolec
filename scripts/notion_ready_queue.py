@@ -32,7 +32,7 @@ import urllib.request
 
 # AI Work Queue (see CLAUDE.md "Audit remediation workflow" + the dev-queue skill).
 # Mirrors scripts/check_deliverable_integrity.py's Notion access (same token/version/db).
-QUEUE_DB_ID = "7adc643a-c448-4a1a-ba80-e27e417f42d6"
+QUEUE_DB_ID = "3bc887c6-4d48-8089-8188-fcf2dc3edc1b"
 NOTION_VERSION = "2022-06-28"
 
 # Ranking: P0 first, then by ascending complexity (Trivial easiest). Unknown → last.
