@@ -34,6 +34,13 @@ convert = importlib.util.module_from_spec(_spec)
 sys.modules["convert_b3_to_otto_jsonl"] = convert
 _spec.loader.exec_module(convert)
 
+_CLI = _REPO_ROOT / "scripts" / "import_otto_facts.py"
+_cli_spec = importlib.util.spec_from_file_location("import_otto_facts", _CLI)
+assert _cli_spec and _cli_spec.loader
+cli = importlib.util.module_from_spec(_cli_spec)
+sys.modules["import_otto_facts"] = cli
+_cli_spec.loader.exec_module(cli)
+
 REPO = _REPO_ROOT
 BATCH_ID = convert.BATCH_ID
 OUT = convert.OUT
@@ -77,15 +84,18 @@ class TestConversion(unittest.TestCase):
         for src, out in zip(source_records(), build()):
             self.assertEqual(out["destination_country"], src["corridor"].split("->")[1].strip())
 
-    def test_the_wildcard_employee_type_becomes_an_omitted_nationality(self) -> None:
-        """`mappings.py`: NULL nationality means *applies to everyone*; "any" is not a value.
+    def test_the_wildcard_employee_type_is_resolved_not_dropped(self) -> None:
+        """This test used to assert the opposite, and the assertion was the mistake.
 
-        Filling a concrete nationality class here would narrow a fact the research never
-        narrowed.
+        It read mappings.py's "NULL means applies to everyone" as licence to omit the key,
+        and passed — which is exactly why the error survived review. `resolve()` refuses a
+        NULL nationality, so every fact staged that way was unpromotable. The source's
+        "all" is a wildcard that must be RESOLVED against the corridor, not carried through.
         """
         for src, out in zip(source_records(), build()):
             self.assertEqual(src["employee_type"], "all")
-            self.assertNotIn("nationality", out["applies_to"])
+            self.assertIn("nationality", out["applies_to"])
+            self.assertIn(out["applies_to"]["nationality"], ("EEA", "non-EEA"))
 
     def test_no_evidence_quote_is_invented(self) -> None:
         """B3 carries no verbatim quotes. A fabricated one would let a row auto-accept."""
@@ -102,6 +112,70 @@ class TestConversion(unittest.TestCase):
             capture_output=True, text=True, cwd=str(REPO),
         )
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+
+class TestNationalityIsDerivedFromTheCorridor(unittest.TestCase):
+    """B3's `employee_type` is the literal "all", so the class has to come from the corridor.
+
+    An earlier version omitted `applies_to.nationality` entirely, reading mappings.py's note
+    that NULL means "applies to everyone" as permission. The same module REFUSES a NULL
+    nationality at promote time, precisely because "applies to everyone" would serve a
+    visa-track requirement to a free mover — so all 20 facts came back Unmapped.
+    """
+
+    def test_every_fact_carries_a_nationality_class(self) -> None:
+        for r in build():
+            self.assertIn(r["applies_to"]["nationality"], ("EEA", "non-EEA"), r["fact_key"])
+
+    def test_brexit_is_not_hand_rolled(self) -> None:
+        """NO→GB and GB→NO are third-country BOTH ways; the four Nordic pairs are not.
+
+        The values come from `nationality_class.classify`, which owns the EU-27/EEA sets and
+        the rule that free movement is worth nothing unless the DESTINATION is inside the
+        area. A second EEA set written here is how NO→GB would quietly stay free-movement.
+        """
+        by_corridor = {
+            r["applies_to"]["corridor"]: r["applies_to"]["nationality"] for r in build()
+        }
+        self.assertEqual(by_corridor["NO->GB"], "non-EEA")
+        self.assertEqual(by_corridor["GB->NO"], "non-EEA")
+        for free in ("DK->NO", "NO->DK", "DK->DE", "DE->DK"):
+            self.assertEqual(by_corridor[free], "EEA", free)
+
+    def test_the_batch_spans_several_destinations(self) -> None:
+        """The precondition that exposed the promote-scoping bug — see `destinations_for`."""
+        self.assertEqual(
+            sorted({r["destination_country"] for r in build()}), ["DE", "DK", "GB", "NO"]
+        )
+
+
+class TestPromotionCoversEveryDestination(unittest.TestCase):
+    """`import_otto_facts` scoped promotion to `rows[0].destination_country`.
+
+    Every batch before B3 was single-destination, so one country was the whole batch and the
+    bug could not show itself. B3 spans four. Its first record is NO→GB, so promotion ran for
+    GB alone, wrote 4 rows, never looked at the other 16 facts, and printed "promote: 4" as
+    though that were the batch.
+    """
+
+    def _rows(self, *dests):
+        from types import SimpleNamespace
+        return [SimpleNamespace(destination_country=d) for d in dests]
+
+    def test_every_destination_is_returned(self) -> None:
+        self.assertEqual(
+            cli.destinations_for(self._rows("NO", "GB", "DK", "DE", "GB")),
+            ["DE", "DK", "GB", "NO"],
+        )
+
+    def test_a_single_destination_batch_is_unchanged(self) -> None:
+        self.assertEqual(cli.destinations_for(self._rows("FR", "FR")), ["FR"])
+
+    def test_it_does_not_return_only_the_first(self) -> None:
+        """The regression. `[rows[0].destination_country]` would pass every other test here."""
+        got = cli.destinations_for(self._rows("NO", "GB", "DK", "DE"))
+        self.assertNotEqual(got, ["NO"])
+        self.assertEqual(len(got), 4)
 
 
 class TestReaderAcceptsTheWholeBatch(unittest.TestCase):

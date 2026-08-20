@@ -30,6 +30,15 @@ import json
 import pathlib
 import sys
 
+REPO_ROOT_FOR_IMPORT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT_FOR_IMPORT))
+
+from backend.app.services.nationality_class import (  # noqa: E402
+    EU_EEA,
+    OWN_NATIONAL,
+    classify,
+)
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCE = REPO_ROOT / "docs" / "imports" / "data" / "B3" / "corridor_facts.ndjson"
 BATCH_ID = "B3-corridor-facts-2026-08-18"
@@ -64,6 +73,28 @@ def split_corridor(corridor: str) -> tuple[str, str]:
     return origin, dest
 
 
+def nationality_class_for(origin: str, dest: str) -> str:
+    """The `applies_to.nationality` value for a national of `origin` arriving in `dest`.
+
+    Delegates to `nationality_class.classify`, which is the product's single answer to "does
+    this person have free movement?" — it holds the EU-27 and EEA sets, Switzerland's AFMP
+    entitlement, and the rule that free movement is worth nothing unless the DESTINATION is
+    itself inside the area. Writing a second EEA set here is how NO→GB would quietly stay
+    free-movement three years after Brexit.
+
+    Maps onto the vocabulary `mappings.NATIONALITY_CLASSES` accepts: `EEA` covers both
+    OWN_NATIONAL and EU_EEA, `non-EEA` is THIRD_COUNTRY. Derived from the corridor B3 already
+    carries — nothing invented.
+    """
+    verdict = classify(origin, dest)
+    if verdict is None:
+        raise ValueError(
+            f"nationality_class.classify({origin!r}, {dest!r}) returned None — one side is "
+            "unrecognised, so this corridor cannot be scoped and must not be guessed"
+        )
+    return "EEA" if verdict in (EU_EEA, OWN_NATIONAL) else "non-EEA"
+
+
 def compose_fact_text(rec: dict) -> str:
     return (
         f"Commonly believed: {rec['official_guidance'].strip()}\n\n"
@@ -87,12 +118,18 @@ def to_record(rec: dict, seq: int) -> dict:
         "source_url": rec["source_url"].strip(),
         "entity_title": f"{dest} {category.replace('_', ' ')}",
         "fact_type": FACT_TYPE_BY_CATEGORY.get(category, "other"),
-        # B3's `employee_type` is the literal "all" — a wildcard, not an employee type.
-        # `backend/imports/otto/mappings.py` is explicit that NULL nationality means
-        # *applies to everyone* and that "any" is deliberately not a value, so the
-        # nationality key is OMITTED rather than filled. Corridor is kept because it is
-        # real scoping information the flat fact would otherwise lose.
-        "applies_to": {"corridor": f"{origin}->{dest}"},
+        # B3's `employee_type` is the literal "all" — a wildcard, not an employee type,
+        # so the class has to come from the corridor instead.
+        #
+        # An earlier version of this script OMITTED `nationality`, reading mappings.py's
+        # note that NULL means "applies to everyone" as permission. It is not: the same
+        # module REFUSES a NULL nationality at promote time, precisely because
+        # "applies to everyone" would serve a visa-track requirement to a free mover.
+        # Every fact staged that way came back Unmapped.
+        "applies_to": {
+            "corridor": f"{origin}->{dest}",
+            "nationality": nationality_class_for(origin, dest),
+        },
         # B3 carries no verbatim source quotes, so `grade()` pins every row to
         # needs_review. That is the intended outcome for unreviewed research, not a gap.
         "evidence_quote": None,
