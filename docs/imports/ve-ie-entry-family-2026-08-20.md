@@ -14,8 +14,8 @@ needs, nothing about her family.
 | sha256 | `2186f59ae0cb06bb7403ef4bed2f291ff1ad4313bc270fb0051883f7e63a46d6` |
 | Records | 9 (6 non-obvious, 4 needs_lawyer_review) |
 | Corridor | ES→IE, nationality class `THIRD_COUNTRY` |
-| Staged into | `otto_staging.immigration_fact_candidates`, `status='new'` |
-| Promoted | **No.** Out of scope for AIQ-2027 — needs counsel sign-off first. |
+| Staged into | `otto_staging.immigration_fact_candidates`, `status='promoted'` |
+| Promoted | **Yes, 2026-08-21** — 9 rows into `public.requirement_items`, all `review_status='pending'`. See *Promotion* below. |
 | Gate | `./.venv311/bin/python scripts/check_ve_ie_batch.py` |
 
 ## Why a conversion step exists
@@ -100,7 +100,12 @@ guards it, and was confirmed to fail against a corridor-derived implementation.
 `fact_uid` · `pillar` · `non_obvious` · `needs_lawyer_review` · `quote_verbatim_confirmed` ·
 `source_name` · `corridor` · `batch_id`
 
-## ⚠ Known gap — `auto_accepted` on a counsel-flagged row
+## ⚠ Known gap — `auto_accepted` on a counsel-flagged row (CLOSED by AIQ-2034)
+
+> **Closed 2026-08-20 in #1937.** `parsers.grade()` now downgrades any row carrying
+> `quote_verbatim_confirmed: false`, so all 9 rows in this batch score `needs_review` and none
+> reaches `auto_accepted`. `check_ve_ie_batch.py` asserts this as a hard failure rather than the
+> warning it used to print. The section below is kept as the record of why the card was raised.
 
 `grade()` awards `auto_accepted` for an official publisher **plus a quotable line of evidence**.
 Every row here carries an `evidence_quote`, but every row also carries
@@ -121,6 +126,46 @@ that needs a lawyer.
 `parsers.grade()` to downgrade on an explicit `quote_verbatim_confirmed: false` — was left out
 deliberately: it changes shared behaviour for every batch and belongs in its own card, not
 smuggled into a load.
+
+## Promotion — 2026-08-21 (AIQ-2027 go-live)
+
+All 9 rows were promoted into `public.requirement_items` on 2026-08-21. **IRELAND is now 20
+approved + 9 pending = 29**; the original 20 were not touched. The promoted rows are
+`review_status='pending'` / `verification_status='representative'` / `purpose='employment'`, so
+`crud.list_requirements` — the single publication gate — withholds all 9 from both readers until
+a reviewer approves them.
+
+Two gates had to be opened by hand, each previewed and asserted inside a transaction:
+
+**The `new` → `ready` flip.** `promote()` reads only `status='ready'` (`executor.py:369`) and
+`stage()` writes `'new'` (`executor.py:68`); nothing in the codebase flips it. That is the
+deliberate "a person must move it" gate described above, and it was opened explicitly for this
+load rather than automated.
+
+**`purpose` would have been `other`, not `employment`.** `mappings.py:176` resolves
+`PURPOSES.get(status or "", "other")`, and the converter carries no `applies_to.status` — so the
+batch fell into the importer's uncategorised default. Meanwhile `public_corridor.py:135` defaults
+`purpose='employment'`, `crud.list_requirements` filters on it, and all 20 existing IRELAND rows
+are `employment`. Promoting as-is would have produced nine rows that every count check reports as
+loaded and that the corridor endpoint can never return — the orphaned-`purpose` artifact, and a
+silent one. `applies_to.status='professional'` was set on the 9 staged rows before promoting.
+That is a **derivation, not an invention**: the manifest scopes the batch to the third-country
+*employment-permit* path, and the family rows are family requirements *within* an employment
+relocation — the same bucket the existing "Bringing a pet from Spain to Ireland" and "Dublin
+rental market" rows already occupy.
+
+**Why the staged rows had to be patched even though the converter was fixed.** #1941 (AIQ-2035)
+taught `convert_ve_ie_to_otto_jsonl.py` to emit `"status": "professional"` and to assert it in
+`check()`. But `promote()` reads `applies_to` from the **staged rows in the database**, not from
+the JSONL — and those rows were written on 2026-08-20 by #1934, before that fix. Regenerating the
+file would not have touched them. So the converter fix protects future batches; this batch's
+already-staged rows needed the patch.
+
+The promote-side fallback is unchanged: `mappings.py:218` still resolves
+`PURPOSES.get(status or "", "other")`. Its sibling key `applies_to.nationality` refuses loudly
+(`Unmapped`) when absent; a missing `status` still yields a plausible-looking row instead. Worth
+considering whether that should be `Unmapped` too — a converter fix stops the batch that is
+already known about, not the next one nobody has written yet.
 
 ## The four rows counsel must clear before any approval
 
@@ -144,4 +189,11 @@ RELOPASS_QUERY_COUNTER_OFF=1 DATABASE_URL="sqlite:///./ci_test.db" \
     ./.venv311/bin/python -m pytest backend/tests/test_ve_ie_corridor_facts_conversion.py -q
 ```
 
-To actually stage, add `--apply`. Rollback is deleting the batch's rows by `batch_id`.
+To actually stage, add `--apply`.
+
+**Rollback.** Staging: delete the batch's rows by `batch_id` from
+`otto_staging.immigration_fact_candidates` (plus the matching `immigration_entities` /
+`load_log` rows). The promoted rows are separate — they live in `public.requirement_items` and
+are removed by `country_code='IRELAND' AND review_status='pending'`, which as of 2026-08-21
+selects exactly this batch's 9 and nothing else. Verify that count before deleting; approving
+any of the 9 changes it.
