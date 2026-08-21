@@ -1,0 +1,137 @@
+{
+ "table": "case_timeline_events",
+ "sqlName": "app_case_timeline_events",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 7,
+ "rows": [
+  {
+   "id": 1,
+   "case_id": 1,
+   "case_obligation_id": null,
+   "event_type": "case_status_changed",
+   "event_data": {
+    "to": "active",
+    "from": "draft"
+   },
+   "description": "Case activated — pathway EEA_FREE_MOVEMENT_EMPLOYMENT_NO matched and 6 obligations instantiated.",
+   "occurred_at": "2024-01-20T09:00:00.000Z",
+   "actor_type": "system",
+   "actor_ref": "rule_engine_v1",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:46.083Z",
+   "updated_at": "2026-07-01T21:40:46.083Z"
+  },
+  {
+   "id": 2,
+   "case_id": 1,
+   "case_obligation_id": 1,
+   "event_type": "obligation_status_changed",
+   "event_data": {
+    "to": "completed",
+    "from": "pending",
+    "obligation_code": "employment_contract_notarization"
+   },
+   "description": "Employment contract marked complete — signed contract uploaded and verified.",
+   "occurred_at": "2024-02-10T14:00:00.000Z",
+   "actor_type": "coordinator",
+   "actor_ref": "coordinator-007",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:46.118Z",
+   "updated_at": "2026-07-01T21:40:46.118Z"
+  },
+  {
+   "id": 3,
+   "case_id": 1,
+   "case_obligation_id": 3,
+   "event_type": "flag_surfaced",
+   "event_data": {
+    "severity": "high",
+    "flag_message": "Required before tax card — most HR teams don't know to start this immediately.",
+    "obligation_code": "d_number_application"
+   },
+   "description": "Non-obvious obligation flag surfaced: D-Number application must be initiated before first paycheck.",
+   "occurred_at": "2024-01-20T09:01:00.000Z",
+   "actor_type": "system",
+   "actor_ref": "flag_engine_v1",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:46.151Z",
+   "updated_at": "2026-07-01T21:40:46.151Z"
+  },
+  {
+   "id": 4,
+   "case_id": 1,
+   "case_obligation_id": 4,
+   "event_type": "flag_surfaced",
+   "event_data": {
+    "severity": "critical",
+    "flag_message": "CRITICAL: Employer must withhold 50% tax without this.",
+    "obligation_code": "tax_card_application"
+   },
+   "description": "CRITICAL flag surfaced: Tax card must arrive before first paycheck. Employer will withhold 50% without it.",
+   "occurred_at": "2024-01-20T09:01:00.000Z",
+   "actor_type": "system",
+   "actor_ref": "flag_engine_v1",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:46.185Z",
+   "updated_at": "2026-07-01T21:40:46.185Z"
+  },
+  {
+   "id": 5,
+   "case_id": 1,
+   "case_obligation_id": 2,
+   "event_type": "obligation_status_changed",
+   "event_data": {
+    "to": "completed",
+    "from": "pending",
+    "authority": "Oslo Police District",
+    "obligation_code": "police_registration"
+   },
+   "description": "EEA registration completed at Oslo Police District. Registration certificate (registreringsbevis) issued.",
+   "occurred_at": "2024-04-15T11:30:00.000Z",
+   "actor_type": "applicant",
+   "actor_ref": "HR-EMP-00441",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:46.218Z",
+   "updated_at": "2026-07-01T21:40:46.218Z"
+  },
+  {
+   "id": 6,
+   "case_id": 1,
+   "case_obligation_id": 4,
+   "event_type": "obligation_status_changed",
+   "event_data": {
+    "to": "completed",
+    "from": "pending",
+    "obligation_code": "tax_card_application",
+    "withholding_rate": "34%"
+   },
+   "description": "Tax card obtained — withholding rate 34% confirmed with employer. Critical deadline met before first paycheck.",
+   "occurred_at": "2024-04-04T16:00:00.000Z",
+   "actor_type": "applicant",
+   "actor_ref": "HR-EMP-00441",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:46.251Z",
+   "updated_at": "2026-07-01T21:40:46.251Z"
+  },
+  {
+   "id": 7,
+   "case_id": 2,
+   "case_obligation_id": 10,
+   "event_type": "flag_surfaced",
+   "event_data": {
+    "severity": "critical",
+    "flag_message": "CRITICAL: Employer must withhold 50% tax without this.",
+    "obligation_code": "tax_card_application",
+    "days_until_paycheck": 46,
+    "first_paycheck_date": "2024-06-30"
+   },
+   "description": "CRITICAL: First paycheck date 2024-06-30 approaching. Tax card not yet obtained. D-number still pending police registration. Risk of 50% withholding.",
+   "occurred_at": "2024-05-15T08:00:00.000Z",
+   "actor_type": "system",
+   "actor_ref": "deadline_monitor_v1",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:46.285Z",
+   "updated_at": "2026-07-01T21:40:46.285Z"
+  }
+ ]
+}

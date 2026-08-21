@@ -1,0 +1,1095 @@
+{
+ "export": "ReloPass WorkspaceDB full export",
+ "workspaceId": "d0c29613-9cb5-4652-9c6a-494eeed352e5",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "uploaded_at": "2026-08-18T17:52:31.999130+00:00",
+ "totalTables": 75,
+ "totalRows": 12207,
+ "totalBytes": 58205902,
+ "rowCountDrift": "none - workspace_db_list_tables counts were identical before and after the export",
+ "emptyTables": [
+  "app_vendor_providers",
+  "attestations",
+  "audit_events",
+  "case_addons",
+  "case_evidence",
+  "corridor_deadline_events",
+  "engagements",
+  "notifications",
+  "outreach_contacts",
+  "relopass_vendors",
+  "requirement_decay_queue",
+  "research_passes",
+  "sign_offs",
+  "vendor_sourcing_requests"
+ ],
+ "piiReview": "persons and person_identities contain personal data; review PII handling before committing these files to a public repo.",
+ "fileShape": {
+  "table": "friendly table name",
+  "sqlName": "physical name",
+  "exported_at": "ISO timestamp",
+  "rowCount": "total rows for the table",
+  "rows": "array of row objects (split files carry part/totalParts/partRowCount)"
+ },
+ "tables": [
+  {
+   "table": "app_corridors",
+   "sqlName": "app_app_corridors",
+   "rowCount": 1,
+   "manifestRowCount": 1,
+   "files": [
+    {
+     "file": "app_corridors.json",
+     "bytes": 1271,
+     "sha256": "4ed5f5813ab7e921038a7f994e3b4389725dc51df0145a5b63639cf03e934ff0",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/efa0b2e2-7a58-4b22-a21b-9f7ecc6249c6.json"
+    }
+   ]
+  },
+  {
+   "table": "app_vendor_providers",
+   "sqlName": "app_app_vendor_providers",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "app_vendor_providers.json",
+     "bytes": 157,
+     "sha256": "d176779c9ee5aace31e58444701a00c1002e062f23d644081656c1b59082af34",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/0f4720e1-2a7a-4c0c-8bb1-94307381b43c.json"
+    }
+   ]
+  },
+  {
+   "table": "approvals",
+   "sqlName": "app_approvals",
+   "rowCount": 17,
+   "manifestRowCount": 17,
+   "files": [
+    {
+     "file": "approvals.json",
+     "bytes": 9642,
+     "sha256": "1881557ea3e652765e7fdfc61571258f19528c0ce85bc5ca6477146e1afd0ce8",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/10b30f0c-5046-4329-949b-bcc35c6584f3.json"
+    }
+   ]
+  },
+  {
+   "table": "attestation_claims",
+   "sqlName": "app_attestation_claims",
+   "rowCount": 23,
+   "manifestRowCount": 23,
+   "files": [
+    {
+     "file": "attestation_claims.json",
+     "bytes": 27715,
+     "sha256": "3eb64b410419e6b632a3cd9a7932e74b72fce8c67895e9eec58333692854c4f9",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/5c0efe8c-d7d9-4419-b881-024ad19f7979.json"
+    }
+   ]
+  },
+  {
+   "table": "attestations",
+   "sqlName": "app_attestations",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "attestations.json",
+     "bytes": 141,
+     "sha256": "b7fea61ef079b4b7d548514bfff45db1e7e387366394539ae19757c613409e76",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/9453e5b9-a6f7-4c9f-a6f5-05774aac7c1f.json"
+    }
+   ],
+   "note": "Authoritative lawyer-verdict table; 0 rows at export time. Exported as an empty rows array - nothing fabricated."
+  },
+  {
+   "table": "audit_events",
+   "sqlName": "app_audit_events",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "audit_events.json",
+     "bytes": 141,
+     "sha256": "f19f97591b73baf2bef6c75924a4c6184b905582b0b6dc681aaa400991bf0fca",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/875dd9f9-5c92-4dd5-91b8-83c44ff7c10c.json"
+    }
+   ]
+  },
+  {
+   "table": "authorities",
+   "sqlName": "app_authorities",
+   "rowCount": 8,
+   "manifestRowCount": 8,
+   "files": [
+    {
+     "file": "authorities.json",
+     "bytes": 4266,
+     "sha256": "a25d8cf510793e144448f9708c1f98f313e2b90bc892eb4ecdc3a12aefaa4812",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/557c168d-2efc-4a20-b478-0f844b1db49b.json"
+    }
+   ]
+  },
+  {
+   "table": "case_access",
+   "sqlName": "app_case_access",
+   "rowCount": 2,
+   "manifestRowCount": 2,
+   "files": [
+    {
+     "file": "case_access.json",
+     "bytes": 1500,
+     "sha256": "1ac1debb4f8b849f46f91d04e698f0dec061887b8dd58ed13990513e55ed79f5",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/7c025e12-f871-4bbf-be08-ae22f83c3b35.json"
+    }
+   ]
+  },
+  {
+   "table": "case_addons",
+   "sqlName": "app_case_addons",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "case_addons.json",
+     "bytes": 139,
+     "sha256": "c2e146a039da7ca8d7504dc7b11d492820edb55aa808234500dd35f4324793c4",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/16191976-e834-422a-8c1b-e3744b15f2d3.json"
+    }
+   ]
+  },
+  {
+   "table": "case_document_uploads",
+   "sqlName": "app_case_document_uploads",
+   "rowCount": 6,
+   "manifestRowCount": 6,
+   "files": [
+    {
+     "file": "case_document_uploads.json",
+     "bytes": 5017,
+     "sha256": "279a7bd2969f1f0d5f4469d2e254c8dac82b45576797801d2aa790ba038fffd8",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/46c26990-02a3-47ae-94e1-fa1a119b2d56.json"
+    }
+   ]
+  },
+  {
+   "table": "case_evidence",
+   "sqlName": "app_case_evidence",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "case_evidence.json",
+     "bytes": 143,
+     "sha256": "e5e6bca97a676b34810e4baa6e07fb30d34263da67115546ce8a54ecdd70e90e",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/09c8205f-3e98-449c-8d2e-e86af130ec66.json"
+    }
+   ]
+  },
+  {
+   "table": "case_facts",
+   "sqlName": "app_case_facts",
+   "rowCount": 24,
+   "manifestRowCount": 24,
+   "files": [
+    {
+     "file": "case_facts.json",
+     "bytes": 8379,
+     "sha256": "9eedd7301dceb16153e42a370e8c9a989f43dfc4ea9114b8c263eb767c1ac0d0",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/de47f917-5dec-4992-b9a0-5289a36570d8.json"
+    }
+   ]
+  },
+  {
+   "table": "case_obligations",
+   "sqlName": "app_case_obligations",
+   "rowCount": 10,
+   "manifestRowCount": 10,
+   "files": [
+    {
+     "file": "case_obligations.json",
+     "bytes": 4882,
+     "sha256": "18cfc04fd570daf603d1a7a5be302affe4a7c29cee6408d6ce297cee4272ec25",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/6a9b39d8-07f8-41e6-8d9f-f8b387159ac4.json"
+    }
+   ]
+  },
+  {
+   "table": "case_timeline_events",
+   "sqlName": "app_case_timeline_events",
+   "rowCount": 7,
+   "manifestRowCount": 7,
+   "files": [
+    {
+     "file": "case_timeline_events.json",
+     "bytes": 4475,
+     "sha256": "e3034363b112935937772d2149e10e7d5a372b6f62f61ce16ec7118d0365259f",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/a4b40a1b-3722-4053-8507-31eac85e7c7f.json"
+    }
+   ]
+  },
+  {
+   "table": "case_verification_reports",
+   "sqlName": "app_case_verification_reports",
+   "rowCount": 1,
+   "manifestRowCount": 1,
+   "files": [
+    {
+     "file": "case_verification_reports.json",
+     "bytes": 1966,
+     "sha256": "9f92c8bcf8ea8ebc40dcb9483b7fefa4f3dacf596efe95dd086a4c59386003ee",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/7c195dc7-c5b6-4b0d-8bd6-9c530f4975bf.json"
+    }
+   ]
+  },
+  {
+   "table": "cases",
+   "sqlName": "app_cases",
+   "rowCount": 7,
+   "manifestRowCount": 7,
+   "files": [
+    {
+     "file": "cases.json",
+     "bytes": 4392,
+     "sha256": "75e4f091ff24055d3bc325f3a1257f94f03e679c51df5491afb85f665c5dc524",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/3e2f5682-a256-4d0c-b708-c427e8605127.json"
+    }
+   ]
+  },
+  {
+   "table": "city_capabilities",
+   "sqlName": "app_city_capabilities",
+   "rowCount": 55,
+   "manifestRowCount": 55,
+   "files": [
+    {
+     "file": "city_capabilities.json",
+     "bytes": 85932,
+     "sha256": "a32b1f44449f9df072cfbf42e7041145663d5f2a921c242356b691f441a9345f",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/7a1b8bc0-0d9a-4009-a411-47acc4f7dc7e.json"
+    }
+   ]
+  },
+  {
+   "table": "competitive_reports",
+   "sqlName": "app_competitive_reports",
+   "rowCount": 7,
+   "manifestRowCount": 7,
+   "files": [
+    {
+     "file": "competitive_reports.json",
+     "bytes": 189040,
+     "sha256": "42cf865b2f3a1cfbb3a7c211837aad2d71534fbe760691f946ebeb591118eddc",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/c87d0475-ea8e-4f22-85ff-2e4aee7403ef.json"
+    }
+   ]
+  },
+  {
+   "table": "compliance_checklist_items",
+   "sqlName": "app_compliance_checklist_items",
+   "rowCount": 15,
+   "manifestRowCount": 15,
+   "files": [
+    {
+     "file": "compliance_checklist_items.json",
+     "bytes": 9932,
+     "sha256": "b49aaecfd750f8e1a9e422d0651adf3abe3e12fae053141f73820b00264d5901",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/787adbe8-2e0d-45dc-a1fa-3e9842bd3cb3.json"
+    }
+   ]
+  },
+  {
+   "table": "confidence_dimensions",
+   "sqlName": "app_confidence_dimensions",
+   "rowCount": 6,
+   "manifestRowCount": 6,
+   "files": [
+    {
+     "file": "confidence_dimensions.json",
+     "bytes": 2549,
+     "sha256": "67b7d8e89fd019558ed95e65ba01c0473b1731eda93bc52ce644510eecd5c6b2",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/dab97f86-92c4-4729-b49f-03e94cfc3bd0.json"
+    }
+   ]
+  },
+  {
+   "table": "coordinators",
+   "sqlName": "app_coordinators",
+   "rowCount": 6,
+   "manifestRowCount": 6,
+   "files": [
+    {
+     "file": "coordinators.json",
+     "bytes": 2000,
+     "sha256": "8ad4eb4d060b9c888e618c5e02079d6f008565fcfe84bb413560f2202dc7cecd",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/8217c526-3ae1-438a-91a9-1297243b6a57.json"
+    }
+   ]
+  },
+  {
+   "table": "corridor_candidate_sets",
+   "sqlName": "app_corridor_candidate_sets",
+   "rowCount": 3,
+   "manifestRowCount": 3,
+   "files": [
+    {
+     "file": "corridor_candidate_sets.json",
+     "bytes": 35404,
+     "sha256": "e99e5c4eaf06d45d28ee528b85b6c7a540db11da23508d8e0176c0c90f32dd87",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/fa404908-18cd-4ee3-94ce-6286850de141.json"
+    }
+   ]
+  },
+  {
+   "table": "corridor_deadline_events",
+   "sqlName": "app_corridor_deadline_events",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "corridor_deadline_events.json",
+     "bytes": 165,
+     "sha256": "15f47c1fc517e94ec0a2a572bd39724b270e2aaae8bcba3cac6be9852d944647",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/c5d71e37-ba84-4b45-8b27-ab475877403d.json"
+    }
+   ]
+  },
+  {
+   "table": "corridor_requirement_candidates",
+   "sqlName": "app_corridor_requirement_candidates",
+   "rowCount": 35,
+   "manifestRowCount": 35,
+   "files": [
+    {
+     "file": "corridor_requirement_candidates.json",
+     "bytes": 67679,
+     "sha256": "6362e8f52a0df3a5431f177ca0086828d390666c778aa35ba8675a5d5c809f5f",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/3eab4b66-6f0d-4aa2-9d86-e324c2986970.json"
+    }
+   ]
+  },
+  {
+   "table": "corridor_requirements",
+   "sqlName": "app_corridor_requirements",
+   "rowCount": 63,
+   "manifestRowCount": 63,
+   "files": [
+    {
+     "file": "corridor_requirements.json",
+     "bytes": 46454,
+     "sha256": "1aa52b250580e424168b8a71ce265475b70fbe9b814c08e353413e240c9a9bd3",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/9009592a-8222-4cef-9dac-2d7a7028b01d.json"
+    }
+   ]
+  },
+  {
+   "table": "corridor_research_findings",
+   "sqlName": "app_corridor_research_findings",
+   "rowCount": 9,
+   "manifestRowCount": 9,
+   "files": [
+    {
+     "file": "corridor_research_findings.json",
+     "bytes": 13728,
+     "sha256": "12310393ddbe55f38efd56cc7155ba90fa5f4e99b680c9d041e5e9aeee9071e4",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/635e749c-1608-4e98-acc3-7a3ed5716e1c.json"
+    }
+   ]
+  },
+  {
+   "table": "corridors",
+   "sqlName": "app_corridors",
+   "rowCount": 3,
+   "manifestRowCount": 3,
+   "files": [
+    {
+     "file": "corridors.json",
+     "bytes": 6687,
+     "sha256": "05542628f4143980a7bc320f321a0e87fc32d20e871574d19a1f281b522d42b1",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/dc85e9a6-93e5-491f-a7a5-f3f55ea40955.json"
+    }
+   ]
+  },
+  {
+   "table": "countries",
+   "sqlName": "app_countries",
+   "rowCount": 8,
+   "manifestRowCount": 8,
+   "files": [
+    {
+     "file": "countries.json",
+     "bytes": 3540,
+     "sha256": "fecd7855d7a493038388a4559956503c140ed43213169fcccb9f87c8434dbee4",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/64bfc35f-91e8-4c32-9d9f-c61d015a84b1.json"
+    }
+   ]
+  },
+  {
+   "table": "decisions",
+   "sqlName": "app_decisions",
+   "rowCount": 1,
+   "manifestRowCount": 1,
+   "files": [
+    {
+     "file": "decisions.json",
+     "bytes": 722,
+     "sha256": "714a7fedd56792834d288ad50f30b4997a6333b61660b3cbe647b1645b358049",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/d7728c6d-d8c8-4f72-88bf-e4122f061f2f.json"
+    }
+   ]
+  },
+  {
+   "table": "document_types",
+   "sqlName": "app_document_types",
+   "rowCount": 14,
+   "manifestRowCount": 14,
+   "files": [
+    {
+     "file": "document_types.json",
+     "bytes": 6525,
+     "sha256": "371e6f9a276b621a55f703fe44961b2df0f9fa5c816b44c2e0ea1721d4968e5e",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/0566d595-3172-431f-b2a8-7086c5d4a648.json"
+    }
+   ]
+  },
+  {
+   "table": "employee_types",
+   "sqlName": "app_employee_types",
+   "rowCount": 4,
+   "manifestRowCount": 4,
+   "files": [
+    {
+     "file": "employee_types.json",
+     "bytes": 1375,
+     "sha256": "eb79b0641d71c0f8aa015b30513141f5a7e0f2a04e245dcb27c0b93d2e96d757",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/e320eded-a740-4cf4-8918-4ef824dcc6d1.json"
+    }
+   ]
+  },
+  {
+   "table": "engagements",
+   "sqlName": "app_engagements",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "engagements.json",
+     "bytes": 139,
+     "sha256": "17ff3ada45ac649bb296845e8be64d53078b4f270e5a28fa5f827704f2115cc3",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/6b81c0c1-01c3-4648-ac14-2a86336531db.json"
+    }
+   ]
+  },
+  {
+   "table": "events_calendar",
+   "sqlName": "app_events_calendar",
+   "rowCount": 514,
+   "manifestRowCount": 514,
+   "files": [
+    {
+     "file": "events_calendar.json",
+     "bytes": 434305,
+     "sha256": "472c2272f22d8b265a3067e9cda3ec62ec5b5a4503b5cf081a8259a40b0bdace",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/e0dbf8c4-8370-457d-b819-1b939cd17b6f.json"
+    }
+   ]
+  },
+  {
+   "table": "evidence_types",
+   "sqlName": "app_evidence_types",
+   "rowCount": 6,
+   "manifestRowCount": 6,
+   "files": [
+    {
+     "file": "evidence_types.json",
+     "bytes": 2970,
+     "sha256": "d9c66c1f5b3f5a7c4f45ecdf39c2ebd0294a321250e98702f6299365dad20ca8",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/881263a5-f4d5-4b90-be3e-7c4d3c6c57ab.json"
+    }
+   ]
+  },
+  {
+   "table": "geo_city_content",
+   "sqlName": "app_geo_city_content",
+   "rowCount": 212,
+   "manifestRowCount": 212,
+   "files": [
+    {
+     "file": "geo_city_content.json",
+     "bytes": 376172,
+     "sha256": "5c4145bb05fad5b75746ddc0cb571873909698e573555fdf21f81f1e46779423",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/e6b8dfef-bc58-4404-9069-fb523dbc364a.json"
+    }
+   ]
+  },
+  {
+   "table": "i18n_glossary",
+   "sqlName": "app_i18n_glossary",
+   "rowCount": 609,
+   "manifestRowCount": 609,
+   "files": [
+    {
+     "file": "i18n_glossary.json",
+     "bytes": 279054,
+     "sha256": "20d7f50ed7360f39978da87adf94fccfa097666f16c85e261aacfe0b706b8910",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/b0e08142-161e-4111-88f0-1341310cfe17.json"
+    }
+   ]
+  },
+  {
+   "table": "jurisdictions",
+   "sqlName": "app_jurisdictions",
+   "rowCount": 8,
+   "manifestRowCount": 8,
+   "files": [
+    {
+     "file": "jurisdictions.json",
+     "bytes": 2503,
+     "sha256": "1fbf420d9190308080c4fd793ee134532d10a114179cf2e5589935a28965006a",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/d799566c-1e5e-436d-b786-f2fabbc3d2fe.json"
+    }
+   ]
+  },
+  {
+   "table": "kg_case_verification_reports",
+   "sqlName": "app_kg_case_verification_reports",
+   "rowCount": 1,
+   "manifestRowCount": 1,
+   "files": [
+    {
+     "file": "kg_case_verification_reports.json",
+     "bytes": 1467,
+     "sha256": "05f47c2bd73595929abb7bc7bb0ec42c748a4cb2f1851c3b8585bd7f75d52f2c",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/91f02409-9981-4a82-9fee-0a76ecbed04e.json"
+    }
+   ]
+  },
+  {
+   "table": "kg_corridor_requirements",
+   "sqlName": "app_kg_corridor_requirements",
+   "rowCount": 6,
+   "manifestRowCount": 6,
+   "files": [
+    {
+     "file": "kg_corridor_requirements.json",
+     "bytes": 10079,
+     "sha256": "be4eae421cff4114dd0ec868cd28f13717359b962d54877bad7297cd24ad2f3c",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/69ba8f63-d28d-419d-a71e-8831c9285aec.json"
+    }
+   ]
+  },
+  {
+   "table": "kg_corridors",
+   "sqlName": "app_kg_corridors",
+   "rowCount": 3,
+   "manifestRowCount": 3,
+   "files": [
+    {
+     "file": "kg_corridors.json",
+     "bytes": 1712,
+     "sha256": "698730f97cce0d9025372fcad79bc7475c9bfd9041c66e4c86b1b22869b182b8",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/4fd7358c-4796-4c0f-893c-7c002e4046dd.json"
+    }
+   ]
+  },
+  {
+   "table": "kg_employee_types",
+   "sqlName": "app_kg_employee_types",
+   "rowCount": 4,
+   "manifestRowCount": 4,
+   "files": [
+    {
+     "file": "kg_employee_types.json",
+     "bytes": 1752,
+     "sha256": "a78744031d37d39d37bf69ef10fef5e2a29c98819a68b7ada8ceaf25d5075877",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/9f595e47-5508-4fd4-857f-abe427a7a835.json"
+    }
+   ]
+  },
+  {
+   "table": "kg_maintenance_queue",
+   "sqlName": "app_kg_maintenance_queue",
+   "rowCount": 3,
+   "manifestRowCount": 3,
+   "files": [
+    {
+     "file": "kg_maintenance_queue.json",
+     "bytes": 2101,
+     "sha256": "bd015531a6cc5bb4a4506ad608b313cd0cf1fa641bfd96206cb18d1689eb8aae",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/137acee1-c7ff-4d6b-ab53-5d4eed0c5f4a.json"
+    }
+   ]
+  },
+  {
+   "table": "kg_prompt_passes",
+   "sqlName": "app_kg_prompt_passes",
+   "rowCount": 5,
+   "manifestRowCount": 5,
+   "files": [
+    {
+     "file": "kg_prompt_passes.json",
+     "bytes": 6433,
+     "sha256": "b3eb93058d76e2d5bca35291370888353b92e5ec8aeda8f68ff54e03730c7abc",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/cae3eab1-2b7a-4923-bb88-6d3aabd7114c.json"
+    }
+   ]
+  },
+  {
+   "table": "kg_requirement_sources",
+   "sqlName": "app_kg_requirement_sources",
+   "rowCount": 7,
+   "manifestRowCount": 7,
+   "files": [
+    {
+     "file": "kg_requirement_sources.json",
+     "bytes": 4239,
+     "sha256": "1c564548c8e6579ba4b122d4b119908adf5443eb5525a80ff67fe488ecf9185e",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/3f0c0727-f355-48d3-bb82-ef74811bc5c0.json"
+    }
+   ]
+  },
+  {
+   "table": "lawyers",
+   "sqlName": "app_lawyers",
+   "rowCount": 1,
+   "manifestRowCount": 1,
+   "files": [
+    {
+     "file": "lawyers.json",
+     "bytes": 546,
+     "sha256": "9c242ac91ba1625a8dd602cf54374f21c9839e01f7e29901bebc34b53dd95017",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/3fd7af45-9ba7-4324-8f31-bef9df59e0ed.json"
+    }
+   ]
+  },
+  {
+   "table": "linked_references",
+   "sqlName": "app_linked_references",
+   "rowCount": 6421,
+   "manifestRowCount": 6421,
+   "files": [
+    {
+     "file": "linked_references.part1of2.json",
+     "bytes": 42098396,
+     "sha256": "50b6ff0c1d76e33e9b2d73781a0394888476c24be305a29a26a3c4f64234ecf7",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/d9aeca42-8e40-4de4-a095-e548caaeba92.json"
+    },
+    {
+     "file": "linked_references.part2of2.json",
+     "bytes": 7555575,
+     "sha256": "c7430a75e4f356972ab35de42aa6166313444955c5d2c4a8c46c4af190bf9538",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/bfdb9192-1a1e-4c46-8d1c-514157a9379b.json"
+    }
+   ]
+  },
+  {
+   "table": "notifications",
+   "sqlName": "app_notifications",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "notifications.json",
+     "bytes": 143,
+     "sha256": "8358afc0147ef34c84c53bfe1aab53fde7283ace5e3754a819b1afebc8682546",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/3fbe2f88-ea67-4efd-8174-3343485f19a9.json"
+    }
+   ]
+  },
+  {
+   "table": "notion_tasks",
+   "sqlName": "app_notion_tasks",
+   "rowCount": 338,
+   "manifestRowCount": 338,
+   "files": [
+    {
+     "file": "notion_tasks.json",
+     "bytes": 773078,
+     "sha256": "989420201035a60bfc950a976a96cd6e3a5f854ae6ecc96143ed229406856e17",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/5e614589-a881-4444-ac41-6a9e0ec33fd4.json"
+    }
+   ]
+  },
+  {
+   "table": "obligation_confidences",
+   "sqlName": "app_obligation_confidences",
+   "rowCount": 11,
+   "manifestRowCount": 11,
+   "files": [
+    {
+     "file": "obligation_confidences.json",
+     "bytes": 5057,
+     "sha256": "e1cf5ebd97dc75b1fd42b23ca572ae50bedcebd6bdc9712e772d2d249db80f64",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/abd1d4d2-590c-4302-b4a5-ef2dc111cf7a.json"
+    }
+   ]
+  },
+  {
+   "table": "obligation_dependencies",
+   "sqlName": "app_obligation_dependencies",
+   "rowCount": 7,
+   "manifestRowCount": 7,
+   "files": [
+    {
+     "file": "obligation_dependencies.json",
+     "bytes": 3864,
+     "sha256": "65fb63accce5dbda5991c451d23d84fab8d589a882d681d3623dc2b0c0c13e19",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/fd610727-df6d-4aa5-9fb7-1cbed679279e.json"
+    }
+   ]
+  },
+  {
+   "table": "obligation_types",
+   "sqlName": "app_obligation_types",
+   "rowCount": 6,
+   "manifestRowCount": 6,
+   "files": [
+    {
+     "file": "obligation_types.json",
+     "bytes": 4377,
+     "sha256": "6319e0f506ae4be1e202725e828774f52e62ca4713b1c157009438ca006ae7e1",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/41ee5cab-9766-4281-86aa-3748fd0896b8.json"
+    }
+   ]
+  },
+  {
+   "table": "obligations",
+   "sqlName": "app_obligations",
+   "rowCount": 6,
+   "manifestRowCount": 6,
+   "files": [
+    {
+     "file": "obligations.json",
+     "bytes": 8026,
+     "sha256": "ffe2691b6d3fb7a3daa63e68328474877e14289b990ea3b9db81af41667eef4b",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/800306f3-fb96-49f0-b4af-60d3a636f6b4.json"
+    }
+   ]
+  },
+  {
+   "table": "outreach_contacts",
+   "sqlName": "app_outreach_contacts",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "outreach_contacts.json",
+     "bytes": 151,
+     "sha256": "7a047c8d3313981079ab188e205fe13fd09c5fa67ef901b27f6d626732acbd33",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/88b42273-0410-4c9e-9100-5332ac33b856.json"
+    }
+   ]
+  },
+  {
+   "table": "pathway_eligibility_rules",
+   "sqlName": "app_pathway_eligibility_rules",
+   "rowCount": 2,
+   "manifestRowCount": 2,
+   "files": [
+    {
+     "file": "pathway_eligibility_rules.json",
+     "bytes": 3123,
+     "sha256": "005b1ddca530be4f116887253620d5e3b44309a802b5f7d384cb977c1bd61963",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/eac2d3a8-aeb4-4670-8c69-c1a737d7fe20.json"
+    }
+   ]
+  },
+  {
+   "table": "pathways",
+   "sqlName": "app_pathways",
+   "rowCount": 3,
+   "manifestRowCount": 3,
+   "files": [
+    {
+     "file": "pathways.json",
+     "bytes": 2810,
+     "sha256": "0464cd0fa51f427173384666c7c43eb547c6d0fe0e8905071a7adedcd4999daf",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/54511183-d3ca-43c8-82da-4c644a90f8c2.json"
+    }
+   ]
+  },
+  {
+   "table": "person_identities",
+   "sqlName": "app_person_identities",
+   "rowCount": 5,
+   "manifestRowCount": 5,
+   "files": [
+    {
+     "file": "person_identities.json",
+     "bytes": 2689,
+     "sha256": "018e7dfeeac3e429f49b59ec915ff7d16aebb7701813ff1ee12cd760ae8c9d80",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/648b1b4e-8851-43a4-9cf4-a4d39cecdb70.json"
+    }
+   ],
+   "piiWarning": "Contains personal data - founder should review PII handling before committing to a public repo."
+  },
+  {
+   "table": "persons",
+   "sqlName": "app_persons",
+   "rowCount": 6,
+   "manifestRowCount": 6,
+   "files": [
+    {
+     "file": "persons.json",
+     "bytes": 2585,
+     "sha256": "08b0586dcd4070d2ea119ef7fa6ea3fef74e3fb9c56ea2eb86cb349cf7d5aaa1",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/81861463-2930-4813-a1c1-0063179cd408.json"
+    }
+   ],
+   "piiWarning": "Contains personal data - founder should review PII handling before committing to a public repo."
+  },
+  {
+   "table": "pet_import_rules",
+   "sqlName": "app_pet_import_rules",
+   "rowCount": 85,
+   "manifestRowCount": 85,
+   "files": [
+    {
+     "file": "pet_import_rules.json",
+     "bytes": 336481,
+     "sha256": "f4cc77297cc8495d19337023d632df9cd1165e2abb70d900959cd8a7a0f325c1",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/4c82d9f8-e771-46f0-a39c-f4eb59eac4d2.json"
+    }
+   ]
+  },
+  {
+   "table": "programs",
+   "sqlName": "app_programs",
+   "rowCount": 7,
+   "manifestRowCount": 7,
+   "files": [
+    {
+     "file": "programs.json",
+     "bytes": 2521,
+     "sha256": "a319779a99cd1e546f9971aa384571814510159e8edab3798e2d13f2ea9442be",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/9802b6b7-9f5c-43b2-8e0c-3ff229f24dbb.json"
+    }
+   ]
+  },
+  {
+   "table": "readiness_templates",
+   "sqlName": "app_readiness_templates",
+   "rowCount": 709,
+   "manifestRowCount": 709,
+   "files": [
+    {
+     "file": "readiness_templates.json",
+     "bytes": 1164509,
+     "sha256": "d7a0b6ef880eaa54d0746e2bf3bd1793a10ca3dec942fd8787ee601c4f9b1579",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/78f1e19d-9a73-4fa9-872b-c275b921b1ee.json"
+    }
+   ]
+  },
+  {
+   "table": "regulatory_versions",
+   "sqlName": "app_regulatory_versions",
+   "rowCount": 2,
+   "manifestRowCount": 2,
+   "files": [
+    {
+     "file": "regulatory_versions.json",
+     "bytes": 1799,
+     "sha256": "6e7130de8314c80c2034dce5b98ac0e68393889b794d9105d43dbc54847b6bbd",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/cb3a2311-a604-4af0-a7d3-77fa2977e853.json"
+    }
+   ]
+  },
+  {
+   "table": "relocation_cases",
+   "sqlName": "app_relocation_cases",
+   "rowCount": 8,
+   "manifestRowCount": 8,
+   "files": [
+    {
+     "file": "relocation_cases.json",
+     "bytes": 7464,
+     "sha256": "3f6387c0f4e2250247c91df3b84324bfe5f80ac81fdf278d6496315e863cf606",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/a53ef657-4824-4146-ba48-08266e8ad706.json"
+    }
+   ]
+  },
+  {
+   "table": "relocation_tasks",
+   "sqlName": "app_relocation_tasks",
+   "rowCount": 20,
+   "manifestRowCount": 20,
+   "files": [
+    {
+     "file": "relocation_tasks.json",
+     "bytes": 8769,
+     "sha256": "03d45526f18934469396440a611b08b589916d7ce3ff2c6a7a07a1418b49e346",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/98255b95-2cab-4c33-b1ba-25446563a2dd.json"
+    }
+   ]
+  },
+  {
+   "table": "relopass_vendors",
+   "sqlName": "app_relopass_vendors",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "relopass_vendors.json",
+     "bytes": 149,
+     "sha256": "d9b02e5f1135f667a6520644506c4baf940f7647e18787de5ff374583fa27347",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/139f17e9-9649-4fb5-ace8-18d17dcb7b08.json"
+    }
+   ]
+  },
+  {
+   "table": "requirement_blocks",
+   "sqlName": "app_requirement_blocks",
+   "rowCount": 63,
+   "manifestRowCount": 63,
+   "files": [
+    {
+     "file": "requirement_blocks.json",
+     "bytes": 94776,
+     "sha256": "53be34472da4ac96f19dc657fd9885391c1a68475c12c4479f991b162fe46928",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/65ade9fb-9c0b-4663-a5fc-a48404669143.json"
+    }
+   ]
+  },
+  {
+   "table": "requirement_decay_queue",
+   "sqlName": "app_requirement_decay_queue",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "requirement_decay_queue.json",
+     "bytes": 163,
+     "sha256": "4dcbb55d5fc04167f8f3034e9dcbe0119965309463072011a4fa66a8eb64b47a",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/3316f453-6f57-4579-a681-a216f961c44a.json"
+    }
+   ]
+  },
+  {
+   "table": "requirement_entities",
+   "sqlName": "app_requirement_entities",
+   "rowCount": 193,
+   "manifestRowCount": 193,
+   "files": [
+    {
+     "file": "requirement_entities.json",
+     "bytes": 221615,
+     "sha256": "03ff1578cd00407f55260603232c17c0ceac9a0fbd703adbccd98452b22f5903",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/0ba9b718-6cbb-438b-9505-3ac5fb66e62e.json"
+    }
+   ]
+  },
+  {
+   "table": "requirement_facts",
+   "sqlName": "app_requirement_facts",
+   "rowCount": 755,
+   "manifestRowCount": 755,
+   "files": [
+    {
+     "file": "requirement_facts.json",
+     "bytes": 1453746,
+     "sha256": "687070c8617f343c92f64259e345aa293a1f28208769129fa5cc1cf1c2ec2aa6",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/a8f2e273-d33a-406e-8f5a-b4e305a5d11a.json"
+    }
+   ]
+  },
+  {
+   "table": "research_passes",
+   "sqlName": "app_research_passes",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "research_passes.json",
+     "bytes": 147,
+     "sha256": "488485e2cea36bdc7a1198ae55761faba0b71feb83a622f3ce0cf1871530a22d",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/47bc2419-fb4c-4b13-a006-22241f9ce9b3.json"
+    }
+   ]
+  },
+  {
+   "table": "roadmaps",
+   "sqlName": "app_roadmaps",
+   "rowCount": 1,
+   "manifestRowCount": 1,
+   "files": [
+    {
+     "file": "roadmaps.json",
+     "bytes": 5171,
+     "sha256": "703a49832e8815daf65a4e1385d041f8903fa578247a17bef9ee1e141be9a56f",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/5fd64349-ca55-45ba-8f58-0109a68e61e3.json"
+    }
+   ]
+  },
+  {
+   "table": "sign_offs",
+   "sqlName": "app_sign_offs",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "sign_offs.json",
+     "bytes": 135,
+     "sha256": "b468dcd90f4f1cb8da254652c6c135879e87f1081a682e680547fa9d66dc7f12",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/baed6e0d-16da-4e0b-a9c8-7062d1df8395.json"
+    }
+   ]
+  },
+  {
+   "table": "vendor_providers",
+   "sqlName": "app_vendor_providers",
+   "rowCount": 1825,
+   "manifestRowCount": 1825,
+   "files": [
+    {
+     "file": "vendor_providers.json",
+     "bytes": 2762092,
+     "sha256": "d89075c8c3cf48d37bc5a262dec67eafeafb13f1ee19ad66e13ad78f83aab482",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/8e405adc-2c49-43f1-9cc5-795c751eaf39.json"
+    }
+   ]
+  },
+  {
+   "table": "vendor_sourcing_requests",
+   "sqlName": "app_vendor_sourcing_requests",
+   "rowCount": 0,
+   "manifestRowCount": 0,
+   "files": [
+    {
+     "file": "vendor_sourcing_requests.json",
+     "bytes": 165,
+     "sha256": "77fae27f942e2a8be045394f3fbf26df67b1181f797ac4d07781784ffd341a49",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/548d0513-fe4b-499f-a822-d4547dcc5abc.json"
+    }
+   ]
+  },
+  {
+   "table": "vendors",
+   "sqlName": "app_vendors",
+   "rowCount": 8,
+   "manifestRowCount": 8,
+   "files": [
+    {
+     "file": "vendors.json",
+     "bytes": 5287,
+     "sha256": "50e6c392b6e48dcc4cd5f10084b5f78d1c93a64990d3860d0cc75c8ddab8eb60",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/a1883b22-4ae2-4ede-8a42-3e7b6303baec.json"
+    }
+   ]
+  },
+  {
+   "table": "verification_log",
+   "sqlName": "app_verification_log",
+   "rowCount": 12,
+   "manifestRowCount": 12,
+   "files": [
+    {
+     "file": "verification_log.json",
+     "bytes": 11609,
+     "sha256": "793c94046f8de979b11c6a6bea00a0b1042a0d4feb86c066097c13ad7ef6e36d",
+     "url": "https://storage.googleapis.com/audos-images/workspaces/d0c29613-9cb5-4652-9c6a-494eeed352e5/uploads/db-exports/d4baf949-2ded-4a8f-b105-95bf4851b48d.json"
+    }
+   ]
+  }
+ ]
+}

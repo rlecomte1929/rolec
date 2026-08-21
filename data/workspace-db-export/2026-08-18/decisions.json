@@ -1,0 +1,27 @@
+{
+ "table": "decisions",
+ "sqlName": "app_decisions",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 1,
+ "rows": [
+  {
+   "id": 1,
+   "case_id": 1,
+   "authority_id": 5,
+   "case_obligation_id": 2,
+   "decision_type": "registration",
+   "outcome": "approved",
+   "reference_number": "POLITIET-2024-EEA-0045821",
+   "decision_date": "2024-04-15T00:00:00.000Z",
+   "effective_date": "2024-04-15T00:00:00.000Z",
+   "expiry_date": null,
+   "conditions": null,
+   "rejection_reason": null,
+   "appeal_deadline": null,
+   "document_reference": "registreringsbevis_camille_dubois_2024.pdf",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:46.616Z",
+   "updated_at": "2026-07-01T21:40:46.616Z"
+  }
+ ]
+}

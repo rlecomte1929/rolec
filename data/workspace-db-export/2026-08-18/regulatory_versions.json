@@ -1,0 +1,42 @@
+{
+ "table": "regulatory_versions",
+ "sqlName": "app_regulatory_versions",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 2,
+ "rows": [
+  {
+   "id": 1,
+   "version_code": "NO-EEA-2024-01",
+   "title": "Norway EEA Free Movement — Employment Rules 2024",
+   "effective_from": "2024-01-01T00:00:00.000Z",
+   "effective_to": null,
+   "source_url": "https://lovdata.no/dokument/NL/lov/1988-06-24-64",
+   "source_authority_id": 1,
+   "jurisdiction_id": 4,
+   "approved_by": "GlobeIQ Legal Team",
+   "change_summary": "Initial UIM regulatory version for Norway EEA employment corridor. Covers police registration, D-number, tax card, bank account, and national registry obligations under the EEA Agreement and Norwegian Immigration Act.",
+   "notes": "Based on EEA Agreement Article 28 on freedom of movement for workers, the EU/EEA Citizens Directive (2004/38/EC) as implemented in Norway, and Skatteetaten D-number regulations.",
+   "is_current": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:37:00.507Z",
+   "updated_at": "2026-07-01T21:37:00.507Z"
+  },
+  {
+   "id": 2,
+   "version_code": "DE-EU-BLUECARD-2024-01",
+   "title": "Germany EU Blue Card Rules 2024",
+   "effective_from": "2024-01-01T00:00:00.000Z",
+   "effective_to": null,
+   "source_url": "https://www.gesetze-im-internet.de/aufenthg/",
+   "source_authority_id": 8,
+   "jurisdiction_id": 6,
+   "approved_by": "GlobeIQ Legal Team",
+   "change_summary": "Initial UIM regulatory version for Germany EU Blue Card corridor. Placeholder for India→Germany pathway.",
+   "notes": "Based on German Residence Act (AufenthG) §18b and EU Blue Card Directive 2021/1883.",
+   "is_current": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:37:00.539Z",
+   "updated_at": "2026-07-01T21:37:00.539Z"
+  }
+ ]
+}

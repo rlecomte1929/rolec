@@ -840,5 +840,133 @@
     "confidence": 90,
     "lat": 25.103,
     "lng": 55.172
+  },
+  {
+    "item_id": "s-ie1",
+    "name": "St Andrew's College",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.2996,
+    "lng": -6.1966,
+    "note": "IB World School in Booterstown, south Dublin."
+  },
+  {
+    "item_id": "s-ie2",
+    "name": "Nord Anglia International School Dublin",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.2717,
+    "lng": -6.2003,
+    "note": "International curriculum school in Leopardstown."
+  },
+  {
+    "item_id": "s-ie3",
+    "name": "Lycee Francais d'Irlande",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "french",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "fr",
+      "en"
+    ],
+    "tuition_level": "high",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.2683,
+    "lng": -6.1683,
+    "note": "French national curriculum, Foxrock."
+  },
+  {
+    "item_id": "s-ie4",
+    "name": "St Kilian's Deutsche Schule",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "de",
+      "en"
+    ],
+    "tuition_level": "high",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.3081,
+    "lng": -6.2367,
+    "note": "German-Irish bilingual school in Clonskeagh."
+  },
+  {
+    "item_id": "s-ie5",
+    "name": "The International School of Dublin",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      12
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.3244,
+    "lng": -6.2564,
+    "note": "IB Primary Years Programme, Ranelagh."
+  },
+  {
+    "item_id": "s-ie6",
+    "name": "Sutton Park School",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "medium",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.3897,
+    "lng": -6.1064,
+    "note": "Co-educational day school on the northside coast."
   }
 ]

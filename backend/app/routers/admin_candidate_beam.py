@@ -32,6 +32,7 @@ from sqlalchemy import text
 
 from ...imports.candidate_beam import importer, pipeline, ranking, store
 from ..auth_deps import require_admin
+from ...imports.otto.parsers import _host, classify_source
 from ..db import SessionLocal
 
 log = logging.getLogger(__name__)
@@ -49,6 +50,13 @@ _TERMINAL_REVIEW_STATES = {"approved", "rejected"}
 class ReviewRequest(BaseModel):
     status: str = Field(..., pattern="^(approved|rejected)$")
     review_note: Optional[str] = Field(None, max_length=2000)
+
+
+class AttachSourceRequest(BaseModel):
+    source_url: str = Field(..., min_length=4, max_length=2000)
+    #: The quotable line the URL actually supports. Optional, because a reviewer may only have
+    #: the page; but FactRow carries it, and a URL without a quote is a weaker citation.
+    evidence_quote: Optional[str] = Field(None, max_length=2000)
 
 
 class ImportPlanRequest(BaseModel):
@@ -131,6 +139,8 @@ def list_items(
                confidence_band, flagged, source_missing, title, official_guidance,
                actual_reality, action_required, source, category, variants,
                status, review_note, reviewed_by, reviewed_at,
+               researched_source_url, researched_evidence_quote, researched_source_class,
+               researched_by, researched_at,
                import_country, import_requirement_type, imported_ref, imported_at
         FROM public.candidate_beam_items
         WHERE run_id = CAST(:run_id AS uuid)
@@ -159,6 +169,19 @@ def list_items(
             # Surfaced as its own number because it is the research worklist, not a defect:
             # a candidate nobody sourced is work to do, and burying it in `total` hides it.
             "source_missing": sum(1 for i in items if i.get("source_missing")),
+            # The ACTIONABLE worklist: unsourced by the beam AND nobody has sourced it since.
+            # `source_missing` deliberately stays frozen — it records what the beam produced,
+            # and ranking.py derives `flagged` from it, so flipping it would rewrite history
+            # and change an unrelated signal. This number shrinks as research lands; that one
+            # stays true.
+            "needs_research": sum(
+                1
+                for i in items
+                if i.get("source_missing") and not (i.get("researched_source_url") or "").strip()
+            ),
+            "researched": sum(
+                1 for i in items if (i.get("researched_source_url") or "").strip()
+            ),
         },
     }
 
@@ -182,7 +205,10 @@ def review_item(
     """
     with SessionLocal() as session:
         row = session.execute(
-            text("SELECT status FROM public.candidate_beam_items WHERE id = CAST(:id AS uuid)"),
+            text(
+                "SELECT status, source, researched_source_url "
+                "FROM public.candidate_beam_items WHERE id = CAST(:id AS uuid)"
+            ),
             {"id": item_id},
         ).mappings().first()
         if not row:
@@ -191,6 +217,23 @@ def review_item(
             raise HTTPException(
                 status_code=409,
                 detail="candidate already imported — its staged row is the record of that decision",
+            )
+        # An unsourced candidate cannot be approved, because the importer would skip it
+        # anyway. Without this the queue tells the reviewer a lie: the candidate reads
+        # "approved" and is silently dropped at import with a reason nobody goes back to read.
+        # Rejecting one is always allowed — refusing a bad candidate needs no citation.
+        # .get(), not [] — the same reasoning list_items states for its counts: an endpoint
+        # whose job is to refuse safely must not 500 because a column came back absent.
+        if body.status == "approved" and not (
+            (row.get("source") or "").strip()
+            or (row.get("researched_source_url") or "").strip()
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "candidate has no source: attach a researched source before approving, "
+                    "or the import will skip it"
+                ),
             )
 
         session.execute(
@@ -214,6 +257,89 @@ def review_item(
         )
         session.commit()
     return {"ok": True, "id": item_id, "status": body.status}
+
+
+@router.post("/items/{item_id}/source")
+def attach_source(
+    item_id: str,
+    body: AttachSourceRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Record a HUMAN'S researched source for a candidate the beam could not cite.
+
+    This is the research worklist's landing place. Around a quarter of a run arrives with no
+    source at all; those candidates are real obligations the model surfaced but could not
+    back, and `FactRow` requires a URL, so they are unimportable until a person finds one.
+
+    What it does NOT do:
+
+    * It does not touch `source`. That column is the model's verbatim claim and its NULL is
+      the worklist itself; overwriting it would erase the difference between what a model
+      asserted and what a person found, on exactly the rows where that difference matters.
+    * It does not verify anything. The row still stages at `needs_review` and still reaches a
+      customer only through the /admin/countries gate.
+    * It does not refuse an unofficial URL. `unofficial` is a true fact about the link, and a
+      reviewer may genuinely have nothing better; the honest move is to store the verdict and
+      show it, not to reject the research and leave the candidate stranded.
+    """
+    url = body.source_url.strip()
+    # Reuses the otto parser's host extraction rather than adding a second URL parser, so
+    # "what counts as a URL here" cannot drift from what classify_source() sees.
+    if not _host(url) or not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=422, detail="source_url must be an absolute http(s) URL"
+        )
+
+    source_class = classify_source(url)
+    who = str(user.get("id") or user.get("email") or "admin")
+
+    with SessionLocal() as session:
+        row = session.execute(
+            text("SELECT status FROM public.candidate_beam_items WHERE id = CAST(:id AS uuid)"),
+            {"id": item_id},
+        ).mappings().first()
+        if not row:
+            raise HTTPException(status_code=404, detail="candidate not found")
+        if row["status"] == "imported":
+            # Same freeze review_item applies: the staged row already carries whatever source
+            # was used, and changing it here would leave the two disagreeing.
+            raise HTTPException(
+                status_code=409,
+                detail="candidate already imported — its staged row records the source it used",
+            )
+
+        session.execute(
+            text(
+                """
+                UPDATE public.candidate_beam_items
+                   SET researched_source_url     = :url,
+                       researched_evidence_quote = :quote,
+                       researched_source_class   = :klass,
+                       researched_by             = :who,
+                       researched_at             = NOW(),
+                       updated_at                = NOW()
+                 WHERE id = CAST(:id AS uuid)
+                """
+            ),
+            {
+                "id": item_id,
+                "url": url,
+                "quote": (body.evidence_quote or "").strip() or None,
+                "klass": source_class,
+                "who": who,
+            },
+        )
+        session.commit()
+
+    # source_class is returned so the caller can tell the reviewer what they just attached is
+    # unofficial BEFORE they approve it, rather than discovering it in the import downgrades.
+    return {
+        "ok": True,
+        "id": item_id,
+        "researched_source_url": url,
+        "researched_source_class": source_class,
+        "researched_by": who,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -283,6 +409,7 @@ def pillars(user: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
 _ITEM_SELECT = """
     SELECT candidate_uid, title, official_guidance, actual_reality,
            action_required, source, category, status, flagged,
+           researched_source_url, researched_evidence_quote, researched_source_class,
            pass_frequency, confidence_band,
            import_country, import_requirement_type, imported_ref, imported_at
       FROM public.candidate_beam_items

@@ -1,0 +1,50 @@
+{
+ "table": "case_access",
+ "sqlName": "app_case_access",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 2,
+ "rows": [
+  {
+   "id": 5,
+   "case_id": null,
+   "case_key": "relopass|france-norway|eea|2026-10-15|mrt645gp-w7t2us",
+   "corridor": "france-norway",
+   "employee_type": "eea",
+   "move_date": "2026-10-15T00:00:00.000Z",
+   "access_tier": "roadmap",
+   "payment_status": "paid",
+   "stripe_session_id": "cs_test_b1CFxZJP0UtrU3ZVgLdlkW29iERikqKDEmbvEQdu62B8qL7ZdMP7IXNTLT",
+   "stripe_payment_intent_id": null,
+   "amount_cents": 80000,
+   "currency": "eur",
+   "billing_company": null,
+   "billing_vat": null,
+   "customer_email": "roma@test.com",
+   "session_id": null,
+   "paid_at": "2026-07-20T12:12:25.533Z",
+   "created_at": "2026-07-20T11:55:23.689Z",
+   "updated_at": "2026-08-16T08:39:42.013Z"
+  },
+  {
+   "id": 6,
+   "case_id": null,
+   "case_key": "relopass|france-norway|eea|2026-11-20|mrt8gvqu-kep0m7",
+   "corridor": "france-norway",
+   "employee_type": "eea",
+   "move_date": "2026-11-20T00:00:00.000Z",
+   "access_tier": "free",
+   "payment_status": "unpaid",
+   "stripe_session_id": "cs_test_b1u5gQHk5h3YlACpsSDoaa7RxaU7v1c8hdbQbtxDl9SwgbazBJuKZQiNu5",
+   "stripe_payment_intent_id": null,
+   "amount_cents": 80000,
+   "currency": "eur",
+   "billing_company": null,
+   "billing_vat": null,
+   "customer_email": null,
+   "session_id": null,
+   "paid_at": null,
+   "created_at": "2026-07-20T13:01:16.854Z",
+   "updated_at": "2026-07-20T13:01:21.812Z"
+  }
+ ]
+}

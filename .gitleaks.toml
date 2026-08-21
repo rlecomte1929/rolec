@@ -58,6 +58,33 @@ regexes = [
   # findings, and sk_live_ / AKIA / a service_role JWT / ghp_ planted in that same
   # file still fire as stripe-access-token, generic-api-key, jwt and github-pat.
   '''^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)+$''',
+  # [AIQ-1892] Same class as the AIQ-1825 slugs above, one character different: these
+  # fact_key/topic_key values carry an ISO country-code PREFIX, so they start with a
+  # capital — "DE-ebc-elig-salary-2024", "JP_hsp_eligibility_70_points",
+  # "KR_D8_corporate_investment". The lowercase-anchored regex above requires ^[a-z]
+  # and therefore misses every one of them; 22 fired on the WorkspaceDB export import.
+  #
+  # Deliberately NOT a `paths` entry for the export directory. The AIQ-1825 note above
+  # records why: a path entry blinds the scanner to everything beneath it, and that
+  # directory is 58 MB of machine-generated rows nobody reads by eye — the worst place
+  # in the repo to stop looking for credentials.
+  #
+  # Shape, tightened past the obvious version. `^[A-Z]{2}[-_]...` alone would also
+  # allowlist "AB_supersecret" and "SG_ActualSecretValueHere123", so this additionally
+  # requires at least TWO segments after the prefix and caps each segment at 12 chars:
+  # a topic slug is many short words, a credential is one long run. Measured on
+  # gitleaks 8.24.3 (the CI version, not brew's 8.30.1): the export reports 0 findings,
+  # while sk_live_ / AKIA / ghp_ / a service_role JWT planted in those same files all
+  # still fire — including the adversarial "US_AKIAIOSFODNN7EXAMPLE",
+  # "DE_aVeryLongSecretTokenValue12345" and "GB-4eC39HqLyjWDarjtT1zdp7dc", which are
+  # built to look like country-prefixed slugs and do not match.
+  '''^[A-Z]{2}[-_][A-Za-z0-9]{1,12}(?:[-_][A-Za-z0-9]{1,12}){1,}$''',
+  # [AIQ-1892] Scraped page text in linked_references, not an identifier at all. A video
+  # listing reads "...Token-Based1 min16:40Demystifying..." and generic-api-key fires on
+  # "40Demystifying" because the word Token sits a few characters to its left. Surgical
+  # single-string match, same approach as the test-token literal above, so the rest of
+  # that 6,421-row scraped corpus stays scanned.
+  '''40Demystifying''',
 ]
 
 # --- Known false-positive paths ------------------------------------------------

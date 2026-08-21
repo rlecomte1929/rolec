@@ -6,7 +6,7 @@ real, and they live in different places:
 | what | where |
 |---|---|
 | Registry profile + pathway step graph | `corridors/<ID>/corridor.yaml`, `corridors/<ID>/pathways/<PATHWAY>/v1.yaml` |
-| Requirement records (the served facts) | `public.requirement_items`, loaded by a `supabase/migrations/` file |
+| Requirement records (the served facts) | `public.requirement_items` — several loaders write it, see [`DATA-PATHS.md`](DATA-PATHS.md) |
 | Documentation, metrics, validation, CVR | `docs/corridors/<id>/` |
 
 Ten corridor profiles exist under `corridors/`: `DE_NO`, `ES_IE`, `ES_NL`, `FR_CH`, `FR_DE`,
@@ -20,6 +20,13 @@ corridor — most have no requirement records behind them yet.
 | IE→ES (Dublin→Madrid) | 25 (15 non-obvious, 2 need counsel) | **no** — all `pending`, migration not applied | none | [`ie-es/`](ie-es/README.md) |
 
 ## Conventions worth knowing before adding one
+
+**Know which loader you are.** A generated migration with `ON CONFLICT (id)` is one of
+several paths into `requirement_items`, and it is the only one that sets `id` itself; the
+others upsert on `(country_code, purpose, title)` through `crud.create_requirement_item`.
+The two cannot see each other's rows, because there is no unique index on that natural key.
+[`DATA-PATHS.md`](DATA-PATHS.md) maps all of them and recommends a fix.
+
 
 **Pick the structural mirror, not the reverse corridor.** IE→ES mirrors `FR_ES`
 (EU free movement into Spain), not `ES_IE` — the reverse corridor models a third-country

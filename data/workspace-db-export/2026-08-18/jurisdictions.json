@@ -1,0 +1,104 @@
+{
+ "table": "jurisdictions",
+ "sqlName": "app_jurisdictions",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 8,
+ "rows": [
+  {
+   "id": 1,
+   "code": "EEA",
+   "name": "European Economic Area",
+   "jurisdiction_type": "supra_national",
+   "country_id": null,
+   "parent_jurisdiction_id": null,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:30.451Z",
+   "updated_at": "2026-07-01T21:36:30.451Z"
+  },
+  {
+   "id": 2,
+   "code": "EU",
+   "name": "European Union",
+   "jurisdiction_type": "supra_national",
+   "country_id": null,
+   "parent_jurisdiction_id": null,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:30.484Z",
+   "updated_at": "2026-07-01T21:36:30.484Z"
+  },
+  {
+   "id": 3,
+   "code": "SCHENGEN",
+   "name": "Schengen Area",
+   "jurisdiction_type": "supra_national",
+   "country_id": null,
+   "parent_jurisdiction_id": null,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:30.516Z",
+   "updated_at": "2026-07-01T21:36:30.516Z"
+  },
+  {
+   "id": 4,
+   "code": "NO",
+   "name": "Norway",
+   "jurisdiction_type": "national",
+   "country_id": 2,
+   "parent_jurisdiction_id": null,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:30.549Z",
+   "updated_at": "2026-07-01T21:36:30.549Z"
+  },
+  {
+   "id": 5,
+   "code": "FR",
+   "name": "France",
+   "jurisdiction_type": "national",
+   "country_id": 1,
+   "parent_jurisdiction_id": null,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:30.581Z",
+   "updated_at": "2026-07-01T21:36:30.581Z"
+  },
+  {
+   "id": 6,
+   "code": "DE",
+   "name": "Germany",
+   "jurisdiction_type": "national",
+   "country_id": 3,
+   "parent_jurisdiction_id": null,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:30.613Z",
+   "updated_at": "2026-07-01T21:36:30.613Z"
+  },
+  {
+   "id": 7,
+   "code": "NO-OSLO",
+   "name": "Oslo Municipality",
+   "jurisdiction_type": "municipal",
+   "country_id": 2,
+   "parent_jurisdiction_id": null,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:30.646Z",
+   "updated_at": "2026-07-01T21:36:30.646Z"
+  },
+  {
+   "id": 8,
+   "code": "DE-BY",
+   "name": "Bavaria",
+   "jurisdiction_type": "regional",
+   "country_id": 3,
+   "parent_jurisdiction_id": null,
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:36:30.678Z",
+   "updated_at": "2026-07-01T21:36:30.678Z"
+  }
+ ]
+}

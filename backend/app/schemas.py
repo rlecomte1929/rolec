@@ -131,6 +131,18 @@ class RequirementItemDTO(BaseModel):
     # Free-text deadline verbatim from the source ("within 8 days of arrival"). None
     # when the source states no deadline.
     timing: Optional[str] = None
+    # Counsel attestation — ORTHOGONAL to verificationStatus, never a rung on the same
+    # ladder. That one is our own provenance (representative -> corpus_grounded ->
+    # verified); this is external legal sign-off. models.py says it plainly: "Sellable
+    # means BOTH". Kept as separate fields so the UI cannot collapse them and let
+    # "Expert-verified" read as counsel-assured, which is the one claim we cannot make.
+    #
+    # None means no counsel has looked at this. That is the honest default and the state
+    # of every row in production today — it must render as ABSENCE, never as a downgrade
+    # badge and never as reassurance.
+    attestationStatus: Optional[str] = None   # None | requested | attested | stale
+    attestedBy: Optional[str] = None          # the firm, e.g. "Wikborg Rein"
+    attestedAt: Optional[datetime] = None
     # 'action' (the default — something is required of someone) or
     # 'nothing_to_do' (a STATED positive confirmation that nothing is required).
     # A correct answer of "none" must be stated, never implied by an empty list.
@@ -177,6 +189,18 @@ class AdminRequirementReviewDTO(BaseModel):
     appliesToAssignmentTypes: Optional[List[str]] = None
     citations: List[str] = []
     lastVerifiedAt: Optional[datetime] = None
+    # Counsel attestation — ORTHOGONAL to verificationStatus, never a rung on the same
+    # ladder. That one is our own provenance (representative -> corpus_grounded ->
+    # verified); this is external legal sign-off. models.py says it plainly: "Sellable
+    # means BOTH". Kept as separate fields so the UI cannot collapse them and let
+    # "Expert-verified" read as counsel-assured, which is the one claim we cannot make.
+    #
+    # None means no counsel has looked at this. That is the honest default and the state
+    # of every row in production today — it must render as ABSENCE, never as a downgrade
+    # badge and never as reassurance.
+    attestationStatus: Optional[str] = None   # None | requested | attested | stale
+    attestedBy: Optional[str] = None          # the firm, e.g. "Wikborg Rein"
+    attestedAt: Optional[datetime] = None
 
 
 class AdminRequirementListDTO(BaseModel):

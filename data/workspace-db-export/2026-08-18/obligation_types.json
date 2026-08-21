@@ -1,0 +1,86 @@
+{
+ "table": "obligation_types",
+ "sqlName": "app_obligation_types",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 6,
+ "rows": [
+  {
+   "id": 1,
+   "code": "employment_contract_notarization",
+   "name": "Employment Contract (Signed)",
+   "description": "Obtain a signed employment contract from the destination country employer. This is the foundational prerequisite document for almost all subsequent immigration obligations. The contract must specify position, salary, start date, and contract duration.",
+   "is_non_obvious": false,
+   "flag_message": null,
+   "obligation_category": "document",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:38:18.889Z",
+   "updated_at": "2026-07-01T21:38:18.889Z"
+  },
+  {
+   "id": 2,
+   "code": "police_registration",
+   "name": "Register with Local Police (EEA Registration)",
+   "description": "EEA nationals must register their right of residence with the local police authority in Norway when staying longer than 3 months. This is the formal exercise of EEA free movement rights and generates the registration certificate used in subsequent applications.",
+   "is_non_obvious": false,
+   "flag_message": "Time-sensitive: must be completed within 90 days of arrival if staying more than 3 months. Failure to register is a violation of immigration law.",
+   "obligation_category": "registration",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:38:18.922Z",
+   "updated_at": "2026-07-01T21:38:18.922Z"
+  },
+  {
+   "id": 3,
+   "code": "d_number_application",
+   "name": "Apply for D-Number (Temporary Tax ID)",
+   "description": "A D-number is a temporary Norwegian tax identification number issued by Skatteetaten to persons who are not permanently resident in Norway. It is required to open a bank account, obtain a tax card, and interact with most Norwegian authorities.",
+   "is_non_obvious": true,
+   "flag_message": "Required before tax card — most HR teams don't know to start this immediately. Without a D-number, the tax card cannot be issued, causing the employer to withhold 50% tax on all income.",
+   "obligation_category": "registration",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:38:18.954Z",
+   "updated_at": "2026-07-01T21:38:18.954Z"
+  },
+  {
+   "id": 4,
+   "code": "tax_card_application",
+   "name": "Obtain Tax Card (Skattekort)",
+   "description": "A Norwegian tax card (skattekort) from Skatteetaten authorises the employer to withhold the correct percentage of income tax. Without a tax card, Norwegian law requires the employer to withhold 50% of all income.",
+   "is_non_obvious": true,
+   "flag_message": "CRITICAL: Employer must withhold 50% tax without this. The tax card must arrive before the first paycheck. Apply immediately after receiving your D-number — do not wait.",
+   "obligation_category": "document",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:38:18.987Z",
+   "updated_at": "2026-07-01T21:38:18.987Z"
+  },
+  {
+   "id": 5,
+   "code": "bank_account_opening",
+   "name": "Open Norwegian Bank Account",
+   "description": "Open a bank account at a Norwegian bank to receive salary and conduct local financial transactions. A D-number is required by Norwegian banks as KYC identification for non-residents.",
+   "is_non_obvious": false,
+   "flag_message": null,
+   "obligation_category": "financial",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:38:19.019Z",
+   "updated_at": "2026-07-01T21:38:19.019Z"
+  },
+  {
+   "id": 6,
+   "code": "national_registry_registration",
+   "name": "Register with Folkeregisteret (National Registry)",
+   "description": "Persons intending to stay in Norway for more than 6 months must register as a resident in the Norwegian National Registry (Folkeregisteret). This registration replaces the D-number with a permanent 11-digit Norwegian national identity number (fødselsnummer).",
+   "is_non_obvious": false,
+   "flag_message": "Required if staying more than 6 months. Must be completed within 8 weeks of the 6-month mark. Registration upgrades your tax ID from D-number to permanent fødselsnummer.",
+   "obligation_category": "registration",
+   "is_active": true,
+   "session_id": null,
+   "created_at": "2026-07-01T21:38:19.051Z",
+   "updated_at": "2026-07-01T21:38:19.051Z"
+  }
+ ]
+}
