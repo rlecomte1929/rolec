@@ -140,7 +140,10 @@ Backend:
 ## Deployment
 
 - **Frontend**: Render Static Site. Build: `npm --prefix frontend ci && npm --prefix frontend run build`. Publish dir: `frontend/dist`.
-- **Backend**: Render Web Service. Start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 4 --proxy-headers`. Python 3.11.
+- **Backend**: Render Web Service. Start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers`. Python 3.11.
+  The service is on Render's **`free`** plan (verified 2026-08-21), which is why it is `--workers 1` and not 4 —
+  and why it spins down after ~15 min idle, costing a real user ~7.7s on their first page. Don't raise the worker
+  count on this plan. See `docs/performance/keep_warm.md`.
 - **Database changes**: Commit a migration file for every schema change. **There is no automated apply-on-merge** — migrations are applied to production manually/out-of-band (operator-run: MCP `apply_migration`/`execute_sql` DDL — **not** `supabase db push`, see the hazard note in *Migration discipline* below), and the ledger is then reconciled by committing the matching file at the applied version. The PR CI only *validates* ledger consistency (the read-only `migration-drift` check); it never applies. See **Migration discipline (MANDATORY)** and **Ledger reconciliation** below.
 - **Deploy trigger**: Push to `main` on GitHub → Render auto-deploys both services. Health check endpoint: `GET /health`.
 

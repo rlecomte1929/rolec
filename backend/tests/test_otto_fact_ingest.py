@@ -31,6 +31,7 @@ from backend.imports.otto.executor import (
     derive_status,
     reconcile,
     stage,
+    summarise,
 )
 from backend.imports.otto.parsers import (
     OFFICIAL,
@@ -535,6 +536,72 @@ def test_rejections_are_carried_into_the_discrepancy(tmp_path):
         _NullConn(), result, source_label="x", expected_count=5, dry_run=True
     )
     assert "1 row(s) rejected on sourcing" in ledger["discrepancy"]
+
+
+# ── AIQ-2035: an absent applies_to.status is silent all the way to invisible ─────────
+
+def _staged(tmp_path, records):
+    """stage() a batch and return (result, the CLI text the operator would see)."""
+    path = _write(tmp_path, records)
+    rows, rejections = read_jsonl(path, batch_id="b-scope")
+    result = stage(_NullConn(), rows, rejections=rejections, dry_run=True)
+    ledger = reconcile(
+        _NullConn(), result, source_label="x", expected_count=len(records), dry_run=True
+    )
+    return result, summarise(result, ledger)
+
+
+def test_a_topic_with_no_applies_to_status_is_reported_before_anything_is_written(tmp_path):
+    """The failure this guard exists for, and it is invisible at every other layer.
+
+    `PURPOSES.get(status or "", "other")` turns an absent status into a real enum value, and
+    `crud.list_requirements` filters purpose with strict equality and no catch-all. So the row
+    promotes fine, approves fine, and is never returned to the dossier or the public corridor
+    endpoint. Nothing errors and no count moves — which is why it has to be said out loud on
+    the dry run, before a single row is staged.
+
+    All nine VE->IE facts shipped without it (AIQ-2035). The converter sets it now, but Otto
+    writes batches straight to the workspace with no converter in the path.
+    """
+    result, text = _staged(tmp_path, [_record()])          # _record carries no status
+    assert len(result.unscoped) == 1
+    assert "eu_free_movement_worker" in result.unscoped[0]
+    assert "no fact carries applies_to.status" in result.unscoped[0]
+    assert "purpose='other'" in result.unscoped[0]
+    assert "NO usable applies_to.status" in text
+
+
+def test_a_topic_that_declares_its_status_is_not_reported(tmp_path):
+    """The control. Passes before this change and after — it tracks the rule, not the diff."""
+    _, text = _staged(tmp_path, [_record(applies_to={"nationality": "EU",
+                                                     "status": "professional"})])
+    assert "NO usable applies_to.status" not in text
+
+
+def test_an_explicit_any_is_a_decision_and_is_left_alone(tmp_path):
+    """`other` is a legitimate purpose — FRANCE serves an approved row at it.
+
+    So the guard must separate "nobody said" from "somebody chose 'any'". Flagging the second
+    would train the reader to skip the block, which is exactly how the original omission
+    survived. Also passes on both sides of the change.
+    """
+    _, text = _staged(tmp_path, [_record(applies_to={"nationality": "EU", "status": "any"})])
+    assert "NO usable applies_to.status" not in text
+
+
+def test_facts_that_disagree_on_status_are_reported_as_a_disagreement(tmp_path):
+    """`_one_value()` returns None when a topic's facts conflict, which also lands 'other'.
+
+    Absent and conflicting are different problems with different fixes, so the message has to
+    say which — the same distinction `mappings.resolve()` draws for nationality after the B3
+    batch blamed a conflict that did not exist.
+    """
+    result, _ = _staged(tmp_path, [
+        _record(fact_key="a", applies_to={"nationality": "EU", "status": "professional"}),
+        _record(fact_key="b", applies_to={"nationality": "EU", "status": "student"}),
+    ])
+    assert len(result.unscoped) == 1
+    assert "disagree" in result.unscoped[0]
 
 
 class _NullConn:
