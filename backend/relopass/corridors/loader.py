@@ -132,6 +132,12 @@ class CorridorStep:
     # Something a non-expert wouldn't know to look for — the flag the product
     # exists to raise: the week-seven ambush, surfaced in week one.
     non_obvious: bool = False
+    # The plain-language explanation OF the non-obvious trap, in the mover's terms —
+    # the reason the flag is raised, not just that it is. Empty when a step carries no
+    # authored explanation. This is representative corridor guidance (the whole pathway
+    # declares itself so), not a cited legal claim, so it lives here rather than in a
+    # requirement_items row that would need a citation the trap does not have.
+    non_obvious_note: str = ""
     # 'information_only' or 'route_to_professional'. A personalised legal or tax
     # determination must route to a regulated professional and must never be
     # answered in ReloPass's own voice.
@@ -635,6 +641,7 @@ def _build_corridor(parsed: Mapping[str, Any]) -> CorridorAgent:
             cite=(s.get("cite") if isinstance(s, Mapping) else None),
             outcome_type=_enum(s, "outcome_type", _OUTCOME_TYPES, "action"),
             non_obvious=bool(s.get("non_obvious", False)) if isinstance(s, Mapping) else False,
+            non_obvious_note=str(s.get("non_obvious_note", "")).strip() if isinstance(s, Mapping) else "",
             advice_boundary=_enum(s, "advice_boundary", _ADVICE_BOUNDARIES, "information_only"),
             assertion=_enum(s, "assertion", _ASSERTIONS, "HARD"),
             arrival_anchor=bool(s.get("arrival_anchor", False)) if isinstance(s, Mapping) else False,

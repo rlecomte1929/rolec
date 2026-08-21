@@ -210,3 +210,66 @@ class TheMergeDoesNotCorruptWhatWasAlreadyThere(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── the "easy to miss" trap notes reach the roadmap the mover opens ──────────────────
+
+class NonObviousStepNotesReachTheRoadmap(unittest.TestCase):
+    """Seven CSEP steps are flagged `non_obvious: true` with an authored explanation.
+
+    The loader parses both the flag and the note, but the overlay used to drop them — the
+    exact analogue of the advisories bug #1953 fixed, one layer down. Without them the mover
+    sees a bare step title and none of the reason it matters: the emergency-tax 40% rate, the
+    proof-of-address catch-22, the ordinarily-resident health test.
+    """
+
+    def test_the_emergency_tax_rate_reaches_the_step(self):
+        tracks: List[RoadmapTrackV2] = []
+        merge_corridor_overlay_v2(tracks, _draft())
+        by_id = {s.id: s for t in tracks for s in t.steps}
+        revenue = by_id["corridor-revenue_registration"]
+        self.assertTrue(revenue.non_obvious)
+        self.assertIn("40%", revenue.non_obvious_note or "")
+        self.assertIn("week five", (revenue.non_obvious_note or "").lower())
+
+    def test_the_proof_of_address_catch22_reaches_the_step(self):
+        tracks: List[RoadmapTrackV2] = []
+        merge_corridor_overlay_v2(tracks, _draft())
+        bank = {s.id: s for t in tracks for s in t.steps}["corridor-bank_account"]
+        self.assertTrue(bank.non_obvious)
+        self.assertIn("proof of address", (bank.non_obvious_note or "").lower())
+
+    def test_exactly_the_seven_flagged_steps_carry_a_note(self):
+        tracks: List[RoadmapTrackV2] = []
+        merge_corridor_overlay_v2(tracks, _draft())
+        flagged = {
+            s.id for t in tracks for s in t.steps
+            if s.id.startswith("corridor-") and s.non_obvious
+        }
+        self.assertEqual(
+            {
+                "corridor-employment_permit_granted",
+                "corridor-d_visa_application",
+                "corridor-irp_registration",
+                "corridor-revenue_registration",
+                "corridor-bank_account",
+                "corridor-health_setup",
+                "corridor-stamp4_eligibility",
+            },
+            flagged,
+        )
+        for t in tracks:
+            for s in t.steps:
+                if s.non_obvious:
+                    self.assertTrue(
+                        (s.non_obvious_note or "").strip(),
+                        f"{s.id} is flagged non_obvious but carries no explanation",
+                    )
+
+    def test_a_routine_step_is_not_flagged(self):
+        """The gate discriminates: JOB_OFFER_CONTRACT and PPSN are not traps."""
+        tracks: List[RoadmapTrackV2] = []
+        merge_corridor_overlay_v2(tracks, _draft())
+        by_id = {s.id: s for t in tracks for s in t.steps}
+        self.assertFalse(by_id["corridor-ppsn"].non_obvious)
+        self.assertIsNone(by_id["corridor-ppsn"].non_obvious_note)

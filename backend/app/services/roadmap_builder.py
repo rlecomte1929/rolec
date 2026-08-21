@@ -530,6 +530,10 @@ def _apply_corridor_overlay(
             "line": step["name"].strip('"'),
             "subs": [],
             "blocking": step["blocking"],
+            # The "easy to miss" flag + its explanation, carried onto the served step so the
+            # roadmap and the plan email can raise it. Empty note for steps without one.
+            "nonObvious": bool(step.get("non_obvious")),
+            "nonObviousNote": step.get("non_obvious_note") or None,
             "provenance": step["provenance"],
         })
 
