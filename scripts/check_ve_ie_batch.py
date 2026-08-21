@@ -124,21 +124,23 @@ def main() -> int:
         for row in rows:
             tiers[row.accuracy_tier] = tiers.get(row.accuracy_tier, 0) + 1
         print(f"  accuracy tiers: {tiers}")
-        flagged_auto = [
+        # AIQ-2034 made this a hard failure rather than the warning it used to print.
+        # `grade()` now downgrades any row carrying `quote_verbatim_confirmed: false`, so a row
+        # that still reaches `auto_accepted` means the guard regressed — and a reviewer would
+        # read that badge on a counsel-flagged row as "already cleared".
+        unconfirmed_auto = [
             row.dedupe_key
             for row in rows
             if row.accuracy_tier == "auto_accepted"
-            and (row.applies_to or {}).get("needs_lawyer_review")
+            and (row.applies_to or {}).get("quote_verbatim_confirmed") is False
         ]
-        if flagged_auto:
-            # Not a failure — nothing is promotable from `status='new'` — but a reviewer
-            # must not read `auto_accepted` on a counsel-flagged row as "already cleared".
-            print(
-                f"  ⚠ {len(flagged_auto)} counsel-flagged row(s) scored auto_accepted on "
-                f"publisher+quote; the quote is NOT verbatim-confirmed. Do not approve:"
+        for key in unconfirmed_auto:
+            failures.append(
+                f"{key}: auto_accepted despite quote_verbatim_confirmed=false — the "
+                "grade() guard has regressed"
             )
-            for key in flagged_auto:
-                print(f"      - {key}")
+        if not unconfirmed_auto:
+            print("✓ no unconfirmed-quote row scored auto_accepted")
     except Exception as exc:  # noqa: BLE001
         failures.append(f"conversion failed: {exc}")
 

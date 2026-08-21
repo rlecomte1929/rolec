@@ -351,6 +351,127 @@ def _immigration_applies(
         return True  # fail safe
 
 
+
+# ── [AIQ-1867] Corridor pathway steps ────────────────────────────────────────────
+#
+# Andrea (ES→IE, Venezuelan, family of 4) sees "Prepare visa / work permit application
+# pack", "Submit visa / work permit application" and "Book biometrics". Her actual route is
+# a Critical Skills Employment Permit, then a long-stay 'D' visa, then IRP registration at
+# Burgh Quay within 90 days, then PPSN, then a Revenue RPN before her first payslip. That
+# journey is authored in corridors/ES_IE/pathways/CSEP_2026/v1.yaml and #1929 already reads
+# it — but only on the roadmap_builder path. The milestone-backed plan view
+# (/api/relocation-plans/{case}/view) never saw it, which is the surface she actually opens.
+#
+# This reuses roadmap_corridor_overlay rather than adding a second YAML reader: one gate on
+# nationality class, one set of supersession rules, one provenance block.
+#
+# Phase, not track. The overlay assigns UI tracks (visa/family/settlement); milestones need a
+# PHASE_ORDER key, and "which phase" is a different question from "which lane" — IRP happens
+# after she lands, PPSN after that.
+_CORRIDOR_STEP_PHASE: Dict[str, str] = {
+    "JOB_OFFER_CONTRACT": "pre_departure",
+    "EMPLOYMENT_PERMIT_APPLICATION": "immigration",
+    "EMPLOYMENT_PERMIT_GRANTED": "immigration",
+    "D_VISA_APPLICATION": "immigration",
+    "D_VISA_GRANTED": "immigration",
+    "TRAVEL_TO_IE": "logistics",
+    "IRP_REGISTRATION": "arrival",
+    "PPSN": "post_arrival",
+    "REVENUE_REGISTRATION": "post_arrival",
+    "BANK_ACCOUNT": "post_arrival",
+    "HEALTH_SETUP": "post_arrival",
+    "FAMILY_REGISTRATION": "post_arrival",
+    "STAMP4_ELIGIBILITY": "post_arrival",
+}
+
+
+#: Generic milestones a corridor's authored immigration steps replace. Named explicitly and
+#: kept deliberately narrow: the corridor tells the employee to file a Critical Skills
+#: Employment Permit and then a 'D' visa, so "Prepare visa / work permit application pack"
+#: and "Submit visa / work permit application" are the same work described vaguely, and
+#: biometrics are part of the visa appointment. `task_immigration_review` is NOT here — a
+#: counsel or vendor review is still a real, separate step on a curated route.
+_CORRIDOR_SUPERSEDED_GENERIC = frozenset({
+    "task_visa_docs_prep",
+    "task_visa_submit",
+    "task_biometrics",
+})
+
+
+def _corridor_milestones(
+    case_draft: Optional[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], frozenset]:
+    """Milestones from the case corridor's authored pathway, and the generic milestone_types
+    they supersede.
+
+    Returns ``([], frozenset())`` whenever no pathway applies — an unknown corridor, a free
+    mover on a corridor whose steps are all immigration-gated, or any failure inside the
+    overlay. The generic scaffold is the fallback and must stay intact in every one of those
+    cases; this only ever REPLACES steps it has a curated answer for.
+    """
+    try:
+        from .roadmap_corridor_overlay import corridor_overlay
+    except ImportError:  # pragma: no cover - defensive, module is in-tree
+        return [], frozenset()
+
+    overlay = corridor_overlay({"draft": case_draft or {}})
+    if not overlay:
+        return [], frozenset()
+    steps = overlay.get("corridor_steps") or []
+    if not steps:
+        return [], frozenset()
+
+    # Every step must have a known phase, or we use none of them.
+    #
+    # 11 of the 12 corridors ship an authored pathway, and their step vocabularies differ —
+    # IN_DE's BLUECARD_2026 and FR_NO's EEA_FREEDOM_2026 share almost no step ids with
+    # CSEP_2026. Defaulting an unrecognised step to pre_departure looked harmless and was
+    # not: measured here, it put 13 of IN_DE's 14 steps in one block, which is a worse plan
+    # than the generic scaffold it replaced. So an unmapped pathway falls back entirely
+    # rather than rendering a jumbled one. Adding a corridor is then a deliberate act:
+    # extend _CORRIDOR_STEP_PHASE with its steps and it starts serving.
+    step_ids = [str(st.get("step_id") or "").strip() for st in steps]
+    if not all(sid in _CORRIDOR_STEP_PHASE for sid in step_ids if sid):
+        return [], frozenset()
+
+    rows: List[Dict[str, Any]] = []
+    for idx, step in enumerate(steps, start=1):
+        sid = str(step.get("step_id") or "").strip()
+        if not sid:
+            continue
+        phase = _CORRIDOR_STEP_PHASE[sid]
+        # {phase}_corridor_{NN} — parsed by relocation_plan_service so the step lands in its
+        # real phase block. Deliberately not the {phase}_ai_{NN} form: this is curated data.
+        rows.append(
+            {
+                "milestone_type": f"{phase}_corridor_{idx:02d}",
+                "title": step.get("name") or sid,
+                "description": None,
+                "sort_order": 500 + idx,
+                "target_date": None,
+                "status": "pending",
+                "owner": step.get("responsible_party") or "joint",
+                # A blocking step is one nothing downstream can proceed without.
+                "criticality": "high" if step.get("blocking") else "normal",
+                "notes": None,
+            }
+        )
+    # The overlay's own `superseded_generic_keys` are roadmap_builder STEP keys
+    # ("permit", "police", "tax") — a different namespace from case_milestones.
+    # milestone_type. Translating here rather than widening the overlay keeps each
+    # consumer owning the vocabulary it actually serves.
+    #
+    # Conditional on the corridor having really supplied immigration steps. A pathway that
+    # resolves but contributes no permit/visa step (an EEA national on this corridor: every
+    # immigration step is gated off) must NOT strip the generic visa track — that would
+    # silently delete the only immigration guidance a mover has, which is the one failure
+    # mode worse than showing generic copy.
+    supersedes: frozenset = frozenset()
+    if any(r["milestone_type"].startswith("immigration_corridor_") for r in rows):
+        supersedes = _CORRIDOR_SUPERSEDED_GENERIC
+    return rows, supersedes
+
+
 def compute_default_milestones(
     case_id: str,
     case_draft: Optional[Dict[str, Any]] = None,
@@ -427,6 +548,14 @@ def compute_default_milestones(
         contract_type=contract_type,
     )
 
+    # ── [AIQ-1867] Corridor pathway, resolved BEFORE the generic loop ────────
+    #
+    # Resolved first because it decides which generic steps may exist at all: a curated
+    # route that names the Critical Skills Employment Permit and the 'D' visa supersedes
+    # "Prepare visa / work permit application pack". Showing both would be worse than
+    # showing only the generic one — the employee cannot tell which is real.
+    corridor_rows, superseded_generic = _corridor_milestones(case_draft)
+
     result: List[Dict[str, Any]] = []
     for spec in OPERATIONAL_TASK_DEFAULTS:
         mt = spec["milestone_type"]
@@ -436,6 +565,8 @@ def compute_default_milestones(
             continue
         if not immigration_applies and mt in _IMMIGRATION_ONLY_TASKS:
             continue  # no application is being filed — the step does not exist
+        if mt in superseded_generic:
+            continue  # the corridor answers this step specifically
         target: Optional[str] = None
         if base:
             dbm = spec.get("days_before_move")
@@ -466,6 +597,8 @@ def compute_default_milestones(
                 "notes": None,
             }
         )
+
+    result.extend(corridor_rows)
 
     # ── Inject family workstream milestones (S5) ─────────────────────────────
     if family_profile:
