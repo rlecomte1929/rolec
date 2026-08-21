@@ -178,6 +178,49 @@ async function runPersona(p) {
     `${r.status}/${r.ms}ms/aid=${assignmentId ? String(assignmentId).slice(0, 8) : 'null'}`,
     r.ok && r.ms < 3000 ? 'PASS' : r.ok ? 'PARTIAL' : 'FAIL', r.ms, r.error || '');
 
+  // ── 5. The employee completes her intake ────────────────────────────────
+  //
+  // Without this the case has NO milestones, and every downstream plan assertion is
+  // measuring an intake nobody filled in. PLAN-1 reported "0 phases / 0 tasks" for months
+  // and it was right to: milestones are seeded by _ensure_default_milestones_for_case
+  // (backend/main.py), whose ONLY caller is POST /api/employee/journey/answer. Seeding is
+  // intake-driven by design. The runner was asserting a plan it never asked the product to
+  // build.
+  //
+  // Mirrors tests/e2e/tests/deep/journey.spec.ts ([DEEP-WIZARD] -> [DEEP-SUBMIT]), which
+  // passes today. Two things there are load-bearing and easy to get wrong:
+  //   * the EMPLOYEE token, not HR — the intake is hers, and that is the path the product
+  //     gates on;
+  //   * every section filled, because submit enforces a 90% profileCompleteness gate. The
+  //     CASE-2 payload above omits familyMembers and services, which is not enough.
+  if (empTok && assignmentId) {
+    const fullDraft = {
+      ...draft,
+      relocationBasics: { ...draft.relocationBasics, durationMonths: 24, hasDependents: false },
+      familyMembers: { maritalStatus: 'single', children: [] },
+      services: ['housing', 'immigration', 'tax', 'moving'],
+    };
+    r = await req('PATCH', `/api/cases/${caseId}`, fullDraft, empTok);
+    ev.intakeFill = r.data;
+    const filled = r.ok;
+
+    r = await req('POST', `/api/employee/assignments/${assignmentId}/submit`, null, empTok, 30000);
+    ev.intakeSubmit = r.data;
+    // 400 = the draft did not reach 90% — a real finding about the gate, not a crash.
+    // Recorded distinctly so a submit failure is visible here rather than resurfacing
+    // later as a mysterious empty plan.
+    record('CASE-5', p.key, 'Setup', 'Employee completes + submits intake (plan precondition)',
+      '200 — profile complete, milestones seeded',
+      `fill=${filled ? 'ok' : 'FAILED'} submit=${r.status}`,
+      r.status === 200 ? 'PASS' : r.status === 400 ? 'PARTIAL' : 'FAIL', r.ms,
+      r.error || JSON.stringify(r.data).slice(0, 200));
+  } else {
+    record('CASE-5', p.key, 'Setup', 'Employee completes + submits intake (plan precondition)',
+      '200 — profile complete, milestones seeded',
+      `empTok=${!!empTok} assignmentId=${!!assignmentId}`, 'BLOCKED', 0,
+      'no employee token or assignment — cannot establish the intake the plan is built from');
+  }
+
   // ══ AREA 1 — DOCUMENTS & IMMIGRATION PAPERS ═════════════════════════════
   r = await req('GET', `/api/hr/cases/${caseId}/immigration-requirements?corridor_from=ES&corridor_to=IE&employee_type=PERMANENT`, null, hrTok);
   ev.immReq = r.data;
