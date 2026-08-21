@@ -251,6 +251,12 @@ def corridor_overlay(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 # consumer place every step by POSITION instead of knowing its name — see
                 # timeline_service._corridor_milestones.
                 "arrival_anchor": bool(getattr(step, "arrival_anchor", False)),
+                # "action" | "nothing_to_do". The pathway marks STAMP4_ELIGIBILITY as
+                # `nothing_to_do`: after 21 months on a Critical Skills permit she moves to
+                # Stamp 4 with no renewal to file. It belongs on the roadmap — it is one of
+                # the corridor's flagged non-obvious facts, and a good one — but it is not a
+                # task, and a task nobody can ever complete nags forever.
+                "outcome_type": getattr(step, "outcome_type", "action") or "action",
                 "provenance": provenance,
             })
 
