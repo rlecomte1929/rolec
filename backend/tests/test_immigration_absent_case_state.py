@@ -84,11 +84,15 @@ class AbsentStateTests(unittest.TestCase):
         self.assertEqual(s["state"], "no_permit_required")
 
     def test_unclassifiable_nationality_never_asserts_a_permit_requirement(self) -> None:
-        """`classify` returns None for forms outside its lookup tables — "Venezuelan"
-        does today, though "VE" and "Indian" both resolve. Andrea, the first real
-        ES->IE case, is Venezuelan. Claiming "a permit is needed" would assert a
-        requirement we have not established; claiming the opposite would be worse."""
-        s = self._state("Venezuelan", "IRELAND")
+        """`classify` returns None for forms outside its lookup tables. Claiming "a
+        permit is needed" would assert a requirement we have not established;
+        claiming the opposite would be far worse.
+
+        [AIQ-2033] This used "Venezuelan", which resolves now that the adjectival and
+        country-name tables were made symmetric — Andrea, the first real ES->IE case,
+        is Venezuelan and no longer lands here. Moved to a nationality the tables
+        still do not know, so the branch stays covered."""
+        s = self._state("Brazilian", "IRELAND")
         self.assertEqual(s["state"], "coverage_gap")
         self.assertIsNone(s["nationality_class"])
         self.assertTrue(s["next_action"])
