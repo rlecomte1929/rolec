@@ -1,0 +1,70 @@
+name: Unapplied migration check (main)
+
+# Backstop for the case the PR-time guards structurally cannot see: a migration that
+# was FINE when it merged and went stale afterwards.
+#
+# ci.yml's `migration-drift` job hard-fails only on migrations a PR ADDS (`--added`).
+# That scoping is deliberate and correct — the tree carries ~148 below-ledger-max files
+# and failing on them would redden every migration PR for debt it did not create. But it
+# means nothing ever re-examines a migration once it is merged. Direction B degrades to
+# "WARN (pre-existing)" with exit 0, printed in the log of some later, unrelated PR.
+#
+# On 2026-08-20 that hid two: 20261110000000 (services_state tenant policies, #1902) and
+# 20261111000000 (candidate_beam researched_* columns, #1894) were merged and never
+# applied, with every check green, while #1895 sat open reading those columns in 51
+# places. Merging a migration does not apply it — the apply is manual and out-of-band —
+# so "merged" and "live" drift apart silently.
+#
+# This job compares the WHOLE tree against the live ledger on a schedule, so a lapse
+# announces itself within a day instead of waiting to be stumbled upon.
+#
+# Deliberately NOT a pull_request job: a PR must not go red because an operator has not
+# applied something yet. The 24h grace window exists for the same reason — a migration
+# merged minutes ago is legitimately unapplied.
+#
+# Blind to: anything listed in scripts/migration_unapplied_baseline.json (the parked
+# backlog) and anything younger than the grace window. The baseline is meant to SHRINK
+# as that backlog is triaged; it is not a dumping ground for new lapses.
+
+on:
+  schedule:
+    # 07:15 UTC daily — after the overnight merge traffic, before the working day.
+    - cron: '15 7 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: migration-unapplied-main
+  cancel-in-progress: true
+
+jobs:
+  unapplied:
+    name: Migrations merged but never applied
+    runs-on: ubuntu-latest
+    # Same gate as ci.yml's ledger check: a no-op where the read-only URL is absent.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The grace window is derived from when each migration first appeared in git
+          # (`git log --diff-filter=A`), so a shallow clone would date nothing. The script
+          # treats an undatable migration as OUTSIDE the grace window rather than silently
+          # excusing it, which on a shallow clone would fail every file at once.
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Check for migrations merged but never applied
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        # --strict-unapplied is what makes this able to FAIL. Without it the run is a
+        # warning that returns 0 — which is exactly how the duplicate backstop shipped,
+        # structurally incapable of firing for months. --baseline is mandatory here: a
+        # missing or malformed one is a hard error, never an empty set.
+        run: |
+          python scripts/check_migration_drift.py \
+            --strict-unapplied \
+            --baseline scripts/migration_unapplied_baseline.json \
+            --grace-hours 24
