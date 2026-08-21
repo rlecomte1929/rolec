@@ -160,10 +160,19 @@ async function runPersona(p) {
   // read back — does nationality survive?
   r = await req('GET', `/api/cases/${caseId}`, null, hrTok);
   ev.caseRead = r.data;
-  const pj = r.data?.profile_json || r.data || {};
-  const rb = pj.relocationBasics || pj.relocation_basics || {};
-  const ep = pj.employeeProfile || pj.employee_profile || {};
-  const gotDest = (rb.destCity || rb.dest_city || '') + '/' + (rb.destCountry || rb.dest_country || '');
+  // GET /api/cases/{id} returns CaseDTO (backend/app/schemas.py:90): the wizard sections
+  // live under `draft`, and destCountry/destCity are ALSO flattened onto the top level.
+  // There is no `profile_json` and no top-level `relocationBasics`. Reading those returned
+  // undefined, so this check reported `dest=/ nat=null` and accused a working endpoint of
+  // losing the nationality — verified false on 2026-08-21: case
+  // bebe7aff-a16f-464b-a965-381c9e82fab3 holds Dublin/IE/IN in production. The `||` chains
+  // are kept so an older or flatter shape still parses.
+  const pj = r.data || {};
+  const dr = pj.draft || pj.profile_json || {};
+  const rb = dr.relocationBasics || dr.relocation_basics || pj.relocationBasics || {};
+  const ep = dr.employeeProfile || dr.employee_profile || pj.employeeProfile || {};
+  const gotDest = (pj.destCity || rb.destCity || rb.dest_city || '') + '/' +
+                  (pj.destCountry || rb.destCountry || rb.dest_country || '');
   const gotNat = ep.nationality || null;
   record('CASE-3', p.key, 'Setup', 'Round-trip: destination + nationality readable', 'Dublin/IE + nationality',
     `dest=${gotDest} nat=${gotNat}`,
