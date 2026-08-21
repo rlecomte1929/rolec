@@ -122,6 +122,42 @@ that needs a lawyer.
 deliberately: it changes shared behaviour for every batch and belongs in its own card, not
 smuggled into a load.
 
+## 2026-08-21 — approved and serving
+
+All nine rows were approved at **12:02:59 UTC** by `admin@relopass.com`, in a single scripted
+call through the review API, and are now served to employees, HR and the unauthenticated public
+corridor endpoint. `IRELAND` reads 29 approved, 0 pending.
+
+**That includes the four rows below, which counsel has not cleared**, and it happened while all
+nine still carried `quote_verbatim_confirmed: false` — every evidence quote was captured and
+never re-checked against its page. Recorded here because the batch doc is the place someone will
+look to find out what state this content is in, and "approved" now means "live", not "reviewed".
+
+Two consequences followed immediately, both traceable to the approval rather than to the load:
+
+- **`needs_lawyer_review` became public.** `public_corridor.py` emitted `citations_json` raw on an
+  endpoint that is unauthenticated and answers `Access-Control-Allow-Origin: *`, so the internal
+  counsel flag appeared in the live body on four requirements. Fixed by an allowlist — the public
+  `source` array now carries URLs and nothing else.
+- **The machine titles went live.** Real users are now served headings like
+  *"Ireland — dependant join family d visa required"*, because `entity_title` was derived as
+  `"Ireland — " + topic_key` with underscores spaced. A rewrite was prepared and **not applied**:
+  `executor.promote()` derives the row id as `uuid5(_SEED_NS, 'IRELAND|employment|<title>')`, so
+  changing a title means re-keying, and re-keying an *approved* row risks orphaning
+  `case_requirement_checklist_state` (TEXT, no FK) and breaking the `corridor_attestation_items`
+  FK (no `ON UPDATE CASCADE`). That window was open while the rows were pending and closed when
+  they were approved. Reopening it means withholding the rows first — a decision, not a cleanup.
+
+### ⚠ The content is origin-specific; the serving is not
+
+`requirement_items` is keyed on destination + nationality class only — there is no origin column.
+These rows say *"A **Venezuelan** national is visa-required"* and *"A **Spanish** residence card /
+TIE"* in their `fact_text`, and they are now served to **every** third-country national moving to
+Ireland, including someone relocating from Berlin.
+
+Not introduced by this batch: the approved row *"Bringing a pet from **Spain** to Ireland"* has
+exactly the same shape. It is a catalog-wide modelling gap and wants its own card.
+
 ## The four rows counsel must clear before any approval
 
 | `fact_uid` | Claim |
