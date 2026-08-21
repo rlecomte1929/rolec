@@ -47,12 +47,18 @@ log = logging.getLogger(__name__)
 #: ``roadmap_builder``'s own ("visa", "family", "settlement"), so injected steps land beside the
 #: generic ones instead of in a parallel structure the UI would have to learn.
 _TRACK_BY_STEP: Dict[str, str] = {
-    "JOB_OFFER_CONTRACT": "visa",
+    # Not immigration acts, and not in the visa lane. `timeline_service._CORRIDOR_STEP_PHASE`
+    # already classifies these two as `pre_departure` and `logistics` respectively, against
+    # `immigration` for the permit and visa steps — the same distinction, made by the same
+    # corridor data, one layer up. Routing them to "visa" put them in a track that
+    # `_visa_track_required` does not build for a free mover, so they were dropped from the
+    # plan while still counting toward its duration.
+    "JOB_OFFER_CONTRACT": "civil",
     "EMPLOYMENT_PERMIT_APPLICATION": "visa",
     "EMPLOYMENT_PERMIT_GRANTED": "visa",
     "D_VISA_APPLICATION": "visa",
     "D_VISA_GRANTED": "visa",
-    "TRAVEL_TO_IE": "visa",
+    "TRAVEL_TO_IE": "settlement",
     "IRP_REGISTRATION": "visa",
     "STAMP4_ELIGIBILITY": "visa",
     "FAMILY_REGISTRATION": "family",

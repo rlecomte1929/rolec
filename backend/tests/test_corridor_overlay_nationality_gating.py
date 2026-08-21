@@ -177,6 +177,42 @@ class FreeMoverIsNotServedTheThirdCountryTrack(unittest.TestCase):
                 self.assertIn("VISA_REQUIRED_NATIONAL", _advisory_ids(roadmap))
 
 
+class TheVisaLaneHoldsOnlyImmigrationSteps(unittest.TestCase):
+    """Root cause of the silent drop: two steps were filed as immigration and are not.
+
+    `timeline_service._CORRIDOR_STEP_PHASE` — the same corridor data, one layer up — already
+    classifies `JOB_OFFER_CONTRACT` as `pre_departure` and `TRAVEL_TO_IE` as `logistics`,
+    against `immigration` for the permit and visa steps. Routing them to the `visa` track put
+    them in a lane `_visa_track_required` does not build for a free mover, which is what made
+    them droppable in the first place.
+    """
+
+    def test_signing_a_contract_and_boarding_a_plane_are_not_visa_steps(self):
+        self.assertEqual("civil", overlay._TRACK_BY_STEP["JOB_OFFER_CONTRACT"])
+        self.assertEqual("settlement", overlay._TRACK_BY_STEP["TRAVEL_TO_IE"])
+
+    def test_the_visa_lane_is_exactly_the_immigration_gated_set(self):
+        """Anything in the visa lane must be a step a free mover does not take.
+
+        Keeps the two tables honest with each other: add a step to the visa lane without
+        gating it, and an EEA national silently acquires an immigration step.
+        """
+        visa_lane = {
+            sid for sid, track in overlay._TRACK_BY_STEP.items() if track == "visa"
+        }
+        self.assertEqual(
+            set(), visa_lane - set(overlay._IMMIGRATION_GATED),
+            "a step in the visa lane that is not immigration-gated would be served to a "
+            "free mover under a 'Visa & Permit' heading",
+        )
+
+    def test_a_free_mover_has_no_step_in_the_visa_lane_at_all(self):
+        ov = overlay.corridor_overlay(_case("Spain"))
+        self.assertEqual(
+            [], [s["step_id"] for s in ov["corridor_steps"] if s["track"] == "visa"]
+        )
+
+
 class NoComputedStepIsSilentlyDropped(unittest.TestCase):
     """Every step the overlay computes must reach a track, or the totals lie."""
 
