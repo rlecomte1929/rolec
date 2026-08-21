@@ -470,7 +470,12 @@ export interface SourceRecordDTO {
   url: string;
   title: string;
   publisherDomain: string;
-  retrievedAt: string;
+  /**
+   * Absent for a citation the backend holds as a bare URL or an inline object — only a
+   * `source_records` row records a retrieval time. Drives StalenessBadge, which renders
+   * nothing without it rather than claiming a freshness we cannot evidence.
+   */
+  retrievedAt?: string | null;
   snippet?: string;
 }
 

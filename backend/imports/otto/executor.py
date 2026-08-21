@@ -310,6 +310,15 @@ STATUS_READY = "ready"
 STATUS_PROMOTED = "promoted"
 EXPERT_VERIFIED = "expert_verified"
 
+#: Every verification_status that means "a human stood behind this row", so promote() must not
+#: overwrite it. `expert_verified` is the value the backend constants use; **`verified` is the
+#: value production actually stores** — 10 rows carry it and none carry `expert_verified`.
+#: Testing only the constant meant the guard below protected nothing that exists, and a
+#: re-promote would rewrite a human-raised row's description, severity and owner. The same
+#: split is documented client-side at `frontend/src/api/admin.ts:24-26` and asserted in
+#: `supabase/migrations/20261112000000_cite_served_requirement_items.sql:126`.
+HUMAN_VERIFIED = (EXPERT_VERIFIED, "verified")
+
 _PROMOTABLE = text(
     """
     SELECT e.destination_country, e.topic_key, e.title, e.domain_area,
@@ -400,9 +409,10 @@ def promote(session: Any, *, country: Optional[str] = None, dry_run: bool = True
             .filter(RequirementItem.title == draft.title)
             .first()
         )
-        if existing is not None and existing.verification_status == EXPERT_VERIFIED:
+        if existing is not None and existing.verification_status in HUMAN_VERIFIED:
             result.skipped_verified.append(
-                f"{draft.country_code}/{draft.purpose}/{draft.title} is expert_verified"
+                f"{draft.country_code}/{draft.purpose}/{draft.title} "
+                f"is {existing.verification_status}"
             )
             continue
 

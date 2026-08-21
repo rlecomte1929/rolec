@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit
 
 from .. import crud
 from ..db import SessionLocal
@@ -342,11 +343,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             # PROVIDED / NEEDS_REVIEW ladder doesn't apply — running it through
             # _status_for_case would mark a positive confirmation NEEDS_REVIEW.
             status = "CONFIRMED" if outcome_type == "nothing_to_do" else _status_for_case(required, draft)
-            citations = [
-                _source_dto(source_map[cid])
-                for cid in item.get("citations", [])
-                if cid in source_map
-            ]
+            citations = _citation_dtos(item.get("citations", []), source_map)
             requirement_dtos.append(
                 RequirementItemDTO(
                     id=item.get("id") or item.get("title"),
@@ -421,4 +418,62 @@ def _source_dto(record: Any) -> SourceRecordDTO:
         publisherDomain=record.publisher_domain,
         retrievedAt=record.retrieved_at,
         snippet=record.snippet,
+    )
+
+
+def _citation_dtos(citations: Any, source_map: Dict[str, Any]) -> List[SourceRecordDTO]:
+    """Resolve a row's `citations_json` into DTOs, across the three shapes prod holds.
+
+    `citations_json` is not one format, and treating it as one silently cost real citations:
+
+    - **`source_records` id** — the original design, resolvable through `source_map`.
+    - **bare URL string** — what `otto.executor.promote()` writes (`mappings.py`, a plain
+      `json.dumps([source_url, ...])`).
+    - **inline object** — what the corridor generators write
+      (`scripts/gen_ie_es_corridor_load.py`), carrying `url`/`name` and, for a flagged claim,
+      `needs_lawyer_review`.
+
+    This used to be `[_source_dto(source_map[cid]) for cid in citations if cid in source_map]`,
+    which had two failure modes. A bare URL is not a key in `source_map`, so it was **dropped**
+    — the requirement served with an empty citation list while
+    `check_requirement_provenance.py` still passed, because that guard only asserts
+    `citations_json IS NOT NULL`. And a dict is unhashable, so `cid in source_map` raised
+    `TypeError: unhashable type: 'dict'` — the 25 IE→ES rows carrying inline objects have
+    simply never been served (all `review_status='pending'`), so the crash stayed latent.
+
+    Anything unrecognised is skipped rather than guessed at. `retrievedAt` is left None for
+    everything but a real `source_records` row — see the note on `SourceRecordDTO`.
+    """
+    resolved: List[SourceRecordDTO] = []
+    for citation in citations or []:
+        if isinstance(citation, str):
+            if citation in source_map:
+                resolved.append(_source_dto(source_map[citation]))
+                continue
+            url = citation.strip()
+            if not url.lower().startswith(("http://", "https://")):
+                # Neither a known id nor a URL — an unresolvable reference, not a source.
+                continue
+            resolved.append(_inline_source_dto(url, None))
+        elif isinstance(citation, dict):
+            url = str(citation.get("url") or "").strip()
+            if not url:
+                continue
+            resolved.append(_inline_source_dto(url, citation.get("name")))
+    return resolved
+
+
+def _inline_source_dto(url: str, name: Optional[str]) -> SourceRecordDTO:
+    """A citation we hold as a URL rather than a retrieved `source_records` row.
+
+    `id` is the URL itself: it is stable, and the client uses it as a list key. No
+    `retrievedAt` — nobody retrieved it.
+    """
+    domain = urlsplit(url).hostname or ""
+    return SourceRecordDTO(
+        id=url,
+        url=url,
+        title=(str(name).strip() if name else "") or domain or url,
+        publisherDomain=domain,
+        retrievedAt=None,
     )

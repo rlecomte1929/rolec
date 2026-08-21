@@ -125,6 +125,48 @@ def compose_description(facts: Sequence[Any]) -> str:
     return "\n".join(f.fact_text.strip() for f in ordered if (f.fact_text or "").strip())
 
 
+def _citations_for(facts: Sequence[Any], topic: str) -> List[Dict[str, Any]]:
+    """One citation object per distinct source URL.
+
+    This used to be `_distinct([f.source_url for f in facts])` — a flat list of bare URL
+    strings. Two things were wrong with that. The reader resolves citations against
+    `source_records` and a bare URL matches nothing there, so a promoted requirement served
+    with an EMPTY citation list while the provenance guard still passed (it only asserts
+    `citations_json IS NOT NULL`). And `needs_lawyer_review` had nowhere to go, so the four
+    counsel-flagged VE→IE claims arrived in `requirement_items` indistinguishable from the
+    checked ones — at exactly the point a reviewer decides whether to approve.
+
+    The object shape follows `scripts/gen_ie_es_corridor_load.py`, which already reached this
+    conclusion for the IE→ES batch. `requirements_builder._citation_dtos` understands all
+    three formats prod holds; see its docstring.
+
+    A URL cited by several facts yields ONE citation, flagged if ANY of those facts is
+    flagged — dropping the flag because a second, unflagged fact shares the source would
+    lose it silently.
+    """
+    ordered: List[Dict[str, Any]] = []
+    by_url: Dict[str, Dict[str, Any]] = {}
+    for fact in facts:
+        url = (fact.source_url or "").strip()
+        if not url:
+            continue
+        meta = fact.applies_to or {}
+        citation = by_url.get(url)
+        if citation is None:
+            citation = {"url": url, "topic_key": topic}
+            name = str(meta.get("source_name") or "").strip()
+            if name:
+                citation["name"] = name
+            corridor = str(meta.get("corridor") or "").strip()
+            if corridor:
+                citation["corridor"] = corridor
+            by_url[url] = citation
+            ordered.append(citation)
+        if meta.get("needs_lawyer_review"):
+            citation["needs_lawyer_review"] = True
+    return ordered
+
+
 def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapped]:
     """Build one requirement payload from an entity and its facts, or explain the refusal.
 
@@ -206,7 +248,16 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
             reason += f" ({unquoted} with no evidence_quote)"
         derivations.append(f"verification_status=representative: {reason}")
 
-    citations = _distinct([f.source_url for f in facts])
+    citations = _citations_for(facts, topic)
+
+    # `non_obvious` is the batch's whole point — the divergence between what the official
+    # page says and what actually happens — and it drives the client's badge. It rides in
+    # `applies_to` because `immigration_fact_candidates` has no column for it. Any
+    # contributing fact being non-obvious makes the merged requirement non-obvious: the
+    # facts are composed into one description a reader cannot unpick.
+    non_obvious = any(bool((f.applies_to or {}).get("non_obvious")) for f in facts)
+    if non_obvious:
+        derivations.append("non_obvious=True from a contributing fact's applies_to")
 
     return RequirementDraft(
         topic_key=topic,
@@ -225,8 +276,9 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
             "severity": DEFAULT_SEVERITY,
             "owner": DEFAULT_OWNER,
             "required_fields_json": "[]",
-            "citations_json": json.dumps(citations),
+            "citations_json": json.dumps(citations, ensure_ascii=False),
             "applies_to_nationality_classes_json": json.dumps(classes),
             "verification_status": verification_status,
+            "non_obvious": non_obvious,
         },
     )
