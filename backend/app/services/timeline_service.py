@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 # ── S5 wiring: workstream_id → (milestone_types, timing, criticality) ────────
 # Maps WorkstreamRequirement.workstream_id from FamilyPropagator to the
@@ -398,6 +398,65 @@ _CORRIDOR_SUPERSEDED_GENERIC = frozenset({
 })
 
 
+
+#: Pathways whose step_graph order is NOT chronological, so position cannot place a step.
+#: RETURNING_EEA_CITIZEN_2026 (NO_FR) lists `A0_DEPART_NO` first and then 29 steps, but
+#: several of those are Norwegian EXIT tasks that must happen BEFORE departure —
+#: "Preserve BankID before deregistration disables it" is the clearest. Deriving from
+#: position would tell a leaver to do it after they have landed in France, which is worse
+#: than saying nothing. It gets the generic scaffold until someone authors its phases.
+_PATHWAYS_NOT_PHASEABLE_BY_POSITION = frozenset({"RETURNING_EEA_CITIZEN_2026"})
+
+
+def _phases_from_arrival_anchor(
+    steps: Sequence[Dict[str, Any]],
+) -> Dict[str, str]:
+    """Place every step by POSITION relative to the pathway's arrival anchor.
+
+    Each pathway marks exactly one step ``arrival_anchor``. Measured across all 11: it sits
+    mid-sequence in ES_IE and IN_DE (the permit routes, where paperwork precedes travel) and
+    is the FIRST step in the other nine, which are register-on-arrival free-movement routes.
+    Both shapes place correctly by position — everything after travel is post-arrival. That removes the need to know 82 step ids by name across
+    the ten non-ES_IE corridors (NO_FR alone declares 30), which is why nine of them served
+    the generic scaffold despite having an authored journey.
+
+    Returns ``{}`` when no anchor is present, which the caller treats as "do not render
+    this pathway at all".
+
+    Coarser than the explicit map on purpose: there is no generic signal for "this step is
+    immigration". ``conditional_on`` is not one — CSEP's EMPLOYMENT_PERMIT_APPLICATION and
+    BLUECARD's VISA_APPLICATION both declare none — and the overlay's _IMMIGRATION_GATED is
+    a hardcoded CSEP set. A corridor earns the finer split by being added to
+    _CORRIDOR_STEP_PHASE, deliberately, when someone has reviewed its journey.
+    """
+    pathway = ""
+    if steps:
+        pathway = str(((steps[0].get("provenance") or {}).get("pathway")) or "")
+    if pathway in _PATHWAYS_NOT_PHASEABLE_BY_POSITION:
+        return {}
+
+    anchor_at: Optional[int] = None
+    for i, st in enumerate(steps):
+        if st.get("arrival_anchor"):
+            anchor_at = i
+            break
+    if anchor_at is None:
+        return {}
+
+    out: Dict[str, str] = {}
+    for i, st in enumerate(steps):
+        sid = str(st.get("step_id") or "").strip()
+        if not sid:
+            continue
+        if i < anchor_at:
+            out[sid] = "pre_departure"
+        elif i == anchor_at:
+            out[sid] = "logistics"
+        else:
+            out[sid] = "post_arrival"
+    return out
+
+
 def _corridor_milestones(
     case_draft: Optional[Dict[str, Any]],
 ) -> Tuple[List[Dict[str, Any]], frozenset]:
@@ -421,17 +480,11 @@ def _corridor_milestones(
     if not steps:
         return [], frozenset()
 
-    # Every step must have a known phase, or we use none of them.
-    #
-    # 11 of the 12 corridors ship an authored pathway, and their step vocabularies differ —
-    # IN_DE's BLUECARD_2026 and FR_NO's EEA_FREEDOM_2026 share almost no step ids with
-    # CSEP_2026. Defaulting an unrecognised step to pre_departure looked harmless and was
-    # not: measured here, it put 13 of IN_DE's 14 steps in one block, which is a worse plan
-    # than the generic scaffold it replaced. So an unmapped pathway falls back entirely
-    # rather than rendering a jumbled one. Adding a corridor is then a deliberate act:
-    # extend _CORRIDOR_STEP_PHASE with its steps and it starts serving.
-    step_ids = [str(st.get("step_id") or "").strip() for st in steps]
-    if not all(sid in _CORRIDOR_STEP_PHASE for sid in step_ids if sid):
+    derived = _phases_from_arrival_anchor(steps)
+    if not derived:
+        # No pivot to place steps against. Rendering them anyway is how 13 of IN_DE's 14
+        # steps once landed in a single pre_departure block — worse than the generic
+        # scaffold it replaced. Fall back wholesale instead.
         return [], frozenset()
 
     rows: List[Dict[str, Any]] = []
@@ -439,7 +492,9 @@ def _corridor_milestones(
         sid = str(step.get("step_id") or "").strip()
         if not sid:
             continue
-        phase = _CORRIDOR_STEP_PHASE[sid]
+        # The explicit map wins where it has an opinion: it is the only thing that puts a
+        # step in the `immigration` phase, which is the distinction AIQ-1867 asked for.
+        phase = _CORRIDOR_STEP_PHASE.get(sid) or derived[sid]
         # {phase}_corridor_{NN} — parsed by relocation_plan_service so the step lands in its
         # real phase block. Deliberately not the {phase}_ai_{NN} form: this is curated data.
         rows.append(
@@ -466,9 +521,22 @@ def _corridor_milestones(
     # immigration step is gated off) must NOT strip the generic visa track — that would
     # silently delete the only immigration guidance a mover has, which is the one failure
     # mode worse than showing generic copy.
-    supersedes: frozenset = frozenset()
-    if any(r["milestone_type"].startswith("immigration_corridor_") for r in rows):
-        supersedes = _CORRIDOR_SUPERSEDED_GENERIC
+    # Supersede when the corridor describes pre-departure work of its own — that is the
+    # same ground "Prepare visa / work permit application pack" gestures at, and showing
+    # both is worse than showing only the generic one because the employee cannot tell
+    # which is real. Measured: without this, IN_DE rendered its "D-visa application at the
+    # German mission in Bangalore" alongside the generic pack.
+    #
+    # Keyed on POSITION (anything before the arrival anchor), not on the `immigration`
+    # phase, because only the explicit map ever produces that phase — the derived rule is
+    # coarser, so an `immigration`-only trigger fires for ES_IE alone.
+    #
+    # A free-movement corridor contributes nothing before travel, so it never strips the
+    # visa track. That is deliberate: a third-country national routed onto an EEA pathway
+    # keeps the generic guidance, because the pathway does not describe their route.
+    pre_anchor = [r for r in rows
+                  if r["milestone_type"].split("_corridor_")[0] in ("immigration", "pre_departure")]
+    supersedes: frozenset = _CORRIDOR_SUPERSEDED_GENERIC if pre_anchor else frozenset()
     return rows, supersedes
 
 

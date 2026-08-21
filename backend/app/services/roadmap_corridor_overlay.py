@@ -200,6 +200,11 @@ def corridor_overlay(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 "expected_duration_days": int(step.expected_duration_days or 0),
                 "prerequisite_step_ids": list(step.prerequisite_step_ids or ()),
                 "blocking": sid in _BLOCKING,
+                # The pathway's own pivot between "before the move" and "after landing".
+                # Exactly one step per corridor carries it (the TRAVEL_* step), which lets a
+                # consumer place every step by POSITION instead of knowing its name — see
+                # timeline_service._corridor_milestones.
+                "arrival_anchor": bool(getattr(step, "arrival_anchor", False)),
                 "provenance": provenance,
             })
 
