@@ -240,6 +240,41 @@ def test_admitting_the_irish_bodies_did_not_admit_the_whole_ie_tld(tmp_path):
 @pytest.mark.parametrize(
     "url",
     [
+        "https://www2.hse.ie/services/schemes-allowances/medical-cards/",
+        "https://www.rtb.ie/registration-and-compliance/tenancy-registration",
+        "https://www.ndls.ie/exchange-a-foreign-driving-licence.html",
+        "https://www.rsa.ie/services/licensed-drivers/exchange-your-licence",
+        "https://www.gov.ie/en/service/12e6c-get-a-personal-public-service-ppsn-number/",
+        "https://services.mywelfare.ie/en/topics/identity/ppsn/",
+        "https://www.welfare.ie/en/Pages/PPSN.aspx",
+    ],
+)
+def test_the_bodies_an_eu_free_mover_deals_with_are_official(url):
+    """The non-EEA track is allowlisted; the free-mover track was not, and that is AIQ-1994.
+
+    `irishimmigration.ie` above covers registration and the IRP — none of which an EU/EEA
+    national ever touches. What a free mover actually needs is a PPSN, health entitlement, a
+    tenancy and a driving licence, and every one of those is published by a body outside
+    `gov.ie`. Unlisted, the suffix rule scored them UNOFFICIAL and `stage()` rejects rather
+    than downgrades, so an Ireland deliverable would lose those topics entirely while
+    reporting success on whatever survived — exactly the Spain failure recorded below.
+    """
+    assert classify_source(url) == OFFICIAL
+
+
+def test_admitting_the_free_mover_bodies_did_not_admit_their_lookalikes(tmp_path):
+    """Named hosts, not substrings: `_matches` requires the host or a dotted subdomain."""
+    assert classify_source("https://nothse.ie/medical-cards") == UNOFFICIAL
+    assert classify_source("https://myrtb.ie/tenancy") == UNOFFICIAL
+    assert classify_source("https://ndls-guide.ie/exchange") == UNOFFICIAL
+    # `mywelfare.ie` does not end in `.welfare.ie`, so both are listed separately and
+    # neither one admits the other's lookalikes.
+    assert classify_source("https://fakewelfare.ie/ppsn") == UNOFFICIAL
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
         "https://skat.dk/en-us/businesses/employees-and-pay/non-danish-labour/",
         "https://www.bzst.de/EN/Private_individuals/Tax_identification_number/",
         "https://service.berlin.de/dienstleistung/120686/",
