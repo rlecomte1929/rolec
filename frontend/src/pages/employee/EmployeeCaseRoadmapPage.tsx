@@ -19,6 +19,7 @@ import { RoadmapPaywallGate } from '../../features/employee-journey/RoadmapPaywa
 import { fetchRoadmapUnlocked } from '../../utils/paymentStatus';
 import { isRoadmapPaywallEnabled } from '../../featureFlags';
 import { RuleUpdateBanner } from '../../features/platform-v2/roadmap/RuleUpdateBanner';
+import { CorridorAdvisories } from '../../features/platform-v2/roadmap/CorridorAdvisories';
 import { useEmployeeRelocationPlanPageData } from '../../features/relocation-plan-employee/useEmployeeRelocationPlanPageData';
 import { useRelocationPlanCtaHandler } from '../../features/relocation-plan-employee/relocationPlanCtaNavigate';
 import {
@@ -28,7 +29,7 @@ import {
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { validateRoadmap } from '../../api/cases';
 import { emitTestDriveStage } from '../../api/testDrive';
-import { getCaseRoadmapV2 } from '../../api/roadmapV2';
+import { getCaseRoadmapV2, type RoadmapV2Advisory } from '../../api/roadmapV2';
 import { buildConfidenceByTitle } from '../../features/relocation-plan-employee/roadmap-template/roadmapTemplateHelpers';
 import type { ConfidenceByTitle } from '../../features/relocation-plan-employee/roadmap-template/RoadmapTemplate';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
@@ -134,12 +135,18 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   // from the parallel /roadmap/tracks projection (the form-backed path that carries
   // source_pages-derived confidence). Best-effort: failures leave tasks badge-less.
   const [confidenceByTitle, setConfidenceByTitle] = useState<ConfidenceByTitle>({});
+  // [AIQ-1867 follow-up] The same response carries the corridor's advisories — the
+  // non-obvious traps this route exists to warn about. Read from the fetch that is already
+  // happening rather than adding a second one.
+  const [advisories, setAdvisories] = useState<RoadmapV2Advisory[]>([]);
   useEffect(() => {
     if (!caseId) return;
     let cancelled = false;
     getCaseRoadmapV2(caseId)
       .then((res) => {
-        if (!cancelled) setConfidenceByTitle(buildConfidenceByTitle(res));
+        if (cancelled) return;
+        setConfidenceByTitle(buildConfidenceByTitle(res));
+        setAdvisories(res.advisories ?? []);
       })
       .catch(() => undefined);
     return () => {
@@ -391,6 +398,9 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
           <h1 className="text-2xl font-semibold text-slate-900 mb-4">My roadmap</h1>
           {/* [AIQ-693] P2-02e — surface approved rule-update notifications for this case. */}
           <RuleUpdateBanner caseId={caseId ?? ''} />
+          {/* [AIQ-1867 follow-up] The corridor's non-obvious traps. Renders nothing when
+              the case has no corridor pathway, or for a resolved free mover. */}
+          <CorridorAdvisories advisories={advisories} />
           <RoadmapTemplate
             data={data}
             header={header}
