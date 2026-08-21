@@ -31,7 +31,8 @@ floors, PPSN, IRP registration, the Schengen-travel caveat, pets and rentals —
 6. `csep_immediate_family_reunification` — CSEP = immediate family reunification (GEP = 12-month wait) *(non-obvious, lawyer-review)*
 7. `spouse_stamp_1g_right_to_work` — CSEP spouse gets Stamp 1G → works with no separate permit *(non-obvious, lawyer-review)*
 8. `dependant_join_family_d_visa_required` — visa-required dependants need an Irish 'D' Join Family visa before travel *(non-obvious, lawyer-review)*
-9. `csep_no_labour_market_needs_test_thresholds` — no LMNT; €40,904 / €36,848 / €68,911 thresholds; Stamp 4 after 2 years
+9. `csep_no_labour_market_needs_test_thresholds` — no LMNT; €40,904 / €36,848 / €68,911 thresholds; the holder can then apply directly for a Stamp 4
+   <br>*(corrected 2026-08-21: this line read "Stamp 4 after 2 years". The artifact's `fact_text` says only "After the permit, the holder can apply directly for a Stamp 4" — no interval appears anywhere in the delivered data, so the two years were invented by this summary. The fact itself was never wrong.)*
 
 ## Sources (all official publishers)
 

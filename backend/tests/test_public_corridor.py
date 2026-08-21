@@ -273,3 +273,68 @@ def test_a_universal_requirement_survives_every_track(monkeypatch):
             "/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA" + query
         )
         assert "Tax deduction card (skattekort) before first salary" in _labels(resp)
+
+
+# ---------------------------------------------------------------------------
+# `source` allowlist
+#
+# This endpoint is unauthenticated and answers `Access-Control-Allow-Origin: *`. It used to emit
+# `citations_json` RAW, and that field holds three shapes — two of which carry internal material:
+# the inline objects written by the corridor generators and `otto.mappings._citations_for` carry
+# `needs_lawyer_review` and, on the IE→ES rows, a `review_reason` naming the claim we do not
+# trust; bare `source_records` ids are internal identifiers meaning nothing to an anonymous
+# caller.
+#
+# Latent only while every object-shaped row sat at `review_status='pending'`. On 2026-08-21
+# 12:02 UTC the nine VE→IE rows were approved and `needs_lawyer_review: true` began appearing in
+# the live public body — confirmed against api.relopass.com before this fix.
+#
+# Allowlist, not denylist: `topic_key` and `corridor` were already being published, and a
+# denylist fails open the next time a generator adds a key.
+# ---------------------------------------------------------------------------
+
+_public_sources = public_corridor._public_sources
+
+
+def test_the_counsel_flag_never_reaches_an_anonymous_caller():
+    got = _public_sources([{
+        "url": "https://www.citizensinformation.ie/en/x/",
+        "name": "Citizens Information",
+        "topic_key": "spouse_stamp_1g_right_to_work",
+        "corridor": "ES->IE",
+        "needs_lawyer_review": True,
+    }])
+    assert got == ["https://www.citizensinformation.ie/en/x/"]
+
+
+def test_a_review_reason_is_not_published():
+    got = _public_sources([{
+        "url": "https://sede.agenciatributaria.gob.es/x",
+        "needs_lawyer_review": True,
+        "review_reason": "sourced to the AEAT residency page, not the treaty text",
+    }])
+    assert "review_reason" not in json.dumps(got)
+    assert "AEAT residency page" not in json.dumps(got)
+
+
+def test_an_internal_source_record_id_is_dropped():
+    assert _public_sources(["1f0e8a2c-0000-4000-8000-000000000001"]) == []
+
+
+def test_a_bare_url_string_still_publishes():
+    url = "https://enterprise.gov.ie/permits/"
+    assert _public_sources([url]) == [url]
+
+
+def test_non_web_schemes_are_refused():
+    assert _public_sources([{"url": "javascript:alert(1)"}]) == []
+
+
+def test_one_url_cited_by_several_facts_appears_once():
+    url = "https://www.irishimmigration.ie/x/"
+    assert _public_sources([{"url": url}, url, {"url": url}]) == [url]
+
+
+def test_no_citations_is_an_empty_list():
+    assert _public_sources(None) == []
+    assert _public_sources([]) == []

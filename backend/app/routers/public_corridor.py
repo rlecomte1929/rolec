@@ -75,6 +75,47 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", (text or "").strip().lower()).strip("_") or "requirement"
 
 
+def _public_sources(citations: Any) -> List[str]:
+    """The citation URLs, and nothing else, for an anonymous caller.
+
+    This endpoint is unauthenticated and answers with `Access-Control-Allow-Origin: *`, and it
+    used to emit `citations_json` RAW. That field is not a list of URLs — it holds three shapes,
+    and two of them carry things an anonymous caller has no business receiving:
+
+    - inline objects from the corridor generators and `otto.mappings._citations_for`, carrying
+      `needs_lawyer_review` and, on the IE→ES rows, a `review_reason` naming exactly which claim
+      we do not trust and why;
+    - bare `source_records` ids, which are internal identifiers and resolve to nothing publicly.
+
+    Both were unreachable only while every object-shaped row sat at `review_status='pending'`.
+    That stopped being true on 2026-08-21 12:02 UTC, when the nine VE→IE rows were approved and
+    `needs_lawyer_review: true` began appearing in the live public payload.
+
+    ALLOWLIST, not denylist. Stripping the two keys we happen to know about fails open the next
+    time a generator adds a third — and `topic_key`/`corridor` were already being published. A
+    citation is a URL to the public; anything that is not one is dropped rather than guessed at.
+
+    The wire type stays `List[str]`: approved string-shaped rows have always emitted a list of
+    strings, and Audos reads this seam. `http`/`https` only, deduped, order preserved.
+    """
+    out: List[str] = []
+    seen = set()
+    for citation in citations or []:
+        if isinstance(citation, dict):
+            url = str(citation.get("url") or "").strip()
+        elif isinstance(citation, str):
+            url = citation.strip()
+        else:
+            continue
+        if not url.lower().startswith(("http://", "https://")):
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        out.append(url)
+    return out
+
+
 def _base_items(requirements: List[Any]) -> List[Dict[str, Any]]:
     """Project ORM RequirementItem rows → the dict shape apply_rules expects.
 
@@ -178,7 +219,7 @@ def corridor_requirements(
             "timing": item.get("timing"),
             "non_obvious": item.get("non_obvious"),
             "category": item.get("pillar"),
-            "source": item.get("citations") or [],
+            "source": _public_sources(item.get("citations")),
         }
         for item in expanded
     ]
