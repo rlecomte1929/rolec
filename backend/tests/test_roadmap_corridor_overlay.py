@@ -164,14 +164,57 @@ def test_every_corridor_step_carries_its_citation_and_representative_status():
 
 # ── the timeline she would actually plan around ──────────────────────────────────────
 
-def test_the_pre_arrival_critical_path_replaces_the_destination_guess():
-    """Generic estimate for IE was '8-14 weeks'. The authored path to arrival is 104 days."""
+def test_the_authored_critical_path_replaces_the_destination_guess():
+    """Generic estimate for IE was '8-14 weeks'. The authored graph beats a country guess.
+
+    `totals.time` used to carry ``pre_arrival_days`` — the runway up to the plane, not the
+    journey. Nothing labels it that way: the plan email renders it under a bare "Overview:"
+    beside cost, so a mover reads it as how long their relocation takes. On a free-movement
+    corridor, where by definition nothing must happen before travel, that shipped
+    ``totals.time = "1 days"`` on FR→NO (255 production cases) next to a 21-day step.
+
+    It is now the critical path through the whole retained graph. Both numbers remain
+    available; only the one that was mislabelled changed.
+    """
     ov = overlay.corridor_overlay(_case("Venezuela"))
+    # Unchanged, and still the figure corridors/ES_IE/corridor.yaml derives its
+    # at_risk_window_days from.
     assert ov["pre_arrival_days"] == 104
+    # The whole journey: 104 to arrival, then IRP (21) and family registration (21).
+    assert ov["total_days"] == 146
 
     roadmap = derive_roadmap(_case("Venezuela"))
-    assert "15" in roadmap["totals"]["time"] or "14" in roadmap["totals"]["time"]
+    assert roadmap["totals"]["time"] == "~21 weeks"
     assert roadmap["totals"]["time"] != "8–14 weeks"
+
+
+def test_the_headline_duration_is_never_shorter_than_a_step_inside_it():
+    """The arithmetic invariant the '1 days' regression violated.
+
+    Asserts nothing about immigration law, so it cannot rot when the law moves — it only
+    says a plan may not claim to be shorter than one of its own steps.
+    """
+    for nationality in ("Venezuela", "Spain"):
+        ov = overlay.corridor_overlay(_case(nationality))
+        longest = max(s["expected_duration_days"] for s in ov["corridor_steps"])
+        assert ov["total_days"] >= longest
+
+
+def test_pre_arrival_never_exceeds_the_whole_journey():
+    """A critical path to arrival cannot be longer than the critical path through everything.
+
+    The hand-rolled accumulator this replaced summed durations in YAML declaration order,
+    double-counting parallel branches: NO_FR reported 349 pre-arrival days against a 79-day
+    journey.
+    """
+    for nationality, origin, dest in (
+        ("Venezuela", "ES", "IE"), ("Spain", "ES", "IE"),
+        ("France", "FR", "NO"), ("Norway", "NO", "FR"),
+    ):
+        ov = overlay.corridor_overlay(_case(nationality, origin=origin, dest=dest))
+        if ov is None:
+            continue
+        assert ov["pre_arrival_days"] <= ov["total_days"], f"{origin}_{dest}/{nationality}"
 
 
 def test_an_unresolvable_nationality_keeps_the_visa_steps():

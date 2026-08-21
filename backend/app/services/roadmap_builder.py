@@ -504,8 +504,16 @@ def _apply_corridor_overlay(
 
     by_id = {t["id"]: t for t in tracks}
     for step in overlay["corridor_steps"]:
-        track = by_id.get(step["track"])
-        if track is None:
+        # A corridor step whose intended track does not exist must still be rendered.
+        # `_TRACK_BY_STEP` routes JOB_OFFER_CONTRACT and TRAVEL_TO_IE to "visa", and
+        # `_visa_track_required` builds no visa track for a free mover — so those two were
+        # dropped here by a bare `continue`, while `corridor_overlay` had already counted
+        # them into the journey. Signing a contract and boarding a plane are not immigration
+        # acts; they happen whatever the passport says. Settlement is built unconditionally,
+        # so it is the safe home. Dropping a computed step is never right: it makes the
+        # roadmap disagree with its own totals, silently.
+        track = by_id.get(step["track"]) or by_id.get("settlement")
+        if track is None:  # pragma: no cover — settlement is always built
             continue
         existing = track.setdefault("steps", [])
         days = step["expected_duration_days"]

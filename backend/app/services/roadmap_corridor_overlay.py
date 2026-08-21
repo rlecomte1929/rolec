@@ -31,9 +31,12 @@ worded conditionally and points at the register that really holds the answer. Sa
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
 from ...relopass.corridors import load_corridor
+from ...relopass.corridors.feasibility import required_lead_time_days
+from ...relopass.corridors.scheduler import schedule_steps
 from . import corridor_registry
 from .nationality_class import EU_EEA, OWN_NATIONAL, classify
 from .wizard_draft_mapper import extract_profile_from_wizard_draft
@@ -61,10 +64,17 @@ _TRACK_BY_STEP: Dict[str, str] = {
 
 #: Steps that exist only because the mover is a third-country national. An EEA national on this
 #: corridor needs no permit, no entry visa and no immigration registration.
+#:
+#: `FAMILY_REGISTRATION` is here as well as in `_FAMILY_GATED`, and needs both: it is
+#: conditioned on the household relocating AND on the third-country path. Its authored title
+#: names Stamp 1G, which is a Critical Skills *dependant* permission — an EEA family member
+#: neither receives nor needs it, and serving them the step states an entitlement they do not
+#: have. Gating on family alone shipped exactly that.
 _IMMIGRATION_GATED = frozenset({
     "EMPLOYMENT_PERMIT_APPLICATION", "EMPLOYMENT_PERMIT_GRANTED",
     "D_VISA_APPLICATION", "D_VISA_GRANTED",
     "IRP_REGISTRATION", "STAMP4_ELIGIBILITY",
+    "FAMILY_REGISTRATION",
 })
 
 #: Steps that must be complete before travel. `D_VISA_GRANTED` is the one the corridor file is
@@ -85,6 +95,21 @@ _SUPERSEDES: Dict[str, Tuple[str, ...]] = {
     "FAMILY_REGISTRATION": ("spouse-permit",),
     "PPSN": ("tax",),
 }
+
+#: Exception cases that presuppose the third-country path, and must therefore be withheld from
+#: a mover the classifier positively resolves as a free mover — the same rule the step graph
+#: already follows, applied to the advisories, which were previously emitted unconditionally.
+#:
+#: This is a *resolved* answer, not a suppressed one. "Is this nationality visa-required for
+#: Ireland?" is an EXTERNAL_LOOKUP we do not hold — but for an EU/EEA or Irish national the
+#: answer is no as a matter of free movement, not as a matter of the missing table. Withholding
+#: is honest here in a way it would not be for an unclassified nationality, which still fails
+#: open and still receives every advisory.
+_THIRD_COUNTRY_ONLY_ADVISORIES = frozenset({
+    "VISA_REQUIRED_NATIONAL",
+    "SPANISH_LTR_DOES_NOT_TRANSFER",
+    "FAMILY_REUNIFICATION_CSEP",
+})
 
 #: Exception cases whose condition depends on an input we cannot resolve. Surfaced, never
 #: asserted — see the module docstring.
@@ -127,6 +152,26 @@ def _resolve_pathway(origin: Optional[str], destination: Optional[str]) -> Optio
     if path is None:
         return None
     return load_corridor(path), corridor_id, pathways[0].id
+
+
+def _critical_path_days(steps: List[Any]) -> int:
+    """Longest path through the retained step graph, in days.
+
+    Delegates to ``scheduler.schedule_steps`` — the same forward topological projection the
+    HR feasibility widget and the ``rce.deadlines`` writer already use — rather than adding a
+    second, subtly different notion of how long a corridor takes. Steps that run in parallel
+    are not double-counted, which is why this is a critical path and not a sum.
+
+    The base date is arbitrary and never leaves this function: we return an interval, so the
+    result is independent of the clock and the caller stays deterministic.
+    """
+    if not steps:
+        return 0
+    base = date(2000, 1, 1)
+    completions = schedule_steps(steps, base)
+    if not completions:
+        return 0
+    return (max(completions.values()) - base).days
 
 
 def _humanise_days(days: int) -> str:
@@ -177,8 +222,7 @@ def corridor_overlay(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         }
 
         steps: List[Dict[str, Any]] = []
-        pre_arrival_days = 0
-        seen_travel = False
+        retained: List[Any] = []
 
         for step in agent.step_graph:
             sid = step.step_id
@@ -186,11 +230,7 @@ def corridor_overlay(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 continue
             if sid in _FAMILY_GATED and not has_family:
                 continue
-
-            if not seen_travel:
-                pre_arrival_days += int(step.expected_duration_days or 0)
-                if sid.startswith("TRAVEL_"):
-                    seen_travel = True
+            retained.append(step)
 
             steps.append({
                 "step_id": sid,
@@ -210,6 +250,8 @@ def corridor_overlay(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
         advisories: List[Dict[str, Any]] = []
         for case_ in agent.exception_cases:
+            if case_.id in _THIRD_COUNTRY_ONLY_ADVISORIES and not is_third_country:
+                continue
             text = _UNRESOLVABLE_CONDITIONS.get(case_.id)
             if text is not None:
                 # Input we do not hold: surface it, worded as a condition she can check.
@@ -238,9 +280,20 @@ def corridor_overlay(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             "corridor_steps": steps,
             "superseded_generic_keys": superseded,
             "advisories": advisories,
-            "pre_arrival_days": pre_arrival_days,
+            # Critical path to the arrival anchor, via the function the HR feasibility widget
+            # already uses. This replaced a hand-rolled accumulator that summed durations in
+            # YAML declaration order and so double-counted parallel branches: on NO_FR it
+            # reported 349 pre-arrival days against a 79-day whole journey, which a critical
+            # path cannot do. ES_IE is a straight chain, so its 104 is unchanged.
+            "pre_arrival_days": required_lead_time_days(retained),
+            "total_days": _critical_path_days(retained),
             "provenance": provenance,
-            "time_estimate": _humanise_days(pre_arrival_days),
+            # The WHOLE journey, not the pre-arrival runway. `pre_arrival_days` used to fill
+            # this, which read to a mover as "how long my relocation takes" while measuring
+            # only the part before the plane. On a free-movement corridor where nothing must
+            # happen before travel that produced `totals.time = "1 days"` beside a 21-day
+            # step — measured on FR→NO, which carries 255 production cases.
+            "time_estimate": _humanise_days(_critical_path_days(retained)),
         }
     except Exception:  # noqa: BLE001 — never break the employee roadmap
         log.warning("corridor_overlay failed; roadmap falls back to generic", exc_info=True)
