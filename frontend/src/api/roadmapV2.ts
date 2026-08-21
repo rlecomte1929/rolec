@@ -28,6 +28,11 @@ export interface RoadmapV2Step {
   // [AIQ-869] Short effort label ('~15 min' | '~1 hour' | 'Half a day'); null
   // once the step is done. Rendered by the AvailableNowWidget effort Pill.
   estimated_effort?: string | null;
+  // The "easy to miss" trap flag and its plain-language explanation, present on a
+  // corridor step that carries one (the emergency-tax 40%, the proof-of-address
+  // catch-22, …). false / absent for a form-projected step.
+  non_obvious?: boolean;
+  non_obvious_note?: string | null;
 }
 
 /**
