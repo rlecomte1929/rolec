@@ -107,27 +107,34 @@ export const VendorBrowsePanel: React.FC<Props> = ({
 
   // ── AIQ-1896: assign a browsed vendor to the case ───────────────────────────
   const queryClient = useQueryClient();
-  const [assignedIds, setAssignedIds] = useState<string[]>([]);
   const [assignError, setAssignError] = useState('');
+
+  // [AIQ-2024] Which vendors are ALREADY on this case, read from the server rather
+  // than remembered for the session. AIQ-1896 could only track clicks in local
+  // state, because the row contract carried the vendor's NAME and not its id —
+  // so the panel forgot every assignment on reload and offered an idle "Assign to
+  // case" button for vendors already attached. The rows now carry `vendor_id`.
+  const assignedQuery = useQuery({
+    queryKey: ['case', caseId, 'vendors'],
+    queryFn: () => hrAPI.getCaseVendors(caseId as string),
+    enabled: isOpen && !!caseId,
+  });
+  const assignedIds = new Set(
+    (assignedQuery.data ?? []).map((row) => row.vendor_id).filter(Boolean) as string[],
+  );
 
   const assignMutation = useMutation({
     mutationFn: (vendorId: string) =>
       hrAPI.assignVendorToCase(caseId as string, { vendor_id: vendorId }),
-    onSuccess: (_row, vendorId) => {
+    onSuccess: () => {
       setAssignError('');
-      setAssignedIds((prev) => (prev.includes(vendorId) ? prev : [...prev, vendorId]));
-      // Refresh the case's assigned-suppliers panel so the new row shows up there.
-      // Fire-and-forget: the refetch is a side effect, not part of the mutation's
-      // success path, and awaiting it would stall the "Assigned" badge.
+      // Refetch the case's assigned vendors — this drives both the badge here and
+      // the assigned-suppliers panel on the page behind. Fire-and-forget: awaiting
+      // it would stall the badge, and the row is already committed server-side.
       void queryClient.invalidateQueries({ queryKey: ['case', caseId, 'vendors'] });
     },
     onError: () => setAssignError('Could not assign that vendor. Please try again.'),
   });
-
-  // Assigned state is tracked for this session only: the case-vendors row contract
-  // carries the vendor's NAME, not its id, so there is nothing reliable to match a
-  // directory row against on open. The POST is idempotent, so a repeat assign is
-  // harmless rather than a duplicate row.
   const canAssign = Boolean(caseId);
 
   if (!isOpen) return null;
@@ -304,7 +311,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
 
                     {/* AIQ-1896: assign action — only with a case to assign into */}
                     {canAssign && (
-                      assignedIds.includes(vendor.id) ? (
+                      assignedIds.has(vendor.id) ? (
                         <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-xs font-medium text-[#166534]">
                           ✓ Assigned
                         </span>
