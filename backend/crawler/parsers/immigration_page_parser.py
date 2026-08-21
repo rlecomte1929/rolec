@@ -22,7 +22,37 @@ from bs4 import BeautifulSoup
 log = logging.getLogger(__name__)
 
 _HEADING_TAGS = {"h1": "#", "h2": "##", "h3": "###", "h4": "###", "h5": "###", "h6": "###"}
-_NOISE_TAGS = ("script", "style", "nav", "footer", "aside", "form", "noscript")
+#: Stripped before the content root is chosen. `form` is NOT here — see `_is_widget_form`.
+_NOISE_TAGS = ("script", "style", "nav", "footer", "aside", "noscript")
+
+#: Below this, a <form>'s text is a widget label rather than a document.
+_FORM_CONTENT_CHARS = 200
+
+
+def _is_widget_form(form) -> bool:
+    """True when a <form> is a search box / signup rather than the page itself.
+
+    ASP.NET WebForms wraps the ENTIRE document in one `<form runat="server">`, so decomposing
+    every form deletes the whole page. Measured 2026-08-21 on enterprise.gov.ie's employment
+    permit fees page: 32,292 chars of HTML containing `€1,000` eight times, parsed down to 308
+    characters of cookie banner, because the fee table's parent chain runs
+    article > div > div > section > div > FORM.
+
+    That is worse than losing the evidence. 308 clears `fact_evidence.MIN_USABLE_SOURCE_CHARS`
+    (200), so the checker reads a cookie notice as a usable source and returns UNVERIFIED
+    ("we have the source, the quote is not in it") rather than NO_SOURCE. A correct fee is
+    recorded as a disproved claim.
+
+    So the test is what the form CONTAINS, not that it is a form: anything carrying a heading, a
+    table, or a document's worth of prose is page content.
+    """
+    if form.find(["h1", "h2", "h3", "h4", "h5", "h6"]) is not None:
+        return False
+    if form.find("table") is not None:
+        return False
+    if len(form.get_text(" ", strip=True)) >= _FORM_CONTENT_CHARS:
+        return False
+    return True
 
 
 def _table_to_pipes(table) -> List[str]:
@@ -44,6 +74,10 @@ def parse(html: str) -> Dict[str, Any]:
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup(list(_NOISE_TAGS)):
         tag.decompose()
+    # Drop only the forms that are widgets; a form wrapping the document is the document.
+    for form in soup.find_all("form"):
+        if _is_widget_form(form):
+            form.decompose()
 
     title = ""
     if soup.title and soup.title.string:
