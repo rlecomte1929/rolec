@@ -1,0 +1,20 @@
+{
+  "batch_id": "ve-ie-entry-family-2026-08-20",
+  "generated_at": "2026-08-20",
+  "generated_by": "claude-cowork (AIQ-1993 research deliverable)",
+  "corridor": "ES-IE",
+  "origin_country_code": "ES",
+  "destination_country_code": "IE",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "IRELAND",
+  "record_count": 9,
+  "non_obvious_count": 6,
+  "needs_lawyer_review_count": 4,
+  "artifact": "ve_ie_entry_family_requirement_facts.ndjson",
+  "sha256": "2186f59ae0cb06bb7403ef4bed2f291ff1ad4313bc270fb0051883f7e63a46d6",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "scope": "Entry-visa + family/dependant facts missing from the 14 approved IRELAND/THIRD_COUNTRY requirement_items. Additive; does not modify existing rows.",
+  "load_task": "AIQ-2027 (Claude Code) — load as candidates into requirement_items, review_status='pending', idempotent on fact_uid, ON CONFLICT must not touch review_status."
+}
