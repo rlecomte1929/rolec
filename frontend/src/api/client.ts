@@ -603,6 +603,12 @@ export interface HrVendor {
  *  Returned by GET /api/cases/:caseId/vendors and, identically shaped, by the
  *  POST that creates one — so an assign result can go straight into the panel's
  *  query cache. Rendered by CaseVendorsPanel. */
+/** [AIQ-2025] The four states public.case_vendor_shortlist.status permits. Mirrors
+ *  the table's CHECK constraint — "Removed" is deliberately absent: unassigning is
+ *  a hard DELETE, not a state. */
+export const CASE_VENDOR_STATUSES = ['Assigned', 'Briefed', 'In Progress', 'Complete'] as const;
+export type CaseVendorStatus = (typeof CASE_VENDOR_STATUSES)[number];
+
 export interface CaseVendorRow {
   shortlist_id: string | null;
   /** [AIQ-2024] The vendor's own id, so a caller can tell WHICH vendor a row is
@@ -1153,6 +1159,22 @@ export const hrAPI = {
   getCaseVendors: async (caseId: string): Promise<CaseVendorRow[]> => {
     const response = await api.get<CaseVendorRow[]>(`/api/cases/${caseId}/vendors`);
     return Array.isArray(response.data) ? response.data : [];
+  },
+
+  /** PATCH /api/cases/:caseId/vendors/:shortlistId — move a vendor through its
+   *  engagement lifecycle. [AIQ-2025] Only Assigned / Briefed / In Progress /
+   *  Complete are accepted; the server 422s anything else rather than letting the
+   *  database CHECK constraint surface as a 500. */
+  updateCaseVendorStatus: async (
+    caseId: string,
+    shortlistId: string,
+    status: CaseVendorStatus,
+  ): Promise<CaseVendorRow> => {
+    const response = await api.patch<CaseVendorRow>(
+      `/api/cases/${caseId}/vendors/${shortlistId}`,
+      { status },
+    );
+    return response.data;
   },
 
   /** DELETE /api/cases/:caseId/vendors/:shortlistId — detach a vendor from a case. */

@@ -49,9 +49,12 @@ from backend.app.routers import cases_read as router_module  # noqa: E402
 from backend.app.routers import cases_write as write_module  # noqa: E402
 from backend.app.routers.cases_read import list_case_vendors  # noqa: E402
 from backend.app.routers.cases_write import (  # noqa: E402
+    VENDOR_ENGAGEMENT_STATUSES,
     _VendorAssignBody,
+    _VendorStatusBody,
     assign_case_vendor,
     unassign_case_vendor,
+    update_case_vendor_status,
 )
 
 # The live schema, reconstructed. public.suppliers is created too — and deliberately
@@ -533,6 +536,91 @@ class AssignCaseVendorTests(_VendorShortlistFixture):
         vid = self._seed_vendor("Admin-added Vendor")
         self._assign(case_id, user=_ADMIN_USER, vendor_id=vid)
         self.assertEqual(len(self._shortlist_rows(case_id)), 1)
+
+
+class UpdateVendorStatusTests(_VendorShortlistFixture):
+    """[AIQ-2025] PATCH /api/cases/{id}/vendors/{shortlist_id}.
+
+    The column and its CHECK constraint always supported four states, and the panel
+    already rendered a badge for each — but nothing could set them. The write path
+    always inserts 'Assigned', so three of the four were dead and only the May seed
+    rows had ever shown otherwise.
+    """
+
+    patched_modules = (router_module, write_module)
+
+    def _patch(self, case_id, shortlist_id, status, user=_HR_USER):
+        return update_case_vendor_status(
+            case_id=case_id, shortlist_id=shortlist_id,
+            body=_VendorStatusBody(status=status), user=user,
+        )
+
+    def test_a_vendor_can_move_through_every_state(self) -> None:
+        case_id = str(uuid.uuid4())
+        vid = self._seed_vendor("BerlinReloc GmbH")
+        row_id = self._seed_shortlist(case_id, vid, status="Assigned")
+        for state in ("Briefed", "In Progress", "Complete"):
+            out = self._patch(case_id, row_id, state)
+            self.assertEqual(out["status"], state)
+            self.assertEqual(list_case_vendors(case_id=case_id, user=_HR_USER)[0]["status"], state)
+
+    def test_the_response_matches_the_read_contract(self) -> None:
+        """So the client can drop the PATCH result straight into the panel cache."""
+        case_id = str(uuid.uuid4())
+        vid = self._seed_vendor("NestFinders Europe")
+        row_id = self._seed_shortlist(case_id, vid)
+        out = self._patch(case_id, row_id, "Briefed")
+        self.assertEqual(set(out.keys()), EXPECTED_KEYS)
+        self.assertEqual(out["vendor_id"], vid)
+
+    def test_an_invalid_status_is_422_not_a_500_from_the_check_constraint(self) -> None:
+        """The CHECK on the table would raise from Postgres and surface as a 500.
+        Reject it here, naming what is allowed."""
+        case_id = str(uuid.uuid4())
+        vid = self._seed_vendor("Acme")
+        row_id = self._seed_shortlist(case_id, vid)
+        for bad in ("Removed", "removed", "assigned", "", "   ", "Done"):
+            with self.assertRaises(HTTPException) as ctx:
+                self._patch(case_id, row_id, bad)
+            self.assertEqual(ctx.exception.status_code, 422, bad)
+        # unchanged
+        self.assertEqual(list_case_vendors(case_id=case_id, user=_HR_USER)[0]["status"], "Assigned")
+
+    def test_the_allowed_set_matches_the_database_check_constraint(self) -> None:
+        """If the CHECK ever changes, this constant has to change with it."""
+        self.assertEqual(
+            tuple(VENDOR_ENGAGEMENT_STATUSES),
+            ("Assigned", "Briefed", "In Progress", "Complete"),
+        )
+
+    def test_removed_is_not_a_valid_state(self) -> None:
+        """The reader has a `selected`-based "Removed" fallback, but it is
+        unreachable — status is NOT NULL DEFAULT 'Assigned', so it always wins, and
+        the CHECK does not permit 'Removed' anyway. Unassign is a hard DELETE."""
+        self.assertNotIn("Removed", VENDOR_ENGAGEMENT_STATUSES)
+
+    def test_employee_cannot_advance_a_vendor(self) -> None:
+        case_id = str(uuid.uuid4())
+        vid = self._seed_vendor("Protected")
+        row_id = self._seed_shortlist(case_id, vid)
+        with self.assertRaises(HTTPException) as ctx:
+            self._patch(case_id, row_id, "Briefed", user=_EMPLOYEE_USER)
+        self.assertEqual(ctx.exception.status_code, 403)
+        self.assertEqual(list_case_vendors(case_id=case_id, user=_HR_USER)[0]["status"], "Assigned")
+
+    def test_cannot_advance_a_row_belonging_to_another_case(self) -> None:
+        case_a, case_b = str(uuid.uuid4()), str(uuid.uuid4())
+        vid = self._seed_vendor("Other Case Vendor")
+        row_in_a = self._seed_shortlist(case_a, vid, status="Assigned")
+        with self.assertRaises(HTTPException) as ctx:
+            self._patch(case_b, row_in_a, "Complete")
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertEqual(list_case_vendors(case_id=case_a, user=_HR_USER)[0]["status"], "Assigned")
+
+    def test_unknown_shortlist_id_404s(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            self._patch(str(uuid.uuid4()), str(uuid.uuid4()), "Briefed")
+        self.assertEqual(ctx.exception.status_code, 404)
 
 
 class UnassignCaseVendorTests(_VendorShortlistFixture):
