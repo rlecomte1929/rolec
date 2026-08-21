@@ -2646,6 +2646,7 @@ def list_case_vendors(
                         cvs.contact_name  AS contact_name,
                         cvs.contact_email AS contact_email,
                         cvs.selected      AS selected,
+                        cvs.vendor_id     AS vendor_id,
                         v.name            AS vendor_name,
                         v.website_url     AS vendor_website
                     FROM public.case_vendor_shortlist cvs
@@ -2667,6 +2668,11 @@ def list_case_vendors(
         d = dict(row)
         result.append({
             "shortlist_id": str(d["shortlist_id"]) if d.get("shortlist_id") else None,
+            # [AIQ-2024] The vendor's own id, so a caller can tell WHICH vendor a row
+            # is without matching on the display name. VendorBrowsePanel could only
+            # track assignments per-session without it, and forgot them on reload.
+            # uuid on prod — stringify like shortlist_id so JSON is consistent.
+            "vendor_id": str(d["vendor_id"]) if d.get("vendor_id") else None,
             "category": d.get("category"),
             # Per-case engagement status; fall back to the `selected` flag when
             # the row hasn't set an explicit status.

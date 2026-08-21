@@ -1803,6 +1803,9 @@ def _vendor_row_dto(row: Dict[str, Any]) -> Dict[str, Any]:
     so the client can drop the POST result straight into the panel's cache."""
     return {
         "shortlist_id": str(row["shortlist_id"]) if row.get("shortlist_id") else None,
+        # [AIQ-2024] Same field the reader now returns — the POST result is meant to
+        # drop straight into the panel's cache, so the shapes must not diverge.
+        "vendor_id": str(row["vendor_id"]) if row.get("vendor_id") else None,
         "category": row.get("category"),
         "status": row.get("status") or "Assigned",
         "contact_name": row.get("contact_name"),
@@ -1871,6 +1874,7 @@ def assign_case_vendor(
                 response.status_code = 200
                 return _vendor_row_dto({
                     "shortlist_id": existing["id"],
+                    "vendor_id": vendor_id,
                     "category": existing["service_key"],
                     "status": existing["status"],
                     "contact_name": existing["contact_name"],
@@ -1911,12 +1915,114 @@ def assign_case_vendor(
 
     return _vendor_row_dto({
         "shortlist_id": new_id,
+        "vendor_id": vendor_id,
         "category": service_key,
         "status": "Assigned",
         "contact_name": body.contact_name,
         "contact_email": body.contact_email,
         "vendor_name": vendor["name"],
         "vendor_website": vendor["website_url"],
+    })
+
+
+# The four states public.case_vendor_shortlist.status actually permits. This is a
+# CHECK constraint on the table, so anything else is a 500 from Postgres rather
+# than a validation error — validate here and return 422 instead.
+VENDOR_ENGAGEMENT_STATUSES = ("Assigned", "Briefed", "In Progress", "Complete")
+
+
+class _VendorStatusBody(BaseModel):
+    """Body for PATCH /api/cases/{case_id}/vendors/{shortlist_id}."""
+    status: str
+
+
+@router.patch("/{case_id}/vendors/{shortlist_id}")
+def update_case_vendor_status(
+    case_id: str,
+    shortlist_id: str,
+    body: _VendorStatusBody,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Move a vendor through its engagement lifecycle.
+
+    [AIQ-2025] The column and its CHECK constraint have always supported four
+    states, and CaseVendorsPanel already renders a distinct badge for each — but
+    nothing could SET them. assign_case_vendor always writes 'Assigned', so three of
+    the four were dead and only the May seed rows had ever shown otherwise.
+
+    Note the reader's `selected`-based "Removed" fallback is unreachable: `status`
+    is NOT NULL DEFAULT 'Assigned', so it always wins. `status` is the real state
+    machine; `selected` is not one. That is why AIQ-1896 made unassign a hard
+    DELETE rather than a soft flag.
+    """
+    _assert_case_access(user, case_id)
+    _require_hr_or_admin(user)
+    resolved_case_id = _canonical_case_id_or_404(case_id)
+
+    status_value = (body.status or "").strip()
+    if status_value not in VENDOR_ENGAGEMENT_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Invalid status {status_value!r}. Allowed: "
+                f"{', '.join(VENDOR_ENGAGEMENT_STATUSES)}."
+            ),
+        )
+
+    try:
+        with main_db.engine.begin() as conn:
+            # Scoped by case_id as well as id, so a shortlist row belonging to
+            # another case can never be moved through this case's route — the same
+            # guard unassign_case_vendor uses.
+            result = conn.execute(
+                _sql_text(
+                    """
+                    UPDATE public.case_vendor_shortlist
+                    SET status = :status
+                    WHERE CAST(id AS TEXT) = :sid
+                      AND case_id = :case_id
+                    """
+                ),
+                {"status": status_value, "sid": shortlist_id, "case_id": resolved_case_id},
+            )
+            if result.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Vendor assignment not found")
+
+            row = conn.execute(
+                _sql_text(
+                    """
+                    SELECT cvs.id AS shortlist_id, cvs.vendor_id, cvs.service_key,
+                           cvs.status, cvs.contact_name, cvs.contact_email,
+                           v.name AS vendor_name, v.website_url AS vendor_website
+                    FROM public.case_vendor_shortlist cvs
+                    LEFT JOIN public.vendors_legacy v
+                           ON CAST(v.id AS TEXT) = CAST(cvs.vendor_id AS TEXT)
+                    WHERE CAST(cvs.id AS TEXT) = :sid
+                    """
+                ),
+                {"sid": shortlist_id},
+            ).mappings().first()
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception(
+            "vendors: status update failed case_id=%s shortlist_id=%s", case_id, shortlist_id
+        )
+        raise HTTPException(status_code=500, detail="Failed to update vendor status")
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vendor assignment not found")
+
+    d = dict(row)
+    return _vendor_row_dto({
+        "shortlist_id": d["shortlist_id"],
+        "vendor_id": d["vendor_id"],
+        "category": d["service_key"],
+        "status": d["status"],
+        "contact_name": d["contact_name"],
+        "contact_email": d["contact_email"],
+        "vendor_name": d["vendor_name"],
+        "vendor_website": d["vendor_website"],
     })
 
 
