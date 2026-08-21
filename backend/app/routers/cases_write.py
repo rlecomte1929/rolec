@@ -257,11 +257,35 @@ def patch_case(
 def patch_case_relocation_basics(
     case_id: str,
     basics: schemas.RelocationBasicsDTO,
+    background_tasks: BackgroundTasks,
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> schemas.CaseDTO:
-    """Alias endpoint: wraps RelocationBasicsDTO into CaseDraftDTO (B17/WZ1a)."""
+    """Alias endpoint: wraps RelocationBasicsDTO into CaseDraftDTO (B17/WZ1a).
+
+    [AIQ-1879] This 500'd on every call from 2026-06-29 until now. #1177 inserted
+    `background_tasks: BackgroundTasks` into patch_case ahead of `user`, and this
+    alias kept calling it positionally as `patch_case(case_id, wrapped, user)` — so
+    the user DICT bound to `background_tasks`, and `user` kept its unresolved
+    `Depends(get_current_user)` sentinel. The first `user.get(...)` inside
+    patch_case then raised `'Depends' object has no attribute 'get'`.
+
+    Calling a FastAPI handler as a plain function does NOT resolve its Depends
+    defaults — the same trap the /recommendations/batch handler carries a note
+    about (AIQ-1856 follow-up). Two things keep it fixed:
+
+      * `background_tasks` is declared here too, so FastAPI injects a real one
+        rather than this alias inventing a throwaway whose tasks never run;
+      * the delegation below is BY KEYWORD, so the next person to reorder
+        patch_case's parameters gets a TypeError at import-adjacent test time
+        instead of a silent rebind that only shows up as a 500 in prod.
+    """
     wrapped = schemas.CaseDraftDTO(relocationBasics=basics)
-    return patch_case(case_id, wrapped, user)
+    return patch_case(
+        case_id=case_id,
+        patch=wrapped,
+        background_tasks=background_tasks,
+        user=user,
+    )
 
 
 @router.patch("/{case_id}/serviceSelections", response_model=schemas.CaseDTO)

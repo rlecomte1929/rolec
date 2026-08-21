@@ -164,19 +164,77 @@ class AdvisorMatchRequest(BaseModel):
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+# [AIQ-1883] Immigration instruments that do NOT exist at a destination, so an
+# advisor who only offers these is not a match for it however well they cover the
+# region. Categorised by DESTINATION — what the country actually operates — never
+# by pattern-matching the advisor, per the permit-gating invariant.
+#
+# Ireland is the case that exposed this: it sits in the EU region but is outside
+# BOTH the Blue Card Directive and the Schengen area, so an "EU Blue Card /
+# Schengen long-stay" specialist is confidently, uselessly wrong there.
+# (European Commission: the Blue Card "does not apply in Denmark and Ireland".)
+_UNAVAILABLE_INSTRUMENTS: Dict[str, tuple] = {
+    "IE": ("blue card", "schengen", "digital nomad"),
+    "DK": ("blue card",),
+}
+
+
+def _advisor_offers_something_usable(advisor: Dict[str, Any], dest: str) -> bool:
+    """False only when EVERY specialism an advisor lists is an instrument the
+    destination does not operate.
+
+    Conservative on purpose: one applicable specialism keeps them in the list. The
+    aim is to drop the confidently-wrong referral, not to curate the roster.
+    """
+    unavailable = _UNAVAILABLE_INSTRUMENTS.get((dest or "").upper())
+    if not unavailable:
+        return True
+    specialisms = [str(x).lower() for x in (advisor.get("specialisms") or []) if x]
+    if not specialisms:
+        return True  # nothing claimed → nothing disqualifying
+    return not all(
+        any(term in spec for term in unavailable) for spec in specialisms
+    )
+
+
 def _advisor_matches_corridor(advisor: Dict[str, Any], dest: str, origin: str) -> bool:
-    """True if the advisor covers the destination corridor (or has global coverage)."""
+    """True if the advisor covers the DESTINATION (or has global coverage).
+
+    [AIQ-1883] This used to also return True when the advisor covered the ORIGIN.
+    Covering Spain is not a qualification to advise on a move INTO Ireland, and that
+    clause is how an "EU Blue Card / Schengen long-stay" specialist — whose corridor
+    list contains ES but not IE — was returned as a match for Madrid to Dublin. The
+    docstring already said destination; the code disagreed with it.
+    """
+    if not _advisor_offers_something_usable(advisor, dest):
+        return False
     corridors = advisor.get("corridors") or []
     if not corridors:
         return True  # global coverage
     dest_upper = (dest or "").upper()
-    origin_upper = (origin or "").upper()
     dest_region = _REGION_MAP.get(dest_upper, "")
-    return (
-        dest_upper in corridors
-        or dest_region in corridors
-        or origin_upper in corridors
-    )
+    return dest_upper in corridors or dest_region in corridors
+
+
+# [AIQ-1883] RFC 2606 reserves example.com/.net/.org for documentation — nothing
+# there resolves. Every advisor in the seed carries one, so a correct match was
+# still unactionable: the user clicked through to nothing.
+#
+# Suppressed at the response boundary rather than deleted from the seed, so the
+# advisor still appears with their real coverage and the UI can say "contact
+# details pending" instead of offering a dead link. A guard test asserts none of
+# these ever reaches a response.
+_PLACEHOLDER_URL_MARKERS = ("example.com", "example.net", "example.org", "example.edu")
+
+
+def _public_contact_url(raw: Optional[str]) -> Optional[str]:
+    """The advisor's contact URL, or None when it is a documentation placeholder."""
+    if not raw:
+        return None
+    lowered = str(raw).lower()
+    if any(marker in lowered for marker in _PLACEHOLDER_URL_MARKERS):
+        return None
+    return raw
 
 
 def _get_preferred_advisor_ids_for_company(company_id: str) -> set:
@@ -264,7 +322,7 @@ def match_advisors(
             verified=bool(a.get("verified")),
             preferred_partner=bool(a.get("preferred_partner")),
             preferred_for_company=aid in preferred_ids,
-            contact_url=a.get("contact_url"),
+            contact_url=_public_contact_url(a.get("contact_url")),
             response_sla=a.get("response_sla"),
             logo_initials=a.get("logo_initials") or _initials(a.get("name", "")),
         ))
@@ -310,7 +368,7 @@ def get_advisor(
                 verified=bool(a.get("verified")),
                 preferred_partner=bool(a.get("preferred_partner")),
                 preferred_for_company=a.get("id") in preferred_ids,
-                contact_url=a.get("contact_url"),
+                contact_url=_public_contact_url(a.get("contact_url")),
                 response_sla=a.get("response_sla"),
                 logo_initials=a.get("logo_initials") or _initials(a.get("name", "")),
             )
