@@ -1,0 +1,61 @@
+{
+  "_comment": "Sample produced-roadmaps input for backend.eval.run_nonobvious_recall_eval. Keys are '<CORRIDOR>:<employee_type>' slice ids matching backend/eval/hlp_nonobvious_baseline.json; values are lists of produced roadmaps (each a list of steps). This sample serves every non-obvious requirement in every slice, so every slice scores recall 1.0.",
+  "FR_NO:eu_national": [
+    [
+      {"order": 1, "title": "Travel to Norway (no visa required for EEA nationals)"},
+      {"order": 2, "title": "EEA registration with the police (registreringsbevis)"},
+      {"order": 3, "title": "Register with the tax office \u2014 D-number / personnummer (Folkeregister)"},
+      {"order": 4, "title": "Tax deduction card (skattekort) issued"},
+      {"order": 5, "title": "Norwegian bank account opened (requires D-number/personnummer)"}
+    ]
+  ],
+  "FR_NO:non_eu_eea_national": [
+    [
+      {"order": 1, "title": "Travel to Norway under EEA free movement"},
+      {"order": 2, "title": "EEA registration with the police (registreringsbevis)"},
+      {"order": 3, "title": "Register with the tax office \u2014 D-number / personnummer (Folkeregister)"},
+      {"order": 4, "title": "Tax deduction card (skattekort) issued"}
+    ]
+  ],
+  "FR_NO:non_eea_national": [
+    [
+      {"order": 1, "title": "UDI residence permit granted before work starts"},
+      {"order": 2, "title": "Register with the tax office \u2014 D-number / personnummer (Folkeregister)"},
+      {"order": 3, "title": "Tax deduction card (skattekort) issued"},
+      {"order": 4, "title": "Norwegian bank account opened"}
+    ]
+  ],
+  "ES_IE:eu_national": [
+    [
+      {"order": 1, "title": "Travel to Ireland (EU free movement)"},
+      {"order": 2, "title": "Obtain a PPSN (Personal Public Service Number)"},
+      {"order": 3, "title": "Register the employment with Revenue (myAccount / RPN) to avoid emergency tax"},
+      {"order": 4, "title": "Open an Irish bank account (proof of address + PPSN)"}
+    ]
+  ],
+  "ES_IE:non_eu_passport_holder": [
+    [
+      {"order": 1, "title": "Critical Skills Employment Permit application to DETE"},
+      {"order": 2, "title": "Employment permit granted by DETE (labour authorisation, not immigration permission)"},
+      {"order": 3, "title": "Long-stay 'D' Employment visa granted before travel (entry authorisation)"},
+      {"order": 4, "title": "Register immigration permission \u2014 IRP card / Stamp 1 (within 90 days)"},
+      {"order": 5, "title": "Obtain a PPSN (Personal Public Service Number)"},
+      {"order": 6, "title": "Register the employment with Revenue (myAccount / RPN) to avoid emergency tax"},
+      {"order": 7, "title": "Open an Irish bank account (proof of address + PPSN/IRP)"},
+      {"order": 8, "title": "Register with a GP and arrange private health insurance"},
+      {"order": 9, "title": "Stamp 4 eligibility reached after 21 months on the Critical Skills permit"}
+    ]
+  ],
+  "NO_FR:norwegian_national": [
+    [
+      {"order": 1, "title": "Preserve BankID before deregistration disables it"},
+      {"order": 2, "title": "Norwegian tax residence does not end on the physical move"},
+      {"order": 3, "title": "Exit Norwegian National Insurance (folketrygden)"},
+      {"order": 4, "title": "Applicable social-security legislation is FRANCE (not Norway)"},
+      {"order": 5, "title": "The A1 certificate is issued by FRANCE (URSSAF), not by Norway"},
+      {"order": 6, "title": "Norwegian employer must register with URSSAF (or delegate under Art. 21)"},
+      {"order": 7, "title": "Register with CPAM for health cover and the carte vitale"},
+      {"order": 8, "title": "Household-goods import with transfer-of-residence relief (franchise de d\u00e9m\u00e9nagement)"}
+    ]
+  ]
+}
