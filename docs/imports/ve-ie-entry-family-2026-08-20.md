@@ -193,7 +193,59 @@ To actually stage, add `--apply`.
 
 **Rollback.** Staging: delete the batch's rows by `batch_id` from
 `otto_staging.immigration_fact_candidates` (plus the matching `immigration_entities` /
-`load_log` rows). The promoted rows are separate — they live in `public.requirement_items` and
-are removed by `country_code='IRELAND' AND review_status='pending'`, which as of 2026-08-21
-selects exactly this batch's 9 and nothing else. Verify that count before deleting; approving
-any of the 9 changes it.
+`load_log` rows). The promoted rows are separate — they live in `public.requirement_items`.
+Select them by the nine canonical ids that check 7 re-derives, **not** by
+`review_status='pending'`: every one of them was approved on 2026-08-21 12:02 UTC, so that
+predicate now matches nothing here and would read as "already rolled back".
+
+## Closure verification (AIQ-2027)
+
+`scripts/verify_aiq_2027_ve_ie_load.py` gates the *landing*, where `check_ve_ie_batch.py`
+gates the *artifact*. Offline it re-hashes the NDJSON against a pinned sha256, asserts nine
+facts with zero shape errors, asserts every `review_status='pending'` and every
+`quote_verbatim_confirmed=false`, and pins the four counsel-flagged topic keys **by name**
+rather than by count — a count still passes if a flag drifts from the load-bearing
+`spanish_residence_does_not_grant_irish_entry` onto a routine fact. With `--db-url` it adds a
+read-only reconciliation: all nine rows present, `purpose='employment'`, counsel flag and
+`topic_key` intact, and no duplicate beside any canonical id.
+
+```bash
+./.venv311/bin/python scripts/verify_aiq_2027_ve_ie_load.py                    # CI-safe, no DB
+./.venv311/bin/python scripts/verify_aiq_2027_ve_ie_load.py --db-url "$URL"    # + reconciliation
+RELOPASS_QUERY_COUNTER_OFF=1 DATABASE_URL="sqlite:///./ci_test.db" \
+    ./.venv311/bin/python -m pytest scripts/tests/test_verify_aiq_2027.py -q
+```
+
+### Why there is no AIQ-2027 migration
+
+The card asked for nine `INSERT`s into `public.requirement_items` keyed on the artifact's
+`fact_uid` with `ON CONFLICT (id) DO NOTHING`. That contract does not hold against this table
+and the migration was not written.
+
+The load path is `promote()`, which writes through `crud.create_requirement_item` — an upsert
+on the natural key `(country_code, purpose, title)` whose primary key is
+`uuid5(_SEED_NS, "country|purpose|title")`, deliberately the same namespace
+`seed_requirements.py` uses so a promoted row and a later YAML re-seed converge on one row.
+Prod holds these nine under ids like `a179d689-f19a-5f2f-8f20-e979cf82db88`; **zero** rows in
+the table are keyed by `fact_uid`. An `INSERT ... ON CONFLICT (id) DO NOTHING` keyed on
+`ES_IE:THIRD_COUNTRY:<topic_key>` therefore conflicts with nothing: it fires zero times and
+inserts nine duplicates beside the nine already live, taking IRELAND to 38 rows with each of
+these facts twice in the reviewer queue and twice in the corridor call.
+
+The idempotency claim is instead evidenced where it actually lives. Check 7 re-derives all
+nine ids through the real converter → reader → mappings path and asserts they equal the ids
+prod holds; equal ids mean a re-run upserts the same nine rows. `test_verify_aiq_2027.py`
+proves the gate discriminates, and the `fact_uid`-keying bug above was itself run against the
+live table — it reports all nine as duplicated, which is the outcome the migration would have
+produced.
+
+Two things worth knowing before touching this batch again:
+
+- Three facts (`csep_immediate_family_reunification`, `spouse_stamp_1g_right_to_work`,
+  `dependant_join_family_d_visa_required`) are authored `domain_area='family'`.
+  `mappings.resolve` returns `Unmapped` for any value other than `'immigration'`, so they
+  promote **only** because staging normalises them. Were that to stop, these three would
+  silently fail to promote while the other six succeeded. Check 6b pins the set.
+- The duplicate check matches on `topic_key`. An earlier revision matched a `batch_id` marker
+  in `citations_json` — a column that carries no `batch_id` at all, so it reported "no
+  duplicates" against a table it had never actually interrogated.
