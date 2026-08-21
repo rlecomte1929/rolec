@@ -90,6 +90,11 @@ CREATE TABLE public.case_vendor_shortlist (
 # The contract the frontend VendorRow type expects (CaseVendorsPanel.tsx).
 EXPECTED_KEYS = {
     "shortlist_id",
+    # [AIQ-2024] The vendor's own id. Added so VendorBrowsePanel can show real
+    # "already assigned" state on open instead of tracking it per-session and
+    # forgetting on reload. This set is asserted EXACTLY — no more, no less — so
+    # a producer that forgets the field fails here rather than in the browser.
+    "vendor_id",
     "category",
     "status",
     "contact_name",
@@ -324,6 +329,69 @@ class ListCaseVendorsTests(_VendorShortlistFixture):
         self.assertEqual(len(result), 2)
         for row in result:
             self.assertEqual(set(row.keys()), EXPECTED_KEYS)
+
+
+class VendorIdOnRowTests(_VendorShortlistFixture):
+    """[AIQ-2024] The row now carries the vendor's own id.
+
+    Without it a caller could only tell rows apart by display NAME, so
+    VendorBrowsePanel tracked assignments per-session and forgot them on reload.
+    Presence is not enough — the id has to be the right one, and the reader and
+    the writer have to agree on it, or the panel matches the wrong vendor.
+    """
+
+    patched_modules = (router_module, write_module)
+
+    def test_read_returns_the_vendors_own_id(self) -> None:
+        case_id = str(uuid.uuid4())
+        vid = self._seed_vendor("NestFinders Europe")
+        self._seed_shortlist(case_id, vid, service_key="housing")
+        row = list_case_vendors(case_id=case_id, user=_HR_USER)[0]
+        self.assertEqual(row["vendor_id"], vid)
+
+    def test_the_id_distinguishes_two_vendors_sharing_a_name(self) -> None:
+        """The reason a name is not an identifier."""
+        case_id = str(uuid.uuid4())
+        a = self._seed_vendor("Relocation Partners", category="Housing Search")
+        b = self._seed_vendor("Relocation Partners", category="Moving & Freight")
+        self._seed_shortlist(case_id, a, service_key="housing")
+        self._seed_shortlist(case_id, b, service_key="moving")
+        ids = {r["vendor_id"] for r in list_case_vendors(case_id=case_id, user=_HR_USER)}
+        self.assertEqual(ids, {a, b})
+
+    def test_assign_returns_the_same_id_the_read_will(self) -> None:
+        """The POST result is meant to drop straight into the panel's cache, so the
+        two shapes must not diverge."""
+        case_id = str(uuid.uuid4())
+        vid = self._seed_vendor("BerlinReloc GmbH")
+        response = _ResponseSpy()
+        posted = assign_case_vendor(
+            case_id=case_id, body=_VendorAssignBody(vendor_id=vid),
+            response=response, user=_HR_USER,
+        )
+        listed = list_case_vendors(case_id=case_id, user=_HR_USER)[0]
+        self.assertEqual(posted["vendor_id"], vid)
+        self.assertEqual(posted["vendor_id"], listed["vendor_id"])
+
+    def test_the_idempotent_repost_also_carries_it(self) -> None:
+        case_id = str(uuid.uuid4())
+        vid = self._seed_vendor("SIRVA Worldwide")
+        for _ in range(2):
+            out = assign_case_vendor(
+                case_id=case_id, body=_VendorAssignBody(vendor_id=vid),
+                response=_ResponseSpy(), user=_HR_USER,
+            )
+            self.assertEqual(out["vendor_id"], vid)
+
+    def test_an_unmatched_row_still_reports_its_vendor_id(self) -> None:
+        """The vendor id lives on the shortlist row, not the registry join — so it
+        survives even when the vendor cannot be resolved to a name."""
+        case_id = str(uuid.uuid4())
+        orphan = str(uuid.uuid4())
+        self._seed_shortlist(case_id, orphan, service_key="banking")
+        row = list_case_vendors(case_id=case_id, user=_HR_USER)[0]
+        self.assertIsNone(row["vendor_name"])
+        self.assertEqual(row["vendor_id"], orphan)
 
 
 class AssignCaseVendorTests(_VendorShortlistFixture):

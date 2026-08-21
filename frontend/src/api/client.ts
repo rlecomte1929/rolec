@@ -605,6 +605,9 @@ export interface HrVendor {
  *  query cache. Rendered by CaseVendorsPanel. */
 export interface CaseVendorRow {
   shortlist_id: string | null;
+  /** [AIQ-2024] The vendor's own id, so a caller can tell WHICH vendor a row is
+   *  without matching on the display name. */
+  vendor_id: string | null;
   category: string | null;
   status: string;
   contact_name: string | null;
@@ -1142,6 +1145,14 @@ export const hrAPI = {
   ): Promise<CaseVendorRow> => {
     const response = await api.post<CaseVendorRow>(`/api/cases/${caseId}/vendors`, payload);
     return response.data;
+  },
+
+  /** GET /api/cases/:caseId/vendors — the vendors already attached to a case.
+   *  [AIQ-2024] Used by VendorBrowsePanel to show real "already assigned" state on
+   *  open, rather than only remembering clicks made in the current session. */
+  getCaseVendors: async (caseId: string): Promise<CaseVendorRow[]> => {
+    const response = await api.get<CaseVendorRow[]>(`/api/cases/${caseId}/vendors`);
+    return Array.isArray(response.data) ? response.data : [];
   },
 
   /** DELETE /api/cases/:caseId/vendors/:shortlistId — detach a vendor from a case. */

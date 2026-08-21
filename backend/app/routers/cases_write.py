@@ -1803,6 +1803,9 @@ def _vendor_row_dto(row: Dict[str, Any]) -> Dict[str, Any]:
     so the client can drop the POST result straight into the panel's cache."""
     return {
         "shortlist_id": str(row["shortlist_id"]) if row.get("shortlist_id") else None,
+        # [AIQ-2024] Same field the reader now returns — the POST result is meant to
+        # drop straight into the panel's cache, so the shapes must not diverge.
+        "vendor_id": str(row["vendor_id"]) if row.get("vendor_id") else None,
         "category": row.get("category"),
         "status": row.get("status") or "Assigned",
         "contact_name": row.get("contact_name"),
@@ -1871,6 +1874,7 @@ def assign_case_vendor(
                 response.status_code = 200
                 return _vendor_row_dto({
                     "shortlist_id": existing["id"],
+                    "vendor_id": vendor_id,
                     "category": existing["service_key"],
                     "status": existing["status"],
                     "contact_name": existing["contact_name"],
@@ -1911,6 +1915,7 @@ def assign_case_vendor(
 
     return _vendor_row_dto({
         "shortlist_id": new_id,
+        "vendor_id": vendor_id,
         "category": service_key,
         "status": "Assigned",
         "contact_name": body.contact_name,
