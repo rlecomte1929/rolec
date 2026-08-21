@@ -214,8 +214,38 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
             "'applies to everyone', which serves a visa track to free movers",
         )
 
-    status = _one_value(facts, "status")
-    purpose = PURPOSES.get(status or "", "other")
+    # `applies_to.status` refuses on the same three conditions its sibling `nationality`
+    # does — absent, conflicting, unrecognised — instead of silently defaulting to
+    # `purpose='other'`.
+    #
+    # The silent default is worse than it looks. `crud.list_requirements` matches purpose
+    # with strict `==` and no catch-all, and `public_corridor` defaults to
+    # `purpose='employment'`, so a row promoted at 'other' by accident is counted as loaded
+    # by every reconciliation, is approvable in the review queue, and can never be returned
+    # to a reader. It is invisible in exactly the way that looks like success.
+    #
+    # An explicit `"any"` still promotes at 'other': FRANCE already serves an approved row
+    # there, so choosing it is a decision. Only the three ways a topic arrives at 'other'
+    # without anyone choosing it refuse here — the same set `executor._unscoped_topics()`
+    # already pre-flights and reports. That report is what this turns into a refusal.
+    status_values = _distinct([(f.applies_to or {}).get("status") for f in facts])
+    if not status_values:
+        return Unmapped(topic, "no fact carries applies_to.status — the requirement would "
+                               "promote as purpose='other', which crud.list_requirements "
+                               "can never return to a reader. Set it before staging")
+    if len(status_values) > 1:
+        return Unmapped(topic, f"facts disagree on applies_to.status "
+                               f"({', '.join(sorted(status_values))}), so this is not one "
+                               "requirement")
+    status = status_values[0]
+    if status not in PURPOSES:
+        return Unmapped(
+            topic,
+            f"applies_to.status={status!r} is not a recognised purpose "
+            f"({', '.join(sorted(PURPOSES))}) — it would promote as purpose='other' and be "
+            "invisible to every reader",
+        )
+    purpose = PURPOSES[status]
 
     derivations = [
         f"pillar={IMMIGRATION_PILLAR} from domain_area='immigration'",

@@ -129,6 +129,17 @@ def to_record(rec: dict, seq: int) -> dict:
         "applies_to": {
             "corridor": f"{origin}->{dest}",
             "nationality": nationality_class_for(origin, dest),
+            # B3 is corridor employee mobility — every fact in it describes an obligation a
+            # relocating worker meets, so `professional` (→ purpose='employment') is the
+            # reading, confirmed by the product owner 2026-08-21.
+            #
+            # Omitting this is not neutral. `mappings.resolve` used to default an absent
+            # status to purpose='other', which `crud.list_requirements` (strict `==`, no
+            # catch-all) can never return — so the row loaded, reconciled, reached the
+            # reviewer's queue and was readable by nobody. The 2026-08-20 B3 promotion put
+            # 13 such rows into production (DK/DE/NO/GB). `resolve` now refuses instead,
+            # and this is the value that satisfies it.
+            "status": "professional",
         },
         # B3 carries no verbatim source quotes, so `grade()` pins every row to
         # needs_review. That is the intended outcome for unreviewed research, not a gap.
