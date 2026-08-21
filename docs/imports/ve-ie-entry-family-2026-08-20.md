@@ -15,7 +15,7 @@ needs, nothing about her family.
 | Records | 9 (6 non-obvious, 4 needs_lawyer_review) |
 | Corridor | ES→IE, nationality class `THIRD_COUNTRY` |
 | Staged into | `otto_staging.immigration_fact_candidates`, `status='promoted'` |
-| Promoted | **Yes, 2026-08-21** — 9 rows into `public.requirement_items`, all `review_status='pending'`. See *Promotion* below. |
+| Promoted | **Yes, 2026-08-21** — 9 rows into `public.requirement_items`, landed `review_status='pending'` and **approved the same day at 12:02 UTC**. See *Promotion* and *approved and serving* below. |
 | Gate | `./.venv311/bin/python scripts/check_ve_ie_batch.py` |
 
 ## Why a conversion step exists
@@ -129,11 +129,14 @@ smuggled into a load.
 
 ## Promotion — 2026-08-21 (AIQ-2027 go-live)
 
-All 9 rows were promoted into `public.requirement_items` on 2026-08-21. **IRELAND is now 20
-approved + 9 pending = 29**; the original 20 were not touched. The promoted rows are
+All 9 rows were promoted into `public.requirement_items` on 2026-08-21, taking **IRELAND to
+20 approved + 9 pending = 29**; the original 20 were not touched. They landed
 `review_status='pending'` / `verification_status='representative'` / `purpose='employment'`, so
-`crud.list_requirements` — the single publication gate — withholds all 9 from both readers until
-a reviewer approves them.
+`crud.list_requirements` — the single publication gate — withheld all 9 from both readers.
+
+**That is the state at load time, and it lasted about two and a half hours.** All nine were
+approved at 12:02 UTC the same day and are now served; see *approved and serving* below. The rest
+of this section describes the promotion itself, which is what it was reviewing.
 
 Two gates had to be opened by hand, each previewed and asserted inside a transaction:
 
@@ -176,7 +179,7 @@ already known about, not the next one nobody has written yet.
 | `…:spouse_stamp_1g_right_to_work` | CSEP spouse gets Stamp 1G with employment access |
 | `…:dependant_join_family_d_visa_required` | Dependants need their own Join Family 'D' visa |
 
-All nine are `verification_status='representative'` and `review_status='pending'`.
+All nine are `verification_status='representative'`. They were `review_status='pending'` when this was written and were approved at 2026-08-21 12:02 UTC — including these four, which is the reason the *approved and serving* section below exists.
 
 ## Reproducing
 
