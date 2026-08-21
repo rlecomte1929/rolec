@@ -421,7 +421,24 @@ def _source_dto(record: Any) -> SourceRecordDTO:
     )
 
 
-def _citation_dtos(citations: Any, source_map: Dict[str, Any]) -> List[SourceRecordDTO]:
+def _is_web_url(value: str) -> bool:
+    """Only `http`/`https` may reach an `href`.
+
+    Both callers render this straight into `<a href=...>` — `Citations.tsx` for the employee and
+    `CountryDetail.tsx` for the reviewer — so a `javascript:` scheme here is a click away from
+    executing in either. The string branch has always required a web scheme; the dict branch,
+    added when the reader learned the inline-object shape, did not, and passed
+    `javascript:alert(document.cookie)` through untouched. Citation objects come from research
+    NDJSON and generator scripts, which is machine-authored input we do not control the contents
+    of, so the shape of the citation must not decide whether the scheme is checked.
+
+    A rejected citation is not silently gone: the review surface lists it as an unresolved
+    source, unlinked, which is what a reviewer needs to see before publishing the row.
+    """
+    return value.lower().startswith(("http://", "https://"))
+
+
+def citation_dtos(citations: Any, source_map: Dict[str, Any]) -> List[SourceRecordDTO]:
     """Resolve a row's `citations_json` into DTOs, across the three shapes prod holds.
 
     `citations_json` is not one format, and treating it as one silently cost real citations:
@@ -451,16 +468,21 @@ def _citation_dtos(citations: Any, source_map: Dict[str, Any]) -> List[SourceRec
                 resolved.append(_source_dto(source_map[citation]))
                 continue
             url = citation.strip()
-            if not url.lower().startswith(("http://", "https://")):
+            if not _is_web_url(url):
                 # Neither a known id nor a URL — an unresolvable reference, not a source.
                 continue
             resolved.append(_inline_source_dto(url, None))
         elif isinstance(citation, dict):
             url = str(citation.get("url") or "").strip()
-            if not url:
+            if not _is_web_url(url):
                 continue
             resolved.append(_inline_source_dto(url, citation.get("name")))
     return resolved
+
+
+#: Public since the admin review surface needs the same resolution (`routers/admin.py`). The
+#: underscored name stays so the existing importers keep working.
+_citation_dtos = citation_dtos
 
 
 def _inline_source_dto(url: str, name: Optional[str]) -> SourceRecordDTO:

@@ -134,13 +134,22 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
               {item.citations.length > 0 && (
                 <ul className="text-xs text-[#6b7280] mt-2 space-y-1">
                   {item.citations.map((c) => (
-                    <li key={c} className="truncate">
-                      {c.startsWith('http') ? (
-                        <a href={c} target="_blank" rel="noopener noreferrer" className="underline">
-                          {c}
+                    <li key={c.id} className="truncate">
+                      {c.url ? (
+                        <a
+                          href={c.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                          title={c.url}
+                        >
+                          {c.title}
                         </a>
                       ) : (
-                        c
+                        // No URL means the backend could not resolve this reference at all.
+                        // Say so — an unresolvable citation on a row about to be published is
+                        // the defect this screen exists to catch, not a cosmetic gap.
+                        <span className="text-[#b45309]">{c.title} (unresolved source)</span>
                       )}
                     </li>
                   ))}
