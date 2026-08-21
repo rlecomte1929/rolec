@@ -88,6 +88,9 @@ _ADJECTIVAL = {
     "LITHUANIAN": "LT", "LUXEMBOURGISH": "LU", "MALTESE": "MT", "POLISH": "PL",
     "PORTUGUESE": "PT", "ROMANIAN": "RO", "SLOVAK": "SK", "SLOVENIAN": "SI",
     "SPANISH": "ES",
+    # Kept in step with the country-name table above — every country needs both
+    # forms, because production stores whichever the person typed.
+    "HONG KONGER": "HK", "VENEZUELAN": "VE",
 }
 
 # Full country names for the free-movement set. `to_iso` only knows the seven
@@ -102,6 +105,20 @@ _COUNTRY_NAME = {
     "LIECHTENSTEIN": "LI", "LITHUANIA": "LT", "LUXEMBOURG": "LU", "MALTA": "MT",
     "POLAND": "PL", "PORTUGAL": "PT", "ROMANIA": "RO", "SLOVAKIA": "SK",
     "SLOVENIA": "SI", "SPAIN": "ES", "SWEDEN": "SE", "SWITZERLAND": "CH",
+    # Non-EU/EEA names. This table began as the free-movement set, so every
+    # country in it was a member state — and the adjectival table meanwhile grew
+    # non-EU entries (INDIAN, AMERICAN, SINGAPOREAN, BRITISH). The two fell out of
+    # step, and the gap was invisible because `to_iso` resolves seeded
+    # DESTINATIONS by name: "Germany" and "France" worked as destinations while
+    # "India" and "Hong Kong" — real nationalities we do not sell relocations TO —
+    # returned None. Nationality ranges over every country; the destination
+    # catalog does not, so it cannot be the fallback for this lookup.
+    "GERMANY": "DE", "FRANCE": "FR", "NETHERLANDS": "NL", "NORWAY": "NO",
+    "UNITED KINGDOM": "GB", "GREAT BRITAIN": "GB", "UK": "GB",
+    "UNITED STATES": "US", "UNITED STATES OF AMERICA": "US", "USA": "US",
+    "INDIA": "IN", "SINGAPORE": "SG", "HONG KONG": "HK",
+    # Named on AIQ-1993: Andrea, the first real ES->IE case, is Venezuelan.
+    "VENEZUELA": "VE",
 }
 
 

@@ -160,13 +160,25 @@ def to_fact_row(
 ) -> FactRow:
     """Convert ONE approved candidate into a stageable FactRow.
 
-    Pinned to `needs_review` regardless of how official the claimed source looks — see the
-    module docstring. `evidence_quote` is deliberately left empty: the beam has no quoted
-    line, and synthesising one from the model's own prose would manufacture the very
-    evidence the tier is supposed to measure.
+    Pinned to `needs_review` regardless of how official the source looks — see the module
+    docstring — and that holds for a human-researched source too. A person finding the right
+    government page is better provenance than a model claim, and it is still not a checked
+    citation; lifting the tier here would undo the argument the whole feature rests on.
+
+    Two sources are possible and they are NOT interchangeable in the record:
+    `source` is the model's verbatim claim, `researched_source_url` is a human's finding for a
+    candidate the beam could not cite. The model's claim wins when both exist — it is what the
+    row was generated from — and whichever is used is named in `downgrades`, so a reader of
+    the staged row can tell them apart without joining back to the beam tables.
+
+    `evidence_quote` stays empty for a model-claimed source: the beam has no quoted line, and
+    synthesising one from its own prose would manufacture the very evidence the tier measures.
+    A researched source may carry one, because a person actually read the page.
     """
     title = str(candidate.get("title") or "").strip()
-    source = (candidate.get("source") or "").strip()
+    claimed = (candidate.get("source") or "").strip()
+    researched = (candidate.get("researched_source_url") or "").strip()
+    source = claimed or researched
     if not title:
         raise ValueError("candidate has no title")
     if not source:
@@ -203,7 +215,12 @@ def to_fact_row(
             "beam_pass_frequency": candidate.get("pass_frequency"),
             "beam_confidence_band": candidate.get("confidence_band"),
         },
-        evidence_quote=None,
+        # Only a human-researched source can carry a quote; see the docstring.
+        evidence_quote=(
+            (str(candidate.get("researched_evidence_quote") or "").strip() or None)
+            if not claimed
+            else None
+        ),
         confidence="medium",
     )
 
@@ -214,10 +231,16 @@ def to_fact_row(
     # The control. grade() would award auto_accepted to an official-looking host; a beam
     # source is an unverified claim, so the tier is pinned and the reason is recorded.
     row.accuracy_tier = TIER_REVIEW
-    row.downgrades.append(
-        "beam-origin: source is the model's unverified claim, not a checked citation — "
-        "pinned to needs_review"
-    )
+    if claimed:
+        row.downgrades.append(
+            "beam-origin: source is the model's unverified claim, not a checked citation — "
+            "pinned to needs_review"
+        )
+    else:
+        row.downgrades.append(
+            "beam-origin: source is human-researched, not model-claimed — still unverified, "
+            "pinned to needs_review"
+        )
     if row.source_class != "official":
         row.downgrades.append(f"claimed publisher is {row.source_class}")
     if candidate.get("flagged"):
@@ -251,7 +274,10 @@ def plan_import(
             plan.skipped.append(ImportSkip(uid, title, f"not approved: status={status or 'unset'}"))
             continue
 
-        if not (candidate.get("source") or "").strip():
+        if not (
+            (candidate.get("source") or "").strip()
+            or (candidate.get("researched_source_url") or "").strip()
+        ):
             plan.skipped.append(
                 ImportSkip(uid, title, "no source: research worklist, not importable")
             )

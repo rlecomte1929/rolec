@@ -96,9 +96,10 @@ class AdminCandidateBeamRouterTests(unittest.TestCase):
 
     def test_every_route_is_mounted_in_the_app_render_boots(self):
         paths = {r.path for r in main.app.routes if "candidate-beam" in r.path}
-        # 9 unique PATHS, not 9 endpoints: /runs carries both the GET listing and the
-        # POST that opens a run.
-        self.assertEqual(len(paths), 9, f"expected 9 route paths, got {sorted(paths)}")
+        # 10 unique PATHS, not 10 endpoints: /runs carries both the GET listing and the
+        # POST that opens a run. The tenth is /items/{id}/source, where a human's researched
+        # citation lands for a candidate the beam could not cite.
+        self.assertEqual(len(paths), 10, f"expected 10 route paths, got {sorted(paths)}")
 
     # ── auth ────────────────────────────────────────────────────────────────
 
@@ -137,7 +138,12 @@ class AdminCandidateBeamRouterTests(unittest.TestCase):
     # ── review ──────────────────────────────────────────────────────────────
 
     def test_approving_a_candidate_records_who_and_when(self):
-        self.session._rows = [{"status": "pending_review"}]
+        # Carries a source, because approval now requires one — an unsourced candidate would
+        # be skipped at import, so approving it tells the reviewer something untrue. The note
+        # below ("checked the citation") always implied there was one to check.
+        self.session._rows = [
+            {"status": "pending_review", "source": "https://www.impots.gouv.fr/x"}
+        ]
         resp = self.client.post(
             "/api/admin/candidate-beam/items/11111111-1111-4111-8111-111111111111/review",
             json={"status": "approved", "review_note": "checked the citation"},

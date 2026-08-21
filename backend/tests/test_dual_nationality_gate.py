@@ -32,11 +32,12 @@ from backend.app.services.nationality_class import (  # noqa: E402
 # ─── the case that forced the change ────────────────────────────────────────
 
 def test_the_venezuelan_italian_dual_moving_to_ireland_has_free_movement():
-    # "Venezuelan" is not in the adjectival table, so alone it classifies as None —
-    # which rules_engine turns into THIRD_COUNTRY via `nationality_class or THIRD_COUNTRY`.
-    # Either way the employee lands on the permit track. The second nationality is what
-    # rescues them.
-    assert classify("Venezuelan", "IRELAND") is None
+    # [AIQ-2033] "Venezuelan" now resolves to THIRD_COUNTRY instead of None — the
+    # adjectival and country-name tables were brought into symmetry. The property
+    # this test exists for is unchanged and now rests on a firmer footing: on the
+    # Venezuelan nationality alone the employee lands on the permit track, and it
+    # is the SECOND nationality that rescues them.
+    assert classify("Venezuelan", "IRELAND") == THIRD_COUNTRY
     assert classify_best(("Venezuelan", "Italian"), "IRELAND") == EU_EEA
 
 
@@ -57,18 +58,24 @@ def test_eu_eea_beats_third_country():
 
 
 def test_two_non_free_movement_nationalities_never_yield_free_movement():
-    # Both unrecognised -> None, which the caller treats as THIRD_COUNTRY. The property
-    # that matters is that nothing here can produce EU_EEA.
-    assert classify_best(("Venezuelan", "Brazilian"), "IRELAND") is None
-    # A recognised non-EEA nationality classifies positively.
-    assert classify_best(("American", "Japanese"), "IRELAND") in (None, THIRD_COUNTRY)
+    # The property that matters is that nothing here can produce EU_EEA — asserted
+    # directly rather than through whichever sentinel the tables happen to return.
+    # [AIQ-2033] Venezuelan resolves now, so this pair yields THIRD_COUNTRY where it
+    # used to yield None; a still-unrecognised pair keeps the None path covered.
+    assert classify_best(("Venezuelan", "Brazilian"), "IRELAND") == THIRD_COUNTRY
+    assert classify_best(("Brazilian", "Colombian"), "IRELAND") is None
+    for pair in (("Venezuelan", "Brazilian"), ("Brazilian", "Colombian"),
+                 ("American", "Japanese")):
+        assert classify_best(pair, "IRELAND") != EU_EEA, pair
 
 
 def test_an_unrecognised_adjectival_is_not_silently_free_movement():
     """The gap this exposed: the adjectival table covers the free-movement area well and
     the rest patchily. An unrecognised nationality must never round UP to EU_EEA — it
     returns None, and rules_engine falls back to the full requirement list."""
-    assert classify_best(("Venezuelan",), "IRELAND") is None
+    # [AIQ-2033] Venezuelan is recognised now, so the example moved to a nationality
+    # the tables still do not know. The rule under test is unchanged.
+    assert classify_best(("Brazilian",), "IRELAND") is None
 
 
 # ─── the honesty rule is preserved ──────────────────────────────────────────
