@@ -260,3 +260,88 @@ def test_the_validation_report_is_committed_and_green():
     assert report["target_table"] == "public.requirement_items"
     failed = [g["gate"] for g in report["gates"] if not g["pass"]]
     assert failed == []
+
+
+# ── nationality scoping: the padrón is not an EU thing ───────────────────────────────
+
+#: Address registration every resident of a Spanish municipality must complete, whatever
+#: passport they hold.
+UNIVERSAL_REGISTRATION = {
+    "empadronamiento_padron_municipal",
+    "empadronamiento_documents",
+    "empadronamiento_dependency_chain",
+}
+
+#: Registration that exists *because* the mover is exercising EU free movement.
+EU_SPECIFIC_REGISTRATION = {
+    "registration_certificado_registro_ue",
+    "registration_ex18_form_fee",
+    "registration_economic_means_proof",
+    "registration_nie_number",
+    "registration_cita_previa_bottleneck",
+    "registration_tie_only_for_non_eu",
+}
+
+
+def _nationality_by_topic(sql: str) -> dict:
+    """Map topic_key -> the emitted applies_to_nationality_classes_json literal.
+
+    Splits on ROW boundaries, not lines. Several of these rows embed a newline in their
+    description (the "Why this is easy to miss" paragraph), so a line-based parse silently
+    returns None for them — which reads as "not scoped" and would let a real regression pass.
+    """
+    rows = re.split(r"\n    \('(?=ES:IE-ES:)", sql)[1:]
+    out = {}
+    for row in rows:
+        topic = row.split("'", 1)[0].split(":")[-1]
+        # The nationality column is the last ["EU_EEA"]-shaped literal before NOW().
+        body = row.split("NOW()")[0]
+        out[topic] = "EU_EEA" if '["EU_EEA"]' in body else "ALL"
+    return out
+
+
+def test_the_padron_is_not_scoped_to_eu_nationals(migration_sql):
+    """`domain_area='registration'` bundles two different things, and the proxy over-reached.
+
+    A third-country national moving Dublin→Madrid must empadronarse — it is normally a
+    prerequisite for their TIE — and so must a returning Spanish national, whom `["EU_EEA"]`
+    also excludes. Scoped as it was, the padrón and the fact that it silently gates the health
+    card, school enrolment and the licence exchange were withheld from exactly the movers most
+    likely to be caught out by it.
+    """
+    nat = _nationality_by_topic(migration_sql)
+    for topic in UNIVERSAL_REGISTRATION:
+        assert nat.get(topic) == "ALL", (
+            f"{topic} is scoped {nat.get(topic)}; the Padrón Municipal applies to every "
+            "resident regardless of nationality"
+        )
+
+
+def test_the_eu_specific_registration_track_keeps_its_scoping(migration_sql):
+    """The control. The fix must narrow the proxy, not delete it.
+
+    The green certificate, its EX-18 form and fee, the economic-means test, the cita previa
+    and the NIE issued alongside all exist because the mover is an EU free mover. Serving them
+    to a third-country national would be the mirror-image defect.
+    """
+    nat = _nationality_by_topic(migration_sql)
+    for topic in EU_SPECIFIC_REGISTRATION:
+        assert nat.get(topic) == "EU_EEA", (
+            f"{topic} lost its EU/EEA scoping; a third-country national cannot be issued a "
+            "Certificado de Registro de Ciudadano de la Unión"
+        )
+
+
+def test_the_generator_and_the_committed_migration_agree(migration_sql):
+    """The file says GENERATED — regenerate, do not hand-edit. This holds that true."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "gen_ie_es", REPO / "scripts" / "gen_ie_es_corridor_load.py"
+    )
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+    assert gen.build_sql(gen.load_records()) == migration_sql, (
+        "the committed migration is not what the generator emits — someone hand-edited it, "
+        "or the generator changed without a re-emit"
+    )

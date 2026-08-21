@@ -85,6 +85,28 @@ PILLAR_OVERRIDES = {
 #: unscoped rather than narrowed on a guess.
 EU_EEA_ONLY_DOMAINS = {"registration", "immigration"}
 
+#: …but `domain_area='registration'` bundles two different things, and the proxy over-reaches.
+#:
+#: The EU-specific half is real: the green certificate, its EX-18 form and fee, the economic-means
+#: test, the cita previa that gates them, and the NIE issued alongside. Those exist because the
+#: mover is exercising free movement.
+#:
+#: The empadronamiento half is not. The Padrón Municipal is address registration for EVERY
+#: resident of a Spanish municipality — a third-country national moving Dublin→Madrid must
+#: empadronarse too, and it is normally a prerequisite for their TIE. So must a returning Spanish
+#: national, whom `["EU_EEA"]` also excludes, which is the case the scoping comment above was
+#: written to protect.
+#:
+#: Scoped as it was, the padrón — and the fact that it silently gates the health card, school
+#: enrolment and the licence exchange — was withheld from precisely the movers most likely to be
+#: caught out by it. Serving a requirement to the wrong audience and withholding it from the right
+#: one are the same defect seen from two sides.
+UNIVERSAL_REGISTRATION_TOPICS = {
+    "empadronamiento_padron_municipal",
+    "empadronamiento_documents",
+    "empadronamiento_dependency_chain",
+}
+
 EMPLOYER_OWNED = {"social_security_employer_alta", "social_security_a1_posted_worker"}
 
 
@@ -230,7 +252,10 @@ def to_row(record: Dict[str, Any]) -> Dict[str, str]:
         description = f"{description}\n\nWhy this is easy to miss: {record['non_obvious_note']}"
 
     nationality = (
-        '["EU_EEA"]' if record["domain_area"] in EU_EEA_ONLY_DOMAINS else None
+        '["EU_EEA"]'
+        if record["domain_area"] in EU_EEA_ONLY_DOMAINS
+        and record["topic_key"] not in UNIVERSAL_REGISTRATION_TOPICS
+        else None
     )
 
     return {
