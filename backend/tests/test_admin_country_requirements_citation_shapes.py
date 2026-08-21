@@ -163,5 +163,37 @@ class TestUnresolvableReferenceIsShownNotDropped(unittest.TestCase):
         self.assertEqual(dto.citations[0].title, "fr-src-0007-not-in-source-records")
 
 
+class TestOnlyWebSchemesReachAnHref(unittest.TestCase):
+    """A citation URL is rendered straight into `<a href=...>` on both surfaces.
+
+    The string branch of `citation_dtos` has always required http/https. The dict branch, added
+    when the reader learned the inline-object shape, did not — so a citation object could carry
+    `javascript:` all the way to the reviewer's link, and to the employee's via `Citations.tsx`.
+    Citation objects come from research NDJSON and generator scripts; the shape of a citation
+    must not decide whether its scheme is checked.
+
+    The admin surface still LISTS the rejected entry as an unresolved source. Silently dropping
+    a hostile citation would hide it from the person deciding whether to publish the row.
+    """
+
+    def test_a_javascript_url_never_becomes_a_link(self) -> None:
+        hostile = {"url": "javascript:alert(document.cookie)", "name": "Official source"}
+        dto = _review_dto(_item([hostile]), SOURCE_MAP)
+        self.assertEqual(len(dto.citations), 1)
+        self.assertIsNone(dto.citations[0].url)
+
+    def test_the_check_is_not_defeated_by_casing_or_padding(self) -> None:
+        dto = _review_dto(_item([{"url": "  JaVaScRiPt:alert(1)"}]), SOURCE_MAP)
+        self.assertIsNone(dto.citations[0].url)
+
+    def test_a_data_url_is_refused_too(self) -> None:
+        dto = _review_dto(_item([{"url": "data:text/html,<script>alert(1)</script>"}]), SOURCE_MAP)
+        self.assertIsNone(dto.citations[0].url)
+
+    def test_a_real_https_source_is_unaffected(self) -> None:
+        dto = _review_dto(_item([VE_IE_CITATION]), SOURCE_MAP)
+        self.assertEqual(dto.citations[0].url, VE_IE_CITATION["url"])
+
+
 if __name__ == "__main__":
     unittest.main()

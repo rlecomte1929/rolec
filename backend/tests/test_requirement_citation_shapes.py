@@ -130,5 +130,23 @@ class TestMixedAndDegenerate(unittest.TestCase):
         self.assertEqual(_citation_dtos([RECORD.id], {}), [])
 
 
+class TestSchemeGate(unittest.TestCase):
+    """`Citations.tsx:24` renders `href={source.url}` — so a non-web scheme must never survive.
+
+    The string branch always required http/https; the dict branch did not until this was fixed,
+    which meant the shape a citation happened to be stored in decided whether it was checked.
+    """
+
+    def test_a_dict_citation_cannot_smuggle_a_javascript_url(self) -> None:
+        self.assertEqual(_citation_dtos([{"url": "javascript:alert(1)"}], {}), [])
+
+    def test_a_string_citation_still_cannot_either(self) -> None:
+        self.assertEqual(_citation_dtos(["javascript:alert(1)"], {}), [])
+
+    def test_https_is_untouched(self) -> None:
+        got = _citation_dtos([{"url": "https://www.gov.ie/x", "name": "Gov"}], {})
+        self.assertEqual(got[0].url, "https://www.gov.ie/x")
+
+
 if __name__ == "__main__":
     unittest.main()
