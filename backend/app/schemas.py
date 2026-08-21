@@ -108,7 +108,11 @@ class SourceRecordDTO(BaseModel):
     url: str
     title: str
     publisherDomain: str
-    retrievedAt: datetime
+    #: Optional because only a `source_records` row actually records a retrieval time. A
+    #: citation stored as a bare URL or an inline object was never retrieved by us, and this
+    #: field drives the client's StalenessBadge — inventing a timestamp here would manufacture
+    #: a freshness claim for a page nobody has checked. None renders no badge.
+    retrievedAt: Optional[datetime] = None
     snippet: Optional[str] = None
 
 

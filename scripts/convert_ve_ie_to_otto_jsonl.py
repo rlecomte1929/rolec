@@ -142,6 +142,13 @@ def to_record(rec: Dict[str, Any]) -> Dict[str, Any]:
         "applies_to": {
             "corridor": f"{origin}->{dest}",
             "nationality": nationality_for(rec),
+            # `mappings.resolve()` derives the requirement's `purpose` from this key
+            # (`PURPOSES`: professional -> employment). Omitting it yields `purpose='other'`,
+            # and `crud.list_requirements` filters `WHERE purpose = :purpose` while
+            # `requirements_builder` asks for 'employment' — so the rows would promote,
+            # approve, go live, and be permanently invisible to the employee. All 20 existing
+            # IRELAND rows are `purpose='employment'`. This batch is an employment relocation.
+            "status": "professional",
             # Everything below has no column in `immigration_fact_candidates`. It rides here
             # verbatim so a reviewer sees what the research actually said — in particular the
             # four rows counsel has to clear before anything is approved.
@@ -191,6 +198,9 @@ def check(records: List[Dict[str, Any]]) -> List[str]:
         if out["applies_to"]["nationality"] != "non-EEA":
             problems.append(f"{uid}: nationality {out['applies_to']['nationality']!r} — this "
                             "batch is a third-country national, the free-mover track is wrong")
+        if out["applies_to"].get("status") != "professional":
+            problems.append(f"{uid}: applies_to.status is not 'professional' — the requirement "
+                            "would promote as purpose='other' and never be served")
         note = rec.get("non_obvious_note") or {}
         for half in ("official_guidance", "actual_reality", "action_required"):
             if note and str(note[half]).strip() not in out["fact_text"]:

@@ -24,7 +24,13 @@ export const Citations: React.FC<CitationsProps> = ({ sources }) => {
             href={source.url}
             target="_blank"
             rel="noreferrer"
-            title={`Retrieved ${new Date(source.retrievedAt).toLocaleDateString('en-US')}`}
+            // Undefined for a citation stored as a bare URL or an inline object — nobody
+            // retrieved those, so there is no date to show and we do not invent one.
+            title={
+              source.retrievedAt
+                ? `Retrieved ${new Date(source.retrievedAt).toLocaleDateString('en-US')}`
+                : undefined
+            }
             className="text-[#0b2b43] hover:underline"
           >
             {source.publisherDomain}
