@@ -164,14 +164,32 @@ class CountryProfileDTO(BaseModel):
     requirementGroups: List[Dict[str, Any]] = []
 
 
+class AdminCitationDTO(BaseModel):
+    """One resolved citation, as the review surface needs it.
+
+    Not `SourceRecordDTO`, for one reason: `url` here is Optional. `citations_json` holds
+    `source_records` ids, and some of them dangle — FRANCE carries 14 non-URL string citations
+    of which only 4 resolve. The employee reader is right to drop an unresolvable reference;
+    the reviewer is the one person who has to SEE that a requirement's only citation points at
+    nothing, because they are the one about to publish it. A dangling reference therefore
+    arrives with its raw text as the title and no `url` to link to.
+
+    No `retrievedAt`/`snippet`: the review surface links out and reads the page itself.
+    """
+
+    #: The `source_records` id, else the URL, else the raw text. Stable, and the client's key.
+    id: str
+    url: Optional[str] = None
+    title: str
+    publisherDomain: Optional[str] = None
+
+
 class AdminRequirementReviewDTO(BaseModel):
     """One requirement as an ADMIN needs to see it before deciding to publish it.
 
-    Deliberately not `RequirementItemDTO`: that one is the employee-facing shape, its
-    `citations` are resolved `SourceRecordDTO` records (which is why the admin handler used to
-    pass `citations=[]` and drop them), and it carries no review fields. An admin needs the raw
-    source URLs, the provenance, the nationality scope and the review state — the things the
-    decision actually turns on.
+    Deliberately not `RequirementItemDTO`: that one is the employee-facing shape and carries no
+    review fields. An admin needs the sources, the provenance, the nationality scope and the
+    review state — the things the decision actually turns on.
     """
 
     id: str
@@ -191,7 +209,7 @@ class AdminRequirementReviewDTO(BaseModel):
     # serves a third-country visa track to an EU free mover.
     appliesToNationalityClasses: Optional[List[str]] = None
     appliesToAssignmentTypes: Optional[List[str]] = None
-    citations: List[str] = []
+    citations: List[AdminCitationDTO] = []
     lastVerifiedAt: Optional[datetime] = None
     # Counsel attestation — ORTHOGONAL to verificationStatus, never a rung on the same
     # ladder. That one is our own provenance (representative -> corpus_grounded ->

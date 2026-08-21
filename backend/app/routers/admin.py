@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 import os
 import uuid
@@ -12,6 +12,7 @@ from ..db import SessionLocal
 from ...database import db, Database
 from .. import crud, schemas, models
 from ..services.research import run_country_research
+from ..services import requirements_builder
 from ..services.official_ingest_service import ingest_url_to_knowledge_doc
 from ..services.audit_log_service import (
     ACTION_INSERT,
@@ -142,7 +143,52 @@ def get_country(country_code: str, user: dict = Depends(require_admin)):
 _REVIEW_STATUSES = {"approved", "rejected"}
 
 
-def _review_dto(item: Any) -> schemas.AdminRequirementReviewDTO:
+def _admin_citation_dtos(
+    raw: Any, source_map: Dict[str, Any]
+) -> List[schemas.AdminCitationDTO]:
+    """Resolve `citations_json` for the review surface, across all three shapes prod holds.
+
+    Delegates the resolution itself to `requirements_builder.citation_dtos` — the same function
+    the employee dossier uses — so the reviewer cannot be reading a citation the reader resolves
+    differently. That is the whole point of reusing it rather than re-parsing here.
+
+    ONE deliberate divergence. `citation_dtos` skips anything it cannot resolve, which is correct
+    for a reader: an unresolvable reference is not a source, and showing a broken one to an
+    employee helps nobody. On this screen the opposite holds — a citation that silently vanishes
+    is a requirement being approved as uncited with no one the wiser. So an entry that resolves
+    to nothing is still listed, with its raw text and no URL, and looks as broken as it is.
+    """
+    resolved: List[schemas.AdminCitationDTO] = []
+    for entry in raw or []:
+        dtos = requirements_builder.citation_dtos([entry], source_map)
+        if dtos:
+            found = dtos[0]
+            resolved.append(
+                schemas.AdminCitationDTO(
+                    id=found.id,
+                    url=found.url,
+                    title=found.title,
+                    publisherDomain=found.publisherDomain,
+                )
+            )
+            continue
+        # Unresolvable. Name it as precisely as the entry allows so the reviewer can tell a
+        # dangling source id from a citation object that forgot its url.
+        if isinstance(entry, dict):
+            label = str(entry.get("name") or entry.get("topic_key") or "").strip() or json.dumps(
+                entry, ensure_ascii=False, sort_keys=True
+            )
+        else:
+            label = str(entry).strip()
+        if not label:
+            continue
+        resolved.append(schemas.AdminCitationDTO(id=label, url=None, title=label))
+    return resolved
+
+
+def _review_dto(
+    item: Any, source_map: Optional[Dict[str, Any]] = None
+) -> schemas.AdminRequirementReviewDTO:
     def _arr(raw: Optional[str]) -> Optional[List[str]]:
         if not raw:
             return None
@@ -168,7 +214,7 @@ def _review_dto(item: Any) -> schemas.AdminRequirementReviewDTO:
         reviewedAt=getattr(item, "reviewed_at", None),
         appliesToNationalityClasses=_arr(getattr(item, "applies_to_nationality_classes_json", None)),
         appliesToAssignmentTypes=_arr(getattr(item, "applies_to_assignment_types_json", None)),
-        citations=_arr(getattr(item, "citations_json", None)) or [],
+        citations=_admin_citation_dtos(_arr(getattr(item, "citations_json", None)), source_map or {}),
         lastVerifiedAt=getattr(item, "last_verified_at", None),
     )
 
@@ -183,7 +229,11 @@ def list_country_requirements(country_code: str, user: dict = Depends(require_ad
     code = country_code.strip().upper()
     with SessionLocal() as db:
         items = crud.list_requirements(db, code, include_unapproved=True)
-        dtos = [_review_dto(i) for i in items]
+        # Needed to resolve `source_records`-id citations, which is most of what the older
+        # rows carry. Without it every one of them degrades to its bare id — 45 citations
+        # across six countries, and the reviewer would have no link to check.
+        source_map = {record.id: record for record in crud.list_sources(db, code)}
+        dtos = [_review_dto(i, source_map) for i in items]
     order = {"pending": 0, "rejected": 1, "approved": 2}
     dtos.sort(key=lambda d: (order.get(d.reviewStatus, 9), d.purpose, d.title))
     return schemas.AdminRequirementListDTO(
@@ -224,7 +274,11 @@ def review_country_requirement(
         item.reviewed_at = datetime.utcnow()
         db.commit()
         db.refresh(item)
-        dto = _review_dto(item)
+        source_map = {
+            record.id: record
+            for record in crud.list_sources(db, (item.country_code or "").upper())
+        }
+        dto = _review_dto(item, source_map)
 
     _audit_postgres(
         entity_type="requirement_item",

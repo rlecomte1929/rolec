@@ -421,7 +421,7 @@ def _source_dto(record: Any) -> SourceRecordDTO:
     )
 
 
-def _citation_dtos(citations: Any, source_map: Dict[str, Any]) -> List[SourceRecordDTO]:
+def citation_dtos(citations: Any, source_map: Dict[str, Any]) -> List[SourceRecordDTO]:
     """Resolve a row's `citations_json` into DTOs, across the three shapes prod holds.
 
     `citations_json` is not one format, and treating it as one silently cost real citations:
@@ -461,6 +461,11 @@ def _citation_dtos(citations: Any, source_map: Dict[str, Any]) -> List[SourceRec
                 continue
             resolved.append(_inline_source_dto(url, citation.get("name")))
     return resolved
+
+
+#: Public since the admin review surface needs the same resolution (`routers/admin.py`). The
+#: underscored name stays so the existing importers keep working.
+_citation_dtos = citation_dtos
 
 
 def _inline_source_dto(url: str, name: Optional[str]) -> SourceRecordDTO:
