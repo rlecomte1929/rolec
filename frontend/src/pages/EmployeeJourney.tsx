@@ -34,6 +34,13 @@ import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '
  * use) opens the roadmap; a pre-submission case opens the case-scoped intake
  * wizard (/employee/case/{id}/intake — AIQ-976, so a multi-case employee opens
  * the clicked case, not the primary one).
+ *
+ * AIQ-1950: the three claim/link flows below now come through here too. They used to
+ * navigate to `/employee/case/{id}/summary`, a route that has never existed — so
+ * accepting an HR invite fell through <Route path="*"> to NotFoundRedirect and bounced
+ * the employee to their role home, silently. Status is unknown at claim time and
+ * isIntakeComplete(undefined) is false, which is the right answer: a freshly claimed
+ * case opens intake.
  */
 function openCaseHref(navId: string, status?: string | null): string {
   return isIntakeComplete(status)
@@ -312,7 +319,7 @@ export const EmployeeJourney: React.FC = () => {
         const targetId = res.assignmentId;
         await refetchAssignment();
         if (targetId) {
-          navigate(`/employee/case/${targetId}/summary`, { replace: true });
+          navigate(openCaseHref(targetId), { replace: true });
         }
       })
       .catch((err: unknown) => {
@@ -418,7 +425,7 @@ export const EmployeeJourney: React.FC = () => {
         alreadyLinked: Boolean(res.alreadyLinked),
       });
       await refetchAssignment();
-      navigate(`/employee/case/${nextAssignment}/summary`);
+      navigate(openCaseHref(nextAssignment));
     } catch (err: unknown) {
       const transport = getClientTransportErrorMessage(err);
       setError(transport ?? getApiErrorMessage(err, "We couldn't link this case. Check the code from HR and try again, or contact your HR team if the issue persists."));
@@ -474,7 +481,7 @@ export const EmployeeJourney: React.FC = () => {
         assignmentId: nextAssignment,
       });
       await refetchAssignment();
-      navigate(`/employee/case/${nextAssignment}/summary`);
+      navigate(openCaseHref(nextAssignment));
     } catch (err: unknown) {
       const transport = getClientTransportErrorMessage(err);
       if (transport) {

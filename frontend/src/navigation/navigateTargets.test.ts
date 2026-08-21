@@ -17,9 +17,20 @@
  * perfectly real, which is how a guard like this earns a reputation for crying wolf and
  * gets deleted.
  *
- * Scope: only literal, parameterless navigate('/…') calls. Template literals and
- * buildRoute() are already type-checked or dynamic; this targets exactly the hand-written
- * string that rots when a route is renamed.
+ * Scope (widened by AIQ-1950): literal navigate('/…'), template-literal navigate(`/…`),
+ * and literal <Link to>/<a href> targets. The original scope note claimed template
+ * literals were "already type-checked or dynamic" — they are neither. A template literal
+ * is still a hand-written string; only the `${…}` segments are dynamic, and the literal
+ * parts around them rot exactly like any other. That gap hid two live bugs:
+ *
+ *   - `/employee/case/${id}/summary` in EmployeeJourney.tsx (x3) — a route that has never
+ *     existed, on the invite-claim and case-link flows, so accepting an HR invite bounced
+ *     the employee to their role home.
+ *   - `/terms` in AuthScreen.tsx — the "Terms of Service" link on the signup consent line.
+ *
+ * `${…}` is normalised to a single path segment before matching, so a template target is
+ * checked on its literal skeleton and its params are ignored — which is the part that can
+ * actually be wrong.
  */
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
@@ -80,5 +91,69 @@ describe('navigate() targets resolve to real routes', () => {
       'fall through to the catch-all and silently send the user somewhere else — the ' +
       'TD-BUG-1 failure. Use buildRoute(<key>) so a rename is a type error, or add the route.',
     ).toEqual([]);
+  });
+
+  /**
+   * A template literal is a hand-written path with holes in it. Normalising `${…}` to one
+   * segment leaves the skeleton, which is the part that rots when a route is renamed.
+   */
+  it('no navigate(`/…`) template literal targets a path the router cannot match', () => {
+    const dead: string[] = [];
+    for (const file of walk(SRC)) {
+      const src = readFileSync(file, 'utf8');
+      for (const m of src.matchAll(/navigate\(\s*`(\/[^`]*)`/g)) {
+        const raw = m[1]!;
+        const target = raw.replace(/\$\{[^}]*\}/g, 'X').split('?')[0]!.replace(/\/$/, '') || '/';
+        if (!resolves(target, routePaths)) {
+          dead.push(`${file.replace(SRC, 'src')} → navigate(\`${raw}\`)`);
+        }
+      }
+    }
+    expect(dead,
+      'These template-literal navigate() calls target paths with no matching <Route>. ' +
+      'The catch-all swallows them, so the user is silently sent to their role home ' +
+      'instead of where the button said. Fix the target, do not widen the catch-all.',
+    ).toEqual([]);
+  });
+
+  /**
+   * `<Link to>` and `<a href>` fail the same way navigate() does, and were never covered.
+   *
+   * KNOWN_BROKEN is not an accepted exception — it is one real bug that needs a decision
+   * this guard cannot make. `/terms` is the "Terms of Service" link on the signup consent
+   * line, and there is no Terms page anywhere in the repo or in production (relopass.com
+   * /terms returns the marketing homepage, byte-identical to a nonsense path, while
+   * /privacy returns a real 12KB page). Writing terms of service is a legal act and
+   * deleting the reference changes what the user is consenting to, so neither belongs in
+   * an agent's diff. Tracked in AIQ-1950; delete this entry when the page exists or the
+   * copy changes — do not add to it.
+   */
+  const KNOWN_BROKEN = new Set(['/terms']);
+
+  it('no <Link to>/<a href> points at a path the router cannot match', () => {
+    const dead: string[] = [];
+    for (const file of walk(SRC)) {
+      const src = readFileSync(file, 'utf8');
+      for (const m of src.matchAll(/(?:to|href)=\{?["'`](\/[^"'`]*)["'`]/g)) {
+        const raw = m[1]!;
+        const target = raw.replace(/\$\{[^}]*\}/g, 'X').split('?')[0]!.replace(/\/$/, '') || '/';
+        if (KNOWN_BROKEN.has(target)) continue;
+        if (!resolves(target, routePaths)) {
+          dead.push(`${file.replace(SRC, 'src')} → ${raw}`);
+        }
+      }
+    }
+    expect(dead,
+      'These link targets have no matching <Route>. A dead <Link> is invisible to tsc ' +
+      'and silent at runtime — the user just lands somewhere else.',
+    ).toEqual([]);
+  });
+
+  it('the link guard still sees the one link we know is broken', () => {
+    // Without this, deleting the AuthScreen link would leave KNOWN_BROKEN as a permanent
+    // lie and the next real break could be waved through as "already known".
+    const authScreen = readFileSync(join(SRC, 'features/platform-v2/auth/AuthScreen.tsx'), 'utf8');
+    expect(authScreen).toContain('href="/terms"');
+    expect(resolves('/terms', routePaths)).toBe(false);
   });
 });
