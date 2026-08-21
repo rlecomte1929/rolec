@@ -4,13 +4,14 @@
   "description": "Human-Level-Performance (HLP) baseline for non-obvious requirement recall, sliced per (corridor x employee_type). Each slice lists the lawyer-verifiable ground-truth set of NON-OBVIOUS requirements a produced roadmap must serve for that slice. Recall for a slice = non_obvious_requirements_correctly_served / total (the length of `requirements`). There is deliberately NO cross-slice average anywhere: the worst slice is the number that ships (data-centric AI / slice-based eval vs HLP, Ng MLOps C1 W2-3).",
   "hlp": {
     "standard": "lawyer_verified",
-    "note": "Per-slice `verification.status` records counsel sign-off. Entries are grounded in the corridor pathway YAMLs' non_obvious step flags (see each slice's `verification.source`); a slice stays `pending_lawyer_signoff` until a regulated professional confirms the list, and the dashboard surfaces that flag rather than hiding it. Counts must never be padded to make a slice look better: removing a genuinely non-obvious requirement from this file inflates recall and defeats the metric."
+    "note": "Per-slice `verification.status` records counsel sign-off. Entries are grounded in the corridor pathway YAMLs' non_obvious step flags (see each slice's `verification.source`); a slice stays `pending_lawyer_signoff` until a regulated professional confirms the list, and the dashboard surfaces that flag rather than hiding it. Counts must never be padded to make a slice look better: removing a genuinely non-obvious requirement from this file inflates recall and defeats the metric.",
+    "must_not_serve_note": "The precision half. `requirements` is what this audience must be shown; `must_not_serve` is what it must never be shown. Recall alone is blind to over-serving — telling a free mover to obtain a 'D' visa costs zero recall — and every defect the 2026-08-21 ES→IE audit found was an over-serving defect. A slice with no `must_not_serve` is unconstrained, and reports itself as such via n_forbidden=0 rather than counting as clean."
   },
   "slices": [
     {
       "corridor": "FR_NO",
       "employee_type": "eu_national",
-      "label": "France \u2192 Norway \u00b7 EU national",
+      "label": "France → Norway · EU national",
       "verification": {
         "status": "pending_lawyer_signoff",
         "verified_by": null,
@@ -21,7 +22,7 @@
         {
           "key": "eea_registration_90_day_window",
           "match": "eea registration",
-          "why": "No residence permit is required, so movers assume no formality at all \u2014 but police EEA registration (registreringsbevis, Utlendingsloven \u00a7110/\u00a7117) is mandatory within 90 days of arrival."
+          "why": "No residence permit is required, so movers assume no formality at all — but police EEA registration (registreringsbevis, Utlendingsloven §110/§117) is mandatory within 90 days of arrival."
         },
         {
           "key": "d_number_before_bank",
@@ -33,12 +34,24 @@
           "match": "skattekort",
           "why": "Without a tax deduction card (skattekort) before the first pay run, Norwegian payroll withholds at the punitive default rate."
         }
+      ],
+      "must_not_serve": [
+        {
+          "key": "work_permit",
+          "match": "work / residence permit",
+          "why": "An EEA national moving France→Norway registers under the EEA scheme; there is no residence permit to apply for."
+        },
+        {
+          "key": "sponsorship",
+          "match": "employer sponsorship letter",
+          "why": "Sponsorship belongs to the third-country permit track."
+        }
       ]
     },
     {
       "corridor": "FR_NO",
       "employee_type": "non_eu_eea_national",
-      "label": "France \u2192 Norway \u00b7 non-EU EEA national",
+      "label": "France → Norway · non-EU EEA national",
       "verification": {
         "status": "pending_lawyer_signoff",
         "verified_by": null,
@@ -49,24 +62,36 @@
         {
           "key": "eea_registration_90_day_window",
           "match": "eea registration",
-          "why": "EEA-but-not-EU nationals still ride EEA Agreement Art. 28 free movement, and still owe the 90-day police EEA registration \u2014 the 'not EU so maybe I need a visa / maybe nothing applies' confusion cuts both ways."
+          "why": "EEA-but-not-EU nationals still ride EEA Agreement Art. 28 free movement, and still owe the 90-day police EEA registration — the 'not EU so maybe I need a visa / maybe nothing applies' confusion cuts both ways."
         },
         {
           "key": "d_number_before_bank",
           "match": "d-number",
-          "why": "Same sequencing trap as every FR\u2192NO track: D-number/personnummer gates banking, payroll and tax."
+          "why": "Same sequencing trap as every FR→NO track: D-number/personnummer gates banking, payroll and tax."
         },
         {
           "key": "skattekort_before_first_pay",
           "match": "skattekort",
           "why": "Tax deduction card must exist before the first pay run."
         }
+      ],
+      "must_not_serve": [
+        {
+          "key": "work_permit",
+          "match": "work / residence permit",
+          "why": "EEA-but-not-EU (Iceland/Liechtenstein/Norway) carries the same free-movement right under the EEA Agreement."
+        },
+        {
+          "key": "sponsorship",
+          "match": "employer sponsorship letter",
+          "why": "As above — no sponsor is involved in an EEA registration."
+        }
       ]
     },
     {
       "corridor": "FR_NO",
       "employee_type": "non_eea_national",
-      "label": "France \u2192 Norway \u00b7 non-EEA national",
+      "label": "France → Norway · non-EEA national",
       "verification": {
         "status": "pending_lawyer_signoff",
         "verified_by": null,
@@ -77,7 +102,7 @@
         {
           "key": "residence_permit_before_work",
           "match": "residence permit",
-          "why": "A non-EEA national legally resident in France has NO free-movement right into Norway: a UDI residence permit must be GRANTED before work starts \u2014 French residence papers transfer nothing."
+          "why": "A non-EEA national legally resident in France has NO free-movement right into Norway: a UDI residence permit must be GRANTED before work starts — French residence papers transfer nothing."
         },
         {
           "key": "d_number_before_bank",
@@ -89,12 +114,19 @@
           "match": "skattekort",
           "why": "Tax deduction card must exist before the first pay run."
         }
+      ],
+      "must_not_serve": [
+        {
+          "key": "no_visa_required_claim",
+          "match": "no visa required",
+          "why": "KNOWN FAILING as of 2026-08-21, and deliberately left failing so the number stays true. FR_NO declares only an EEA_FREEDOM_2026 pathway, and roadmap_corridor_overlay._resolve_pathway serves pathways[0] to EVERY nationality with no class check. So a third-country national is shown the step title 'Travel to Norway (no visa required for EEA nationals)' AND, from the generic scaffold, 'Work / residence permit application' — two contradictory instructions in one plan. Fixing it needs a product decision (serve no overlay for an uncovered class, or author a third-country FR_NO pathway), so it is reported rather than silently excluded."
+        }
       ]
     },
     {
       "corridor": "ES_IE",
       "employee_type": "eu_national",
-      "label": "Spain \u2192 Ireland \u00b7 EU national",
+      "label": "Spain → Ireland · EU national",
       "verification": {
         "status": "pending_lawyer_signoff",
         "verified_by": null,
@@ -105,7 +137,7 @@
         {
           "key": "revenue_rpn_before_first_pay",
           "match": "revenue",
-          "why": "Without a Revenue RPN registered before the first pay run, PAYE is deducted at the emergency rate (TCA 1997) \u2014 the Irish 'tax card before first pay' trap applies to EU movers too."
+          "why": "Without a Revenue RPN registered before the first pay run, PAYE is deducted at the emergency rate (TCA 1997) — the Irish 'tax card before first pay' trap applies to EU movers too."
         },
         {
           "key": "ppsn_before_payroll",
@@ -117,12 +149,54 @@
           "match": "bank account",
           "why": "Proof-of-address is a chicken-and-egg barrier on arrival; most movers must bridge with a digital account before a traditional Irish bank account opens."
         }
+      ],
+      "must_not_serve": [
+        {
+          "key": "csep_permit",
+          "match": "employment permit",
+          "why": "The Critical Skills Employment Permit is a third-country labour authorisation. An EU national exercising free movement into Ireland needs no employment permit at all."
+        },
+        {
+          "key": "d_visa",
+          "match": "'d' employment visa",
+          "why": "Ireland requires no entry visa from an EEA national. Telling a free mover to obtain one before travelling is the defect fixed in #1951."
+        },
+        {
+          "key": "irp_registration",
+          "match": "irp card",
+          "why": "IRP / Stamp 1 registration under Immigration Act 2004 s.9 is a duty of a non-national. An EEA national does not register with ISD."
+        },
+        {
+          "key": "stamp_4",
+          "match": "stamp 4",
+          "why": "Stamp 4 is the permission a Critical Skills holder converts to after 21 months. It has no meaning for a free mover."
+        },
+        {
+          "key": "stamp_1g_spouse",
+          "match": "stamp 1g",
+          "why": "Stamp 1G is a CSEP dependant permission. An EEA national's family member neither receives nor needs it."
+        },
+        {
+          "key": "visa_required_advisory",
+          "match": "VISA_REQUIRED_NATIONAL",
+          "why": "An advisory conditioned on the third-country entry path. Emitted to every nationality until #1951."
+        },
+        {
+          "key": "ltr_advisory",
+          "match": "SPANISH_LTR_DOES_NOT_TRANSFER",
+          "why": "Directive 2003/109/EC long-term residence is irrelevant to someone moving on free movement."
+        },
+        {
+          "key": "csep_family_advisory",
+          "match": "FAMILY_REUNIFICATION_CSEP",
+          "why": "Asserted (not hedged) to free movers until #1951 — a CSEP entitlement stated to someone not on a CSEP."
+        }
       ]
     },
     {
       "corridor": "ES_IE",
       "employee_type": "non_eu_passport_holder",
-      "label": "Spain \u2192 Ireland \u00b7 non-EU passport holder (priority \u2014 Madrid\u2192Dublin case)",
+      "label": "Spain → Ireland · non-EU passport holder (priority — Madrid→Dublin case)",
       "priority": true,
       "verification": {
         "status": "pending_lawyer_signoff",
@@ -134,7 +208,7 @@
         {
           "key": "permit_is_not_immigration_permission",
           "match": "employment permit",
-          "why": "The CSEP is a labour authorisation from DETE, NOT immigration permission \u2014 it does not by itself allow entry or residence."
+          "why": "The CSEP is a labour authorisation from DETE, NOT immigration permission — it does not by itself allow entry or residence."
         },
         {
           "key": "d_visa_before_travel",
@@ -144,7 +218,7 @@
         {
           "key": "irp_registration_90_days",
           "match": "irp",
-          "why": "Immigration registration (IRP card / Stamp 1, Immigration Act 2004 s.9) within 90 days of arrival, \u20ac300 fee \u2014 separate from both the permit and the visa."
+          "why": "Immigration registration (IRP card / Stamp 1, Immigration Act 2004 s.9) within 90 days of arrival, €300 fee — separate from both the permit and the visa."
         },
         {
           "key": "revenue_rpn_emergency_tax",
@@ -171,7 +245,7 @@
     {
       "corridor": "NO_FR",
       "employee_type": "norwegian_national",
-      "label": "Norway \u2192 France \u00b7 Norwegian national (repatriation, SLB case)",
+      "label": "Norway → France · Norwegian national (repatriation, SLB case)",
       "verification": {
         "status": "pending_lawyer_signoff",
         "verified_by": null,
@@ -182,17 +256,17 @@
         {
           "key": "preserve_bankid_before_deregistration",
           "match": "bankid",
-          "why": "Deregistering can disable BankID, and BankID is what files the exit-year return remotely \u2014 wrong order locks the mover out of their own tax affairs."
+          "why": "Deregistering can disable BankID, and BankID is what files the exit-year return remotely — wrong order locks the mover out of their own tax affairs."
         },
         {
           "key": "no_tax_residence_does_not_end_on_move",
           "match": "tax residence",
-          "why": "Norwegian tax residence ends only on the strict emigration test, not on the physical move \u2014 Norway can retain taxing rights up to three income years."
+          "why": "Norwegian tax residence ends only on the strict emigration test, not on the physical move — Norway can retain taxing rights up to three income years."
         },
         {
           "key": "folketrygden_exit",
           "match": "folketrygden",
-          "why": "Counter-intuitive: you exit Norwegian National Insurance even though you keep the Norwegian employer \u2014 membership follows where you WORK, not who pays you."
+          "why": "Counter-intuitive: you exit Norwegian National Insurance even though you keep the Norwegian employer — membership follows where you WORK, not who pays you."
         },
         {
           "key": "applicable_legislation_is_france",
@@ -202,22 +276,22 @@
         {
           "key": "a1_issued_by_france",
           "match": "a1 certificate",
-          "why": "The A1 certificate comes from FRANCE (URSSAF), not from Norway \u2014 the direction everyone guesses wrong."
+          "why": "The A1 certificate comes from FRANCE (URSSAF), not from Norway — the direction everyone guesses wrong."
         },
         {
           "key": "employer_urssaf_registration",
           "match": "urssaf",
-          "why": "The Norwegian employer must register with URSSAF (or delegate under Reg. 987/2009 Art. 21) \u2014 never a checkbox on the employee's list."
+          "why": "The Norwegian employer must register with URSSAF (or delegate under Reg. 987/2009 Art. 21) — never a checkbox on the employee's list."
         },
         {
           "key": "cpam_coverage_gap",
           "match": "cpam",
-          "why": "HELFO cover ends before CPAM cover begins; sequenced badly the employee is uninsured in between \u2014 the coverage-gap trap."
+          "why": "HELFO cover ends before CPAM cover begins; sequenced badly the employee is uninsured in between — the coverage-gap trap."
         },
         {
           "key": "household_goods_customs_import",
           "match": "household-goods",
-          "why": "Norway is EEA but NOT in the EU customs union: NO\u2192FR household goods are a customs IMPORT needing transfer-of-residence relief, which almost nobody expects."
+          "why": "Norway is EEA but NOT in the EU customs union: NO→FR household goods are a customs IMPORT needing transfer-of-residence relief, which almost nobody expects."
         }
       ]
     }
