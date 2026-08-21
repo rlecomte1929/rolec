@@ -108,6 +108,17 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # (docs/audos/otto-batch-2026-08-13/otto-batch.json:699, otto_verify.py:56) — the
     # importer's allowlist had simply never been told.
     "irishimmigration.ie",
+    # Ireland — the statutory bodies an EU/EEA free mover actually deals with. Immigration
+    # Service Delivery above covers the non-EEA track; none of it applies to a free mover, who
+    # instead needs a PPSN, health entitlement, a tenancy and a driving licence. Every one of
+    # those is published by a body outside `gov.ie`, so the suffix rule scored them UNOFFICIAL
+    # and rejected the facts outright — the same failure the Spain block below records. The HSE
+    # is the health service setting out its own ordinary-residence entitlement; the RTB is the
+    # statutory board that runs tenancy registration; the NDLS and its parent RSA run licence
+    # exchange; welfare.ie and mywelfare.ie are the Department of Social Protection's own
+    # portals, and MyWelfare is where a PPSN application is actually made. Each publishes its
+    # own rule rather than restating one, which is the line this list draws.
+    "hse.ie", "rtb.ie", "ndls.ie", "rsa.ie", "welfare.ie", "mywelfare.ie",
     # Denmark. Denmark uses no governmental suffix at all, so the suffix rule scored the
     # national tax authority itself as a relocation blog and rejected it.
     "skat.dk",
@@ -240,9 +251,10 @@ def _humanise(topic_key: str) -> str:
 def grade(row: FactRow) -> FactRow:
     """Set `accuracy_tier` and `confidence_score` from the evidence, recording every downgrade.
 
-    `auto_accepted` requires **both** an official publisher and a quotable line of evidence.
-    Otto's own `confidence` is an input, never the last word: an agent calling its own finding
-    "high" is not evidence, and every one of the 24 rows already staged called itself high.
+    `auto_accepted` requires an official publisher, a quotable line of evidence, and that the
+    quote has not been explicitly marked unconfirmed. Otto's own `confidence` is an input, never
+    the last word: an agent calling its own finding "high" is not evidence, and every one of the
+    24 rows already staged called itself high.
     """
     row.confidence_score = CONFIDENCE_SCORES.get(row.confidence, CONFIDENCE_SCORES["medium"])
 
@@ -253,6 +265,20 @@ def grade(row: FactRow) -> FactRow:
         )
     if not (row.evidence_quote or "").strip():
         row.downgrades.append("no evidence_quote — the claim cannot be re-checked from the row")
+    # A batch that captured a quote but never re-read it against the page says so, via
+    # `quote_verbatim_confirmed`. There is no column for that flag, so it rides in
+    # `applies_to`. Without this, an unchecked quote scores exactly like a checked one and a
+    # row a lawyer still has to clear is badged as though the evidence were verified — which is
+    # how an unreviewed claim survives review by looking already-done.
+    #
+    # Tested with `is False`, never falsiness: an absent key and `None` mean "not claimed", not
+    # "not confirmed". Every batch before ve-ie-entry-family-2026-08-20 omits the key, and
+    # re-grading those rows would invalidate reviews that have already happened.
+    if (row.applies_to or {}).get("quote_verbatim_confirmed") is False:
+        row.downgrades.append(
+            "evidence_quote is not verbatim-confirmed — captured but never re-checked "
+            "against the source page"
+        )
     if row.confidence not in CONFIDENCE_SCORES:
         row.downgrades.append(f"unrecognised confidence {row.confidence!r}, scored as medium")
 
