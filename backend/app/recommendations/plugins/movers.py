@@ -48,33 +48,155 @@ def estimate_volume_m3(criteria: Dict[str, Any]) -> Dict[str, Any]:
     return {"volume_m3_estimate": volume_m3, "suggested_truck_class": truck}
 
 
-def _service_area_score(destination_city: str, service_areas: List[str]) -> float:
-    """Score 0–100 for how well a mover's service_areas cover the destination city.
+# [AIQ-1872] Destination country -> logistics coverage region, from one source
+# of truth so an ISO code and a written-out name always agree.
+#
+# Deliberately a MOVING-INDUSTRY coverage map, not an immigration one: it is about
+# which movers plausibly serve a lane, so the UK sits in Europe and Switzerland is
+# unremarkable. Do NOT swap in immigration_regime._EU_EEA_COUNTRIES — that set
+# answers "does this person have free movement?", a different question with a
+# different answer for the same countries.
+#
+# Covers the destinations the product actually serves (the readiness-template set
+# plus the resource-catalog countries). An unmapped country simply yields no region
+# tier, which scores as no-coverage rather than guessing a continent.
+_COUNTRIES: tuple[tuple[str, str, str], ...] = (
+    # (ISO-2, common name, coverage region)
+    ("ie", "ireland", "europe"),
+    ("gb", "united kingdom", "europe"),
+    ("fr", "france", "europe"),
+    ("de", "germany", "europe"),
+    ("es", "spain", "europe"),
+    ("it", "italy", "europe"),
+    ("nl", "netherlands", "europe"),
+    ("no", "norway", "europe"),
+    ("dk", "denmark", "europe"),
+    ("se", "sweden", "europe"),
+    ("ch", "switzerland", "europe"),
+    ("pt", "portugal", "europe"),
+    ("be", "belgium", "europe"),
+    ("at", "austria", "europe"),
+    ("pl", "poland", "europe"),
+    ("us", "united states", "americas"),
+    ("ca", "canada", "americas"),
+    ("br", "brazil", "americas"),
+    ("mx", "mexico", "americas"),
+    ("sg", "singapore", "asia"),
+    ("hk", "hong kong", "asia"),
+    ("jp", "japan", "asia"),
+    ("cn", "china", "asia"),
+    ("in", "india", "asia"),
+    ("au", "australia", "oceania"),
+    ("nz", "new zealand", "oceania"),
+    ("ae", "united arab emirates", "middle_east"),
+    ("za", "south africa", "africa"),
+)
+
+# Any form of a country -> its coverage region.
+_COUNTRY_REGION: dict[str, str] = {
+    form: region for iso, name, region in _COUNTRIES for form in (iso, name)
+}
+
+# Any form of a country -> every form of it, so an ISO code on the case matches a
+# mover that wrote the country out in words. "IE" is not a substring of "Ireland",
+# which is exactly how country-level coverage scored as no coverage before.
+_COUNTRY_FORMS: dict[str, tuple[str, ...]] = {
+    form: (iso, name) for iso, name, _ in _COUNTRIES for form in (iso, name)
+}
+
+# Cities the recommendation datasets actually carry, mapped to their region.
+#
+# Needed because `destination_country` is not always supplied — the frozen scoring
+# baseline passes a bare `destination_city: "Tokyo"`, and so can any caller that
+# builds criteria by hand. Without this, requiring a country to resolve a region
+# would trade the old Asia-only bug for a country-required one: Tokyo vs ["Asia"]
+# would drop from 75 to 20.
+_CITY_REGION: dict[str, str] = {
+    "dublin": "europe", "madrid": "europe", "munich": "europe", "oslo": "europe",
+    "london": "europe", "paris": "europe", "berlin": "europe", "amsterdam": "europe",
+    "copenhagen": "europe", "stavanger": "europe", "barcelona": "europe",
+    "lisbon": "europe", "zurich": "europe", "milan": "europe",
+    "new york": "americas", "san francisco": "americas", "toronto": "americas",
+    "sao paulo": "americas", "mexico city": "americas",
+    "singapore": "asia", "tokyo": "asia", "hong kong": "asia",
+    "shanghai": "asia", "mumbai": "asia", "bangalore": "asia",
+    "sydney": "oceania", "melbourne": "oceania", "auckland": "oceania",
+    "dubai": "middle_east", "abu dhabi": "middle_east",
+    "johannesburg": "africa", "cape town": "africa",
+}
+
+# Words a mover may use to describe each region's coverage.
+_REGION_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "europe": ("europe", "european", "emea", "eu"),
+    "americas": ("americas", "north america", "south america", "latam", "usa", "us"),
+    "asia": ("asia", "asia-pacific", "apac", "far east"),
+    "oceania": ("oceania", "australasia", "asia-pacific", "apac", "anz"),
+    "middle_east": ("middle east", "gulf", "gcc", "emea"),
+    "africa": ("africa", "emea"),
+}
+
+
+def _service_area_score(
+    destination_city: str,
+    service_areas: List[str],
+    destination_country: str = "",
+) -> float:
+    """Score 0–100 for how well a mover's service_areas cover the destination.
 
     Tiers:
     - 100: exact city name appears in service_areas (e.g. "Tokyo" for Tokyo)
+    - 95:  the destination COUNTRY appears (e.g. "Ireland" for Dublin)
     - 85:  broad global coverage ("Global", "Worldwide")
-    - 75:  regional coverage that includes the destination continent/subregion
-           (e.g. "Asia", "Asia-Pacific" for a Japanese city)
-    - 20:  no relevant coverage (local-only or wrong region)
+    - 75:  the destination's own REGION appears (e.g. "Europe" for Dublin)
+    - 20:  no relevant coverage
+
+    [AIQ-1872] This used to know exactly one region — Asia — and only ever matched
+    a city by name. The result was a dimension that was actively WRONG outside
+    Asia rather than merely weak. Measured on the shipped dataset before the fix:
+
+        Dublin vs ["Europe"]  -> 20      Dublin vs ["Asia"]   -> 75
+        Dublin vs ["Ireland"] -> 20      New York vs ["Americas"] -> 20
+
+    A mover covering Europe scored worse for a Dublin move than one covering Asia,
+    and a mover covering Ireland scored as though it had no coverage at all.
+
+    Deliberately still a SCORE and not a hard gate: the ticket warns against
+    over-filtering corridors that legitimately share regional movers, and a
+    coverage list is vendor-authored free text, not a guarantee. Out-of-region
+    vendors are penalised, not excluded.
     """
-    if not destination_city:
+    if not destination_city and not destination_country:
         return 50.0  # unknown destination → neutral
-    dest = destination_city.strip().lower()
-    areas_lower = [a.strip().lower() for a in (service_areas or [])]
+    dest = (destination_city or "").strip().lower()
+    country = (destination_country or "").strip().lower()
+    areas_lower = [a.strip().lower() for a in (service_areas or []) if a and a.strip()]
+    if not areas_lower:
+        return 20.0
 
     # Exact city match (substring in either direction)
-    if any(dest in a or a == dest for a in areas_lower):
+    if dest and any(dest in a or a == dest for a in areas_lower):
         return 100.0
+
+    # Destination country named outright, in any form we know for it.
+    country_forms = _COUNTRY_FORMS.get(country, (country,)) if country else ()
+    if any(f and (f in a or a == f) for a in areas_lower for f in country_forms):
+        return 95.0
 
     # Global coverage keywords
     if any(k in a for a in areas_lower for k in ("global", "worldwide")):
         return 85.0
 
-    # Regional keywords that cover Asia/Pacific
-    asia_keywords = ("asia", "asia-pacific", "apac")
-    if any(k in a for a in areas_lower for k in asia_keywords):
-        return 75.0
+    # The destination's own region. Resolved from the country when we have it,
+    # otherwise from the city name if it happens to be a country we know.
+    region = (
+        _COUNTRY_REGION.get(country)
+        or _COUNTRY_REGION.get(dest)   # the "city" is actually a country name
+        or _CITY_REGION.get(dest)      # a known city, when no country was supplied
+    )
+    if region:
+        for keyword in _REGION_KEYWORDS.get(region, ()):
+            if any(keyword in a for a in areas_lower):
+                return 75.0
 
     return 20.0
 
@@ -82,6 +204,11 @@ def _service_area_score(destination_city: str, service_areas: List[str]) -> floa
 class MoversCriteria(BaseModel):
     origin_city: str = ""
     destination_city: str = ""
+    # [AIQ-1872] criteria_builder has always emitted `destination_country`, but this
+    # model never declared it, so pydantic dropped it and the service-area scorer
+    # only ever saw a city name. That is why country-level coverage ("Ireland" for
+    # a Dublin move) scored as no coverage at all.
+    destination_country: str = ""
     move_type: str = "international"
     current_accommodation: Optional[Dict[str, Any]] = None
     people: int = 2
@@ -167,7 +294,9 @@ class MoversPlugin(BasePlugin):
         availability_score = avail_map.get(avail, 75)
 
         service_area_score = _service_area_score(
-            c.destination_city, item.get("service_areas") or []
+            c.destination_city,
+            item.get("service_areas") or [],
+            destination_country=c.destination_country,
         )
 
         dw = get_weights("movers", segment=derive_segment(c))

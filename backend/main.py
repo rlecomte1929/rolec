@@ -5321,6 +5321,23 @@ def update_employee_assignment_intake_draft(
     """
     effective = _effective_user(user, UserRole.EMPLOYEE)
     rid = getattr(request.state, "request_id", None)
+
+    # [AIQ-1885] 200 used to mean "received", not "stored usefully". A draft in the
+    # wrong shape was written verbatim and echoed back by GET, so the caller had
+    # every reason to believe it had saved — and the failure only surfaced later,
+    # when submit reported six relocationBasics fields missing that were plainly
+    # present in the stored draft. Reject the unreadable shape here, naming it,
+    # rather than hours later somewhere else.
+    #
+    # Deliberately narrow: only a draft with content and NOT ONE convertible key is
+    # refused. Sparse partial autosaves — including the empty first debounce — are
+    # normal and still succeed.
+    from .intake_draft_to_case_draft import unreadable_draft_reason
+
+    unreadable = unreadable_draft_reason(body.data)
+    if unreadable:
+        raise HTTPException(status_code=422, detail=unreadable)
+
     result = db.update_assignment_intake_draft(
         assignment_id=assignment_id,
         employee_user_id=effective["id"],

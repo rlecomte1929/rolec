@@ -50,16 +50,31 @@ the tree is at 591 files with zero duplicated versions, so strict costs nothing.
 
 The dead-version check stays scoped to `--added`, because ITS debt is real and unpaid.
 
+`--strict-unapplied` closes the gap those scopings leave open: a migration that was fine
+when it merged and went stale afterwards. Because dead/duplicate hard failures only look at
+the files a change ADDS, nothing ever re-examines a migration after merge — it degrades to a
+warning printed in some later PR's log. On 2026-08-20 that hid two: 20261110000000
+(services_state tenant policies, #1902) and 20261111000000 (candidate_beam researched_*
+columns, #1894) were merged and never applied, with every check green, while an open PR
+(#1895) read those columns in 51 places. This mode spans BOTH dead and ahead files, since
+the difference between them is `db push` ordering and this repo never runs `db push`; what
+matters is only whether the migration is live. It needs `--baseline` to tell a new lapse
+from the parked backlog, and excuses anything younger than `--grace-hours` (default 24)
+so a just-merged migration does not redden the job before an operator can act.
+
 Exit codes (mirrors scripts/check_rls_coverage.py):
   0 — no drift; nothing newly dead or newly duplicated
   1 — prod version with no repo file; a NEW dead/duplicate migration; any duplicate under
-      --strict-duplicates; or 0 migration files read (CI should fail)
+      --strict-duplicates; a merged-but-unapplied migration under --strict-unapplied; or
+      0 migration files read (CI should fail)
   2 — could not connect to DB / query failed (unexpected — investigate)
 
 Usage:
   DATABASE_URL=postgresql://... python scripts/check_migration_drift.py
   DATABASE_URL=postgresql://... python scripts/check_migration_drift.py --json
   python scripts/check_migration_drift.py --no-db --strict-duplicates  # whole-tree gate
+  DATABASE_URL=postgresql://... python scripts/check_migration_drift.py \
+      --strict-unapplied --baseline scripts/migration_unapplied_baseline.json
   python scripts/check_migration_drift.py --no-db --added "$(git diff --diff-filter=A \
       --name-only origin/main...HEAD -- supabase/migrations)"
 """
@@ -69,7 +84,9 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Set
 
@@ -183,6 +200,102 @@ def split_dead_and_ahead(
     return dead, ahead
 
 
+def load_baseline(path: Path) -> Set[str]:
+    """
+    Read the known-unapplied baseline: the versions we already know are merged but not
+    applied, and have consciously parked.
+
+    A missing or unparseable baseline is a HARD ERROR, never an empty set. The whole
+    value of this file is that it is the difference between "nothing new is wrong" and
+    "we are not looking" — and a guard that silently degrades to the second while
+    printing the first is the exact failure this repo found in `--strict-duplicates`,
+    which was structurally incapable of firing from the day it was written.
+
+    Format: {"versions": {"<14-digit>": "<name or note>", ...}} — a dict rather than a
+    list so each parked entry can carry why it is parked.
+    """
+    if not path.exists():
+        raise SystemExit(
+            f"❌  Baseline not found: {path}\n"
+            "    Refusing to run: with no baseline this check cannot tell a NEW unapplied\n"
+            "    migration from the long-standing parked backlog, so it would either fail on\n"
+            "    everything or (worse) be softened until it fails on nothing.\n"
+            "    Generate one with:  --strict-unapplied --write-baseline <path>"
+        )
+    try:
+        raw = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        raise SystemExit(f"❌  Baseline at {path} is unreadable: {exc}")
+    versions = raw.get("versions")
+    if not isinstance(versions, dict):
+        raise SystemExit(
+            f"❌  Baseline at {path} has no 'versions' object — refusing to treat that as "
+            "'nothing is parked'."
+        )
+    return set(versions)
+
+
+def git_added_at(version: str, name: str) -> "datetime | None":
+    """
+    When did this migration file first appear in git history?
+
+    Used for the grace window: a migration merged minutes ago is legitimately unapplied,
+    and failing on it would make the job red for every normal migration PR until an
+    operator got to it.
+
+    Returns None when git cannot answer (shallow clone, untracked file). The caller
+    treats None as OUTSIDE the grace window — unknown age must not become a silent
+    exemption, and in CI the checkout is full-depth so None means something is wrong.
+    """
+    path = f"supabase/migrations/{version}_{name}.sql"
+    try:
+        out = subprocess.run(
+            ["git", "log", "--diff-filter=A", "--format=%cI", "-1", "--", path],
+            cwd=REPO_ROOT, capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    stamp = out.stdout.strip()
+    if out.returncode != 0 or not stamp:
+        return None
+    try:
+        return datetime.fromisoformat(stamp)
+    except ValueError:
+        return None
+
+
+def find_new_unapplied(
+    repo_only: List[Dict[str, str]],
+    baseline: Set[str],
+    grace_hours: float,
+    now: "datetime | None" = None,
+) -> "tuple[List[Dict[str, str]], List[Dict[str, str]]]":
+    """
+    Partition Direction-B rows into (failing, excused).
+
+    Failing = merged, not applied, not in the baseline, and older than the grace window.
+    That is precisely "someone merged a migration and nobody ever ran it", which is the
+    gap this check exists to close: #1902 and #1894 sat in that state with every CI check
+    green, because the existing dead/duplicate hard failures are scoped to the files a PR
+    ADDS and nothing re-examines a migration after it merges.
+    """
+    now = now or datetime.now(timezone.utc)
+    failing: List[Dict[str, str]] = []
+    excused: List[Dict[str, str]] = []
+    for row in repo_only:
+        if row["version"] in baseline:
+            excused.append({**row, "excuse": "baseline"})
+            continue
+        added = git_added_at(row["version"], row["name"])
+        if added is not None:
+            age_hours = (now - added).total_seconds() / 3600.0
+            if age_hours < grace_hours:
+                excused.append({**row, "excuse": f"within {grace_hours}h grace"})
+                continue
+            row = {**row, "age_hours": round(age_hours, 1)}
+        failing.append(row)
+    return failing, excused
+
 def parse_added_versions(raw: str) -> Set[str]:
     """
     Extract 14-digit versions from a comma/newline-separated list of added paths.
@@ -295,7 +408,37 @@ def main() -> int:
              "--added. Required for a whole-tree run to be able to fail at all; used by "
              "the post-merge backstop on main.",
     )
+    parser.add_argument(
+        "--strict-unapplied",
+        action="store_true",
+        help="Fail on migrations that are merged but have NO prod ledger row, excluding "
+             "those in --baseline and those younger than --grace-hours. Without this flag "
+             "Direction B stays a warning, exactly as before.",
+    )
+    parser.add_argument(
+        "--baseline",
+        default="",
+        help="Path to the known-unapplied baseline JSON. Required with --strict-unapplied: "
+             "it is what separates a NEW unapplied migration from the parked backlog. A "
+             "missing or unparseable file is a hard error, never an empty set.",
+    )
+    parser.add_argument(
+        "--grace-hours",
+        type=float,
+        default=24.0,
+        help="Migrations that first appeared in git within this many hours are excused — "
+             "a migration merged minutes ago is legitimately not applied yet. Default 24.",
+    )
+    parser.add_argument(
+        "--write-baseline",
+        default="",
+        help="Write the CURRENT unapplied set to this path and exit 0. Run once, after the "
+             "outstanding applies are done, so the backlog is parked but today's gap is not.",
+    )
     args = parser.parse_args()
+
+    if args.strict_unapplied and not (args.baseline or args.write_baseline):
+        parser.error("--strict-unapplied requires --baseline (or --write-baseline to create one)")
 
     # A guard that read no migration files has not checked anything. Without this,
     # `--no-db` on an empty or misplaced directory prints
@@ -320,7 +463,11 @@ def main() -> int:
 
     # State the mode. A green run that examined a diff of zero files reads identically to
     # one that verified the whole tree, and the difference is the entire question.
-    if args.strict_duplicates:
+    if args.strict_duplicates and args.strict_unapplied:
+        mode = "STRICT — duplicates and unapplied migrations are failures"
+    elif args.strict_unapplied:
+        mode = "STRICT(unapplied) — a merged-but-unapplied migration is a failure"
+    elif args.strict_duplicates:
         mode = "STRICT — every duplicated version is a failure"
     elif scoped:
         mode = f"scoped to {len(added_versions)} added version(s)"
@@ -366,6 +513,32 @@ def main() -> int:
     # those would redden every migration PR for debt it did not create.
     dead_fail = [d for d in dead if d["version"] in added_versions] if scoped else []
 
+    # Direction B, the whole-tree view: merged but never applied. Deliberately spans BOTH
+    # dead and ahead — the distinction between them is `db push` ordering semantics, and
+    # this repo never runs `db push`. What matters here is only "is it live in prod".
+    unapplied_fail: List[Dict[str, str]] = []
+    unapplied_excused: List[Dict[str, str]] = []
+    if args.write_baseline:
+        target = Path(args.write_baseline)
+        target.write_text(json.dumps({
+            "_comment": (
+                "Migrations merged but not applied to prod, consciously parked. Generated by "
+                "check_migration_drift.py --write-baseline. Entries should be REMOVED as the "
+                "backlog is triaged; this file is meant to shrink. A version absent from here "
+                "and unapplied past the grace window fails the scheduled job."
+            ),
+            "generated_from_ledger_max": ledger_max,
+            "count": len(repo_only),
+            "versions": {r["version"]: r["name"] for r in repo_only},
+        }, indent=2) + "\n")
+        print(f"✅  Wrote baseline of {len(repo_only)} unapplied migration(s) to {target}")
+        return 0
+    if args.strict_unapplied:
+        baseline = load_baseline(Path(args.baseline))
+        unapplied_fail, unapplied_excused = find_new_unapplied(
+            repo_only, baseline, args.grace_hours
+        )
+
     # Annotate each drift row with a suggested reconciliation target if the same
     # migration NAME exists in the repo at a different version (the common case:
     # apply-time version vs committed forward-timestamp version).
@@ -381,8 +554,11 @@ def main() -> int:
              "dead_added": dead_fail, "dead_added_count": len(dead_fail),
              "duplicates": duplicates, "duplicate_count": len(duplicates),
              "duplicates_failing": dup_fail, "duplicates_failing_count": len(dup_fail),
+             "unapplied_failing": unapplied_fail,
+             "unapplied_failing_count": len(unapplied_fail),
+             "unapplied_excused_count": len(unapplied_excused),
              "ledger_max": ledger_max, "mode": mode,
-             "pass": not (drift or dead_fail or dup_fail)},
+             "pass": not (drift or dead_fail or dup_fail or unapplied_fail)},
             indent=2,
         ))
 
@@ -431,6 +607,23 @@ def main() -> int:
     if duplicates and not args.json:
         _print_duplicates(dup_fail or duplicates, hard=bool(dup_fail))
 
+    # Direction B (whole tree) — merged but never applied, and not parked in the baseline.
+    if unapplied_fail and not args.json:
+        print(f"\n❌  Migration check FAILED — {len(unapplied_fail)} migration(s) are merged "
+              "but have NEVER been applied to production:\n")
+        for u in unapplied_fail:
+            age = u.get("age_hours")
+            age_s = f"unapplied for {age}h" if age is not None else "age unknown (shallow clone?)"
+            print(f"  • {u['version']}_{u['name']}.sql  — {age_s}")
+        print("\n  Merging a migration does not apply it. Apply it out-of-band with MCP")
+        print("  execute_sql (NOT apply_migration, which stamps an apply-time version, and")
+        print("  NEVER `supabase db push`), then record it:")
+        print("    supabase migration repair --status applied <version> --db-url \"$DATABASE_URL\"")
+        print("  If it is deliberately parked, add it to the baseline with a note saying why.")
+        if unapplied_excused:
+            print(f"\n  ({len(unapplied_excused)} other unapplied migration(s) excused: "
+                  "baseline or grace window.)")
+
     # Direction B (ahead) — repo file above the ledger max with no prod row. WARNING
     # only (exit 0): legitimate undeployed work, but it breaks `db push` / Branching.
     if repo_ahead and not args.json:
@@ -441,7 +634,7 @@ def main() -> int:
         print("     This will cause `db push` / Supabase Branching to fail with")
         print("     'local migration files not found in remote database'.")
 
-    failed = bool(drift or dead_fail or dup_fail)
+    failed = bool(drift or dead_fail or dup_fail or unapplied_fail)
 
     # Summary line — always printed.
     if not args.json:
@@ -449,7 +642,8 @@ def main() -> int:
         print(f"{mark}  Migration ledger: {len(applied)} prod rows, {len(repo_by_ver)} repo files, "
               f"{len(drift)} mismatch(es), {len(dead)} dead ({len(dead_fail)} failing), "
               f"{len(duplicates)} duplicate version(s) ({len(dup_fail)} failing), "
-              f"{len(repo_ahead)} repo-ahead warning(s). [{mode}]")
+              f"{len(repo_ahead)} repo-ahead warning(s), "
+              f"{len(unapplied_fail)} unapplied failing. [{mode}]")
 
     return 1 if failed else 0
 
