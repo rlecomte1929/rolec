@@ -154,11 +154,18 @@ async function runPersona(p) {
   };
   r = await req('PATCH', `/api/cases/${caseId}`, draft, hrTok);
   ev.patch = r.data;
+  // POST /api/hr/cases returns an id from a DIFFERENT namespace than wizard_cases, and
+  // GET /api/cases/{that id} answers "Case not found" — measured 2026-08-21. PATCH takes
+  // its create-on-missing branch and mints the wizard case under a fresh uuid, which it
+  // returns as `id`. That is the id every /api/cases/{id} read must use; without it CASE-3
+  // 404s and reports `dest=/ nat=null`, which reads as the endpoint losing the nationality
+  // rather than the runner asking about a case that never existed under that key.
+  const wizardCaseId = r.data?.id || caseId;
   record('CASE-2', p.key, 'Setup', 'Save Madrid→Dublin detail + nationality onto case', '200, values persisted',
     `${r.status}`, r.ok ? 'PASS' : 'FAIL', r.ms, r.error || JSON.stringify(r.data).slice(0, 160));
 
   // read back — does nationality survive?
-  r = await req('GET', `/api/cases/${caseId}`, null, hrTok);
+  r = await req('GET', `/api/cases/${wizardCaseId}`, null, hrTok);
   ev.caseRead = r.data;
   // GET /api/cases/{id} returns CaseDTO (backend/app/schemas.py:90): the wizard sections
   // live under `draft`, and destCountry/destCity are ALSO flattened onto the top level.
