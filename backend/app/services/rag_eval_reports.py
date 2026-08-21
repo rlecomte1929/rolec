@@ -64,6 +64,17 @@ METRIC_SPECS: List[MetricSpec] = [
     # sorted worst-first. Threshold 1.0: a single missed non-obvious requirement
     # in any one slice must alert.
     MetricSpec("nonobvious_recall", "Non-obvious recall (worst corridor \u00d7 employee-type slice)", 1.0),
+    # overserved_requirements = the PRECISION half of the non-obvious metric: what a roadmap
+    # told an audience that it must never tell them. Recall is structurally blind to it —
+    # telling a free mover to obtain a 'D' visa costs zero recall — and every defect the
+    # 2026-08-21 ES->IE audit found was an over-serving defect.
+    #
+    # Emitted as 1.0 (clean) / 0.0 (any violation) rather than a raw count, because
+    # `load_live_reports` hardcodes `passes_threshold = aggregate >= threshold` and a
+    # count-down metric reads backwards there. The count and the named violations ride in
+    # the payload. The key must NOT begin "nonobvious_recall": `_metric_key_for_filename`
+    # matches by startswith, so such a name would be plotted on the recall chart.
+    MetricSpec("overserved_requirements", "Corridor over-serving (violations, 0 = clean)", 1.0),
     # Mission Control demand-triage accuracy (emitted by run_triage_eval): fraction
     # of demands classified to the right kind (bug/idea/quality/task).
     MetricSpec("triage_accuracy", "Demand triage accuracy", 0.85),
@@ -191,6 +202,7 @@ _MOCK_VALUES: Dict[str, List[float]] = {
     # non-obvious requirement in one slice (see _MOCK_NONOBVIOUS_SLICES) pulls
     # the worst slice, and only that slice, below target.
     "nonobvious_recall": [0.75, 0.75, 0.8571, 0.8571, 0.8571, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.8571],
+    "overserved_requirements": [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0],
     "triage_accuracy": [0.86, 0.88, 0.89, 0.90, 0.92, 0.93, 0.95, 0.96, 0.97, 1.0, 1.0, 1.0, 1.0],
     "routing_accuracy": [0.92, 0.94, 0.94, 0.95, 0.97, 0.97, 0.97, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
     "answer_grounding": [0.90, 0.91, 0.92, 0.92, 0.93, 0.93, 0.94, 0.94, 0.95, 0.95, 0.96, 0.96, 0.96],
