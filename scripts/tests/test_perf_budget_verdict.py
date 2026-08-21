@@ -11,9 +11,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+# `scripts/` is not a package, so the sibling guards put the directory itself on the path and
+# import by bare name. Matching that: `scripts.<mod>` resolved locally but not under CI's
+# full-suite discovery (ModuleNotFoundError).
+SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
 
-from scripts.perf_budget_verdict import verdict  # noqa: E402
+from perf_budget_verdict import verdict  # noqa: E402
 
 CEILINGS = dict(reg_p95=3000.0, reg_max=5000.0, strict_p95=2000.0, strict_max=3000.0)
 
