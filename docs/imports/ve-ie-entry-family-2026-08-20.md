@@ -100,6 +100,28 @@ guards it, and was confirmed to fail against a corridor-derived implementation.
 `fact_uid` · `pillar` · `non_obvious` · `needs_lawyer_review` · `quote_verbatim_confirmed` ·
 `source_name` · `corridor` · `batch_id`
 
+## Quote verification — 2026-08-21
+
+All nine `evidence_quote` values were re-fetched from their source pages and checked against the
+live text. **9 of 9 verbatim.** The artifact ships `quote_verbatim_confirmed: false` on every
+row because the research lane could not check them; this is that check.
+
+Method: `curl` with a browser UA, `<script>`/`<style>` stripped, tags removed, whitespace and
+smart-punctuation normalised, then an exact substring match of the stored quote.
+
+Two things worth knowing before re-running it:
+
+- **`citizensinformation.ie` starts returning HTTP 403** after a handful of requests. A 403 body
+  is ~919 bytes, so it cannot contain a long quote and will not produce a false VERBATIM — but it
+  *will* produce a false NOT-FOUND. Always assert the status code; a second pass here reported
+  every probe absent purely because it was reading the block page.
+- **Tag-stripping leaves a space before punctuation** (`long stay 'D' visa .`), so an exact match
+  on a quote ending in a full stop fails. That alone downgraded row 2 to PARTIAL on the first
+  pass; the page carries the sentence word for word.
+
+This does not clear the four `needs_lawyer_review` rows. Confirming a quote is transcribed
+correctly is not confirming the legal claim built on it.
+
 ## ⚠ Known gap — `auto_accepted` on a counsel-flagged row (CLOSED by AIQ-2034)
 
 > **Closed 2026-08-20 in #1937.** `parsers.grade()` now downgrades any row carrying
