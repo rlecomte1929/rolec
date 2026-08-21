@@ -157,19 +157,6 @@ async function runPersona(p) {
   record('CASE-2', p.key, 'Setup', 'Save Madrid→Dublin detail + nationality onto case', '200, values persisted',
     `${r.status}`, r.ok ? 'PASS' : 'FAIL', r.ms, r.error || JSON.stringify(r.data).slice(0, 160));
 
-  // read back — does nationality survive?
-  r = await req('GET', `/api/cases/${caseId}`, null, hrTok);
-  ev.caseRead = r.data;
-  const pj = r.data?.profile_json || r.data || {};
-  const rb = pj.relocationBasics || pj.relocation_basics || {};
-  const ep = pj.employeeProfile || pj.employee_profile || {};
-  const gotDest = (rb.destCity || rb.dest_city || '') + '/' + (rb.destCountry || rb.dest_country || '');
-  const gotNat = ep.nationality || null;
-  record('CASE-3', p.key, 'Setup', 'Round-trip: destination + nationality readable', 'Dublin/IE + nationality',
-    `dest=${gotDest} nat=${gotNat}`,
-    gotDest.includes('Dublin') && gotNat === p.nationality ? 'PASS' : gotDest.includes('Dublin') ? 'PARTIAL' : 'FAIL', r.ms,
-    gotNat ? '' : 'nationality not surfaced on case read — immigration branching cannot key off it');
-
   // ── 4. Assign to the employee ───────────────────────────────────────────
   r = await req('POST', `/api/hr/cases/${caseId}/assign`, { employee_email: empEmail }, hrTok, 15000);
   const assignmentId = r.data?.assignment_id || r.data?.assignmentId || r.data?.id || null;
@@ -177,6 +164,38 @@ async function runPersona(p) {
   record('CASE-4', p.key, 'Setup', 'Assign case to employee', '<3s, assignment created',
     `${r.status}/${r.ms}ms/aid=${assignmentId ? String(assignmentId).slice(0, 8) : 'null'}`,
     r.ok && r.ms < 3000 ? 'PASS' : r.ok ? 'PARTIAL' : 'FAIL', r.ms, r.error || '');
+
+  // ── 3b. Read back, AFTER the assignment exists ──────────────────────────
+  //
+  // Order is load-bearing. Case visibility resolves THROUGH an assignment, so before
+  // CASE-4 runs there is nothing to resolve and GET /api/cases/{id} answers 404
+  // "Case not found" — which reads as the endpoint losing the data. Reproduced as the
+  // owning HR user on 2026-08-21: POST /api/hr/cases -> 200, PATCH -> 200 with the data
+  // persisted (wizard_cases and relocation_cases rows both present, destCity=Dublin,
+  // nationality=IN), GET -> 404, and case_assignments had no row. Assign first and the
+  // same GET returns 200. A different HR user gets 403, not 404, so absence and refusal
+  // are distinct here: this really was "not visible yet", not "not permitted".
+  r = await req('GET', `/api/cases/${caseId}`, null, hrTok);
+  ev.caseRead = r.data;
+  // GET /api/cases/{id} returns CaseDTO (backend/app/schemas.py:90): the wizard sections
+  // live under `draft`, and destCountry/destCity are ALSO flattened onto the top level.
+  // There is no `profile_json` and no top-level `relocationBasics`. Reading those returned
+  // undefined, so this check reported `dest=/ nat=null` and accused a working endpoint of
+  // losing the nationality — verified false on 2026-08-21: case
+  // bebe7aff-a16f-464b-a965-381c9e82fab3 holds Dublin/IE/IN in production. The `||` chains
+  // are kept so an older or flatter shape still parses.
+  const pj = r.data || {};
+  const dr = pj.draft || pj.profile_json || {};
+  const rb = dr.relocationBasics || dr.relocation_basics || pj.relocationBasics || {};
+  const ep = dr.employeeProfile || dr.employee_profile || pj.employeeProfile || {};
+  const gotDest = (pj.destCity || rb.destCity || rb.dest_city || '') + '/' +
+                  (pj.destCountry || rb.destCountry || rb.dest_country || '');
+  const gotNat = ep.nationality || null;
+  record('CASE-3', p.key, 'Setup', 'Round-trip: destination + nationality readable', 'Dublin/IE + nationality',
+    `dest=${gotDest} nat=${gotNat}`,
+    gotDest.includes('Dublin') && gotNat === p.nationality ? 'PASS' : gotDest.includes('Dublin') ? 'PARTIAL' : 'FAIL', r.ms,
+    gotNat ? '' : 'nationality not surfaced on case read — immigration branching cannot key off it');
+
 
   // ── 5. The employee completes her intake ────────────────────────────────
   //
