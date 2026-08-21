@@ -154,18 +154,28 @@ async function runPersona(p) {
   };
   r = await req('PATCH', `/api/cases/${caseId}`, draft, hrTok);
   ev.patch = r.data;
-  // POST /api/hr/cases returns an id from a DIFFERENT namespace than wizard_cases, and
-  // GET /api/cases/{that id} answers "Case not found" — measured 2026-08-21. PATCH takes
-  // its create-on-missing branch and mints the wizard case under a fresh uuid, which it
-  // returns as `id`. That is the id every /api/cases/{id} read must use; without it CASE-3
-  // 404s and reports `dest=/ nat=null`, which reads as the endpoint losing the nationality
-  // rather than the runner asking about a case that never existed under that key.
-  const wizardCaseId = r.data?.id || caseId;
   record('CASE-2', p.key, 'Setup', 'Save Madrid→Dublin detail + nationality onto case', '200, values persisted',
     `${r.status}`, r.ok ? 'PASS' : 'FAIL', r.ms, r.error || JSON.stringify(r.data).slice(0, 160));
 
-  // read back — does nationality survive?
-  r = await req('GET', `/api/cases/${wizardCaseId}`, null, hrTok);
+  // ── 4. Assign to the employee ───────────────────────────────────────────
+  r = await req('POST', `/api/hr/cases/${caseId}/assign`, { employee_email: empEmail }, hrTok, 15000);
+  const assignmentId = r.data?.assignment_id || r.data?.assignmentId || r.data?.id || null;
+  ev.assign = r.data;
+  record('CASE-4', p.key, 'Setup', 'Assign case to employee', '<3s, assignment created',
+    `${r.status}/${r.ms}ms/aid=${assignmentId ? String(assignmentId).slice(0, 8) : 'null'}`,
+    r.ok && r.ms < 3000 ? 'PASS' : r.ok ? 'PARTIAL' : 'FAIL', r.ms, r.error || '');
+
+  // ── 3b. Read back, AFTER the assignment exists ──────────────────────────
+  //
+  // Order is load-bearing. Case visibility resolves THROUGH an assignment, so before
+  // CASE-4 runs there is nothing to resolve and GET /api/cases/{id} answers 404
+  // "Case not found" — which reads as the endpoint losing the data. Reproduced as the
+  // owning HR user on 2026-08-21: POST /api/hr/cases -> 200, PATCH -> 200 with the data
+  // persisted (wizard_cases and relocation_cases rows both present, destCity=Dublin,
+  // nationality=IN), GET -> 404, and case_assignments had no row. Assign first and the
+  // same GET returns 200. A different HR user gets 403, not 404, so absence and refusal
+  // are distinct here: this really was "not visible yet", not "not permitted".
+  r = await req('GET', `/api/cases/${caseId}`, null, hrTok);
   ev.caseRead = r.data;
   // GET /api/cases/{id} returns CaseDTO (backend/app/schemas.py:90): the wizard sections
   // live under `draft`, and destCountry/destCity are ALSO flattened onto the top level.
@@ -186,13 +196,6 @@ async function runPersona(p) {
     gotDest.includes('Dublin') && gotNat === p.nationality ? 'PASS' : gotDest.includes('Dublin') ? 'PARTIAL' : 'FAIL', r.ms,
     gotNat ? '' : 'nationality not surfaced on case read — immigration branching cannot key off it');
 
-  // ── 4. Assign to the employee ───────────────────────────────────────────
-  r = await req('POST', `/api/hr/cases/${caseId}/assign`, { employee_email: empEmail }, hrTok, 15000);
-  const assignmentId = r.data?.assignment_id || r.data?.assignmentId || r.data?.id || null;
-  ev.assign = r.data;
-  record('CASE-4', p.key, 'Setup', 'Assign case to employee', '<3s, assignment created',
-    `${r.status}/${r.ms}ms/aid=${assignmentId ? String(assignmentId).slice(0, 8) : 'null'}`,
-    r.ok && r.ms < 3000 ? 'PASS' : r.ok ? 'PARTIAL' : 'FAIL', r.ms, r.error || '');
 
   // ── 5. The employee completes her intake ────────────────────────────────
   //
