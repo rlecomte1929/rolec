@@ -22,6 +22,54 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 
+# [AIQ-1885] Every top-level key this converter reads. Kept beside it so the
+# can-convert check below cannot drift from what the mapping actually consumes;
+# a test asserts the two agree by parsing this module's own source.
+RECOGNISED_INTAKE_KEYS: frozenset = frozenset({
+    "contract_start", "contract_type", "dest_city", "dest_country", "email",
+    "full_name", "job_title", "members", "nationality", "office_address",
+    "origin_city", "origin_country", "passport_country", "passport_expiry",
+    "purpose", "salary_band", "second_nationality", "target_date",
+})
+
+# The canonical camelCase-nested CaseDraftDTO sections. A draft carrying these
+# and none of the flat keys is the exact shape that reached production during the
+# T18 campaign: stored verbatim, echoed back by GET, and unreadable here — so the
+# submit guard later reported all six relocationBasics fields missing while they
+# were plainly visible in the stored draft.
+_CANONICAL_SECTIONS = ("relocationBasics", "employeeProfile", "familyMembers",
+                       "assignmentContext")
+
+
+def unreadable_draft_reason(data: Optional[Dict[str, Any]]) -> Optional[str]:
+    """``None`` when this converter can read the draft, else why it cannot.
+
+    Deliberately permissive. The wizard autosaves as the employee types, so a
+    draft holding one key — or none at all, on the first debounce — is normal and
+    must keep working. This only objects when a draft carries content and *not a
+    single key the converter consumes*, which is the difference between "partially
+    filled in" and "wrong shape entirely".
+    """
+    if not isinstance(data, dict) or not data:
+        return None  # an empty first autosave is legitimate
+    if RECOGNISED_INTAKE_KEYS & set(data):
+        return None  # at least one usable key — a normal partial draft
+
+    nested = [k for k in _CANONICAL_SECTIONS if k in data]
+    if nested:
+        return (
+            "Intake draft is in the canonical nested CaseDraftDTO shape "
+            f"({', '.join(nested)}), but this endpoint stores the wizard's FLAT "
+            "snake_case draft. Send flat keys such as origin_country, dest_country, "
+            "purpose, target_date — or PATCH /api/cases/{case_id} for the nested shape."
+        )
+    return (
+        "Intake draft contains no keys this endpoint can read "
+        f"(got: {', '.join(sorted(map(str, data))[:8])}). Expected flat snake_case "
+        "wizard keys such as origin_country, dest_country, purpose, target_date."
+    )
+
+
 def _s(value: Any) -> Optional[str]:
     """A string field as ``value or None`` — TS ``x || undefined``. Blank → None."""
     if value is None:
