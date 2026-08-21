@@ -257,6 +257,14 @@ def corridor_overlay(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 # the corridor's flagged non-obvious facts, and a good one — but it is not a
                 # task, and a task nobody can ever complete nags forever.
                 "outcome_type": getattr(step, "outcome_type", "action") or "action",
+                # The trap flag AND its plain-language explanation. The loader parses both
+                # (loader.py:134,142) but the overlay used to drop them — the exact analogue
+                # of the advisories bug #1953 fixed, one layer down. Seven CSEP steps carry
+                # them (the emergency-tax 40%, the proof-of-address catch-22, the
+                # ordinarily-resident health test), and without this they never reach the
+                # roadmap the mover opens.
+                "non_obvious": bool(getattr(step, "non_obvious", False)),
+                "non_obvious_note": getattr(step, "non_obvious_note", "") or "",
                 "provenance": provenance,
             })
 

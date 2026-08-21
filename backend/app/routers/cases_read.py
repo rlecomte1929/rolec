@@ -102,6 +102,11 @@ class RoadmapStepV2(BaseModel):
     # derived from the projected step's form category. Null once the step is
     # done or when no estimate applies. Powers the AvailableNowWidget effort Pill.
     estimated_effort: Optional[str] = None
+    # The "easy to miss" trap flag and its plain-language explanation, for a corridor
+    # step that carries one (the emergency-tax 40%, the proof-of-address catch-22, …).
+    # False / None for a form-projected step, which has no such annotation.
+    non_obvious: bool = False
+    non_obvious_note: Optional[str] = None
 
 
 class RoadmapTrackV2(BaseModel):
@@ -228,6 +233,8 @@ def merge_corridor_overlay_v2(
                     ],
                     confidence_level="UNKNOWN",
                     source_url=None,
+                    non_obvious=bool(step.get("non_obvious")),
+                    non_obvious_note=step.get("non_obvious_note") or None,
                 )
             )
 
