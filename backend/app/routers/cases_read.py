@@ -113,8 +113,143 @@ class RoadmapTrackV2(BaseModel):
     steps: List[RoadmapStepV2] = []
 
 
+class RoadmapAdvisoryV2(BaseModel):
+    """A corridor exception case, surfaced on the roadmap the employee actually opens.
+
+    ``asserted`` is the honesty bit and the UI must respect it. False means the condition
+    depends on an input we do not hold (the pathway's ``visa_required_nationality`` is an
+    EXTERNAL_LOOKUP that does not exist in this repo), so the text is worded as something to
+    check and must never be rendered as a statement of the reader's situation.
+    """
+
+    id: str
+    text: str
+    asserted: bool
+    cite: Optional[str] = None
+    provenance: Optional[Dict[str, Any]] = None
+
+
 class RoadmapTracksResponse(BaseModel):
     tracks: List[RoadmapTrackV2]
+    # [AIQ-1867 follow-up] Corridor advisories. Empty for a case with no corridor pathway,
+    # and empty for a mover the classifier positively resolves as a free mover.
+    advisories: List[RoadmapAdvisoryV2] = []
+
+
+#: Corridor ``responsible_party`` → the ``owner`` vocabulary this response already uses
+#: (``roadmap_projection`` emits "employee" for every projected form step).
+_CORRIDOR_OWNER = {
+    "EMPLOYEE": "employee",
+    "EMPLOYER": "employer",
+}
+
+
+def _corridor_owner(responsible_party: Optional[str], outcome_type: str = "action") -> str:
+    """Who this step belongs to, in the `owner` vocabulary the roadmap already uses.
+
+    ``owner`` is load-bearing beyond display: `EmployeeTaskPage` builds the employee's task
+    list from `owner === 'employee'`, so anything returned here as "employee" becomes a
+    to-do item. A `nothing_to_do` outcome must therefore never be one — the pathway's
+    STAMP4_ELIGIBILITY is a forward-looking fact ("no renewal needed after 21 months"), and
+    a task that can never be completed nags forever.
+    """
+    if outcome_type == "nothing_to_do":
+        return "informational"
+    rp = (responsible_party or "").upper()
+    if rp in _CORRIDOR_OWNER:
+        return _CORRIDOR_OWNER[rp]
+    # AUTHORITY_IE_DETE / AUTHORITY_IE_ISD and anything else the pathway declares: this is
+    # waiting on a government body, which is neither the employee's nor the employer's task.
+    return "authority" if rp.startswith("AUTHORITY") else "employee"
+
+
+def merge_corridor_overlay_v2(
+    tracks: List[RoadmapTrackV2], draft: Dict[str, Any]
+) -> List[RoadmapAdvisoryV2]:
+    """Fold a corridor's authored journey into the form-projected roadmap, in place.
+
+    ``GET /roadmap/tracks`` projects steps from the case's real ``case_forms`` and read no
+    corridor asset at all, while ``derive_roadmap`` — which does — serves
+    ``GET /roadmap``, an endpoint with **no frontend caller**. So AIQ-1867's whole corridor
+    journey (the CSEP permit chain, the long-stay 'D' visa, the family route) reached the
+    plan email and the HR timeline but never the screen the employee opens.
+
+    **Fallback-safe, exactly like the overlay itself.** Any failure leaves ``tracks``
+    untouched and returns no advisories: a roadmap that silently lost its corridor content
+    is bad, but a roadmap that 500s is worse, and an absent overlay must never read as
+    reassurance.
+
+    Corridor steps are ``pending`` and carry ``confidence_level="UNKNOWN"`` with no
+    ``source_url`` — the corridor files describe themselves as REPRESENTATIVE and not
+    SME-verified, and ``resolveConfidenceLevel`` in the UI downgrades anything without a
+    source to UNKNOWN anyway. Claiming HIGH here would be inventing assurance.
+    """
+    try:
+        from ..services.roadmap_corridor_overlay import corridor_overlay
+        from ..services.roadmap_projection import TRACKS as _PROJECTION_TRACKS
+
+        overlay = corridor_overlay({"draft": draft or {}})
+        if not overlay:
+            return []
+
+        by_key = {t.id: t for t in tracks}
+        for idx, step in enumerate(overlay.get("corridor_steps") or []):
+            key = step["track"]
+            track = by_key.get(key)
+            if track is None:
+                meta = _PROJECTION_TRACKS.get(key)
+                if meta is None:  # pragma: no cover — overlay only emits known track ids
+                    continue
+                track = RoadmapTrackV2(
+                    id=key, name=meta["name"], icon=meta["icon"],
+                    sort_order=meta["sort_order"], progress_pct=0, steps=[],
+                )
+                by_key[key] = track
+                tracks.append(track)
+            days = step.get("expected_duration_days") or 0
+            track.steps.append(
+                RoadmapStepV2(
+                    id=f"corridor-{step['step_id'].lower()}",
+                    title=str(step["name"]).strip('"'),
+                    description=(f"Typically {days} days." if days else None),
+                    status="pending",
+                    owner=_corridor_owner(
+                        step.get("responsible_party"),
+                        str(step.get("outcome_type") or "action"),
+                    ),
+                    due_date=None,
+                    due_date_is_suggested=False,
+                    # Mirrors timeline_service's convention for curated corridor content:
+                    # offset well past the projected forms so authored steps sort after the
+                    # real, actionable ones rather than interleaving unpredictably.
+                    sort_order=500 + idx,
+                    dependency_ids=[
+                        f"corridor-{p.lower()}" for p in (step.get("prerequisite_step_ids") or [])
+                    ],
+                    confidence_level="UNKNOWN",
+                    source_url=None,
+                )
+            )
+
+        # Recompute progress: the corridor steps are all pending, so a track that was 100%
+        # on its forms alone is no longer complete. Leaving the old number would tell someone
+        # they had finished a track that just grew six steps.
+        for track in tracks:
+            total = len(track.steps)
+            done = sum(1 for s in track.steps if s.status in ("completed", "skipped"))
+            track.progress_pct = int(round(100 * done / total)) if total else 0
+
+        tracks.sort(key=lambda t: t.sort_order)
+        return [
+            RoadmapAdvisoryV2(
+                id=a["id"], text=a["text"], asserted=bool(a.get("asserted")),
+                cite=a.get("cite"), provenance=a.get("provenance"),
+            )
+            for a in (overlay.get("advisories") or [])
+        ]
+    except Exception:  # noqa: BLE001 — never break the roadmap over the overlay
+        logger.exception("roadmap tracks: corridor overlay failed")
+        return []
 
 
 def _bucket_confidence(pct: Optional[int]) -> Optional[str]:
@@ -1134,12 +1269,20 @@ def get_case_roadmap_tracks(
     # case can't be loaded or has no move date, move_date stays None and no
     # suggestion is made — a real deadline is never overwritten either way.
     move_date: Optional[_dt.date] = None
+    # [AIQ-1867 follow-up] The same load also yields the wizard draft, which the corridor
+    # overlay needs. Read once; the overlay is applied after the tracks are built.
+    draft: Dict[str, Any] = {}
     try:
         resolved_case_id = resolve_case_forms_case_id(case_id)
         with SessionLocal() as db:
             _case = crud.get_case(db, resolved_case_id)
         if _case is not None:
             move_date = getattr(_case, "target_move_date", None)
+            try:
+                draft = json.loads(getattr(_case, "draft_json", None) or "{}") or {}
+            except (TypeError, ValueError):
+                logger.exception("roadmap: unparseable draft_json for case_id=%s", case_id)
+                draft = {}
     except Exception:
         logger.exception("roadmap: failed to load move date for case_id=%s", case_id)
         move_date = None
@@ -1188,7 +1331,8 @@ def get_case_roadmap_tracks(
                 steps=step_models,
             )
         )
-    return RoadmapTracksResponse(tracks=tracks)
+    advisories = merge_corridor_overlay_v2(tracks, draft)
+    return RoadmapTracksResponse(tracks=tracks, advisories=advisories)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
