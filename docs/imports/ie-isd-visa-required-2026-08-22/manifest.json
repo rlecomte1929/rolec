@@ -1,0 +1,27 @@
+{
+  "batch_id": "ie-isd-visa-required-2026-08-22",
+  "generated_at": "2026-08-22",
+  "generated_by": "claude-code (AIQ-2027 dependency A3, built in-repo from the cited page)",
+  "kind": "lookup_table",
+  "jurisdiction": "IE",
+  "target_table": null,
+  "target_table_note": "DELIBERATELY NULL. This batch is NOT requirement facts and must never be promoted into public.requirement_items. It is the reference data behind the CSEP_2026 pathway's declared `EXTERNAL_LOOKUP -> isd_visa_required.{nationality_iso}`, consumed at request time by backend/app/services/isd_visa_required.py. Naming a target table here is what sent the ES->IE batch at `requirement_facts`, a table with no fact_uid column and two NOT NULL uuid FKs it could not supply.",
+  "artifact": "isd_visa_required.json",
+  "sha256": "0974c7d0b19a413026d9d51aac947b9123291db4f86aa10cec8f7d0e9bfb71b0",
+  "visa_free_nationality_count": 45,
+  "structural_exemption_count": 3,
+  "verification_status": "representative",
+  "review_status": "pending",
+  "review_note": "Transcribed from one official-adjacent page in a single pass. Citizens Information is the Citizens Information Board's public-facing service, not the Department of Justice's own instrument; ISD (irishimmigration.ie) publishes the same list through a JavaScript table (Ninja Tables id 19077) that does not survive HTML fetching, which is why the readable source was used. Corroborate against ISD before this is treated as anything better than representative.",
+  "sources": [
+    {
+      "source_url": "https://www.citizensinformation.ie/en/moving-country/visas-for-ireland/visa-requirements-for-entering-ireland/",
+      "source_name": "Citizens Information — Visa requirements for entering Ireland",
+      "retrieved_at": "2026-08-22T00:00:00Z",
+      "role": "primary"
+    }
+  ],
+  "scope": "The nationalities Ireland exempts from the visa requirement, the exemptions that are not nationality-based, and the preclearance rule that survives a visa exemption. Additive: creates no requirement, corridor, or served row.",
+  "why_this_exists": "corridors/ES_IE/pathways/CSEP_2026/v1.yaml declares visa_required_nationality as EXTERNAL_LOOKUP -> isd_visa_required.{nationality_iso}. The lookup did not exist, so roadmap_corridor_overlay emitted an unasserted advisory telling the mover to go and ask an embassy the question the product exists to answer. Commissioned as A3 in docs/otto/andrea-denis-brief-2026-08-21.md and never delivered.",
+  "integrity": "backend/tests/test_isd_visa_required.py re-hashes the artifact against this manifest and re-counts both collections. scripts/check_otto_batches.py is NOT used: it lives in unmerged PR #1971 and is a fact-stream gate that does not model a lookup table."
+}
