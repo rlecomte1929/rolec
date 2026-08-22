@@ -466,6 +466,32 @@ discipline (MANDATORY)* and *Ledger reconciliation*); `execute_sql` only for rea
 queries or non-schema backfills; every new `public` table needs RLS + a policy +
 `REVOKE ALL ... FROM anon` (see *Database Migrations — Security Rules*).
 
+## Work in a worktree, not the shared checkout
+
+The main checkout is shared with other agents and is usually dirty — uncommitted edits you did
+not make, ~100 untracked files, a `.env` pointing at the prod pooler, a stray `ci_test.db`. Treat
+it as a place to *read* from, and do the work somewhere clean:
+
+```bash
+git worktree add -q -b <branch> /tmp/wt-<name> origin/main
+```
+
+Three failures this prevents, all observed:
+
+- **`git checkout -b` just fails.** Another agent's uncommitted `.githooks/pre-commit` blocked
+  both the checkout and a later `git pull`, leaving local `main` **14 commits behind**. Do not
+  `git stash` to get around it (parallel agents race the stack) and do not discard work that is
+  not yours.
+- **A stale checkout fabricates findings.** `grep` for `verification_guard.py` in a 14-commit-old
+  tree returned "No such file or directory" for a file that had been on `main` for hours. Read
+  from the ref when it matters: `git show origin/main:<path>`.
+- **Both sides of a comparison must be worktrees.** The polluted checkout inflates results — the
+  same commit measured **16 failures / 216s** there and **15 failures / 27s** in a clean detached
+  worktree. The 8× runtime gap is the tell that you are not comparing like with like.
+
+Commit with explicit paths (`git commit -- <path>…`), never a bare `git commit -a`: other agents
+pre-stage files in the shared index and a pathless commit sweeps them into yours.
+
 ## Build hygiene (pre-push hook + CI)
 
 Render auto-deploys `main` on every push, so **every commit on `main` must build cleanly** — a broken build is a user-visible deploy failure.
@@ -546,6 +572,35 @@ a genuine and useful outcome, but it is not the ticket being finished.
 **Verifying a closure:** check the file or the diff, never the commit subject alone. Tests are
 often `unittest` classes, so `grep "^def test_"` returns 0 for a file full of them — use
 `grep -nE "^class |    def test_"`.
+
+**A `MERGED` badge is not evidence the code is on `main`.** Same failure one level up. GitHub
+reports a PR as merged when it merges into *its own base*, and if that base is another feature
+branch which has since merged (or been deleted), the commit lands somewhere with nowhere to go.
+
+`#1973` is the worked example: base `feat/enrich-curated-batches-non-obvious`, which had already
+merged as `#1969` three and a half hours earlier. The PR reports `MERGED`, CI was green, the
+review was sound — and `resolve_pillar` reached `main` in neither. It had to be re-landed as
+`#1983`. Across the last 250 merged PRs it is the **only** one with a non-`main` base, and the
+only one whose content went missing; the two facts are the same fact.
+
+So, around every merge:
+
+```bash
+gh pr view <n> --json baseRefName --jq .baseRefName          # must be "main" BEFORE you merge
+git fetch -q origin
+git merge-base --is-ancestor <mergeCommitSha> origin/main    # must exit 0 AFTER
+```
+
+To audit the whole history at once:
+
+```bash
+gh pr list --state merged --limit 250 --json number,baseRefName,mergeCommit \
+  --jq '.[] | "\(.number)|\(.baseRefName)|\(.mergeCommit.oid // "none")"' |
+while IFS='|' read -r n base sha; do
+  [ "$sha" = "none" ] && continue
+  git merge-base --is-ancestor "$sha" origin/main 2>/dev/null || echo "#$n base=$base NOT ON MAIN"
+done
+```
 
 ## Behavioral Guidelines (Karpathy)
 

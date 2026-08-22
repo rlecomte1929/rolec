@@ -214,6 +214,14 @@ SELECT m.case_id        AS case_id,
 FROM public.case_milestones m
 JOIN public.relocation_cases rc ON rc.id::text = m.case_id
 WHERE COALESCE(rc.status, '') NOT IN :closed_statuses
+  -- [AIQ-2088] A case HR has closed is finished; its overdue milestones are history,
+  -- not work. Closure writes case_assignments.status, NOT relocation_cases.status
+  -- (which is NULL on 1,925 of 1,940 rows), so filtering rc.status alone would keep
+  -- every closed case in HR's "Needs your attention" list forever.
+  AND NOT EXISTS (
+      SELECT 1 FROM public.case_assignments a
+      WHERE a.case_id = rc.id::text AND a.status = 'closed'
+  )
   AND m.target_date IS NOT NULL
   AND m.actual_date IS NULL
   AND COALESCE(m.status, '') NOT IN ('completed', 'not_applicable', 'done')

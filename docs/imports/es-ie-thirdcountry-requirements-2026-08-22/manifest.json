@@ -1,0 +1,232 @@
+{
+  "schema_version": "1.0",
+  "batch_id": "es-ie-thirdcountry-requirements-2026-08-22",
+  "batch_date": "2026-08-22",
+  "batch_date_note": "batch_date is the assigned batch identifier date; retrieved_at is the actual UTC instant each official page was fetched. Every record's last_verified_date is 2026-08-21, the UTC date of retrieval.",
+  "title": "ES->IE destination requirements for a third-country (non-EEA) professional",
+  "corridor": "ES-IE",
+  "jurisdiction": "IE",
+  "direction": "destination (Ireland arrival)",
+  "persona": {
+    "name": "Andrea",
+    "nationality_class": "non-EEA",
+    "status": "professional",
+    "route": "Madrid -> Dublin",
+    "note": "Third-country national resident in Spain taking up employment in Ireland."
+  },
+  "retrieved_at": "2026-08-21T22:30:00Z",
+  "target_table": "requirement_facts",
+  "loader": {
+    "name": "otto-loader",
+    "version": 6,
+    "reference": "tools/otto-loader-index.ts",
+    "routing_field": "target_table",
+    "routing_value": "requirement_facts",
+    "note": "Every record carries target_table=requirement_facts at record level, so routing does not depend on the manifest row. topic_key is set at record level AND inside entity, because the loader reads topic_key / entity.topic_key and does NOT read entity_topic_key."
+  },
+  "sources": [
+    {
+      "source_url": "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/",
+      "source_domain": "enterprise.gov.ie",
+      "publisher": "Department of Enterprise, Tourism and Employment (DETE), Ireland",
+      "source_name": "DETE - Critical Skills Employment Permit",
+      "retrieved_at": "2026-08-21T22:30:00Z",
+      "page_last_updated": null,
+      "records_citing": 9
+    },
+    {
+      "source_url": "https://www.irishimmigration.ie/registering-your-immigration-permission/",
+      "source_domain": "irishimmigration.ie",
+      "publisher": "Immigration Service Delivery (ISD), Department of Justice, Ireland",
+      "source_name": "ISD - Registering your immigration permission",
+      "retrieved_at": "2026-08-21T22:30:00Z",
+      "page_last_updated": "December 23, 2025",
+      "records_citing": 1
+    },
+    {
+      "source_url": "https://www.irishimmigration.ie/registering-your-immigration-permission/frequently-asked-questions-for-registration/",
+      "source_domain": "irishimmigration.ie",
+      "publisher": "Immigration Service Delivery (ISD), Department of Justice, Ireland",
+      "source_name": "ISD - Frequently asked questions for Registration",
+      "retrieved_at": "2026-08-21T22:30:00Z",
+      "page_last_updated": null,
+      "records_citing": 8
+    },
+    {
+      "source_url": "https://www.irishimmigration.ie/registering-your-immigration-permission/how-to-register-your-immigration-permission-for-the-first-time/required-documents/",
+      "source_domain": "irishimmigration.ie",
+      "publisher": "Immigration Service Delivery (ISD), Department of Justice, Ireland",
+      "source_name": "ISD - Required Documents (first-time registration)",
+      "retrieved_at": "2026-08-21T22:30:00Z",
+      "page_last_updated": null,
+      "records_citing": 2
+    },
+    {
+      "source_url": "https://services.mywelfare.ie/en/topics/identity-services/personal-public-service-pps-number/",
+      "source_domain": "services.mywelfare.ie",
+      "publisher": "Department of Social Protection (DSP), Ireland",
+      "source_name": "DSP / MyWelfare - Personal Public Service (PPS) Number",
+      "retrieved_at": "2026-08-21T22:30:00Z",
+      "page_last_updated": null,
+      "records_citing": 4
+    },
+    {
+      "source_url": "https://www.revenue.ie/en/jobs-and-pensions/emergency-tax/index.aspx",
+      "source_domain": "revenue.ie",
+      "publisher": "Office of the Revenue Commissioners, Ireland",
+      "source_name": "Revenue - Emergency Tax (overview)",
+      "retrieved_at": "2026-08-21T22:30:00Z",
+      "page_last_updated": null,
+      "records_citing": 3
+    },
+    {
+      "source_url": "https://www.revenue.ie/en/jobs-and-pensions/emergency-tax/emergency-tax-rules.aspx",
+      "source_domain": "revenue.ie",
+      "publisher": "Office of the Revenue Commissioners, Ireland",
+      "source_name": "Revenue - Emergency Tax rules",
+      "retrieved_at": "2026-08-21T22:30:00Z",
+      "page_last_updated": null,
+      "records_citing": 4
+    },
+    {
+      "source_url": "https://www.revenue.ie/en/jobs-and-pensions/starting-your-first-job/index.aspx",
+      "source_domain": "revenue.ie",
+      "publisher": "Office of the Revenue Commissioners, Ireland",
+      "source_name": "Revenue - Starting your first job",
+      "retrieved_at": "2026-08-21T22:30:00Z",
+      "page_last_updated": null,
+      "records_citing": 1
+    },
+    {
+      "source_url": "https://www.revenue.ie/en/jobs-and-pensions/tax-residence/index.aspx",
+      "source_domain": "revenue.ie",
+      "publisher": "Office of the Revenue Commissioners, Ireland",
+      "source_name": "Revenue - Tax residence",
+      "retrieved_at": "2026-08-21T22:30:00Z",
+      "page_last_updated": null,
+      "records_citing": 3
+    },
+    {
+      "source_url": "https://www2.healthservice.hse.ie/files/690/",
+      "source_domain": "www2.healthservice.hse.ie",
+      "publisher": "Health Service Executive (HSE), Ireland",
+      "source_name": "HSE - National Assessment Guidelines for Medical Card and GP Visit Card",
+      "retrieved_at": "2026-08-21T22:30:00Z",
+      "page_last_updated": "effective from 01/04/2026",
+      "records_citing": 3
+    }
+  ],
+  "files": [
+    {
+      "path": "es_ie_thirdcountry_requirements.ndjson",
+      "role": "fact_stream",
+      "format": "ndjson",
+      "bytes": 78040,
+      "sha256": "188028d60e5e400bb3128fa45c292b584d691c7281c048522900854fd0beacb7",
+      "records": 38
+    }
+  ],
+  "counts": {
+    "records_total": 38,
+    "ndjson_lines": 38,
+    "nationality_non_eea": 38,
+    "status_professional": 38,
+    "nationality_null_or_missing": 0,
+    "fact_type_step": 0,
+    "distinct_topics": 6,
+    "distinct_source_urls": 10,
+    "nationality_scope_basis_nationality_determined": 21,
+    "nationality_scope_basis_audience_scope": 17,
+    "non_obvious_true": 16,
+    "needs_lawyer_review_true": 6,
+    "conditional_assertions": 2,
+    "quote_verbatim_confirmed": 37,
+    "quote_normalized": 1,
+    "by_topic": {
+      "health_entitlements": 3,
+      "immigration_work_authorization": 9,
+      "isd_irp_registration": 11,
+      "ppsn": 5,
+      "revenue_rpn_emergency_tax": 7,
+      "taxation": 3
+    },
+    "by_fact_type": {
+      "account": 2,
+      "deadline": 3,
+      "document": 3,
+      "eligibility": 10,
+      "fee": 2,
+      "other": 16,
+      "where_to_apply": 2
+    },
+    "by_domain_area": {
+      "healthcare": 3,
+      "immigration": 9,
+      "registration": 11,
+      "social_security": 5,
+      "tax": 10
+    }
+  },
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "reconciliation": {
+    "rule_records": "records_total == ndjson_lines",
+    "records_balanced": true,
+    "rule_topics": "records_total == sum(counts.by_topic)",
+    "topics_balanced": true,
+    "rule_fact_types": "records_total == sum(counts.by_fact_type)",
+    "fact_types_balanced": true,
+    "rule_nationality": "records_total == nationality_non_eea",
+    "nationality_balanced": true,
+    "rule_status": "records_total == status_professional",
+    "status_balanced": true,
+    "rule_sources": "records_total == sum(sources[].records_citing)",
+    "sources_balanced": true,
+    "no_fact_type_step": true,
+    "every_record_cites_official_source": true,
+    "every_record_has_evidence_quote": true,
+    "distinct_source_domains": [
+      "enterprise.gov.ie",
+      "irishimmigration.ie",
+      "revenue.ie",
+      "services.mywelfare.ie",
+      "www2.healthservice.hse.ie"
+    ],
+    "fabricated_records": 0,
+    "fabrication_control": "Every evidence_quote was copied from a page fetched during this run from the publisher's own domain; no quote was reconstructed from memory. Records whose quote required whitespace/bullet normalisation are listed in quote_normalized_records and carry quote_verbatim_confirmed=false.",
+    "quote_normalized_records": [
+      "health_non_eea_immigration_permission_verified"
+    ]
+  },
+  "dependencies": {
+    "A3_isd_visa_required": {
+      "batch_id": "ie-isd-visa-required-2026-08-22",
+      "status": "LANDED and WIRED (2026-08-22, PR #1986). The artifact is docs/imports/ie-isd-visa-required-2026-08-22/ and it is consumed at request time by backend/app/services/isd_visa_required.py, which the CSEP_2026 pathway declares as EXTERNAL_LOOKUP -> isd_visa_required.{nationality_iso}.",
+      "effect_on_this_batch": "No record in this batch asserts that any nationality IS visa-required. The two records that touch the visa question are marked assertion_mode=conditional and quote the source's own conditional wording ('and if visa required', 'If you are a visa-required national'). The visa-required determination stays with A3.",
+      "conditional_records": [
+        "entry_visa_follows_permit_if_visa_required",
+        "leaving_state_before_registration_needs_new_entry_visa"
+      ],
+      "effect_on_this_batch_now": "This batch's decision to leave the visa-required determination to A3 is what makes it correct now: roadmap_corridor_overlay resolves the question (Venezuela and North Macedonia both visa-required; a nationality it cannot place stays unasserted), while these two records keep their conditional wording and no longer dangle."
+    },
+    "S1_nationality_scoping_self_audit": {
+      "required_before_delivery": true,
+      "status": "run over this batch and its README",
+      "scope": "all 38 records plus README.md",
+      "result_recorded_in": "README.md section 'S1 - nationality-scoping self-audit'",
+      "machine_readable_marker": "applies_to.nationality_scope_basis",
+      "basis_definitions": {
+        "audience_scope": "This rule is nationality-neutral in Irish law. applies_to.nationality='non-EEA' records the audience of this batch, NOT a restriction - the same rule binds an EEA mover and must not be withheld from one.",
+        "nationality_determined": "This obligation exists because the person is a non-EEA national; an EEA/EU national does not face it."
+      },
+      "bases": {
+        "nationality_determined": 21,
+        "audience_scope": 17
+      },
+      "rule_bases": "records_total == nationality_determined + audience_scope",
+      "bases_balanced": true,
+      "finding": "All 38 records satisfy the contract (nationality='non-EEA', status='professional'), but only 21 are nationality-DETERMINED. The other 17 are nationality-neutral Irish rules (PPSN, PAYE/RPN/Emergency Tax, tax residence, ordinary-residence health entitlement) where 'non-EEA' is the batch's audience and not a legal restriction. Each record now states which it is in applies_to.nationality_scope_basis, so a serving layer cannot infer that an EEA mover is exempt from a rule that binds everyone."
+    }
+  },
+  "target_table_note": "`target_table` / loader.routing_value name the AUDOS-side otto-loader v6 contract (tools/otto-loader-index.ts), which is not in this repo. They are NOT a route this checkout can execute. Verified against prod 2026-08-22: public.requirement_facts has NO fact_uid column and two NOT NULL uuid FKs with no default (entity_id, source_doc_id) that this batch cannot supply, so an in-repo load keyed on fact_uid would fail. The in-repo path is scripts/import_otto_facts.py -> otto_staging.immigration_* -> executor.promote() -> public.requirement_items, which is where corridor requirement data actually lands. Left unchanged rather than rewritten: the routing value is a contract with a loader this repo cannot test, and CLAUDE.md's rule is to verify the claim, not to silently re-point someone else's contract."
+}

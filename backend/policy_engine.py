@@ -20,31 +20,41 @@ class PolicyEngine:
         return {}
 
     def compute_spend(self, assignment_id: str, profile: Dict[str, Any], policy: Dict[str, Any]) -> Dict[str, Any]:
-        caps = policy.get("caps", {})
-        destination = profile.get("movePlan", {}).get("destination", "")
-        dependents = profile.get("dependents", []) or []
-        family_size = 1 + (1 if profile.get("spouse", {}).get("fullName") else 0) + len(dependents)
+        """No spend categories: this platform does not track actual spend yet.
 
-        seed = sum(ord(ch) for ch in assignment_id) % 1000
+        [AIQ-2087] This method used to SYNTHESISE per-category utilisation:
 
-        housing_cap = caps.get("housing", {}).get("amount", 5000)
-        movers_cap = caps.get("movers", {}).get("amount", 10000)
-        schools_cap = caps.get("schools", {}).get("amount", 20000)
-        immigration_cap = caps.get("immigration", {}).get("amount", 4000)
+            seed = sum(ord(ch) for ch in assignment_id) % 1000
+            housing_used = int(housing_cap * 0.64 + (seed % 600))
+            ...
 
-        housing_used = int(housing_cap * 0.64 + (seed % 600))
-        movers_used = int(movers_cap * (1.18 if "New York" in destination else 0.72) + (seed % 500))
-        schools_used = int(schools_cap * (0.92 if family_size > 2 else 0.12) + (seed % 400))
-        immigration_used = int(immigration_cap * 0.35 + (seed % 200))
+        A hash of the case id, scaled against caps read from the checked-in
+        ``backend/policy_config.json``. It was not an estimate and not a default —
+        it was a number with no referent, and it reached HR three ways:
 
-        spend = {
-            "housing": self._build_spend_item("Housing", housing_used, housing_cap, "USD"),
-            "movers": self._build_spend_item("Movers & Logistics", movers_used, movers_cap, "USD"),
-            "schools": self._build_spend_item("Schools", schools_used, schools_cap, "USD"),
-            "immigration": self._build_spend_item("Immigration & Legal", immigration_used, immigration_cap, "USD"),
-        }
+          * ``GET /api/hr/policy?caseId=`` -> the ``spend`` block;
+          * ``build_compliance_report`` turned each item into a COMPLIANCE CHECK
+            ("Housing over policy cap", FAIL/CRITICAL, action "Request Exception"),
+            which also feeds ``summary.riskScore``;
+          * ``over_limit`` drove ``gating.requiresAcknowledgement`` and
+            ``gating.requiresHRApproval`` — so a hash decided whether a case needed
+            HR sign-off.
 
-        return spend
+        Note the caps were fiction too: ``load_policy()`` reads one static file with
+        no company parameter, so every tenant saw the same $5k/$10k/$20k/$4k while
+        their real policy sat in ``policy_config_benefits`` (21,662 rows, served by
+        ``/api/hr/policy-config/*``).
+
+        Returning ``{}`` is the honest answer — there is no actuals source anywhere
+        in the platform (``case_budget_lines`` holds 0 rows). Downstream this means
+        no cap checks are emitted and the gates fall back to real pending exceptions
+        from ``policy_cap_requests``. Real per-case spend tracking is its own piece
+        of work; do not repopulate this from anything but a real ledger.
+
+        Same class as AIQ-1527 (``test_budget_summary_honest.py``): the system
+        asserting something it never measured.
+        """
+        return {}
 
     def build_policy_response(
         self,
@@ -178,23 +188,6 @@ class PolicyEngine:
             "checks": checks,
             "consistencyConflicts": conflicts,
             "recentChecks": checks[:5],
-        }
-
-    def _build_spend_item(self, title: str, used: int, cap: int, currency: str) -> Dict[str, Any]:
-        remaining = max(cap - used, 0)
-        if used > cap:
-            status = "OVER_LIMIT"
-        elif used > int(cap * 0.85):
-            status = "NEAR_LIMIT"
-        else:
-            status = "ON_TRACK"
-        return {
-            "title": title,
-            "used": used,
-            "cap": cap,
-            "remaining": remaining,
-            "currency": currency,
-            "status": status,
         }
 
     def _doc_check(self, check_id: str, label: str, value: Any, owner: str) -> Dict[str, Any]:
