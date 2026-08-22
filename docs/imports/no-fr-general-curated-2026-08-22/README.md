@@ -33,3 +33,29 @@ sequence step). Preserved in `raw/`.
 **Load contract:** candidates only.
 `python scripts/import_otto_facts.py docs/imports/no-fr-general-curated-2026-08-22/no-fr-general-curated-2026-08-22.ndjson --expected 17`
 (dry-run; the CLI resolves workspace batch-ids only, so pass the path), then `--apply`; human flips staging rows to `'ready'` before any `--promote`. Never past pending.
+
+## Enrichment 2026-08-22 — non_obvious / timing
+
+This is the batch that matters most. Measured in production on 2026-08-22, **FRANCE had 0 of 16
+approved requirements flagged `non_obvious` and 0 with `timing`** — Denis saw a flat list with no
+"Easy to miss" badge and no deadlines, while Andrea's IRELAND showed 12 traps. Loading this batch
+as curated would have taken him from 6 bland requirements to ~15 bland ones.
+
+`scripts/enrich_curated_batches_non_obvious_2026_08_22.py` adds `applies_to.non_obvious`,
+`non_obvious_note` and `timing` from an explicit per-fact disposition table carrying each
+entry's justification. **8 of 17 records flagged (47%)**, calibrated against the 12 IRELAND and
+4 NORWAY traps already live.
+
+Nothing was invented: no `fact_text`, `source_url` or `evidence_quote` was modified, and every
+`timing` restates a deadline the fact's own text already states (the DPAE 8-day rule, the A1
+before day one, the France Travail three-month mark). `quote_verbatim_confirmed` stays `false`.
+
+**Gate after enrichment:** `parsers.read_jsonl` 17 rows / **0 rejections**; `mappings.resolve`
+**9 requirement drafts for FRANCE, 0 Unmapped** — unchanged from the curation gate — of which
+**7 are now non_obvious** and 4 carry timing.
+
+**Known limit.** `non_obvious_note` has nowhere to land yet: `requirement_items` has
+`non_obvious` (bool) and `timing` (text) but no note column, and `mappings.resolve` carries
+none. The boolean and the timing DO reach the reader today (badge + practical-realities line);
+the note text needs a column plus an importer change. It is recorded here so the authoring is
+auditable and the follow-up is cheap.

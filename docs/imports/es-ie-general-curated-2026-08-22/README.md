@@ -41,3 +41,26 @@ Ireland** (Reg. 1231/2010 participation) is a legal determination deliberately N
 (dry-run; the CLI resolves workspace batch-ids only, so pass the path), then `--apply`. Stages to `otto_staging` at `status='new'`; promotion needs the human flip to
 `'ready'` and `--promote`, landing `review_status='pending'` / `verification_status='representative'`
 in `public.requirement_items`. Never past pending.
+
+## Enrichment 2026-08-22 — non_obvious / timing
+
+Curation made this batch loadable; it did **not** make it valuable. As curated, all 29 records
+carried no `non_obvious` flag and no `timing`, so loading them would have added volume and not
+one trap — and the trap is what the product is for.
+
+`scripts/enrich_curated_batches_non_obvious_2026_08_22.py` adds `applies_to.non_obvious`,
+`non_obvious_note` and `timing` from an explicit per-fact disposition table (that table is the
+audit trail — every entry carries its justification). **13 of 29 records flagged (45%)**,
+calibrated against the 12 existing IRELAND traps already in production (41%).
+
+Nothing was invented: no `fact_text`, `source_url` or `evidence_quote` was modified, and every
+`timing` restates a deadline the fact's own text already states. `quote_verbatim_confirmed`
+stays `false` — a human confirms the quote before approval.
+
+**Gate after enrichment:** `parsers.read_jsonl` 29 rows / **0 rejections**; `mappings.resolve`
+**13 requirement drafts, 0 Unmapped**, of which **11 non_obvious** and 9 carry timing.
+
+Timing merges per requirement, not per fact — `mappings.resolve` takes the first contributing
+fact in `fact_key` order. `es_ie_prsi_rate_increase_october_2026__*` is therefore deliberately
+left with no timing: it sorts ahead of the 2025 unearned-income rule and would otherwise put a
+scheduled future rate change in the requirement's deadline slot.
