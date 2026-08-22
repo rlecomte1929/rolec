@@ -479,6 +479,29 @@ def check_batch(batch_id: str) -> Result:
     if not r.check(bool(records), "fact stream is not empty"):
         return r
 
+    # Sections 1-3 grade a batch against the otto-loader v6 delivery contract: record-level
+    # `target_table`, `applies_to.nationality`, `fact_type` from the loader's set,
+    # `confidence_score`, the by_* count histograms, the promotion simulation. A batch that
+    # never claimed that contract must not be graded by it.
+    #
+    # `ve-ie-entry-family-2026-08-20` is the case. It predates this gate, carries a different
+    # and legitimate shape (`fact_uid`, `applies_to_nationality_classes`, no `fact_type` or
+    # `confidence_score`), targets `public.requirement_items` rather than the loader's
+    # `requirement_facts`, and is validated by its own `scripts/verify_aiq_2027_ve_ie_load.py`,
+    # which passes. Graded here it scored 18 PASS / 15 FAIL — every failure being "you are not
+    # the other batch's schema".
+    #
+    # It landed anyway because CI gates only CHANGED batches and #1971 did not touch it, so the
+    # false universality stayed invisible until the first edit to that batch. Dispatch on what
+    # the manifest actually declares, and say plainly what was not checked — a silent skip and a
+    # false failure are both worse than a stated one.
+    if not manifest.get("loader"):
+        r.skip("batch does not declare the otto-loader contract",
+               "no manifest 'loader' block, so the v6 record contract, the by_* count "
+               "histograms and the promotion simulation do not apply; NDJSON validity, "
+               "README, batch_id and manifest parsing were still checked")
+        return r
+
     check_contract(r, records, manifest)
     check_manifest(r, records, line_count, raw, stream_path, manifest)
     check_promotion(r, records)

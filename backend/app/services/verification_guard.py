@@ -47,12 +47,30 @@ from typing import Any, Iterable, Mapping, Optional
 #: The canonical provenance ladder. Anything else is a label-consistency defect —
 #: ``draft`` exists only in ``draft_requirements.py`` output files, which by
 #: contract never reach the database.
-VERIFICATION_STATUSES = ("representative", "corpus_grounded", "expert_verified")
+#:
+#: ``verified`` was missing here and PRODUCTION USES IT. Measured 2026-08-22:
+#: ``representative`` 163 / ``corpus_grounded`` 19 / ``verified`` 11 — and all 11
+#: ``verified`` rows are SERVED (``review_status='approved'``). The frontend has
+#: rendered it since #1922, as "Reviewed" (info), deliberately distinct from
+#: "Expert-verified" because no lawyer has seen those rows.
+#:
+#: So this tuple described a ladder the database does not have, and
+#: ``assert_generator_verification_write`` would have rejected a legitimate
+#: ``verified`` write through ``crud.create_requirement_item`` as "outside the
+#: canonical ladder". Latent only because the rows that use it were written by
+#: direct SQL during founder review (AIQ-1845), which does not pass through here.
+VERIFICATION_STATUSES = ("representative", "corpus_grounded", "verified", "expert_verified")
 
 EXPERT_VERIFIED = "expert_verified"
 
 #: What an automated producer may write. ``None`` is also accepted (legacy rows
 #: and the research stub carry no provenance claim at all).
+#:
+#: ``verified`` is NOT here, and that is the point of adding it above rather than
+#: below: it is a claim that a human read the source and confirmed the row, so a
+#: generator must not be able to mint it. It sits on the ladder so the value is
+#: legal and renderable; it stays off this set so only a human review path writes
+#: it — the same two-key split ``expert_verified`` already has, one rung down.
 GENERATOR_WRITABLE_STATUSES = frozenset({"representative", "corpus_grounded"})
 
 #: Columns only ``mark_expert_verified`` may set. A generator payload that
