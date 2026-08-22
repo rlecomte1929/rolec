@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from backend.app.services.nationality_class import EU_EEA, OWN_NATIONAL, THIRD_COUNTRY
 from backend.app.services.requirements_country_key import iso_to_catalog_name
@@ -57,7 +57,81 @@ PURPOSES: Dict[str, str] = {
 #: Every `otto_staging` entity carries `domain_area='immigration'`, and a residence/entry
 #: permit is a RESIDENCE requirement. This is read off the schema, not guessed — which is why
 #: a row with any other `domain_area` is refused rather than filed under a default pillar.
+#:
+#: This is the DEFAULT, not the verdict: a batch that states a pillar on its facts overrides it
+#: (see `resolve_pillar`). Reading it off `domain_area` alone filed every immigration-domain
+#: topic under RESIDENCE, including tax ones — so the ES→IE batch's Revenue/RPN and tax-residence
+#: topics would have landed at RESIDENCE while production already serves Irish tax under
+#: EMPLOYMENT, splitting one subject across two pillars.
 IMMIGRATION_PILLAR = "RESIDENCE"
+
+#: The pillars `requirement_items` actually has. Identical to `candidate_beam.importer.PILLARS`
+#: and to the seven distinct values in production — there is no CHECK constraint on the column,
+#: so an unrecognised pillar would be written happily and invent an eighth that no rules engine
+#: or UI knows how to render. That is why an unknown pillar refuses below instead of defaulting.
+CANONICAL_PILLARS: Tuple[str, ...] = (
+    "RESIDENCE",
+    "IDENTITY",
+    "EMPLOYMENT",
+    "HOUSING",
+    "SOCIAL_SECURITY",
+    "TIMELINE",
+    "HEALTHCARE",
+)
+
+#: Vocabulary the research batches use that is not a catalog pillar. `TAX` is the live example:
+#: the ES→IE batch tags its tax-residence facts `pillar='TAX'`, which is not one of the seven.
+#: Mapping it to EMPLOYMENT is not a guess — `candidate_beam.importer.PILLAR_BY_CATEGORY`
+#: already maps `tax` and `payroll` to EMPLOYMENT, grounded there in an existing production row
+#: ("Tax deduction card (skattekort) before first salary"), and IRELAND already serves
+#: "Irish tax residence turns on 183 days in a year, or 280 across two" at EMPLOYMENT.
+PILLAR_ALIASES: Dict[str, str] = {
+    "TAX": "EMPLOYMENT",
+    "PAYROLL": "EMPLOYMENT",
+}
+
+
+def resolve_pillar(
+    facts: Sequence[Any], *, default: str = IMMIGRATION_PILLAR
+) -> Tuple[Optional[str], Optional[str]]:
+    """The pillar a topic's facts state, or `default` when they state none.
+
+    Returns `(pillar, None)` or `(None, reason)` — the reason becoming an `Unmapped`, in the
+    same style as the `nationality` and `status` refusals: a batch that cannot say where a
+    requirement belongs gets reported, never filed somewhere plausible.
+
+    A fact carrying the default pillar is treated as *saying nothing*, because that is exactly
+    what the schema default already produces — `domain_area='immigration'` yields RESIDENCE
+    whether or not the fact repeats it. So the signal is the non-default pillar, and a topic
+    whose facts split between RESIDENCE and one other pillar resolves to that other one rather
+    than refusing. Two *different* non-default pillars is a genuine disagreement and refuses:
+    one topic becomes one `requirement_items` row, which has exactly one pillar.
+    """
+    stated: List[str] = []
+    for fact in facts:
+        raw = (fact.applies_to or {}).get("pillar")
+        if raw is None or not str(raw).strip():
+            continue
+        value = str(raw).strip().upper()
+        value = PILLAR_ALIASES.get(value, value)
+        if value not in CANONICAL_PILLARS:
+            return None, (
+                f"applies_to.pillar={str(raw).strip()!r} is not a catalog pillar "
+                f"({', '.join(sorted(CANONICAL_PILLARS))}) and has no known alias — the column "
+                "has no CHECK constraint, so promoting it would invent a pillar nothing renders"
+            )
+        if value not in stated:
+            stated.append(value)
+
+    distinctive = [p for p in stated if p != default]
+    if not distinctive:
+        return default, None
+    if len(distinctive) > 1:
+        return None, (
+            f"facts disagree on applies_to.pillar ({', '.join(sorted(distinctive))}), so this is "
+            "not one requirement — one topic promotes to one row, which has one pillar"
+        )
+    return distinctive[0], None
 
 #: Otto's schema carries no notion of blocking-ness, and it cannot be inferred from the text:
 #: the France set includes `cardOptional` ("EU citizens have the right, the card is optional"),
@@ -270,8 +344,16 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
         )
     purpose = PURPOSES[status]
 
+    pillar, pillar_error = resolve_pillar(facts)
+    if pillar_error is not None:
+        return Unmapped(topic, pillar_error)
+
     derivations = [
-        f"pillar={IMMIGRATION_PILLAR} from domain_area='immigration'",
+        (
+            f"pillar={pillar} from applies_to.pillar"
+            if pillar != IMMIGRATION_PILLAR
+            else f"pillar={pillar} from domain_area='immigration'"
+        ),
         f"severity={DEFAULT_SEVERITY} (not derivable from Otto's schema; a human raises it)",
         f"owner={DEFAULT_OWNER} (employee-obtained document)",
         f"purpose={purpose} from applies_to.status={status!r}",
@@ -331,7 +413,7 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
     payload = {
         "country_code": country_code,
         "purpose": purpose,
-        "pillar": IMMIGRATION_PILLAR,
+        "pillar": pillar,
         "title": entity.title,
         "description": compose_description(facts),
         "severity": DEFAULT_SEVERITY,
