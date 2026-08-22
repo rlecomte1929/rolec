@@ -296,3 +296,75 @@ describe('states that must never read as "complete"', () => {
     }
   });
 });
+
+/**
+ * A fact the source states only under a condition it does not itself determine. The two ES→IE
+ * entry-visa records are exactly this: they assert a SEQUENCE, while whether a nationality is
+ * visa-required is a separate ISD lookup. Rendered flat, they tell a mover she is
+ * visa-required on the authority of a page that never says so.
+ */
+const CONDITIONAL_FACT = {
+  ...FACT,
+  fact_id: 'f3',
+  fact_text:
+    'If the national is visa-required, the entry visa application follows the employment permit.',
+  assertion_mode: 'conditional' as const,
+  conditional_on:
+    'ie-isd-visa-required-2026-08-22 (task A3) determines whether a given nationality is visa-required.',
+};
+
+/** An easy-to-miss trap: high cost of not knowing, and nothing else prompts you. */
+const TRAP_FACT = {
+  ...FACT,
+  fact_id: 'f4',
+  fact_text: 'A registration appointment cannot be booked before you arrive in the State.',
+  non_obvious: true,
+};
+
+describe('conditional facts and easy-to-miss traps', () => {
+  it('marks a conditional fact as conditional and shows what it depends on', async () => {
+    mockGetSufficiency.mockResolvedValue(ok({ supporting_requirements: [CONDITIONAL_FACT] }));
+    render(<RequirementsSufficiencyPanel caseId={CASE_ID} />);
+
+    await screen.findByTestId('sufficiency-fact-conditional');
+    expect(screen.getByTestId('sufficiency-fact-condition')).toHaveTextContent(
+      /ie-isd-visa-required/,
+    );
+  });
+
+  it('does not dress a plain assertion up as conditional', async () => {
+    mockGetSufficiency.mockResolvedValue(ok({ supporting_requirements: [FACT] }));
+    render(<RequirementsSufficiencyPanel caseId={CASE_ID} />);
+
+    await screen.findByTestId('sufficiency-fact');
+    expect(screen.queryByTestId('sufficiency-fact-conditional')).toBeNull();
+    expect(screen.queryByTestId('sufficiency-fact-condition')).toBeNull();
+  });
+
+  it('flags a non-obvious fact as easy to miss', async () => {
+    mockGetSufficiency.mockResolvedValue(ok({ supporting_requirements: [TRAP_FACT] }));
+    render(<RequirementsSufficiencyPanel caseId={CASE_ID} />);
+
+    await screen.findByTestId('sufficiency-fact-trap');
+  });
+
+  it('leaves an ordinary fact unflagged', async () => {
+    mockGetSufficiency.mockResolvedValue(ok({ supporting_requirements: [FACT] }));
+    render(<RequirementsSufficiencyPanel caseId={CASE_ID} />);
+
+    await screen.findByTestId('sufficiency-fact');
+    expect(screen.queryByTestId('sufficiency-fact-trap')).toBeNull();
+  });
+
+  it('a payload predating these fields renders as a plain assertion, never as conditional', async () => {
+    // Absent must fall to the weaker claim, never borrow the stronger one — the same rule
+    // AIQ-2132 applies to citation_status.
+    const legacy = { fact_id: 'f5', fact_text: 'x', source_url: 'https://www.revenue.ie/', required_fields: [] };
+    mockGetSufficiency.mockResolvedValue(ok({ supporting_requirements: [legacy] }));
+    render(<RequirementsSufficiencyPanel caseId={CASE_ID} />);
+
+    await screen.findByTestId('sufficiency-fact');
+    expect(screen.queryByTestId('sufficiency-fact-conditional')).toBeNull();
+    expect(screen.queryByTestId('sufficiency-fact-trap')).toBeNull();
+  });
+});
