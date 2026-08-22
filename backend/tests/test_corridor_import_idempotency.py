@@ -18,7 +18,7 @@ Three layers are pinned here, all against the REAL Norway corridor seed
   (b) the guard lives in the DATABASE: a writer that bypasses
       ``crud.create_requirement_item`` entirely cannot insert a duplicate either
       (``uq_requirement_items_country_purpose_title``, sqlite here, Postgres via
-      migration 20261117000000);
+      migration 20261118000000);
   (c) the lost-pre-select race: the insert path runs
       ``ON CONFLICT (country_code, purpose, title) DO NOTHING``, so an import
       that raced past the pre-select inserts zero rows and converges on the row

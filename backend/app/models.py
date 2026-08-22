@@ -107,7 +107,7 @@ class RequirementItem(Base):
     # constraint a duplicate import physically cannot insert a second row for the same
     # (country_code, purpose, title) — crud inserts with ON CONFLICT DO NOTHING pinned
     # to this key. Production Postgres gets the same index (after a dedupe) from
-    # migration 20261117000000; SQLite test databases get it from this declaration.
+    # migration 20261118000000; SQLite test databases get it from this declaration.
     __table_args__ = (
         UniqueConstraint(
             "country_code",

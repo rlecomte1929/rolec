@@ -36,7 +36,7 @@
 -- the dedupe loop finds nothing on a second run and the index create is IF NOT EXISTS.
 --
 -- guard: column-read-ok — operator applies to production BEFORE the PR merges
--- (psql -f + `supabase migration repair --status applied 20261117000000`), same
+-- (psql -f + `supabase migration repair --status applied 20261118000000`), same
 -- procedure as 20261103/20261104/20261108. Ordering matters here more than usual: the
 -- backend's insert names this index in its ON CONFLICT clause, so deploying the code
 -- without the index would fail every NEW-row import loudly (never silently).

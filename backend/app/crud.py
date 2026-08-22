@@ -142,7 +142,7 @@ def _has_citations(value: Any) -> bool:
 
 #: The natural key every requirement-item import matches on. The database enforces it
 #: too (uq_requirement_items_country_purpose_title — models.RequirementItem /
-#: migration 20261117000000), so the ON CONFLICT insert below is pinned to exactly
+#: migration 20261118000000), so the ON CONFLICT insert below is pinned to exactly
 #: this index and a duplicate corridor import inserts ZERO rows.
 REQUIREMENT_ITEM_NATURAL_KEY = ("country_code", "purpose", "title")
 
