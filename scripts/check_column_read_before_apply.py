@@ -108,6 +108,32 @@ def _is_scanned(path: str) -> bool:
     return True
 
 
+# `verified_by = Column(Text, nullable=True)` — a SQLAlchemy mapped column, including the
+# 2.0 annotated form `verified_by: Mapped[str | None] = mapped_column(...)`.
+#
+# WHY THIS IS ITS OWN PATTERN, added 2026-08-22 after a second incident. The read patterns
+# below all look for a column referenced at a *call site* (`ft.sections`, `row["sections"]`).
+# A mapped column has no call site: declaring it puts it in the SELECT list that SQLAlchemy
+# emits for **every** query against that table. So it is simultaneously the most damaging
+# read form and the only one that is invisible to a text search for uses.
+#
+# PR #1963 shipped `20261117000000_..._verified_write_guardrail.sql` (ADD COLUMN verified_by,
+# verified_at) together with those two lines on `RequirementItem`. This guard ran and passed
+# — `_reads_of` scored 0 on both — and prod returned
+# `column requirement_items.verified_by does not exist` on GET /api/public/corridor-requirements
+# for EVERY corridor and on GET /api/cases/{id}/requirements, because one bad mapped column
+# takes down the whole table rather than one route. The blast radius is what made it read
+# like a serving-layer bug rather than a schema drift.
+#
+# Anchored to `= Column(` / `= mapped_column(` so it stays as narrow as the rest: it cannot
+# fire on `sections = build_sections()`, which the tests pin as a non-violation.
+_ORM_COLUMN_DECL = (
+    r"^\s*{col}\s*"          # column name at the start of the line
+    r"(?::[^=]+)?"            # optional `: Mapped[...]` annotation
+    r"=\s*(?:sa\.|orm\.)?(?:mapped_column|Column)\s*\("
+)
+
+
 _COMMENT_STARTS = ("#", "//", "*", '"""', "'''", "--")
 _BACKTICKED = re.compile(r"`[^`]*`")
 
@@ -133,10 +159,15 @@ def _reads_of(col: str, lines: List[str]) -> List[str]:
     Requires a qualified or aliased reference — `ft.sections`, `sections AS x`,
     `"sections"` inside SQL — rather than the bare word. A bare match on a name like
     `status` or `name` would fire on almost every diff, and a guard that cries wolf gets
-    switched off. Under-matching is the safer failure here: the rule is also written down
+    switched off.
+
+    The one exception is a SQLAlchemy mapped-column declaration (`_ORM_COLUMN_DECL`): it
+    has no call site to match on, and it is a read of the column in every query against
+    its table. Under-matching is the safer failure here: the rule is also written down
     in CLAUDE.md, and a missed case costs one revert, whereas a noisy guard costs the
     guard.
     """
+    orm = re.compile(_ORM_COLUMN_DECL.format(col=re.escape(col)))
     pat = re.compile(
         rf"(?:[A-Za-z_][A-Za-z0-9_]*\.{re.escape(col)}\b"      # ft.sections
         rf"|\b{re.escape(col)}\s+AS\s"                          # sections AS template_sections
@@ -146,7 +177,11 @@ def _reads_of(col: str, lines: List[str]) -> List[str]:
         rf"|[\"'`]{re.escape(col)}[\"'`]\s*(?:[,)\]]|$))",
         re.IGNORECASE,
     )
-    return [ln.strip() for ln in lines if pat.search(_code_only(ln))]
+    return [
+        ln.strip()
+        for ln in lines
+        if pat.search(_code_only(ln)) or orm.search(_code_only(ln))
+    ]
 
 
 def main() -> int:
