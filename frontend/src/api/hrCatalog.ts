@@ -17,12 +17,6 @@ export interface CurationRow {
   source: string | null;
   city: string | null;
   country: string | null;
-  /**
-   * Human-authoritative ReloPass accreditation check. Lifted out of `attributes` by the
-   * backend so the UI does not parse a free-form blob. Unverified vendors stay selectable
-   * but must be visibly flagged; nothing in the product ever sets this true in code.
-   */
-  verified: boolean;
 }
 
 export interface CurationView {
@@ -56,15 +50,9 @@ export interface CustomVendorBody {
 export const getCurationView = (
   category: string,
   destinationCity?: string | null,
-  /**
-   * ISO alpha-2 destination country. Scopes the catalog proposal to that country so a case
-   * bound for Ireland is offered Ireland's vendors. Omitted keeps the unscoped behaviour.
-   */
-  country?: string | null,
 ): Promise<CurationView> => {
   const qs = new URLSearchParams({ category });
   if (destinationCity) qs.set('destination_city', destinationCity);
-  if (country) qs.set('country', country);
   return apiGet<CurationView>(`/api/hr/catalog/curation?${qs.toString()}`);
 };
 
