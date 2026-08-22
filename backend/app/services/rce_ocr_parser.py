@@ -30,6 +30,12 @@ from backend.relopass.agents.models import ParsedDocument
 
 log = logging.getLogger(__name__)
 
+# [AIQ-2121] The content classifier. Imported at module level (unlike `classify_document`,
+# which is imported inside _classify to preserve the AIQ-1764 decoupling note) because it
+# is called on the hot path and pulls no heavy dependency of its own — its LLM client is a
+# lazy import inside the function.
+from .document_classifier import classify_document_content
+
 # Document-type codes whose identity comes from an ICAO 9303 MRZ — these carry an
 # mrz_text the passport_td3 / id_card agents consume.
 _MRZ_DOC_TYPES = {"PASSPORT", "PASSPORT_TD3", "ID_CARD"}
@@ -44,6 +50,12 @@ class OcrParseResult:
     document_type: str               # PASSPORT / CONTRACT / OTHER / ...
     ocr_engine: str                  # 'gpt4o_passport' | 'mistral_ocr' | 'none'
     ok: bool                         # False when no engine ran / OCR failed (fail-soft)
+    # [AIQ-2121] The RUNTIME extractor code (PASSPORT_TD3 / DIPLOMA / …) derived by reading
+    # the document's TEXT, or None when nothing readable came back. Distinct from
+    # `document_type` above, which stays the pre-OCR routing guess so existing consumers are
+    # unaffected. Defaulted, so the positional constructions below and in the tests keep
+    # working unchanged.
+    runtime_code: Optional[str] = None
 
 
 # ── Pure mappers ──────────────────────────────────────────────────────────────
@@ -206,7 +218,33 @@ async def parse_stored_document(
             document_id=document_id, case_id=case_id, mime_type=mime_type,
             language=None, text=text, words=(),
         )
-        return OcrParseResult(parsed, None, doc_type, "mistral_ocr", True)
+        # [AIQ-2121] Now that text exists, ask the REAL classifier what this document is.
+        #
+        # The `doc_type` above is a filename guess, and it is used to pick the OCR ENGINE —
+        # that decision has to happen before any text exists, so it stays as it is. But its
+        # four codes map to no runtime extractor at all (`runtime_code_for` returns None for
+        # every one of them), so a document routed by filename alone can never reach an
+        # agent. Reading the content yields codes that do map: EMPLOYMENT_CONTRACT,
+        # PASSPORT_TD3, ID_CARD, VISA_PERMIT, DIPLOMA.
+        #
+        # Only when the CALLER did not state a type. An explicit document_type — from
+        # rce.documents or a test — is a stated fact and outranks anything inferred here.
+        #
+        # classify_document_content never raises and degrades to the filename heuristic with
+        # a recorded reason, which is what keeps this inside the fail-soft contract.
+        runtime_code: Optional[str] = None
+        if not document_type:
+            classification = classify_document_content(
+                text, file_name=file_name, mime_type=mime_type
+            )
+            runtime_code = classification.runtime_code
+            log.info(
+                "rce_ocr_parser: content classification doc=%s code=%s runtime=%s "
+                "method=%s confidence=%s",
+                document_id, classification.code, runtime_code,
+                classification.method, classification.confidence,
+            )
+        return OcrParseResult(parsed, None, doc_type, "mistral_ocr", True, runtime_code)
     except Exception as exc:  # never raise into the pipeline
         log.warning(
             "rce_ocr_parser failed-soft for doc=%s type=%s: %s", document_id, doc_type, exc
