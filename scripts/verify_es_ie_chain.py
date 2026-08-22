@@ -33,8 +33,9 @@ Postgres `::text` casts), so --seed needs a Postgres target. --read-only works a
 Needs an ES→IE fixture case. `scripts/seed_es_ie_fixture.py` makes one through the real HR
 API; pass its id as RELOPASS_ESIE_CASE_ID, or let this script call it for you (--seed).
 
-Andrea's live case 6ecadafe is deliberately NOT the default: it is real work belonging to a
-real person, and it sits at a company with no HR profile, so nothing here could drive it.
+Andrea's live case 6ecadafe is deliberately NOT the default for the WRITING modes: it is real
+work belonging to a real person, and a re-run would rewrite her roadmap. It is a perfectly good
+--read-only target once hydrated, and is the intended one.
 
 WHAT THIS DELIBERATELY DOES NOT DO. The OCR half of the extraction flow (`propose`) is behind
 --with-ocr. It needs MISTRAL_API_KEY, costs money per run, and is non-deterministic. The

@@ -7,9 +7,13 @@ was no ES→IE case reachable by a login that works. Measured that day: the demo
 FR→DE / FR→JP / FR→NL / FR→SG / FR→ES / FR→US cases and **not one ES→IE**. So verifying the
 corridor meant hand-building state every time, which is why it had not been verified at all.
 
-Andrea's own case is NOT usable for this: it lives at company 46fc3db0, which has no profile
-row of any kind, so no HR user can open it. It is also real work belonging to a real person —
-a verification fixture must never be someone's live case.
+Andrea's own case is NOT usable for this: it is real work belonging to a real person, and a
+verification fixture must never be someone's live case — a re-run would rewrite her roadmap.
+
+(An earlier draft of this file said her company had no HR user who could open the case. That
+was wrong: access resolves through `users` + `hr_users`, not `profiles`, and company 46fc3db0
+does have an HR user. What is missing there is only the `profiles` row, which affects display
+lookups and not access. Corrected so nobody repeats the inference.)
 
 THROUGH THE API, NOT THROUGH SQL. This drives POST /api/hr/cases → POST
 /api/hr/cases/{id}/assign, the same two calls the HR UI makes. A fixture built by INSERT
