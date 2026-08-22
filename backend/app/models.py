@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey, JSON, Uuid
+from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey, JSON, UniqueConstraint, Uuid
 from sqlalchemy.sql import func
 from .db import Base
 
@@ -99,6 +99,23 @@ class SourceRecord(Base):
 
 class RequirementItem(Base):
     __tablename__ = "requirement_items"
+    # Corridor-import idempotency (the 2026-08-15 FR→NO double-import incident): the
+    # natural key the crud.create_requirement_item upsert matches on is enforced by the
+    # DATABASE, not just by application code. Two racing imports both pre-select nothing
+    # and would both insert; a writer that bypasses the funnel duplicates freely; and
+    # once duplicates exist, .first() serves an arbitrary one of them. With this
+    # constraint a duplicate import physically cannot insert a second row for the same
+    # (country_code, purpose, title) — crud inserts with ON CONFLICT DO NOTHING pinned
+    # to this key. Production Postgres gets the same index (after a dedupe) from
+    # migration 20261118000000; SQLite test databases get it from this declaration.
+    __table_args__ = (
+        UniqueConstraint(
+            "country_code",
+            "purpose",
+            "title",
+            name="uq_requirement_items_country_purpose_title",
+        ),
+    )
 
     id = Column(String, primary_key=True, index=True)
     country_code = Column(String, index=True)
@@ -121,7 +138,17 @@ class RequirementItem(Base):
     # AIQ-1349: provenance level (representative / corpus_grounded / expert_verified).
     # Describes how well-sourced the content is. It is a DISPLAY BADGE, not a gate — no read
     # path filters on it. Use review_status below to decide what is served.
+    # Generator/verifier separation: 'expert_verified' is a human signature. Only
+    # services/verification_guard.mark_expert_verified may write it (stamping verified_by +
+    # verified_at below); crud.create_requirement_item — the funnel every automated producer
+    # uses — refuses it outright and refuses to rewrite it once set.
     verification_status = Column(String, nullable=True)
+    # The human behind verification_status='expert_verified'. Guard-owned: writable only via
+    # verification_guard.mark_expert_verified; a generator payload carrying either column is
+    # rejected. Mirrors reviewed_by/reviewed_at (publication) and attested_by/attested_at
+    # (counsel) — three axes, each stamped with its own accountable actor.
+    verified_by = Column(Text, nullable=True)
+    verified_at = Column(DateTime(timezone=True), nullable=True)
     # Admin publication gate: pending | approved | rejected. Only 'approved' is served, by
     # employees and by the public corridor endpoint alike. Set on insert, carried on update.
     review_status = Column(String, nullable=False, server_default="approved")

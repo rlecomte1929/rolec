@@ -19,6 +19,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.app import crud, models
+from backend.app.services import verification_guard
 
 
 @pytest.fixture()
@@ -72,11 +73,21 @@ def test_the_admin_surface_sees_what_it_must_approve(db):
 def test_provenance_is_not_a_gate(db):
     """`representative` content is served exactly like `expert_verified` content. The badge
     describes sourcing; it has never decided visibility, and conflating the two is what made
-    the missing gate hard to see."""
-    for status in ("representative", "corpus_grounded", "expert_verified"):
+    the missing gate hard to see.
+
+    The expert_verified row is created through the human sign-off path — since the
+    verified-write guardrail (services/verification_guard), a generator insert can no
+    longer claim that status directly (see test_verified_write_guardrail.py)."""
+    for status in ("representative", "corpus_grounded"):
         crud.create_requirement_item(
             db, _payload(f"{status} item", verification_status=status, review_status="approved")
         )
+    signed = crud.create_requirement_item(
+        db,
+        _payload("expert_verified item", verification_status="corpus_grounded", review_status="approved"),
+    )
+    verification_guard.mark_expert_verified(signed, verified_by="jane@relopass.com")
+    db.commit()
     assert len(crud.list_requirements(db, "NORWAY")) == 3
 
 
