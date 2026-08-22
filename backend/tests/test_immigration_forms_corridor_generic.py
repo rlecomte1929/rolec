@@ -28,7 +28,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite://")
 # conftest mocks backend.database, and the query counter then tries to attach a
 # SQLAlchemy `before_cursor_execute` event to a MagicMock engine, which raises.
 # Both flags must be set BEFORE that import — CI does not set them. Same prelude
-# as test_auth_login_identifier.py / test_hr_export.py.
+# as test_auth_login_identifier.py.
 os.environ.setdefault("RELOPASS_DISABLE_RATE_LIMITS", "1")
 os.environ.setdefault("RELOPASS_QUERY_COUNTER_OFF", "1")
 
