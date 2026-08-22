@@ -16,10 +16,25 @@ WHAT IT DOES
 --dry-run (THE DEFAULT) writes nothing and prints exactly what would change. A dead source is
 signal, not failure: a fact whose page has vanished is precisely a fact to re-check.
 
+RE-CHECKING THE SERVED COHORT — use --only-unchecked. `--status approved` selects facts the
+product is serving right now, and this script rewrites evidence_verified for EVERY fact it
+selects. On a re-check that means an already-verified fact can flip to FALSE (page reworded,
+publisher started refusing us, parser output shifted) and drop straight out of
+`list_approved_requirement_facts`, which filters `COALESCE(evidence_verified, TRUE) = TRUE`.
+A remediation that removes a working citation is worse than the gap it set out to close, so
+narrow the run to the facts that have never been checked.
+
+Note NULL is not a synonym for "never checked": check_evidence returns None for TRANSLATED
+(the quote is a translation of the source, so a verbatim match is impossible) as well as for
+NO_SOURCE. Those stay NULL after a run and keep being served — only evidence_checked_at moves,
+which is what distinguishes "never ran" from "ran, did not apply".
+
 Usage:
     python backend/scripts/backfill_fact_evidence.py                  # dry run, all destinations
     python backend/scripts/backfill_fact_evidence.py --dest NO        # one destination
     python backend/scripts/backfill_fact_evidence.py --apply          # write
+    python backend/scripts/backfill_fact_evidence.py \\
+        --dest IE --status approved --only-unchecked                  # re-check the served gap
 """
 from __future__ import annotations
 
@@ -251,11 +266,21 @@ def main(argv: Optional[List[str]] = None) -> int:
                    help="Fact status to process. DEFAULTS TO 'pending' — pass --status approved "
                         "to touch the served cohort, which is a different set of facts.")
     p.add_argument("--limit-urls", type=int, help="Process at most N source URLs (for a smoke run)")
+    p.add_argument("--only-unchecked", action="store_true",
+                   help="Only facts with evidence_verified IS NULL. Use this on the SERVED cohort "
+                        "(--status approved): without it, a re-check rewrites the verdict of every "
+                        "fact in scope, so an already-verified fact can flip to FALSE and silently "
+                        "leave the served surface.")
     args = p.parse_args(argv)
 
     from backend.database import db
 
     where_dest = "AND e.destination_country = :dest" if args.dest else ""
+    # Filter on the FACT, not the document. One source document routinely carries both an
+    # already-verified fact and an unchecked one; scoping by document would drag the verified
+    # fact back through the check and put its verdict at risk, which is the whole thing this
+    # flag exists to prevent.
+    where_unchecked = "AND f.evidence_verified IS NULL" if args.only_unchecked else ""
     params: Dict[str, Any] = {"status": args.status}
     if args.dest:
         params["dest"] = args.dest
@@ -266,7 +291,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                    e.destination_country
             FROM requirement_facts f
             JOIN requirement_entities e ON e.id = f.entity_id
-            WHERE f.status = :status {where_dest}
+            WHERE f.status = :status {where_dest} {where_unchecked}
         """), params).fetchall()
 
     by_doc: Dict[str, List[Any]] = {}
@@ -283,7 +308,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     # Say which cohort this is. The default is 'pending', and a run aimed at the served surface
     # needs --status approved — silently processing the wrong set is how a remediation reports
     # success while the facts it was meant to fix stay untouched.
-    print(f"status={args.status!r}" + (f"  dest={args.dest}" if args.dest else ""))
+    print(f"status={args.status!r}" + (f"  dest={args.dest}" if args.dest else "")
+          + ("  only-unchecked=True" if args.only_unchecked else ""))
     print(f"{len(facts)} facts across {len(by_doc)} source documents"
           f"{f' (processing {len(doc_ids)})' if args.limit_urls else ''}\n")
 
