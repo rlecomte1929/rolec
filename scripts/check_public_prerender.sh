@@ -68,14 +68,16 @@ check_one() {
     return
   fi
 
-  if ! printf '%s' "$body" | grep -qF "<title>${expect}</title>"; then
+  # Herestring, not `printf | grep -q` — see check_ad_landing_prerender.sh: pipefail
+  # plus grep -q's early exit turns a present <title> into a spurious failure.
+  if ! grep -qF "<title>${expect}</title>" <<<"$body"; then
     echo "FAIL  $url ($label) — ${bytes} bytes but no <title>${expect}</title>."
     echo "      Served real markup, but not this route's page. Check for a rewrite pointing at the wrong file."
     fail=1
     return
   fi
 
-  if printf '%s' "$body" | grep -qF 'Loading ReloPass'; then
+  if grep -qF 'Loading ReloPass' <<<"$body"; then
     echo "WARN  $url ($label) — prerendered, but the loading splash is still present in the markup."
   fi
 
