@@ -518,6 +518,19 @@ export interface RequirementItemDTO {
   nonObvious?: boolean | null;
   /** Free-text deadline verbatim from the source ("within 3 months of arrival"). */
   timing?: string | null;
+  /**
+   * AIQ-1969. `'conditional'` means the requirement does NOT apply unconditionally, and it
+   * must never be rendered as a flat claim. The case that named the card: Emergency-Tax
+   * relief shown as "you are exempt" when it is conditional on a PPS number and a valid
+   * employer RPN.
+   */
+  assertionMode?: 'conditional' | 'unconditional' | string | null;
+  /**
+   * The condition itself, verbatim. Present without `assertionMode` on many catalog rows —
+   * treat either signal as conditional, because dropping a recorded condition because its
+   * sibling field was absent is the same silent flattening.
+   */
+  conditionalOn?: string | null;
 }
 
 export interface CountryProfileDTO {

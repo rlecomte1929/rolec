@@ -48,6 +48,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from .requirement_conditional_copy import build_render_flags, render_from_item
+
 log = logging.getLogger(__name__)
 
 # (requirement_items.country_code, requirement title) -> the generic milestone whose
@@ -205,7 +207,18 @@ def enrich_milestones_with_requirements(
             continue
         enriched = dict(m)
         enriched["title"] = item.title
-        enriched["description"] = item.description
+        # AIQ-1969: a conditional requirement must reach the reader WITH its condition, and a
+        # non_obvious one must be flagged. Before this the overlay copied `description`
+        # verbatim, so "you are exempt from Emergency Tax" replaced the generic copy as a flat
+        # claim — losing the PPSN + valid-RPN condition the catalog already knew about.
+        # render_from_item degrades to the plain description when neither signal is present.
+        enriched["description"] = render_from_item(item)
+        # Structured signals too, so the UI can style the condition instead of parsing prose.
+        enriched["requirement_render"] = build_render_flags(
+            assertion_mode=getattr(item, "assertionMode", None),
+            conditional_on=getattr(item, "conditionalOn", None),
+            non_obvious=getattr(item, "nonObvious", False),
+        )
         # Marks this row as rewritten, so relocation_plan_service surfaces our
         # description as `why_this_matters` — the line the employee actually reads.
         # Without it the specific copy is written and then silently thrown away: the

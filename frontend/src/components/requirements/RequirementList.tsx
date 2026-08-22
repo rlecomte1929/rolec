@@ -99,6 +99,47 @@ const attestationBadge = (
 const nonObviousBadge = (nonObvious: RequirementItemDTO['nonObvious']) =>
   nonObvious ? <Badge variant="warning" size="sm">Easy to miss</Badge> : null;
 
+/**
+ * AIQ-1969 — a conditional requirement must reach the reader WITH its condition.
+ *
+ * The case that named this: Andrea (ES→IE, EEA national) shown "you are exempt from
+ * Emergency Tax". Relief is conditional — on holding a PPS number AND the employer operating
+ * a correct RPN. Rendered flat, she expects a normal first payslip and may be taxed at 40%
+ * from the first run.
+ *
+ * Either signal makes it conditional. `conditionalOn` is present without `assertionMode` on
+ * many catalog rows, and dropping a recorded condition because its sibling was absent is the
+ * same silent flattening.
+ *
+ * When the row says conditional but carries no condition text, this renders a caveat rather
+ * than nothing: falling back to silence restates the claim as unconditional fact, which is
+ * the bug. Mirrors `requirement_conditional_copy.py` so both surfaces say the same thing.
+ */
+const conditionLine = (
+  assertionMode: RequirementItemDTO['assertionMode'],
+  conditionalOn: RequirementItemDTO['conditionalOn'],
+) => {
+  const condition = (conditionalOn ?? '').trim();
+  const isConditional = assertionMode === 'conditional' || condition.length > 0;
+  if (!isConditional) return null;
+  return (
+    <div
+      data-testid="requirement-condition"
+      className="text-xs text-[#7a5e2a] mt-1 border-l-2 border-[#f59e0b] pl-2"
+    >
+      {condition ? (
+        <>
+          <span className="font-semibold">Applies only if:</span> {condition}
+        </>
+      ) : (
+        <span className="font-semibold">
+          This does not apply in every case — check before relying on it.
+        </span>
+      )}
+    </div>
+  );
+};
+
 /** Free text, not a date — the source phrases deadlines against events we do not model. */
 const timingLine = (timing: RequirementItemDTO['timing']) =>
   timing ? (
@@ -153,6 +194,7 @@ export const RequirementList: React.FC<RequirementListProps> = ({ items, onActio
               <div>
                 <div className="text-sm font-semibold text-[#0b2b43]">{item.title}</div>
                 <div className="text-xs text-[#6b7280] mt-1">{item.description}</div>
+                {conditionLine(item.assertionMode, item.conditionalOn)}
                 {timingLine(item.timing)}
                 <div className="flex flex-wrap gap-2 mt-3">
                   <Badge variant={statusVariant(item.statusForCase)} size="sm">
