@@ -16,6 +16,7 @@ import logging
 from typing import Any, Dict
 
 from .case_delay_monitor import scan_active_cases
+from .case_suggested_action import build_suggested_action
 
 logger = logging.getLogger(__name__)
 
@@ -119,10 +120,23 @@ def _company_case_ids(company_id: str) -> set:
 
 
 def list_behind_cases_for_company(company_id: str) -> list:
-    """AIQ-378d read layer: the open ``case_behind_schedule`` alerts whose case
-    belongs to ``company_id`` — the tenant-scoped feed for the HR "Case health"
-    panel. Read-only; **tenant-safe** (an alert for another company's case is
-    excluded); safe-fails to ``[]``; empty until the pilot raises alerts.
+    """The behind-schedule cases for ``company_id`` — the tenant-scoped feed for
+    the HR "Needs your attention" panel. Read-only, tenant-safe, safe-fails to ``[]``.
+
+    [AIQ-2041] Computed **live** from the delay signal, not read back from the
+    notifications the nightly scan raises.
+
+    It used to read ``ops_notifications``, which made the HR surface depend on the
+    cron having run — and that cron is gated behind the ``CASE_HEALTH_CRON_ENABLED``
+    repo variable, which `docs/findings/AIQ-2012-cron-gates-never-set.md` records as
+    **never set**. So the panel showed "nothing behind schedule" no matter what the
+    data said, and fixing the two SQL predicates in ``case_delay_monitor`` would not
+    have changed that on its own.
+
+    Reading live also makes the panel *current* rather than showing last night's
+    snapshot, which is what an action list on a dashboard should be. The nightly
+    scan keeps its job — raising deduped notifications and firing Slack/email
+    alerts; that is a different concern from what this screen renders.
     """
     if not company_id:
         return []
@@ -130,34 +144,31 @@ def list_behind_cases_for_company(company_id: str) -> list:
     if not case_ids:
         return []
 
-    import json
-
-    from .ops_notification_service import list_ops_notifications
+    from .case_delay_monitor import scan_active_cases
 
     try:
-        result = list_ops_notifications(
-            notification_type=NOTIFICATION_TYPE, open_only=True, limit=200
-        )
-    except Exception:  # noqa: BLE001
-        logger.exception("case_health_scan: list_ops_notifications failed")
+        signals = scan_active_cases()
+    except Exception:  # noqa: BLE001 — degrade rather than raise
+        logger.exception("case_health_scan: live delay scan failed")
         return []
 
     out = []
-    for n in result.get("items", []):
-        payload = n.get("payload")
-        if not payload and n.get("payload_json"):
-            try:
-                payload = json.loads(n["payload_json"])
-            except (TypeError, ValueError):
-                payload = {}
-        payload = payload or {}
+    for payload in signals:
         cid = str(payload.get("case_id") or "")
         if not cid or cid not in case_ids:
             continue  # tenant scope: only this company's cases
+        payload = {**payload, **build_suggested_action(payload)}
         out.append(
             {
                 "case_id": cid,
                 "stage": payload.get("stage"),
+                # [AIQ-2041] The milestone's own curated title and owner. `stage` is a
+                # milestone_type key and many are opaque ('pre_departure_ai_01'), so
+                # showing it alone tells an HR user nothing; the title is what the
+                # step actually is. Exposed as `milestone_title` because `title` on a
+                # notification already means the notification's own headline.
+                "milestone_title": payload.get("title"),
+                "owner": payload.get("owner"),
                 "days_behind": payload.get("days_behind"),
                 "expected_date": payload.get("expected_date"),
                 "severity": payload.get("severity"),
