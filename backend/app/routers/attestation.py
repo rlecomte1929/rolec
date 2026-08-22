@@ -55,6 +55,7 @@ from ..schemas import (
     AttestationAdminDTO,
     AttestationChecklistItemDTO,
     AttestationCreatedDTO,
+    AttestationCaseCreateIn,
     AttestationCreateIn,
     AttestationDecisionIn,
     AttestationPromoteResultDTO,
@@ -62,6 +63,13 @@ from ..schemas import (
     AttestationSignatureDTO,
     AttestationSignIn,
 )
+# The canonical case-id boundary (AIQ-1704) and the real serving selection. Both live
+# outside this module on purpose: ATT-3.2 must attest what the case is ACTUALLY SERVED,
+# and re-deriving that here would create a second answer to "what does this case need",
+# which is the bug class the requirements engine exists to end. `cases_read.py` is the
+# in-tree precedent for an app/ router reaching `database.db` for the resolver.
+from ...database import db as main_db
+from ..services.requirements_builder import compute_case_requirements
 from ..services.attestation_tokens import (
     DEFAULT_TOKEN_TTL_DAYS,
     content_hash,
@@ -311,6 +319,163 @@ def create_attestation(
             # by the database CHECK rather than stored.
             promotion_policy=body.promotion_policy,
             advance_review_status=body.advance_review_status,
+        )
+        db.add(req)
+        db.flush()
+
+        for snap, cand in zip(snapshot_items, candidates):
+            db.add(CorridorAttestationItem(
+                id=str(uuid.uuid4()),
+                request_id=req.id,
+                requirement_item_id=cand.id,
+                item_title=snap["title"],
+                claim_snapshot=snap["claim"],
+                source_url_snapshot=snap["source_url"],
+                evidence_snapshot=snap["evidence"],
+                decision="pending",
+            ))
+        db.commit()
+        db.refresh(req)
+
+        base = str(request.base_url).rstrip("/")
+        return AttestationCreatedDTO(
+            request=_admin_dto(db, req),
+            review_token=raw_token,
+            review_url=f"{base}/attest/{raw_token}",
+            token_expires_at=req.token_expires_at,
+        )
+
+
+@admin_router.post("/case", response_model=AttestationCreatedDTO, status_code=status.HTTP_201_CREATED)
+def create_case_attestation(
+    body: AttestationCaseCreateIn,
+    request: Request,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> AttestationCreatedDTO:
+    """Snapshot ONE CASE's served requirements and mint a reviewer link.
+
+    The corridor path (`POST ""`) asks "has counsel signed off on Ireland?". This asks
+    "has counsel signed off on THIS person's move?" — which is the question a customer
+    actually pays for.
+
+    **The served set is not re-derived here.** `compute_case_requirements` is the same
+    function that builds the employee's roadmap, so counsel is shown exactly the rows the
+    case is served — no more, and never a second opinion about what this case needs. This
+    module only decides which of those rows are in LEGAL scope and projects them into the
+    envelope.
+
+    **PII boundary.** A case carries employee and company data; none of it may reach
+    counsel. The snapshot is built from the CATALOG rows (`requirement_items`) that the
+    serving call selected — title, description, citation URL — exactly as the corridor path
+    builds it, so the two envelopes are structurally identical and neither can carry case
+    data. `case_id` is written to the request row only; it never enters
+    `corridor_attestation_items`, the snapshot JSON, or `AttestationPublicViewDTO`.
+    """
+    ids = main_db.resolve_case_ids(body.case_id)
+    if ids is None:
+        # Fail closed. `resolve_case_ids` accepts all three id forms, so None means the id
+        # maps to no assignment at all — a 404, never a silent empty attestation.
+        raise HTTPException(status_code=404, detail="Case not found")
+    canonical = ids.canonical_case_id
+
+    # `corridor_attestation_requests.case_id` is `uuid` (migration 20261121000000) while
+    # `wizard_cases.id` is `character varying`. Measured in production 2026-08-22: 7 of
+    # 1,840 case ids are not uuid-shaped — six demo/seed rows plus a literal "undefined"
+    # a frontend once persisted. Writing one of those straight into the uuid column raises
+    # a psycopg2 DataError out of the endpoint: a 500 whose DETAIL renders the whole
+    # failing row. Refuse at the boundary instead; the column type stays the authority.
+    try:
+        uuid.UUID(str(canonical))
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Case '{canonical}' has a non-UUID id and cannot be attested. "
+                "Case-scoped attestation requires a uuid case id."
+            ),
+        )
+
+    try:
+        served = compute_case_requirements(canonical)
+    except ValueError:
+        # The resolver found an assignment but no wizard_cases row backs it.
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if not served.covered:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"No requirement catalog coverage for destination '{served.destCountry}'. "
+                "There is nothing to attest — this is a catalog gap, not an empty case."
+            ),
+        )
+
+    # Legal scope, same rule as the corridor path: operational pillars are not what counsel
+    # is being asked about.
+    served_ids = [
+        r.id for r in served.requirements
+        if (r.pillar or "").upper() not in OPERATIONAL_PILLARS
+    ]
+    if not served_ids:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Case {canonical} is served no in-scope legal requirements. "
+                "Nothing to attest."
+            ),
+        )
+
+    with _db() as db:
+        # Re-read the catalog rows the serving call selected, and build the envelope from
+        # THOSE — identical construction to create_attestation, so a case envelope and a
+        # corridor envelope are byte-comparable and the whitelist is enforced once.
+        candidates = (
+            db.query(RequirementItem).filter(RequirementItem.id.in_(served_ids)).all()
+        )
+        if not candidates:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Case {canonical} resolved requirements that no longer exist in the catalog.",
+            )
+
+        snapshot_items = [
+            {
+                "requirement_item_id": c.id,
+                "title": c.title,
+                "claim": c.description,
+                "source_url": _first_citation_url(c),
+                "evidence": c.description,
+            }
+            for c in candidates
+        ]
+        snapshot_hash = content_hash(snapshot_items)
+
+        raw_token, token_digest = mint_token()
+        ttl = body.ttl_days or DEFAULT_TOKEN_TTL_DAYS
+        # country_code/purpose come from the catalog rows the case resolved to, not from the
+        # case record — the envelope describes the corridor being attested, and a case field
+        # copied in here would be the first crack in the PII boundary.
+        corridor_key = candidates[0].country_code or served.destCountry
+        purpose_key = candidates[0].purpose or served.purpose
+
+        req = CorridorAttestationRequest(
+            id=str(uuid.uuid4()),
+            country_code=corridor_key,
+            purpose=purpose_key,
+            scope="case",
+            case_id=str(canonical),
+            title=body.title or f"{corridor_key} — case legal compliance attestation",
+            status="draft",
+            requested_by=str(user.get("email") or user.get("id") or "admin"),
+            reviewer_org=body.reviewer_org,
+            reviewer_name=body.reviewer_name,
+            reviewer_email=body.reviewer_email,
+            reviewer_credential=body.reviewer_credential,
+            link_token_hash=token_digest,
+            token_expires_at=_now() + timedelta(days=ttl),
+            content_snapshot_hash=snapshot_hash,
+            content_snapshot_json=snapshot_items,
+            disclaimer_version=DISCLAIMER_VERSION,
         )
         db.add(req)
         db.flush()
