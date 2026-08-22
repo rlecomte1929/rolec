@@ -289,6 +289,43 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
     if non_obvious:
         derivations.append("non_obvious=True from a contributing fact's applies_to")
 
+    # `timing` rides in `applies_to` for the same reason `non_obvious` does — the staging
+    # table has no column for it — but it merges differently. It is free text, not a flag,
+    # so `any()` has no meaning: take the FIRST contributing fact that carries one, in fact
+    # order, which is stable for a given batch. Everything downstream already supports this
+    # column (`requirement_items.timing` from 20261103000000, the update branch in
+    # `crud.create_requirement_item`, `requirements_builder`'s "timing" DTO field and the
+    # client's practical-realities line) — only this payload never populated it, so a batch
+    # that stated a deadline silently lost it at promote time.
+    timing = next(
+        (str(t).strip() for f in facts
+         if (t := (f.applies_to or {}).get("timing")) and str(t).strip()),
+        None,
+    )
+    if timing:
+        derivations.append("timing from a contributing fact's applies_to")
+
+    payload = {
+        "country_code": country_code,
+        "purpose": purpose,
+        "pillar": IMMIGRATION_PILLAR,
+        "title": entity.title,
+        "description": compose_description(facts),
+        "severity": DEFAULT_SEVERITY,
+        "owner": DEFAULT_OWNER,
+        "required_fields_json": "[]",
+        "citations_json": json.dumps(citations, ensure_ascii=False),
+        "applies_to_nationality_classes_json": json.dumps(classes),
+        "verification_status": verification_status,
+        "non_obvious": non_obvious,
+    }
+    # Only send `timing` when this batch actually carries one. `crud.create_requirement_item`
+    # updates the column on the mere presence of the key, so passing an unconditional None
+    # would blank a deadline a reviewer had curated — the same downgrade-to-empty that the
+    # citations_json guard there exists to prevent.
+    if timing:
+        payload["timing"] = timing
+
     return RequirementDraft(
         topic_key=topic,
         country_code=country_code,
@@ -297,18 +334,5 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
         verification_status=verification_status,
         fact_ids=[str(f.id) for f in facts],
         derivations=derivations,
-        payload={
-            "country_code": country_code,
-            "purpose": purpose,
-            "pillar": IMMIGRATION_PILLAR,
-            "title": entity.title,
-            "description": compose_description(facts),
-            "severity": DEFAULT_SEVERITY,
-            "owner": DEFAULT_OWNER,
-            "required_fields_json": "[]",
-            "citations_json": json.dumps(citations, ensure_ascii=False),
-            "applies_to_nationality_classes_json": json.dumps(classes),
-            "verification_status": verification_status,
-            "non_obvious": non_obvious,
-        },
+        payload=payload,
     )

@@ -202,3 +202,66 @@ def test_description_order_is_stable_so_a_rerun_is_a_real_no_op():
     facts = [_fact(fact_type="fee", fact_key="b"), _fact(fact_type="eligibility", fact_key="a")]
     assert compose_description(facts) == compose_description(list(reversed(facts)))
     assert compose_description(facts).startswith(facts[1].fact_text)
+
+
+# ── rule 5: a deadline the batch states must survive promotion ───────────────────────
+#
+# `requirement_items.timing` has existed since 20261103000000 and every layer above it —
+# `crud.create_requirement_item`, `requirements_builder`'s "timing" DTO, the client's
+# practical-realities line — already reads it. `mappings.resolve` was the one link that never
+# populated it, so a batch that stated "at least 8 days before the first day of work" lost the
+# deadline at promote time and the mover was told *what* to do but never *when*.
+
+
+def test_timing_from_applies_to_reaches_the_payload():
+    got = resolve(_entity(), [_fact(applies_to={
+        "status": "professional", "nationality": "EU",
+        "timing": "at least 8 days before the first day of work",
+    })])
+    assert isinstance(got, RequirementDraft)
+    assert got.payload["timing"] == "at least 8 days before the first day of work"
+    assert "timing from a contributing fact's applies_to" in got.derivations
+
+
+def test_absent_timing_omits_the_key_entirely():
+    """Not `timing: None` — the KEY must be absent.
+
+    `crud.create_requirement_item` updates the column on the mere presence of the key, so an
+    unconditional None would blank a deadline a reviewer had curated on a re-load. Same
+    downgrade-to-empty the citations_json guard there exists to prevent.
+    """
+    got = resolve(_entity(), [_fact()])
+    assert "timing" not in got.payload
+
+
+def test_blank_timing_is_treated_as_absent():
+    got = resolve(_entity(), [_fact(applies_to={
+        "status": "professional", "nationality": "EU", "timing": "   ",
+    })])
+    assert "timing" not in got.payload
+
+
+def test_first_fact_in_key_order_supplies_the_timing():
+    """`_PROMOTABLE` orders by `fact_key`, so this is stable for a given batch."""
+    got = resolve(_entity(), [
+        _fact(fact_key="aFirst", applies_to={
+            "status": "professional", "nationality": "EU", "timing": "before departure"}),
+        _fact(fact_key="bSecond", applies_to={
+            "status": "professional", "nationality": "EU", "timing": "within 90 days"}),
+    ])
+    assert got.payload["timing"] == "before departure"
+
+
+def test_non_obvious_still_rides_alongside_timing():
+    got = resolve(_entity(), [_fact(applies_to={
+        "status": "professional", "nationality": "EU",
+        "non_obvious": True, "timing": "before the posting begins",
+    })])
+    assert got.payload["non_obvious"] is True
+    assert got.payload["timing"] == "before the posting begins"
+
+
+def test_an_ordinary_fact_is_not_flagged_non_obvious():
+    """The badge is only worth something if it discriminates."""
+    got = resolve(_entity(), [_fact()])
+    assert got.payload["non_obvious"] is False
