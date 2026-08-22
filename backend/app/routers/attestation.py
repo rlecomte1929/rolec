@@ -35,6 +35,7 @@ Dual-registered in backend/main.py AND backend/app/main.py (CLAUDE.md 405 rule).
 # PydanticUndefinedAnnotation at import time, i.e. the whole app fails to boot. Keep the
 # annotations as real objects.
 import json
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -77,6 +78,8 @@ from ..services.attestation_tokens import (
     is_well_formed,
     mint_token,
 )
+
+logger = logging.getLogger(__name__)
 
 admin_router = APIRouter(prefix="/api/admin/attestations", tags=["attestation-admin"])
 public_router = APIRouter(prefix="/api/public/attestations", tags=["attestation-public"])
@@ -608,11 +611,22 @@ def _apply_promotion(
         item.attested_at = stamped
         item.attested_by = firm
         item.latest_attestation_request_id = str(req.id)
-        # TODO [ATT-2.4]: when `advance_review_status` is True, advance the item's
-        # review_status here (pending -> approved), stamping `actor` as the reviewer.
-        # Left unwired on purpose: advancing review_status PUBLISHES a requirement to
-        # movers (requirements_builder serves approved rows only), so it is a behaviour
-        # change that belongs in its own reviewable PR, not in this refactor.
+
+        # [ATT-2.4] THE LINE THAT PUBLISHES. `requirements_builder` serves `approved`
+        # rows only, so this is the moment a requirement becomes visible to a mover.
+        # Gated three ways and none of them are decoration: the request must have opted
+        # in at creation (`advance_review_status`), every gate above must have passed
+        # (signed, hash still matching, this item marked `approved` by the reviewer), and
+        # the caller decides — the admin endpoint passes False, exactly as before.
+        #
+        # `reviewed_by` is the ACTOR (who caused publication); `attested_by` stays the
+        # FIRM (whose legal opinion it is). Those are different questions and collapsing
+        # them would misattribute counsel's opinion — see the ATT-2.3 note.
+        if advance_review_status and (item.review_status or "") != "approved":
+            item.review_status = "approved"
+            item.reviewed_by = actor
+            item.reviewed_at = stamped
+
         promoted.append(str(item.id))
 
     # Assert the arithmetic before committing: a silent short-write here would report
@@ -756,6 +770,81 @@ def public_decide_item(
         return _public_view(db, req)
 
 
+def _maybe_auto_promote(
+    db: Session, req: CorridorAttestationRequest, body: AttestationSignIn
+) -> None:
+    """[ATT-2.4] Let a valid, credentialed signature publish — when the request asked for it.
+
+    This is the only place a signature reaches `requirement_items`, and it exists so the
+    two-key rule can be waived DELIBERATELY, at creation time, on the record — never by
+    default and never by an admin forgetting to click promote.
+
+    Four conditions, all required:
+      * `promotion_policy == 'auto_on_sign'` — recorded when the request was created
+        (ATT-2.2). The default is `'manual'`, so every existing request is unaffected.
+      * the signer supplied a `signer_credential`. An attestation is worth what the
+        signer's standing is worth; an anonymous typed name may be RECORDED, but it may
+        not publish. The signature is still stored either way — refusing to auto-publish
+        is not refusing the review.
+      * every gate inside `_apply_promotion` passes. Reused, never reimplemented: a second
+        copy that forgot the content-hash check would publish a signature that no longer
+        describes the content, which is the exact lie this feature exists to prevent.
+      * the reviewer marked the item `approved`. `amended`/`rejected` are skipped there.
+
+    Failure is swallowed ON PURPOSE, and logged. The realistic failure is the
+    partial-write guard (a catalog row deleted between snapshot and signature), which is
+    an internal inconsistency the REVIEWER cannot act on — and they are already finished:
+    their signature is committed. Raising at them would report failure for an act that
+    succeeded, while leaving them unable to retry (status `signed` is not in
+    OPEN_STATUSES). Swallowing leaves the request `signed` and un-attested — the manual
+    path, recoverable by an admin — and can only ever publish LESS than intended, never
+    more. Silent it is not: it logs at ERROR with the request id.
+    """
+    if (req.promotion_policy or "manual") != "auto_on_sign":
+        return
+
+    credential = (body.signer_credential or "").strip()
+    if not credential:
+        logger.warning(
+            "attestation auto_on_sign: request %s signed without a credential — signature "
+            "recorded, NOT auto-promoted; an admin must promote it deliberately.",
+            req.id,
+        )
+        return
+
+    try:
+        result = _apply_promotion(
+            db,
+            req,
+            actor=f"auto:{body.signer_name}",
+            advance_review_status=bool(req.advance_review_status),
+        )
+    except HTTPException as exc:
+        db.rollback()
+        logger.error(
+            "attestation auto_on_sign: promotion FAILED for request %s (%s: %s). The "
+            "signature is committed and the request stays 'signed' but un-attested — "
+            "promote it manually via POST /api/admin/attestations/%s/promote once the "
+            "cause is resolved.",
+            req.id, exc.status_code, exc.detail, req.id,
+        )
+        return
+    except Exception:
+        # Belt and braces for the ATT-2.2 lesson: a raw DBAPI error must not escape into
+        # the reviewer's response, where its DETAIL would render the failing row.
+        db.rollback()
+        logger.exception(
+            "attestation auto_on_sign: unexpected error promoting request %s. Signature "
+            "committed; request left 'signed' and un-attested.", req.id,
+        )
+        return
+
+    logger.info(
+        "attestation auto_on_sign: request %s promoted %d item(s), advance_review_status=%s",
+        req.id, result.promoted_count, bool(req.advance_review_status),
+    )
+
+
 @public_router.post("/{token}/sign", response_model=AttestationPublicViewDTO)
 @limiter.limit("20/hour;100/day")
 def public_sign(token: str, body: AttestationSignIn, request: Request) -> AttestationPublicViewDTO:
@@ -827,6 +916,24 @@ def public_sign(token: str, body: AttestationSignIn, request: Request) -> Attest
         req.status = "signed"
         req.completed_at = _now()
         req.updated_at = _now()
+
+        # Commit the signature BEFORE attempting any promotion, deliberately.
+        #
+        # A signature is counsel's own act and the table is append-only ("no code path
+        # updates or deletes a signature"). `_apply_promotion` calls db.rollback() on its
+        # partial-write guard — inside one transaction that would destroy the signature
+        # too, and the reviewer could not re-sign to recover it: status is now `signed`,
+        # which is not in OPEN_STATUSES, so `_resolve(require_open=True)` 404s them. They
+        # would be left with no signature, no path forward, and a lost legal review.
+        #
+        # Committing first means a failed promotion rolls back ONLY the promotion. The
+        # request stays `signed` and un-attested, which is precisely the manual path — the
+        # conservative state, recoverable by an admin calling /promote. Nothing is
+        # over-published by a failure; that is the direction this has to fail in.
         db.commit()
+        db.refresh(req)
+
+        _maybe_auto_promote(db, req, body)
+
         db.refresh(req)
         return _public_view(db, req)

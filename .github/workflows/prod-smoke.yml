@@ -1,0 +1,92 @@
+name: Prod smoke (public endpoints)
+
+# THE GAP THIS FILLS. On 2026-08-22, GET /api/public/corridor-requirements returned HTTP
+# 500 for both flagship corridors (ES->IE and FR->NO) from 09:44 to 17:13 UTC — 7h29m —
+# with `UndefinedColumn: column requirement_items.verified_by does not exist`. It was found
+# by accident, while auditing something else. Measured afterwards, here is what was
+# watching and why each one stayed green:
+#
+#   keepalive.yml            32 green runs DURING the outage. It pings /health, and
+#                            /health does not read the database.
+#   e2e-campaign.yml         ran on the breaking SHA at 09:44:17Z and passed. Not
+#                            scheduled, and no spec requests this endpoint.
+#   test_public_corridor.py  12 tests on this route, every one monkeypatching
+#                            crud.list_requirements away, so not one emits a SELECT.
+#   migration-unapplied-main ran 07:44 UTC, two hours early; and with --grace-hours 24
+#                            the first run that could fail was ~46h out.
+#
+# Nothing in this repository issued a real, unmocked HTTP request to a business endpoint on
+# api.relopass.com and asserted a 200. This job is that request.
+#
+# WHY A SCHEDULE AND NOT A POST-DEPLOY HOOK. Waiting for Render to report a deploy live
+# needs the deploys API and a polling loop, for a marginal gain over 30 minutes. Turning
+# 7.5 hours into <=30 minutes is the whole win; the rest is complexity that can itself
+# break. If a tighter bound is ever wanted, add a workflow_run trigger — do not make this
+# job's correctness depend on deploy timing.
+#
+# WHAT IT ASSERTS. 200 AND a non-empty payload. A 200 carrying zero rows is this repo's
+# other recurring silent failure and it looks identical to health from the status line
+# alone. Never an exact count — corridor counts legitimately move as the catalog is
+# curated, and a check that needs editing after every content change gets edited without
+# being read.
+#
+# NOT gated on a repository variable. case-health-scan.yml is gated on
+# CASE_HEALTH_CRON_ENABLED, which is not set, and has therefore resolved to `skipped` every
+# day for months while looking scheduled on the runs page. The public endpoints need no
+# credentials, so this job has nothing to gate on and will not acquire a switch that can be
+# left off.
+
+on:
+  schedule:
+    # Every 30 minutes, 05:00-21:59 UTC. GitHub throttles high-frequency crons hard, so
+    # this is best-effort like keepalive — but even a missed slot leaves the worst case far
+    # below the 7.5 hours it replaces. Outside these hours a break waits for the morning,
+    # which is the right trade for a free-plan service nobody is using at 03:00.
+    - cron: '*/30 5-21 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: prod-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Public endpoints serve real content
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      # No pip install: the script shells out to curl and uses stdlib only, deliberately,
+      # so the thing that watches production has as little machinery as possible between it
+      # and the answer.
+      - name: Smoke the public API
+        run: python scripts/smoke_public_endpoints.py
+
+  schema-drift:
+    name: ORM model vs live schema
+    runs-on: ubuntu-latest
+    # Same gate as ci.yml's ledger, RLS-coverage and requirement-provenance jobs: a no-op
+    # where the read-only URL is absent. Unlike the smoke job above this one needs a
+    # credential, so it has something legitimate to gate on.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      # The post-merge half of the column-read guard. scripts/check_column_read_before_apply.py
+      # is static and fires only when a migration and its read are in the SAME PR — which is
+      # the thing we are told not to do. Split them as prescribed and the second merge carries
+      # a bare Column() with no migration beside it, invisible to that guard. Whether the
+      # column is actually applied is a question about production state, so this asks
+      # production. Also catches drift that arrives out-of-band, which no PR job can see.
+      - name: Check the ORM against the live database
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/check_model_schema_drift.py

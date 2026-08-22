@@ -312,8 +312,17 @@ def _attestation_state(item_ids):
         }
 
 
-def test_signing_alone_does_not_touch_requirement_items(corridor):
-    """THE two-key guarantee: a reviewer records an opinion, never a served claim."""
+def test_signing_alone_does_not_touch_requirement_items_on_the_manual_path(corridor):
+    """THE two-key guarantee, on the DEFAULT path — a reviewer records an opinion,
+    never a served claim.
+
+    [ATT-2.4] Narrowed, not weakened. `promotion_policy` defaults to `'manual'` and
+    `_create` sends no policy, so this is still the behaviour of every request unless
+    one deliberately opts out at creation. The opt-in case is
+    test_attestation_auto_on_sign.py, which asserts the opposite for
+    `auto_on_sign` — the two tests together are the guarantee, and neither is
+    meaningful alone.
+    """
     before = _attestation_state(corridor["ids"])
     created = _create(corridor["country"])
     token, req_id = created["review_token"], created["request"]["id"]

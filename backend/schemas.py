@@ -74,7 +74,15 @@ class Child(BaseModel):
 class Spouse(BaseModel):
     fullName: Optional[str] = None
     nationality: Optional[str] = None
-    wantsToWork: bool = True
+    # Was `bool = True`. As a pydantic DEFAULT that asserted, for every case nobody had
+    # filled in, that there IS a spouse and they DO want to work — 2001 of 2037 production
+    # cases carried `wantsToWork: true` with a NULL `fullName`, i.e. a working spouse who
+    # does not exist. It is not inert: services/rules_engine.py:65 branches on
+    # `spouse.get("wantsToWork")` on the SERVING path, so the default put spouse
+    # work-authorisation requirements on the roadmap of every single-person relocation.
+    # None = "not asked yet", which is the truth before intake; every reader above already
+    # treats a falsy value as "no".
+    wantsToWork: Optional[bool] = None
     occupation: Optional[str] = None
     educationLevel: Optional[str] = None
 
@@ -119,7 +127,11 @@ class HousingPreferences(BaseModel):
     desiredMoveInDate: Optional[date] = None
     temporaryStayWeeks: Optional[int] = None
     budgetMonthlySGD: Optional[str] = None
-    bedroomsMin: int = 3
+    # Was `int = 3`, i.e. a three-bedroom requirement invented for someone who had stated no
+    # household at all (2001 of 2037 production cases). agents/recommendation_engine.py
+    # already supplies its own `housing_prefs.get("bedroomsMin", 3)` fallback and
+    # agents/validator.py tests `is not None`, so None flows through both correctly.
+    bedroomsMin: Optional[int] = None
     preferredAreas: List[str] = Field(default_factory=list)
     mustHave: List[str] = Field(default_factory=list)
 
@@ -177,9 +189,22 @@ class ComplianceDocs(BaseModel):
 # Main RelocationProfile
 class RelocationProfile(BaseModel):
     userId: Optional[str] = None
-    familySize: int = 4
+    # Was `int = 4` with `dependents` defaulting to two blank Child() rows — a family of four
+    # asserted about everyone. Measured in production 2026-08-22: 2001 of 2037 cases (98.2%)
+    # carry familySize=4 AND two blank dependents AND spouse.wantsToWork AND bedroomsMin=3,
+    # and **0 cases carry any other familySize** — nothing has ever written a real one, so
+    # the whole cluster is the schema default and nothing else. Same shape, and the same
+    # root cause, as the invented "Oslo, Norway" -> "Singapore" MovePlan below.
+    #
+    # This mattered for Andrea's ES->IE case 6ecadafe, which reached the roadmap with
+    # intake_step=0: every downstream reader saw a family of four with a working spouse.
+    #
+    # None/[] = "not asked yet". frontend caseEssentials.ts already reads
+    # `(profile.familySize ?? 0) > 1`, and the two HR surfaces compute family size from
+    # spouse+dependents rather than this field.
+    familySize: Optional[int] = None
     maritalStatus: Optional[MaritalStatus] = None
-    dependents: List[Child] = Field(default_factory=lambda: [Child(), Child()])
+    dependents: List[Child] = Field(default_factory=list)
     spouse: Spouse = Field(default_factory=Spouse)
     primaryApplicant: PrimaryApplicant = Field(default_factory=PrimaryApplicant)
     movePlan: MovePlan = Field(default_factory=MovePlan)
