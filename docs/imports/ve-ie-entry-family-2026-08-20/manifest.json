@@ -12,7 +12,7 @@
   "non_obvious_count": 6,
   "needs_lawyer_review_count": 4,
   "artifact": "ve_ie_entry_family_requirement_facts.ndjson",
-  "sha256": "2186f59ae0cb06bb7403ef4bed2f291ff1ad4313bc270fb0051883f7e63a46d6",
+  "sha256": "364266122a5ec89b2b93d829b5ccef1195e24818ec7a9ad5d71bb212a82bc2fc",
   "review_status_all": "pending",
   "verification_status_all": "representative",
   "scope": "Entry-visa + family/dependant facts missing from the 14 approved IRELAND/THIRD_COUNTRY requirement_items. Additive; does not modify existing rows.",

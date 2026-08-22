@@ -42,6 +42,8 @@ import {
   Rocket,
   Megaphone,
   MessageCircleQuestion,
+  PlaneTakeoff,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -76,6 +78,11 @@ export const NAV_ICONS = {
   // HR Operations
   'company-profile': Briefcase,
   'mobility-control': Globe2,
+  // [AIQ-2086] PlaneTakeoff/UsersRound, not the Plane/Users already used by
+  // admin-assignments and prospects — an HR nav item that looks identical to an
+  // admin one reads as the same destination.
+  relocations: PlaneTakeoff,
+  employees: UsersRound,
   risk: ShieldAlert,
   'policy-builder': PenSquare,
   'policy-benefits': ShieldCheck,

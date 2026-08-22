@@ -142,3 +142,76 @@ def test_custom_warn_threshold_changes_flagging():
     rows = [_ms("c1", "visa_decision", "pending", date(2026, 6, 7))]  # 2 behind
     assert cdm.evaluate_case_delays(rows, now=NOW, warn_days=2) != []  # flagged at warn=2
     assert cdm.evaluate_case_delays(rows, now=NOW, warn_days=3) == []  # not at warn=3
+
+
+# ── AIQ-2041: the source table, the status filter, and the carried fields ───
+#
+# The whole proactive loop was inert for two reasons at once, and each of these
+# tests fails against the pre-AIQ-2041 code.
+
+def test_query_reads_case_milestones_not_the_empty_immigration_table():
+    """The signal must come from the table that actually holds milestones.
+
+    Measured on prod 2026-08-22: public.immigration_milestones 0 rows;
+    public.case_milestones 14,282 rows (861 joining relocation_cases). Pointing at
+    the former is why scan_active_cases() had never returned a signal.
+    """
+    sql = cdm._ACTIVE_MILESTONES_SQL
+    assert "public.case_milestones" in sql
+    assert "immigration_milestones" not in sql
+    # actual_date is case_milestones' completion column; the pure core reads
+    # `completed_date`, so the alias must survive any future edit of this query.
+    assert "m.actual_date    AS completed_date" in sql
+
+
+def test_query_does_not_require_status_active():
+    """`relocation_cases.status = 'active'` matched 5 of 1,940 rows in prod.
+
+    status is NULL on 1,925 of them — the canonical lifecycle lives on
+    case_assignments, not here — so requiring 'active' is a filter that can
+    essentially never match. Swapping the table WITHOUT also fixing this still
+    yielded 0 signals.
+    """
+    sql = cdm._ACTIVE_MILESTONES_SQL
+    assert "rc.status = :active_status" not in sql
+    assert "NOT IN :closed_statuses" in sql
+    assert "closed" in cdm._CLOSED_CASE_STATUSES
+
+
+def test_done_status_is_terminal():
+    """case_milestones' completion status is 'done', not 'completed'.
+
+    The old _TERMINAL_STATUSES ({'completed','not_applicable'}) did not contain it,
+    so a finished milestone whose actual_date happened to be unset would have been
+    reported to HR as overdue.
+    """
+    assert "done" in cdm._TERMINAL_STATUSES
+    rows = [_ms("c1", "task_passport_upload", "done", date(2026, 6, 1))]
+    assert cdm.evaluate_case_delays(rows, now=NOW) == []
+
+
+def test_title_and_owner_are_carried_onto_the_signal():
+    """Needed so an unrecognised stage can be described by its real title."""
+    rows = [
+        {
+            "case_id": "c1",
+            "milestone_type": "pre_departure_ai_01",
+            "status": "pending",
+            "target_date": date(2026, 6, 1),
+            "completed_date": None,
+            "title": "Gather core identity and employment documents",
+            "owner": "EMPLOYEE",  # deliberately upper-case: the column holds both
+        }
+    ]
+    signal = cdm.evaluate_case_delays(rows, now=NOW)[0]
+    assert signal["title"] == "Gather core identity and employment documents"
+    assert signal["owner"] == "employee"  # normalised
+
+
+def test_missing_title_and_owner_default_to_empty_not_none():
+    """The partner-sync path supplies neither; it must not crash or emit None."""
+    signal = cdm.evaluate_case_delays(
+        [_ms("c1", "visa_decision", "pending", date(2026, 6, 1))], now=NOW
+    )[0]
+    assert signal["title"] == ""
+    assert signal["owner"] == ""

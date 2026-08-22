@@ -53,7 +53,14 @@ if [ -n "$_otto_batches" ] || [ -n "$_gate_touched" ]; then
 fi
 
 # Only relevant when frontend source is staged — skip fast otherwise.
-if ! git diff --cached --name-only --diff-filter=ACM | grep -qE '^frontend/src/.*\.(ts|tsx)$'; then
+#
+# Herestring, not `git diff | grep -q`: with `set -o pipefail` (line 16) a large
+# staged set makes grep -q quit on match, SIGPIPE the writer (141), and pipefail
+# reports 141 for the whole pipeline — which this `!` then reads as "no frontend
+# files staged" and skips the lint. Fails open, silently, on big commits. Same bug
+# fixed in pre-push; see its comment for the full mechanism.
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+if ! grep -qE '^frontend/src/.*\.(ts|tsx)$' <<<"$staged_files"; then
   exit 0
 fi
 

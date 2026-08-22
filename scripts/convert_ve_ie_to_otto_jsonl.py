@@ -111,7 +111,7 @@ def compose_fact_text(rec: Dict[str, Any]) -> str:
     parts: List[str] = [str(rec["fact_text"]).strip()]
     note = rec.get("non_obvious_note") or {}
     if note:
-        parts.append(f"Commonly believed: {str(note['official_guidance']).strip()}")
+        parts.append(f"Official guidance: {str(note['official_guidance']).strip()}")
         parts.append(f"Actually: {str(note['actual_reality']).strip()}")
         parts.append(f"Action required: {str(note['action_required']).strip()}")
     return "\n\n".join(parts)

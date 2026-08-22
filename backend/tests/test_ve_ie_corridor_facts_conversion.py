@@ -79,7 +79,7 @@ class TestConversion(unittest.TestCase):
             self.assertIn(note["official_guidance"].strip(), out["fact_text"])
             self.assertIn(note["actual_reality"].strip(), out["fact_text"])
             self.assertIn(note["action_required"].strip(), out["fact_text"])
-            self.assertIn("Commonly believed:", out["fact_text"])
+            self.assertIn("Official guidance:", out["fact_text"])
             self.assertIn("Actually:", out["fact_text"])
 
     def test_the_statement_itself_survives(self) -> None:

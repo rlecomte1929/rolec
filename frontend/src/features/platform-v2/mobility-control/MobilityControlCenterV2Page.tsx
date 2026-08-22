@@ -15,6 +15,7 @@ import { getCaseStatusLabel } from '../../../utils/caseStatusLabel';
 import { DataTable, ResetColumnsLink, type DataTableColumn } from '../data-table';
 import { useHrCompanyContext } from '../../../contexts/HrCompanyContext';
 import { fetchExecSummary } from '../../../api/nlg';
+import { HrCaseHealthPanel } from '../../../components/case/HrCaseHealthPanel';
 
 /**
  * Mobility Control Center — V2.
@@ -717,6 +718,10 @@ export function MobilityControlCenterV2Page() {
             <Button unstyled type="button" onClick={() => void dashboardQuery.refetch()} className="text-amber-700 hover:underline">Retry</Button>
           </div>
         )}
+
+        {/* [AIQ-2041] Action-first: what needs doing sits ABOVE the case table, so
+            the page opens with work rather than with a list to scan. */}
+        <HrCaseHealthPanel />
 
         {/* Two-column layout: cases table + right-rail. The right rail grows
             up to 360px on wider monitors but the table always gets the

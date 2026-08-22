@@ -41,7 +41,7 @@ AIQ-233:backend/services/policy_assistant_embedder.py  # SHIPPED (verified basen
 AIQ-233:backend/services/policy_chunk_retriever.py  # SHIPPED (verified basename): backend/app/services/policy_chunk_retriever.py
 AIQ-233:supabase/migrations/20260503100000_policy_assistant_chunks.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260503100001_policy_assistant_chunks.sql
 AIQ-233:supabase/migrations/20260522110000_policy_chunks_vector_index.sql  # SHIPPED (verified git-history): 2635d030 chore: stage untracked platform-v2 frontend, migrations, backend services, and edge functions
-AIQ-236:backend/app/routers/comparison.py  # SHIPPED (verified token-in-filename): apps/hr-dashboard/node_modules/@typescript-eslint/eslint-plugin/dist/rules/no-unsafe-enum-comparison.d.ts
+AIQ-236:backend/app/routers/comparison.py  # SHIPPED (verified token-in-filename): apps/hr-dashboard/node_modules/@typescript-eslint/eslint-plugin/dist/rules/no-unsafe-enum-comparison.d.ts [path deleted by AIQ-1865; the match was a vendored node_modules file and was never real evidence]
 AIQ-236:backend/app/schemas_comparison.py  # SHIPPED (verified git-history): 8cdd47e2 feat(comparison): AIQ-236 P3-1 — benefit comparison engine (service asks vs tier caps)
 AIQ-236:backend/app/services/comparison_engine.py  # SHIPPED (verified token-in-filename): backend/app/services/service_comparison_engine.py
 AIQ-236:backend/tests/test_comparison_api.py  # SHIPPED (verified git-history): 8cdd47e2 feat(comparison): AIQ-236 P3-1 — benefit comparison engine (service asks vs tier caps)
@@ -59,7 +59,7 @@ AIQ-489:backend/tests/test_document_classifier.py  # SHIPPED (verified git-histo
 AIQ-489:prompts/classifier/document_classifier_v1.txt  # SHIPPED (verified git-history): 001a917c feat(agents): C1-04 — document classifier (17 codes, escalation, UNKNOWN floor)
 AIQ-494:prompts/entity/resolver_v1.eval.md  # SHIPPED (verified git-history): 912765a6 feat(prompts): C1-07P — entity-resolution LLM fallback prompt + 20-pair eval
 AIQ-494:prompts/entity/resolver_v1.txt  # SHIPPED (verified git-history): 912765a6 feat(prompts): C1-07P — entity-resolution LLM fallback prompt + 20-pair eval
-AIQ-495:backend/relopass/agents/contradiction.py  # SHIPPED (verified token-in-filename): apps/hr-dashboard/src/api/contradictions.ts
+AIQ-495:backend/relopass/agents/contradiction.py  # SHIPPED (verified token-in-filename): apps/hr-dashboard/src/api/contradictions.ts [path deleted by AIQ-1865; deliverable itself still tracked]
 AIQ-495:backend/tests/test_contradiction_detection.py  # SHIPPED (verified git-history): 9f7eb387 feat(agents): C1-08 — cross-document contradiction detector (fixed 5-field set)
 AIQ-495:supabase/migrations/20260529120000_rce_contradictions.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260602000000_rce_contradictions.sql
 AIQ-497:backend/tests/test_corridor_fr_no_eea_2026.py  # SHIPPED (verified git-history): 41df9e1e feat(corridors): P0-05 — FR_NO_EEA_2026 corridor YAML + loader sanity test (AIQ-189)
@@ -70,7 +70,7 @@ AIQ-523:prompts/extraction/passport_td3_v1.txt  # SHIPPED (verified git-history)
 AIQ-525:prompts/extraction/payslip_v1.eval.md  # SHIPPED (verified git-history): 1c8eb6f5 feat(prompts): C1-05P-d — PAYSLIP extraction prompt (FR/DE/NO + anti-hallucination)
 AIQ-525:prompts/extraction/payslip_v1.txt  # SHIPPED (verified git-history): 1c8eb6f5 feat(prompts): C1-05P-d — PAYSLIP extraction prompt (FR/DE/NO + anti-hallucination)
 AIQ-540:scripts/relopass_api_runner.js  # SHIPPED (verified token-in-filename): relopass_api_runner_patched.js
-AIQ-544:frontend/src/components/antigravity/Skeleton.tsx  # SHIPPED (verified token-in-filename): apps/hr-dashboard/src/features/cases/CasesSkeleton.tsx
+AIQ-544:frontend/src/components/antigravity/Skeleton.tsx  # SHIPPED (verified token-in-filename): apps/hr-dashboard/src/features/cases/CasesSkeleton.tsx [path deleted by AIQ-1865; deliverable itself still tracked]
 AIQ-54:backend/services/provider_jwt.py  # SHIPPED (verified basename): backend/app/services/provider_jwt.py
 AIQ-552:backend/relopass/agents/extraction/init.py  # SHIPPED (verified dir-alive-generic): backend/relopass/agents/extraction/
 AIQ-552:backend/relopass/agents/init.py  # SHIPPED (verified dir-alive-generic): backend/relopass/agents/
