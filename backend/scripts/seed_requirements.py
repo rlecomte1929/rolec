@@ -94,6 +94,16 @@ def build_payloads(seed: Dict[str, Any], only_country: Optional[str] = None) -> 
                     "review_status": "pending",
                     "last_verified_at": stamp,
                 })
+    # Generator/verifier separation: a seed FILE is an automated write path, so it may
+    # only claim generator-writable provenance (representative / corpus_grounded). A YAML
+    # claiming 'expert_verified' would record a human signature that never happened —
+    # refuse the whole expansion here, before any DB session opens. crud enforces the
+    # same rule again at the write funnel (defense in depth).
+    from backend.app.services.verification_guard import assert_generator_statuses
+    assert_generator_statuses(
+        (p.get("verification_status") for p in payloads),
+        context="seed_requirements.build_payloads",
+    )
     return payloads
 
 

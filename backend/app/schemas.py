@@ -201,6 +201,10 @@ class AdminRequirementReviewDTO(BaseModel):
     owner: str
     # How well-sourced: representative | corpus_grounded | expert_verified. A badge.
     verificationStatus: Optional[str] = None
+    # The human signature behind verificationStatus='expert_verified' (verified-write
+    # guardrail): who signed it off and when. NULL until a human verifies.
+    verifiedBy: Optional[str] = None
+    verifiedAt: Optional[datetime] = None
     # Whether it is served: pending | approved | rejected. The gate.
     reviewStatus: str = "approved"
     reviewedBy: Optional[str] = None
