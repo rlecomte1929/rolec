@@ -23,6 +23,15 @@ import type { RequirementsSufficiency } from '../../../api/client';
  * difference (never colour alone), and an absent `citation_status` falls to the weaker claim.
  * This changes how a citation is described, never which facts are served.
  *
+ * WHY A CONDITIONAL FACT IS NOT AN ASSERTION. A record tagged `assertion_mode: 'conditional'`
+ * states a consequence whose trigger it does not itself determine — the two ES→IE entry-visa
+ * records assert a SEQUENCE, while whether a nationality is visa-required is a separate ISD
+ * lookup. Rendered flat, they tell a mover she is visa-required on the authority of a page
+ * that never says so. So the condition is shown beside the fact, never dropped. `non_obvious`
+ * marks the traps (16 of the 38 ES→IE records) where the cost of not knowing is high and
+ * nothing else prompts you. Both are labels on a fact we already serve — neither changes
+ * WHICH facts are served.
+ *
  * WHY EMPTY IS NOT "COMPLETE". The endpoint answers HTTP 200 for `insufficient_data` and
  * `unavailable` too, so a naive render would show a reassuring empty panel while the backend
  * is broken. Every state below is distinguishable, and no state ever says "you're all set".
@@ -199,13 +208,38 @@ export const RequirementsSufficiencyPanel: React.FC<Props> = ({ caseId, intakeHr
             <ul className="space-y-2">
               {facts.map((fact) => {
                 const verified = fact.citation_status === 'verified';
+                const conditional = fact.assertion_mode === 'conditional';
                 return (
                   <li
                     key={fact.fact_id}
                     data-testid="sufficiency-fact"
                     className="rounded-xl border border-slate-200 bg-white px-4 py-3"
                   >
+                    {fact.non_obvious && (
+                      <p
+                        data-testid="sufficiency-fact-trap"
+                        className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#0b2b43]"
+                      >
+                        Easy to miss
+                      </p>
+                    )}
+                    {conditional && (
+                      <p
+                        data-testid="sufficiency-fact-conditional"
+                        className="mb-1 text-xs font-semibold text-slate-600"
+                      >
+                        Applies only in certain cases
+                      </p>
+                    )}
                     <p className="text-sm text-slate-800">{fact.fact_text}</p>
+                    {conditional && fact.conditional_on && (
+                      <p
+                        data-testid="sufficiency-fact-condition"
+                        className="mt-1 text-xs text-slate-600"
+                      >
+                        Depends on: {fact.conditional_on}
+                      </p>
+                    )}
                     <a
                       href={fact.source_url}
                       target="_blank"
