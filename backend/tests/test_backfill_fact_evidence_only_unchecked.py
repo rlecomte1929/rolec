@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 import sys
+import types
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -34,7 +35,6 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-import backend.database as backend_database  # noqa: E402  (main() does `from backend.database import db`)
 import backend.scripts.backfill_fact_evidence as bf  # noqa: E402
 
 # The archived page text every stubbed fetch returns. Long enough to clear any minimum-length
@@ -103,8 +103,24 @@ def _seed_engine():
 
 @pytest.fixture()
 def engine(monkeypatch):
+    """Own the `backend.database` module entry outright for the duration of the test.
+
+    `main()` resolves the handle with a function-local `from backend.database import db`.
+    Setting the attribute on the already-imported module is NOT enough here: backend's
+    conftest substitutes its own object for that module, so under full-suite discovery the
+    attribute we patch and the one `main()` reads are not always the same object — the run
+    then quietly processes nothing and every assertion about writes trivially "passes" as
+    an empty set. That is precisely how this file passed alone and failed in CI.
+
+    Replacing the sys.modules entry makes the import resolve to this stub whatever else
+    the suite has done, and monkeypatch restores the original afterwards. Deliberately NOT
+    importing backend.database at module scope either: importing it at collection time is
+    itself the ordering hazard conftest warns about.
+    """
     eng = _seed_engine()
-    monkeypatch.setattr(backend_database, "db", _StubDb(eng), raising=False)
+    stub_module = types.ModuleType("backend.database")
+    stub_module.db = _StubDb(eng)
+    monkeypatch.setitem(sys.modules, "backend.database", stub_module)
     monkeypatch.setattr(
         bf, "fetch_and_parse",
         lambda url, robots=None, limiter=None: {
