@@ -14,6 +14,7 @@ import { RoadmapReviewPanel } from '../components/case/RoadmapReviewPanel';
 import { CaseFeasibilityPanel } from '../components/case/CaseFeasibilityPanel';
 import { statusLabel } from '../lib/statusLabel';
 import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
+import { IntakePrefillPanel } from '../components/case/IntakePrefillPanel';
 import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
 import { CaseVendorsPanel } from '../components/case/CaseVendorsPanel';
 import type { ImmigrationContext } from '../components/case/immigrationContext';
@@ -346,6 +347,16 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         <AdvisorsPanel
           destinationCountry={detail.destCountry}
         />
+
+        {/* ── [W1-3b] Prefill the intake from the contract HR already holds, so the
+             employee is not asked to retype what the employer has on file. Upload
+             proposes; nothing is written until HR confirms each field.
+
+             caseId STRICTLY detail.caseId, no `?? detail.id` fallback: these endpoints
+             resolve via _require_case_access → get_relocation_case, so the assignment PK
+             404s — and a 404 here would look identical to "the document did not read",
+             hiding the real failure. Same reasoning as CaseFeasibilityPanel above. ── */}
+        {detail.caseId && <IntakePrefillPanel caseId={detail.caseId} />}
 
         {/* ── IMM-13: Immigration status panel ── */}
         <Card padding="lg" className="border border-[#e2e8f0]">
