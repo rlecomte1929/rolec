@@ -47,6 +47,21 @@ _ISO_TO_CATALOG_NAME = {
     "US": "UNITED STATES",
     "FR": "FRANCE",
     "NL": "NETHERLANDS",
+    "IE": "IRELAND",
+    # Destinations of committed corridor profiles. Each was missing while its corridor
+    # existed, and a missing entry is silent: `resolve_catalog_country` falls back to the
+    # raw ISO code, which matches no `requirement_items` row and serves nobody.
+    #
+    # ES cost the IE→ES batch exactly that — 25 source-verified records applied to
+    # production, reachable by no case, because destinations are stored as ISO alpha-2 and
+    # "ES" never became "SPAIN". FR_ES targets it too.
+    "ES": "SPAIN",
+    # CH is a destination of FR_CH. `nationality_class` already models Swiss free movement
+    # under the EU–Swiss AFMP, so the codebase treated CH as first-class everywhere but here.
+    "CH": "SWITZERLAND",
+    # DK is not a corridor profile yet, but the B3 batch stages six Denmark-destination
+    # facts and `mappings.resolve()` refuses an entity whose destination has no coverage.
+    "DK": "DENMARK",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.

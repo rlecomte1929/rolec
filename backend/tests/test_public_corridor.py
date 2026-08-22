@@ -90,6 +90,61 @@ def test_fr_no_lta_returns_generic_requirements_no_auth(monkeypatch):
         assert forbidden not in full, f"PII/case field '{forbidden}' leaked"
 
 
+def test_non_obvious_and_timing_are_carried_from_the_catalog_row(monkeypatch):
+    """A POPULATED value must reach the payload, not just the key.
+
+    Every row in production has `non_obvious=false` / `timing IS NULL` today, so a live
+    check against prod proves only that the keys exist — it cannot tell "carried through
+    correctly" apart from "still hardcoded to None", which is what this endpoint did
+    before. So seed values that could only have come from the row.
+
+    This is also the regression test for the `apply_rules` pass-through contract seen from
+    the caller's side: a rebuild inside the engine would null both of these while
+    test_rules_engine_*.py stayed green.
+    """
+    seeded = _norway_seed()
+    seeded[0].non_obvious = True
+    seeded[0].timing = "within 8 days of arrival"
+    monkeypatch.setattr(
+        public_corridor.crud, "list_requirements",
+        lambda db, country, purpose: seeded if country == "NORWAY" else [],
+    )
+
+    resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
+    assert resp.status_code == 200, resp.text
+    reqs = resp.json()["requirements"]
+
+    carried = next(r for r in reqs if r["key"] == "residence_registration_folkeregister")
+    assert carried["non_obvious"] is True
+    assert carried["timing"] == "within 8 days of arrival"
+
+    # The other seeded rows carry the column defaults, and must not inherit the neighbour's.
+    others = [r for r in reqs if r["key"] != "residence_registration_folkeregister"]
+    assert others, "expected more than one requirement in the NO/LTA set"
+    assert all(r["non_obvious"] is False and r["timing"] is None for r in others)
+
+
+def test_a_row_predating_the_columns_degrades_rather_than_raising(monkeypatch):
+    """A row object with neither attribute must yield false/None, not a 500.
+
+    `_base_items` reads both with `getattr(..., default)` precisely so the endpoint
+    survives a row shape that predates the migration.
+    """
+    bare = _norway_seed()
+    for row in bare:
+        assert not hasattr(row, "non_obvious") and not hasattr(row, "timing")
+    monkeypatch.setattr(
+        public_corridor.crud, "list_requirements",
+        lambda db, country, purpose: bare if country == "NORWAY" else [],
+    )
+
+    resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
+    assert resp.status_code == 200, resp.text
+    reqs = resp.json()["requirements"]
+    assert reqs
+    assert all(r["non_obvious"] is False and r["timing"] is None for r in reqs)
+
+
 def test_cors_wildcard_header(monkeypatch):
     _patch_seed(monkeypatch)
     resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
@@ -218,3 +273,68 @@ def test_a_universal_requirement_survives_every_track(monkeypatch):
             "/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA" + query
         )
         assert "Tax deduction card (skattekort) before first salary" in _labels(resp)
+
+
+# ---------------------------------------------------------------------------
+# `source` allowlist
+#
+# This endpoint is unauthenticated and answers `Access-Control-Allow-Origin: *`. It used to emit
+# `citations_json` RAW, and that field holds three shapes — two of which carry internal material:
+# the inline objects written by the corridor generators and `otto.mappings._citations_for` carry
+# `needs_lawyer_review` and, on the IE→ES rows, a `review_reason` naming the claim we do not
+# trust; bare `source_records` ids are internal identifiers meaning nothing to an anonymous
+# caller.
+#
+# Latent only while every object-shaped row sat at `review_status='pending'`. On 2026-08-21
+# 12:02 UTC the nine VE→IE rows were approved and `needs_lawyer_review: true` began appearing in
+# the live public body — confirmed against api.relopass.com before this fix.
+#
+# Allowlist, not denylist: `topic_key` and `corridor` were already being published, and a
+# denylist fails open the next time a generator adds a key.
+# ---------------------------------------------------------------------------
+
+_public_sources = public_corridor._public_sources
+
+
+def test_the_counsel_flag_never_reaches_an_anonymous_caller():
+    got = _public_sources([{
+        "url": "https://www.citizensinformation.ie/en/x/",
+        "name": "Citizens Information",
+        "topic_key": "spouse_stamp_1g_right_to_work",
+        "corridor": "ES->IE",
+        "needs_lawyer_review": True,
+    }])
+    assert got == ["https://www.citizensinformation.ie/en/x/"]
+
+
+def test_a_review_reason_is_not_published():
+    got = _public_sources([{
+        "url": "https://sede.agenciatributaria.gob.es/x",
+        "needs_lawyer_review": True,
+        "review_reason": "sourced to the AEAT residency page, not the treaty text",
+    }])
+    assert "review_reason" not in json.dumps(got)
+    assert "AEAT residency page" not in json.dumps(got)
+
+
+def test_an_internal_source_record_id_is_dropped():
+    assert _public_sources(["1f0e8a2c-0000-4000-8000-000000000001"]) == []
+
+
+def test_a_bare_url_string_still_publishes():
+    url = "https://enterprise.gov.ie/permits/"
+    assert _public_sources([url]) == [url]
+
+
+def test_non_web_schemes_are_refused():
+    assert _public_sources([{"url": "javascript:alert(1)"}]) == []
+
+
+def test_one_url_cited_by_several_facts_appears_once():
+    url = "https://www.irishimmigration.ie/x/"
+    assert _public_sources([{"url": url}, url, {"url": url}]) == [url]
+
+
+def test_no_citations_is_an_empty_list():
+    assert _public_sources(None) == []
+    assert _public_sources([]) == []

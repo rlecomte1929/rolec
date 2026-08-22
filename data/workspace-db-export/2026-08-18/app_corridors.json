@@ -1,0 +1,24 @@
+{
+ "table": "app_corridors",
+ "sqlName": "app_app_corridors",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 1,
+ "rows": [
+  {
+   "id": 1,
+   "origin_country": "Norway",
+   "destination_country": "France",
+   "employee_types_in_scope": [
+    "employed",
+    "self_employed"
+   ],
+   "authoring_status": "authoring",
+   "assurance_status": "not_started",
+   "demand_score": "0.8",
+   "notes": "NO->FR corridor (Gap 1 of ReloPass_Gap_Analysis_and_Build_Spec_v2_codebase_aware.md) entered AUTHORING on 2026-08-10: the deterministic requirement set (phases A-D: Norway exit admin, cross-border employment & social security, France establishment, goods/vehicle customs — 25 items) is authored into the Case Command rule engine (apps/case-command/rule-engine.ts) and selectable in the Corridor Check UI. Content is DRAFT / needs-source-verification — sourced, informational, NOT counsel-assured. Reference/validation profile: French (also NO/SE) citizen, Oslo->Paris, retains Norwegian employer, unsupported move, already departed (retrospective anchor). Next: source-verification pass, then France counsel engagement for assurance.",
+   "session_id": null,
+   "created_at": "2026-08-13T12:12:48.499Z",
+   "updated_at": "2026-08-13T12:12:48.499Z"
+  }
+ ]
+}

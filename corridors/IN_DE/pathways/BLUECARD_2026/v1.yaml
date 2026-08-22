@@ -224,6 +224,11 @@ corridor_agent:
       time_window_relative_to: TRAVEL_TO_DE
       time_window_min_days: 0
       time_window_max_days: 14
+      deadline_trigger:
+        tag: "relopass-deadline-anmeldung-de"
+        label: "Anmeldung — German address registration"
+        channel: "email"
+        lead_days: 7
 
     - step_id: HEALTH_INSURANCE_SETUP
       name: "Health insurance (statutory or private) enrolment"
@@ -245,6 +250,11 @@ corridor_agent:
       time_window_relative_to: ANMELDUNG
       time_window_min_days: 0
       time_window_max_days: 60
+      deadline_trigger:
+        tag: "relopass-deadline-biometrics-appointment-de"
+        label: "Biometrics appointment for the Blue Card"
+        channel: "email"
+        lead_days: 14
 
     - step_id: AUFENTHALTSTITEL_APPLICATION
       name: "Aufenthaltstitel (residence-permit) application submitted"
@@ -266,6 +276,11 @@ corridor_agent:
       time_window_relative_to: AUFENTHALTSTITEL_DECISION
       time_window_min_days: 0
       time_window_max_days: 30
+      deadline_trigger:
+        tag: "relopass-deadline-blue-card-collection-de"
+        label: "Blue Card collection"
+        channel: "email"
+        lead_days: 14
 
     - step_id: NOTIFICATION_82_AUFENTHG
       name: "§82 AufenthG notifications set up (employer changes / address changes / family events)"

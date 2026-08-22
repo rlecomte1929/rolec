@@ -21,7 +21,7 @@ fabricated "nothing required".
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Sequence
 
 from .requirements_country_key import to_iso
 
@@ -88,6 +88,9 @@ _ADJECTIVAL = {
     "LITHUANIAN": "LT", "LUXEMBOURGISH": "LU", "MALTESE": "MT", "POLISH": "PL",
     "PORTUGUESE": "PT", "ROMANIAN": "RO", "SLOVAK": "SK", "SLOVENIAN": "SI",
     "SPANISH": "ES",
+    # Kept in step with the country-name table above — every country needs both
+    # forms, because production stores whichever the person typed.
+    "HONG KONGER": "HK", "VENEZUELAN": "VE",
 }
 
 # Full country names for the free-movement set. `to_iso` only knows the seven
@@ -102,6 +105,20 @@ _COUNTRY_NAME = {
     "LIECHTENSTEIN": "LI", "LITHUANIA": "LT", "LUXEMBOURG": "LU", "MALTA": "MT",
     "POLAND": "PL", "PORTUGAL": "PT", "ROMANIA": "RO", "SLOVAKIA": "SK",
     "SLOVENIA": "SI", "SPAIN": "ES", "SWEDEN": "SE", "SWITZERLAND": "CH",
+    # Non-EU/EEA names. This table began as the free-movement set, so every
+    # country in it was a member state — and the adjectival table meanwhile grew
+    # non-EU entries (INDIAN, AMERICAN, SINGAPOREAN, BRITISH). The two fell out of
+    # step, and the gap was invisible because `to_iso` resolves seeded
+    # DESTINATIONS by name: "Germany" and "France" worked as destinations while
+    # "India" and "Hong Kong" — real nationalities we do not sell relocations TO —
+    # returned None. Nationality ranges over every country; the destination
+    # catalog does not, so it cannot be the fallback for this lookup.
+    "GERMANY": "DE", "FRANCE": "FR", "NETHERLANDS": "NL", "NORWAY": "NO",
+    "UNITED KINGDOM": "GB", "GREAT BRITAIN": "GB", "UK": "GB",
+    "UNITED STATES": "US", "UNITED STATES OF AMERICA": "US", "USA": "US",
+    "INDIA": "IN", "SINGAPORE": "SG", "HONG KONG": "HK",
+    # Named on AIQ-1993: Andrea, the first real ES->IE case, is Venezuelan.
+    "VENEZUELA": "VE",
 }
 
 
@@ -151,6 +168,43 @@ def classify(nationality: Optional[str], dest_country: Optional[str]) -> Optiona
     if dest in _EEA and nat in _FREE_MOVEMENT:
         return EU_EEA
     return THIRD_COUNTRY
+
+
+#: Best-to-worst. A dual national holds the UNION of their rights, so when two
+#: nationalities disagree the more favourable class is the true one.
+_CLASS_RANK = {OWN_NATIONAL: 0, EU_EEA: 1, THIRD_COUNTRY: 2}
+
+
+def classify_best(
+    nationalities: Sequence[Optional[str]], dest_country: Optional[str]
+) -> Optional[str]:
+    """The most favourable class across every nationality a person holds.
+
+    A dual national does not have to choose which passport to be judged by: rights
+    are cumulative. A Venezuelan/Italian citizen moving to Ireland exercises Italian
+    free movement, and classifying them on the Venezuelan nationality alone produces
+    the exact opposite answer — a permit track they must not apply for, plus a
+    "not enough lead time" verdict that is false because the 104-day permit chain
+    does not apply to them at all.
+
+    That is not hypothetical. Intake ASKS for a second nationality
+    (`q_has_second_nationality` → `second_nationality`), stores it, and exports it
+    under GDPR — and nothing consulted it at the gate, so whichever nationality
+    happened to be captured first decided the whole journey.
+
+    Returns ``None`` only when NO nationality could be recognised, preserving
+    `classify`'s rule: suppress a requirement only when we positively know free
+    movement applies. One unrecognised nationality alongside one recognised one
+    yields the recognised answer rather than discarding it.
+    """
+    best: Optional[str] = None
+    for nat in nationalities:
+        got = classify(nat, dest_country)
+        if got is None:
+            continue
+        if best is None or _CLASS_RANK[got] < _CLASS_RANK[best]:
+            best = got
+    return best
 
 
 def is_free_movement_national(nationality: Optional[str]) -> bool:

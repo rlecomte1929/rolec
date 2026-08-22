@@ -599,6 +599,29 @@ export interface HrVendor {
   is_approved: boolean;
 }
 
+/** A row of a case's assigned-vendor shortlist.
+ *  Returned by GET /api/cases/:caseId/vendors and, identically shaped, by the
+ *  POST that creates one — so an assign result can go straight into the panel's
+ *  query cache. Rendered by CaseVendorsPanel. */
+/** [AIQ-2025] The four states public.case_vendor_shortlist.status permits. Mirrors
+ *  the table's CHECK constraint — "Removed" is deliberately absent: unassigning is
+ *  a hard DELETE, not a state. */
+export const CASE_VENDOR_STATUSES = ['Assigned', 'Briefed', 'In Progress', 'Complete'] as const;
+export type CaseVendorStatus = (typeof CASE_VENDOR_STATUSES)[number];
+
+export interface CaseVendorRow {
+  shortlist_id: string | null;
+  /** [AIQ-2024] The vendor's own id, so a caller can tell WHICH vendor a row is
+   *  without matching on the display name. */
+  vendor_id: string | null;
+  category: string | null;
+  status: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  vendor_name: string | null;
+  vendor_website: string | null;
+}
+
 export interface ImmigrationRequirementsResponse {
   covered: boolean;
   coverage_reason: string | null;
@@ -1108,6 +1131,56 @@ export const hrAPI = {
   },
 
   // ── AIQ-40-A/B: Vendor directory ─────────────────────────────────────────
+
+  // ── AIQ-1896: case vendor assignment ─────────────────────────────────────
+  //
+  // These are the write path public.case_vendor_shortlist never had. They live on
+  // /api/cases (cases_write.py), not /api/hr, because the shortlist is keyed on the
+  // canonical case id — the backend resolves whichever id form the caller passes.
+
+  /** POST /api/cases/:caseId/vendors — attach a browsed vendor to a case.
+   *  Idempotent: re-assigning the same vendor+service returns the existing row. */
+  assignVendorToCase: async (
+    caseId: string,
+    payload: {
+      vendor_id: string;
+      service_key?: string;
+      contact_name?: string;
+      contact_email?: string;
+    },
+  ): Promise<CaseVendorRow> => {
+    const response = await api.post<CaseVendorRow>(`/api/cases/${caseId}/vendors`, payload);
+    return response.data;
+  },
+
+  /** GET /api/cases/:caseId/vendors — the vendors already attached to a case.
+   *  [AIQ-2024] Used by VendorBrowsePanel to show real "already assigned" state on
+   *  open, rather than only remembering clicks made in the current session. */
+  getCaseVendors: async (caseId: string): Promise<CaseVendorRow[]> => {
+    const response = await api.get<CaseVendorRow[]>(`/api/cases/${caseId}/vendors`);
+    return Array.isArray(response.data) ? response.data : [];
+  },
+
+  /** PATCH /api/cases/:caseId/vendors/:shortlistId — move a vendor through its
+   *  engagement lifecycle. [AIQ-2025] Only Assigned / Briefed / In Progress /
+   *  Complete are accepted; the server 422s anything else rather than letting the
+   *  database CHECK constraint surface as a 500. */
+  updateCaseVendorStatus: async (
+    caseId: string,
+    shortlistId: string,
+    status: CaseVendorStatus,
+  ): Promise<CaseVendorRow> => {
+    const response = await api.patch<CaseVendorRow>(
+      `/api/cases/${caseId}/vendors/${shortlistId}`,
+      { status },
+    );
+    return response.data;
+  },
+
+  /** DELETE /api/cases/:caseId/vendors/:shortlistId — detach a vendor from a case. */
+  unassignVendorFromCase: async (caseId: string, shortlistId: string): Promise<void> => {
+    await api.delete(`/api/cases/${caseId}/vendors/${shortlistId}`);
+  },
 
   /** GET /api/hr/vendors?corridor=X&category=Y */
   getVendors: async (params?: {

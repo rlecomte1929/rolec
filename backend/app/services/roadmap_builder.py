@@ -19,6 +19,7 @@ from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 from .immigration_regime import ImmigrationRegimeRouter
+from .roadmap_corridor_overlay import corridor_overlay
 from .wizard_draft_mapper import extract_profile_from_wizard_draft
 
 logger = logging.getLogger(__name__)
@@ -453,6 +454,17 @@ def derive_roadmap(case: Dict[str, Any]) -> Dict[str, Any]:
     # Employer covers note
     employer = (draft.get("assignmentContext") or {}).get("employerName", "Your employer")
 
+    # AIQ-1867: fold in the corridor's authored step graph where one exists. Until now the only
+    # reader of corridors/<id>/pathways/*.yaml was the HR feasibility widget, so the employee
+    # never saw the entry visa, the family route or the real durations. None => unchanged.
+    advisories: List[Dict[str, Any]] = []
+    overlay = corridor_overlay(case)
+    if overlay:
+        _apply_corridor_overlay(tracks, overlay)
+        advisories = overlay["advisories"]
+        # The authored critical path beats a guess keyed off the destination country.
+        time_estimate = overlay["time_estimate"]
+
     return {
         "totals": {
             "time": time_estimate,
@@ -461,11 +473,69 @@ def derive_roadmap(case: Dict[str, Any]) -> Dict[str, Any]:
         },
         "outcomes": outcomes,
         "tracks": tracks,
+        # Corridor exception cases. Empty unless the corridor declares them.
+        "advisories": advisories,
         # Flat steps list for Pathway V2 compatibility (legacy shape)
         "steps": _flatten_steps(tracks),
         # Family parallel lanes (Pathway V2 shape)
         "lanes": _build_lanes(case),
     }
+
+
+def _apply_corridor_overlay(
+    tracks: List[Dict[str, Any]], overlay: Dict[str, Any]
+) -> None:
+    """Append the corridor's steps to their tracks, in the order the pathway declares them.
+
+    Injected steps keep a ``corridor-`` key prefix so a consumer can tell authored corridor
+    content from the generic scaffold, and each carries its provenance — the corridor files
+    describe themselves as REPRESENTATIVE and not SME-verified, and a duration a family plans
+    around must not render as established fact.
+    """
+    # Drop the generic scaffold steps the corridor supersedes, before appending. A plan that
+    # says both "each dependent needs their own permit" and "the spouse may work on Stamp 1G
+    # without a separate permit" is worse than one that only said the first.
+    superseded = set(overlay.get("superseded_generic_keys") or ())
+    if superseded:
+        for track in tracks:
+            track["steps"] = [
+                s for s in track.get("steps", []) if s.get("key") not in superseded
+            ]
+
+    by_id = {t["id"]: t for t in tracks}
+    for step in overlay["corridor_steps"]:
+        # A corridor step whose intended track does not exist must still be rendered.
+        # `_TRACK_BY_STEP` routes JOB_OFFER_CONTRACT and TRAVEL_TO_IE to "visa", and
+        # `_visa_track_required` builds no visa track for a free mover — so those two were
+        # dropped here by a bare `continue`, while `corridor_overlay` had already counted
+        # them into the journey. Signing a contract and boarding a plane are not immigration
+        # acts; they happen whatever the passport says. Settlement is built unconditionally,
+        # so it is the safe home. Dropping a computed step is never right: it makes the
+        # roadmap disagree with its own totals, silently.
+        track = by_id.get(step["track"]) or by_id.get("settlement")
+        if track is None:  # pragma: no cover — settlement is always built
+            continue
+        existing = track.setdefault("steps", [])
+        days = step["expected_duration_days"]
+        existing.append({
+            "n": len(existing) + 1,
+            "key": f"corridor-{step['step_id'].lower()}",
+            "title": step["name"].strip('"'),
+            "status": "locked",
+            "owner": step["responsible_party"],
+            "where": None,
+            "time": f"{days} days" if days else None,
+            "cost": None,
+            "depends": ", ".join(step["prerequisite_step_ids"]) or None,
+            "line": step["name"].strip('"'),
+            "subs": [],
+            "blocking": step["blocking"],
+            # The "easy to miss" flag + its explanation, carried onto the served step so the
+            # roadmap and the plan email can raise it. Empty note for steps without one.
+            "nonObvious": bool(step.get("non_obvious")),
+            "nonObviousNote": step.get("non_obvious_note") or None,
+            "provenance": step["provenance"],
+        })
 
 
 def _flatten_steps(tracks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

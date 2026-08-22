@@ -234,6 +234,7 @@ corridor_agent:
       # NON-OBVIOUS: the permit is a labour authorisation, NOT immigration
       # permission. It does not by itself allow entry or residence.
       non_obvious: true
+      non_obvious_note: "The employment permit is a labour authorisation from DETE, not immigration permission — it does not by itself let you enter or live in Ireland. You still need the entry visa, and immigration registration after you arrive."
       advice_boundary: information_only
       cite: IE_CSEP
 
@@ -245,6 +246,7 @@ corridor_agent:
       # NON-OBVIOUS: required BECAUSE Ireland is outside Schengen and Venezuela is
       # visa-required — a mover holding a Spanish TIE typically assumes free entry.
       non_obvious: true
+      non_obvious_note: "A Spanish residence card (TIE) does not give visa-free entry to Ireland — Ireland is outside Schengen, and a visa-required national must have the long-stay 'D' visa GRANTED before travelling. The permit alone is not enough to board a plane."
       conditional_on: "visa_required_nationality == true"
       cite: IE_D_VISA
 
@@ -274,7 +276,13 @@ corridor_agent:
       time_window_min_days: 0
       time_window_max_days: 90
       non_obvious: true
+      non_obvious_note: "You must register your immigration permission (IRP card / Stamp 1) within 90 days of arriving — in person at Burgh Quay for Dublin, with a €300 fee. Easy to leave too late while you are settling in."
       cite: IE_IMMIGRATION_2004_S9
+      deadline_trigger:
+        tag: "relopass-deadline-irp-registration-ie"
+        label: "Irish residence permission (IRP) registration"
+        channel: "email"
+        lead_days: 30
 
     - step_id: PPSN
       name: "Obtain a PPSN (Personal Public Service Number) via the Dept. of Social Protection"
@@ -291,6 +299,7 @@ corridor_agent:
       # deducted at the emergency rate — the Irish analogue of the "tax card before
       # first pay" trap.
       non_obvious: true
+      non_obvious_note: "If the job is not registered with Revenue before your first pay run, you are put on emergency tax: a single person's rate band for the first four weeks, then ALL income at the higher 40% rate from week five. Getting the RPN in place in time avoids it."
       cite: IE_TCA_1997_PAYE
 
     - step_id: BANK_ACCOUNT
@@ -302,6 +311,7 @@ corridor_agent:
       # movers bridge with a digital account (Revolut/N26) until a traditional
       # account can be opened.
       non_obvious: true
+      non_obvious_note: "Opening a traditional Irish bank account needs proof of address — which needs an address you may not yet have. It is a chicken-and-egg on arrival; most movers bridge with a digital account (Revolut/N26) until a traditional one can be opened."
 
     - step_id: HEALTH_SETUP
       name: "Register with a GP and arrange private health insurance"
@@ -312,6 +322,7 @@ corridor_agent:
       # resident" test, and GP visits are normally paid out of pocket — a newcomer
       # is effectively on private cover at first.
       non_obvious: true
+      non_obvious_note: "Public healthcare eligibility hinges on an 'ordinarily resident' test, and GP visits are normally paid out of pocket — as a newcomer you are effectively on private cover at first, so arrange private health insurance early."
 
     - step_id: FAMILY_REGISTRATION
       name: "Register accompanying family (spouse/partner Stamp 1G; children 16+ register)"
@@ -330,5 +341,6 @@ corridor_agent:
       # A forward-looking positive: no permit renewal needed — after 21 months she
       # can move to Stamp 4 and work without an employment permit.
       non_obvious: true
+      non_obvious_note: "A forward-looking positive: after 21 months on the Critical Skills permit you can move to Stamp 4 and work in Ireland without an employment permit — no renewal needed."
       advice_boundary: information_only
       cite: IE_CSEP

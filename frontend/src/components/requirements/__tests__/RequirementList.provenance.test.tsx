@@ -23,6 +23,21 @@ describe('RequirementList provenance badge', () => {
     expect(screen.getByText('Source-grounded')).toBeTruthy();
   });
 
+  // Production stores `verified` for rows reviewed INTERNALLY. On 2026-08-20 all ten such
+  // rows were Norway, reviewed_by='romain', attestation_status=null — no licensed
+  // immigration lawyer has seen any of them, and expert_verified is 0 across the catalog.
+  // disclaimers.py reserves "expert_verified" for counsel sign-off, so rendering `verified`
+  // as "Expert-verified" told users we held a status we do not.
+  it('does NOT claim expert verification for an internally-reviewed row', () => {
+    render(<RequirementList items={[item('verified')]} />);
+    expect(screen.queryByText('Expert-verified')).toBeNull();
+  });
+
+  it('still shows a badge for verified — the fix must not blank it', () => {
+    render(<RequirementList items={[item('verified')]} />);
+    expect(screen.getByText('Reviewed')).toBeTruthy();
+  });
+
   it('renders no provenance badge when absent', () => {
     render(<RequirementList items={[item(undefined)]} />);
     expect(screen.queryByText('Representative')).toBeNull();

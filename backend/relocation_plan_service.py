@@ -110,15 +110,24 @@ def _phase_and_seq_from_synthetic_code(code: str) -> Tuple[str, int]:
     persist_generated_milestones) so each step lands in its real phase block
     instead of all defaulting to pre_departure. Parse the phase prefix (only
     when it is a known PHASE_ORDER value) and the numeric suffix for in-phase
-    ordering. Any other code keeps the legacy pre_departure / 999 default."""
-    if "_ai_" in code:
-        prefix, _, suffix = code.partition("_ai_")
-        if prefix in PHASE_ORDER:
-            try:
-                seq = int(suffix)
-            except (TypeError, ValueError):
-                seq = 999
-            return prefix, seq
+    ordering. Any other code keeps the legacy pre_departure / 999 default.
+
+    [AIQ-1867] ``{phase}_corridor_{NN}`` is the same convention for steps sourced from a
+    corridor's authored pathway (see timeline_service._corridor_milestones). It needs its
+    own marker rather than reusing ``_ai_``: these steps are curated deterministic data
+    read from ``corridors/<id>/pathways/*.yaml``, and labelling them AI-generated would be
+    false in a codebase where provenance is the product. Without a marker they would all
+    collapse into pre_departure/999 and the CSEP journey would render as one jumbled
+    block."""
+    for marker in ("_ai_", "_corridor_"):
+        if marker in code:
+            prefix, _, suffix = code.partition(marker)
+            if prefix in PHASE_ORDER:
+                try:
+                    seq = int(suffix)
+                except (TypeError, ValueError):
+                    seq = 999
+                return prefix, seq
     return "pre_departure", 999
 
 

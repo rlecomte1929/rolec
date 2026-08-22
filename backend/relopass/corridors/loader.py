@@ -79,6 +79,40 @@ class CorridorExceptionCase:
 
 
 @dataclass(frozen=True)
+class CorridorDeadlineTrigger:
+    """A step's opt-in to the deadline-alert sweep.
+
+    Only steps that state a hard legal window carry one. ``lead_days`` opens the
+    alert window: the sweep fires when ``due - lead_days <= today <= due``, so
+    the message is always "this window is open", never "due today".
+
+    ``tag`` is the copy key AND the destination-correctness boundary. One tag
+    maps to exactly ONE destination's rule set — see
+    :mod:`backend.relopass.corridors.deadline_alerts`. Norway requires an
+    anti-echinococcus treatment before arrival and France requires none; a tag
+    shared across both destinations forces copy that is wrong for half its
+    readers, so the invariant is enforced rather than documented.
+
+    ``tag`` is NOT the ledger key — ``step_id`` is. Renaming a tag is therefore
+    safe (it re-points copy); renaming a step_id re-fires history.
+    """
+
+    tag: str
+    label: str
+    channel: str
+    lead_days: int
+    # The country whose rule set this alert states, ISO3. Defaults to the
+    # corridor's destination, which is right for every entry obligation.
+    #
+    # It exists for EXIT obligations, which are owed to the origin: NO_FR's
+    # "report the move abroad to Folkeregisteret" is a Norwegian rule inside a
+    # corridor bound for France. Keyed on the corridor destination it would be
+    # labelled French, and a second Norway-exit corridor would then look like a
+    # cross-destination tag conflict when the two rule sets are in fact identical.
+    jurisdiction: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class CorridorStep:
     step_id: str
     name: str
@@ -98,6 +132,12 @@ class CorridorStep:
     # Something a non-expert wouldn't know to look for — the flag the product
     # exists to raise: the week-seven ambush, surfaced in week one.
     non_obvious: bool = False
+    # The plain-language explanation OF the non-obvious trap, in the mover's terms —
+    # the reason the flag is raised, not just that it is. Empty when a step carries no
+    # authored explanation. This is representative corridor guidance (the whole pathway
+    # declares itself so), not a cited legal claim, so it lives here rather than in a
+    # requirement_items row that would need a citation the trap does not have.
+    non_obvious_note: str = ""
     # 'information_only' or 'route_to_professional'. A personalised legal or tax
     # determination must route to a regulated professional and must never be
     # answered in ReloPass's own voice.
@@ -112,6 +152,10 @@ class CorridorStep:
     # Declared rather than inferred: step-id spelling is not a safe proxy (NO_FR's
     # is A0_DEPART_NO, IN_DE's graph roots elsewhere entirely).
     arrival_anchor: bool = False
+    # Opt-in to the deadline-alert sweep. None (the default) means this step is
+    # scheduled and flagged as before but never sends anything — alerting is
+    # additive, so every existing corridor keeps its current behaviour.
+    deadline_trigger: Optional[CorridorDeadlineTrigger] = None
 
 
 @dataclass(frozen=True)
@@ -446,6 +490,80 @@ def _enum(step: Any, key: str, allowed: Tuple[str, ...], default: str) -> str:
     return value
 
 
+# Delivery channels the sweep knows how to emit. A typo must fail the load rather
+# than silently produce an alert nothing dispatches.
+_ALERT_CHANNELS = ("email", "in_app")
+
+# Tag grammar: relopass-deadline-<slug>[-<dest-iso2-lower>]. Lowercase kebab only,
+# so a tag is safe as a copy-registry key and as an external CRM tag alike.
+_TAG_RE = re.compile(r"^relopass-deadline-[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def _deadline_trigger(step: Any, step_id: str) -> Optional[CorridorDeadlineTrigger]:
+    """Build a step's deadline trigger, or None when it declares none.
+
+    Every field is required: a half-declared trigger is a content bug, and
+    defaulting ``lead_days`` would invent a legal notice period we never authored.
+    """
+    if not isinstance(step, Mapping):
+        return None
+    raw = step.get("deadline_trigger")
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise CorridorLoadError(
+            f"step {step_id}: deadline_trigger must be a mapping, got {type(raw).__name__}"
+        )
+
+    unknown = set(raw) - {"tag", "label", "channel", "lead_days", "jurisdiction"}
+    if unknown:
+        raise CorridorLoadError(
+            f"step {step_id}: unknown deadline_trigger key(s) {sorted(unknown)}"
+        )
+
+    tag = str(_require(raw, "tag", f"step_graph[{step_id}].deadline_trigger"))
+    if not _TAG_RE.match(tag):
+        raise CorridorLoadError(
+            f"step {step_id}: deadline_trigger.tag {tag!r} must match "
+            f"relopass-deadline-<slug>, lowercase kebab-case"
+        )
+
+    channel = str(_require(raw, "channel", f"step_graph[{step_id}].deadline_trigger"))
+    if channel not in _ALERT_CHANNELS:
+        raise CorridorLoadError(
+            f"step {step_id}: deadline_trigger.channel must be one of "
+            f"{list(_ALERT_CHANNELS)}, got {channel!r}"
+        )
+
+    raw_lead = _require(raw, "lead_days", f"step_graph[{step_id}].deadline_trigger")
+    if not isinstance(raw_lead, int) or isinstance(raw_lead, bool) or raw_lead < 1:
+        raise CorridorLoadError(
+            f"step {step_id}: deadline_trigger.lead_days must be a positive int, "
+            f"got {raw_lead!r}"
+        )
+
+    label = str(_require(raw, "label", f"step_graph[{step_id}].deadline_trigger"))
+    if not label.strip():
+        raise CorridorLoadError(f"step {step_id}: deadline_trigger.label must not be empty")
+
+    jurisdiction = raw.get("jurisdiction")
+    if jurisdiction is not None:
+        jurisdiction = str(jurisdiction)
+        if not re.fullmatch(r"[A-Z]{3}", jurisdiction):
+            raise CorridorLoadError(
+                f"step {step_id}: deadline_trigger.jurisdiction must be an ISO 3166-1 "
+                f"alpha-3 code in uppercase, got {jurisdiction!r}"
+            )
+
+    return CorridorDeadlineTrigger(
+        tag=tag,
+        label=label,
+        channel=channel,
+        lead_days=raw_lead,
+        jurisdiction=jurisdiction,
+    )
+
+
 def _as_tuple(value: Any) -> Tuple[Any, ...]:
     if value is None:
         return ()
@@ -523,9 +641,11 @@ def _build_corridor(parsed: Mapping[str, Any]) -> CorridorAgent:
             cite=(s.get("cite") if isinstance(s, Mapping) else None),
             outcome_type=_enum(s, "outcome_type", _OUTCOME_TYPES, "action"),
             non_obvious=bool(s.get("non_obvious", False)) if isinstance(s, Mapping) else False,
+            non_obvious_note=str(s.get("non_obvious_note", "")).strip() if isinstance(s, Mapping) else "",
             advice_boundary=_enum(s, "advice_boundary", _ADVICE_BOUNDARIES, "information_only"),
             assertion=_enum(s, "assertion", _ASSERTIONS, "HARD"),
             arrival_anchor=bool(s.get("arrival_anchor", False)) if isinstance(s, Mapping) else False,
+            deadline_trigger=_deadline_trigger(s, str(s.get("step_id")) if isinstance(s, Mapping) else "?"),
         )
         for s in _as_tuple(cfg.get("step_graph"))
     )
@@ -563,6 +683,21 @@ def _build_corridor(parsed: Mapping[str, Any]) -> CorridorAgent:
                     f"step {step.step_id} time_window_relative_to "
                     f"{step.time_window_relative_to!r} not in step_graph"
                 )
+        if step.deadline_trigger is not None:
+            # compute_deadlines only dates a step that states a window, so a
+            # trigger without one could never fire. Refuse it at load time rather
+            # than ship an alert that is silently unreachable.
+            has_window = step.time_window_relative_to is not None and (
+                step.time_window_max_days is not None
+                or step.time_window_min_days is not None
+            )
+            if not has_window:
+                raise CorridorLoadError(
+                    f"step {step.step_id} declares a deadline_trigger but states no "
+                    f"time window; a step with no due date can never fire an alert"
+                )
+
+    _reject_prerequisite_cycles(steps)
 
     return CorridorAgent(
         corridor_id=str(_require(cfg, "corridor_id", "corridor_agent")),
@@ -604,3 +739,51 @@ def load_corridor_text(text: str) -> CorridorAgent:
     if not isinstance(parsed, Mapping):
         raise CorridorLoadError("Top-level YAML must be a mapping")
     return _build_corridor(parsed)
+
+
+def _reject_prerequisite_cycles(steps: Sequence["CorridorStep"]) -> None:
+    """[AIQ-1953] Refuse a step graph that cannot be ordered, AT LOAD TIME.
+
+    `scheduler._topological_order` already runs Kahn's algorithm and raises on a
+    cycle — but it runs when a timeline is being SCHEDULED, which is to say while
+    serving a real person's case. A corridor authored with `A -> B -> A` therefore
+    loaded cleanly, passed review, and failed later at the moment someone needed
+    their plan. The card's constraint says it plainly: cycle detection must fail
+    the build, not serve.
+
+    The dangling-prerequisite guard above already establishes that every
+    `prerequisite_step_ids` entry names a real step, so this only has to answer
+    "can these edges be ordered at all".
+
+    Deliberately duplicated rather than imported from `scheduler`: that module
+    imports `CorridorStep` from this one, so depending on it here would be a
+    circular import. The two are ~15 lines of Kahn and are covered by their own
+    tests; a shared module for this alone would cost more than it saves.
+
+    The error names the steps still holding a back-edge, because "there is a cycle
+    somewhere in 23 steps" is not something an author can act on.
+    """
+    indegree: Dict[str, int] = {s.step_id: 0 for s in steps}
+    dependents: Dict[str, List[str]] = {s.step_id: [] for s in steps}
+    for step in steps:
+        for prereq in step.prerequisite_step_ids:
+            if prereq in indegree:
+                indegree[step.step_id] += 1
+                dependents[prereq].append(step.step_id)
+
+    queue = [sid for sid, deg in indegree.items() if deg == 0]
+    ordered = 0
+    while queue:
+        sid = queue.pop(0)
+        ordered += 1
+        for dep in dependents[sid]:
+            indegree[dep] -= 1
+            if indegree[dep] == 0:
+                queue.append(dep)
+
+    if ordered != len(steps):
+        stuck = sorted(sid for sid, deg in indegree.items() if deg > 0)
+        raise CorridorLoadError(
+            "step_graph has a circular prerequisite chain and cannot be ordered; "
+            f"steps still blocked: {', '.join(stuck)}"
+        )

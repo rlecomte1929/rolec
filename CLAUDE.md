@@ -140,7 +140,10 @@ Backend:
 ## Deployment
 
 - **Frontend**: Render Static Site. Build: `npm --prefix frontend ci && npm --prefix frontend run build`. Publish dir: `frontend/dist`.
-- **Backend**: Render Web Service. Start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 4 --proxy-headers`. Python 3.11.
+- **Backend**: Render Web Service. Start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers`. Python 3.11.
+  The service is on Render's **`free`** plan (verified 2026-08-21), which is why it is `--workers 1` and not 4 —
+  and why it spins down after ~15 min idle, costing a real user ~7.7s on their first page. Don't raise the worker
+  count on this plan. See `docs/performance/keep_warm.md`.
 - **Database changes**: Commit a migration file for every schema change. **There is no automated apply-on-merge** — migrations are applied to production manually/out-of-band (operator-run: MCP `apply_migration`/`execute_sql` DDL — **not** `supabase db push`, see the hazard note in *Migration discipline* below), and the ledger is then reconciled by committing the matching file at the applied version. The PR CI only *validates* ledger consistency (the read-only `migration-drift` check); it never applies. See **Migration discipline (MANDATORY)** and **Ledger reconciliation** below.
 - **Deploy trigger**: Push to `main` on GitHub → Render auto-deploys both services. Health check endpoint: `GET /health`.
 
@@ -209,6 +212,108 @@ The product sends user-supplied text to third-party LLM sub-processors (OpenAI a
 
 Sub-processor DPA coverage and EU-residency status are tracked in `docs/security/PRIV-004_sub-processor_register.md` (GDPR Art. 28 register). Update it whenever a new sub-processor (LLM, email, analytics, hosting, CDN) is added to the stack.
 
+## Generation/serving split (HARD GATE)
+
+**The deterministic requirement-serving path must NEVER be able to call an LLM at
+request time.** Served requirements come from rule engines over curated, cited catalog
+data; LLMs live only in the authoring/drafting layer, whose output is human-reviewed
+before it becomes served data. This is the trust architecture the whole "why not just
+use ChatGPT" story rests on.
+
+CI enforces it: **`scripts/check_serving_llm_isolation.py`** (job: *Serving/LLM
+isolation guard*; also asserted from pytest via
+`scripts/tests/test_check_serving_llm_isolation.py` in the backend-tests job) builds
+the full backend import graph via AST — lazy function-local imports included — and
+fails the PR with the exact import chain if any serving engine
+(`requirements_builder`, `rules_engine`, `requirement_evaluation_service`,
+`immigration_requirement_service`, `hr_policy_resolver`) can reach an LLM gateway
+module or an LLM SDK import. There is no allowlist. Fix a violation by breaking the
+import (move the LLM use into authoring; serve reviewed data), never by editing the
+guard's lists. New serving engines must be registered in `SERVING_ROOTS`; a renamed
+root fails the build (exit 2) until re-registered, as does any module inside the serving
+closure that fails to parse — an unparsed module hides whatever it imports. See
+`docs/specs/serving-llm-isolation.md`.
+
+## Corridor requirement data
+
+A corridor's requirement records are the product's core asset. Two rules, both learned by
+nearly getting them wrong on IE→ES (`docs/corridors/README.md` has the full set):
+
+**`requirement_items.review_status` DEFAULTS to `'approved'`, and `requirements_builder`
+serves only approved rows.** A corridor load that omits the column therefore publishes
+unreviewed, representative facts to real users the moment it applies. Set `'pending'`
+explicitly, and never let an `ON CONFLICT` update overwrite it — re-running a load must not
+un-approve what a reviewer has since approved.
+
+**Verify the live table before writing the load.** A batch manifest names a target table and
+key; that is a claim, not a schema. The IE→ES manifest named `requirement_facts` keyed on
+`fact_uid` — a table with no `fact_uid` column and two NOT NULL uuid FKs the batch could not
+supply. Corridor requirement data lands in `public.requirement_items`, whose varchar `id`
+carries the batch's own uid verbatim.
+
+Corridor registry profiles and pathway step graphs live in `corridors/<ID>/`; docs, metrics
+and the Case Verification Report live in `docs/corridors/<id>/`.
+
+## Research batch intake (GCS → candidate)
+
+Otto researches in the Audos workspace and its real deliverable is **NDJSON files on Google
+Cloud Storage plus a manifest**, not the chat text. Bringing one in is a repeatable procedure,
+not a one-off. `docs/imports/B3-facts-enrichment.md` is the worked example.
+
+1. **Get untruncated URLs.** Otto's chat renderer truncates the anchor *text* while leaving
+   the `href` intact — read the page's accessibility tree rather than asking Otto to re-paste.
+2. **Fetch the manifest first.** It declares each artifact's schema, record count and full
+   GCS URL. Counts must reconcile against it exactly, and any discrepancy is the batch's
+   problem to explain, not yours to reconcile away.
+3. **Verify the manifest's claims against the live schema before writing anything.** A
+   manifest names a target table and key; that is a claim, and it has been wrong. B3 named
+   four tables (`kg_corridors`, `kg_corridor_requirements`, `kg_employee_types`,
+   `geo_city_content`) that **do not exist in this repo at all**, alongside a
+   `tools/wave2-import-pipeline.mjs` that exists on no ref. Confirm the table, then map the
+   fields.
+4. **Commit the artifacts + a batch doc under `docs/imports/`,** with a gate script that
+   re-hashes each file and reconciles counts. A GCS object with no repo record is one bucket
+   cleanup away from gone, and a "verified" fact nobody can diff is not verified.
+5. **Load as candidates only.** `status='pending'` / `'candidate'` / `'new'`, never `live`,
+   `verified`, `lawyer_verified` or `approved`. Idempotent on the batch's own uid, and an
+   `ON CONFLICT` must never overwrite a reviewer's decision.
+6. **Never fill a gap.** A field the artifact does not carry stays NULL. A record with
+   `source_missing=true` keeps the flag and gets no invented citation. Deriving a slug key
+   from delivered fields is fine and must be documented as derived; inventing a source, a
+   number or a confidence score is fabrication.
+
+**Search for the capability, not for the table name the task gave you.** This is the mistake
+B3 made and it cost a whole pass. The task named `kg_corridor_requirements` and
+`tools/wave2-import-pipeline.mjs`; both are fictional, and grepping for them concluded there
+was no home for the data. There is:
+
+```
+Otto research (JSONL in audos-workspace-776786/data/)
+  → backend/imports/otto/parsers.py     FactRow, source-domain tiering
+  → executor.stage()                    otto_staging.immigration_*
+  → executor.reconcile()                load_log, processing_queue
+  → executor.promote()   [opt-in]       public.requirement_items   ← human gate
+```
+
+`scripts/import_otto_facts.py <batch-id>` is the CLI for requirement facts (dry-run by
+default); `scripts/import_resources.py --bundle` is the parallel path for city/destination
+content, in `draft_only` mode. Both land candidates only. **Check these before concluding a
+batch has nowhere to go.**
+
+**Source domain decides whether a fact is kept at all.** `classify_source()` rejects
+UNOFFICIAL outright, and its allowlist is a list of *hosts*, because statutory bodies
+routinely publish on a domain that is not a gov TLD. It has been too narrow three times now —
+`irishimmigration.ie`, `citizensinformation.ie`/`revenue.ie`, and the DK/DE set
+(`skat.dk`, `bzst.de`, `service.berlin.de`, `rundfunkbeitrag.de`, `borger.dk`) which silently
+rejected 9 of B3's 20 facts, being every Danish- and German-destination direction. When a
+batch's rejects cluster by country, suspect the allowlist before the research.
+
+**Only when there is genuinely no in-repo path**, land the artifacts plus a decision record
+and run the write where the database is — the `kg_*` corridor toolchain and WorkspaceDB do
+live in the Audos workspace and are unreachable from a CLI checkout. Writing an importer
+against an imagined schema invents the row shape, the column names and the write contract,
+which is worse than nothing for work whose entire purpose is auditability.
+
 ## Migration discipline (MANDATORY)
 
 NEVER apply a migration to production via MCP `apply_migration` or by manually
@@ -226,20 +331,43 @@ The ONLY permitted workflow for schema changes:
 ### ⛔ Never run `supabase db push` against prod
 
 `db push` applies **every** pending migration, and the repo/prod ledgers have drifted far
-apart. Measured 2026-08-03: 572 distinct repo versions vs 425 in the prod ledger —
-**147 pending versions (153 files), reaching back to 2026-04-27**. Two confirmed landmines
-in that set:
+apart. Measured **2026-08-19**: **614 distinct repo versions vs 466 in the prod ledger —
+148 pending versions (148 files), 0 orphans**, reaching back to 2026-04-27.
 
-- `20261004000000_cleanup_living_areas_supplier_shells.sql` — destructive `DELETE`s against
-  `company_vendor_selections` and `service_catalog_items`.
-- `20260605950000_rfq_requests.sql` — creates `public.rfq_requests`, a **superseded** design.
+**The danger is not mass deletion — it is resurrection of reverted state.** Earlier
+revisions of this file named two `DELETE`-carrying "landmines"; both were re-measured on
+2026-08-19 and each now deletes **0 rows** (the cleanups were applied out-of-band long ago).
+Of the 148 pending files, 14 contain a `DELETE`/`TRUNCATE`/`DROP TABLE`, mostly as
+commented-out rollback notes; the only live row-deleter is
+`20260605800000_imm11_form_field_mappings_seed.sql`, a scoped idempotent reseed. The
+`DROP TABLE ... CASCADE` block in `20260520000000_platform_redesign_schema.sql` is a
+**verified no-op**: all six of its discriminator guards evaluate `false` against prod.
+
+The real hazard is ordering. The 148 pending files are *interleaved* with 363 already-applied
+later ones, so replaying an old migration runs it **after its own reversal**, and the
+reversal will not re-run. Two confirmed instances:
+
+- `20260427110000_services_state.sql` re-creates `trg_audit_services_state`, which
+  `20260731000000` — already applied — deliberately dropped for writing a duplicate
+  `audit_logs` row per save carrying the whole `state_json` blob (up to 256 KB) attributed
+  to `system`. The table has 334 live rows.
+- `20260605950000_rfq_requests.sql` creates `public.rfq_requests`, a **superseded** design.
   Prod renamed that table to `rfq_requests_legacy`; the live RFQ system is `rfqs` /
   `rfq_items` / `rfq_recipients`. Applying it resurrects dead schema beside the live tables.
 
-Most of the drift is bookkeeping (the migration was applied out-of-band and the ledger never
-recorded it), but it is **not uniformly so**, which is why there is no safe bulk action.
-A full triage — classify each pending migration as applied / superseded / genuinely-missing —
-is parked until the pre-launch data reset, when migrations must become authoritative.
+**The applier has been jammed since 2026-04-22.** The Supabase↔GitHub integration's
+sequential applier stops on `20260427110000_services_state.sql` with `operator does not
+exist: text = uuid` (42883) — that migration was written for a uuid-keyed table, but prod's
+`services_state` is text-keyed on all three columns and was created out-of-band. This is why
+the default branch sits at `MIGRATIONS_FAILED` and every preview branch fails. Note
+`Supabase Preview` is **not** a required check (only backend-tests and frontend-build gate
+merges), so the red X blocks nothing — do not treat it as a real failure signal.
+
+**Never "fix" the failing migration to un-jam the applier** while the integration is
+connected: that releases all 148 behind it, with the ordering hazard above. Retire the
+integration first, or baseline the ledger. A full triage — classify each pending migration
+as applied / superseded / genuinely-missing — is parked until the pre-launch data reset,
+when migrations must become authoritative.
 
 **To record an out-of-band apply, reconcile the ledger instead:**
 
@@ -354,13 +482,34 @@ git config core.hooksPath .githooks
 
 **Emergency bypass:** `git push --no-verify` skips the hook. Use sparingly — every avoided round-trip with Render is faster than every emergency bypass.
 
+## Working from the Notion task board
+
+Work arrives as cards on the **AI Work Queue** board (`3bc887c6-4d48-8089-8188-fcf2dc3edc1b`,
+data source `collection://4e2887c6-4d48-82c1-931e-87b09fb5c4ed`). A card's `Execution Prompt` is
+handed to the executing agent **verbatim**, so it must stand alone.
+
+Two lanes route to different places, and picking the wrong one strands the card:
+
+- **`Ready for AI`** → a repo-attached session (Claude Code / Cursor) that can read the codebase
+  and commit. Any card whose deliverable is a commit belongs here.
+- **`Otto ready`** → the Audos bridge / Otto research lane. **The bridge cannot push to GitHub** —
+  it writes back only the `Status` flip to `In progress`, and results land in WorkspaceDB and task
+  reports, never in Notion fields.
+
+Fetch and update cards **by page URL, not by `AIQ-nnnn`** — the id is a display field and MCP
+search matches body text, so an id search returns every card that merely mentions it.
+
+Full reference — card schema, the five-step loop, the card-quality checklist, and the known
+limits: **[docs/notion-otto-workflow.md](docs/notion-otto-workflow.md)**. The lane-hygiene rules
+that keep the board honest are in *Work Queue hygiene* below.
+
 ## Audit remediation workflow
 
 A multi-stage remediation plan lives at `audit/REMEDIATION_PLAN.md` with a rolling log at `audit/STAGES.md` and per-stage re-audit docs at `audit/re-audit-stage-N-*.md`.
 
 **Branch naming convention for audit remediation:** `audit/stage-N-<slug>` (e.g. `audit/stage-1-security`, `audit/stage-2-copy`). One branch per stage; one PR per stage; one re-audit doc per stage. Sub-stages use `audit/stage-Na-<slug>` (e.g. `audit/stage-8a-route-auth-ci`).
 
-**System of record:** Each finding has a Notion AI Work Queue entry (DB id `7adc643a-c448-4a1a-ba80-e27e417f42d6`) with Priority + Complexity + Validation Criteria + Context Links back to the originating `audit/02-expert-*.md` file. Update Status as the work moves through `Ready for AI → AI in Progress → Human Review → Done`.
+**System of record:** Each finding has a Notion AI Work Queue entry (DB id `3bc887c6-4d48-8089-8188-fcf2dc3edc1b`; the earlier `7adc643a…` is the database now titled *AI Work Queue (RETIRED)* — do not write to it) with Priority + Complexity + Validation Criteria + Context Links back to the originating `audit/02-expert-*.md` file. Update Status as the work moves through `Ready for AI → AI in Progress → Human Review → Done`.
 
 **Gate discipline:** No stage starts until the previous stage's PR is merged + canary clean. See `audit/REMEDIATION_PLAN.md` §"Universal stage protocol" for the per-stage checklist.
 

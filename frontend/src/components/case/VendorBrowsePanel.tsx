@@ -13,12 +13,15 @@
  *                         immigration panel; surfaces a hint on the panel
  *
  * AIQ-1682: the per-vendor "Request quote" action was removed — HR no longer
- * originates RFQs (RFQs are employee-led; HR is payer/approver). This is now a
- * read-only directory browser.
+ * originates RFQs (RFQs are employee-led; HR is payer/approver).
+ *
+ * AIQ-1896: with a `caseId`, each vendor gains an "Assign to case" action — the
+ * write path public.case_vendor_shortlist never had. Without one the panel stays
+ * the read-only directory browser AIQ-1682 left behind.
  */
 
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import type { ImmigrationContext } from './immigrationContext';
@@ -60,6 +63,8 @@ interface Props {
   destCountry?: string;
   initialCategory?: string;
   immigrationContext?: ImmigrationContext | null;
+  /** AIQ-1896 — the case to assign into. Omit for a read-only browse. */
+  caseId?: string | null;
 }
 
 export const VendorBrowsePanel: React.FC<Props> = ({
@@ -68,6 +73,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
   destCountry,
   initialCategory,
   immigrationContext,
+  caseId,
 }) => {
   // Filters — initialCategory pre-selects service category (e.g. from immigration panel)
   const [selectedCategory, setSelectedCategory] = useState(initialCategory ?? '');
@@ -99,6 +105,38 @@ export const VendorBrowsePanel: React.FC<Props> = ({
   const loading = vendorsQuery.isLoading;
   const error = vendorsQuery.isError ? 'Failed to load vendors.' : '';
 
+  // ── AIQ-1896: assign a browsed vendor to the case ───────────────────────────
+  const queryClient = useQueryClient();
+  const [assignError, setAssignError] = useState('');
+
+  // [AIQ-2024] Which vendors are ALREADY on this case, read from the server rather
+  // than remembered for the session. AIQ-1896 could only track clicks in local
+  // state, because the row contract carried the vendor's NAME and not its id —
+  // so the panel forgot every assignment on reload and offered an idle "Assign to
+  // case" button for vendors already attached. The rows now carry `vendor_id`.
+  const assignedQuery = useQuery({
+    queryKey: ['case', caseId, 'vendors'],
+    queryFn: () => hrAPI.getCaseVendors(caseId as string),
+    enabled: isOpen && !!caseId,
+  });
+  const assignedIds = new Set(
+    (assignedQuery.data ?? []).map((row) => row.vendor_id).filter(Boolean) as string[],
+  );
+
+  const assignMutation = useMutation({
+    mutationFn: (vendorId: string) =>
+      hrAPI.assignVendorToCase(caseId as string, { vendor_id: vendorId }),
+    onSuccess: () => {
+      setAssignError('');
+      // Refetch the case's assigned vendors — this drives both the badge here and
+      // the assigned-suppliers panel on the page behind. Fire-and-forget: awaiting
+      // it would stall the badge, and the row is already committed server-side.
+      void queryClient.invalidateQueries({ queryKey: ['case', caseId, 'vendors'] });
+    },
+    onError: () => setAssignError('Could not assign that vendor. Please try again.'),
+  });
+  const canAssign = Boolean(caseId);
+
   if (!isOpen) return null;
 
   return (
@@ -122,7 +160,9 @@ export const VendorBrowsePanel: React.FC<Props> = ({
           <div>
             <h2 className="text-base font-semibold text-[#0b2b43]">Find a vendor</h2>
             <p className="text-xs text-[#64748b] mt-0.5">
-              Select a vendor to send them a quote request
+              {canAssign
+                ? 'Assign a vendor to this case'
+                : 'Browse the approved vendor directory'}
             </p>
           </div>
           <Button unstyled
@@ -144,7 +184,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
             {immigrationContext.corridor_from && immigrationContext.corridor_to
               ? ` · ${immigrationContext.corridor_from}→${immigrationContext.corridor_to}`
               : ''}
-            {' '}— the quote request will include the case context.
+            {' '}— filters are pre-set from that case.
           </div>
         )}
 
@@ -196,6 +236,11 @@ export const VendorBrowsePanel: React.FC<Props> = ({
 
         {/* Vendor list */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          {assignError && (
+            <div className="mb-3 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#dc2626]">
+              {assignError}
+            </div>
+          )}
           {loading && (
             <div className="flex items-center gap-2 text-sm text-[#64748b] py-8 justify-center">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#0b2b43] border-t-transparent" />
@@ -263,6 +308,28 @@ export const VendorBrowsePanel: React.FC<Props> = ({
                         </p>
                       )}
                     </div>
+
+                    {/* AIQ-1896: assign action — only with a case to assign into */}
+                    {canAssign && (
+                      assignedIds.has(vendor.id) ? (
+                        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-xs font-medium text-[#166534]">
+                          ✓ Assigned
+                        </span>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0"
+                          disabled={assignMutation.isPending}
+                          onClick={() => assignMutation.mutate(vendor.id)}
+                        >
+                          {assignMutation.isPending && assignMutation.variables === vendor.id
+                            ? 'Assigning…'
+                            : 'Assign to case'}
+                        </Button>
+                      )
+                    )}
                   </div>
                 </li>
               ))}

@@ -7,13 +7,22 @@ import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, ProgressBar } from '../components/antigravity';
 import { hrAPI } from '../api/client';
 import { getCaseDetailsByAssignmentId } from '../api/caseDetails';
-import type { AssignmentDetail, AssignmentSummary, CaseDraftDTO, ComplianceReport } from '../types';
+import type {
+  AssignmentDetail,
+  AssignmentSummary,
+  CaseDraftDTO,
+  CaseRequirementsDTO,
+  ComplianceReport,
+} from '../types';
+import { DestinationRequirements } from '../features/platform-v2/dossier/DestinationRequirements';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { blockerSummaryMessage } from '../features/cases/blockerSummaryCopy';
 import { HrAssignmentServicesCapPanel } from '../features/policy-config/HrAssignmentServicesCapPanel';
 import { AssignmentDebugPanel } from './AssignmentDebugPanel';
+import { VisaChecklistCard } from '../features/cases/VisaChecklistCard';
 import { destinationPermitLabel } from './hrAssignmentPermit';
+import { pathTileSubtitle } from './hrAssignmentPathCopy';
 
 type TabKey = 'timeline' | 'intake' | 'documents' | 'providers' | 'messages';
 
@@ -239,6 +248,19 @@ export const HrAssignmentReview: React.FC = () => {
       })
     : '-';
   const permitLabel = destinationPermitLabel(destination);
+
+  // [AIQ-1902] What the destination actually requires, reported up by the
+  // DestinationRequirements section mounted below. The Path tile can then stop claiming
+  // there is no mapping for a destination whose requirements are listed underneath it.
+  //
+  // `null` is "no answer yet" (loading, or the fetch failed), NOT "nothing required" —
+  // so every branch below falls back to the old copy rather than inventing reassurance.
+  const [requirementsDto, setRequirementsDto] = useState<CaseRequirementsDTO | null>(null);
+  const requirementCount = requirementsDto?.requirements?.length ?? 0;
+  // The tile's own `destination` comes from the intake draft and the assignment hints,
+  // both of which are empty on cases created outside the wizard. The dossier resolves
+  // the destination from the canonical case row, so it knows when they don't.
+  const knownDestination = destination || (requirementsDto?.covered ? requirementsDto.destCountry : '');
   const stageLabel =
     assignment?.status === 'submitted'
       ? 'Stage: Intake - Profile Review'
@@ -519,11 +541,11 @@ export const HrAssignmentReview: React.FC = () => {
                       {permitLabel ?? 'To be determined'}
                     </div>
                     <div className="text-xs text-slate-500 mt-1">
-                      {permitLabel
-                        ? 'Indicative — confirm with the relevant authority.'
-                        : destination
-                          ? 'No permit mapping for this destination yet.'
-                          : 'Awaiting destination from intake.'}
+                      {pathTileSubtitle({
+                        permitLabel,
+                        requirementCount,
+                        destination: knownDestination,
+                      })}
                     </div>
                   </Card>
                 </div>
@@ -551,8 +573,25 @@ export const HrAssignmentReview: React.FC = () => {
                 </div>
               </Card>
 
+              {/* [AIQ-1902] What the destination requires, from the approved catalog.
+                  Mounted OUTSIDE the tab switch on purpose: it feeds the Path tile above
+                  via onLoaded, and inside a tab that tile's wording would change as HR
+                  clicked between tabs. Same component and same HR copy as the case
+                  dossier — the four-state "an empty list never claims anything" contract
+                  lives in there and must not be reimplemented here. */}
+              {selectedCaseId && (
+                <Card padding="md">
+                  <DestinationRequirements
+                    caseId={selectedCaseId}
+                    audience="hr"
+                    onLoaded={setRequirementsDto}
+                  />
+                </Card>
+              )}
+
               {activeTab === 'timeline' && (
                 <div className="space-y-6">
+                  <VisaChecklistCard caseId={assignment?.id} />
                   {/* Attention/On-track → antigravity Alert; task rows → Card + Chip */}
                   {attentionItems.length > 0 ? (
                     <>

@@ -1,0 +1,44 @@
+{
+ "table": "employee_types",
+ "sqlName": "app_employee_types",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 4,
+ "rows": [
+  {
+   "type_id": "eu-national",
+   "label": "EU National",
+   "description": "Citizen of an EU/EEA member state",
+   "typical_requirements_count": null,
+   "session_id": null,
+   "created_at": "2026-08-17T21:42:53.467Z",
+   "updated_at": "2026-08-17T21:42:53.467Z"
+  },
+  {
+   "type_id": "non-eu-national",
+   "label": "Non-EU National",
+   "description": "Citizen of a non-EU/EEA country, requires work authorization in most countries",
+   "typical_requirements_count": null,
+   "session_id": null,
+   "created_at": "2026-08-17T21:42:53.467Z",
+   "updated_at": "2026-08-17T21:42:53.467Z"
+  },
+  {
+   "type_id": "posted-worker",
+   "label": "Posted Worker",
+   "description": "Employee temporarily assigned by employer, remains on home country payroll and social security",
+   "typical_requirements_count": null,
+   "session_id": null,
+   "created_at": "2026-08-17T21:42:53.467Z",
+   "updated_at": "2026-08-17T21:42:53.467Z"
+  },
+  {
+   "type_id": "repatriate",
+   "label": "Repatriate",
+   "description": "Employee returning to their home country after a period abroad",
+   "typical_requirements_count": null,
+   "session_id": null,
+   "created_at": "2026-08-17T21:42:53.467Z",
+   "updated_at": "2026-08-17T21:42:53.467Z"
+  }
+ ]
+}

@@ -1,0 +1,140 @@
+{
+ "table": "obligation_confidences",
+ "sqlName": "app_obligation_confidences",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 11,
+ "rows": [
+  {
+   "id": 1,
+   "obligation_id": 2,
+   "dimension_id": 1,
+   "score": "9.5",
+   "rationale": "EEA registration obligation is codified in Norwegian Immigration Regulations § 19-2 and directly implements EEA Agreement Annex V. Highly certain — no recent legislative changes.",
+   "scored_by": "GlobeIQ Legal",
+   "scored_at": "2024-01-10T09:00:00.000Z",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:08.244Z",
+   "updated_at": "2026-07-01T21:40:08.244Z"
+  },
+  {
+   "id": 2,
+   "obligation_id": 2,
+   "dimension_id": 2,
+   "score": "9",
+   "rationale": "Primary source: UDI official guidance at udi.no/en. Cross-verified with Lovdata legislation. Source is authoritative and up to date.",
+   "scored_by": "GlobeIQ Legal",
+   "scored_at": "2024-01-10T09:00:00.000Z",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:08.281Z",
+   "updated_at": "2026-07-01T21:40:08.281Z"
+  },
+  {
+   "id": 3,
+   "obligation_id": 2,
+   "dimension_id": 4,
+   "score": "7.5",
+   "rationale": "Process is clear but appointment availability varies significantly by police district. Some districts have 4-6 week wait times which can cause deadline compliance risk despite procedural clarity.",
+   "scored_by": "GlobeIQ Legal",
+   "scored_at": "2024-01-10T09:00:00.000Z",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:08.314Z",
+   "updated_at": "2026-07-01T21:40:08.314Z"
+  },
+  {
+   "id": 4,
+   "obligation_id": 3,
+   "dimension_id": 1,
+   "score": "9",
+   "rationale": "D-number obligation is grounded in Skatteforvaltningsloven. Requirement is unambiguous for non-resident workers.",
+   "scored_by": "GlobeIQ Legal",
+   "scored_at": "2024-01-10T09:00:00.000Z",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:08.347Z",
+   "updated_at": "2026-07-01T21:40:08.347Z"
+  },
+  {
+   "id": 5,
+   "obligation_id": 3,
+   "dimension_id": 3,
+   "score": "8.5",
+   "rationale": "Evidence requirements are clear: passport + police registration certificate + employment contract. Application process is standardised at Skatteetaten offices.",
+   "scored_by": "GlobeIQ Legal",
+   "scored_at": "2024-01-10T09:00:00.000Z",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:08.380Z",
+   "updated_at": "2026-07-01T21:40:08.380Z"
+  },
+  {
+   "id": 6,
+   "obligation_id": 3,
+   "dimension_id": 5,
+   "score": "8",
+   "rationale": "D-number issuance is a ministerial function with low discretionary rejection rate. Processing times are predictable at 1-2 weeks.",
+   "scored_by": "GlobeIQ Legal",
+   "scored_at": "2024-01-10T09:00:00.000Z",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:08.413Z",
+   "updated_at": "2026-07-01T21:40:08.413Z"
+  },
+  {
+   "id": 7,
+   "obligation_id": 4,
+   "dimension_id": 1,
+   "score": "10",
+   "rationale": "Tax card obligation is an absolute legal requirement under Skattebetalingsloven § 5-4. 50% withholding in absence is statutory — no ambiguity.",
+   "scored_by": "GlobeIQ Legal",
+   "scored_at": "2024-01-10T09:00:00.000Z",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:08.447Z",
+   "updated_at": "2026-07-01T21:40:08.447Z"
+  },
+  {
+   "id": 8,
+   "obligation_id": 4,
+   "dimension_id": 4,
+   "score": "9",
+   "rationale": "Online application process at skatteetaten.no is fully digitalised. Employer receives tax card automatically. Process is streamlined and well-documented in English.",
+   "scored_by": "GlobeIQ Legal",
+   "scored_at": "2024-01-10T09:00:00.000Z",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:08.479Z",
+   "updated_at": "2026-07-01T21:40:08.479Z"
+  },
+  {
+   "id": 9,
+   "obligation_id": 4,
+   "dimension_id": 5,
+   "score": "9.5",
+   "rationale": "Tax card issuance is automatic upon D-number verification. No authority discretion involved. Outcome is fully predictable if D-number is in place.",
+   "scored_by": "GlobeIQ Legal",
+   "scored_at": "2024-01-10T09:00:00.000Z",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:08.512Z",
+   "updated_at": "2026-07-01T21:40:08.512Z"
+  },
+  {
+   "id": 10,
+   "obligation_id": 6,
+   "dimension_id": 1,
+   "score": "9",
+   "rationale": "Folkeregisteret registration for stays >6 months is mandatory under Folkeregisterloven § 2-1. Threshold is 6 months within a 12-month period.",
+   "scored_by": "GlobeIQ Legal",
+   "scored_at": "2024-01-10T09:00:00.000Z",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:08.545Z",
+   "updated_at": "2026-07-01T21:40:08.545Z"
+  },
+  {
+   "id": 11,
+   "obligation_id": 6,
+   "dimension_id": 4,
+   "score": "7",
+   "rationale": "Process requires in-person visit to Skatteetaten with multiple documents. Appointment availability can be limited. Process less digitalised than D-number application.",
+   "scored_by": "GlobeIQ Legal",
+   "scored_at": "2024-01-10T09:00:00.000Z",
+   "session_id": null,
+   "created_at": "2026-07-01T21:40:08.578Z",
+   "updated_at": "2026-07-01T21:40:08.578Z"
+  }
+ ]
+}

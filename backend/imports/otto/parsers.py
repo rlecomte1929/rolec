@@ -99,6 +99,50 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     "make-it-in-germany.com", "arbeitsagentur.de",
     # Portugal
     "aima.gov.pt", "seg-social.pt", "portaldasfinancas.gov.pt",
+    # Ireland. Immigration Service Delivery, the Department of Justice unit that operates
+    # registration and issues the IRP — it publishes the rule, it does not restate one, which
+    # is what separates it from citizensinformation.ie below. The `.ie` domain does not end in
+    # `gov.ie`, so the suffix rule alone rejected it and took the whole first-time
+    # registration entity with it: the 90-day deadline, the €300 fee, the 10-working-day card
+    # delivery. This repo's own Otto card contract already names the host as statutory
+    # (docs/audos/otto-batch-2026-08-13/otto-batch.json:699, otto_verify.py:56) — the
+    # importer's allowlist had simply never been told.
+    "irishimmigration.ie",
+    # Ireland — the statutory bodies an EU/EEA free mover actually deals with. Immigration
+    # Service Delivery above covers the non-EEA track; none of it applies to a free mover, who
+    # instead needs a PPSN, health entitlement, a tenancy and a driving licence. Every one of
+    # those is published by a body outside `gov.ie`, so the suffix rule scored them UNOFFICIAL
+    # and rejected the facts outright — the same failure the Spain block below records. The HSE
+    # is the health service setting out its own ordinary-residence entitlement; the RTB is the
+    # statutory board that runs tenancy registration; the NDLS and its parent RSA run licence
+    # exchange; welfare.ie and mywelfare.ie are the Department of Social Protection's own
+    # portals, and MyWelfare is where a PPSN application is actually made. Each publishes its
+    # own rule rather than restating one, which is the line this list draws.
+    "hse.ie", "rtb.ie", "ndls.ie", "rsa.ie", "welfare.ie", "mywelfare.ie",
+    # Denmark. Denmark uses no governmental suffix at all, so the suffix rule scored the
+    # national tax authority itself as a relocation blog and rejected it.
+    "skat.dk",
+    # Germany. `bund.de` covers the federal portal, but the bodies that actually publish the
+    # rule mostly do not sit under it: the BZSt issues the tax ID, service.berlin.de is the
+    # Land of Berlin's own service catalogue for the Anmeldung, and Rundfunkbeitrag is the
+    # body that levies the broadcasting fee it describes.
+    "bzst.de", "service.berlin.de", "rundfunkbeitrag.de",
+    # Spain. Only the `gob.es` suffix was recognised, so every statutory body that does not
+    # sit under it scored UNOFFICIAL and was rejected outright — which is every Spain-side
+    # fact in an ES->IE deliverable. `boe.es` is the starkest: the Boletín Oficial del Estado
+    # publishes the law itself, exactly as `legifrance.gouv.fr` and `lovdata.no` do, and both
+    # of those were already listed. The AEAT was *half* admitted, because
+    # `agenciatributaria.gob.es` (the sede) passes on the suffix while `agenciatributaria.es`
+    # does not — so a tax fact survived or died on which of the agency's own two domains the
+    # researcher happened to cite. All five publish their own rule rather than restating one.
+    "boe.es", "seg-social.es", "agenciatributaria.es", "policia.es", "sepe.es",
+    # Spain — municipal (padrón). Same call as `service.berlin.de` above: the town hall runs
+    # and publishes its own registration procedure, so it is the publisher, not a portal
+    # restating someone else's rule. Neither `.es` nor `.cat` carries a governmental suffix
+    # (`.cat` is a *linguistic* TLD), so both councils were scored as relocation blogs and the
+    # padrón vanished from any ES-side deliverable. Named hosts only — a third city is a
+    # decision, not a silent addition.
+    "madrid.es", "barcelona.cat",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )
@@ -108,6 +152,20 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
 _SEMI_OFFICIAL_HOSTS: Tuple[str, ...] = (
     "campusfrance.org", "welcometofrance.com", "workinnorway.no",
     "newtonorway.no", "study.eu", "youreurope.europa.eu",
+    # Ireland. Both are statutory bodies whose domain does not end in `.gov.ie`, so the
+    # suffix rule alone read them as a relocation blog and REJECTED them outright. That
+    # cost us the facts nobody else publishes plainly: emergency tax until the Revenue
+    # job registration lands, RTB tenancy registration, and the non-Schengen consequence
+    # of an Irish permission. Citizens Information is run by the Citizens Information
+    # Board (a statutory agency under the Department of Social Protection); Revenue is
+    # the tax authority itself. Semi-official, not official: both restate rules published
+    # elsewhere, so a fact from here is worth keeping and belongs in the review queue.
+    "citizensinformation.ie", "revenue.ie",
+    # Denmark. borger.dk is the Danish state's official citizen portal, run by the Agency
+    # for Digital Government — so it belongs in, not out. Semi-official for the same reason
+    # as citizensinformation.ie: it is a portal that restates what SKAT, the CPR office and
+    # the regions publish elsewhere, so a fact from here belongs in the review queue.
+    "borger.dk",
 )
 
 
@@ -193,9 +251,10 @@ def _humanise(topic_key: str) -> str:
 def grade(row: FactRow) -> FactRow:
     """Set `accuracy_tier` and `confidence_score` from the evidence, recording every downgrade.
 
-    `auto_accepted` requires **both** an official publisher and a quotable line of evidence.
-    Otto's own `confidence` is an input, never the last word: an agent calling its own finding
-    "high" is not evidence, and every one of the 24 rows already staged called itself high.
+    `auto_accepted` requires an official publisher, a quotable line of evidence, and that the
+    quote has not been explicitly marked unconfirmed. Otto's own `confidence` is an input, never
+    the last word: an agent calling its own finding "high" is not evidence, and every one of the
+    24 rows already staged called itself high.
     """
     row.confidence_score = CONFIDENCE_SCORES.get(row.confidence, CONFIDENCE_SCORES["medium"])
 
@@ -206,6 +265,20 @@ def grade(row: FactRow) -> FactRow:
         )
     if not (row.evidence_quote or "").strip():
         row.downgrades.append("no evidence_quote — the claim cannot be re-checked from the row")
+    # A batch that captured a quote but never re-read it against the page says so, via
+    # `quote_verbatim_confirmed`. There is no column for that flag, so it rides in
+    # `applies_to`. Without this, an unchecked quote scores exactly like a checked one and a
+    # row a lawyer still has to clear is badged as though the evidence were verified — which is
+    # how an unreviewed claim survives review by looking already-done.
+    #
+    # Tested with `is False`, never falsiness: an absent key and `None` mean "not claimed", not
+    # "not confirmed". Every batch before ve-ie-entry-family-2026-08-20 omits the key, and
+    # re-grading those rows would invalidate reviews that have already happened.
+    if (row.applies_to or {}).get("quote_verbatim_confirmed") is False:
+        row.downgrades.append(
+            "evidence_quote is not verbatim-confirmed — captured but never re-checked "
+            "against the source page"
+        )
     if row.confidence not in CONFIDENCE_SCORES:
         row.downgrades.append(f"unrecognised confidence {row.confidence!r}, scored as medium")
 

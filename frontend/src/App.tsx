@@ -133,6 +133,8 @@ const EmployeeRichProfilePage = lazy(() => import('./features/platform-v2/employ
 const EmployeeIntakePage = lazy(() => import('./features/platform-v2/intake/EmployeeIntakePage').then((module) => ({ default: module.EmployeeIntakePage })));
 const ProviderPortal = lazy(() => import('./pages/ProviderPortal').then((module) => ({ default: module.ProviderPortal })));
 const SupplierQuotePage = lazy(() => import('./pages/public/SupplierQuotePage').then((module) => ({ default: module.SupplierQuotePage })));
+const AttestationReviewPage = lazy(() => import('./pages/public/AttestationReviewPage').then((module) => ({ default: module.AttestationReviewPage })));
+const AdminAttestationsPage = lazy(() => import('./pages/admin/AdminAttestationsPage').then((module) => ({ default: module.AdminAttestationsPage })));
 const EmployeeTaskPage = lazy(() => import('./pages/employee/EmployeeTaskPage').then((module) => ({ default: module.EmployeeTaskPage })));
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings').then((module) => ({ default: module.NotificationSettings })));
 const DesignPreview = lazy(() => import('./pages/DesignPreview').then((module) => ({ default: module.DesignPreview })));
@@ -152,6 +154,7 @@ const AdminAiControlsPage = lazy(() => import('./pages/admin/AdminAiControlsPage
 const AdminMobilityCaseInspectPage = lazy(() => import('./pages/admin/AdminMobilityCaseInspectPage').then((module) => ({ default: module.AdminMobilityCaseInspectPage })));
 const AdminPoliciesPage = lazy(() => import('./pages/admin/AdminPoliciesPage').then((module) => ({ default: module.AdminPoliciesPage })));
 const AdminCatalogQueuePage = lazy(() => import('./pages/admin/AdminCatalogQueuePage').then((module) => ({ default: module.AdminCatalogQueuePage })));
+const AdminCandidateBeamPage = lazy(() => import('./pages/admin/AdminCandidateBeamPage').then((module) => ({ default: module.AdminCandidateBeamPage })));
 const AdminRequirementFactsPage = lazy(() => import('./pages/admin/AdminRequirementFactsPage').then((module) => ({ default: module.AdminRequirementFactsPage })));
 const AdminResearchRequestsPage = lazy(() => import('./pages/admin/AdminResearchRequestsPage').then((module) => ({ default: module.AdminResearchRequestsPage })));
 // AdminPolicyConfigPage (/admin/policy-config) was retired: it duplicated the
@@ -314,6 +317,9 @@ function App() {
         <Route path={ROUTE_DEFS.providerPortal.path} element={<ProviderPortal />} />
         {/* AIQ-1521 — supplier magic-link quote page. Public: token in the URL is the only auth. */}
         <Route path={ROUTE_DEFS.supplierQuote.path} element={<SupplierQuotePage />} />
+        {/* Counsel attestation reviewer. NO guard wrapper — deliberately public; the token
+            in the URL is the only credential and the holder has no ReloPass account. */}
+        <Route path={ROUTE_DEFS.attestationReview.path} element={<AttestationReviewPage />} />
         <Route path="/journey" element={<RequireEmployeeRoute><Journey /></RequireEmployeeRoute>} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path={ROUTE_DEFS.employeeJourney.path} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
@@ -444,6 +450,7 @@ function App() {
         <Route path={ROUTE_DEFS.employeeCaseRoadmap.path} element={<RequireEmployeeRoute><EmployeeCaseRoadmapPage /></RequireEmployeeRoute>} />
         {/* [MVG-6B] Employee — immigration document checklist; allowHR so HR can view via timeline link */}
         <Route path={ROUTE_DEFS.employeeCaseImmigrationChecklist.path} element={<RequireEmployeeRoute allowHR><ImmigrationChecklistPage /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.adminAttestations.path} element={<RequireAdminRoute><AdminAttestationsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCountries.path} element={<RequireAdminRoute><CountriesPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCountryDetail.path} element={<RequireAdminRoute><CountryDetailPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
@@ -462,6 +469,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminMissionControl.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminFeedback.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAiControls.path} element={<RequireAdminRoute><AdminAiControlsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCatalogQueue.path} element={<RequireAdminRoute><AdminCatalogQueuePage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCandidateBeam.path} element={<RequireAdminRoute><AdminCandidateBeamPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRequirementFacts.path} element={<RequireAdminRoute><AdminRequirementFactsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResearchRequests.path} element={<RequireAdminRoute><AdminResearchRequestsPage /></RequireAdminRoute>} />
         {/* platform-v2: companies promoted to default-on (2026-05-20).

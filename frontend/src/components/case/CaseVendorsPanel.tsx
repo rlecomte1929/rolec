@@ -9,20 +9,15 @@
  * empty list — keeps the HR page clean for cases with no vendors assigned.
  */
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { apiGet } from '../../api/client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiGet, hrAPI, CASE_VENDOR_STATUSES } from '../../api/client';
+import type { CaseVendorRow, CaseVendorStatus } from '../../api/client';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface VendorRow {
-  shortlist_id: string | null;
-  category: string | null;
-  status: string;
-  contact_name: string | null;
-  contact_email: string | null;
-  vendor_name: string | null;
-  vendor_website: string | null;
-}
+// The row contract lives in api/client.ts (AIQ-1896) — the assign endpoint returns
+// the same shape, so both producers share one definition.
+type VendorRow = CaseVendorRow;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -31,6 +26,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   housing:           'Housing',
   moving:            'Moving & Freight',
   tax:               'Tax Advisory',
+  banking:           'Banking setup',
   school:            'School search',
   destination:       'Destination services',
 };
@@ -71,6 +67,18 @@ export const CaseVendorsPanel: React.FC<CaseVendorsPanelProps> = ({ caseId }) =>
   // Fail silently (errors → []) — preserve the original soft-fail behaviour.
   const vendors: VendorRow[] = vendorsQuery.data ?? [];
   const loading = vendorsQuery.isLoading;
+
+  // [AIQ-2025] The column and its CHECK constraint always supported four states and
+  // this panel already rendered a badge for each — but nothing could set them, so
+  // three of the four were unreachable and every real row read "Assigned" forever.
+  const queryClient = useQueryClient();
+  const statusMutation = useMutation({
+    mutationFn: ({ shortlistId, status }: { shortlistId: string; status: CaseVendorStatus }) =>
+      hrAPI.updateCaseVendorStatus(caseId, shortlistId, status),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['case', caseId, 'vendors'] });
+    },
+  });
 
   if (loading || vendors.length === 0) return null;
 
@@ -118,7 +126,28 @@ export const CaseVendorsPanel: React.FC<CaseVendorsPanelProps> = ({ caseId }) =>
                   )}
                 </td>
                 <td className="px-4 py-3 text-[#475569]">{categoryLabel(v.category)}</td>
-                <td className="px-4 py-3">{statusBadge(v.status)}</td>
+                <td className="px-4 py-3">
+                  {v.shortlist_id ? (
+                    <select
+                      aria-label={`Engagement status for ${v.vendor_name ?? 'vendor'}`}
+                      value={v.status}
+                      disabled={statusMutation.isPending}
+                      onChange={(e) =>
+                        statusMutation.mutate({
+                          shortlistId: v.shortlist_id as string,
+                          status: e.target.value as CaseVendorStatus,
+                        })
+                      }
+                      className="rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs text-[#475569] focus:outline-none focus:ring-2 focus:ring-[#1f8e8b]"
+                    >
+                      {CASE_VENDOR_STATUSES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    statusBadge(v.status)
+                  )}
+                </td>
                 <td className="px-4 py-3 text-[#475569]">
                   {v.contact_name ? (
                     <div>

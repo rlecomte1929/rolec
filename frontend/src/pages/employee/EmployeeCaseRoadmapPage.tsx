@@ -19,6 +19,7 @@ import { RoadmapPaywallGate } from '../../features/employee-journey/RoadmapPaywa
 import { fetchRoadmapUnlocked } from '../../utils/paymentStatus';
 import { isRoadmapPaywallEnabled } from '../../featureFlags';
 import { RuleUpdateBanner } from '../../features/platform-v2/roadmap/RuleUpdateBanner';
+import { CorridorAdvisories } from '../../features/platform-v2/roadmap/CorridorAdvisories';
 import { useEmployeeRelocationPlanPageData } from '../../features/relocation-plan-employee/useEmployeeRelocationPlanPageData';
 import { useRelocationPlanCtaHandler } from '../../features/relocation-plan-employee/relocationPlanCtaNavigate';
 import {
@@ -28,7 +29,7 @@ import {
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { validateRoadmap } from '../../api/cases';
 import { emitTestDriveStage } from '../../api/testDrive';
-import { getCaseRoadmapV2 } from '../../api/roadmapV2';
+import { getCaseRoadmapV2, type RoadmapV2Advisory } from '../../api/roadmapV2';
 import { buildConfidenceByTitle } from '../../features/relocation-plan-employee/roadmap-template/roadmapTemplateHelpers';
 import type { ConfidenceByTitle } from '../../features/relocation-plan-employee/roadmap-template/RoadmapTemplate';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
@@ -37,6 +38,24 @@ import type { RelocationPlanPhaseTaskDTO } from '../../types/relocationPlanView'
 import { track } from '../../analytics';
 import { resolveRoadmapBuildVariant } from './roadmapBuildVariant';
 import { isRoadmapHeldForHrReview } from './roadmapReleaseGate';
+
+/**
+ * Tasks whose dossier target is a SET of forms, not one form → dossier `?forms=`.
+ *
+ * `confirm_family_details` is the case this exists for. It carries
+ * `required_inputs=()` (relocation_plan_task_library.py:112), so there is no key to
+ * derive a single `?form=` hint from — and its forms are corridor-specific pairs:
+ * FAM-SPOUSE + FAM-CHILD, DEP-PARTNER + DEP-CHILD, plus AE-FAM-*, CH-FAM-*, ES-FAM-*
+ * and JP-DEP-* variants. Matching on "family" alone would expand whichever sorted
+ * first and miss the Dependant-named corridors entirely, so both tokens are sent and
+ * the dossier scopes its list to every match.
+ *
+ * Keyed by task_code because that is what identifies the task across corridors;
+ * titles are display strings and the required_inputs are empty.
+ */
+const FORM_GROUP_BY_TASK_CODE: Record<string, string | undefined> = {
+  confirm_family_details: 'family,depend',
+};
 
 export const EmployeeCaseRoadmapPage: React.FC = () => {
   const caseId = useValidatedParams(caseParamsSchema, {
@@ -83,7 +102,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     // [AIQ-1252] For document-upload tasks, pass the document key so the dossier
     // can deep-link to (auto-expand) the form whose required documents include it.
     const docKey = t.required_inputs?.find((ri) => ri.type === 'document')?.key;
-    runCta(t.cta ?? null, docKey);
+    runCta(t.cta ?? null, docKey, FORM_GROUP_BY_TASK_CODE[t.task_code]);
   };
 
   // Header meta (cities / employee / role / move date) — separate endpoint.
@@ -116,12 +135,18 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   // from the parallel /roadmap/tracks projection (the form-backed path that carries
   // source_pages-derived confidence). Best-effort: failures leave tasks badge-less.
   const [confidenceByTitle, setConfidenceByTitle] = useState<ConfidenceByTitle>({});
+  // [AIQ-1867 follow-up] The same response carries the corridor's advisories — the
+  // non-obvious traps this route exists to warn about. Read from the fetch that is already
+  // happening rather than adding a second one.
+  const [advisories, setAdvisories] = useState<RoadmapV2Advisory[]>([]);
   useEffect(() => {
     if (!caseId) return;
     let cancelled = false;
     getCaseRoadmapV2(caseId)
       .then((res) => {
-        if (!cancelled) setConfidenceByTitle(buildConfidenceByTitle(res));
+        if (cancelled) return;
+        setConfidenceByTitle(buildConfidenceByTitle(res));
+        setAdvisories(res.advisories ?? []);
       })
       .catch(() => undefined);
     return () => {
@@ -373,6 +398,9 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
           <h1 className="text-2xl font-semibold text-slate-900 mb-4">My roadmap</h1>
           {/* [AIQ-693] P2-02e — surface approved rule-update notifications for this case. */}
           <RuleUpdateBanner caseId={caseId ?? ''} />
+          {/* [AIQ-1867 follow-up] The corridor's non-obvious traps. Renders nothing when
+              the case has no corridor pathway, or for a resolved free mover. */}
+          <CorridorAdvisories advisories={advisories} />
           <RoadmapTemplate
             data={data}
             header={header}

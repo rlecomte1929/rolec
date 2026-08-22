@@ -3,11 +3,26 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Tuple, Optional
 
-from .nationality_class import EU_EEA, OWN_NATIONAL, THIRD_COUNTRY, classify
+from .nationality_class import EU_EEA, OWN_NATIONAL, THIRD_COUNTRY, classify, classify_best
 from .requirements_country_key import iso_to_catalog_name, to_iso
 
 
 def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, Any]]) -> Tuple[List[str], List[Dict[str, Any]], Dict[str, Any]]:
+    """Filter and expand a catalog's requirement dicts against one case draft.
+
+    **Pass-through contract — load-bearing.** A caller's item dicts are carried through
+    OPAQUELY: `expanded` is a shallow copy holding the *same* dict objects, and every
+    filter below is a comprehension over those objects. Keys this module has never heard
+    of (`non_obvious`, `timing`, `verificationStatus`, …) therefore survive untouched, and
+    a caller may add a field to its projection without editing this file.
+
+    Do not "tidy" this into a rebuild — `[{k: r[k] for k in KNOWN_KEYS} ...]` or a dataclass
+    round-trip would silently drop every such field, and the loss is invisible here: the
+    engine's own tests would still pass while the public corridor payload quietly went null.
+    Only items this module *synthesises* (`_requirement`, `_immigration_confirmation`) carry
+    the smaller key set they define, which is why callers must read with `.get()`.
+    Pinned by backend/tests/test_rules_engine_key_passthrough.py.
+    """
     required_fields: List[str] = []
     expanded = list(base_requirements)
     flags: Dict[str, Any] = {}
@@ -103,7 +118,16 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
     # the full French work-visa track. Drop requirements that don't apply to the
     # case's nationality class — and, critically, STATE the resulting "nothing
     # required" rather than leaving an empty pillar (see _immigration_confirmation).
-    nationality_class = classify(profile.get("nationality"), basics.get("destCountry"))
+    # BOTH nationalities, because rights are cumulative. A Venezuelan/Italian dual
+    # moving to Ireland exercises Italian free movement; judging them on whichever
+    # nationality intake happened to record first hands them a permit track they
+    # must not apply for. Intake already asks for and stores `second_nationality` —
+    # this is the consumer it never had. Absent from the draft, behaviour is
+    # identical to classifying on `nationality` alone.
+    nationality_class = classify_best(
+        (profile.get("nationality"), profile.get("second_nationality")),
+        basics.get("destCountry"),
+    )
 
     # An unknown nationality must still be FILTERED, and this is subtle enough to
     # be worth spelling out.

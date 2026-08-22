@@ -28,6 +28,28 @@ export interface RoadmapV2Step {
   // [AIQ-869] Short effort label ('~15 min' | '~1 hour' | 'Half a day'); null
   // once the step is done. Rendered by the AvailableNowWidget effort Pill.
   estimated_effort?: string | null;
+  // The "easy to miss" trap flag and its plain-language explanation, present on a
+  // corridor step that carries one (the emergency-tax 40%, the proof-of-address
+  // catch-22, …). false / absent for a form-projected step.
+  non_obvious?: boolean;
+  non_obvious_note?: string | null;
+}
+
+/**
+ * A corridor exception case — the non-obvious traps a mover would not expect.
+ *
+ * `asserted` is the honesty bit and callers MUST respect it. `false` means the condition
+ * depends on an input the platform does not hold (the ES→IE pathway declares
+ * `visa_required_nationality` as an EXTERNAL_LOOKUP that does not exist), so the text is
+ * worded as something to check and must never be rendered as a statement about this reader.
+ * `true` means we resolved it from the case itself.
+ */
+export interface RoadmapV2Advisory {
+  id: string;
+  text: string;
+  asserted: boolean;
+  cite?: string | null;
+  provenance?: { corridor?: string; pathway?: string; verification?: string } | null;
 }
 
 export interface RoadmapV2Track {
@@ -41,6 +63,8 @@ export interface RoadmapV2Track {
 
 export interface RoadmapV2Response {
   tracks: RoadmapV2Track[];
+  /** Empty when the case has no corridor pathway, and for a resolved free mover. */
+  advisories?: RoadmapV2Advisory[];
 }
 
 export async function getCaseRoadmapV2(caseId: string): Promise<RoadmapV2Response> {

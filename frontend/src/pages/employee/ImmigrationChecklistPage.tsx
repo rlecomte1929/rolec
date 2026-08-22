@@ -29,7 +29,25 @@ interface ImmigrationCase {
   permit_type: string;
   status: string;
   document_statuses: Record<string, DocStatus>;
+  // [AIQ-1881] Set on every response the backend produces now. Optional so a
+  // response that predates it still renders as a real case rather than being
+  // mistaken for an absent one.
+  state?: 'open';
 }
+
+/** [AIQ-1881] What the endpoint returns when no immigration case exists yet.
+ *  It used to 404 with "Contact your HR team" — a dead end pointing at someone
+ *  who had nothing to give. Now it returns 200 with the honest reason. */
+interface AbsentImmigrationCase {
+  state: 'no_permit_required' | 'awaiting_hr' | 'coverage_gap';
+  immigration_case: null;
+  headline: string;
+  detail: string;
+  next_action: string | null;
+  nationality_class: string | null;
+}
+
+type ImmigrationResponse = ImmigrationCase | AbsentImmigrationCase;
 
 // ── Document lists per permit type ────────────────────────────────────────────
 
@@ -95,7 +113,7 @@ export const ImmigrationChecklistPage: React.FC = () => {
     queryKey: ['employee', 'immigration-case', caseId],
     queryFn: async () => {
       const res = await api.get(`/api/employee/cases/${caseId}/immigration`);
-      return res.data as ImmigrationCase;
+      return res.data as ImmigrationResponse;
     },
     enabled: !!caseId,
   });
@@ -124,7 +142,38 @@ export const ImmigrationChecklistPage: React.FC = () => {
       <AppShell title="Document checklist">
         <div className="p-8">
           <Alert variant="error">
-            {error ?? 'No immigration case found for this relocation. Contact your HR team.'}
+            {error ?? 'Could not load your immigration status. Please try again.'}
+          </Alert>
+          <Button
+            className="mt-4"
+            variant="ghost"
+            onClick={() => navigate(buildRoute('employeeDashboard'))}
+          >
+            Back to dashboard
+          </Button>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // [AIQ-1881] No immigration case — render the reason, not an error. For a
+  // free-movement national "no permit needed" is the COMPLETE answer, so it is
+  // shown as success rather than as something missing.
+  // Discriminate on the ABSENT shape, not on `state`: only the absent response
+  // carries `immigration_case`, and keying off `state` would misread any response
+  // without it — including the existing page fixture — as a missing case.
+  if ('immigration_case' in immCase) {
+    const absent: AbsentImmigrationCase = immCase;
+    const settled = absent.state === 'no_permit_required';
+    return (
+      <AppShell title="Document checklist">
+        <div className="max-w-xl mx-auto py-8 px-4">
+          <Alert variant={settled ? 'success' : 'info'}>
+            <div className="font-semibold">{absent.headline}</div>
+            <p className="mt-1 text-sm leading-relaxed">{absent.detail}</p>
+            {absent.next_action && (
+              <p className="mt-2 text-sm font-medium">Next: {absent.next_action}</p>
+            )}
           </Alert>
           <Button
             className="mt-4"

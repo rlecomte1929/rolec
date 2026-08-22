@@ -18,6 +18,22 @@ const PROVENANCE: Record<string, { label: string; variant: 'neutral' | 'info' | 
   representative: { label: 'Representative', variant: 'neutral' },
   corpus_grounded: { label: 'Source-grounded', variant: 'info' },
   expert_verified: { label: 'Expert-verified', variant: 'success' },
+  // Production stores `verified` for INTERNALLY reviewed rows. The backend passes
+  // verification_status straight through — there is no translation layer — so this map
+  // must honour the value the database actually holds, or the badge silently disappears.
+  //
+  // It must NOT, however, borrow the expert label. Measured 2026-08-20: all ten `verified`
+  // rows are Norway, reviewed_by='romain', attestation_status=null, and `expert_verified`
+  // is 0 across the entire catalog. disclaimers.py reserves "expert_verified" for content
+  // "signed off by a licensed immigration lawyer" — no lawyer has seen these. Rendering
+  // them as "Expert-verified" asserted a status we do not hold, to the reader least able
+  // to check it. Missing provenance is a gap; a false provenance claim is a liability, and
+  // it is the same mistake as the "EU AI Act Ready" badge (AIQ-1513).
+  //
+  // 'info', not 'success': the green rung stays reserved for genuine external sign-off, so
+  // the first real counsel attestation is visibly distinct rather than lost among ten rows
+  // already wearing the strongest badge we have.
+  verified: { label: 'Reviewed', variant: 'info' },
 };
 
 const REVIEW: Record<ReviewStatus, { label: string; variant: 'warning' | 'success' | 'error' }> = {
@@ -118,13 +134,22 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
               {item.citations.length > 0 && (
                 <ul className="text-xs text-[#6b7280] mt-2 space-y-1">
                   {item.citations.map((c) => (
-                    <li key={c} className="truncate">
-                      {c.startsWith('http') ? (
-                        <a href={c} target="_blank" rel="noopener noreferrer" className="underline">
-                          {c}
+                    <li key={c.id} className="truncate">
+                      {c.url ? (
+                        <a
+                          href={c.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                          title={c.url}
+                        >
+                          {c.title}
                         </a>
                       ) : (
-                        c
+                        // No URL means the backend could not resolve this reference at all.
+                        // Say so — an unresolvable citation on a row about to be published is
+                        // the defect this screen exists to catch, not a cosmetic gap.
+                        <span className="text-[#b45309]">{c.title} (unresolved source)</span>
                       )}
                     </li>
                   ))}

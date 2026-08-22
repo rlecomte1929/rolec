@@ -80,6 +80,40 @@ describe('resolveRelocationTaskCtaTarget', () => {
     });
   });
 
+  it('[AIQ-1892] a formGroupHint deep-links ?forms=<tokens> so a set of forms is scoped, not one expanded', () => {
+    // "Confirm family / dependent details" has required_inputs=() and its forms are
+    // corridor-specific pairs (FAM-SPOUSE + FAM-CHILD, DEP-PARTNER + DEP-CHILD, …).
+    // ?form= resolves via forms.find(), so it would expand whichever sorted first and
+    // hide the other; ?forms= scopes the list to every match.
+    const cta: RelocationPlanCtaDTO = { type: 'complete_wizard_step', label: 'Continue' };
+    expect(resolveRelocationTaskCtaTarget({ ...employeeCtx, formGroupHint: 'family,depend' }, cta)).toEqual({
+      kind: 'internal',
+      to: `/employee/case/${encodeURIComponent('assign-1')}/dossier?forms=family%2Cdepend`,
+    });
+  });
+
+  it('[AIQ-1892] a group hint wins over a single formHint', () => {
+    const cta: RelocationPlanCtaDTO = { type: 'complete_wizard_step', label: 'Continue' };
+    const target = resolveRelocationTaskCtaTarget(
+      { ...employeeCtx, formHint: 'spouse_form', formGroupHint: 'family,depend' },
+      cta,
+    );
+    expect(target).toEqual({
+      kind: 'internal',
+      to: `/employee/case/${encodeURIComponent('assign-1')}/dossier?forms=family%2Cdepend`,
+    });
+  });
+
+  it('[AIQ-1892] an empty group hint falls back to the existing ?form= behaviour', () => {
+    const cta: RelocationPlanCtaDTO = { type: 'complete_wizard_step', label: 'Continue' };
+    expect(
+      resolveRelocationTaskCtaTarget({ ...employeeCtx, formHint: 'passport_copy', formGroupHint: '  ' }, cta),
+    ).toEqual({
+      kind: 'internal',
+      to: `/employee/case/${encodeURIComponent('assign-1')}/dossier?form=passport_copy`,
+    });
+  });
+
   it('routes view_details (review) to employee case summary', () => {
     const cta: RelocationPlanCtaDTO = { type: 'view_details', label: 'Review' };
     expect(resolveRelocationTaskCtaTarget(employeeCtx, cta)).toEqual({

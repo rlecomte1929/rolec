@@ -109,6 +109,7 @@ class StageResult:
     entities: int = 0
     rejections: List[str] = field(default_factory=list)
     downgraded: List[str] = field(default_factory=list)
+    unscoped: List[str] = field(default_factory=list)
 
     @property
     def accounted_for(self) -> int:
@@ -118,6 +119,54 @@ class StageResult:
         inserts 0 and is still complete, which a bare `inserted` count would call a failure.
         """
         return self.inserted + self.already_present
+
+
+def _unscoped_topics(rows: Sequence[FactRow]) -> List[str]:
+    """Topics whose facts will promote to `purpose='other'` because nobody said otherwise.
+
+    `mappings.resolve()` derives purpose from `applies_to.status`, and `PURPOSES.get(status or
+    '', 'other')` turns an ABSENT status into a real enum value. That is the quiet half of the
+    contract: `crud.list_requirements` filters `purpose` with strict equality and no catch-all,
+    so a row that lands at 'other' is approved, live, and permanently invisible to the
+    `purpose=employment` readers — the dossier and the public corridor endpoint. The count does
+    not move and nothing errors. All nine VE->IE facts shipped this way (AIQ-2035); the
+    converter now sets it, but Otto writes batches with no converter in the path at all.
+
+    Reported per `entity_topic_key`, because the topic is the unit of promotion — one
+    requirement, however many facts fed it.
+
+    An explicit `"any"` is NOT flagged: 'other' is a legitimate purpose that FRANCE already
+    serves an approved row at, so choosing it deliberately is a decision, not an omission. Only
+    absent, unrecognised, or self-contradicting statuses appear here — the three ways a topic
+    arrives at 'other' without anyone having chosen it.
+    """
+    # Local, mirroring promote(): mappings pulls in backend.app.services, and stage() has no
+    # other reason to drag that into the import graph.
+    from backend.imports.otto.mappings import PURPOSES
+
+    by_topic: Dict[Any, List[FactRow]] = {}
+    for row in rows:
+        by_topic.setdefault((row.destination_country, row.entity_topic_key), []).append(row)
+
+    out: List[str] = []
+    for (country, topic), facts in by_topic.items():
+        values = {(f.applies_to or {}).get("status") for f in facts}
+        known = {v for v in values if v in PURPOSES}
+        if len(known) == 1 and len(values) == 1:
+            continue                      # one recognised status, agreed on — nothing to say
+        if not known:
+            why = ("no fact carries applies_to.status"
+                   if values == {None}
+                   else f"applies_to.status {sorted(str(v) for v in values)} is not a "
+                        f"recognised purpose")
+        else:
+            why = (f"facts disagree on applies_to.status "
+                   f"({sorted(str(v) for v in values)}), so the group is not one requirement")
+        out.append(
+            f"{country}/{topic}: {why} — will promote as purpose='other' and be invisible "
+            f"to the purpose=employment readers"
+        )
+    return sorted(out)
 
 
 def stage(
@@ -152,6 +201,8 @@ def stage(
     for row in rows:
         if row.downgrades:
             result.downgraded.append(f"{row.dedupe_key}: {'; '.join(row.downgrades)}")
+
+    result.unscoped = _unscoped_topics(rows)
 
     if dry_run:
         result.already_present = sum(1 for r in rows if r.dedupe_key in existing)
@@ -310,6 +361,15 @@ STATUS_READY = "ready"
 STATUS_PROMOTED = "promoted"
 EXPERT_VERIFIED = "expert_verified"
 
+#: Every verification_status that means "a human stood behind this row", so promote() must not
+#: overwrite it. `expert_verified` is the value the backend constants use; **`verified` is the
+#: value production actually stores** — 10 rows carry it and none carry `expert_verified`.
+#: Testing only the constant meant the guard below protected nothing that exists, and a
+#: re-promote would rewrite a human-raised row's description, severity and owner. The same
+#: split is documented client-side at `frontend/src/api/admin.ts:24-26` and asserted in
+#: `supabase/migrations/20261112000000_cite_served_requirement_items.sql:126`.
+HUMAN_VERIFIED = (EXPERT_VERIFIED, "verified")
+
 _PROMOTABLE = text(
     """
     SELECT e.destination_country, e.topic_key, e.title, e.domain_area,
@@ -400,9 +460,10 @@ def promote(session: Any, *, country: Optional[str] = None, dry_run: bool = True
             .filter(RequirementItem.title == draft.title)
             .first()
         )
-        if existing is not None and existing.verification_status == EXPERT_VERIFIED:
+        if existing is not None and existing.verification_status in HUMAN_VERIFIED:
             result.skipped_verified.append(
-                f"{draft.country_code}/{draft.purpose}/{draft.title} is expert_verified"
+                f"{draft.country_code}/{draft.purpose}/{draft.title} "
+                f"is {existing.verification_status}"
             )
             continue
 
@@ -471,6 +532,9 @@ def summarise(result: StageResult, ledger: Dict[str, Any]) -> str:
         lines += [f"    - {d}" for d in result.downgraded[:10]]
         if len(result.downgraded) > 10:
             lines.append(f"    … and {len(result.downgraded) - 10} more")
+    if result.unscoped:
+        lines.append(f"\n  {len(result.unscoped)} topic(s) with NO usable applies_to.status:")
+        lines += [f"    - {u}" for u in result.unscoped]
     if result.rejections:
         lines.append(f"\n  {len(result.rejections)} row(s) REJECTED (nothing staged for these):")
         lines += [f"    - {r}" for r in result.rejections]

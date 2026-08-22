@@ -1,13 +1,20 @@
 /**
  * Section C: ISO-3166 alpha-2 country list with friendly names.
  * Mirrors backend/services/policy_section_c_validation.py — keep them in
- * sync if you add a country (rare). Order is alphabetical by name so the
- * picker reads naturally; the value persisted is the alpha-2 code.
+ * sync if you add a country (rare). The value persisted is the alpha-2 code.
+ *
+ * [AIQ-1861] The display order is ENFORCED here, not assumed of the literal.
+ * This comment used to claim "alphabetical by name" while the literal below was
+ * ordered by ISO CODE — so the picker rendered Andorra, United Arab Emirates,
+ * Afghanistan (AD, AE, AF). Reported from the product as "germany is between
+ * Czech and Denmark", which is CZ, DE, DK read out by name. Sorting at the
+ * export means every consumer of this list is correct, rather than each picker
+ * having to remember to sort.
  */
 
 export type CountryOption = { code: string; name: string };
 
-export const COUNTRY_OPTIONS: ReadonlyArray<CountryOption> = [
+const COUNTRY_OPTIONS_BY_CODE: ReadonlyArray<CountryOption> = [
   { code: 'AD', name: 'Andorra' },
   { code: 'AE', name: 'United Arab Emirates' },
   { code: 'AF', name: 'Afghanistan' },
@@ -185,6 +192,11 @@ export const COUNTRY_OPTIONS: ReadonlyArray<CountryOption> = [
   { code: 'ZM', name: 'Zambia' },
   { code: 'ZW', name: 'Zimbabwe' },
 ];
+
+/** Sorted by display name. `'en'` is pinned so tests and browsers agree. */
+export const COUNTRY_OPTIONS: ReadonlyArray<CountryOption> = [...COUNTRY_OPTIONS_BY_CODE].sort(
+  (a, b) => a.name.localeCompare(b.name, 'en'),
+);
 
 const _NAME_BY_CODE: Map<string, string> = new Map(
   COUNTRY_OPTIONS.map((c) => [c.code, c.name])

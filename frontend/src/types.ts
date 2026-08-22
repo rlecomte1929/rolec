@@ -470,7 +470,12 @@ export interface SourceRecordDTO {
   url: string;
   title: string;
   publisherDomain: string;
-  retrievedAt: string;
+  /**
+   * Absent for a citation the backend holds as a bare URL or an inline object — only a
+   * `source_records` row records a retrieval time. Drives StalenessBadge, which renders
+   * nothing without it rather than claiming a freshness we cannot evidence.
+   */
+  retrievedAt?: string | null;
   snippet?: string;
 }
 
@@ -486,7 +491,15 @@ export interface RequirementItemDTO {
   statusForCase: 'PROVIDED' | 'MISSING' | 'NEEDS_REVIEW' | 'CONFIRMED';
   citations: SourceRecordDTO[];
   /** AIQ-1349: provenance level. */
-  verificationStatus?: 'representative' | 'corpus_grounded' | 'expert_verified' | null;
+  // `verified` is what production actually stores (10 approved rows); `expert_verified` is
+  // what the backend constants and every doc comment say. Both are accepted until the two
+  // are normalised — see the PROVENANCE map in RequirementList.tsx.
+  verificationStatus?: 'representative' | 'corpus_grounded' | 'expert_verified' | 'verified' | null;
+  // Counsel attestation. A SEPARATE axis from verificationStatus, not a further rung on it:
+  // ours is provenance, this is external legal sign-off. null = no counsel has looked.
+  attestationStatus?: 'requested' | 'attested' | 'stale' | null;
+  attestedBy?: string | null;
+  attestedAt?: string | null;
   /**
    * 'action' (something is required of someone) or 'nothing_to_do' (a STATED
    * confirmation that nothing is required — e.g. "No visa or residence permit
@@ -496,6 +509,15 @@ export interface RequirementItemDTO {
   outcomeType?: 'action' | 'nothing_to_do';
   /** Why nothing is required. The only human-readable payload of a nothing_to_do item. */
   reason?: string | null;
+  /**
+   * A real obligation the person would not anticipate (the skattekort needed before
+   * first pay, police registration). Optional rather than `boolean`: an item the rules
+   * engine synthesised has no catalog row behind it, and null ("not modeled") is a
+   * different claim from false ("modeled, and it is obvious").
+   */
+  nonObvious?: boolean | null;
+  /** Free-text deadline verbatim from the source ("within 3 months of arrival"). */
+  timing?: string | null;
 }
 
 export interface CountryProfileDTO {

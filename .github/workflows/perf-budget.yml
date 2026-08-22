@@ -8,6 +8,22 @@ name: Perf budget (authed latency)
 #     (~0.6-2.8s, see docs/performance/authed_audit_2026-06.md) but catches real
 #     regressions and outages.
 #
+# [AIQ-2038] Three changes, because the gate had become decoration: 5 failures and
+# 3 passes in the 8 runs to 2026-08-21, which trains everyone to ignore it.
+#   1. WARM FIRST. `rolec-eu` is on Render's `free` plan and spins down after ~15
+#      min idle. A free instance is not slow for one request after waking, it is
+#      slow for a while — cold imports, unfilled pool, cold query plans. The
+#      harness only discards ONE request per endpoint as `cold`, so boot slowness
+#      leaked into the "warm" numbers it asserts on.
+#   2. SAY WHICH FAILURE IT IS. An asleep instance and a shipped N+1 both showed
+#      up as the same red X, so neither could be acted on. Waking now WARNS;
+#      only an already-warm breach can FAIL.
+#   3. CONFIRM BEFORE FAILING. A breach is re-measured once in the same run and
+#      fails only if it repeats. Measured 2026-08-21: of five breaching endpoints,
+#      four were environmental (hr/command-center/cases 7939ms in CI vs 953ms
+#      warm) and one was real (employee/assignments/overview, over ceiling while
+#      warm). Confirming separates them without waiting for the next cron.
+#
 # NOT run on PRs: it needs prod + costs metered Actions minutes. Scheduled a few
 # times a day during business hours + manual dispatch.
 #
@@ -56,6 +72,29 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Wake and warm the instance
+        id: warm
+        # The instance may have been asleep for hours. Poll /health until it answers
+        # quickly and consistently, and record whether we had to wake it — that flag is
+        # what lets the evaluator tell infrastructure from a regression.
+        run: |
+          set -uo pipefail
+          BASE="https://api.relopass.com"
+          first=""; fast=0; asleep=false
+          for _ in $(seq 1 45); do
+            ms=$(curl -s -o /dev/null -w '%{time_total}' --max-time 30 "$BASE/health" || echo "30")
+            ms=$(python3 -c "print(int(float('$ms')*1000))")
+            [ -z "$first" ] && first=$ms && echo "first /health: ${ms}ms"
+            if [ "$ms" -lt 500 ]; then fast=$((fast+1)); else fast=0; fi
+            [ "$fast" -ge 3 ] && break
+            sleep 2
+          done
+          # >3s on the first touch means it was spun down (warm /health is ~50-250ms).
+          [ "$first" -gt 3000 ] && asleep=true
+          echo "was_asleep=$asleep" >> "$GITHUB_OUTPUT"
+          echo "first_ms=$first"   >> "$GITHUB_OUTPUT"
+          echo "Warm-up done: first=${first}ms, consecutive_fast=$fast, was_asleep=$asleep"
+
       - name: Run authed latency harness
         env:
           SAMPLES: ${{ github.event.inputs.samples || '6' }}
@@ -74,59 +113,57 @@ jobs:
             > perf.json
           echo "Harness run complete."
 
-      - name: Evaluate budgets (warn aspirational, fail on regression/outage)
+      - name: Detect breaches (first pass)
+        id: detect
         env:
           REG_P95: ${{ github.event.inputs.p95_regression_ms || '3000' }}
           REG_MAX: ${{ github.event.inputs.max_regression_ms || '5000' }}
-          STRICT_P95: "2000"
-          STRICT_MAX: "3000"
         run: |
-          python3 - <<'PY'
-          import json, os, sys
+          set -uo pipefail
+          # Detection only — this must not fail the job, because a single breach on a shared
+          # free instance is not yet evidence of anything. It sets `breached` so the next
+          # step knows whether a second measurement is worth the minutes.
+          python3 scripts/perf_budget_verdict.py perf.json \
+            --regression-p95 "$REG_P95" --regression-max "$REG_MAX" \
+            --github-output "$GITHUB_OUTPUT" || true
 
-          reg_p95 = float(os.environ["REG_P95"])
-          reg_max = float(os.environ["REG_MAX"])
-          strict_p95 = float(os.environ["STRICT_P95"])
-          strict_max = float(os.environ["STRICT_MAX"])
+      - name: Re-measure to confirm (only when warm and only when something breached)
+        if: steps.detect.outputs.breached == 'true' && steps.warm.outputs.was_asleep != 'true'
+        env:
+          SAMPLES: ${{ github.event.inputs.samples || '6' }}
+          SECRET_ADMIN_PW: ${{ secrets.PERF_ADMIN_PW }}
+          SECRET_HR_PW: ${{ secrets.PERF_HR_PW }}
+          SECRET_EMP_PW: ${{ secrets.PERF_EMP_PW }}
+        run: |
+          set -euo pipefail
+          [ -n "${SECRET_ADMIN_PW:-}" ] && export PERF_ADMIN_PW="$SECRET_ADMIN_PW"
+          [ -n "${SECRET_HR_PW:-}" ] && export PERF_HR_PW="$SECRET_HR_PW"
+          [ -n "${SECRET_EMP_PW:-}" ] && export PERF_EMP_PW="$SECRET_EMP_PW"
+          python3 scripts/perf_authed_harness.py \
+            --json --samples "$SAMPLES" --delay-ms 600 \
+            > perf-confirm.json
+          echo "Confirmation run complete."
 
-          with open("perf.json") as f:
-              data = json.load(f)
-
-          warnings, failures = [], []
-          for persona, block in data.get("personas", {}).items():
-              if not block.get("logged_in"):
-                  failures.append(f"{persona}: login FAILED ({block.get('identifier')}) — outage or cred drift")
-                  continue
-              for ep in block.get("endpoints", []):
-                  warm = ep.get("warm")
-                  name = f"{persona} {ep['endpoint']}"
-                  if not warm:
-                      # No warm 2xx samples: surface, but don't fail (could be a
-                      # tight rate limit on that route, not a latency regression).
-                      warnings.append(f"{name}: no warm 2xx samples (statuses={ep.get('statuses')}, rl={ep.get('rate_limited')})")
-                      continue
-                  p95, mx = warm["p95_ms"], warm["max_ms"]
-                  if p95 > strict_p95 or mx > strict_max:
-                      warnings.append(f"{name}: p95={p95}ms max={mx}ms over aspirational {strict_p95:.0f}/{strict_max:.0f}")
-                  if p95 > reg_p95:
-                      failures.append(f"{name}: p95 {p95}ms > regression ceiling {reg_p95:.0f}ms")
-                  if mx > reg_max:
-                      failures.append(f"{name}: max {mx}ms > regression ceiling {reg_max:.0f}ms")
-
-          for w in warnings:
-              print(f"::warning::{w}")
-          for fdesc in failures:
-              print(f"::error::{fdesc}")
-
-          print(f"\nSummary: {len(warnings)} aspirational warning(s), {len(failures)} regression/outage failure(s).")
-          print(f"Aspirational budget p95<={strict_p95:.0f} max<={strict_max:.0f}; regression ceiling p95<={reg_p95:.0f} max<={reg_max:.0f}.")
-          sys.exit(1 if failures else 0)
-          PY
+      - name: Verdict (warn aspirational, fail only on a confirmed warm regression)
+        env:
+          REG_P95: ${{ github.event.inputs.p95_regression_ms || '3000' }}
+          REG_MAX: ${{ github.event.inputs.max_regression_ms || '5000' }}
+          WAS_ASLEEP: ${{ steps.warm.outputs.was_asleep }}
+        run: |
+          set -uo pipefail
+          ARGS=""
+          [ -f perf-confirm.json ] && ARGS="--confirm perf-confirm.json"
+          [ "$WAS_ASLEEP" = "true" ] && ARGS="$ARGS --was-asleep"
+          # shellcheck disable=SC2086
+          python3 scripts/perf_budget_verdict.py perf.json $ARGS \
+            --regression-p95 "$REG_P95" --regression-max "$REG_MAX"
 
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: perf-budget-${{ github.run_id }}
-          path: perf.json
+          path: |
+            perf.json
+            perf-confirm.json
           retention-days: 30

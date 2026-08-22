@@ -31,8 +31,10 @@ Honesty / scope (what this exposes = exactly what the engine produces):
     not a silent `[]`). Known non-obvious NO items (tax card/skattekort, police
     registration, EEA registration) are NOT yet modeled in this engine — that's a
     separate Phase-1 accuracy task, not this endpoint's job.
-  * `key`/`timing`/`non_obvious` are not modeled by the engine: `key` is slugified
-    from the title; `timing` and `non_obvious` are `null` (do not fabricate).
+  * `key` is not modeled by the engine — it is slugified from the title.
+  * `timing`/`non_obvious` ARE now columns on `requirement_items` and are carried
+    through verbatim. They stay `null` until a fact populates them, and stay `null`
+    for engine-synthesised items, which have no such data. Never fabricate either.
 
 CORS: must be callable cross-origin from the Audos surface. The global
 CORSMiddleware uses an allowlist with `allow_credentials=True` that won't include
@@ -73,6 +75,47 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", (text or "").strip().lower()).strip("_") or "requirement"
 
 
+def _public_sources(citations: Any) -> List[str]:
+    """The citation URLs, and nothing else, for an anonymous caller.
+
+    This endpoint is unauthenticated and answers with `Access-Control-Allow-Origin: *`, and it
+    used to emit `citations_json` RAW. That field is not a list of URLs — it holds three shapes,
+    and two of them carry things an anonymous caller has no business receiving:
+
+    - inline objects from the corridor generators and `otto.mappings._citations_for`, carrying
+      `needs_lawyer_review` and, on the IE→ES rows, a `review_reason` naming exactly which claim
+      we do not trust and why;
+    - bare `source_records` ids, which are internal identifiers and resolve to nothing publicly.
+
+    Both were unreachable only while every object-shaped row sat at `review_status='pending'`.
+    That stopped being true on 2026-08-21 12:02 UTC, when the nine VE→IE rows were approved and
+    `needs_lawyer_review: true` began appearing in the live public payload.
+
+    ALLOWLIST, not denylist. Stripping the two keys we happen to know about fails open the next
+    time a generator adds a third — and `topic_key`/`corridor` were already being published. A
+    citation is a URL to the public; anything that is not one is dropped rather than guessed at.
+
+    The wire type stays `List[str]`: approved string-shaped rows have always emitted a list of
+    strings, and Audos reads this seam. `http`/`https` only, deduped, order preserved.
+    """
+    out: List[str] = []
+    seen = set()
+    for citation in citations or []:
+        if isinstance(citation, dict):
+            url = str(citation.get("url") or "").strip()
+        elif isinstance(citation, str):
+            url = citation.strip()
+        else:
+            continue
+        if not url.lower().startswith(("http://", "https://")):
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        out.append(url)
+    return out
+
+
 def _base_items(requirements: List[Any]) -> List[Dict[str, Any]]:
     """Project ORM RequirementItem rows → the dict shape apply_rules expects.
 
@@ -107,6 +150,14 @@ def _base_items(requirements: List[Any]) -> List[Dict[str, Any]]:
                 else None
             ),
             "verificationStatus": getattr(item, "verification_status", None),
+            "attestationStatus": getattr(item, "attestation_status", None),
+            "attestedBy": getattr(item, "attested_by", None),
+            "attestedAt": getattr(item, "attested_at", None),
+            # getattr-defaulted, not `item.non_obvious`: the canned SimpleNamespace rows in
+            # backend/tests/test_public_corridor.py don't carry these, and a row read before
+            # the migration lands must degrade to false/None rather than raise.
+            "non_obvious": bool(getattr(item, "non_obvious", False)),
+            "timing": getattr(item, "timing", None),
         }
         for item in requirements
     ]
@@ -161,10 +212,14 @@ def corridor_requirements(
             "key": _slug(item.get("title") or item.get("id") or ""),
             "label": item.get("title"),
             "description": item.get("description"),
-            "timing": None,       # not modeled in the engine (Phase-1 gap; do not fabricate)
-            "non_obvious": None,  # not modeled in the engine (Phase-1 gap; do not fabricate)
+            # Carried from the catalog row. Still `null` for an item the ENGINE synthesised
+            # (_requirement / _immigration_confirmation) rather than read from the catalog —
+            # those have no such data, and null ("not modeled") is a different claim from
+            # false ("modeled, and it is obvious"). Do not collapse them.
+            "timing": item.get("timing"),
+            "non_obvious": item.get("non_obvious"),
             "category": item.get("pillar"),
-            "source": item.get("citations") or [],
+            "source": _public_sources(item.get("citations")),
         }
         for item in expanded
     ]

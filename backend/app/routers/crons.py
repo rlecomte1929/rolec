@@ -35,11 +35,13 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import date
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from ..services.corridor_deadline_sweep import run_corridor_deadline_sweep
 from ..services.crawl_scheduler_service import process_due_schedules
 from ..services.dossier_notifications import run_deadline_reminder_cron
 from ..services.milestone_reminders import run_milestone_reminder_cron
@@ -209,6 +211,45 @@ def milestone_reminders(request: Request) -> Dict[str, Any]:
     _verify_cron_secret(request)
     log.info("milestone_reminders cron triggered")
     result = run_milestone_reminder_cron()
+    return {"ok": True, **result}
+
+
+class CorridorDeadlineSweepBody(BaseModel):
+    # Plan everything, write nothing. The report answers "what would fire today,
+    # and what was skipped and why" — which is the thing to read before the first
+    # real run against live cases.
+    dry_run: bool = False
+    # Override the sweep's notion of today (ISO date). The engine takes `today` as
+    # an input rather than reading the clock, so a boundary can be reproduced
+    # exactly instead of waited for.
+    today: Optional[str] = None
+
+
+@router.post("/corridor-deadline-sweep")
+def corridor_deadline_sweep(request: Request,
+                            body: Optional[CorridorDeadlineSweepBody] = None) -> Dict[str, Any]:
+    """
+    Daily corridor deadline-alert sweep.
+
+    Resolves every open case through the corridor step graph, finds the steps
+    whose alert window [due - lead_days, due] contains today, and emits one
+    notification_outbox row per firing. Exactly-once via
+    public.corridor_deadline_events, keyed (case, step, due_date) — so the
+    cadence only bounds latency and a re-run is harmless.
+
+    Cases with no authored corridor or no move date are SKIPPED with a stated
+    reason and reported; nothing is guessed.
+    """
+    _verify_cron_secret(request)
+    body = body or CorridorDeadlineSweepBody()
+    today = None
+    if body.today:
+        try:
+            today = date.fromisoformat(body.today)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="today must be an ISO date (YYYY-MM-DD)")
+    log.info("corridor_deadline_sweep cron triggered (dry_run=%s)", body.dry_run)
+    result = run_corridor_deadline_sweep(today=today, dry_run=body.dry_run)
     return {"ok": True, **result}
 
 

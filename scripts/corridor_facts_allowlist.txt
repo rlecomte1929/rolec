@@ -1,0 +1,19 @@
+# Corridor fact-pack gate — tolerance surface.
+#
+# Format:  <canonical-key>  <check-id>  # why, and what closes it
+# Example: NO:housing-husleieloven:lease_terms  b-freshness  # lovdata undated, re-sourcing
+#
+# Check ids: a-official-source  a2-jurisdiction-match  a3-binding-direction
+#            b-freshness        c-completeness         d-consistency
+#
+# THIS FILE IS VERIFIED, NOT TRUSTED. scripts/check_corridor_facts.py FAILS the build on an
+# entry whose violation no longer reproduces, so the file drains as things are fixed instead
+# of silently accumulating into a blindfold. That is the same contract as
+# supabase/rls_allowlist.txt.
+#
+# An entry here means "this is knowingly broken and tracked", never "this check is wrong".
+# If a check is wrong, fix the check and its meta-test — do not paper over it here.
+#
+# It is currently EMPTY, which is the goal state. Every one of the 21 promoted facts carries
+# an official, dated, quoted source. Adding the first entry should need a reason a reviewer
+# would accept out loud.

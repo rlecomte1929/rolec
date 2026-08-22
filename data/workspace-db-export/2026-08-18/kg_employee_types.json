@@ -1,0 +1,77 @@
+{
+ "table": "kg_employee_types",
+ "sqlName": "app_kg_employee_types",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 4,
+ "rows": [
+  {
+   "id": "eu-national",
+   "label": "EU/EEA National",
+   "description": "Citizen of EU or EEA member state",
+   "applies_to_origin_regions": [
+    "EU",
+    "EEA"
+   ],
+   "applies_to_destination_regions": [
+    "EU",
+    "EEA",
+    "NON-EU"
+   ],
+   "session_id": null,
+   "created_at": "2026-08-18T08:45:24.951Z",
+   "updated_at": "2026-08-18T08:45:24.951Z"
+  },
+  {
+   "id": "non-eu-national",
+   "label": "Non-EU National",
+   "description": "Citizen of non-EU/EEA country requiring work authorization",
+   "applies_to_origin_regions": [
+    "NON-EU",
+    "NON-EEA"
+   ],
+   "applies_to_destination_regions": [
+    "EU",
+    "EEA",
+    "NON-EU"
+   ],
+   "session_id": null,
+   "created_at": "2026-08-18T08:45:24.951Z",
+   "updated_at": "2026-08-18T08:45:24.951Z"
+  },
+  {
+   "id": "posted-worker",
+   "label": "Posted Worker",
+   "description": "Employee remaining on home-country contract while working abroad temporarily",
+   "applies_to_origin_regions": [
+    "EU",
+    "EEA",
+    "NON-EU"
+   ],
+   "applies_to_destination_regions": [
+    "EU",
+    "EEA"
+   ],
+   "session_id": null,
+   "created_at": "2026-08-18T08:45:24.951Z",
+   "updated_at": "2026-08-18T08:45:24.951Z"
+  },
+  {
+   "id": "repatriate",
+   "label": "Repatriate",
+   "description": "Employee returning to home country after international assignment",
+   "applies_to_origin_regions": [
+    "EU",
+    "EEA",
+    "NON-EU"
+   ],
+   "applies_to_destination_regions": [
+    "EU",
+    "EEA",
+    "NON-EU"
+   ],
+   "session_id": null,
+   "created_at": "2026-08-18T08:45:24.951Z",
+   "updated_at": "2026-08-18T08:45:24.951Z"
+  }
+ ]
+}

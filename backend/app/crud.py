@@ -121,6 +121,24 @@ def list_sources(db: Session, country_code: str, limit: int = _DEFAULT_LIST_LIMI
     )
 
 
+def _has_citations(value: Any) -> bool:
+    """True when `value` carries at least one citation.
+
+    citations_json is stored as a JSON string but callers pass lists too, and prod holds
+    three interchangeable citation FORMATS (raw URLs, source_records uuids,
+    immigration_rule.* corpus refs) — so this deliberately counts entries and never
+    inspects their shape.
+    """
+    if value is None:
+        return False
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (ValueError, TypeError):
+            return bool(value.strip())
+    return bool(value)
+
+
 def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.RequirementItem:
     existing = (
         db.query(models.RequirementItem)
@@ -134,7 +152,21 @@ def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.Requ
         existing.severity = payload["severity"]
         existing.owner = payload["owner"]
         existing.required_fields_json = payload["required_fields_json"]
-        existing.citations_json = payload["citations_json"]
+        # citations_json follows the SAME rule as review_status below: curated provenance is
+        # an editorial fact about the row, not a property of the seed file. Never replace a
+        # citation with nothing.
+        #
+        # run_country_research() rebuilds these rows on every backend startup — so on every
+        # Render deploy — with citations_json = json.dumps(source_ids[:1]). source_ids is
+        # EMPTY whenever the StubResearchProvider returns nothing that passes
+        # _is_official_domain for that country, which is every SINGAPORE and UNITED STATES
+        # run. On 2026-08-20 that silently blanked a verified ICA citation applied hours
+        # earlier, and only the requirement-provenance guard caught it.
+        #
+        # An incoming citation still wins — this exempts nothing from legitimate updates, it
+        # only refuses the downgrade to empty.
+        if _has_citations(payload["citations_json"]) or not _has_citations(existing.citations_json):
+            existing.citations_json = payload["citations_json"]
         # AIQ-1349: keep the assignment-type applicability in sync on re-load.
         if "applies_to_assignment_types_json" in payload:
             existing.applies_to_assignment_types_json = payload["applies_to_assignment_types_json"]
@@ -142,6 +174,15 @@ def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.Requ
             existing.applies_to_nationality_classes_json = payload["applies_to_nationality_classes_json"]
         if "verification_status" in payload:
             existing.verification_status = payload["verification_status"]
+        # non_obvious / timing were added by 20261103000000 and this update branch never
+        # learned about them: they were set on INSERT and silently dropped on every re-load,
+        # so correcting a deadline in a seed file changed nothing for an existing row.
+        # Guarded with `in payload` like the two above, so a caller that does not manage
+        # these columns cannot blank them.
+        if "non_obvious" in payload:
+            existing.non_obvious = payload["non_obvious"]
+        if "timing" in payload:
+            existing.timing = payload["timing"]
         # review_status is deliberately NOT synced here. It is an admin decision about an
         # existing row, not a property of the seed file, and re-running any YAML seed would
         # otherwise silently un-approve live content — germany.yaml alone owns 16 rows. Set on
