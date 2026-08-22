@@ -45,7 +45,9 @@ router = APIRouter(prefix="/api/hr/cases", tags=["hr-case-detail"])
 
 
 # ---------------------------------------------------------------------------
-# Pydantic response shapes (mirror apps/hr-dashboard/src/features/case-detail/types.ts)
+# Pydantic response shapes. These mirrored apps/hr-dashboard's case-detail types.ts,
+# which AIQ-1865 deleted along with that never-deployed app; the shapes below are now
+# the sole contract, so a consumer must be written against THIS file.
 # ---------------------------------------------------------------------------
 
 

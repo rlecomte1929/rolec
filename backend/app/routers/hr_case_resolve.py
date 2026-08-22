@@ -1,11 +1,14 @@
 """
 C1-12-be · Contradiction resolve + escalate POST endpoints.
 
-Closes the C1-12 Resolution UI's Partial deferral. The frontend mutation
-hook on apps/hr-dashboard/src/api/contradictions.ts already binds to
-these endpoints — once this lands, the data flywheel is live: every
-override produces a Correction row with full context_snapshot, feeding
+Every override produces a Correction row with full context_snapshot, feeding
 Cohort 5's retrieval-augmented suggestion.
+
+NOTE (AIQ-1865): these endpoints are mounted in prod but have NO UI consumer.
+The only one was apps/hr-dashboard/src/api/contradictions.ts, in an app that was
+never deployed and has been deleted. rce.contradictions and rce.corrections both
+hold 0 rows, so nothing exercises this path today. Kept because the endpoints are
+correct and tested; rebuilding the UI is carded, gated on detection producing rows.
 
 Endpoints:
   POST /api/hr/cases/{case_id}/contradictions/{cid}/resolve
@@ -41,9 +44,10 @@ log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Constants — P0-06 reason codes must match the frontend dropdown verbatim
-# (apps/hr-dashboard/src/features/resolution/reasonCodes.ts) AND the C1-01
-# CHECK constraint on rce.corrections.reason_code.
+# Constants — P0-06 reason codes must match the C1-01 CHECK constraint on
+# rce.corrections.reason_code. They also had to match a frontend dropdown
+# (apps/hr-dashboard reasonCodes.ts), deleted by AIQ-1865; whoever rebuilds that
+# UI must re-derive its options from THIS list and the CHECK constraint.
 # ---------------------------------------------------------------------------
 
 

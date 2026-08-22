@@ -10,6 +10,13 @@ relopass.db
 # (a trailing-slash pattern matches directories only, which let one get tracked).
 frontend/node_modules
 frontend/dist/
+# AIQ-1865: the previous rules were path-specific, so a `npm i` run anywhere ELSE
+# committed its whole dependency tree. Two did: apps/hr-dashboard/node_modules
+# (15,635 files) and design/templates/node_modules (383, a stray `npm i docx` in a
+# folder with no package.json). Both are untracked as of this commit. These
+# unanchored rules match at ANY depth; scripts/check_no_vendored_deps.py enforces it.
+node_modules/
+dist/
 # Intermediate SSR bundle from scripts/prerender.mjs. Normally deleted by the script;
 # survives only when KEEP_PRERENDER_SSR=1 is set to inspect the SSR module graph.
 frontend/.prerender-ssr/
