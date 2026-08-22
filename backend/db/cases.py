@@ -947,6 +947,28 @@ class CasesMixin:
             )
         return getattr(result, "rowcount", 0) or 0
 
+    def delete_case_milestone(
+        self, milestone_id: str, *, case_id: str, request_id: Optional[str] = None,
+    ) -> int:
+        """Delete ONE milestone, scoped to its case.
+
+        Roadmap regeneration removes individual stale rows; `delete_case_milestones` above
+        clears a whole case, which would take the completed and service-owned rows with it.
+        The case_id predicate is not decoration — the id alone would let a caller holding a
+        milestone id from another case delete across the tenant boundary.
+        """
+        cid = self.coalesce_case_lookup_id(case_id)
+        with self.engine.begin() as conn:
+            result = self._exec(
+                conn,
+                "DELETE FROM case_milestones WHERE id = :id "
+                "AND (canonical_case_id = :cid OR case_id = :cid)",
+                {"id": milestone_id, "cid": cid},
+                op_name="delete_case_milestone",
+                request_id=request_id,
+            )
+        return getattr(result, "rowcount", 0) or 0
+
     def delete_service_milestones_not_in(
         self, case_id: str, keep_service_keys: Sequence[str],
         *, request_id: Optional[str] = None,
