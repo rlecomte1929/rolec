@@ -15,6 +15,14 @@ import type { RequirementsSufficiency } from '../../../api/client';
  * an authority published and an admin approved. `missing_fields` are questions our own form
  * has not collected. Never merge them, never let one borrow the other's authority.
  *
+ * WHY TWO SOURCE TREATMENTS. [AIQ-2132] `list_approved_requirement_facts` serves two evidence
+ * states side by side: PR #1851 excludes only `evidence_verified = FALSE`, because NULL means
+ * "never checked", not "wrong". Measured on production 2026-08-22, of the 205 served facts
+ * **121 are verified and 84 have never been checked** — and this panel rendered both with the
+ * same "Source: host" anchor, so a mover could not tell them apart. The label now carries the
+ * difference (never colour alone), and an absent `citation_status` falls to the weaker claim.
+ * This changes how a citation is described, never which facts are served.
+ *
  * WHY EMPTY IS NOT "COMPLETE". The endpoint answers HTTP 200 for `insufficient_data` and
  * `unavailable` too, so a naive render would show a reassuring empty panel while the backend
  * is broken. Every state below is distinguishable, and no state ever says "you're all set".
@@ -189,23 +197,35 @@ export const RequirementsSufficiencyPanel: React.FC<Props> = ({ caseId, intakeHr
 
           {!degraded && facts.length > 0 && (
             <ul className="space-y-2">
-              {facts.map((fact) => (
-                <li
-                  key={fact.fact_id}
-                  data-testid="sufficiency-fact"
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-3"
-                >
-                  <p className="text-sm text-slate-800">{fact.fact_text}</p>
-                  <a
-                    href={fact.source_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-1 inline-block text-xs text-[#1f8e8b] hover:underline"
+              {facts.map((fact) => {
+                const verified = fact.citation_status === 'verified';
+                return (
+                  <li
+                    key={fact.fact_id}
+                    data-testid="sufficiency-fact"
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-3"
                   >
-                    Source: {hostOf(fact.source_url)}
-                  </a>
-                </li>
-              ))}
+                    <p className="text-sm text-slate-800">{fact.fact_text}</p>
+                    <a
+                      href={fact.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      data-testid={
+                        verified ? 'sufficiency-source-verified' : 'sufficiency-source-unverified'
+                      }
+                      className={
+                        verified
+                          ? 'mt-1 inline-block text-xs text-[#1f8e8b] hover:underline'
+                          : 'mt-1 inline-block text-xs text-slate-500 hover:underline'
+                      }
+                    >
+                      {verified
+                        ? `Verified source: ${hostOf(fact.source_url)}`
+                        : `Source — not independently verified: ${hostOf(fact.source_url)}`}
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
           )}
 
