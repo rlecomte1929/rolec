@@ -207,7 +207,9 @@ export interface Child {
 export interface Spouse {
   fullName?: string;
   nationality?: string;
-  wantsToWork: boolean;
+  // Nullable since the backend stopped defaulting it to `true` (see backend/schemas.py):
+  // null = intake has not asked yet, and is NOT the same claim as "does not want to work".
+  wantsToWork?: boolean | null;
   occupation?: string;
   educationLevel?: string;
 }
@@ -247,7 +249,9 @@ export interface HousingPreferences {
   desiredMoveInDate?: string;
   temporaryStayWeeks?: number;
   budgetMonthlySGD?: string;
-  bedroomsMin: number;
+  // Nullable: the backend no longer invents a 3-bedroom requirement for a household
+  // nobody has described yet.
+  bedroomsMin?: number | null;
   preferredAreas: string[];
   mustHave: string[];
 }
@@ -616,7 +620,9 @@ export interface CaseClassification {
 
 export interface RelocationProfile {
   userId?: string;
-  familySize: number;
+  // Nullable: the backend no longer defaults this to 4. `caseEssentials.ts` already reads
+  // it as `(profile.familySize ?? 0)`, which is the correct handling for "not asked yet".
+  familySize?: number | null;
   maritalStatus?: string;
   dependents: Child[];
   spouse: Spouse;
