@@ -66,6 +66,58 @@ def _parse_corridor(value: str) -> Tuple[str, str]:
     return parts[0].upper(), parts[1].upper()
 
 
+#: Errors worth one more attempt: the connection died, not the work.
+#: Deliberately narrow — a broad `except Exception: retry` would paper over a genuine data
+#: fault by running it twice, and on an --apply run that is a second write.
+_TRANSIENT_DB_MARKERS = (
+    "ssl connection has been closed",
+    "server closed the connection",
+    "connection already closed",
+    "terminating connection",
+    "could not receive data from server",
+    "eof detected",
+)
+
+
+def _is_transient_db_error(exc: BaseException) -> bool:
+    text_form = f"{type(exc).__name__}: {exc}".lower()
+    cause = getattr(exc, "__cause__", None)
+    if cause is not None:
+        text_form += f" {type(cause).__name__}: {cause}".lower()
+    return any(marker in text_form for marker in _TRANSIENT_DB_MARKERS)
+
+
+def _regenerate_with_retry(db: Any, case_id: str, draft: Dict[str, Any], *, apply: bool):
+    """One retry, and only for a dropped connection.
+
+    MEASURED 2026-08-22 on the FR_NO population: the FIRST case of every run died with
+    `SSL connection has been closed unexpectedly`, and it was POSITION-dependent, not
+    case-dependent — a case that succeeded inside a batch failed when run first, and vice
+    versa. So a bulk run silently lost one case, and `--case <id>` — the obvious way to
+    check a single case before committing to a bulk write — failed 100% of the time.
+
+    Supabase's transaction pooler closes it. `pool_pre_ping` is already on in db_config and
+    does not catch this: the connection is alive when pinged and dies on the first real
+    statement. A warm-up `SELECT 1` does not catch it either — that was tried, the SELECT
+    succeeded, and the following case still failed, so the warm-up was removed rather than
+    left in as a no-op whose docstring claimed otherwise.
+
+    Safe on an --apply run because `regenerate_case_milestones` is idempotent: a second run
+    over an already-regenerated case is a no-op (test_a_second_run_is_a_no_op). A retry on a
+    NON-transient error would not be safe — it would run genuinely faulty work twice, and on
+    --apply that is a second write — which is why the marker list is narrow rather than a
+    bare `except Exception: retry`.
+    """
+    try:
+        return regenerate_case_milestones(db, case_id, draft=draft, apply=apply)
+    except Exception as exc:
+        if not _is_transient_db_error(exc):
+            raise
+        log.warning("transient DB error on %s (%s) — retrying once",
+                    case_id, exc.__class__.__name__)
+        return regenerate_case_milestones(db, case_id, draft=draft, apply=apply)
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(description="Regenerate roadmaps for a corridor's cases")
     p.add_argument("--corridor", help="e.g. ES_IE. Required unless --case is given.")
@@ -106,9 +158,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         except (TypeError, json.JSONDecodeError):
             draft = {}
         try:
-            plan = regenerate_case_milestones(
-                db, case_id, draft=draft, apply=args.apply
-            )
+            plan = _regenerate_with_retry(db, case_id, draft, apply=args.apply)
         except Exception:
             tally["failed"] += 1
             log.exception("FAIL  %s", case_id)
