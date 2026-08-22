@@ -1297,24 +1297,6 @@
   },
   {
     "destination_country": "IE",
-    "topic_key": "csep_application_fee",
-    "entity_title": "Employment Permit — application fees",
-    "fact_type": "fee",
-    "fact_key": "csep_application_fee",
-    "fact_text": "The processing fee for a Critical Skills Employment Permit is €1,000. If the application is unsuccessful, 90% of the fee (€900) is refunded. For a General Employment Permit, the fee is €1,500 for up to 36 months.",
-    "applies_to": {
-      "role": "primary",
-      "status": "professional",
-      "household": "any",
-      "nationality": "non-EEA"
-    },
-    "source_url": "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/fees/",
-    "evidence_quote": null,
-    "confidence": "high",
-    "accuracy_tier": "auto_accepted"
-  },
-  {
-    "destination_country": "IE",
     "topic_key": "csep_eligibility",
     "entity_title": "Critical Skills Employment Permit — eligibility",
     "fact_type": "eligibility",
@@ -1345,24 +1327,6 @@
       "nationality": "non-EEA"
     },
     "source_url": "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/",
-    "evidence_quote": null,
-    "confidence": "high",
-    "accuracy_tier": "auto_accepted"
-  },
-  {
-    "destination_country": "IE",
-    "topic_key": "csep_salary_threshold",
-    "entity_title": "Critical Skills Employment Permit — salary threshold",
-    "fact_type": "eligibility",
-    "fact_key": "csep_salary_threshold",
-    "fact_text": "Minimum annual salary is €40,904 for occupations on the Critical Skills Occupations List; roles not on the list require at least €60,000 per year and a relevant Level 9 (NFQ) or higher qualification.",
-    "applies_to": {
-      "role": "primary",
-      "status": "professional",
-      "household": "any",
-      "nationality": "non-EEA"
-    },
-    "source_url": "https://www.citizensinformation.ie/en/moving-country/working-in-ireland/employment-permits/green-card-permits/",
     "evidence_quote": null,
     "confidence": "high",
     "accuracy_tier": "auto_accepted"
@@ -1463,7 +1427,7 @@
     "entity_title": "General Employment Permit – application fee",
     "fact_type": "fee",
     "fact_key": "ie_gep_fee",
-    "fact_text": "The processing fee for a General Employment Permit is €1,500 for a permit of 6 months up to 36 months duration; the renewal fee is €1,500 for up to 36 months.",
+    "fact_text": "The processing fee for a General Employment Permit is €1,000 for up to 24 months, or €500 for six months or less. The renewal fee is €750 for six months or less, or €1,500 up to 36 months.",
     "applies_to": {
       "role": "primary",
       "status": "professional",
