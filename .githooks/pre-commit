@@ -21,6 +21,37 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+# ── Otto import-batch gate (docs/imports) ────────────────────────────────────────────
+# Validate any research batch you are committing against the delivery contract, and keep
+# the gate's loader mirror in sync with the deployed loader. Gates only the batches you
+# actually staged (legacy batches are left untouched — same "only what changed" shape as
+# the CI path filters); fast no-op when nothing relevant is staged.
+# Bypass in emergencies with: git commit --no-verify
+_staged="$(git diff --cached --name-only --diff-filter=ACM || true)"
+_otto_batches="$(printf '%s\n' "$_staged" | awk -F/ '$1=="docs" && $2=="imports" && NF>=3 {print $3}' | sort -u)"
+_gate_touched="$(printf '%s\n' "$_staged" | grep -E '^(scripts/check_otto_batches\.py|scripts/check_gate_loader_sync\.py|supabase/functions/otto-loader/index\.ts)$' || true)"
+if [ -n "$_otto_batches" ] || [ -n "$_gate_touched" ]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "pre-commit: ⚠️  python3 not found — skipping the Otto batch gate for this commit."
+  else
+    if ! python3 scripts/check_gate_loader_sync.py; then
+      echo ""
+      echo "pre-commit: ❌ gate↔loader allow-list drift — commit aborted."
+      echo "            Reconcile scripts/check_otto_batches.py with the loader, or bypass: git commit --no-verify"
+      exit 1
+    fi
+    for _id in $_otto_batches; do
+      [ -f "docs/imports/$_id/manifest.json" ] || continue   # skip non-batch dirs
+      if ! python3 scripts/check_otto_batches.py "$_id"; then
+        echo ""
+        echo "pre-commit: ❌ Otto batch '$_id' fails the delivery gate — commit aborted."
+        echo "            Fix the batch above, or bypass: git commit --no-verify"
+        exit 1
+      fi
+    done
+  fi
+fi
+
 # Only relevant when frontend source is staged — skip fast otherwise.
 #
 # Herestring, not `git diff | grep -q`: with `set -o pipefail` (line 16) a large
