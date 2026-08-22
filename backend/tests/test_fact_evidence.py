@@ -134,6 +134,95 @@ class TestPlantedErrors:
         assert r.verified is False
 
 
+class TestRecomposedQuotes:
+    """[AIQ-2126] A quotation assembled from the page with an ellipsis or a flattened list is
+    still a quotation.
+
+    The extractor legitimately recomposes: it joins a lead-in to its bullet ("You can receive a
+    D number if you: ... provide a certified copy"), or elides an aside with "...". Every word
+    still comes from the page, in page order — but a plain substring test says "unsupported",
+    which is then written as `evidence_verified = FALSE`, and PR #1851 excludes FALSE from
+    serving. So a correctly-quoted fact gets DELETED from what a user sees.
+
+    Measured 2026-08-23 over the 120 approved SG + IE facts that carry a quote: 81 fail the
+    substring test, and 8 of those are ordered spans of the page. This class pins those 8.
+
+    The rule is deliberately narrow and provable: EVERY segment must appear verbatim, in
+    increasing order, the first segment must be a substantial anchor, and the matched
+    characters must cover most of the quote. That is strictly stronger than "the words appear
+    somewhere" — see TestRecomposedRuleCannotLaunderErrors, which is the half that matters.
+    """
+
+    def test_an_ellipsis_quotation_is_verified(self):
+        quote = "You cannot apply for a D number... it needs you to have a Norwegian identification number."
+        r = check_evidence(quote, SOURCE)
+        assert r.status == VERIFIED
+        assert r.verified is True
+
+    def test_a_flattened_list_is_verified(self):
+        """The lead-in and its bullet, joined — the shape that broke Singapore."""
+        quote = "You can receive a D number if you: - provide a certified copy of your proof of identity when requested"
+        r = check_evidence(quote, SOURCE)
+        assert r.status == VERIFIED
+
+    def test_a_recomposed_match_reports_an_offset_and_context(self):
+        """A reviewer must still be able to see where it came from."""
+        quote = "You cannot apply for a D number... it needs you to have a Norwegian identification number."
+        r = check_evidence(quote, SOURCE)
+        assert r.offset is not None and r.offset >= 0
+        assert "D number" in r.context
+
+    def test_segments_must_appear_in_page_order(self):
+        """Reversing the halves is not a quotation of this page — it asserts a sequence the
+        source does not make."""
+        reversed_quote = (
+            "it needs you to have a Norwegian identification number"
+            "... There are two types of identification numbers in Norway"
+        )
+        assert check_evidence(reversed_quote, SOURCE).status == UNVERIFIED
+
+
+class TestRecomposedRuleCannotLaunderErrors:
+    """THE POINT, again. Every planted error must stay caught once recomposition is allowed.
+
+    A looser rule is only worth having if it still fails. `You can apply for a D number
+    yourself` shares nearly every content word with the source and inverts its meaning — which
+    is exactly why this check is span-based and ordered rather than bag-of-words. A
+    content-overlap rule would have let that negation through as supported.
+    """
+
+    @pytest.mark.parametrize("quote", TestPlantedErrors.PLANTED)
+    def test_planted_errors_survive_the_recomposition_rule(self, quote):
+        r = check_evidence(quote, SOURCE)
+        assert r.status == UNVERIFIED, f"recomposition laundered an unsupported claim: {quote!r}"
+        assert r.verified is False
+
+    @pytest.mark.parametrize("quote", TestPlantedErrors.PLANTED)
+    def test_planted_errors_stay_caught_when_spliced_onto_a_true_anchor(self, quote):
+        """The attack the rule invites: prepend a real sentence, splice on a false one."""
+        anchor = "A Norwegian D number is an identification number that may be relevant"
+        r = check_evidence(f"{anchor}... {quote}", SOURCE)
+        assert r.status == UNVERIFIED, f"a true anchor laundered a false tail: {quote!r}"
+
+    def test_a_negation_flip_is_not_rescued_by_segmenting(self):
+        """The source says 'You cannot apply'. Splitting the inversion into segments must not
+        turn it into a quotation."""
+        r = check_evidence("You can apply for a D number... yourself", SOURCE)
+        assert r.status == UNVERIFIED
+
+    def test_the_recomposed_rule_still_discriminates(self):
+        supported = check_evidence(
+            "You can receive a D number if you: - attend an ID check when an enterprise asks you to",
+            SOURCE,
+        )
+        unsupported = check_evidence(
+            "You can receive a D number if you: - pay a fee of NOK 5,400 at the police station",
+            SOURCE,
+        )
+        assert supported.status == VERIFIED
+        assert unsupported.status == UNVERIFIED
+
+
 class TestTranslated:
     """A verbatim check cannot apply across languages — and must not pretend to.
 
