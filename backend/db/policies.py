@@ -2497,19 +2497,44 @@ class PoliciesMixin:
         country_code: Optional[str] = None,
         company_entity: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Return the first published policy that matches band, assignment type, optionally country/entity."""
+        """Return this COMPANY's published policy matching band + assignment type.
+
+        [AIQ-2090] This used to select every published policy in the table —
+        `SELECT id, policy_json FROM hr_policies WHERE status = 'published'` with no
+        company predicate — and its only live caller
+        (`GET /api/employee/policy/applicable`, backend/main.py) passed no
+        `company_entity`. So the first published policy from ANY company that matched
+        the band and assignment type was returned to the employee as *their* applicable
+        policy, benefit caps and all. A cross-tenant disclosure straight to an end user.
+
+        It has never fired in production because `hr_policies` holds 0 rows: the only
+        writer is `_seed_default_hr_policy`, gated behind `_db_scheme == "sqlite"`
+        (backend/main.py) and so dead on Postgres. The exposure was latent, not live —
+        one published legacy policy would have armed it.
+
+        Now FAIL-CLOSED: `company_entity` is required, filtered in SQL, and a policy row
+        with a NULL/blank `company_entity` belongs to no tenant and is never served —
+        which is exactly the shape the demo seed would have created.
+        """
+        scope = (company_entity or "").strip()
+        if not scope:
+            # No tenant, no policy. Returning "the first published policy" here is the
+            # bug above; refusing is the only safe answer.
+            return None
         with self.engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT id, policy_json FROM hr_policies WHERE status = 'published' "
-                "ORDER BY effective_date DESC, created_at DESC"
-            )).fetchall()
+            rows = conn.execute(
+                text(
+                    "SELECT id, policy_json FROM hr_policies "
+                    "WHERE status = 'published' AND company_entity = :company "
+                    "ORDER BY effective_date DESC, created_at DESC"
+                ),
+                {"company": scope},
+            ).fetchall()
         for row in rows:
             policy = json.loads(row._mapping["policy_json"])
             bands = policy.get("employeeBands", [])
             types = policy.get("assignmentTypes", [])
             if employee_band in bands and assignment_type in types:
-                if company_entity and policy.get("companyEntity") != company_entity:
-                    continue
                 policy["id"] = row._mapping["id"]
                 return policy
         return None

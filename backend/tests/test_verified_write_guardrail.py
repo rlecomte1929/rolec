@@ -331,3 +331,39 @@ def test_otto_promotion_drafts_stay_generator_writable():
     verification_guard.assert_generator_verification_write(
         draft.payload, context="otto.promote"
     )  # must not raise
+
+
+# ── the ladder must describe the database it guards ──────────────────────────────────
+
+
+def test_verified_is_on_the_ladder_because_production_serves_it():
+    """`verified` was missing from VERIFICATION_STATUSES while 11 SERVED rows used it.
+
+    Measured on prod 2026-08-22: representative 163 / corpus_grounded 19 / verified 11,
+    and all 11 `verified` rows are `review_status='approved'`. The frontend has rendered
+    it since #1922 as "Reviewed" (info) — deliberately NOT "Expert-verified", because no
+    lawyer has seen them.
+
+    A ladder that omits a value the database serves is not a stricter ladder, it is a
+    wrong one: `assert_generator_verification_write` would reject a legitimate `verified`
+    write as "outside the canonical ladder". It stayed latent only because those rows were
+    written by direct SQL during founder review, which never passes through this guard.
+    """
+    assert "verified" in verification_guard.VERIFICATION_STATUSES
+
+
+def test_verified_is_still_not_something_a_generator_may_mint():
+    """On the ladder, off the generator set — the same two-key split as expert_verified.
+
+    `verified` claims a human read the source and confirmed the row. Being renderable must
+    not make it forgeable.
+    """
+    assert "verified" not in verification_guard.GENERATOR_WRITABLE_STATUSES
+    assert verification_guard.GENERATOR_WRITABLE_STATUSES == {"representative", "corpus_grounded"}
+
+
+def test_the_generator_set_is_a_subset_of_the_ladder():
+    """Guards against the inverse drift: a writable status that is not a legal one."""
+    assert verification_guard.GENERATOR_WRITABLE_STATUSES.issubset(
+        set(verification_guard.VERIFICATION_STATUSES)
+    )

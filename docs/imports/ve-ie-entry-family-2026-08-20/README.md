@@ -2,7 +2,13 @@
 
 **AIQ-1993 research deliverable.** Authored by Claude (Cowork) on 2026-08-20 for Andrea's real
 test case: a **Venezuelan national, legally resident in Spain, moving Madrid → Dublin for Google,
-family of 4**. This is the third-country employment-permit path, not EU free movement.
+with a Macedonian spouse and no children**. This is the third-country employment-permit path,
+not EU free movement.
+
+> **Household corrected 2026-08-22.** This batch was authored against "family of 4". Andrea has
+> no children; the household is two. The immigration facts are unaffected — the CSEP/GEP
+> reunification rule is nationality- and size-neutral — but a served requirement must not
+> describe one customer's household, so the wording moved off the persona.
 
 ## What this closes
 

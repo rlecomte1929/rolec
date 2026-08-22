@@ -280,7 +280,12 @@ def register(body: RegisterRequest, request: Request):
         company_name = (body.company_name or "").strip()
         if company_name:
             # AIQ-829: capture the HR signup's headcount band onto the company.
-            company_id = db.find_or_create_company_by_name(
+            # [AIQ-2090] ALWAYS creates a new company. This used to be
+            # find_or_create_company_by_name, a case-insensitive name match — so typing
+            # an existing customer's company name on this PUBLIC form joined their
+            # workspace and handed over their cases, employees and policies. A typed
+            # string is not an authorisation check.
+            company_id = db.create_company_for_self_serve_signup(
                 company_name, company_size=(body.company_size or "").strip() or None
             )
             if company_id:

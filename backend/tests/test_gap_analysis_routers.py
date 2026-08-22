@@ -7,7 +7,7 @@ All DB calls are mocked.  Tests are pure-Python unittest — no pytest plugins n
 Routers under test
 ------------------
   relocation_profile  — GET/PUT /api/employee/cases/{id}/relocation-profile
-  hr_analytics        — GET /api/hr/policy-compliance-matrix
+  hr_analytics        — calibration alerts + answer provenance
   advisors            — POST /api/advisors/match  +  GET /api/advisors/{id}
   rules               — GET /api/rules/pet-restrictions
   marketplace         — GET /api/employee/assignments/{id}/marketplace
@@ -178,69 +178,15 @@ class TestRichProfile(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════════════════════
 # GAP 3 — hr_analytics (compliance matrix)
 # ═══════════════════════════════════════════════════════════════════════════════
-class TestHrAnalytics(unittest.TestCase):
-    def _mod(self):
-        from backend.app.routers import hr_analytics as m
-        return m
+# [AIQ-2087] TestHrAnalytics was removed with the Policy-vs-Reality matrix.
+#
+# Worth recording WHY those tests never caught the defect: they exercised
+# `_compute_cells` by passing spend values IN — {"immigration": 1200} vs a cap of
+# 1000 — and correctly asserted red/amber/green. The production caller passed
+# `spend_by_benefit = {}` unconditionally, so every real cell computed ratio 0 and
+# came out green. The unit tests proved the arithmetic while the feature was
+# structurally incapable of reaching it.
 
-    def test_benefit_columns_min_count(self):
-        m = self._mod()
-        self.assertGreaterEqual(len(m.BENEFIT_COLUMNS), 13)
-
-    def test_benefit_labels_covers_columns(self):
-        m = self._mod()
-        for col in m.BENEFIT_COLUMNS:
-            self.assertIn(col, m.BENEFIT_LABELS, f"{col} missing from BENEFIT_LABELS")
-
-    def test_compute_cells_grey_when_not_covered(self):
-        m = self._mod()
-        cells = m._compute_cells({}, set(), set(), {}, {})
-        for key in m.BENEFIT_COLUMNS:
-            self.assertEqual(cells[key], "grey")
-
-    def test_compute_cells_blue_for_exception(self):
-        m = self._mod()
-        covered = set(m.BENEFIT_COLUMNS)
-        exception_keys = {"immigration"}      # "immigration" is a real column
-        cells = m._compute_cells({}, covered, exception_keys, {}, {})
-        self.assertEqual(cells["immigration"], "blue")
-
-    def test_compute_cells_green_within_cap(self):
-        m = self._mod()
-        covered = set(m.BENEFIT_COLUMNS)
-        cells = m._compute_cells({}, covered, set(), {"immigration": 800}, {"immigration": 1000})
-        self.assertEqual(cells["immigration"], "green")
-
-    def test_compute_cells_red_over_cap(self):
-        m = self._mod()
-        covered = set(m.BENEFIT_COLUMNS)
-        cells = m._compute_cells({}, covered, set(), {"immigration": 1200}, {"immigration": 1000})
-        self.assertEqual(cells["immigration"], "red")
-
-    def test_compute_cells_amber_borderline(self):
-        m = self._mod()
-        covered = set(m.BENEFIT_COLUMNS)
-        # 95% utilisation → amber (>= 90%)
-        cells = m._compute_cells({}, covered, set(), {"immigration": 950}, {"immigration": 1000})
-        self.assertEqual(cells["immigration"], "amber")
-
-    def test_matrix_endpoint_empty_smoke(self):
-        m = self._mod()
-        # _get_matrix_data(company_id, period_months) returns list of assignment dicts
-        # _get_covered_benefits_for_company returns dict {benefit_key: {...}}
-        with mock.patch.object(m, "_get_matrix_data", return_value=[]), \
-             mock.patch.object(m, "_get_covered_benefits_for_company", return_value={}), \
-             mock.patch.object(m, "_get_exception_keys_for_assignment", return_value=set()):
-            resp = m.get_policy_compliance_matrix(user=_MOCK_USER)
-        # response has .cases (list) and .kpis
-        self.assertIsNotNone(resp)
-        self.assertIsInstance(resp.cases, list)
-        self.assertEqual(resp.kpis.compliance_pct, 100)  # empty → 100%
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# GAP 4 — advisors
-# ═══════════════════════════════════════════════════════════════════════════════
 class TestAdvisors(unittest.TestCase):
     def _mod(self):
         from backend.app.routers import advisors as m
@@ -638,10 +584,6 @@ class TestCrossRouterChecks(unittest.TestCase):
     def test_marketplace_router_prefix(self):
         from backend.app.routers.marketplace import router
         self.assertEqual(router.prefix, "/api/employee/assignments")
-
-    def test_hr_analytics_has_benefit_columns(self):
-        from backend.app.routers.hr_analytics import BENEFIT_COLUMNS
-        self.assertGreaterEqual(len(BENEFIT_COLUMNS), 13)
 
     def test_advisors_has_5_fallback_entries(self):
         from backend.app.routers.advisors import _FALLBACK_ADVISORS

@@ -170,6 +170,12 @@ jobs:
           python-version: "3.11"
       - name: Check no dependency tree or build output is tracked
         run: python scripts/check_no_vendored_deps.py
+      # #1906 removed `github.event.pull_request.base.sha` from the migration guards
+      # because it is frozen at PR-open time and makes a job blame one PR for another's
+      # files. One day later #1971 reintroduced it in a new workflow — the lesson lived
+      # only in a comment, so nothing stopped it. This is the enforcement.
+      - name: Check no workflow derives a diff range from a stale base
+        run: python scripts/check_workflow_base_sha.py
 
   # Frontend build + type-check + lint + unit tests, consolidated into ONE job
   # (was three: frontend-build / frontend-checks / frontend-unit-tests).

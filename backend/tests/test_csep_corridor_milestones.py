@@ -6,7 +6,7 @@ not the surface the employee opens: `GET /api/relocation-plans/{case}/view` is s
 by `timeline_service.compute_default_milestones` from the GENERIC task library.
 
 Measured on Andrea's live case (6ecadafe-0fdb-43c5-b8dc-0284e323cf51, ES→IE, Venezuelan,
-family of 4) on 2026-08-21: 16 milestones, 0 corridor steps, and all three of
+family of 2 — spouse, no children) on 2026-08-21: 16 milestones, 0 corridor steps, and all three of
 `task_visa_docs_prep` / `task_visa_submit` / `task_biometrics` — the generic copy the
 ticket exists to remove. These tests pin the milestone path specifically, so a future
 change to roadmap_builder alone cannot make them pass.

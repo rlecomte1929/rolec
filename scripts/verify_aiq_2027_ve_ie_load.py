@@ -50,7 +50,7 @@ MANIFEST = BATCH_DIR / "manifest.json"
 
 # Pinned independently of manifest.json. If both the artifact and the manifest were edited in
 # one commit, reconciling them against each other would still pass.
-EXPECTED_SHA256 = "364266122a5ec89b2b93d829b5ccef1195e24818ec7a9ad5d71bb212a82bc2fc"
+EXPECTED_SHA256 = "47d3273a76361a9233ca1ac83b35ce2112c9fb7c11b3290612f4f6349fba2295"
 EXPECTED_COUNT = 9
 
 # The four rows counsel must clear before they can be approved at all. Named, not counted:

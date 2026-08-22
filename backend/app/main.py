@@ -53,7 +53,6 @@ from .routers import (
     hr_analytics,
     hr_case_summary,
     hr_onboarding,
-    hr_export,
     hr_case_audit,
     hr_case_notes,
     coordinator,
@@ -66,6 +65,7 @@ from .routers import (
     outcome_consent,
     outcomes_ingest,
     hr_case_resolve,
+    hr_case_closure,
     hr_case_escalation,
     setup_assistant,
     hr_catalog,
@@ -182,7 +182,6 @@ def create_app() -> FastAPI:
     app.include_router(hr_analytics.router)
     app.include_router(hr_case_summary.router)  # AIQ-1697 — AI case summary proxy
     app.include_router(hr_onboarding.router)  # AIQ-1223c — deterministic onboarding inference
-    app.include_router(hr_export.router)
     # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.
     app.include_router(hr_case_detail.router)
     app.include_router(hr_roadmap_review.router)
@@ -199,6 +198,7 @@ def create_app() -> FastAPI:
     # C1-12-be: resolve + escalate POST endpoints — closes the C1-12 deferral.
     app.include_router(hr_case_resolve.router)
     app.include_router(hr_case_escalation.router)  # W2-3 — HR case escalation
+    app.include_router(hr_case_closure.router)  # [AIQ-2088] HR case closure
     app.include_router(setup_assistant.router)  # Setup & Help Assistant — read-only GET /api/hr/setup-status
     # [Parker-J] NLG exec-summary + policy TL;DR routes
     app.include_router(nlg.router)
