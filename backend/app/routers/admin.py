@@ -788,3 +788,178 @@ def reconcile_policy_ingest(
             actor_id=actor_id,
         )
     return summary
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Deterministic milestone regeneration
+#
+# WHY THIS EXISTS. `compute_default_milestones` resolves the case's corridor and
+# substitutes the authored pathway's steps for the generic ones it supersedes — so an
+# ES→IE case gets its CSEP steps instead of "Prepare visa / work permit application
+# pack". But every path that seeds milestones is guarded by `if len(milestones) == 0`
+# (backend/main.py, two places, plus `_ensure_default_milestones_for_case`). A case
+# seeded before its corridor pathway was authored therefore keeps the generic steps
+# FOREVER: the logic that would fix it is never reached.
+#
+# WHY NOT REUSE THE EXISTING REGENERATE. `POST /api/internal/rag/generate-roadmap`
+# regenerates, but it writes AI/RAG steps and calls `persist_generated_milestones`,
+# which deletes everything that is not a Services row. Pointing it at a curated corridor
+# destroys the pathway (see AIQ-2115 — that had already happened to 265 FR→NO cases).
+# This endpoint is its deterministic sibling: rule engines over authored data, no LLM
+# anywhere in the call graph.
+# ─────────────────────────────────────────────────────────────────────────────
+
+#: Milestone fields carried across a regeneration when the step still exists.
+#: `status` is the one that matters — see the note in the handler.
+_REGEN_PRESERVED_FIELDS = ("status", "actual_date")
+
+
+@router.post("/cases/{case_id}/milestones/regenerate")
+def regenerate_case_milestones(
+    case_id: str,
+    apply: bool = False,
+    user: dict = Depends(require_admin),
+):
+    """Rebuild a case's deterministic milestones so a corridor pathway supersedes the
+    generic steps. **Dry run unless `?apply=true`.**
+
+    Returns the before/after sets either way, so the caller can see exactly what a real
+    run would do. Destructive by construction — it deletes before it writes — so the
+    default has to be the safe one.
+    """
+    request_id = str(uuid.uuid4())
+
+    ids = db.resolve_case_ids(case_id, request_id=request_id)
+    if ids is None:
+        raise HTTPException(status_code=404, detail="case not found")
+
+    before = db.list_case_milestones(case_id, request_id=request_id) or []
+
+    case_draft: Dict[str, Any] = {}
+    target_move_date = None
+    services: List[str] = []
+    with SessionLocal() as session:
+        case = crud.get_case(session, ids.canonical_case_id)
+        if case is None:
+            raise HTTPException(status_code=404, detail="case not found")
+        try:
+            case_draft = json.loads(getattr(case, "draft_json", None) or "{}")
+        except (json.JSONDecodeError, TypeError, ValueError):
+            case_draft = {}
+        target_move_date = getattr(case, "target_move_date", None)
+    if isinstance(case_draft.get("selectedServices"), list):
+        services = [str(s) for s in case_draft["selectedServices"]]
+
+    # Same context builder the timeline's ensure_defaults arm uses, so a regenerated
+    # plan cannot silently differ from the one a fresh seed would produce.
+    from ..services.timeline_service import (
+        compute_default_milestones,
+        milestone_args_from_draft,
+    )
+
+    computed = compute_default_milestones(
+        case_id=ids.canonical_case_id,
+        case_draft=case_draft,
+        selected_services=services,
+        target_move_date=str(target_move_date) if target_move_date else None,
+        **milestone_args_from_draft(case_draft),
+    )
+
+    # Carry forward what the employee has already done. A regeneration is a correction to
+    # the PLAN, not to their progress: silently resetting a completed step to 'pending'
+    # would ask them to redo work they have finished, and there is no audit trail that
+    # would let anyone reconstruct what had been done.
+    prior_by_type = {str(m.get("milestone_type")): m for m in before}
+    preserved = 0
+    for row in computed:
+        prior = prior_by_type.get(str(row.get("milestone_type")))
+        if not prior:
+            continue
+        carried = False
+        for field in _REGEN_PRESERVED_FIELDS:
+            if prior.get(field) not in (None, "", "pending"):
+                row[field] = prior[field]
+                carried = True
+        preserved += 1 if carried else 0
+
+    before_types = {str(m.get("milestone_type")) for m in before}
+    after_types = {str(m.get("milestone_type")) for m in computed}
+    # Rows that are neither kept nor Services-managed: what the run would actually drop.
+    service_types = {
+        str(m.get("milestone_type")) for m in before if m.get("source") == "service"
+    }
+    removed = sorted(before_types - after_types - service_types)
+
+    summary: Dict[str, Any] = {
+        "case_id": case_id,
+        "canonical_case_id": ids.canonical_case_id,
+        "applied": bool(apply),
+        "before_count": len(before),
+        "after_count": len(computed),
+        "removed_milestone_types": removed,
+        "added_milestone_types": sorted(after_types - before_types),
+        "preserved_progress_count": preserved,
+        "corridor_step_count": sum(1 for t in after_types if "_corridor_" in t),
+        # The whole point: generic steps a corridor pathway replaces.
+        "superseded_generic_still_present": sorted(
+            t for t in after_types
+            if t in {"task_visa_docs_prep", "task_visa_submit", "task_biometrics"}
+        ),
+        # Snapshot for audit / rollback. There is no history table for case_milestones,
+        # so this response is the only record of what was there before.
+        "before_snapshot": [
+            {
+                "milestone_type": m.get("milestone_type"),
+                "title": m.get("title"),
+                "status": m.get("status"),
+                "source": m.get("source"),
+                "sort_order": m.get("sort_order"),
+            }
+            for m in before
+        ],
+    }
+
+    if not apply:
+        summary["note"] = "Dry run — nothing written. Re-send with ?apply=true to persist."
+        return summary
+
+    deleted = db.delete_case_milestones(
+        ids.canonical_case_id, exclude_source="service", request_id=request_id
+    )
+    written = 0
+    for row in computed:
+        # No `source` kwarg, deliberately: the seeding path in backend/main.py omits it
+        # too, so every deterministic milestone in the table carries source NULL. Writing
+        # a novel value here would make regenerated rows a shape nothing else produces or
+        # reads, while still being deleted by exclude_source='service'.
+        db.upsert_case_milestone(
+            case_id=ids.canonical_case_id,
+            milestone_type=row["milestone_type"],
+            title=row["title"],
+            description=row.get("description"),
+            target_date=row.get("target_date"),
+            status=row.get("status", "pending"),
+            sort_order=row.get("sort_order", 0),
+            owner=row.get("owner", "joint"),
+            criticality=row.get("criticality", "normal"),
+            notes=row.get("notes"),
+            request_id=request_id,
+        )
+        written += 1
+
+    summary["deleted_count"] = deleted
+    summary["written_count"] = written
+    logger.info(
+        "regenerate_case_milestones: case=%s deleted=%d written=%d corridor_steps=%d "
+        "preserved_progress=%d",
+        case_id, deleted, written, summary["corridor_step_count"], preserved,
+    )
+    _audit_postgres(
+        entity_type="case_milestones",
+        entity_id=str(ids.canonical_case_id),
+        action_type=ACTION_UPDATE,
+        old_value={"count": len(before), "milestone_types": sorted(before_types)},
+        new_value={"count": written, "milestone_types": sorted(after_types)},
+        actor_id=str(user.get("id") or user.get("sub") or "admin"),
+    )
+    return summary

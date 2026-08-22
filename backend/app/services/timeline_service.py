@@ -540,6 +540,65 @@ def _corridor_milestones(
     return rows, supersedes
 
 
+#: Wizard contract-type labels → the internal case_type tokens `plan_scope` and
+#: `immigration_regime` expect. The wizard says "assignment"/"permanent"/"contract";
+#: they say "lta"/"permanent_transfer"/"short_term_project".
+_CONTRACT_TYPE_MAP = {
+    "assignment": "lta",
+    "permanent": "permanent_transfer",
+    "contract": "short_term_project",
+}
+
+
+def milestone_args_from_draft(
+    case_draft: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Pull `compute_default_milestones`' context kwargs out of a wizard draft.
+
+    Returns the contract_type / family_profile / destination_country / origin_country /
+    nationality block, ready to splat into `compute_default_milestones`.
+
+    EXTRACTED SO THERE IS ONE COPY. This logic was inline in the `ensure_defaults` arm of
+    `GET /api/cases/{id}/timeline` (backend/main.py). The regenerate endpoint needs exactly
+    the same context — and if the two ever disagree, a regenerated plan silently differs
+    from the one the case was seeded with, in ways nobody would think to look for: a missed
+    contract-type mapping alone changes which phases are active, so steps appear or vanish
+    for reasons unrelated to the corridor. Duplicating it is how that happens.
+
+    Pure: reads a dict, touches no database, raises on nothing.
+    """
+    draft = case_draft or {}
+    ctx = draft.get("assignmentContext") or {}
+    assignment = draft.get("assignment") or {}
+    basics = draft.get("relocationBasics") or {}
+
+    raw_contract = (
+        assignment.get("contractType")
+        or ctx.get("contractType")
+        or basics.get("contractType")
+        or None
+    )
+    contract_type = _CONTRACT_TYPE_MAP.get((raw_contract or "").lower(), raw_contract)
+
+    employee = draft.get("employeeProfile") or {}
+    applicant = draft.get("primaryApplicant") or {}
+    nationality = (
+        applicant.get("nationality")
+        or employee.get("nationality")
+        or employee.get("nationalityCountry")
+        or basics.get("nationality")
+        or None
+    )
+
+    return {
+        "contract_type": contract_type,
+        "family_profile": draft.get("family") or None,
+        "destination_country": basics.get("destCountry") or basics.get("destination_country") or None,
+        "origin_country": basics.get("originCountry") or basics.get("origin_country") or None,
+        "nationality": nationality,
+    }
+
+
 def compute_default_milestones(
     case_id: str,
     case_draft: Optional[Dict[str, Any]] = None,

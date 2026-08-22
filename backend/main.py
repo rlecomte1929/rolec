@@ -63,7 +63,11 @@ from .app.services.policy_extractor import (
     extract_policy_from_bytes,
     extract_policy_with_diff,
 )
-from .app.services.timeline_service import compute_default_milestones, compute_timeline_summary
+from .app.services.timeline_service import (
+    compute_default_milestones,
+    compute_timeline_summary,
+    milestone_args_from_draft,
+)
 from .hr_case_readiness_view import build_intake_checklist_items, build_hr_case_readiness_ui
 from .intake_completeness import incomplete_intake_detail, missing_intake_basics
 from .intake_draft_to_case_draft import intake_draft_to_case_draft
@@ -11257,38 +11261,17 @@ def get_case_timeline(
                     except (json.JSONDecodeError, TypeError, ValueError):
                         draft = {}
                     target_move_date = getattr(case, "target_move_date", None)
-            # ── S5 wiring: extract plan-scope context from draft ─────────────
-            _s5_ac = draft.get("assignmentContext") or {}
-            _s5_as = draft.get("assignment") or {}
-            _s5_rb = draft.get("relocationBasics") or {}
-            _raw_ct = (
-                _s5_as.get("contractType")
-                or _s5_ac.get("contractType")
-                or _s5_rb.get("contractType")
-                or None
-            )
-            # Normalise wizard contract type labels → internal case_type tokens.
-            # The wizard presents "assignment" / "permanent" / "contract" while
-            # plan_scope and immigration_regime expect "lta" / "permanent_transfer".
-            _CT_MAP = {
-                "assignment": "lta",
-                "permanent":  "permanent_transfer",
-                "contract":   "short_term_project",
-            }
-            _s5_contract_type = _CT_MAP.get((_raw_ct or "").lower(), _raw_ct)
-            _s5_family = draft.get("family") or None
-            _s5_dest = _s5_rb.get("destCountry") or _s5_rb.get("destination_country") or None
-            _s5_origin = _s5_rb.get("originCountry") or _s5_rb.get("origin_country") or None
-            # ── P2 wiring: nationality for immigration regime detection ────────
-            _s5_ep = draft.get("employeeProfile") or {}
-            _s5_pa = draft.get("primaryApplicant") or {}
-            _s5_nationality = (
-                _s5_pa.get("nationality")
-                or _s5_ep.get("nationality")
-                or _s5_ep.get("nationalityCountry")
-                or _s5_rb.get("nationality")
-                or None
-            )
+            # ── S5/P2 wiring: plan-scope + nationality context from the draft ──
+            # Extracted to timeline_service.milestone_args_from_draft so this and the
+            # admin regenerate endpoint build the SAME context. Two copies drift, and a
+            # drifted contract-type mapping changes which phases are active — steps
+            # appear or vanish for reasons unrelated to the corridor.
+            _s5_args = milestone_args_from_draft(draft)
+            _s5_contract_type = _s5_args["contract_type"]
+            _s5_family = _s5_args["family_profile"]
+            _s5_dest = _s5_args["destination_country"]
+            _s5_origin = _s5_args["origin_country"]
+            _s5_nationality = _s5_args["nationality"]
 
             # ── Create default milestones only when none exist yet ────────────
             if len(milestones) == 0:
@@ -11297,11 +11280,7 @@ def get_case_timeline(
                     case_draft=draft,
                     selected_services=services,
                     target_move_date=str(target_move_date) if target_move_date else None,
-                    contract_type=_s5_contract_type,
-                    family_profile=_s5_family,
-                    destination_country=_s5_dest,
-                    origin_country=_s5_origin,
-                    nationality=_s5_nationality,
+                    **_s5_args,
                 )
                 for m in defaults:
                     try:
