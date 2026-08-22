@@ -1,0 +1,405 @@
+RAW SOURCE EVIDENCE - Immigration Service Delivery (ISD), Ireland
+==============================================================================
+Source page   : https://www.irishimmigration.ie/visa-non-visa-required-nationalities/
+Data endpoint : https://www.irishimmigration.ie/wp-admin/admin-ajax.php?action=wp_ajax_ninja_tables_public_action&table_id=19077&target_action=get-all-data&default_sorting=old_first
+Retrieved at  : 2026-08-21T21:50:02Z (UTC)
+
+PART 1 - Text of the ISD source page as published.
+PART 2 - The 206-row nationality table from that page, verbatim.
+         The table is a Ninja Tables AJAX table (id 19077, aria-label
+         "isd-visa-and-non-visa-required-nationalities"). Its rows are not
+         inlined in the page HTML; they are served from the same
+         irishimmigration.ie origin by the data endpoint above.
+
+==============================================================================
+PART 1 - ISD SOURCE PAGE TEXT
+==============================================================================
+
+Skip to content
+
+Choose your language Português (Brasil)
+Українська
+Français
+Polski
+Deutsch
+中文 (简体)
+Русский
+Español
+Gaeilge
+العربية‏
+Türkçe
+हिंदी
+اردو
+
+Search ISD
+
+More results...
+
+Home
+Get Started I would like to come to Ireland to…
+Visit
+Work
+Study
+Live
+Join Family
+
+I’m in Ireland and I'd like to learn more about…
+Border controls
+Registering your immigration permission
+Becoming a citizen
+
+Quick Links
+My situation has changed since I arrived in Ireland
+Latest Visa/Preclearance Decisions
+Residency Calculator
+International Protection Office
+International Protection Accommodation Service
+Glossary of Immigration Terms
+
+News and Updates
+Contact Us
+
+Home
+Get Started I would like to come to Ireland to…
+Visit
+Work
+Study
+Live
+Join Family
+
+I’m in Ireland and I'd like to learn more about…
+Border controls
+Registering your immigration permission
+Becoming a citizen
+
+Quick Links
+My situation has changed since I arrived in Ireland
+Latest Visa/Preclearance Decisions
+Residency Calculator
+International Protection Office
+International Protection Accommodation Service
+Glossary of Immigration Terms
+
+News and Updates
+Contact Us
+
+Visa Non-Visa Required Nationalities
+
+Home
+Visa Non-Visa Required Nationalities
+
+As of 12 noon on 19 July, Ireland is temporarily suspending operation of the European Agreement on the Abolition of Visas for Refugees for a period of 12 months. As of that date, holders of 1951 travel documents are required to be in possession of an Irish entry visa before travelling to the border. You can apply for an Irish visa online .
+&times;
+
+You do not need an Irish visa to travel to Ireland if:
+
+you have a valid Irish Residence Permit , or
+
+you have a Travel Document which was issued by Ireland, or
+
+you have a document called "Residence card of a family member of a Union citizen" issued, by any country, under Article 10 of Directive 2004/38/EC (the "Free Movement Directive"). Please contact the authority who issued the document for advice if the document you have comes within the definition of the Directive, as implemented by that particular Member State or
+
+You are a minor, under the age of 16, who is usually resident in Ireland and is availing of the temporary visa suspension .
+
+For all other situations, regardless of where you live, or the nationality of your family member, your needing an Irish Visa is based on:
+
+your nationality (if you are not a refugee); or
+
+the country which issued your Travel Document (if you are a refugee).
+
+As of 12 noon on 19 July, Ireland is temporarily suspending operation of the European Agreement on the Abolition of Visas for Refugees for a period of 12 months. As of that date, holders of 1951 travel documents are required to be in possession of an Irish entry visa before travelling to the border.
+
+You will not need a visa if you hold a 1954 Convention Travel Document issued by Ireland. All other 1954 Convention Travel Document holders will, unless otherwise exempt (see exemptions above), need a visa.
+
+** Notice | Irish Visa Applications from Libyan nationals
+
+Certain restrictions on consideration of Irish visa applications from Libyan nationals have been in place since August, 2014. Following review, the categories of applicants who may now (May 2018) be considered for visa processing has been extended.
+
+Details are as follows:
+
+Beef Industry - applications will be accepted only from persons with a previous good travel history to Ireland, the United Kingdom, or Schengen countries and known to and sponsored by An Bord Bia and/or the Department of Agriculture and Food. Evidence of sponsorship must be provided with the application.
+
+Oil Industry - full details of travel arrangements out and back into Libya should be provided with the application. These applications will be subject to stringent security checks. Consideration of visa applications for accompanying family members remains suspended.
+
+Air Industry - consideration of visa applications for the purpose of training in the air industry remains suspended.
+
+Study/Training - applications for the purpose of all forms of study or training continue to be subject to the existing suspension of consideration of applications.
+
+Visa applications will be considered from immediate family members (spouse or partner, parents, and dependent children) of:
+
+Irish citizens;
+
+EU Citizens; or
+
+long term Irish residents (those who are living in Ireland for at least five years on Stamp 1 or Stamp 4).
+
+Visa applications from visitors of Libyan nationality who are long-term resident of EU Member States or other countries and have good and recent UK, EU, Australian, New Zealand, Canadian or US travel history will be considered; and
+
+Visa applications supported by Irish Government Departments and State Agencies will also be considered. Evidence of sponsorship must be provided with the application.
+
+This page was last updated on March 14, 2025
+
+Contact Us
+
+Immigration Service Delivery
+
+Department of Justice,
+
+Home Affairs and Migration
+
+13-14 Burgh Quay
+
+Dublin 2 D02 XK70
+
+Ireland
+
+Social Channels
+
+Our Location
+
+Click here to view our location
+
+Useful Links
+
+Privacy Policy and Cookies
+
+Accessibility
+
+Disclaimer
+
+Immigration Service Delivery (ISD) Online – Terms and Conditions
+
+Immigration Legislation and Policy Guidelines
+
+Freedom of Information (FOI)
+
+Protecting Personal Data in the Department of Justice, Home Affairs and Migration
+
+Sitemap
+
+© Copyright
+
+- An Roinn Dlí agus Cirt, Gnóthaí Baile agus Imirce | Department Of Justice, Home Affairs and Migration | All Rights Reserved
+
+Facebook X Instagram Pinterest
+
+Page load link
+
+Have questions? Why not use our Citizenship Assistant!
+
+Go to Top
+
+==============================================================================
+PART 2 - ISD NATIONALITY TABLE (table id 19077), VERBATIM
+==============================================================================
+
+Nationality | Do you require a visa?
+----------- | ----------------------
+Afghanistan | Yes
+Albania | Yes
+Algeria | Yes
+Andorra | No
+Angola | Yes
+Antigua and Barbuda | No
+Argentina | No
+Armenia | Yes
+Australia | No
+Austria | No
+Azerbaijan | Yes
+Bahamas | No
+Bahrain | Yes
+Bangladesh | Yes
+Barbados | No
+Belarus | Yes
+Belgium | No
+Belize | No
+Benin | Yes
+Bhutan | Yes
+Bolivia | Yes
+Bosnia and Herzegovina | Yes
+Botswana | Yes
+Brazil | No
+Brunei | No
+Bulgaria | No
+Burkina Faso | Yes
+Burundi | Yes
+Cambodia | Yes
+Cameroon | Yes
+Canada | No
+Cape Verde | Yes
+Central African Republic | Yes
+Chad | Yes
+Chile | No
+China (People's Republic of) | Yes
+Colombia | Yes
+Comoros | Yes
+Congo (Brazzaville) | Yes
+Congo (Democratic Republic of) | Yes
+Costa Rica | No
+Cote D'Ivoire (Ivory Coast) | Yes
+Croatia | No
+Cuba | Yes
+Cyprus | No
+Czech Republic | No
+Denmark | No
+Djibouti | Yes
+Dominica | Yes
+Dominican Republic | Yes
+Ecuador | Yes
+Egypt | Yes
+El Salvador | No
+Equatorial Guinea | Yes
+Eritrea | Yes
+Estonia | No
+Eswatini | Yes
+Ethiopia | Yes
+Fiji | No
+Finland | No
+France | No
+Gabon | Yes
+Gambia | Yes
+Georgia | Yes
+Germany | No
+Ghana | Yes
+Great Britain (UK) - Dependent Citizen | No
+Great Britain (UK) - National (overseas) | No
+Great Britain (UK) - Overseas citizen | No
+Great Britain (UK) - Protected Person | Yes
+Great Britain (UK) - Subject | No
+United Kingdom, British Overseas Territories and Crown Dependencies | No
+Greece | No
+Grenada | No
+Guatemala | No
+Guinea | Yes
+Guinea-Bissau | Yes
+Guyana | No
+Haiti | Yes
+Honduras | Yes
+Hong Kong  (Special Administrative Region) (Document of Identity) | Yes
+Hong Kong (Special Administrative Region) | No
+Hungary | No
+Iceland | No
+India | Yes
+Indonesia | Yes
+Iran | Yes
+Iraq | Yes
+Ireland | No
+Israel | No
+Italy | No
+Jamaica | Yes
+Japan | No
+Jordan | Yes
+Kazakhstan | Yes
+Kenya | Yes
+Kiribati | No
+Korea (North) | Yes
+Korea (South) | No
+Kosovo | Yes
+Nicaragua | Yes
+Kuwait | Yes
+Kyrgyzstan | Yes
+Laos | Yes
+Latvia | No
+Lebanon | Yes
+Lesotho | Yes
+Liberia | Yes
+Libya** | Yes
+Liechtenstein | No
+Lithuania | No
+Luxembourg | No
+Macau (SAR) | No
+Madagascar | Yes
+Malawi | Yes
+Malaysia | No
+Maldives | No
+Mali | Yes
+Malta | No
+Marshall Islands | Yes
+Mauritania | Yes
+Mauritius | Yes
+Mexico | No
+Saint Lucia | Yes
+Micronesia | Yes
+Moldova | Yes
+Monaco | No
+Mongolia | Yes
+Montenegro | Yes
+Morocco | Yes
+Mozambique | Yes
+Myanmar | Yes
+Namibia | Yes
+Nauru | Yes
+Nepal | Yes
+Netherlands | No
+New Zealand | No
+Niger | Yes
+Nigeria | Yes
+North Macedonia, Republic of | Yes
+Norway | No
+Oman | Yes
+Pakistan | Yes
+Palau | Yes
+Palestinian National Authority | Yes
+Panama | No
+Papua New Guinea | Yes
+Paraguay | No
+Peru | Yes
+Philippines | Yes
+Poland | No
+Portugal | No
+Qatar | Yes
+Refugee or Stateless* | Yes
+Romania | No
+Russian Federation | Yes
+Rwanda | Yes
+Saint Kitts and Nevis | Yes
+Saint Vincent and the Grenadines | No
+Samoa | No
+San Marino | No
+Sao Tome and Principe | Yes
+Saudi Arabia | Yes
+Senegal | Yes
+Serbia | Yes
+Seychelles | No
+Sierra Leone | Yes
+Singapore | No
+Slovakia | No
+Slovenia | No
+Solomon Islands | No
+Somalia | Yes
+South Africa | Yes
+South Sudan | Yes
+Spain | No
+Sri Lanka | Yes
+Sudan | Yes
+Suriname | Yes
+Sweden | No
+Switzerland | No
+Syrian Arab Republic | Yes
+Taiwan Province of China | No
+Tajikistan | Yes
+Tanzania | Yes
+Thailand | Yes
+Timor-Leste | Yes
+Togo | Yes
+Tonga | No
+Trinidad and Tobago | Yes
+Tunisia | Yes
+Turkiye | Yes
+Turkmenistan | Yes
+Tuvalu | No
+Uganda | Yes
+Ukraine | No
+United Arab Emirates | No
+United States of America | No
+Uruguay | No
+Uzbekistan | Yes
+Vanuatu | Yes
+Vatican City (Holy See) | No
+Venezuela | Yes
+Vietnam | Yes
+Yemen | Yes
+Zambia | Yes
+Zimbabwe | Yes
+
+Total rows: 206
