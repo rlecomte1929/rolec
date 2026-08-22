@@ -17,7 +17,7 @@
   "origin_candidates": 0,
   "deferred": 12,
   "artifact": "es-ie-general-curated-2026-08-22.ndjson",
-  "sha256": "8e3f48060afb8ecb96f323a71197fd4523a498a3df45edbe115518f4ede90d4a",
+  "sha256": "3c95634c6ddf243c22bdfa8f8dd9b69f01c781ec95cb6e4f058444963a975142",
   "review_status_all": "pending",
   "verification_status_all": "representative",
   "scope": "Curated, nationality-scoped subset of Otto's refused general batch. Covers employed-mover destination requirements only; steps routed to pathway-graph candidates, origin-side duties routed to corridors/<id>/facts.yaml candidates, self-employment sub-corpus deferred to the Otto re-delivery (AIQ-1833). Must reconcile: curated + steps + origin + deferred == raw_record_count (twinned records counted once via their base fact_key).",
