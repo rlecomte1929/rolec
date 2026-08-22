@@ -28,6 +28,7 @@ import { CasePredictionCard } from '../components/case/CasePredictionCard';
 import { CaseSummaryCard } from '../components/case/CaseSummaryCard';
 import { EscalateCaseModal } from '../components/case/EscalateCaseModal';
 import { ReassignCaseModal } from '../components/case/ReassignCaseModal';
+import { CloseCaseModal } from '../components/case/CloseCaseModal';
 import { AIRecommendationCard } from '../features/ai-oversight/AIRecommendationCard';
 import { CoordinatorChatPanel } from '../features/coordinator/CoordinatorChatPanel';
 import { isCoordinatorEnabled } from '../featureFlags';
@@ -117,6 +118,8 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   const [escalateSuccessMsg, setEscalateSuccessMsg] = useState('');
   // AIQ-1136: case-level reassign — HR hands a case to another HR in the company.
   const [reassignOpen, setReassignOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closeSuccessMsg, setCloseSuccessMsg] = useState('');
   const [reassignSuccessMsg, setReassignSuccessMsg] = useState('');
 
   const budgetStatus = (): 'Within' | 'Approaching' | 'Exceeded' | null => {
@@ -174,6 +177,14 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             <Button variant="outline" onClick={() => navigate(buildRoute('hrAssignmentReview', { id: detail.id }))}>
               Open in Employee Dashboard
             </Button>
+            {/* [AIQ-2088] The end of the lifecycle. Until this shipped, `closed` was a
+                legal status that nothing HR could reach had ever written — 0 of 1,418
+                production assignments. Hidden once closed so the action cannot repeat. */}
+            {detail.status !== 'closed' && (
+              <Button variant="outline" onClick={() => setCloseOpen(true)}>
+                Close case
+              </Button>
+            )}
           </div>
         </div>
 
@@ -459,6 +470,25 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         onSuccess={() => {
           setEscalateOpen(false);
           setEscalateSuccessMsg('Case escalated — the specialist has been notified.');
+        }}
+      />
+
+      {closeSuccessMsg && (
+        <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-5 py-3 shadow-lg text-sm text-[#166534] font-medium">
+          ✓ {closeSuccessMsg}
+          <Button unstyled type="button" aria-label="Dismiss notification" onClick={() => setCloseSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</Button>
+        </div>
+      )}
+
+      <CloseCaseModal
+        open={closeOpen}
+        onClose={() => setCloseOpen(false)}
+        assignmentId={detail.id}
+        caseLabel={detail.employeeIdentifier}
+        onSuccess={(message) => {
+          setCloseOpen(false);
+          setCloseSuccessMsg(message);
+          void detailQuery.refetch();
         }}
       />
 

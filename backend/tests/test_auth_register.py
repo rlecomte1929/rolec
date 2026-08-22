@@ -60,13 +60,13 @@ class TestRegisterCompanyLink(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_register_new_company_creates_link(self):
         db = _base_db_mock()
-        db.find_or_create_company_by_name.return_value = "company-new-1"
+        db.create_company_for_self_serve_signup.return_value = "company-new-1"
         with patch("backend.app.routers.auth.db", db):
             resp = self.client.post("/api/auth/register",
                                     json=_register_body(company_name="Brand New Co"))
 
         self.assertEqual(resp.status_code, 200, resp.text)
-        db.find_or_create_company_by_name.assert_called_once_with("Brand New Co", company_size=None)
+        db.create_company_for_self_serve_signup.assert_called_once_with("Brand New Co", company_size=None)
         # profile linked to the resolved company id
         args, kwargs = db.set_profile_company.call_args
         self.assertEqual(args[1] if len(args) > 1 else kwargs["company_id"], "company-new-1")
@@ -75,33 +75,44 @@ class TestRegisterCompanyLink(unittest.TestCase):
         self.assertEqual(resp.json()["user"]["company"], "company-new-1")
 
     # ------------------------------------------------------------------
-    # Scenario 2: existing company_name → reuses the existing id, no new row
+    # [AIQ-2090] Scenario 2 INVERTED: a name that matches an existing company must
+    # NOT join it. This used to call find_or_create_company_by_name, a
+    # LOWER(TRIM(name)) match, so typing a customer's company name on this PUBLIC
+    # form linked the new account into their workspace — their cases, their
+    # employees, their policies. A typed string is not an authorisation check.
     # ------------------------------------------------------------------
-    def test_register_existing_company_reuses_link(self):
+    def test_register_with_an_existing_company_name_does_not_join_it(self):
         db = _base_db_mock()
-        db.find_or_create_company_by_name.return_value = "existing-test-co"
+        db.create_company_for_self_serve_signup.return_value = "brand-new-id"
         with patch("backend.app.routers.auth.db", db):
             resp = self.client.post("/api/auth/register",
                                     json=_register_body(company_name="Test company"))
 
         self.assertEqual(resp.status_code, 200, resp.text)
-        db.find_or_create_company_by_name.assert_called_once_with("Test company", company_size=None)
-        db.set_profile_company.assert_called_once()
-        self.assertEqual(resp.json()["user"]["company"], "existing-test-co")
+        # The name-matching helper must not be reachable from signup at all.
+        self.assertFalse(
+            hasattr(db.find_or_create_company_by_name, "assert_not_called")
+            and db.find_or_create_company_by_name.called,
+            "signup must never call the name-matching join",
+        )
+        db.create_company_for_self_serve_signup.assert_called_once_with(
+            "Test company", company_size=None
+        )
+        self.assertEqual(resp.json()["user"]["company"], "brand-new-id")
 
     # ------------------------------------------------------------------
     # AIQ-829: HR signup forwards company_size → company create-or-link path
     # ------------------------------------------------------------------
     def test_register_hr_forwards_company_size(self):
         db = _base_db_mock()
-        db.find_or_create_company_by_name.return_value = "company-sized-1"
+        db.create_company_for_self_serve_signup.return_value = "company-sized-1"
         with patch("backend.app.routers.auth.db", db):
             resp = self.client.post(
                 "/api/auth/register",
                 json=_register_body(company_name="Sized Co", company_size="51-500"),
             )
         self.assertEqual(resp.status_code, 200, resp.text)
-        db.find_or_create_company_by_name.assert_called_once_with("Sized Co", company_size="51-500")
+        db.create_company_for_self_serve_signup.assert_called_once_with("Sized Co", company_size="51-500")
 
     # ------------------------------------------------------------------
     # Scenario 3: no company_name → no link attempt (unchanged legacy path)
@@ -112,7 +123,7 @@ class TestRegisterCompanyLink(unittest.TestCase):
             resp = self.client.post("/api/auth/register", json=_register_body())
 
         self.assertEqual(resp.status_code, 200, resp.text)
-        db.find_or_create_company_by_name.assert_not_called()
+        db.create_company_for_self_serve_signup.assert_not_called()
         db.set_profile_company.assert_not_called()
         self.assertIsNone(resp.json()["user"]["company"])
 

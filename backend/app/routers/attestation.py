@@ -356,9 +356,20 @@ def send_attestation(request_id: str, user: Dict[str, Any] = Depends(require_adm
         return _admin_dto(db, req)
 
 
-@admin_router.post("/{request_id}/promote", response_model=AttestationPromoteResultDTO)
-def promote_attestation(request_id: str, user: Dict[str, Any] = Depends(require_admin)) -> AttestationPromoteResultDTO:
-    """THE SECOND KEY — the only path in the codebase that writes attestation_status='attested'.
+def _apply_promotion(
+    db: Session,
+    req: CorridorAttestationRequest,
+    *,
+    actor: str,
+    advance_review_status: bool = False,
+) -> AttestationPromoteResultDTO:
+    """THE SECOND KEY — the only place in the codebase that writes attestation_status='attested'.
+
+    Extracted from `promote_attestation` so that ATT-2.4 can reach the SAME gates from the
+    signing path when `promotion_policy='auto_on_sign'`. The point of sharing the function
+    rather than copying it is that the three gates below cannot then drift apart: a second
+    implementation that forgot the hash check would publish a signature that no longer
+    describes the content, which is precisely the lie this feature exists to prevent.
 
     Three gates, all of them load-bearing:
       * the request must be `signed` — an unsigned opinion promotes nothing;
@@ -369,68 +380,98 @@ def promote_attestation(request_id: str, user: Dict[str, Any] = Depends(require_
         `rejected` are reported back as skipped, never quietly upgraded.
 
     Never touches `verification_status` — that is the other, orthogonal axis.
+
+    `req` is already loaded; the 404 for an unknown id stays with the caller, because a
+    request that does not exist is a routing concern rather than a promotion one.
+
+    **`actor` and `advance_review_status` are accepted but deliberately UNUSED here.** They
+    are the seam ATT-2.4 needs, added now so that wiring them is a change to this function's
+    body rather than to its signature and every call site. `attested_by` continues to come
+    from the reviewer/firm, NOT from `actor`: who published an attestation is not who gave
+    it, and overwriting the firm with the admin's email would misattribute counsel's opinion.
+    """
+    if req.status != "signed":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot promote a request in status '{req.status}' — it must be signed first.",
+        )
+
+    sig = _latest_signature(db, req.id)
+    if sig is None:
+        raise HTTPException(status_code=409, detail="Request is marked signed but carries no signature row.")
+    if sig.signed_content_hash != req.content_snapshot_hash:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "The checklist changed after it was signed — the signature no longer covers "
+                "the current content. Issue a new attestation request."
+            ),
+        )
+
+    rows = db.query(CorridorAttestationItem).filter(
+        CorridorAttestationItem.request_id == req.id
+    ).all()
+    approved = [r for r in rows if (r.decision or "") == "approved"]
+    skipped = [str(r.requirement_item_id) for r in rows if (r.decision or "") != "approved"]
+
+    firm = req.reviewer_org or sig.signer_org or sig.signer_name
+    stamped = _now()
+    promoted: List[str] = []
+    for row in approved:
+        item = db.get(RequirementItem, row.requirement_item_id)
+        if item is None:
+            continue
+        item.attestation_status = "attested"
+        item.attested_at = stamped
+        item.attested_by = firm
+        item.latest_attestation_request_id = str(req.id)
+        # TODO [ATT-2.4]: when `advance_review_status` is True, advance the item's
+        # review_status here (pending -> approved), stamping `actor` as the reviewer.
+        # Left unwired on purpose: advancing review_status PUBLISHES a requirement to
+        # movers (requirements_builder serves approved rows only), so it is a behaviour
+        # change that belongs in its own reviewable PR, not in this refactor.
+        promoted.append(str(item.id))
+
+    # Assert the arithmetic before committing: a silent short-write here would report
+    # more corridor coverage than we actually hold, which is the one lie this feature
+    # exists to prevent.
+    if len(promoted) != len(approved):
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Refusing to commit a partial promote: {len(approved)} items approved but "
+                f"{len(promoted)} resolved. No rows changed."
+            ),
+        )
+
+    db.commit()
+    return AttestationPromoteResultDTO(
+        request_id=str(req.id),
+        promoted_item_ids=promoted,
+        promoted_count=len(promoted),
+        attested_by=firm,
+        skipped_not_approved=skipped,
+    )
+
+
+@admin_router.post("/{request_id}/promote", response_model=AttestationPromoteResultDTO)
+def promote_attestation(request_id: str, user: Dict[str, Any] = Depends(require_admin)) -> AttestationPromoteResultDTO:
+    """Admin-triggered promotion — the authenticated half of the two-key rule.
+
+    All the gates live in `_apply_promotion`; this endpoint resolves the id, supplies the
+    actor, and keeps `advance_review_status=False`, which is exactly what it did before the
+    logic was extracted.
     """
     with _db() as db:
         req = db.get(CorridorAttestationRequest, request_id)
         if req is None:
             raise HTTPException(status_code=404, detail="Attestation request not found")
-        if req.status != "signed":
-            raise HTTPException(
-                status_code=409,
-                detail=f"Cannot promote a request in status '{req.status}' — it must be signed first.",
-            )
-
-        sig = _latest_signature(db, req.id)
-        if sig is None:
-            raise HTTPException(status_code=409, detail="Request is marked signed but carries no signature row.")
-        if sig.signed_content_hash != req.content_snapshot_hash:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "The checklist changed after it was signed — the signature no longer covers "
-                    "the current content. Issue a new attestation request."
-                ),
-            )
-
-        rows = db.query(CorridorAttestationItem).filter(
-            CorridorAttestationItem.request_id == req.id
-        ).all()
-        approved = [r for r in rows if (r.decision or "") == "approved"]
-        skipped = [str(r.requirement_item_id) for r in rows if (r.decision or "") != "approved"]
-
-        firm = req.reviewer_org or sig.signer_org or sig.signer_name
-        stamped = _now()
-        promoted: List[str] = []
-        for row in approved:
-            item = db.get(RequirementItem, row.requirement_item_id)
-            if item is None:
-                continue
-            item.attestation_status = "attested"
-            item.attested_at = stamped
-            item.attested_by = firm
-            item.latest_attestation_request_id = str(req.id)
-            promoted.append(str(item.id))
-
-        # Assert the arithmetic before committing: a silent short-write here would report
-        # more corridor coverage than we actually hold, which is the one lie this feature
-        # exists to prevent.
-        if len(promoted) != len(approved):
-            db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    f"Refusing to commit a partial promote: {len(approved)} items approved but "
-                    f"{len(promoted)} resolved. No rows changed."
-                ),
-            )
-
-        db.commit()
-        return AttestationPromoteResultDTO(
-            request_id=str(req.id),
-            promoted_item_ids=promoted,
-            promoted_count=len(promoted),
-            attested_by=firm,
-            skipped_not_approved=skipped,
+        return _apply_promotion(
+            db,
+            req,
+            actor=str(user.get("email") or user.get("id") or "admin"),
+            advance_review_status=False,
         )
 
 

@@ -90,7 +90,7 @@ _ADJECTIVAL = {
     "SPANISH": "ES",
     # Kept in step with the country-name table above — every country needs both
     # forms, because production stores whichever the person typed.
-    "HONG KONGER": "HK", "VENEZUELAN": "VE",
+    "HONG KONGER": "HK", "VENEZUELAN": "VE", "MACEDONIAN": "MK",
 }
 
 # Full country names for the free-movement set. `to_iso` only knows the seven
@@ -119,6 +119,11 @@ _COUNTRY_NAME = {
     "INDIA": "IN", "SINGAPORE": "SG", "HONG KONG": "HK",
     # Named on AIQ-1993: Andrea, the first real ES->IE case, is Venezuelan.
     "VENEZUELA": "VE",
+    # Same case, the other half of the household: Andrea's spouse is Macedonian, and a
+    # dependant's nationality decides whether they need their own Join Family 'D' visa.
+    # Unresolved, it returned None and the family's entry route could not be stated at all.
+    # Both forms are stored in the wild — the country renamed in 2019 and intake is free text.
+    "NORTH MACEDONIA": "MK", "MACEDONIA": "MK",
 }
 
 

@@ -18,9 +18,15 @@ describe('getCaseStatusLabel', () => {
 
   it('maps the remaining lifecycle statuses', () => {
     expect(getCaseStatusLabel('submitted')).toBe('Awaiting HR review');
-    expect(getCaseStatusLabel('approved')).toBe('Complete');
+    // [AIQ-2088] `approved` is MID-lifecycle — granted when HR reviews the submitted
+    // intake, weeks before the move — so it must not read 'Complete'. `closed` is the
+    // terminal state and covers a finished move as well as an abandoned one, so it
+    // must not read 'Canceled', which asserts the second.
+    expect(getCaseStatusLabel('approved')).toBe('Approved');
     expect(getCaseStatusLabel('rejected')).toBe('Rejected');
-    expect(getCaseStatusLabel('closed')).toBe('Canceled');
+    expect(getCaseStatusLabel('closed')).toBe('Closed');
+    expect(getCaseStatusLabel('approved')).not.toBe('Complete');
+    expect(getCaseStatusLabel('closed')).not.toBe('Canceled');
   });
 
   it('is case-insensitive', () => {
