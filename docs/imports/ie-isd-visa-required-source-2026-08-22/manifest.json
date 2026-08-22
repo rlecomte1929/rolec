@@ -1,6 +1,8 @@
 {
   "schema_version": "1.1",
-  "batch_id": "ie-isd-visa-required-2026-08-22",
+  "batch_id": "ie-isd-visa-required-source-2026-08-22",
+  "batch_id_note": "Renamed on landing in the ReloPass repo, from \"ie-isd-visa-required-2026-08-22\", because that directory is already taken by the Citizens-Information-sourced lookup this batch corroborates (commit 3bd79083). The CI delivery gate requires batch_id to equal the directory name. Otto authored this as ie-isd-visa-required-2026-08-22; the dataset file keeps that original id in its dataset_id field, which is covered by the sha256 below and was NOT modified.",
+  "corroborates_batch_id": "ie-isd-visa-required-2026-08-22",
   "batch_date": "2026-08-22",
   "revision": 2,
   "revision_note": "Revision 2 adds the time-limited flag on the 'Refugee or Stateless*' row (see volatility) and the matching caveat in the data file. Source data, retrieved_at, and every country determination are unchanged from revision 1; the source evidence file is byte-identical.",

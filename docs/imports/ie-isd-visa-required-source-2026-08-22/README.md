@@ -60,6 +60,16 @@ both.
   An expiry was **not** inferred. This is the correct handling and the reason the row is not
   persisted as a standing rule.
 
+## Batch id
+
+Otto authored this as `ie-isd-visa-required-2026-08-22`. It was renamed to
+`ie-isd-visa-required-source-2026-08-22` on landing, because that directory name is already
+held by the Citizens-Information-sourced lookup this batch corroborates (`3bd79083`), and
+the CI delivery gate requires `manifest.batch_id` to equal the directory name.
+
+`isd_visa_required_map.json` keeps Otto's original `dataset_id` unchanged — it is covered by
+the manifest's sha256 and was not touched. `manifest.corroborates_batch_id` records the link.
+
 ## Provenance and integrity
 
 - Source: `https://www.irishimmigration.ie/visa-non-visa-required-nationalities/`
