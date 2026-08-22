@@ -57,6 +57,10 @@ _IMPORT_RE = re.compile(r"(?<![\w])llm_client\s+import\s+([^\n]+)")
 #             mask (masking would corrupt grounding). Justify per CLAUDE.md.
 # ---------------------------------------------------------------------------
 _ALLOWLIST = {
+    "backend/app/services/document_classifier.py": (
+        "MASKED", "mask_pii(text) before the prompt is built in "
+                  "classify_document_content() — the uploaded document's OCR text is the "
+                  "most PII-dense payload in the product (AIQ-1854)."),
     "backend/app/services/receipt_field_extractor.py": (
         "MASKED", "mask_pii(ocr_text) before complete() — receipt OCR free-text."),
     "backend/app/services/requirement_fact_extractor.py": (
