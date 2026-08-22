@@ -53,7 +53,6 @@ from ..services.research import run_country_research
 from ..services.test_drive_corridor import resolve_test_drive_route
 from ..services.trigger_engine import fire_roadmap_events
 from ...database import db as main_db
-from ..services import vendor_proposal
 from ...schemas import UserRole  # NB: backend.schemas, not the app.schemas imported above
 
 # Pydantic models + private helpers borrowed from cases.py.
@@ -374,53 +373,6 @@ def validate_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
     }
 
 
-def _seed_vendor_proposal_for_case(
-    user: Dict[str, Any], dest_country: Optional[str], case_id: str
-) -> None:
-    """[AIQ-1903] Give a REAL company its destination vendor list the first time a case for that
-    destination is finalised.
-
-    Nothing used to do this. Measured 2026-08-17: the only automatic seeder was the test-drive
-    provisioner, so 27 of 32 non-test companies had ZERO rows in `company_vendor_selections`.
-    `SLB_Denis` had 46 only because a human typed them in, and that manual step is the bug this
-    closes.
-
-    Seeded UNSELECTED (`default_selected=False`), which is the whole point of doing it here.
-    `hr_catalog.get_curation_view` treats an untouched master as `selected=False` — "the employee
-    can only pick from the list pre-selected and validated by HR" — and the employee filter shows
-    an empty curation as "HR is finalizing providers". Seeding rows as approved would overturn
-    that authority model and put vendors in front of employees no HR user ever ticked. So HR
-    gains a full pre-filled list to work through; the employee sees no change until HR approves.
-
-    Best-effort but never silent: a seed failure must not fail case creation (the case is already
-    committed by the time we get here), yet a swallowed exception on a seeding path has caused a
-    P0 before, so failures log with a stack.
-
-    Tenant scope comes from the CALLER's profile, not from any request field — the company is
-    never client-supplied.
-    """
-    try:
-        profile = main_db.get_profile_record(user.get("id")) or {}
-        company_id = profile.get("company_id") or main_db.get_hr_company_id(user.get("id"))
-        if not company_id:
-            # An employee with no company link is a real state (self-serve wizard users). No
-            # tenant to seed, so nothing to do — INFO, not an error.
-            logger.info(
-                "vendor proposal: no company for user on case %s — skipping seed", case_id
-            )
-            return
-        vendor_proposal.seed_destination_proposal(
-            company_id=str(company_id),
-            dest_country=dest_country,
-            created_by=user.get("id"),
-            default_selected=False,
-        )
-    except Exception:  # noqa: BLE001 - must not break case creation; must not be silent
-        logger.exception(
-            "vendor proposal: seed failed for case %s (destination %s)", case_id, dest_country
-        )
-
-
 @router.post("/{case_id}/create")
 def create_case(
     case_id: str,
@@ -486,8 +438,6 @@ def create_case(
         )
     except Exception:
         pass
-
-    _seed_vendor_proposal_for_case(user, basics.get("destCountry"), case_id)
 
     return {"createdCaseId": case_id, "requirementsSnapshotId": snapshot_id}
 
