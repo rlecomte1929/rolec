@@ -697,6 +697,8 @@ def _build_corridor(parsed: Mapping[str, Any]) -> CorridorAgent:
                     f"time window; a step with no due date can never fire an alert"
                 )
 
+    _reject_prerequisite_cycles(steps)
+
     return CorridorAgent(
         corridor_id=str(_require(cfg, "corridor_id", "corridor_agent")),
         version=str(_require(cfg, "version", "corridor_agent")),
@@ -737,3 +739,51 @@ def load_corridor_text(text: str) -> CorridorAgent:
     if not isinstance(parsed, Mapping):
         raise CorridorLoadError("Top-level YAML must be a mapping")
     return _build_corridor(parsed)
+
+
+def _reject_prerequisite_cycles(steps: Sequence["CorridorStep"]) -> None:
+    """[AIQ-1953] Refuse a step graph that cannot be ordered, AT LOAD TIME.
+
+    `scheduler._topological_order` already runs Kahn's algorithm and raises on a
+    cycle — but it runs when a timeline is being SCHEDULED, which is to say while
+    serving a real person's case. A corridor authored with `A -> B -> A` therefore
+    loaded cleanly, passed review, and failed later at the moment someone needed
+    their plan. The card's constraint says it plainly: cycle detection must fail
+    the build, not serve.
+
+    The dangling-prerequisite guard above already establishes that every
+    `prerequisite_step_ids` entry names a real step, so this only has to answer
+    "can these edges be ordered at all".
+
+    Deliberately duplicated rather than imported from `scheduler`: that module
+    imports `CorridorStep` from this one, so depending on it here would be a
+    circular import. The two are ~15 lines of Kahn and are covered by their own
+    tests; a shared module for this alone would cost more than it saves.
+
+    The error names the steps still holding a back-edge, because "there is a cycle
+    somewhere in 23 steps" is not something an author can act on.
+    """
+    indegree: Dict[str, int] = {s.step_id: 0 for s in steps}
+    dependents: Dict[str, List[str]] = {s.step_id: [] for s in steps}
+    for step in steps:
+        for prereq in step.prerequisite_step_ids:
+            if prereq in indegree:
+                indegree[step.step_id] += 1
+                dependents[prereq].append(step.step_id)
+
+    queue = [sid for sid, deg in indegree.items() if deg == 0]
+    ordered = 0
+    while queue:
+        sid = queue.pop(0)
+        ordered += 1
+        for dep in dependents[sid]:
+            indegree[dep] -= 1
+            if indegree[dep] == 0:
+                queue.append(dep)
+
+    if ordered != len(steps):
+        stuck = sorted(sid for sid, deg in indegree.items() if deg > 0)
+        raise CorridorLoadError(
+            "step_graph has a circular prerequisite chain and cannot be ordered; "
+            f"steps still blocked: {', '.join(stuck)}"
+        )
