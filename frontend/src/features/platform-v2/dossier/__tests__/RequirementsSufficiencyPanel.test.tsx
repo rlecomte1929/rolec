@@ -40,6 +40,16 @@ const FACT = {
   fact_text: 'You must provide a certified copy of your proof of identity when requested.',
   source_url: 'https://www.skatteetaten.no/en/person/foreign/norwegian-identification-number/d-number/',
   required_fields: [],
+  citation_status: 'verified' as const,
+};
+
+/** Same shape, but nobody has ever opened the source to check the quote. */
+const UNVERIFIED_FACT = {
+  ...FACT,
+  fact_id: 'f2',
+  fact_text: 'You must register your move with the population register within eight days.',
+  source_url: 'https://www.udi.no/en/word-definitions/registration-certificate/',
+  citation_status: 'unverified' as const,
 };
 
 /**
@@ -102,6 +112,73 @@ describe('populated', () => {
       '../../../immigration/immigrationDisclaimerContent'
     );
     expect(container.textContent).not.toContain(IMMIGRATION_DISCLAIMER_TITLE);
+  });
+});
+
+/**
+ * [AIQ-2132] Provenance is the product. `list_approved_requirement_facts` serves two evidence
+ * states side by side — PR #1851 excludes only `evidence_verified = FALSE`, so NULL ("never
+ * checked") still serves. Measured on production 2026-08-22: of the 205 served facts, 121 are
+ * verified and 84 have never been checked, and this panel rendered both with the identical
+ * "Source: host" anchor.
+ *
+ * These tests fail against the pre-fix render, which had one anchor for both.
+ */
+describe('verified vs unverified citations', () => {
+  it('labels a verified citation as verified', async () => {
+    mockGetSufficiency.mockResolvedValue(ok({ supporting_requirements: [FACT] }));
+    renderPanel();
+
+    const link = await screen.findByTestId('sufficiency-source-verified');
+    expect(link).toHaveTextContent(/verified source/i);
+    expect(link).toHaveAttribute('href', FACT.source_url);
+    expect(screen.queryByTestId('sufficiency-source-unverified')).not.toBeInTheDocument();
+  });
+
+  it('says plainly that an unchecked citation was not independently verified', async () => {
+    mockGetSufficiency.mockResolvedValue(ok({ supporting_requirements: [UNVERIFIED_FACT] }));
+    renderPanel();
+
+    const link = await screen.findByTestId('sufficiency-source-unverified');
+    expect(link).toHaveTextContent(/not independently verified/i);
+    expect(link).toHaveAttribute('href', UNVERIFIED_FACT.source_url);
+    expect(screen.queryByTestId('sufficiency-source-verified')).not.toBeInTheDocument();
+  });
+
+  it('never renders the two states identically', async () => {
+    mockGetSufficiency.mockResolvedValue(
+      ok({ supporting_requirements: [FACT, UNVERIFIED_FACT] }),
+    );
+    renderPanel();
+
+    await screen.findByText(FACT.fact_text);
+    const verified = screen.getByTestId('sufficiency-source-verified').textContent ?? '';
+    const unverified = screen.getByTestId('sufficiency-source-unverified').textContent ?? '';
+    expect(verified).not.toEqual(unverified);
+    // The weaker claim must not contain the stronger word standing on its own.
+    expect(unverified).toMatch(/not independently verified/i);
+  });
+
+  it('a fact with no citation_status is never claimed as verified', async () => {
+    // Absent evidence is not evidence: an older payload, or a row predating the evidence
+    // ledger, must fall to the weaker treatment rather than borrow the stronger one.
+    const { citation_status: _drop, ...bare } = FACT;
+    mockGetSufficiency.mockResolvedValue(ok({ supporting_requirements: [bare] }));
+    renderPanel();
+
+    expect(await screen.findByTestId('sufficiency-source-unverified')).toBeInTheDocument();
+    expect(screen.queryByTestId('sufficiency-source-verified')).not.toBeInTheDocument();
+  });
+
+  it('still serves every fact — the label changes, the list does not', async () => {
+    mockGetSufficiency.mockResolvedValue(
+      ok({ supporting_requirements: [FACT, UNVERIFIED_FACT] }),
+    );
+    renderPanel();
+
+    await screen.findByText(FACT.fact_text);
+    expect(screen.getAllByTestId('sufficiency-fact')).toHaveLength(2);
+    expect(screen.getByText(UNVERIFIED_FACT.fact_text)).toBeInTheDocument();
   });
 });
 

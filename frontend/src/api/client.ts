@@ -2684,6 +2684,13 @@ export interface SupportingRequirement {
   fact_id: string;
   fact_text: string;
   source_url: string;
+  /**
+   * [AIQ-2132] Whether we confirmed the quoted wording appears on the cited page.
+   * `'verified'` = checked verbatim; `'unverified'` = never checked (the serving guard in
+   * PR #1851 already excludes citations we have DISPROVED). Optional because a payload
+   * predating this field must fall to the weaker claim, never borrow the stronger one.
+   */
+  citation_status?: 'verified' | 'unverified';
   /** Profile fields this fact implies we need. Keys of the case profile snapshot. */
   required_fields: string[];
 }
