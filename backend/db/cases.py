@@ -499,6 +499,81 @@ class CasesMixin:
             "intake_draft": draft,
         }
 
+    def merge_assignment_intake_draft_as_hr(
+        self,
+        assignment_id: str,
+        patch: Dict[str, Any],
+        *,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Merge a patch into an assignment's intake_draft on HR's behalf.
+
+        SEPARATE FROM `update_assignment_intake_draft` ON PURPOSE. That one is scoped by
+        `employee_user_id`, which is exactly right for the employee autosaving their own
+        wizard — and unusable here, because the whole point of an HR prefill is that it
+        happens BEFORE the employee exists. Measured on Andrea's assignment
+        c4f43f49-110c-44f3-85fa-79f0fb5d1f3e: `employee_user_id` is NULL at intake_step=0,
+        so the employee-scoped UPDATE matches no row and silently returns None.
+
+        This method therefore carries NO tenant predicate of its own, and must only be
+        called behind a caller that has already checked company ownership (the HR routers'
+        `_require_case_access`). It is not exported to any employee-facing path.
+
+        MERGE, not replace: a partial extraction must never blank a field the employee has
+        already answered. Existing keys win over the patch for that reason — HR proposing a
+        job title does not get to overwrite one the employee typed.
+        """
+        aid = (assignment_id or "").strip()
+        if not aid or not isinstance(patch, dict):
+            return None
+        # Read the draft directly: `get_assignment_intake` is employee-scoped too, so it
+        # returns None for exactly the pre-registration assignments this path serves.
+        with self.engine.connect() as conn:
+            existing_row = self._exec(
+                conn,
+                "SELECT intake_draft FROM case_assignments WHERE id = :id",
+                {"id": aid},
+                op_name="read_intake_draft_for_merge",
+                request_id=request_id,
+            ).fetchone()
+        if not existing_row:
+            return None
+        raw = (existing_row._mapping if hasattr(existing_row, "_mapping") else dict(existing_row))["intake_draft"]
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except (TypeError, json.JSONDecodeError):
+                raw = {}
+        current = raw if isinstance(raw, dict) else {}
+        merged = dict(current)
+        for key, value in patch.items():
+            if key not in merged or merged.get(key) in (None, "", [], {}):
+                merged[key] = value
+
+        now = datetime.utcnow().isoformat()
+        payload = json.dumps(merged)
+        if _is_sqlite:
+            sql = (
+                "UPDATE case_assignments SET intake_draft = :draft, "
+                "intake_updated_at = :now, updated_at = :now WHERE id = :id "
+                "RETURNING intake_updated_at"
+            )
+        else:
+            sql = (
+                "UPDATE case_assignments SET intake_draft = CAST(:draft AS jsonb), "
+                "intake_updated_at = CAST(:now AS timestamptz), "
+                "updated_at = CAST(:now AS timestamptz) WHERE id = :id "
+                "RETURNING intake_updated_at"
+            )
+        with self.engine.begin() as conn:
+            row = self._exec(
+                conn, sql, {"draft": payload, "now": now, "id": aid},
+                op_name="merge_assignment_intake_draft_as_hr", request_id=request_id,
+            ).fetchone()
+        if not row:
+            return None
+        return {"intake_draft": merged}
+
     def set_assignment_submitted(self, assignment_id: str, request_id: Optional[str] = None) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:

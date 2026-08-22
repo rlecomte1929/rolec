@@ -214,6 +214,7 @@ from .app.routers import research_requests as research_requests_router  # [AIQ-1
 from .app.routers import hr_vendor_widgets as hr_vendor_widgets_router
 from .app.routers import hr_case_detail as hr_case_detail_router
 from .app.routers import hr_roadmap_review as hr_roadmap_review_router  # HR validates the roadmap before the employee acts on it  # C1-11c-be — per-case detail reads (dual-layer per CLAUDE.md)
+from .app.routers import hr_intake_extraction as hr_intake_extraction_router  # [W1-3] HR contract → intake prefill — dual-layer per CLAUDE.md
 from .app.routers import hr_case_audit as hr_case_audit_router  # C1-16 — case audit endpoint (dual-layer per CLAUDE.md)
 from .app.routers import hr_case_notes as hr_case_notes_router  # AIQ-1136 — case notes (dual-layer per CLAUDE.md)
 from .app.routers import coordinator as coordinator_router  # AIQ-1414 — coordinator respond (dual-layer per CLAUDE.md)
@@ -881,6 +882,7 @@ app.include_router(hr_vendor_widgets_router.router)  # [B16/AIQ-422] bare-path v
 app.include_router(hr_case_detail_router.router)
 app.include_router(hr_roadmap_review_router.router)  # dual-layer per CLAUDE.md: prod boots THIS app  # C1-11c-be — 6 per-case detail reads consumed by HR Dashboard
 app.include_router(hr_roadmap_review_router.metrics_router)  # [AIQ-1526] ops metrics — dual-layer per CLAUDE.md
+app.include_router(hr_intake_extraction_router.router)  # [W1-3] dual-layer per CLAUDE.md: prod boots THIS app
 app.include_router(hr_case_audit_router.router)  # C1-16 — GET /api/hr/cases/{id}/audit chronological lineage
 app.include_router(hr_case_notes_router.router)  # AIQ-1136 — GET/POST /api/hr/cases/{id}/notes (internal case notes)
 app.include_router(coordinator_router.router)  # AIQ-1414 — POST /api/cases/{id}/coordinator/respond (flag-gated)

@@ -61,6 +61,18 @@ _ALLOWLIST = {
         "MASKED", "mask_pii(text) before the prompt is built in "
                   "classify_document_content() — the uploaded document's OCR text is the "
                   "most PII-dense payload in the product (AIQ-1854)."),
+    "backend/app/services/intake_contract_extractor.py": (
+        "MASKED", "mask_pii(ocr_text) before complete() — employment-contract OCR text "
+                  "(W1-3). Reviewed with eyes open: mask_pii removes phone/IBAN/passport/"
+                  "SSN/national-id/email, and this extractor needs NONE of those. It does "
+                  "read the employee's NAME, SALARY and job title, which mask_pii does not "
+                  "redact (it does not catch an uncued personal name) — so those DO reach "
+                  "OpenAI, a DPA-covered sub-processor in "
+                  "docs/security/PRIV-004_sub-processor_register.md. That is a deliberate, "
+                  "documented transfer and the minimum the feature can work on, not an "
+                  "oversight. Authoring-time only; the serving path cannot reach it "
+                  "(check_serving_llm_isolation passes). OCR text and extraction are never "
+                  "logged."),
     "backend/app/services/receipt_field_extractor.py": (
         "MASKED", "mask_pii(ocr_text) before complete() — receipt OCR free-text."),
     "backend/app/services/requirement_fact_extractor.py": (

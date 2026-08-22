@@ -57,6 +57,7 @@ from .routers import (
     hr_case_notes,
     coordinator,
     hr_case_detail,
+    hr_intake_extraction,
     hr_roadmap_review,
     compliance,
     gdpr,
@@ -185,6 +186,7 @@ def create_app() -> FastAPI:
     # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.
     app.include_router(hr_case_detail.router)
     app.include_router(hr_roadmap_review.router)
+    app.include_router(hr_intake_extraction.router)  # [W1-3] HR contract → proposed intake prefill
     app.include_router(hr_roadmap_review.metrics_router)  # [AIQ-1526] ops metrics for the HR notification
     # C1-16: GET /api/hr/cases/{id}/audit — chronological event timeline.
     app.include_router(hr_case_audit.router)
