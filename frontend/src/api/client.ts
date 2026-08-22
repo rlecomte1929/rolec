@@ -2691,6 +2691,21 @@ export interface SupportingRequirement {
    * predating this field must fall to the weaker claim, never borrow the stronger one.
    */
   citation_status?: 'verified' | 'unverified';
+  /**
+   * Whether the source states this as a flat rule or only under a condition it does not itself
+   * determine. Two ES→IE records assert an entry-visa SEQUENCE while the visa-required
+   * determination lives in a separate ISD lookup; rendering them flat would tell a mover she
+   * is visa-required when the cited page never says so. Optional, and absent falls to
+   * `'assertion'` — the plain reading of a fact we hold no condition for.
+   */
+  assertion_mode?: 'assertion' | 'conditional' | null;
+  /** The condition a `conditional` fact hangs on, in the batch's own words. */
+  conditional_on?: string | null;
+  /**
+   * An easy-to-miss trap — the skattekort-before-first-pay class, where the cost of not
+   * knowing is high and nothing prompts you. 16 of the 38 ES→IE records carry this.
+   */
+  non_obvious?: boolean;
   /** Profile fields this fact implies we need. Keys of the case profile snapshot. */
   required_fields: string[];
 }
