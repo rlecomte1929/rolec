@@ -19,9 +19,15 @@ const CASE_STATUS_LABELS: Record<string, string> = {
   assigned: 'Not started',
   awaiting_intake: 'Intake in progress',
   submitted: 'Awaiting HR review',
-  approved: 'Complete',
+  // [AIQ-2088] `approved` used to read 'Complete' and `closed` 'Canceled'. Both were
+  // wrong about the lifecycle: `approved` is granted when HR reviews the employee's
+  // SUBMITTED INTAKE (the `assignment.approved` event) — weeks before anyone moves —
+  // so calling it Complete told HR a relocation had finished when it had barely
+  // started. `closed` is the terminal state, and it covers a move that finished as
+  // well as one that was abandoned; 'Canceled' asserted the second.
+  approved: 'Approved',
   rejected: 'Rejected',
-  closed: 'Canceled',
+  closed: 'Closed',
 };
 
 export function getCaseStatusLabel(status: string | null | undefined): string {

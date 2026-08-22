@@ -221,6 +221,7 @@ from .app.routers import roadmap_audit as roadmap_audit_router  # P1-08c/d/e —
 from .app.routers import case_rule_updates as case_rule_updates_router  # AIQ-693 — P2-02e rule-update banner (dual-layer per CLAUDE.md)
 from .app.routers import hr_case_resolve as hr_case_resolve_router  # C1-12-be — resolve+escalate POST endpoints (dual-layer per CLAUDE.md)
 from .app.routers import hr_case_escalation as hr_case_escalation_router  # W2-3 — HR case escalation (dual-layer per CLAUDE.md)
+from .app.routers import hr_case_closure as hr_case_closure_router  # [AIQ-2088] HR case closure (dual-layer per CLAUDE.md)
 from .app.routers import policy_gaps as policy_gaps_router  # C2-06-FOLLOWUP — policy-gap reads (dual-layer per CLAUDE.md)
 from .app.routers import providers as providers_router
 from .app.routers import provider_portal as provider_portal_router  # H2 — external provider portal (dual-layer per CLAUDE.md)
@@ -887,6 +888,7 @@ app.include_router(roadmap_audit_router.router)  # P1-08c/d/e — GET /api/cases
 app.include_router(case_rule_updates_router.router)  # AIQ-693 — GET/POST /api/cases/{id}/rule-updates (P2-02e banner)
 app.include_router(hr_case_resolve_router.router)  # C1-12-be — 2 POST endpoints consumed by #183 Contradiction Resolution UI
 app.include_router(hr_case_escalation_router.router)  # W2-3 — HR case escalation
+app.include_router(hr_case_closure_router.router)  # [AIQ-2088] HR case closure
 app.include_router(setup_assistant_router.router)  # Setup & Help Assistant — read-only GET /api/hr/setup-status
 app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps
 app.include_router(providers_router.router)
