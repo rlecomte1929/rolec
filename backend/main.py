@@ -12459,75 +12459,30 @@ def get_employee_policy_caps(
 # ---------------------------------------------------------------------------
 # HR Policy Management (full policy spec - create, edit, upload)
 # ---------------------------------------------------------------------------
-@app.get("/api/hr/policies")
-def list_hr_policies(
-    status: Optional[str] = Query(None),
-    companyEntity: Optional[str] = Query(None, alias="companyEntity"),
-    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
-):
-    policies = db.list_hr_policies(status_filter=status, company_entity=companyEntity)
-    return {"policies": policies}
+# [AIQ-2090] The legacy `/api/hr/policies` CRUD endpoints were REMOVED here.
+#
+# GET/PUT/DELETE `/api/hr/policies/{policy_id}` had NO ownership check of any kind —
+# `db.get_hr_policy(policy_id)` / `update` / `delete` on a bare id — so any authenticated
+# HR user could read, OVERWRITE or DELETE another company's policy given its id. The list
+# endpoint took `companyEntity` as a CLIENT-SUPPLIED query parameter defaulting to None,
+# which returned every tenant's rows.
+#
+# An existing guard, `HrComplianceReadTenantScopeGuardTests.test_get_hr_policy_scoped`,
+# reads as though it covered this. It does not: it asserts on a function literally named
+# `get_hr_policy` — which is `GET /api/hr/policy?caseId=` (case-scoped, and correctly
+# guarded by `_hr_can_access_assignment`). The unguarded one is `get_hr_policy_by_id`.
+# A name collision, not coverage.
+#
+# Deleted rather than hardened because nothing uses them: `hr_policies` holds 0 rows in
+# production (its only writer, `_seed_default_hr_policy`, is gated behind
+# `_db_scheme == "sqlite"` and so never runs on Postgres); the sole frontend consumer,
+# `HrPolicyManagement.tsx`, is not mounted — `/hr/policy-management` <Navigate>s to
+# `/hr/policy`; and the live stack is `/api/hr/policy-config/*`. You cannot leak through
+# an endpoint that does not exist.
+#
+# Still live and unaffected: `GET /api/hr/policy?caseId=` (case-scoped) and the whole
+# `/api/hr/policy-config/*` subsystem.
 
-
-@app.post("/api/hr/policies")
-def create_hr_policy(
-    body: Dict[str, Any],
-    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
-):
-    policy_id = body.get("policyId") or str(uuid.uuid4())
-    body["policyId"] = policy_id
-    body["status"] = body.get("status", "draft")
-    body["version"] = body.get("version", 1)
-    db.create_hr_policy(policy_id, body, created_by=user.get("id"))
-    return {"policyId": policy_id, "policy": body}
-
-
-@app.post("/api/hr/policies/upload")
-async def upload_hr_policy(
-    req: Request,
-    file: UploadFile = File(...),
-    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
-):
-    """Upload HR policy JSON or YAML file. Creates a new policy from the file content."""
-    content = await file.read()
-    try:
-        raw = content.decode("utf-8")
-    except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded")
-    try:
-        if file.filename and (file.filename.endswith(".yaml") or file.filename.endswith(".yml")):
-            try:
-                import yaml
-                policy = yaml.safe_load(raw)
-            except ImportError:
-                raise HTTPException(status_code=400, detail="YAML support requires PyYAML. Use JSON format.")
-        else:
-            policy = json.loads(raw)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON/YAML: {str(e)}")
-    if not isinstance(policy, dict):
-        raise HTTPException(status_code=400, detail="Policy must be a JSON object")
-    policy_id = policy.get("policyId") or str(uuid.uuid4())
-    policy["policyId"] = policy_id
-    policy["status"] = policy.get("status", "draft")
-    policy["version"] = policy.get("version", 1)
-    if not policy.get("effectiveDate"):
-        policy["effectiveDate"] = datetime.utcnow().strftime("%Y-%m-%d")
-    if not policy.get("employeeBands"):
-        policy["employeeBands"] = ["Band1", "Band2", "Band3", "Band4"]
-    if not policy.get("assignmentTypes"):
-        policy["assignmentTypes"] = ["Permanent", "Long-Term", "Short-Term"]
-    if not policy.get("benefitCategories"):
-        policy["benefitCategories"] = {}
-    db.create_hr_policy(policy_id, policy, created_by=user.get("id"))
-    return {"policyId": policy_id, "policy": policy, "message": "Policy uploaded successfully"}
-
-
-# ---------------------------------------------------------------------------
-# Company Policy Documents (docx/pdf + extracted benefits)
-# ---------------------------------------------------------------------------
 @app.get("/api/company-policies")
 def list_company_policies(
     company_id: Optional[str] = Query(None, description="Admin override: scope to this company"),
@@ -15045,46 +15000,6 @@ def extract_company_policy_preview(
     return {"policy": policy, "preview": preview}
 
 
-@app.get("/api/hr/policies/{policy_id}")
-def get_hr_policy_by_id(
-    policy_id: str,
-    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
-):
-    policy = db.get_hr_policy(policy_id)
-    if not policy:
-        raise HTTPException(status_code=404, detail="Policy not found")
-    return policy
-
-
-@app.put("/api/hr/policies/{policy_id}")
-def update_hr_policy(
-    policy_id: str,
-    body: Dict[str, Any],
-    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
-):
-    existing = db.get_hr_policy(policy_id)
-    if not existing:
-        raise HTTPException(status_code=404, detail="Policy not found")
-    body["policyId"] = policy_id
-    version = existing.get("version", 1)
-    if body.get("status") == "published" and existing.get("_meta", {}).get("status") != "published":
-        version = version + 1
-    body["version"] = body.get("version", version)
-    db.update_hr_policy(policy_id, body)
-    return {"policyId": policy_id, "policy": body}
-
-
-@app.delete("/api/hr/policies/{policy_id}")
-def delete_hr_policy(
-    policy_id: str,
-    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
-):
-    ok = db.delete_hr_policy(policy_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Policy not found")
-    return {"success": True}
-
-
 # Employee: get applicable policy and wizard criteria for auto-fill
 @app.get("/api/employee/policy/applicable")
 def get_applicable_employee_policy(
@@ -15142,10 +15057,17 @@ def get_applicable_employee_policy(
     assignment_type = {"STA": "Short-Term", "LTA": "Long-Term", "PERMANENT": "Permanent"}.get(
         _resolved, "Long-Term"
     )
+    # [AIQ-2090] Scope to the employee's own company. Without this argument the query
+    # returned the first published policy from ANY tenant that matched the band and
+    # assignment type — another company's relocation policy, served to this employee as
+    # theirs. The company comes from the case; a case with no company yields no policy
+    # (fail-closed), which is correct: an unattributed policy belongs to nobody.
+    _company_scope = (_case_row or {}).get("company_id") or assignment.get("company_id")
     policy = db.get_published_hr_policy_for_employee(
         employee_band=employee_band,
         assignment_type=assignment_type,
         country_code=country_code,
+        company_entity=str(_company_scope) if _company_scope else None,
     )
     if not policy:
         return {"policy": None, "allowedBenefits": [], "wizardCriteria": {}, "message": "No matching published policy"}

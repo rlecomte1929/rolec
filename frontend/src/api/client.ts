@@ -3492,33 +3492,13 @@ export interface TimelineMilestone {
   links?: Array<{ id: string; linked_entity_type: string; linked_entity_id: string }>;
 }
 
-export const hrPolicyAPI = {
-  list: async (params?: { status?: string; companyEntity?: string }): Promise<{ policies: unknown[] }> => {
-    const response = await api.get<{ policies: unknown[] }>('/api/hr/policies', { params: params || {} });
-    return response.data;
-  },
-  get: async (policyId: string): Promise<unknown> => {
-    const response = await api.get<unknown>(`/api/hr/policies/${policyId}`);
-    return response.data;
-  },
-  create: async (policy: Record<string, unknown>): Promise<{ policyId: string; policy: unknown }> => {
-    const response = await api.post<{ policyId: string; policy: unknown }>('/api/hr/policies', policy);
-    return response.data;
-  },
-  update: async (policyId: string, policy: Record<string, unknown>): Promise<unknown> => {
-    const response = await api.put<unknown>(`/api/hr/policies/${policyId}`, policy);
-    return response.data;
-  },
-  upload: async (file: File): Promise<{ policyId: string; policy: unknown }> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await api.post<{ policyId: string; policy: unknown }>('/api/hr/policies/upload', formData, { timeout: 120_000 });
-    return response.data;
-  },
-  delete: async (policyId: string): Promise<void> => {
-    await api.delete<unknown>(`/api/hr/policies/${policyId}`);
-  },
-};
+// [AIQ-2090] `hrPolicyAPI` was REMOVED with the legacy /api/hr/policies endpoints it
+// wrapped. Those had no ownership check on get/update/delete by id, so any HR user could
+// read, overwrite or delete another company's policy given its id. Its only consumer,
+// HrPolicyManagement.tsx, was not mounted — /hr/policy-management <Navigate>s to
+// /hr/policy — and hr_policies holds 0 rows in production.
+//
+// The live policy stack is policyConfigAPI (/api/hr/policy-config/*), below.
 
 /** Structured Compensation & Allowance matrix (policy_configs / versions / benefits). */
 // [AIQ-1615] Shared in-flight guard: the Policy Builder "Publish" and the Published-policy
