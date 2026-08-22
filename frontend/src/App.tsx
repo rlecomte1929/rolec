@@ -127,7 +127,6 @@ const HrRiskDashboardPage = lazy(() => import('./features/platform-v2/mobility-c
 // for the embedded Exceptions tab.
 const HrRequirementsPage = lazy(() => import('./features/requirements/HrRequirementsPage').then((module) => ({ default: module.HrRequirementsPage })));
 const AIDecisionsAuditPage = lazy(() => import('./features/ai-oversight/AIDecisionsAuditPage').then((module) => ({ default: module.AIDecisionsAuditPage })));
-const HrPolicyRealityPage = lazy(() => import('./features/platform-v2/policy-reality/HrPolicyRealityPage').then((module) => ({ default: module.HrPolicyRealityPage })));
 const HrPolicyDashboardPage = lazy(() => import('./features/platform-v2/policy-dashboard/HrPolicyDashboardPage').then((module) => ({ default: module.HrPolicyDashboardPage })));
 const EmployeeRichProfilePage = lazy(() => import('./features/platform-v2/employee-profile/EmployeeRichProfilePage').then((module) => ({ default: module.EmployeeRichProfilePage })));
 const EmployeeIntakePage = lazy(() => import('./features/platform-v2/intake/EmployeeIntakePage').then((module) => ({ default: module.EmployeeIntakePage })));
@@ -377,7 +376,6 @@ function App() {
         <Route path={ROUTE_DEFS.hrExceptions.path} element={<RequireHrRoute><Navigate to={`${ROUTE_DEFS.hrPolicy.path}?tab=exceptions`} replace /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrRequirements.path} element={<RequireHrRoute><HrRequirementsPage /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrAiDecisions.path} element={<RequireHrRoute><AIDecisionsAuditPage /></RequireHrRoute>} />
-                <Route path={ROUTE_DEFS.hrPolicyReality.path} element={<RequireHrRoute><HrPolicyRealityPage /></RequireHrRoute>} />
                 <Route path={ROUTE_DEFS.hrPolicyDashboard.path} element={<RequireHrRoute><HrPolicyDashboardPage /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<RequireHrRoute><HrAssignmentReview /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<RequireHrRoute><HrCaseSummary /></RequireHrRoute>} />

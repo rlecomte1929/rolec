@@ -254,7 +254,6 @@ from .app.routers import hr_analytics as hr_analytics_router
 from .app.routers import hr_case_summary as hr_case_summary_router  # AIQ-1697 — AI case summary proxy (dual-layer per CLAUDE.md)
 from .app.routers import hr_onboarding as hr_onboarding_router  # AIQ-1223c — onboarding inference (dual-layer per CLAUDE.md)
 from .app.routers import setup_assistant as setup_assistant_router  # Setup & Help Assistant — read-only setup-status (dual-layer per CLAUDE.md)
-from .app.routers import hr_export as hr_export_router
 from .app.routers import advisors as advisors_router
 from .app.routers import assistant_router as assistant_router_router
 from .app.routers import branding as branding_router
@@ -15664,7 +15663,6 @@ app.include_router(marketplace_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(hr_analytics_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(hr_case_summary_router.router)  # AIQ-1697 — AI case summary proxy
 app.include_router(hr_onboarding_router.router)  # AIQ-1223c — deterministic onboarding inference
-app.include_router(hr_export_router.router)  # W2-4 HR compliance export
 # GAP 4: Immigration advisor matching
 app.include_router(advisors_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(assistant_router_router.router)  # policy-bridge domain routing — POST /api/assistant/route

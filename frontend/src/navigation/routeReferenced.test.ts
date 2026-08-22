@@ -28,7 +28,8 @@
  * from a reachable surface or deleting the route and its page — both product decisions,
  * not mechanical ones. The guard's job meanwhile is that no NEW orphan is added silently.
  *
- * Baseline captured 2026-08-22 (AIQ-2086): 54 entries.
+ * Baseline captured 2026-08-22 (AIQ-2086): 54 entries; 53 after AIQ-2087 removed
+ * `hrPolicyReality` (the Policy-vs-Reality page) outright rather than wiring it up.
  */
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
@@ -99,7 +100,7 @@ const KNOWN_UNREFERENCED = [
   'caseServicesRecommendations', 'compliance', 'employeeCaseDossierBuild', 'employeeDocuments',
   'employeePolicy', 'employeeRichProfile', 'hrAnalytics', 'hrCaseDossier',
   'hrEmployeeDashboard', 'hrErasureRequests', 'hrPackage', 'hrPolicyBuilder',
-  'hrPolicyDashboard', 'hrPolicyManagement', 'hrPolicyReality', 'hrVendorCuration',
+  'hrPolicyDashboard', 'hrPolicyManagement', 'hrVendorCuration',
   'notificationSettings', 'providerPortal', 'quoteRfqDetail', 'servicesConclusion',
   'supplierQuote', 'vendorRfq',
 ];
