@@ -70,6 +70,35 @@ class TestReadDetection(unittest.TestCase):
         line = "    `sections` is the template's `form_templates.sections` array, and when"
         self.assertEqual(guard._reads_of("sections", [line]), [])
 
+    def test_catches_a_sqlalchemy_mapped_column_declaration(self) -> None:
+        """The exact two lines of PR #1963 that took every corridor down on 2026-08-22.
+
+        This guard ran on that PR and passed: a mapped column has no call site, so none of
+        the qualified/aliased/quoted patterns match it. It is also the worst read form,
+        because SQLAlchemy puts a mapped column in the SELECT list of EVERY query against
+        the table — `GET /api/public/corridor-requirements` failed for FR→NO, IN→DE and
+        ES→IE at once, and `GET /api/cases/{id}/requirements` with them.
+        """
+        for line in [
+            "    verified_by = Column(Text, nullable=True)",
+            "    verified_at = Column(DateTime(timezone=True), nullable=True)",
+            "    verified_by: Mapped[str | None] = mapped_column(Text, nullable=True)",
+            "    verified_by = sa.Column(sa.Text)",
+        ]:
+            self.assertTrue(guard._reads_of("verified_by", [line])
+                            or guard._reads_of("verified_at", [line]), line)
+
+    def test_the_orm_pattern_does_not_fire_on_an_ordinary_assignment(self) -> None:
+        """Kept as narrow as the rest — it is anchored to `= Column(` / `= mapped_column(`,
+        so a variable that merely shares the column's name is still not a violation."""
+        for line in [
+            "    verified_by = resolve_actor(payload)",
+            "    verified_by = None",
+            "        verified_by=actor,",
+            "    # verified_by = Column(Text) in the model is what we are guarding against",
+        ]:
+            self.assertEqual(guard._reads_of("verified_by", [line]), [], line)
+
     def test_does_not_fire_on_a_bare_word(self) -> None:
         """Deliberately under-matches. A bare match on a name like `status` or `name` would
         fire on nearly every diff; the rule is also written in CLAUDE.md, so a missed case
