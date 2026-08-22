@@ -663,6 +663,30 @@ class AttestationCreateIn(BaseModel):
     advance_review_status: bool = False
 
 
+class AttestationCaseCreateIn(BaseModel):
+    """Create a CASE-scoped attestation — counsel signs off on one person's move.
+
+    Deliberately a separate model from `AttestationCreateIn` rather than an optional
+    `case_id` on it. The corridor path is keyed on (country_code, purpose); this one is
+    keyed on a case and derives the corridor from what the case is actually served. Folding
+    both into one model would make `country_code` conditionally-required and let a caller
+    send a combination that means nothing.
+
+    Carries NO case data beyond the id. Everything counsel sees is catalog content — see
+    the whitelist in attestation_tokens.canonical_payload.
+    """
+
+    # Any of the three id forms a URL may carry (assignment id, case_id, canonical_case_id);
+    # resolved through db.resolve_case_ids, which is the canonical boundary.
+    case_id: str = Field(min_length=1, max_length=128)
+    title: Optional[str] = None
+    reviewer_org: Optional[str] = None
+    reviewer_name: Optional[str] = None
+    reviewer_email: Optional[str] = None
+    reviewer_credential: Optional[str] = None
+    ttl_days: Optional[int] = Field(default=None, ge=1, le=90)
+
+
 class AttestationAdminDTO(BaseModel):
     """Admin-side view. Carries reviewer contact details, which the public view must not."""
 
