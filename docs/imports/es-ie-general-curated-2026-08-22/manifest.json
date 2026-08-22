@@ -17,9 +17,13 @@
   "origin_candidates": 0,
   "deferred": 12,
   "artifact": "es-ie-general-curated-2026-08-22.ndjson",
-  "sha256": "141ce1a9a86f932c68eeaf623f599a48a1d6d0cf36a2c464d1882521ad2270a0",
+  "sha256": "8e3f48060afb8ecb96f323a71197fd4523a498a3df45edbe115518f4ede90d4a",
   "review_status_all": "pending",
   "verification_status_all": "representative",
   "scope": "Curated, nationality-scoped subset of Otto's refused general batch. Covers employed-mover destination requirements only; steps routed to pathway-graph candidates, origin-side duties routed to corridors/<id>/facts.yaml candidates, self-employment sub-corpus deferred to the Otto re-delivery (AIQ-1833). Must reconcile: curated + steps + origin + deferred == raw_record_count (twinned records counted once via their base fact_key).",
-  "load_task": "AIQ-1833"
+  "load_task": "AIQ-1833",
+  "non_obvious_count": 13,
+  "timing_count": 9,
+  "enrichment_script": "scripts/enrich_curated_batches_non_obvious_2026_08_22.py",
+  "enrichment_note": "non_obvious / non_obvious_note / timing added 2026-08-22 by editorial judgement over the already-cited facts. No fact_text, source_url or evidence_quote was modified; every timing restates a deadline the fact already states. quote_verbatim_confirmed remains false pending human confirmation."
 }
