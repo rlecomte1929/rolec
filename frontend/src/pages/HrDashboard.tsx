@@ -888,9 +888,9 @@ export const HrDashboard: React.FC = () => {
                   <option value="assigned">Not started</option>
                   <option value="awaiting_intake">Intake in progress</option>
                   <option value="submitted">Awaiting HR review</option>
-                  <option value="approved">Complete</option>
+                  <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>
-                  <option value="closed">Canceled</option>
+                  <option value="closed">Closed</option>
                 </select>
               </div>
               <div>
