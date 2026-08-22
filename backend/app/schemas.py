@@ -2,7 +2,7 @@ from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import date, datetime
 
 
@@ -643,6 +643,24 @@ class AttestationCreateIn(BaseModel):
     # that are operational rather than legal (see routers/attestation.py OPERATIONAL_PILLARS).
     requirement_item_ids: Optional[List[str]] = None
     ttl_days: Optional[int] = Field(default=None, ge=1, le=90)
+    # How this attestation publishes. 'manual' (default) preserves the two-key rule:
+    # signing writes a signature only, and an admin must call /promote. 'auto_on_sign'
+    # is recorded now and honoured in ATT-2.4.
+    #
+    # Typed as a Literal so an out-of-vocabulary value is a 422 at the boundary. The
+    # database CHECK (ck_cap_promotion_policy, migration 20261120000000) remains the
+    # authority and the backstop — but reaching it is not an acceptable way to reject
+    # a typo: the CheckViolation propagates out of the endpoint unhandled, which is a
+    # 500 rather than a validation error, and psycopg2's DETAIL line renders the whole
+    # failing row (content snapshot included) into the traceback. Measured on Postgres
+    # 2026-08-22 before this annotation was added.
+    promotion_policy: Literal["manual", "auto_on_sign"] = "manual"
+    # Whether promoting this attestation may ALSO advance the item's review_status.
+    # Setting it widens the snapshot to include `pending` items — an attestation that
+    # can advance review_status is precisely the one that should be showing counsel the
+    # not-yet-published rows. The advance itself is ATT-2.4; this flag only records the
+    # intent and selects the candidates.
+    advance_review_status: bool = False
 
 
 class AttestationAdminDTO(BaseModel):
