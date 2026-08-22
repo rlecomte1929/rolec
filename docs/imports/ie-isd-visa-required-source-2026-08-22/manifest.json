@@ -1,0 +1,150 @@
+{
+  "schema_version": "1.1",
+  "batch_id": "ie-isd-visa-required-2026-08-22",
+  "batch_date": "2026-08-22",
+  "revision": 2,
+  "revision_note": "Revision 2 adds the time-limited flag on the 'Refugee or Stateless*' row (see volatility) and the matching caveat in the data file. Source data, retrieved_at, and every country determination are unchanged from revision 1; the source evidence file is byte-identical.",
+  "batch_date_note": "batch_date is the assigned batch identifier date; retrieved_at is the actual UTC instant the ISD page and its nationality table were fetched.",
+  "title": "Ireland (ISD) visa-required nationalities, ISO 3166-1 alpha-2 map",
+  "jurisdiction": "IE",
+  "retrieved_at": "2026-08-21T21:50:02Z",
+  "sources": [
+    {
+      "source_url": "https://www.irishimmigration.ie/visa-non-visa-required-nationalities/",
+      "source_domain": "irishimmigration.ie",
+      "publisher": "Immigration Service Delivery (ISD), Department of Justice, Ireland",
+      "retrieved_at": "2026-08-21T21:50:02Z",
+      "page_last_updated": "March 14, 2025",
+      "evidence_file": "source_isd_visa-non-visa-required-nationalities.txt",
+      "evidence_part": "PART 1 - ISD SOURCE PAGE TEXT"
+    },
+    {
+      "source_url": "https://www.irishimmigration.ie/wp-admin/admin-ajax.php?action=wp_ajax_ninja_tables_public_action&table_id=19077&target_action=get-all-data&default_sorting=old_first",
+      "source_domain": "irishimmigration.ie",
+      "publisher": "Immigration Service Delivery (ISD), Department of Justice, Ireland",
+      "retrieved_at": "2026-08-21T21:50:02Z",
+      "note": "Ninja Tables data endpoint backing table id 19077 on the source page, same irishimmigration.ie origin; the machine-readable form of the published table.",
+      "evidence_file": "source_isd_visa-non-visa-required-nationalities.txt",
+      "evidence_part": "PART 2 - ISD NATIONALITY TABLE (table id 19077), VERBATIM"
+    }
+  ],
+  "files": [
+    {
+      "path": "isd_visa_required.json",
+      "role": "data",
+      "bytes": 52370,
+      "sha256": "3df4e26c36395aa21a3c9aa8f853b55550337c50ed7809b8a1c7b6dfda7d6ac1"
+    },
+    {
+      "path": "source_isd_visa-non-visa-required-nationalities.txt",
+      "role": "source_evidence",
+      "bytes": 10629,
+      "sha256": "b45fdd9a141e9b8bce9df6b740b3244965ecc0252ce92dc769c6d3a41820f1a7"
+    }
+  ],
+  "counts": {
+    "isd_rows_total": 206,
+    "entries_mapped_to_iso2": 199,
+    "entries_unmapped": 7,
+    "visa_required_true": 123,
+    "visa_required_false": 76
+  },
+  "reconciliation": {
+    "rule_rows": "isd_rows_total == entries_mapped_to_iso2 + entries_unmapped",
+    "sum_rows": 206,
+    "rows_balanced": true,
+    "rule_split": "entries_mapped_to_iso2 == visa_required_true + visa_required_false",
+    "sum_split": 199,
+    "split_balanced": true,
+    "every_entry_cites_source": true,
+    "flat_map_matches_entries": true,
+    "distinct_source_domains": [
+      "irishimmigration.ie"
+    ],
+    "fabricated_entries": 0,
+    "fabrication_control": "Every row of the ISD table is either mapped to an ISO 3166-1 alpha-2 code or listed in unmapped_entries with a stated reason; the builder aborts on any label it cannot account for, so no entry exists that the source does not."
+  },
+  "assertions": {
+    "VE_present": true,
+    "VE_visa_required": true,
+    "VE_isd_label": "Venezuela",
+    "VE_source_url": "https://www.irishimmigration.ie/visa-non-visa-required-nationalities/"
+  },
+  "volatility": [
+    {
+      "affects": "unmapped_entries -> 'Refugee or Stateless*' (no ISO 3166-1 code)",
+      "issue": "Determination is time-limited, not a standing rule.",
+      "detail": "ISD records the row as visa-required because Ireland has temporarily suspended the European Agreement on the Abolition of Visas for Refugees. The page states the suspension runs 'as of 12 noon on 19 July' 'for a period of 12 months' but names no year. The Department of Justice press release linked from the ISD page records the suspension as introduced in July 2022 and extended on a rolling 12-month review basis since, so the current window's end date cannot be derived from the saved source text.",
+      "action_required": "Re-verify against the ISD page before relying on this row; do not persist it as permanent and do not infer an expiry date.",
+      "expiry_asserted": false,
+      "country_determinations_affected": 0,
+      "verify_at": "https://www.irishimmigration.ie/visa-non-visa-required-nationalities/",
+      "last_reverified_at": "2026-08-22T07:19:17.833Z",
+      "last_reverification_result": "unchanged",
+      "last_reverification_evidence": {
+        "suspension_notice_present": true,
+        "refugee_or_stateless_row_value": "Yes",
+        "nationality_table_rows": 206,
+        "year_published": false,
+        "end_date_published": false,
+        "page_last_updated": "March 14, 2025",
+        "table_endpoint": "https://www.irishimmigration.ie/wp-admin/admin-ajax.php?action=wp_ajax_ninja_tables_public_action&table_id=19077&target_action=get-all-data&default_sorting=old_first"
+      }
+    }
+  ],
+  "monitoring": {
+    "server_function": "isd-refugee-visa-monitor",
+    "intended_cadence": "monthly at 09:00 UTC, anchored shortly after the 19 July renewal boundary",
+    "runtime_volatility_records": "WorkspaceDB table isd_visa_suspension_verifications",
+    "registration_status": "blocked: the documented canonical scheduler route requires interactive authentication from the server-function runtime, and the authenticated legacy scheduler family exposes listing but no recurring-create route",
+    "fetch_scope": "Exactly the two source_url values declared in sources[]",
+    "unchanged_protocol": "Append the UTC verification result to the runtime volatility records and update last_reverified_at when source artifacts are maintained.",
+    "changed_protocol": "Create a new dated batch; never overwrite this batch. Bump the new manifest revision and change only the unmapped 'Refugee or Stateless*' row. Preserve all 199 ISO 3166-1 determinations, including VE=true."
+  },
+  "non_standard_iso2_codes": [
+    {
+      "iso2": "XK",
+      "isd_nationality_label": "Kosovo",
+      "note": "User-assigned code widely used for Kosovo (EU/IMF convention); not officially assigned in ISO 3166-1."
+    }
+  ],
+  "visa_required_iso2": ["AF", "AL", "AM", "AO", "AZ", "BA", "BD", "BF", "BH", "BI", "BJ", "BO", "BT", "BW", "BY", "CD", "CF", "CG", "CI", "CM", "CN", "CO", "CU", "CV", "DJ", "DM", "DO", "DZ", "EC", "EG", "ER", "ET", "FM", "GA", "GE", "GH", "GM", "GN", "GQ", "GW", "HN", "HT", "ID", "IN", "IQ", "IR", "JM", "JO", "KE", "KG", "KH", "KM", "KN", "KP", "KW", "KZ", "LA", "LB", "LC", "LK", "LR", "LS", "LY", "MA", "MD", "ME", "MG", "MH", "MK", "ML", "MM", "MN", "MR", "MU", "MW", "MZ", "NA", "NE", "NG", "NI", "NP", "NR", "OM", "PE", "PG", "PH", "PK", "PS", "PW", "QA", "RS", "RU", "RW", "SA", "SD", "SL", "SN", "SO", "SR", "SS", "ST", "SY", "SZ", "TD", "TG", "TH", "TJ", "TL", "TM", "TN", "TR", "TT", "TZ", "UG", "UZ", "VE", "VN", "VU", "XK", "YE", "ZA", "ZM", "ZW"],
+  "not_visa_required_iso2": ["AD", "AE", "AG", "AR", "AT", "AU", "BB", "BE", "BG", "BN", "BR", "BS", "BZ", "CA", "CH", "CL", "CR", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FJ", "FR", "GB", "GD", "GR", "GT", "GY", "HK", "HR", "HU", "IE", "IL", "IS", "IT", "JP", "KI", "KR", "LI", "LT", "LU", "LV", "MC", "MO", "MT", "MV", "MX", "MY", "NL", "NO", "NZ", "PA", "PL", "PT", "PY", "RO", "SB", "SC", "SE", "SG", "SI", "SK", "SM", "SV", "TO", "TV", "TW", "UA", "US", "UY", "VA", "VC", "WS"],
+  "unmapped_isd_labels": [
+    {
+      "isd_nationality_label": "Great Britain (UK) - Dependent Citizen",
+      "visa_required": false,
+      "reason_no_iso2": "British Dependent Territories citizen passport class, not a country"
+    },
+    {
+      "isd_nationality_label": "Great Britain (UK) - National (overseas)",
+      "visa_required": false,
+      "reason_no_iso2": "British National (Overseas) passport class, not a country"
+    },
+    {
+      "isd_nationality_label": "Great Britain (UK) - Overseas citizen",
+      "visa_required": false,
+      "reason_no_iso2": "British Overseas citizen passport class, not a country"
+    },
+    {
+      "isd_nationality_label": "Great Britain (UK) - Protected Person",
+      "visa_required": true,
+      "reason_no_iso2": "British Protected Person passport class, not a country"
+    },
+    {
+      "isd_nationality_label": "Great Britain (UK) - Subject",
+      "visa_required": false,
+      "reason_no_iso2": "British Subject passport class, not a country"
+    },
+    {
+      "isd_nationality_label": "Hong Kong  (Special Administrative Region) (Document of Identity)",
+      "visa_required": true,
+      "reason_no_iso2": "Hong Kong Document of Identity for Visa Purposes, a travel-document class distinct from the HKSAR passport"
+    },
+    {
+      "isd_nationality_label": "Refugee or Stateless*",
+      "visa_required": true,
+      "reason_no_iso2": "1951/1954 Convention travel-document holder status, not a nationality"
+    }
+  ]
+}
