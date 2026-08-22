@@ -13,7 +13,9 @@ The verdict is intentionally three-valued, because "we never checked" and "we ch
 isn't there" are very different things to show a reviewer:
 
     VERIFIED     the quote is in the source, character-for-character (modulo whitespace/curly
-                 quotes). The strongest claim available without a human.
+                 quotes) — or, [AIQ-2126], is an ORDERED RECOMPOSITION of it: every segment
+                 verbatim, in page order, behind a substantial anchor. The strongest claim
+                 available without a human.
     TRANSLATED   the source is in a different language from the quote. A verbatim match is
                  impossible by construction, so this says nothing about correctness — it says
                  the check does not apply. Measured 2026-08-12: every one of France's 97 pending
@@ -128,6 +130,67 @@ def normalise(text: str) -> str:
     return re.sub(r"\s+", " ", out).strip()
 
 
+# [AIQ-2126] A recomposed quotation: segments joined by an ellipsis, or a lead-in flattened onto
+# its bullet. Splitting on these connectors and requiring EVERY segment verbatim and IN ORDER is
+# what makes the relaxation provable rather than fuzzy — it is still "these exact words, in this
+# order, on this page", only with the joins forgiven.
+_SEGMENT_SPLIT = re.compile(r"\.{3}|…|;|\s-\s|\s—\s|–")
+
+# The first segment must be a substantial anchor. Without this, a quote that opens with a stock
+# phrase ("You must") would anchor anywhere and the ordering guarantee would mean nothing.
+# 30 rather than a rounder 40 because real lead-ins are short — "You can receive a D number if
+# you" is 33 characters and is a perfectly distinctive anchor. Swept against the SG + IE corpus
+# from 20 to 40: the rescued count is 8 at every value and the planted-error suite leaks at
+# none, so this floor is not what bounds the rule — MIN_SPAN_COVERAGE is.
+MIN_ANCHOR_CHARS = 30
+
+# Matched segments must account for most of the quote. Stops a long invented claim from riding
+# in on one real fragment: the planted-error suite exercises exactly that splice.
+MIN_SPAN_COVERAGE = 0.80
+
+
+def _ordered_span_match(n_quote: str, n_source: str) -> Optional[int]:
+    """Offset of the first segment when `n_quote` is an ordered recomposition of `n_source`.
+
+    None unless ALL of: two or more segments, a first segment of at least MIN_ANCHOR_CHARS,
+    every segment found verbatim at a strictly later position than the last, and matched
+    characters covering at least MIN_SPAN_COVERAGE of the quote.
+
+    Deliberately NOT a bag-of-words or content-overlap test. Measured over the 81 approved
+    SG + IE facts that fail the substring check, 66 have >=90% content-word overlap with their
+    page — but so does "You can apply for a D number yourself" against a source that says you
+    CANNOT. Overlap cannot see a dropped negation; ordered spans can, because the inverted
+    clause is not on the page in that form.
+    """
+    segments = [seg.strip(" .;:-") for seg in _SEGMENT_SPLIT.split(n_quote)]
+    segments = [seg for seg in segments if seg]
+    if len(segments) < 2 or len(segments[0]) < MIN_ANCHOR_CHARS:
+        return None
+
+    low_source = n_source.lower()
+    first_idx: Optional[int] = None
+    cursor = 0
+    matched = 0
+    for seg in segments:
+        idx = low_source.find(seg.lower(), cursor)
+        if idx == -1:
+            return None
+        if first_idx is None:
+            first_idx = idx
+        cursor = idx + len(seg)
+        matched += len(seg)
+
+    if matched / max(1, len(n_quote)) < MIN_SPAN_COVERAGE:
+        return None
+    return first_idx
+
+
+def _context_around(n_source: str, idx: int, span: int) -> str:
+    start = max(0, idx - CONTEXT_WINDOW_CHARS)
+    end = min(len(n_source), idx + span + CONTEXT_WINDOW_CHARS)
+    return ("…" if start > 0 else "") + n_source[start:end] + ("…" if end < len(n_source) else "")
+
+
 def check_evidence(quote: Optional[str], source_text: Optional[str]) -> EvidenceCheck:
     """Verdict for one (quote, archived source text) pair."""
     n_source = normalise(source_text or "")
@@ -142,6 +205,15 @@ def check_evidence(quote: Optional[str], source_text: Optional[str]) -> Evidence
 
     idx = n_source.lower().find(n_quote.lower())
     if idx == -1:
+        # [AIQ-2126] A quotation the extractor recomposed — an ellipsis, or a lead-in flattened
+        # onto its bullet — is still this page's words in this page's order. Tried before the
+        # language rule because it is a positive finding, and a translated quote cannot span-match
+        # anyway. Without this, a correctly-quoted fact is written FALSE and PR #1851 drops it
+        # from serving entirely.
+        span_idx = _ordered_span_match(n_quote, n_source)
+        if span_idx is not None:
+            return EvidenceCheck(VERIFIED, span_idx, _context_around(n_source, span_idx, len(n_quote)))
+
         # Before calling it unsupported, rule out the case where a match was never possible:
         # an English rendering of a French page cannot contain a French substring.
         # The source is long and reliable; the quote is short, so it gets a lower bar.
@@ -151,7 +223,4 @@ def check_evidence(quote: Optional[str], source_text: Optional[str]) -> Evidence
             return EvidenceCheck(TRANSLATED, None, "")
         return EvidenceCheck(UNVERIFIED, None, "")
 
-    start = max(0, idx - CONTEXT_WINDOW_CHARS)
-    end = min(len(n_source), idx + len(n_quote) + CONTEXT_WINDOW_CHARS)
-    context = ("…" if start > 0 else "") + n_source[start:end] + ("…" if end < len(n_source) else "")
-    return EvidenceCheck(VERIFIED, idx, context)
+    return EvidenceCheck(VERIFIED, idx, _context_around(n_source, idx, len(n_quote)))
