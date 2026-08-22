@@ -16,7 +16,7 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 os.environ.setdefault("RELOPASS_DISABLE_RATE_LIMITS", "1")
 os.environ.setdefault("RELOPASS_QUERY_COUNTER_OFF", "1")
@@ -103,6 +103,38 @@ def _tables():
     yield
 
 
+def _insert_assignment(assignment_id: str, cid: str) -> None:
+    """Insert an assignment row into whatever `case_assignments` actually exists.
+
+    The CREATE above is `IF NOT EXISTS`, so in a FULL-SUITE run another module may have
+    already created a much wider `case_assignments` — and the real one carries NOT NULL
+    columns this file knows nothing about (`hr_user_id` was the one that caught this).
+    A fixed three-column INSERT passes when this file runs alone and dies with
+    `NOT NULL constraint failed` when it does not, which is the worst kind of test: green
+    in isolation, red only in the run that matters.
+
+    So discover the shape at runtime and fill every NOT NULL column that has no default.
+    """
+    insp = inspect(main_db.engine)
+    cols = {c["name"]: c for c in insp.get_columns("case_assignments")}
+
+    values = {"id": assignment_id, "case_id": cid, "canonical_case_id": cid}
+    for name, col in cols.items():
+        if name in values:
+            continue
+        if col.get("nullable", True) or col.get("default") is not None:
+            continue
+        # A required column this test does not model. It only has to be non-null and
+        # unique-ish; nothing under test reads it.
+        values[name] = f"test-{uuid.uuid4().hex[:12]}"
+
+    usable = {k: v for k, v in values.items() if k in cols}
+    columns = ", ".join(usable)
+    binds = ", ".join(f":{k}" for k in usable)
+    with main_db.engine.begin() as conn:
+        conn.execute(text(f"INSERT INTO case_assignments ({columns}) VALUES ({binds})"), usable)
+
+
 def _seed_case(dest="Norway", purpose="employment", case_id=None):
     """A wizard case whose draft is stuffed with PII, plus its assignment row."""
     cid = case_id or str(uuid.uuid4())
@@ -124,12 +156,7 @@ def _seed_case(dest="Norway", purpose="employment", case_id=None):
             origin_country="Spain", purpose=purpose, status="created",
         ))
         db.commit()
-    with main_db.engine.begin() as conn:
-        conn.execute(
-            text("INSERT INTO case_assignments (id, case_id, canonical_case_id) "
-                 "VALUES (:a, :c, :c)"),
-            {"a": assignment_id, "c": cid},
-        )
+    _insert_assignment(assignment_id, cid)
     return {"case_id": cid, "assignment_id": assignment_id}
 
 
