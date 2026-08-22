@@ -21,6 +21,7 @@ from backend.imports.otto.mappings import (
     DEFAULT_OWNER,
     DEFAULT_SEVERITY,
     IMMIGRATION_PILLAR,
+    NON_OBVIOUS_MARKER,
     RequirementDraft,
     Unmapped,
     compose_description,
@@ -265,3 +266,73 @@ def test_an_ordinary_fact_is_not_flagged_non_obvious():
     """The badge is only worth something if it discriminates."""
     got = resolve(_entity(), [_fact()])
     assert got.payload["non_obvious"] is False
+
+
+# ── rule 6: a flagged trap must explain itself ───────────────────────────────────────
+#
+# `requirement_items` has no note column, so `RequirementList.tsx:99-100` renders a WORDLESS
+# amber "Easy to miss" pill. A warning with no guidance is the opposite of the relief moment
+# the batch contract describes. Until the column exists, the explanation rides in the
+# description behind a fixed marker — the same shape `gen_ie_es_corridor_load.py` writes, and
+# the same assertion `test_corridor_ie_es.py` makes about it.
+
+
+def _noted(**over):
+    applies = {"status": "professional", "nationality": "EU", "non_obvious": True}
+    applies.update(over.pop("applies_to", {}))
+    return _fact(applies_to=applies, **over)
+
+
+def test_the_note_reaches_the_served_description():
+    got = resolve(_entity(), [_noted(applies_to={
+        "non_obvious_note": "Commonly believed X. Actually Y. Action required: Z."})])
+    assert NON_OBVIOUS_MARKER in got.payload["description"]
+    assert "Action required: Z." in got.payload["description"]
+
+
+def test_the_fact_text_is_left_alone():
+    """The note is commentary; `fact_text` stays answerable to its evidence_quote."""
+    got = resolve(_entity(), [_noted(applies_to={"non_obvious_note": "Some note."})])
+    body, _, note = got.payload["description"].partition(NON_OBVIOUS_MARKER)
+    assert body == "The card is free of charge."
+    assert note == "Some note."
+
+
+def test_a_requirement_with_no_note_gets_no_marker():
+    got = resolve(_entity(), [_fact()])
+    assert NON_OBVIOUS_MARKER not in got.payload["description"]
+    assert got.payload["description"] == "The card is free of charge."
+
+
+def test_twinned_facts_sharing_one_note_do_not_repeat_it():
+    """EEA/non-EEA twins carry the same note; the reader must not see it twice."""
+    note = "Commonly believed A. Actually B."
+    got = resolve(_entity(), [
+        _noted(fact_key="aOne", applies_to={"non_obvious_note": note}),
+        _noted(fact_key="bTwo", applies_to={"non_obvious_note": note}),
+    ])
+    assert got.payload["description"].count("Commonly believed A.") == 1
+
+
+def test_two_distinct_notes_both_survive():
+    got = resolve(_entity(), [
+        _noted(fact_key="aOne", applies_to={"non_obvious_note": "First trap."}),
+        _noted(fact_key="bTwo", applies_to={"non_obvious_note": "Second trap."}),
+    ])
+    desc = got.payload["description"]
+    assert "First trap." in desc and "Second trap." in desc
+    assert desc.count(NON_OBVIOUS_MARKER) == 1, "one marker, so the block stays strippable"
+
+
+def test_the_marker_makes_the_note_strippable():
+    """The migration that adds a real note column must be able to split cleanly."""
+    got = resolve(_entity(), [_noted(applies_to={"non_obvious_note": "A note."})])
+    assert got.payload["description"].split(NON_OBVIOUS_MARKER)[0] == "The card is free of charge."
+
+
+def test_composition_is_byte_stable_across_runs():
+    facts = [_noted(fact_key="bTwo", applies_to={"non_obvious_note": "Second."}),
+             _noted(fact_key="aOne", applies_to={"non_obvious_note": "First."})]
+    first = resolve(_entity(), facts).payload["description"]
+    second = resolve(_entity(), list(reversed(facts))).payload["description"]
+    assert first == second, "re-running must be a no-op upsert, not a silent rewrite"

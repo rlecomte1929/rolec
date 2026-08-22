@@ -113,16 +113,39 @@ def _one_value(facts: Sequence[Any], key: str) -> Optional[str]:
     return values[0] if len(values) == 1 else None
 
 
+#: Marker introducing the non-obvious explanation inside `description`. Matches the wording
+#: `gen_ie_es_corridor_load.py` already writes, so both loaders produce one shape.
+#:
+#: It lives in the description because `requirement_items` has **no note column** — the reader
+#: would otherwise get `RequirementList.tsx`'s wordless "Easy to miss" pill and no way to act
+#: on it. Keeping it behind a fixed marker is what makes it mechanically strippable when the
+#: real column lands: `description.split(NON_OBVIOUS_MARKER)[0].rstrip()`.
+NON_OBVIOUS_MARKER = "\n\nWhy this is easy to miss: "
+
+
 def compose_description(facts: Sequence[Any]) -> str:
     """One requirement's description, built from its facts in a stable order.
 
     Ordered by `fact_type` rather than by insertion so re-running produces byte-identical text
     and the upsert is a genuine no-op instead of a silent rewrite.
+
+    Any `applies_to.non_obvious_note` on a contributing fact is appended after the facts,
+    behind `NON_OBVIOUS_MARKER`. Notes are deduplicated (twinned EEA/non-EEA facts carry the
+    same note) and follow the same stable order, so the text stays byte-identical on re-run.
+
+    The note is editorial commentary over cited facts, not a sourced claim — which is exactly
+    why it is labelled and kept out of `fact_text`. `fact_text` must stay answerable to its
+    `evidence_quote`; this paragraph is answerable to the reviewer who approved it.
     """
     order = {"eligibility": 0, "step": 1, "document": 2, "deadline": 3, "fee": 4,
              "where_to_apply": 5, "other": 6}
     ordered = sorted(facts, key=lambda f: (order.get(f.fact_type, 99), f.fact_key or ""))
-    return "\n".join(f.fact_text.strip() for f in ordered if (f.fact_text or "").strip())
+    body = "\n".join(f.fact_text.strip() for f in ordered if (f.fact_text or "").strip())
+
+    notes = _distinct([(f.applies_to or {}).get("non_obvious_note") for f in ordered])
+    if notes:
+        body += NON_OBVIOUS_MARKER + "\n\n".join(notes)
+    return body
 
 
 def _citations_for(facts: Sequence[Any], topic: str) -> List[Dict[str, Any]]:
