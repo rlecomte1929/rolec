@@ -650,6 +650,13 @@ class CorridorAttestationRequest(Base):
     country_code = Column(String, nullable=False, index=True)
     purpose = Column(String, nullable=False, server_default="employment")
     scope = Column(Text, nullable=False, server_default="legal")
+    # Set when scope='case': the ONE case this attestation covers. NULL for corridor-scoped
+    # requests, which is every row today. Deliberately has no ForeignKey — the canonical
+    # case-id boundary is resolved in the application (db.resolve_case_ids) across three
+    # case tables; see migration 20261121000000. `_UUID`, not String: the column is `uuid`
+    # in Postgres, and wizard_cases.id is varchar, so the router validates the shape at the
+    # boundary rather than letting a non-uuid id raise a DataError out of the endpoint.
+    case_id = Column(_UUID, nullable=True, index=True)
     title = Column(Text, nullable=True)
     # draft | sent | in_review | changes_requested | signed | revoked | superseded
     status = Column(Text, nullable=False, server_default="draft")
