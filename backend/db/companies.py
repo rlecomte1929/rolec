@@ -397,6 +397,41 @@ class CompaniesMixin:
             ).fetchone()
         return self._row_to_dict(row)
 
+    def create_company_for_self_serve_signup(
+        self, name: str, company_size: Optional[str] = None
+    ) -> Optional[str]:
+        """Create a NEW company for a self-serve signup. Never joins an existing one.
+
+        [AIQ-2090] The public `POST /api/auth/register` used to call
+        `find_or_create_company_by_name`, which matches on `LOWER(TRIM(name))`. Typing an
+        existing customer's company name therefore linked the new account straight into
+        that customer's workspace — every HR API call is scoped by the profile's
+        company_id, so the stranger got their cases, their employees and their policies.
+        An unauthenticated form field is not an authorisation check.
+
+        The dedupe that call was written for (the "17 Test company" problem) is real but
+        it is a support annoyance; a stranger inside a tenant is not. So a self-serve
+        signup now always gets its own workspace, and two companies may share a display
+        name until an admin merges them.
+
+        The typed name is kept verbatim rather than disambiguated — it is what the user
+        entered, and inventing "Acme (2)" would put a string in front of them that nobody
+        chose. Admins can tell them apart by id and created_at.
+
+        NOTE: `find_or_create_company_by_name` below is deliberately left in place for
+        `test_drive.py`, which mints uniquely-named throwaway companies where name-based
+        dedupe is safe and wanted. Do not point signup back at it.
+        """
+        cleaned = (name or "").strip()
+        if not cleaned:
+            return None
+        company_id = str(uuid.uuid4())
+        self.create_company(
+            company_id=company_id, name=cleaned, status="active", plan_tier="starter",
+            size_band=company_size,
+        )
+        return company_id
+
     def find_or_create_company_by_name(
         self, name: str, company_size: Optional[str] = None
     ) -> Optional[str]:
