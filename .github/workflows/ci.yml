@@ -38,6 +38,7 @@ jobs:
       workflows: ${{ steps.filter.outputs.workflows }}
       edge_functions: ${{ steps.filter.outputs.edge_functions }}
       case_id_writers: ${{ steps.filter.outputs.case_id_writers == 'true' || steps.stacked.outputs.untrusted_base == 'true' }}
+      orm_models: ${{ steps.filter.outputs.orm_models == 'true' || steps.stacked.outputs.untrusted_base == 'true' }}
       corridor_facts: ${{ steps.filter.outputs.corridor_facts }}
     steps:
       - uses: actions/checkout@v4
@@ -135,6 +136,14 @@ jobs:
               - 'scripts/fresh_onboarding_teardown.sql'
               - 'backend/db/cases.py'
               - 'backend/app/services/unified_assignment_creation.py'
+            # Every mapped column enters the SELECT list of every query on its table, so a
+            # column the ORM declares and prod lacks 500s EVERY read path at once — that is
+            # the 2026-08-22 outage. The guard script is listed beside the file it reads for
+            # the reason the `migrations` filter spells out: a gate whose own config can
+            # change while the gate is skipped reports green on an unchecked tree.
+            orm_models:
+              - 'backend/app/models.py'
+              - 'scripts/check_model_schema_drift.py'
             workflows:
               - '.github/workflows/**'
             edge_functions:
@@ -868,6 +877,41 @@ jobs:
             exit 1
           fi
           python scripts/check_column_read_before_apply.py --base "$BASE_SHA"
+
+  orm-schema-drift:
+    # The POST-merge half of the column-read guard, run pre-merge on the PR that adds the
+    # read. scripts/check_column_read_before_apply.py (hardened in #2001 to see
+    # `= Column(` / `= mapped_column(` / `: Mapped[...]`) is static and fires only when a
+    # migration file and its read are in the SAME PR — which is the split we are told NOT
+    # to produce. Follow the prescribed order (migration merges, operator applies, then the
+    # code that reads it) and the second PR carries a bare Column() with no migration
+    # beside it, which that guard structurally cannot see. It exited 0 on #1998 six minutes
+    # after it was hardened, for exactly that reason.
+    #
+    # "Is this column applied in production?" is a question about production state. This
+    # job asks production. It is the check that would have stopped the 2026-08-22 outage
+    # (7h29m of HTTP 500 on /api/public/corridor-requirements, ORM declaring
+    # requirement_items.verified_by against a prod that did not have it).
+    #
+    # Gated on the read-only URL like the ledger, RLS-coverage and provenance jobs. The
+    # scheduled run in prod-smoke.yml covers drift that arrives out-of-band, which no
+    # PR-triggered job can see; this one covers the PR that introduces it.
+    name: ORM model vs live schema
+    needs: changes
+    runs-on: ubuntu-latest
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.orm_models == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Check the ORM against the live database
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/check_model_schema_drift.py
 
   migration-duplicate-versions:
     # Two migration files sharing a 14-digit version: schema_migrations is keyed on
