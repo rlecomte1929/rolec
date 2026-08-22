@@ -151,8 +151,20 @@ def get_curation_view(
     """
     Combined view HR uses to curate one category × city. Returns:
     - Every admin master item for (category, city) with the HR selection state
-      attached (or "selected=true" by default if HR hasn't decided yet).
+      attached. A master HR has not decided on comes back ``selected=false`` —
+      the strict authority model, spelled out at the assignment below: an item
+      the employee can pick must have been ticked by HR first.
     - Every HR custom vendor row for the same scope.
+
+    [AIQ-1904] This docstring used to claim the opposite — ``selected=true`` by
+    default "if HR hasn't decided yet" — while the code has always defaulted to
+    False. Measured against production 2026-08-22 as hr@testingapril.com:
+    ``category=movers`` returns 105 rows, **105 of them ``selected: false`` with
+    ``selection_id: null``**. Reading the old sentence, an engineer would conclude
+    a fresh company already had its catalog curated and that employees could see
+    it; in fact they get the "HR is finalizing providers" empty state until HR
+    ticks something (or AIQ-1903's seed writes explicit rows). That is a
+    deliberate design, and this line was the only thing contradicting it.
     """
     company_id = _caller_company_id(user)
     # Match the master plugins' geo-bound vs geo-agnostic split: when the
