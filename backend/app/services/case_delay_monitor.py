@@ -9,20 +9,37 @@ nightly scan + alert dispatch (subtask b) and HR surface (subtask d) to consume.
 Design rules carried from ``case_staleness_alert.py``:
   * **Read-only.** Never mutates case or milestone data.
   * **Inert without data.** Zero active cases / zero overdue milestones -> ``[]``.
-    Safe to ship dormant (the AIQ-378 epic is gated post-pilot; this layer simply
-    returns nothing until ``immigration_milestones`` is populated).
-  * **Honest signals only.** ``days_behind`` is computed from real
-    ``immigration_milestones.target_date``; a milestone with no ``target_date`` is
-    never flagged (no fabricated ETAs).
+  * **Honest signals only.** ``days_behind`` is computed from a real
+    ``target_date``; a milestone with no ``target_date`` is never flagged (no
+    fabricated ETAs).
   * **Configurable env thresholds, clamped.**
 
-Source of truth (resolved during recon — design §5 left this open):
-  ``public.immigration_milestones`` (the AIQ-379 partner-sync table) — per-milestone
-  ``target_date`` (expected) + ``status`` + ``completed_date``; ``milestone_type`` is
-  the stage. Active cases = ``relocation_cases.status = 'active'`` joined on
-  ``relocation_cases.id::text = immigration_milestones.case_id``. Milestone status
-  vocabulary mirrors ``immigration_partner_adapter.MilestoneStatus``; the terminal
-  statuses ('completed', 'not_applicable') are never flagged.
+Source of truth: ``public.case_milestones``.
+
+[AIQ-2041] It used to be ``public.immigration_milestones``, and the whole proactive
+loop was inert because of it — not "dormant until the pilot", as this docstring
+claimed, but pointed at a table that has never held a row. Measured 2026-08-22:
+
+    public.immigration_milestones     0 rows
+    public.case_milestones       14,282 rows, 861 joining relocation_cases
+
+Two predicates had to change together; fixing either alone still yields nothing:
+
+    today (immigration_milestones + rc.status='active')  ->   0 behind,  0 cases
+    swap the table only                                  ->   0 behind,  0 cases
+    swap the table AND fix the status filter             -> 146 behind, 18 cases
+
+The second predicate was ``relocation_cases.status = 'active'``, which matches
+**5 of 1,940 rows** — status is NULL on 1,925 of them, because the canonical case
+lifecycle lives on ``case_assignments``, not here. Requiring 'active' is therefore
+a filter that can essentially never match; it is replaced by excluding terminal
+statuses, which is both correct today and safe as the column gets populated.
+
+Column mapping vs the old table: ``case_milestones.actual_date`` is the completion
+date (aliased to ``completed_date`` so the pure core is unchanged), and its status
+vocabulary is ``pending`` / ``in_progress`` / ``done`` — note **``done``**, which is
+not one of the immigration table's terminal statuses. Both vocabularies are honoured
+in ``_TERMINAL_STATUSES`` so a completed milestone is never reported as overdue.
 """
 from __future__ import annotations
 
@@ -32,7 +49,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from ...database import db
 
@@ -46,9 +63,15 @@ ENV_WARN_DAYS = "CASE_DELAY_WARN_DAYS"
 DEFAULT_CRIT_DAYS = 7
 ENV_CRIT_DAYS = "CASE_DELAY_CRIT_DAYS"
 
-_ACTIVE_STATUS = "active"
+# Case statuses that mean the case is over — its milestones are never flagged.
+# Deliberately an exclusion list rather than `status = 'active'`: see the module
+# docstring, that equality matched 5 of 1,940 rows (AIQ-2041).
+_CLOSED_CASE_STATUSES = ("closed", "cancelled", "canceled", "completed", "archived")
 # Milestone statuses that mean "done" or "doesn't apply" — never flagged.
-_TERMINAL_STATUSES = frozenset({"completed", "not_applicable"})
+# 'completed'/'not_applicable' are the immigration_partner_adapter vocabulary;
+# 'done' is case_milestones' own. Both are honoured so the source table can change
+# without silently flagging finished work.
+_TERMINAL_STATUSES = frozenset({"completed", "not_applicable", "done"})
 _MAX_DAYS = 3650  # clamp env thresholds to a sane upper bound
 
 
@@ -97,6 +120,15 @@ class DelaySignal:
     expected_date: str    # ISO date string (target_date)
     days_behind: int
     severity: str         # 'warning' | 'critical'
+    # [AIQ-2041] The milestone's own curated title and owner, carried so the HR
+    # surface can say something true about an unrecognised stage instead of a
+    # generic line. ~90 distinct milestone_types exist and many are opaque codes
+    # ('pre_departure_ai_01', 'post_arrival_corridor_07') whose meaning cannot be
+    # inferred from the key — but their titles are specific and human-written
+    # ("Register under the EEA regulations with UDI"). Using the real title beats
+    # inventing a template for a code we do not understand.
+    title: str = ""
+    owner: str = ""       # 'hr' | 'employee' | 'joint' | authority code | ''
 
     def as_dict(self) -> Dict[str, Any]:
         return {
@@ -105,6 +137,8 @@ class DelaySignal:
             "expected_date": self.expected_date,
             "days_behind": self.days_behind,
             "severity": self.severity,
+            "title": self.title,
+            "owner": self.owner,
         }
 
 
@@ -119,7 +153,8 @@ def evaluate_case_delays(
 
     Args:
         milestones: rows with ``case_id``, ``milestone_type``, ``status``,
-            ``target_date`` (date|str|None), ``completed_date`` (date|str|None).
+            ``target_date`` (date|str|None), ``completed_date`` (date|str|None),
+            and optionally ``title`` / ``owner`` (carried through to the signal).
         now: reference date (defaults to UTC today).
         warn_days / crit_days: thresholds (default to env / clamped).
 
@@ -154,6 +189,9 @@ def evaluate_case_delays(
             expected_date=target.isoformat(),
             days_behind=days_behind,
             severity="critical" if days_behind >= crit else "warning",
+            title=str(milestone.get("title") or ""),
+            # Normalised: the column holds both 'employee' and 'EMPLOYEE'.
+            owner=str(milestone.get("owner") or "").strip().lower(),
         )
         existing = worst.get(case_id)
         if existing is None or signal.days_behind > existing.days_behind:
@@ -170,13 +208,15 @@ SELECT m.case_id        AS case_id,
        m.milestone_type AS milestone_type,
        m.status         AS status,
        m.target_date    AS target_date,
-       m.completed_date AS completed_date
-FROM public.immigration_milestones m
+       m.actual_date    AS completed_date,
+       m.title          AS title,
+       m.owner          AS owner
+FROM public.case_milestones m
 JOIN public.relocation_cases rc ON rc.id::text = m.case_id
-WHERE rc.status = :active_status
+WHERE COALESCE(rc.status, '') NOT IN :closed_statuses
   AND m.target_date IS NOT NULL
-  AND m.completed_date IS NULL
-  AND COALESCE(m.status, '') NOT IN ('completed', 'not_applicable')
+  AND m.actual_date IS NULL
+  AND COALESCE(m.status, '') NOT IN ('completed', 'not_applicable', 'done')
 """
 
 
@@ -186,7 +226,12 @@ def _fetch_active_case_milestones() -> List[Dict[str, Any]]:
     try:
         with db.engine.connect() as conn:
             rows = (
-                conn.execute(text(_ACTIVE_MILESTONES_SQL), {"active_status": _ACTIVE_STATUS})
+                conn.execute(
+                    text(_ACTIVE_MILESTONES_SQL).bindparams(
+                        bindparam("closed_statuses", expanding=True)
+                    ),
+                    {"closed_statuses": list(_CLOSED_CASE_STATUSES)},
+                )
                 .mappings()
                 .all()
             )
@@ -203,6 +248,6 @@ def scan_active_cases(now: Optional[date] = None) -> List[Dict[str, Any]]:
     ``target_date`` by at least ``CASE_DELAY_WARN_DAYS``.
 
     Inert by construction: ``[]`` when there are no active cases or no overdue
-    milestones (i.e. always, until the pilot populates ``immigration_milestones``).
+    milestones.
     """
     return evaluate_case_delays(_fetch_active_case_milestones(), now=now)

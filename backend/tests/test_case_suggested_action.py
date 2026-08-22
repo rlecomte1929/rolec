@@ -64,3 +64,61 @@ def test_missing_fields_degrade_without_leaking_none():
 def test_actions_are_distinct_across_stages():
     actions = [csa._STAGE_ACTIONS[mt.value] for mt in MilestoneType]
     assert len(set(actions)) == len(actions)  # no two stages share an action
+
+
+# ── AIQ-2041: the live milestone vocabulary, and honest fallbacks ───────────
+
+def test_live_task_vocabulary_is_templated_hr_side():
+    """case_milestones uses task_*/service_* keys, and titles are employee-framed.
+
+    Before AIQ-2041 every one of these fell through to the generic fallback, so an
+    HR user got "Review this case and follow up on the overdue step." for all 16
+    milestone types that can actually be flagged today.
+    """
+    action = csa.suggested_action_for_stage("task_passport_upload")
+    assert action != csa._FALLBACK_ACTION
+    assert "passport" in action.lower()
+    # An HR-owned step reads as HR's own job, not as something to chase.
+    assert "yourself" in csa.suggested_action_for_stage("task_hr_case_review").lower()
+
+
+def test_unknown_stage_uses_the_milestones_real_title_not_an_invention():
+    """~90 milestone types exist; the opaque codes cannot be templated honestly.
+
+    'pre_departure_ai_01' says nothing about what it is, but its curated title does.
+    Using the title is real data; inventing a sentence for the code would not be.
+    """
+    action = csa.suggested_action_for_stage(
+        "pre_departure_ai_01",
+        title="Gather core identity and employment documents",
+        owner="employee",
+    )
+    assert action == "Chase the employee: Gather core identity and employment documents."
+
+
+def test_unknown_stage_owner_hr_reads_as_waiting_on_hr():
+    action = csa.suggested_action_for_stage(
+        "post_arrival_corridor_07", title="Optional EU residence documentation", owner="hr"
+    )
+    assert action.startswith("Waiting on HR:")
+
+
+def test_unknown_stage_and_no_title_falls_back_to_generic():
+    """Never fabricate: with neither a template nor a title there is nothing to say."""
+    assert csa.suggested_action_for_stage("mystery_code_42") == csa._FALLBACK_ACTION
+    assert csa.suggested_action_for_stage("mystery_code_42", title="  ") == csa._FALLBACK_ACTION
+
+
+def test_build_suggested_action_threads_title_and_owner():
+    out = csa.build_suggested_action(
+        {
+            "case_id": "c1",
+            "stage": "immigration_ai_03",
+            "days_behind": 12,
+            "expected_date": "2026-06-01",
+            "title": "Register under the EEA regulations with UDI",
+            "owner": "employee",
+        }
+    )
+    assert "Register under the EEA regulations with UDI" in out["suggested_action"]
+    assert "12 day(s)" in out["draft_reminder"]

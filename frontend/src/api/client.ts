@@ -491,6 +491,11 @@ export interface HrBacklogResponse {
 export interface CaseHealthFlag {
   case_id: string;
   stage: string | null;
+  /** [AIQ-2041] The milestone's own curated title. `stage` is a milestone_type key
+   *  and many are opaque ('pre_departure_ai_01'), so this is what to display. */
+  milestone_title: string | null;
+  /** 'hr' | 'employee' | 'joint' | authority code — who the overdue step is on. */
+  owner: string | null;
   days_behind: number | null;
   expected_date: string | null;
   severity: string | null;
