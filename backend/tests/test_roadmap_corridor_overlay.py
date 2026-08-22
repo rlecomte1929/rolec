@@ -129,20 +129,61 @@ def test_a_solo_move_gets_no_family_step():
 
 # ── honesty about what we do not know ────────────────────────────────────────────────
 
-def test_the_visa_required_advisory_is_conditional_because_we_hold_no_isd_list():
-    """`visa_required_nationality` is declared EXTERNAL_LOOKUP -> isd_visa_required.{iso}.
+def _visa_advisory(nationality: str):
+    ov = overlay.corridor_overlay(_case(nationality))
+    return next(a for a in ov["advisories"] if a["id"] == "VISA_REQUIRED_NATIONAL")
 
-    That lookup does not exist in this repo. Asserting "you are a visa-required national" would
-    be inventing the answer, so the advisory must be conditionally worded and tell her where the
-    real list lives.
+
+def test_the_visa_advisory_is_now_answered_for_a_visa_required_national():
+    """`visa_required_nationality` is EXTERNAL_LOOKUP -> isd_visa_required.{iso}, and the
+    lookup now EXISTS.
+
+    This test previously pinned the opposite — that the advisory stays conditional "because we
+    hold no ISD list". That premise is gone, and its wording was the product telling Andrea to
+    go and ask an embassy the one question the corridor is built to answer.
     """
-    ov = overlay.corridor_overlay(_case("Venezuela"))
-    adv = next(a for a in ov["advisories"] if a["id"] == "VISA_REQUIRED_NATIONAL")
+    adv = _visa_advisory("Venezuela")
+
+    assert adv["asserted"] is True
+    assert adv["cite"] == "IE_D_VISA"
+    assert "visa-required" in adv["text"].lower()
+    assert "granted before you travel" in adv["text"].lower()
+
+
+def test_the_spouse_nationality_resolves_too():
+    """Andrea's spouse is Macedonian. Unresolved, the family's entry route was unstatable."""
+    assert _visa_advisory("North Macedonia")["asserted"] is True
+    assert "visa-required" in _visa_advisory("MK")["text"].lower()
+
+
+def test_a_visa_exempt_national_is_told_about_preclearance_not_just_no():
+    """The dangerous half of a "no". A CSEP holder's US spouse who reads "no visa needed" and
+    books a flight still needs preclearance — a rule no requirement_item carries (0 of 42)."""
+    adv = _visa_advisory("United States")
+
+    assert adv["asserted"] is True
+    assert "preclearance" in adv["text"].lower()
+    assert "not on ireland's visa-required list" in adv["text"].lower()
+
+
+def test_an_unresolvable_nationality_keeps_the_conditional_wording():
+    """The reason `visa_required` is three-valued. A nationality we cannot parse must never
+    be reported as "no visa needed" — production holds 'f', 'asdas' and '1212' in this field."""
+    adv = _visa_advisory("asdas")
 
     assert adv["asserted"] is False
-    assert adv["cite"] == "IE_D_VISA"
     lowered = adv["text"].lower()
     assert "if" in lowered or "check" in lowered
+
+
+def test_the_visa_advisory_names_the_exemptions_it_cannot_check():
+    """A Venezuelan in Spain with a FRENCH spouse is visa-exempt; with a Macedonian or Spanish
+    spouse she is not. We cannot tell from a nationality, so the advisory must say so rather
+    than assert an unqualified 'you need a visa'."""
+    text = _visa_advisory("Venezuela")["text"].lower()
+
+    assert "residence card issued by an eea country" in text
+    assert "do not depend on nationality" in text
 
 
 def test_every_corridor_step_carries_its_citation_and_representative_status():

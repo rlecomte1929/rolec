@@ -107,12 +107,27 @@ class TheCorridorJourneyReachesTheEmployeeScreen(unittest.TestCase):
         )
 
     def test_an_unresolved_condition_is_never_marked_asserted(self):
-        """The honesty bit. `visa_required_nationality` is a lookup this repo does not hold."""
+        """The honesty bit — now with one fewer unknown.
+
+        `visa_required_nationality` WAS a lookup this repo did not hold. It does now
+        (`isd_visa_required`, backed by a committed artifact), so for a nationality the
+        lookup places, the advisory is answered rather than deferred. The draft here is
+        Andrea's — Venezuelan — which resolves.
+
+        `SPANISH_LTR_DOES_NOT_TRANSFER` stays unasserted: whether she holds Spanish
+        long-term residence is a fact about her documents, not her passport, and nothing
+        in the draft tells us.
+        """
         by_id = {a.id: a for a in merge_corridor_overlay_v2([], _draft())}
-        self.assertFalse(by_id["VISA_REQUIRED_NATIONAL"].asserted)
+        self.assertTrue(by_id["VISA_REQUIRED_NATIONAL"].asserted)
         self.assertFalse(by_id["SPANISH_LTR_DOES_NOT_TRANSFER"].asserted)
         # This one we CAN resolve — the household is in the draft.
         self.assertTrue(by_id["FAMILY_REUNIFICATION_CSEP"].asserted)
+
+    def test_a_nationality_the_lookup_cannot_place_stays_unasserted(self):
+        """The guard the change must not weaken: resolving must never become guessing."""
+        by_id = {a.id: a for a in merge_corridor_overlay_v2([], _draft("asdas"))}
+        self.assertFalse(by_id["VISA_REQUIRED_NATIONAL"].asserted)
 
     def test_corridor_steps_never_claim_confidence_they_cannot_back(self):
         tracks: List[RoadmapTrackV2] = []

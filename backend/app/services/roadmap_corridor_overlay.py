@@ -38,6 +38,7 @@ from ...relopass.corridors import load_corridor
 from ...relopass.corridors.feasibility import required_lead_time_days
 from ...relopass.corridors.scheduler import schedule_steps
 from . import corridor_registry
+from . import isd_visa_required
 from .nationality_class import EU_EEA, OWN_NATIONAL, classify
 from .wizard_draft_mapper import extract_profile_from_wizard_draft
 
@@ -132,6 +133,50 @@ _UNRESOLVABLE_CONDITIONS = {
         "visa and registration sequence still applies."
     ),
 }
+
+
+def _resolve_visa_required_advisory(nationality: Optional[str]) -> Optional[str]:
+    """The VISA_REQUIRED_NATIONAL advisory, answered — or None to keep the hedge.
+
+    The pathway declares ``visa_required_nationality`` as
+    ``EXTERNAL_LOOKUP -> isd_visa_required.{nationality_iso}``, and that lookup now exists
+    (`isd_visa_required`, backed by a committed artifact). Where it resolves, the mover gets
+    an answer instead of an instruction to go and ask an embassy the question this product
+    exists to answer.
+
+    Returns None for a nationality the lookup cannot place, which keeps the existing
+    unasserted advisory. That is the whole reason `visa_required` is three-valued: a
+    nationality we failed to parse must never be reported as "no visa needed".
+
+    The visa-free answer is deliberately NOT phrased as "you need nothing". Two of Ireland's
+    exemptions (an EEA-family residence card, the UK short-stay waiver) can make a
+    visa-required person exempt, and the preclearance rule can bind a visa-EXEMPT spouse of a
+    Critical Skills holder — so the "no" carries that caveat rather than closing the question.
+    """
+    required = isd_visa_required.visa_required(nationality)
+    if required is None:
+        return None
+
+    src = isd_visa_required.source()
+    if required:
+        carve_outs = "; ".join(
+            e["quote"] for e in isd_visa_required.exemptions_not_resolvable_from_nationality()
+        )
+        return (
+            f"Your nationality is visa-required for Ireland: a long-stay 'D' Employment visa "
+            f"must be applied for and GRANTED before you travel — the employment permit alone "
+            f"does not permit entry. Each visa-required family member needs their own visa. "
+            f"Two exemptions do not depend on nationality and we cannot check them for you — "
+            f"{carve_outs}. Source: {src['name']}."
+        )
+    return (
+        f"Your nationality is not on Ireland's visa-required list, so no entry visa is needed "
+        f"to land. Note that this is separate from PRECLEARANCE: the spouse or partner of a "
+        f"Critical Skills Employment Permit holder must apply for preclearance before "
+        f"travelling even when visa-exempt (this does not apply to citizens of Switzerland or "
+        f"the UK). You must still register your permission after arrival. "
+        f"Source: {src['name']}."
+    )
 
 
 def _has_family_relocating(draft: Dict[str, Any]) -> bool:
@@ -272,6 +317,19 @@ def corridor_overlay(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         for case_ in agent.exception_cases:
             if case_.id in _THIRD_COUNTRY_ONLY_ADVISORIES and not is_third_country:
                 continue
+            resolved_visa = (
+                _resolve_visa_required_advisory(profile.get("nationality"))
+                if case_.id == "VISA_REQUIRED_NATIONAL"
+                else None
+            )
+            if resolved_visa is not None:
+                # The lookup the pathway declares now exists — answer, do not defer.
+                advisories.append({
+                    "id": case_.id, "cite": case_.cite, "text": resolved_visa,
+                    "asserted": True, "provenance": provenance,
+                })
+                continue
+
             text = _UNRESOLVABLE_CONDITIONS.get(case_.id)
             if text is not None:
                 # Input we do not hold: surface it, worded as a condition she can check.

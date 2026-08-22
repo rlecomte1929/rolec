@@ -1,0 +1,110 @@
+{
+  "lookup_id": "isd_visa_required",
+  "jurisdiction": "IE",
+  "question": "Does a national of {nationality_iso} need an Irish visa to land in Ireland?",
+  "retrieved_at": "2026-08-22T00:00:00Z",
+  "source_url": "https://www.citizensinformation.ie/en/moving-country/visas-for-ireland/visa-requirements-for-entering-ireland/",
+  "source_name": "Citizens Information — Visa requirements for entering Ireland",
+  "verification_status": "representative",
+  "review_status": "pending",
+
+  "semantics": {
+    "visa_free_nationalities": "Citizens of these ISO codes do NOT need a visa to land in Ireland. Anything absent is visa-required — but see `not_a_closed_world` below.",
+    "not_a_closed_world": "Absence from `visa_free_nationalities` means visa-REQUIRED only for a nationality the caller has already normalised to a real ISO code. An unrecognised or missing nationality must resolve to null, never to true. The published page states the exemption list positively and does not publish the complement, so the complement is an inference from a closed table; it is sound for a listed-vs-unlisted question and unsound for an unparseable input.",
+    "exemptions_beyond_nationality": "The three entries in `structural_exemptions` are NOT nationality-based and cannot be answered from an ISO code alone. A lookup that returns `true` for a nationality may still be wrong for a specific person who holds one of these. Callers that cannot evaluate them must say so rather than assert.",
+    "preclearance": "Independent of the visa answer. A visa-EXEMPT person can still be required to obtain preclearance before travel — see `preclearance_required_even_if_visa_exempt`."
+  },
+
+  "visa_free_nationalities": [
+    { "iso": "AD", "name": "Andorra" },
+    { "iso": "AG", "name": "Antigua & Barbuda" },
+    { "iso": "AR", "name": "Argentina" },
+    { "iso": "AU", "name": "Australia" },
+    { "iso": "BS", "name": "Bahamas" },
+    { "iso": "BB", "name": "Barbados" },
+    { "iso": "BZ", "name": "Belize" },
+    { "iso": "BR", "name": "Brazil" },
+    { "iso": "BN", "name": "Brunei" },
+    { "iso": "CA", "name": "Canada" },
+    { "iso": "CL", "name": "Chile" },
+    { "iso": "CR", "name": "Costa Rica" },
+    { "iso": "SV", "name": "El Salvador" },
+    { "iso": "FJ", "name": "Fiji" },
+    { "iso": "GD", "name": "Grenada" },
+    { "iso": "GT", "name": "Guatemala" },
+    { "iso": "GY", "name": "Guyana" },
+    { "iso": "HK", "name": "Hong Kong (Special Admin. Region)" },
+    { "iso": "IL", "name": "Israel" },
+    { "iso": "JP", "name": "Japan" },
+    { "iso": "KI", "name": "Kiribati" },
+    { "iso": "MO", "name": "Macau (Special Admin. Region)" },
+    { "iso": "MY", "name": "Malaysia" },
+    { "iso": "MV", "name": "Maldives" },
+    { "iso": "MX", "name": "Mexico" },
+    { "iso": "MC", "name": "Monaco" },
+    { "iso": "NZ", "name": "New Zealand" },
+    { "iso": "PA", "name": "Panama" },
+    { "iso": "PY", "name": "Paraguay" },
+    { "iso": "VC", "name": "Saint Vincent & the Grenadines" },
+    { "iso": "WS", "name": "Samoa" },
+    { "iso": "SM", "name": "San Marino" },
+    { "iso": "SC", "name": "Seychelles" },
+    { "iso": "SG", "name": "Singapore" },
+    { "iso": "SB", "name": "Solomon Islands" },
+    { "iso": "KR", "name": "South Korea" },
+    { "iso": "TW", "name": "Taiwan" },
+    { "iso": "TO", "name": "Tonga" },
+    { "iso": "TV", "name": "Tuvalu" },
+    { "iso": "UA", "name": "Ukraine" },
+    { "iso": "AE", "name": "United Arab Emirates" },
+    { "iso": "GB", "name": "United Kingdom" },
+    { "iso": "US", "name": "United States of America" },
+    { "iso": "UY", "name": "Uruguay" },
+    { "iso": "VA", "name": "Vatican City" }
+  ],
+
+  "structural_exemptions": [
+    {
+      "key": "eea_uk_swiss_citizen",
+      "quote": "You do not need a visa to land in Ireland if you: Are a citizen of the EU or the EEA (the EU plus Iceland, Norway and Lichtenstein) or Switzerland",
+      "resolvable_from_iso": true
+    },
+    {
+      "key": "eea_family_member_residence_card",
+      "quote": "Have a residence card issued by an EEA country or Switzerland because you are the family member of an EEA or Swiss citizen living in a country outside of the EEA/Swiss family member's home country (for example, you live in Germany with your French spouse)",
+      "resolvable_from_iso": false,
+      "note": "Requires knowing the card's legal basis AND that the sponsoring citizen is outside their own home country. A Venezuelan in Spain with a Spanish spouse is NOT exempt; the same person with a French spouse in Spain IS."
+    },
+    {
+      "key": "uk_short_stay_visa_waiver",
+      "quote": "Have a UK short-stay visa and qualify for the short-stay visa waiver or the British-Irish Visa Scheme",
+      "resolvable_from_iso": false
+    }
+  ],
+
+  "preclearance_required_even_if_visa_exempt": {
+    "quote": "If you are moving to Ireland to live with your Irish de facto partner, a spouse or partner who holds a Critical Skills Employment Permit, or your UK spouse or partner, you have to apply for preclearance even if you are from one of the countries listed above (this does not apply to citizens of Switzerland or the UK).",
+    "applies_to": ["irish_de_facto_partner", "csep_holder_spouse_or_partner", "uk_spouse_or_partner"],
+    "excluded_nationalities": ["CH", "GB"],
+    "why_it_matters": "A CSEP holder's spouse from a visa-exempt country (US, Brazil, Canada, Australia…) reads the visa answer as 'no visa needed' and books travel. Preclearance is a separate pre-travel authorisation they must still hold. No requirement_item in the Irish catalog mentions preclearance (verified 0 of 42, 2026-08-22)."
+  },
+
+  "notes": [
+    {
+      "key": "uk_nationality_types",
+      "quote": "Visa free travel also applies to the following types of British nationality: British national (overseas), British overseas territories citizen, British overseas citizen. Visa free travel does not apply to people who have a British passport as a 'British protected person'."
+    },
+    {
+      "key": "refugee_travel_document",
+      "quote": "If you have a refugee travel document issued by a country outside Ireland, you must apply for a visa to enter Ireland. Visa free travel for travel document holders is suspended until further notice."
+    },
+    {
+      "key": "india_china_uk_visa_holders",
+      "quote": "If you have a short stay visa for the UK and are an Indian or Chinese citizen, you can travel to Ireland without a visa."
+    },
+    {
+      "key": "ukraine",
+      "quote": "From 25 February 2022, citizens of Ukraine do not need a visa to travel to Ireland."
+    }
+  ]
+}
