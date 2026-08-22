@@ -14,9 +14,14 @@ export interface CountryOption {
  * for relocation origin/destination pickers — NOT for identity fields like
  * nationality, passport, or country of incorporation, which must accept the full
  * ISO list (`COUNTRY_OPTIONS` in features/policy-config/countryList.ts). AIQ-1341.
- * Alphabetical by country name; cities within each country alphabetical.
+ * Cities within each country are alphabetical.
+ *
+ * [AIQ-1861] Country order is ENFORCED at the export below. This comment used to
+ * claim the literal was alphabetical by name while it was ordered by ISO code —
+ * KR rendering as South Korea between Mexico and Netherlands, and CZ/DE/DK as
+ * Czech Republic, Germany, Denmark, which is what was reported.
  */
-export const DESTINATION_COUNTRIES: CountryOption[] = [
+const DESTINATION_COUNTRIES_BY_CODE: CountryOption[] = [
   { code: 'AR', name: 'Argentina', cities: ['Buenos Aires', 'Córdoba', 'La Plata', 'Mar del Plata', 'Mendoza', 'Rosario', 'Salta', 'San Juan', 'San Miguel de Tucumán', 'Santa Fe'] },
   { code: 'AT', name: 'Austria', cities: ['Dornbirn', 'Graz', 'Innsbruck', 'Klagenfurt', 'Linz', 'Salzburg', 'St. Pölten', 'Vienna', 'Villach', 'Wels'] },
   { code: 'AU', name: 'Australia', cities: ['Adelaide', 'Brisbane', 'Canberra', 'Gold Coast', 'Melbourne', 'Newcastle', 'Perth', 'Sunshine Coast', 'Sydney', 'Wollongong'] },
@@ -58,6 +63,11 @@ export const DESTINATION_COUNTRIES: CountryOption[] = [
   { code: 'US', name: 'United States', cities: ['Austin', 'Boston', 'Chicago', 'Columbus', 'Dallas', 'Denver', 'Houston', 'Jacksonville', 'Los Angeles', 'New York', 'Philadelphia', 'Phoenix', 'San Antonio', 'San Diego', 'San Francisco', 'San Jose', 'Seattle', 'Washington'] },
   { code: 'ZA', name: 'South Africa', cities: ['Bloemfontein', 'Cape Town', 'Durban', 'East London', 'Johannesburg', 'Pietermaritzburg', 'Port Elizabeth', 'Pretoria'] },
 ];
+
+/** Sorted by display name. `'en'` is pinned so tests and browsers agree. */
+export const DESTINATION_COUNTRIES: CountryOption[] = [...DESTINATION_COUNTRIES_BY_CODE].sort(
+  (a, b) => a.name.localeCompare(b.name, 'en'),
+);
 
 /**
  * Normalize a country value to its display name.
