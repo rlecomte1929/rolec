@@ -150,13 +150,31 @@ async def process_rce_document(rce_document_id: str, *, engine: Any = None) -> P
     ocr_ok = bool(ocr and getattr(ocr, "ok", False))
 
     # 2. Extract → rce.extracted_fields (E-PIPE-4)
+    #
+    # [AIQ-2121] `code` (rce.documents.document_type_id) was the ONLY gate, so a document
+    # that arrived without a stored type skipped extraction entirely even after a clean OCR
+    # — and the filename classifier that would have supplied one maps to no runtime code at
+    # all, so nothing ever filled the gap. Fall back to the type the OCR step derived by
+    # READING the document.
+    #
+    # The stored code still wins: it is a stated fact, the derived one is an inference.
+    # `run_extraction_for_document` wants the RUNTIME code, which is exactly what
+    # `ocr.runtime_code` carries (mapped through CLASSIFIER_TO_RUNTIME) — never the raw
+    # classifier code.
     extraction_status = "skipped_no_ocr"
-    if ocr is not None and code:
+    derived_code = getattr(ocr, "runtime_code", None) if ocr is not None else None
+    effective_code = code or derived_code
+    if ocr is not None and effective_code:
         try:
             outcome = await run_extraction_for_document(
-                ocr_result=ocr, document_type_code=code, engine=eng
+                ocr_result=ocr, document_type_code=effective_code, engine=eng
             )
             extraction_status = outcome.status
+            if not code:
+                log.info(
+                    "rce_pipeline doc=%s extracted on a CONTENT-DERIVED type=%s "
+                    "(no stored document_type_id)", rce_document_id, effective_code,
+                )
         except Exception as exc:
             extraction_status = "failed"
             errors.append(f"extract:{exc}")
