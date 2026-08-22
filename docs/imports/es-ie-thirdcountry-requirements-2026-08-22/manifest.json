@@ -201,12 +201,13 @@
   "dependencies": {
     "A3_isd_visa_required": {
       "batch_id": "ie-isd-visa-required-2026-08-22",
-      "status": "present in docs/imports/ - landed",
+      "status": "LANDED and WIRED (2026-08-22, PR #1986). The artifact is docs/imports/ie-isd-visa-required-2026-08-22/ and it is consumed at request time by backend/app/services/isd_visa_required.py, which the CSEP_2026 pathway declares as EXTERNAL_LOOKUP -> isd_visa_required.{nationality_iso}.",
       "effect_on_this_batch": "No record in this batch asserts that any nationality IS visa-required. The two records that touch the visa question are marked assertion_mode=conditional and quote the source's own conditional wording ('and if visa required', 'If you are a visa-required national'). The visa-required determination stays with A3.",
       "conditional_records": [
         "entry_visa_follows_permit_if_visa_required",
         "leaving_state_before_registration_needs_new_entry_visa"
-      ]
+      ],
+      "effect_on_this_batch_now": "This batch's decision to leave the visa-required determination to A3 is what makes it correct now: roadmap_corridor_overlay resolves the question (Venezuela and North Macedonia both visa-required; a nationality it cannot place stays unasserted), while these two records keep their conditional wording and no longer dangle."
     },
     "S1_nationality_scoping_self_audit": {
       "required_before_delivery": true,
@@ -226,5 +227,6 @@
       "bases_balanced": true,
       "finding": "All 38 records satisfy the contract (nationality='non-EEA', status='professional'), but only 21 are nationality-DETERMINED. The other 17 are nationality-neutral Irish rules (PPSN, PAYE/RPN/Emergency Tax, tax residence, ordinary-residence health entitlement) where 'non-EEA' is the batch's audience and not a legal restriction. Each record now states which it is in applies_to.nationality_scope_basis, so a serving layer cannot infer that an EEA mover is exempt from a rule that binds everyone."
     }
-  }
+  },
+  "target_table_note": "`target_table` / loader.routing_value name the AUDOS-side otto-loader v6 contract (tools/otto-loader-index.ts), which is not in this repo. They are NOT a route this checkout can execute. Verified against prod 2026-08-22: public.requirement_facts has NO fact_uid column and two NOT NULL uuid FKs with no default (entity_id, source_doc_id) that this batch cannot supply, so an in-repo load keyed on fact_uid would fail. The in-repo path is scripts/import_otto_facts.py -> otto_staging.immigration_* -> executor.promote() -> public.requirement_items, which is where corridor requirement data actually lands. Left unchanged rather than rewritten: the routing value is a contract with a loader this repo cannot test, and CLAUDE.md's rule is to verify the claim, not to silently re-point someone else's contract."
 }

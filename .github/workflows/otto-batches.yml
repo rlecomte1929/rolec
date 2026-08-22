@@ -46,12 +46,27 @@ jobs:
         run: python scripts/check_gate_loader_sync.py
 
       # Enforce the delivery contract on each batch touched in this PR.
+      #
+      # Derive the base from LIVE origin/main, NOT github.event.pull_request.base.sha —
+      # the same fix #1906 made to the migration guards, for the same reason. That field
+      # records the base tip when the PR was OPENED and GitHub never refreshes it as the
+      # base branch moves. HEAD here is the PR merge ref (base + PR), so a three-dot diff
+      # from a stale SHA spans every batch merged into main since, and this job then fails
+      # a PR for somebody else's file. #1906 is the worked example: a guard "written to
+      # survive a moving base" blamed #1894 for a file #1901 had merged minutes earlier.
+      #
+      # Live here is not hypothetical: this branch sat 11 commits behind main while
+      # ie-isd-visa-required-2026-08-22 landed, so a stale base would gate that batch here.
       - name: Delivery gate on changed batches
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          mapfile -t ids < <(git diff --name-only "$BASE_SHA...$HEAD_SHA" -- 'docs/imports/**' \
+          git fetch --quiet origin main
+          BASE_SHA=$(git merge-base origin/main HEAD || true)
+          if [ -z "$BASE_SHA" ]; then
+            echo "::error::No merge base with origin/main — cannot determine which batches"
+            echo "this PR changed. (This job requires actions/checkout fetch-depth: 0.)"
+            exit 1
+          fi
+          mapfile -t ids < <(git diff --name-only "$BASE_SHA...HEAD" -- 'docs/imports/**' \
             | awk -F/ 'NF>=3 {print $3}' | sort -u)
           if [ "${#ids[@]}" -eq 0 ]; then
             echo "No batch directory changed in this PR (gate/loader-only change)."
