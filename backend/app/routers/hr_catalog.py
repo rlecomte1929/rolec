@@ -82,6 +82,22 @@ def _caller_company_id_optional(user: Dict[str, Any]) -> Optional[str]:
     return str(company_id) if company_id else None
 
 
+def _is_verified(attributes: Any) -> bool:
+    """Read the human-authoritative `verified` flag off a catalog item's attributes.
+
+    Tolerant of the shapes the column has actually held — a real bool, or the string "true"
+    from a JSON round-trip — and defaults to False. Absence means "nobody has signed this
+    off", which is exactly the state the UI must flag, so an unreadable value must never
+    read as verified.
+    """
+    if not isinstance(attributes, dict):
+        return False
+    raw = attributes.get("verified")
+    if isinstance(raw, bool):
+        return raw
+    return str(raw).strip().lower() == "true"
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
@@ -97,6 +113,10 @@ class CurationRow(BaseModel):
     source: Optional[str] = None  # master row source (scraper / manual / seed / hr_promoted)
     city: Optional[str] = None
     country: Optional[str] = None
+    # Lifted out of `attributes` so the UI does not have to reach into a free-form blob to
+    # decide whether to show the "Pending ReloPass verification" flag. Human-authoritative:
+    # nothing in the serving path ever sets this true, it only reads what ops signed off.
+    verified: bool = False
 
     # The id fields come straight from the DB. Under Postgres (prod) uuid
     # columns are returned as `uuid.UUID` objects, but under SQLite (tests)
@@ -146,6 +166,13 @@ class CustomVendorBody(BaseModel):
 def get_curation_view(
     category: str = Query(..., min_length=1),
     destination_city: Optional[str] = Query(None),
+    country: Optional[str] = Query(
+        None,
+        min_length=2,
+        max_length=2,
+        description="ISO alpha-2 destination country. Scopes the catalog proposal to vendors "
+                    "in that country. Omitted = every country, the pre-existing behaviour.",
+    ),
     user: Dict[str, Any] = Depends(require_admin_or_hr),
 ) -> Dict[str, Any]:
     """
@@ -156,16 +183,25 @@ def get_curation_view(
       the employee can pick must have been ticked by HR first.
     - Every HR custom vendor row for the same scope.
 
-    [AIQ-1904] This docstring used to claim the opposite — ``selected=true`` by
-    default "if HR hasn't decided yet" — while the code has always defaulted to
-    False. Measured against production 2026-08-22 as hr@testingapril.com:
-    ``category=movers`` returns 105 rows, **105 of them ``selected: false`` with
-    ``selection_id: null``**. Reading the old sentence, an engineer would conclude
-    a fresh company already had its catalog curated and that employees could see
-    it; in fact they get the "HR is finalizing providers" empty state until HR
-    ticks something (or AIQ-1903's seed writes explicit rows). That is a
-    deliberate design, and this line was the only thing contradicting it.
+    `country` scopes the catalog side to one destination. Without it the proposal spans every
+    country in the catalog, which is why a case bound for Ireland could not surface Ireland's
+    vendors as a destination list — the filter simply was not offered. `service_catalog.list_items`
+    has always accepted the argument; this route just never passed it.
+
+    [AIQ-1904] This docstring used to claim the opposite of the line above — ``selected=true``
+    by default "if HR hasn't decided yet" — while the code has always defaulted to False.
+    Measured against production 2026-08-22 as hr@testingapril.com: ``category=movers``
+    returns 105 rows, **105 of them ``selected: false`` with ``selection_id: null``**.
+    Reading the old sentence, an engineer would conclude a fresh company already had its
+    catalog curated and that employees could see it; in fact they get the "HR is finalizing
+    providers" empty state until HR ticks something (or AIQ-1903's seed writes explicit
+    rows). That is a deliberate design, and this line was the only thing contradicting it.
     """
+    # This router is unit-tested by calling the function directly rather than through FastAPI,
+    # so an unfilled `Query(...)` default arrives as a Query object, not None. Left unnormalised
+    # it is truthy, reaches `list_items` and dies at the SQL bind with
+    # "type 'Query' is not supported". Coerce anything that is not a real string to None.
+    country = country if isinstance(country, str) else None
     company_id = _caller_company_id(user)
     # Match the master plugins' geo-bound vs geo-agnostic split: when the
     # category has no rows tagged with a city, every row applies everywhere
@@ -173,6 +209,7 @@ def get_curation_view(
     # leave HR with "0 items" for categories that in fact have a full list.
     all_active = service_catalog.list_items(
         category=category,
+        country=country,
         active_only=True,
         limit=200,
     )
@@ -231,6 +268,7 @@ def get_curation_view(
                 source=m.get("source"),
                 city=m.get("city"),
                 country=m.get("country"),
+                verified=_is_verified(m.get("attributes_json")),
             )
         )
     for c in customs:
@@ -246,6 +284,9 @@ def get_curation_view(
                 source=None,
                 city=c.get("destination_city"),
                 country=c.get("country"),
+                # An HR-added vendor has by definition not been through ReloPass accreditation,
+                # so it is never platform-verified regardless of what the payload claims.
+                verified=False,
             )
         )
     return {
