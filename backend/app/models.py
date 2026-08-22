@@ -674,6 +674,14 @@ class CorridorAttestationRequest(Base):
     disclaimer_version = Column(Text, nullable=True)
     sent_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+    # How this attestation reaches requirement_items, and whether promoting it may also
+    # advance review_status. Both default to today's behaviour, so an omitted field is the
+    # conservative choice rather than a surprise. The vocabulary of `promotion_policy` is
+    # enforced by a CHECK constraint in the database (ck_cap_promotion_policy), NOT here —
+    # see migration 20261120000000. `auto_on_sign` is honoured in ATT-2.4; as of ATT-2.2
+    # these are recorded intent and nothing acts on them.
+    promotion_policy = Column(Text, nullable=False, server_default="manual")
+    advance_review_status = Column(Boolean, nullable=False, server_default="false")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

@@ -247,10 +247,23 @@ def create_attestation(
 ) -> AttestationCreatedDTO:
     """Snapshot a corridor's legal checklist and mint a one-time reviewer link."""
     with _db() as db:
+        # Which review_status values counsel is shown.
+        #
+        # Default: `approved` only — the served corpus, and what every request has asked
+        # for to date. Asking counsel about a row no reader can reach would waste the
+        # scarcest resource this feature spends.
+        #
+        # `advance_review_status=True`: also `pending`. The two go together deliberately.
+        # A request whose promotion is allowed to advance review_status is exactly the one
+        # whose job is to move unpublished rows INTO the served corpus, so it has to show
+        # counsel the unpublished rows. Widening the snapshot without the flag would put
+        # unreachable rows in front of a lawyer; setting the flag without widening would
+        # leave nothing for it to advance.
+        review_statuses = ("approved", "pending") if body.advance_review_status else ("approved",)
         q = db.query(RequirementItem).filter(
             RequirementItem.country_code == body.country_code,
             RequirementItem.purpose == body.purpose,
-            RequirementItem.review_status == "approved",
+            RequirementItem.review_status.in_(review_statuses),
         )
         if body.requirement_item_ids:
             q = q.filter(RequirementItem.id.in_(body.requirement_item_ids))
@@ -301,6 +314,11 @@ def create_attestation(
             content_snapshot_hash=snapshot_hash,
             content_snapshot_json=snapshot_items,
             disclaimer_version=DISCLAIMER_VERSION,
+            # Recorded intent only. Nothing reads either field until ATT-2.4 — see the
+            # TODO in _apply_promotion. An out-of-vocabulary promotion_policy is refused
+            # by the database CHECK rather than stored.
+            promotion_policy=body.promotion_policy,
+            advance_review_status=body.advance_review_status,
         )
         db.add(req)
         db.flush()
