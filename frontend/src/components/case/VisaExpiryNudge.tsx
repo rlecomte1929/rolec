@@ -54,6 +54,21 @@ export function confidenceForAlert(alert: ComplianceAlert): ConfidenceLevel {
 }
 
 /**
+ * What is actually expiring, from the field that fired. Derived from
+ * `detail.field` rather than `category`: every rule in this family is seeded
+ * with category='immigration', so branching on it would always pick one label
+ * and leave the other unreachable — and would have called a work permit a visa.
+ */
+export function subjectForAlert(alert: ComplianceAlert): string {
+  const field = typeof alert.detail?.field === 'string' ? alert.detail.field : '';
+  if (field === 'permit_expiry_date') return 'Permit';
+  if (field === 'existing_visa_expiry') return 'Visa';
+  if (field === 'passport_expiry') return 'Passport';
+  // We do not know which; say so rather than picking one and being wrong.
+  return 'Permit or visa';
+}
+
+/**
  * The one alert worth nudging about: open, about a visa/permit expiry, on this
  * case, and soonest first. Exported so the threshold logic is unit-testable
  * without rendering.
@@ -145,7 +160,7 @@ export const VisaExpiryNudge: React.FC<VisaExpiryNudgeProps> = ({ caseId, onStar
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className={`font-semibold ${headingTone}`}>
-          {alert.category === 'immigration' ? 'Visa' : 'Permit'} expires {dayLabel}
+          {subjectForAlert(alert)} expires {dayLabel}
         </span>
         <ConfidenceBadge level={level} size="sm" />
       </div>

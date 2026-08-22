@@ -14,6 +14,7 @@ import {
   VisaExpiryNudge,
   selectNudgeAlert,
   confidenceForAlert,
+  subjectForAlert,
   URGENT_WITHIN_DAYS,
 } from '../VisaExpiryNudge';
 import {
@@ -68,6 +69,28 @@ describe('confidenceForAlert — provenance of the date, not a model score', () 
   it('falls back to UNKNOWN rather than guessing when the field is absent', () => {
     expect(confidenceForAlert(alert({ detail: {} }))).toBe('UNKNOWN');
     expect(confidenceForAlert(alert({ detail: { field: 42 } }))).toBe('UNKNOWN');
+  });
+});
+
+describe('subjectForAlert — name the right document', () => {
+  it('calls a permit a permit, not a visa', () => {
+    expect(subjectForAlert(alert({ detail: { field: 'permit_expiry_date' } }))).toBe('Permit');
+  });
+
+  it('distinguishes a visa and a passport', () => {
+    expect(subjectForAlert(alert({ detail: { field: 'existing_visa_expiry' } }))).toBe('Visa');
+    expect(subjectForAlert(alert({ detail: { field: 'passport_expiry' } }))).toBe('Passport');
+  });
+
+  it('hedges rather than guessing when the field is unknown', () => {
+    expect(subjectForAlert(alert({ detail: {} }))).toBe('Permit or visa');
+  });
+
+  it('does not branch on category, which is always "immigration" for this rule family', () => {
+    // Both of these are category='immigration'; the label must still differ,
+    // which is exactly what a category-based ternary could not do.
+    expect(subjectForAlert(alert({ category: 'immigration', detail: { field: 'permit_expiry_date' } })))
+      .not.toBe(subjectForAlert(alert({ category: 'immigration', detail: { field: 'existing_visa_expiry' } })));
   });
 });
 
