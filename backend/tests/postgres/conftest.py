@@ -25,7 +25,9 @@ table is still `uuid`.
 ADDING A TABLE TO THIS LANE
 ---------------------------
 Append to `_AUTHORITATIVE_DDL`: the migration file, and the tables it owns. The tables are
-dropped (CASCADE) after `create_all` and recreated by replaying the file.
+dropped (CASCADE) after `create_all` and recreated by replaying the file. A migration that
+only ALTERs an already-listed table owns nothing, so it registers with an empty tuple and
+drops nothing — list it after the migration that creates the table, since replay is in order.
 
 Deliberately NOT replaying the whole `supabase/migrations/` tree: 600+ files, ~147 of them
 never applied to prod, and at least two destructive (CLAUDE.md, "Never run `supabase db push`
@@ -53,6 +55,14 @@ _AUTHORITATIVE_DDL: List[Tuple[str, Tuple[str, ...]]] = [
             "corridor_attestation_requests",
         ),
     ),
+    # ALTERs on the table phase-1 creates, so they own no table of their own and must
+    # drop nothing — they replay in order, on top of it. Unregistered, the lane rebuilds
+    # the table at its phase-1 column set and every INSERT that names a newer column
+    # dies with UndefinedColumn, which is a fixture gap wearing a model/migration
+    # divergence's clothes. Both are ADD COLUMN IF NOT EXISTS, so the replay is a no-op
+    # if a future create_all ever renders them.
+    ("20261120000000_attestation_promotion_policy.sql", ()),
+    ("20261121000000_attestation_case_scope.sql", ()),
 ]
 
 #: Supabase ships these; a bare postgres:16 container does not. The migration GRANTs to them
@@ -112,7 +122,8 @@ def pg_schema():
                     "would leave the lane green while testing a model-built schema, which is "
                     "exactly the blindness this file exists to remove."
                 )
-            cur.execute("DROP TABLE IF EXISTS " + ", ".join(tables) + " CASCADE;")
+            if tables:
+                cur.execute("DROP TABLE IF EXISTS " + ", ".join(tables) + " CASCADE;")
             cur.execute(path.read_text())
         raw.commit()
     finally:

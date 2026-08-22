@@ -30,13 +30,48 @@ jobs:
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
-      migrations: ${{ steps.filter.outputs.migrations }}
+      # A stacked PR's diff base is its PARENT branch, which already contains the
+      # parent's migrations — so paths-filter reports `false` and every migration
+      # guard skips. See the `stacked` step below. OR'd, never replaced: on a normal
+      # PR this is byte-identical to what it was.
+      migrations: ${{ steps.filter.outputs.migrations == 'true' || steps.stacked.outputs.untrusted_base == 'true' }}
       workflows: ${{ steps.filter.outputs.workflows }}
       edge_functions: ${{ steps.filter.outputs.edge_functions }}
-      case_id_writers: ${{ steps.filter.outputs.case_id_writers }}
+      case_id_writers: ${{ steps.filter.outputs.case_id_writers == 'true' || steps.stacked.outputs.untrusted_base == 'true' }}
       corridor_facts: ${{ steps.filter.outputs.corridor_facts }}
     steps:
       - uses: actions/checkout@v4
+      # On `pull_request`, paths-filter diffs against the PR's BASE BRANCH. For a stacked
+      # PR that base is the parent feature branch, so anything the parent already carries
+      # reads as "unchanged" and the jobs gated on it never run.
+      #
+      # Measured on PR #1997 (base `feat/att-foundations`), run 32590076205: the parent
+      # carried the two attestation migrations, the child was the first commit to READ the
+      # new columns from backend/app/models.py, and all four of
+      #   Migration column-read check · Migration duplicate-version check
+      #   Migration ledger drift check · canonical_case_id drift check
+      # reported `skipping`. The column-read guard exists for exactly that commit: a column
+      # read merged ahead of its migration being applied to prod already 500'd production
+      # once. The one PR it was built to catch is the one it could not see.
+      #
+      # The guards themselves are fine — each already diffs `git merge-base origin/main HEAD`
+      # rather than a base ref (that was #1906). Only the TRIGGER was base-relative. So when
+      # the base is not the default branch, force the migration-scoped filters on and let the
+      # guards decide. Deliberately conservative: a stacked PR now re-runs its parent's
+      # migration guards, which is a few wasted Actions-minutes on a rare PR shape. A guard
+      # that silently skips costs a production incident.
+      #
+      # Not `base:` on paths-filter — that input is documented as ignored on pull_request
+      # events, so setting it would look like a fix and check nothing.
+      - name: Is this PR stacked on a non-default base?
+        id: stacked
+        run: |
+          if [ "${{ github.base_ref }}" != "${{ github.event.repository.default_branch }}" ]; then
+            echo "::notice::Base '${{ github.base_ref }}' is not the default branch; migration filters cannot be trusted, forcing the migration guards on."
+            echo "untrusted_base=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "untrusted_base=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: dorny/paths-filter@v3
         id: filter
         with:
