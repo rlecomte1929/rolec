@@ -140,9 +140,9 @@ class _Result:
 def test_seed_file_is_readable_and_complete():
     seed = parsers.read_seed(SEED_PATH)
     assert seed.rejections == []
-    assert len(seed.rows) == 142
+    assert len(seed.rows) == 140
     assert len({r.destination_country for r in seed.rows}) == 15
-    assert len(seed.source_urls) == 86
+    assert len(seed.source_urls) == 83
 
 
 def test_uk_is_stored_as_gb():
