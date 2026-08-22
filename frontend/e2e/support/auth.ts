@@ -46,6 +46,22 @@ export async function seedAuth(
       localStorage.setItem('relopass_email', 'e2e@test.relopass');
       localStorage.setItem('relopass_username', 'e2e');
       localStorage.setItem('relopass_name', 'E2E User');
+      // AIQ-1711 welcome gate. `useWelcomeRedirect` runs on the role home's mount and
+      // navigates to /<role>/welcome whenever `hasSeenWelcome(relopass_user_id)` is
+      // false — which it always is in a fresh context, because the flag is normally
+      // mirrored from `profiles.welcome_seen_at` by `useAuth.setSession`, and seedAuth
+      // deliberately bypasses the login path that calls it.
+      //
+      // That made every seedAuth-based dashboard assertion a RACE against a useEffect:
+      // catch the render first and it passes, lose and the page is the onboarding
+      // screen with no `#employee-hub-linked-assignments` in the DOM at all. It failed
+      // by run ORDER, not by change — a11y.axe.spec.ts running first was enough to flip
+      // it, which is why it read as "the dependency bump broke E2E" on an innocent PR.
+      //
+      // seedAuth means "a logged-in returning user", and a returning user has seen the
+      // welcome. welcome.persistence.spec.ts is unaffected: it drives the real login
+      // form precisely because seedAuth skips setSession.
+      localStorage.setItem('relopass_welcome_seen_e2e-user', '1');
     },
     [role, token] as const,
   );
