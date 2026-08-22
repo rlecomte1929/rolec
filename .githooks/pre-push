@@ -51,10 +51,21 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   fi
 
   changed=$(git diff --name-only "$range" 2>/dev/null || true)
-  if printf '%s\n' "$changed" | grep -qE '^frontend/'; then
+  # Match with a HERESTRING, never `printf ... | grep -q`.
+  #
+  # `set -o pipefail` (line 13) + `grep -q` is a silent-skip trap on large pushes:
+  # grep -q exits the moment it matches, the writer gets SIGPIPE (141), and pipefail
+  # makes the PIPELINE report 141 — so a real match reads as "no match" and the build
+  # is skipped. It only fires when the diff is big enough that the writer is still
+  # going when grep quits, which is why it went unnoticed: every small push worked.
+  #
+  # Found on the AIQ-1865 push (16,101 changed files), which skipped BOTH the frontend
+  # build and the workflow-scope warning despite touching frontend/ and
+  # .github/workflows/. Same silent-skip class as AIQ-550 above, different mechanism.
+  if grep -qE '^frontend/' <<<"$changed"; then
     need_build=1
   fi
-  if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/'; then
+  if grep -qE '^\.github/workflows/' <<<"$changed"; then
     touches_workflow=1
   fi
 done

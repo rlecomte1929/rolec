@@ -52,7 +52,11 @@ for entry in "${CHECKS[@]}"; do
     continue
   fi
 
-  if ! printf '%s' "$body" | grep -qF "<title>${expect}</title>"; then
+  # Herestring, not `printf | grep -q`: with pipefail, grep -q quits at the match,
+  # the writer takes SIGPIPE (141), and the pipeline reports 141 — so a title that IS
+  # present reads as absent. A <title> sits near the top of the document, so the writer
+  # has the whole body left to push, which is exactly when this fires.
+  if ! grep -qF "<title>${expect}</title>" <<<"$body"; then
     echo "FAIL  $url — ${bytes} bytes but no <title>${expect}</title>."
     echo "      Served something, but not this page's prerendered HTML."
     fail=1
