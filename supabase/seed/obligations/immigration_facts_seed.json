@@ -1380,7 +1380,7 @@
       "household": "any",
       "nationality": "non-EEA"
     },
-    "source_url": "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/fees/",
+    "source_url": "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/",
     "evidence_quote": null,
     "confidence": "high",
     "accuracy_tier": "auto_accepted"
@@ -1391,14 +1391,14 @@
     "entity_title": "Critical Skills Permit – occupation list",
     "fact_type": "eligibility",
     "fact_key": "ie_csep_occupation",
-    "fact_text": "For a Critical Skills Employment Permit, the role must appear on the Critical Skills Occupations List (Schedule 3 of the Regulations, updated by SI 213 of 2026, effective 13 May 2026). Roles earning €68,911 or more annually are generally eligible regardless of occupation.",
+    "fact_text": "For a Critical Skills Employment Permit, the role must appear on the Critical Skills Occupations List (Schedule 3 of the Regulations, updated by SI 213 of 2026, effective 13 May 2026). Occupations with a minimum annual remuneration of over €68,911 are also eligible, other than those on the Ineligible List of Occupations for Employment Permits or which are contrary to the public interest.",
     "applies_to": {
       "role": "primary",
       "status": "professional",
       "household": "any",
       "nationality": "non-EEA"
     },
-    "source_url": "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/employment-permit-eligibility/highly-skilled-eligible-occupations-list/",
+    "source_url": "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/",
     "evidence_quote": null,
     "confidence": "high",
     "accuracy_tier": "auto_accepted"
@@ -1409,7 +1409,7 @@
     "entity_title": "Critical Skills Permit – salary threshold",
     "fact_type": "eligibility",
     "fact_key": "ie_csep_salary",
-    "fact_text": "Critical Skills Employment Permit requires a minimum annual remuneration of €40,904 (based on a 39-hour week; €41,953.60 for a 40-hour week), rising further under the published MAR roadmap.",
+    "fact_text": "Critical Skills Employment Permit requires a minimum annual remuneration of €40,904, or €36,848 where the applicant received their qualification within the 12 months before the date of application. Thresholds rise further under the published MAR roadmap.",
     "applies_to": {
       "role": "primary",
       "status": "professional",
@@ -1499,7 +1499,7 @@
     "entity_title": "General Employment Permit – salary threshold",
     "fact_type": "eligibility",
     "fact_key": "ie_gep_salary",
-    "fact_text": "General Employment Permit requires a minimum annual remuneration of €36,605 (39-hour week; €37,544 for a 40-hour week) following the March 2026 increase under the government's MAR roadmap.",
+    "fact_text": "General Employment Permit requires a minimum annual remuneration generally above €36,605, following the March 2026 increase under the government's MAR roadmap.",
     "applies_to": {
       "role": "primary",
       "status": "professional",
