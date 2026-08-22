@@ -30,7 +30,6 @@ jobs:
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
-      hr_dashboard: ${{ steps.filter.outputs.hr_dashboard }}
       migrations: ${{ steps.filter.outputs.migrations }}
       workflows: ${{ steps.filter.outputs.workflows }}
       edge_functions: ${{ steps.filter.outputs.edge_functions }}
@@ -42,13 +41,13 @@ jobs:
         id: filter
         with:
           filters: |
-            # `.nvmrc` is listed under BOTH Node-built apps on purpose. It sets the Node
-            # version for every one of them and for the production Render build, yet it
-            # was in no filter — so a Node bump triggered NOTHING. Changing it to 22.23.2
-            # ran the frontend jobs only by accident, because that commit also touched
-            # frontend/package.json; the HR Dashboard build was skipped, and a Node
-            # upgrade could have shipped without ever building it. Same silent-drift
-            # shape as the four duplicated Node pins this change collapses into one.
+            # `.nvmrc` is listed under `frontend` on purpose. It sets the Node version for
+            # the app and for the production Render build, yet it was in no filter — so a
+            # Node bump triggered NOTHING. Changing it to 22.23.2 ran the frontend jobs
+            # only by accident, because that commit also touched frontend/package.json.
+            # AIQ-1865 removed the second Node-built app (apps/hr-dashboard), so `frontend`
+            # is now the only consumer; if another Node app is ever added, list `.nvmrc`
+            # under it too or a Node upgrade can ship without ever building it.
             # Not added to `backend` — that suite is Python and `.nvmrc` cannot affect it.
             frontend:
               - 'frontend/**'
@@ -69,9 +68,6 @@ jobs:
               - 'scripts/check_corridor_facts.py'
               - 'scripts/corridor_facts_allowlist.txt'
               - 'backend/imports/otto/parsers.py'
-            hr_dashboard:
-              - 'apps/hr-dashboard/**'
-              - '.nvmrc'
             # This filter gates FIVE jobs: RLS coverage, Storage bucket, Migration ledger
             # drift, Migration column-read, Migration duplicate-version. It was
             # `supabase/migrations/**` alone, so **editing a guard or its allowlist did not
@@ -149,6 +145,32 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: ${{ github.workspace }}/.gitleaks.toml
 
+  repo-hygiene:
+    # [AIQ-1865] Fail the PR if a dependency tree or build output is tracked by git.
+    #
+    # `.gitignore` named build dirs path by path (`frontend/node_modules`,
+    # `frontend/dist/`), and a rule that names one path protects no other. Two
+    # `npm install` runs elsewhere committed their whole dependency tree and stayed
+    # on `main` for months: apps/hr-dashboard/node_modules (15,635 files) and
+    # design/templates/node_modules (383 — a stray `npm i docx` in a directory with
+    # no package.json), plus a root `node_modules/.vite/...` vitest cache artefact.
+    # All three were untracked in the commit that added this job, and the ignore
+    # rules are now unanchored, so the guard starts from a genuinely clean tree.
+    #
+    # Always runs — deliberately NOT behind a path filter. A vendored tree can be
+    # introduced from any directory, including one no existing filter names; that is
+    # precisely how the two above went unnoticed. It needs no deps and no secret.
+    name: Repo hygiene (no vendored deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Check no dependency tree or build output is tracked
+        run: python scripts/check_no_vendored_deps.py
+
   # Frontend build + type-check + lint + unit tests, consolidated into ONE job
   # (was three: frontend-build / frontend-checks / frontend-unit-tests).
   # The three separate jobs each did their own checkout + setup-node + `npm ci`,
@@ -225,46 +247,6 @@ jobs:
         run: npm run test:coverage
         env:
           CI: true
-
-  hr-dashboard-build:
-    # C1-11a: separate Vite app at apps/hr-dashboard/. Mirrors the
-    # frontend-build job's shape (npm ci → build → typecheck → lint) so a
-    # regression in either app surfaces in the same CI lane.
-    name: HR Dashboard build
-    needs: changes
-    if: needs.changes.outputs.hr_dashboard == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/hr-dashboard
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: apps/hr-dashboard/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Type-check
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
-
-      - name: Confirm dist/ was produced
-        run: |
-          if [ ! -d dist ] || [ -z "$(ls -A dist)" ]; then
-            echo "::error::apps/hr-dashboard/dist was not produced by the build"
-            exit 1
-          fi
 
   e2e:
     # QG-5a (AIQ-1178): Playwright E2E smoke against the BUILT app served by

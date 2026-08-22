@@ -28,8 +28,9 @@ from .correction_analytics import (
 
 log = logging.getLogger(__name__)
 
-# Human-readable labels for the render — mirrors apps/hr-dashboard reasonCodes.ts
-# REASON_CODE_LABELS so the email reads the same as the Resolution UI.
+# Human-readable labels for the render. These mirrored apps/hr-dashboard's
+# reasonCodes.ts REASON_CODE_LABELS so the email read the same as the Resolution UI;
+# AIQ-1865 deleted that app, so this is now the only copy of the wording.
 _REASON_LABELS: Dict[str, str] = {
     "OCR_ERROR": "OCR misread",
     "TYPO_IN_SOURCE": "Typo in source",

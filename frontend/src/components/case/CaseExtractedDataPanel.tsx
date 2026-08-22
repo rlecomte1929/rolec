@@ -45,7 +45,8 @@ function labelFor(key: string): string {
 }
 
 /**
- * Thresholds match the existing hr-dashboard band (0.9 / 0.75). Deliberately not
+ * Thresholds are the 0.9 / 0.75 band inherited from the (now-deleted, AIQ-1865)
+ * hr-dashboard app. Deliberately not
  * `resolveConfidenceLevel` from confidence.tokens — that one downgrades to UNKNOWN
  * without a source URL, which is a roadmap-citation rule, not an extraction one.
  */
