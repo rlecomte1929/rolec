@@ -1,0 +1,70 @@
+name: Otto import batches
+
+# Gate Otto research batches under docs/imports/ against the delivery contract, and keep
+# the gate's loader mirror in sync with the deployed loader. Runs only when a batch, the
+# gate, its drift guard, or the loader's allow-lists change (native path filter — the repo
+# configures no required status checks, so a skipped run is safe and does not block merge).
+#
+# Design note: this gates only batches ADDED OR CHANGED in the PR, not `--all`. Several
+# batches predate the gate and do not meet the strict contract; re-gating them would fail
+# CI on untouched legacy content. Grandfathering-by-non-change mirrors ci.yml's path
+# filters ("run only the jobs that matter for this diff"). Editing a legacy batch opts it
+# back into the gate — touching it means bringing it up to standard.
+on:
+  pull_request:
+    paths:
+      - 'docs/imports/**'
+      - 'scripts/check_otto_batches.py'
+      - 'scripts/check_gate_loader_sync.py'
+      - 'supabase/functions/otto-loader/index.ts'
+
+concurrency:
+  group: otto-batches-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Delivery gate (changed batches)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # need the PR base commit to diff which batches changed
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      # The gate mirrors the deployed loader's allow-lists (FACT_TYPES / ALLOWED_DOMAINS)
+      # by copy. Fail if they have drifted, so the offline gate can never grade a batch
+      # against a stale taxonomy. Pure stdlib — no install step.
+      - name: Gate<->loader allow-list drift guard
+        run: python scripts/check_gate_loader_sync.py
+
+      # Enforce the delivery contract on each batch touched in this PR.
+      - name: Delivery gate on changed batches
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mapfile -t ids < <(git diff --name-only "$BASE_SHA...$HEAD_SHA" -- 'docs/imports/**' \
+            | awk -F/ 'NF>=3 {print $3}' | sort -u)
+          if [ "${#ids[@]}" -eq 0 ]; then
+            echo "No batch directory changed in this PR (gate/loader-only change)."
+            exit 0
+          fi
+          rc=0
+          for id in "${ids[@]}"; do
+            if [ ! -f "docs/imports/$id/manifest.json" ]; then
+              echo "skip '$id' (no manifest.json — not a batch directory)"
+              continue
+            fi
+            echo "::group::delivery gate — $id"
+            python scripts/check_otto_batches.py "$id" || rc=1
+            echo "::endgroup::"
+          done
+          exit "$rc"
