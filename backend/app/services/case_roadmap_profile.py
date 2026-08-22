@@ -8,6 +8,36 @@ roadmap (which may be RULE_NOT_FOUND) or None when the case can't be mapped.
 
 The country normaliser and EEA/pathway classification are reused from existing
 services so this stays a thin glue layer.
+
+A CURATED CORRIDOR OUTRANKS A GENERATED ONE
+-------------------------------------------
+``persist_generated_milestones`` calls ``delete_case_milestones(exclude_source="service")``
+before writing, so anything that is not a Services-tab step is destroyed — including the
+authored corridor pathway ``timeline_service._corridor_milestones`` seeds. On intake submit
+``_async_seed_and_generate_roadmap`` (backend/main.py) runs the two in sequence: seed the
+deterministic milestones, THEN generate and persist. The generated steps therefore replace
+the seeded ones by design, and for a corridor nobody has authored that is the right trade.
+
+For a CURATED corridor it is exactly backwards. The pathway is sequenced, cited and
+human-reviewed; the generated steps are none of those things.
+
+Measured in production 2026-08-22 — this is not hypothetical:
+
+  corridor   corpus chunks   cases w/ AI steps   cases w/ corridor steps
+  FR_NO           46               265                    0
+  IN_DE           19                 6                    0
+  ES_IE            8                 0                    8
+  US_FR           19                 0                    0
+
+All 272 cases carrying AI steps hold NOTHING but ``source='ai'`` and ``source='service'``
+rows — the signature of the delete, since the submit chain always seeds first. FR→NO is
+known to have an authored pathway (one case still carries its corridor rows), so those 265
+lost theirs. ES→IE had not fired only because its corpus was indexed the same day; the
+retriever short-circuits to RULE_NOT_FOUND on an empty corpus, and with 8 active chunks it
+no longer does. The next ES→IE intake submit would have deleted the CSEP pathway.
+
+Hence the guard in ``persist_generated_milestones``: if the case already holds curated
+corridor milestones, refuse to persist and keep them.
 """
 from __future__ import annotations
 
@@ -127,6 +157,45 @@ def map_generated_steps_to_milestones(
     return rows
 
 
+#: Curated corridor milestones are named ``{phase}_corridor_{NN}`` by
+#: ``timeline_service._corridor_milestones`` — e.g. ``immigration_corridor_05``,
+#: ``post_arrival_corridor_03``.
+#:
+#: MATCH ON THE NAME, NOT ON ``source``. Every one of the 455 corridor rows in
+#: production carries ``source IS NULL``; the only non-null sources in that table are
+#: 'service' (3,570), 'ai' (2,065) and 'deterministic_seed' (293). A guard written
+#: against ``source='deterministic'`` — the value one would reasonably guess — matches
+#: nothing at all and silently protects nothing.
+_CORRIDOR_MILESTONE_MARKER = "_corridor_"
+
+
+def curated_corridor_milestones(
+    db: Any, case_id: str, request_id: Optional[str] = None
+) -> Optional[List[Dict[str, Any]]]:
+    """The case's authored-pathway milestones.
+
+    Returns the matching rows, ``[]`` when the case demonstrably has none, and **None**
+    when we could not find out.
+
+    FAILS CLOSED, and the three-state return is the whole point. Collapsing the error
+    case into ``[]`` would read as "no curated steps here" and let the caller delete the
+    very pathway this guard exists to protect — a transient database blip would destroy
+    authored content. `None` forces the caller to treat "unknown" as "do not touch".
+    """
+    try:
+        existing = db.list_case_milestones(case_id, request_id=request_id) or []
+    except Exception:  # pragma: no cover - defensive; see docstring
+        log.warning(
+            "curated_corridor_milestones: could not read milestones for case %s — "
+            "treating as UNKNOWN so the caller refuses to overwrite", case_id, exc_info=True,
+        )
+        return None
+    return [
+        m for m in existing
+        if _CORRIDOR_MILESTONE_MARKER in str(m.get("milestone_type") or "")
+    ]
+
+
 def persist_generated_milestones(
     db: Any,
     case_id: str,
@@ -145,6 +214,25 @@ def persist_generated_milestones(
     """
     rows = map_generated_steps_to_milestones(steps, corridor)
     if not rows:
+        return 0
+    # A CURATED CORRIDOR OUTRANKS A GENERATED ONE. Refuse to replace an authored
+    # pathway with generated steps — see the module note above for the measurements.
+    curated = curated_corridor_milestones(db, case_id, request_id=request_id)
+    if curated is None:
+        log.warning(
+            "persist_generated_milestones: REFUSED for case %s (corridor=%s) — could not "
+            "determine whether curated corridor milestones exist. Refusing rather than "
+            "risking the deletion of an authored pathway.", case_id, corridor,
+        )
+        return 0
+    if curated:
+        log.warning(
+            "persist_generated_milestones: REFUSED for case %s (corridor=%s) — %d curated "
+            "corridor milestones present (%s). The authored pathway is sequenced and cited; "
+            "the generated one is not. Keeping the curated steps.",
+            case_id, corridor, len(curated),
+            ", ".join(sorted(str(m.get("milestone_type") or "?") for m in curated)[:5]),
+        )
         return 0
     # Preserve service-derived milestones (source='service') so a regeneration
     # of the AI roadmap doesn't wipe steps the employee added via the Services tab.
