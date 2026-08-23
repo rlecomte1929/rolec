@@ -179,30 +179,30 @@ AIQ-234:frontend/src/features/platform-v2/policy-builder/PolicyDocumentsPage.tsx
 
 # ── 2026-08-23 · first live run after NOTION_QUEUE_TOKEN was refreshed ─────────
 #
-# The secret had been stale since 2026-06-04, so this guard reported a pass on a
-# queue it could not read for nearly three months. This is the backlog that
-# surfaced when it could finally see. Every entry below is taken VERBATIM from the
-# guard's own output on a full-history checkout.
+# CORRECTED 2026-08-23 (second pass). The first version of this block listed 46
+# entries. It was wrong: the guard could not see git history (#2055) and I compounded
+# that by reconstructing lists by hand instead of reading the guard's output.
 #
-# The original run reported 110 claims. They account for exactly:
-#     51  existed and were later renamed or removed — the work SHIPPED   [INFO]
-#     13  resolve once Notion's eaten underscores are restored — EXISTS  [WARN]
-#     46  never existed in any commit on any branch, across 26 tasks     [FAIL]
-#     ---
-#     110
+# With #2055 (history visible) and the migration-restamp rule, the 110 original claims
+# now resolve as:
+#     ~70  added at some point, later renamed or removed — the work SHIPPED   [INFO]
+#       6  a migration re-stamped before it landed — the file EXISTS          [WARN]
+#      13  Notion ate the underscores of __init__.py / __tests__ — EXISTS     [WARN]
+#      20  never added anywhere in this repo's history   <-- only these, below
 #
-# The first two are deliberately NOT listed. The guard was changed to stop asking
-# 'is this a tracked file today' and start asking 'did this deliverable ever ship',
-# so they resolve automatically. Listing them would have added 64 entries needing
-# perpetual upkeep and left every future refactor tripping the same way.
+# 26 entries were removed from this block, and 16 Notion cards that had been flipped
+# to Rejected on the strength of them were restored to Done.
 #
-# History comes from ONE sweep, not a per-path query:
-#     git log --all --diff-filter=A --name-only --format=
-# A per-path `git log -- <path>` applies history simplification and misses a file
-# added on a merged side branch.
+# TWO GDPR MIGRATIONS WERE AMONG THE FALSE FINDINGS: IMM-17 erasure_requests and
+# IMM-18 retention_automation. Both shipped, both are live in production
+# (`erasure_requests` table; `fn_case_close_set_retention` +
+# `fn_immigration_retention_cleanup`), and both were briefly and wrongly reported as
+# never existing. See the findings doc for the full retraction.
 #
-# Full analysis and the 26 tasks:
-#     docs/findings/deliverable-integrity-first-live-run-2026-08-23.md
+# Verified with the guard itself, not by hand:
+#     git log --all HEAD --no-renames --diff-filter=A --name-only --format=
+#
+# docs/findings/deliverable-integrity-first-live-run-2026-08-23.md
 
 # 623 · AI-W7.2 — LLM-as-judge for assistant tone, groundedness, actionability
 623:backend/eval/judges/base.py
@@ -213,70 +213,20 @@ AIQ-234:frontend/src/features/platform-v2/policy-builder/PolicyDocumentsPage.tsx
 623:backend/tests/fixtures/judges/labelled_examples.json
 623:backend/tests/test_judges.py
 
-# 575 · AI-W6.2 — Correction-to-gold-fixture promotion script
-575:backend/app/services/correction_anonymizer.py
-575:backend/app/services/correction_promotion.py
-575:backend/scripts/promote_correction_to_gold.py
-575:backend/tests/fixtures/pilot/promoted/README.md
-575:backend/tests/test_promote_correction.py
-
 # 541 · AI-W3.4 — Promptfoo PR-gate CI workflow
 541:.github/test-events/sample-pr.json
 541:.github/workflows/ai-eval-gate.yml
 541:backend/prompts/promptfooconfig.yaml
 
-# 552 · AI-W5.1 — Extraction Agent runtime + versioning semantics
-552:backend/app/services/extraction_agent.py
-552:backend/tests/test_extraction_agent_runtime.py
-552:supabase/migrations/20260601000000_extraction_agents.sql
-
-# 111 · IMM-10 · Frontend — wire Step 4 'Immigration' in employee journey wizard
-111:backend/tests/test_immigration_requirements_summary.py
-111:frontend/src/features/immigration/ImmigrationStep.tsx
-
-# 188 · IMM-16 · Backend — immutable data access audit log (DB trigger)
-188:docs/privacy/immigration-data-access-log.md
-188:supabase/migrations/20260605500000_imm16_profile_access_audit_trigger.sql
-
-# 545 · AI-W7.1 — Eligibility-reasoning LLM node (Claude Sonnet via Bedrock Frankfurt)
-545:backend/relopass/agents/eligibility_reasoner.py
-545:backend/tests/test_eligibility_reasoner.py
-
-# 592 · C1-07P · Prompt engineering: LLM entity-resolution fallback (structured output)
-592:prompts/entity/resolver_v1.eval.md
-592:prompts/entity/resolver_v1.txt
-
 # 617 · AI-W2.2 — Adapter: ai_trace_logger.TraceSession → agent_runs writer
 617:backend/app/services/agent_run_writer.py
 617:backend/tests/test_agent_run_writer.py
 
-# 714 · P3-01b · Build context-precision evaluator
-714:scripts/eval_context_precision.py
-714:scripts/rag_eval_harness.py
-
-# 144 · IMM-17 · Backend — right-to-access data export endpoint
-144:supabase/migrations/20260605600000_imm17_erasure_requests.sql
-
-# 145 · IMM-18 · Backend — data erasure workflow + retention automation
-145:supabase/migrations/20260605700000_imm18_retention_automation.sql
-
-# 319 · FOUNDATION-1A · Design & create events + daily_summaries schema
-319:supabase/migrations/20260523000000_analytics_events_and_daily_summaries.sql
-
-# 332 · [P4-3] 'Add document' — ad-hoc forms outside the registry
-332:supabase/migrations/20260605600000_case_forms_adhoc.sql
-
 # 540 · Test runner: stop sending invite emails to fake @testco.com domains (kills Resend send
 540:scripts/relopass_api_runner.js
 
-# 555 · AI-W5.2 — PASSPORT_TD3 extraction agent (deterministic MRZ + LLM for non-MRZ fields)
-555:backend/tests/test_passport_td3_agent.py
-
 # 565 · C2-06 · Policy-versus-reality gap detector (entitlement gaps with clause citations)
 565:backend/relopass/policy_evidence/models.py
-
-# 574 · C2-01 · FamilyMember + spouse/child document types (MARRIAGE_CERT, BIRTH_CERT, FOSTER_
-574:supabase/migrations/20260602000000_rce_family_document_types_seed.sql
 
 # 577 · C2-02b-FOLLOWUP · Agent wiring + AgentRegistry registration (tax_cert_{fr,de,no}.py)
 577:backend/relopass/agents/extraction/tax_cert_findings.py
@@ -284,27 +234,15 @@ AIQ-234:frontend/src/features/platform-v2/policy-builder/PolicyDocumentsPage.tsx
 # 580 · AI-I.5 — Remove/avoid LangGraph dependency; commit FastAPI + Pydantic pipeline pattern
 580:audit/ADR-001-no-langgraph.md
 
-# 601 · P1-04a · Build specialist_review_events analytics schema + ETL view
-601:supabase/migrations/20260604120000_specialist_review_calibration_view.sql
-
 # 620 · AI-W3.5 — Nightly full-corpus eval job + Langfuse leaderboard
 620:.github/workflows/ai-eval-nightly.yml
-
-# 627 · AI-W5.4 — DIPLOMA extraction agent
-627:prompts/extraction/diploma_v1.txt
-
-# 665 · P3-01c · Build factual-consistency evaluator
-665:scripts/eval_factual_consistency.py
 
 # 698 · [BUG-A] Fix GET /api/company/branding-config returning 500 — missing branding_config c
 698:supabase/migrations/20260527_add_company_branding_config.sql
 
+# 714 · P3-01b · Build context-precision evaluator
+714:scripts/eval_context_precision.py
+
 # 750 · AI-W2.1 — Migration: unified agent_runs table with RLS
 750:supabase/migrations/20260531000000_agent_runs.sql
 
-
-# 2026-08-23 — investigated, not a leak. The note's path uses `tests/`; this repo's frontend
-# convention is `__tests__/`, and the file is tracked at
-# frontend/src/pages/admin/__tests__/AdminVettingQueue.test.tsx. Two trailing segments differ, so
-# the suffix resolver cannot (and should not) match it.
-1893:frontend/src/pages/admin/tests/AdminVettingQueue.test.tsx

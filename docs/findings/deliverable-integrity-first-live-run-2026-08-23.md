@@ -2,6 +2,79 @@
 
 **Date:** 2026-08-23 · **Guard:** `scripts/check_deliverable_integrity.py`
 
+---
+
+# ⚠️ CORRECTION — 2026-08-23, second pass
+
+**Most of what the first version of this document said was wrong, and two of its claims were
+alarming as well as wrong.**
+
+## The retraction that matters: the GDPR alarm was false
+
+The first version flagged three adjacent privacy obligations as marked Done with nothing
+shipped, and urged a deliberate check. All three had shipped. Verified against production:
+
+| capability | state in prod |
+|---|---|
+| IMM-16 — immutable data-access audit log | `data_access_log`: **3,858 rows**, 1 active trigger |
+| IMM-17 — right-to-access export | `erasure_requests` table exists (0 rows: no requests yet) |
+| IMM-18 — retention automation | `fn_case_close_set_retention`, `fn_immigration_retention_cleanup` |
+
+Plus routers `gdpr.py`, `immigration_gdpr.py`, `admin_dsar.py`. The IMM-17 and IMM-18 migrations
+are on `main` under later timestamps than the cards recorded — this repo re-stamps migrations by
+policy, so a card written before its file lands is wrong **by construction**.
+
+Notes claiming otherwise were written onto those three Notion cards. They have been retracted
+there.
+
+## Corrected numbers
+
+The guard could not see git history at all (fixed in #2055 — `actions/checkout` leaves a PR build
+on a detached HEAD, and `--all` enumerated no refs, so `paths_ever_added` returned the **empty
+set**). Every conclusion drawn before that fix was drawn from a blind guard.
+
+With history visible, the original 110 claims resolve as:
+
+| category | count |
+|---|---:|
+| added at some point, later renamed or removed — **shipped** | ~70 |
+| a migration re-stamped before it landed — **the file exists** | 6 |
+| Notion ate the underscores of `__init__.py` / `__tests__` — **exists** | 13 |
+| **never added anywhere in this repo's history** | **20** |
+
+Not 46. **26 allowlist entries were removed, and 16 Notion cards that had been flipped to
+`Rejected` were restored to `Done`.**
+
+## What actually went wrong, four times
+
+1. `git log --all --diff-filter=A -- <path>` **per path** — applies history simplification, misses
+   files added on merged side branches. Gave 62/10/25.
+2. Rebuilt the list from a **truncated** `gh run view --log` capture — produced the wrong 23.
+3. Took CI's next failure list as "the answer" when it was only *what remained after the previous
+   23 were suppressed*. The union was 46.
+4. Concluded migration re-stamping was unhandled by grepping `_MANGLE_RULES` — while
+   `resolve_restamped_migration` already existed 70 lines below.
+
+Every one is the same mistake: **reasoning about what the tool would say instead of running it and
+reading the answer.** Number 4 is the sharpest, because "search for the capability, not the name"
+is the rule this very document was written to illustrate.
+
+## Standing caveat
+
+The 20 remaining are absent **by path**. That is filename evidence, not capability evidence — and
+capability checks on four clusters found three had shipped under different names
+(`feedback_to_gold.py` for correction→gold promotion; `extraction_agents_storage.py` +
+`rce_extraction_agents.sql` for the extraction runtime; `run_judge_calibration.py` +
+`run_rag_triad.py` for LLM-as-judge). Only AI-W3.4's Promptfoo **PR gate** was confirmed genuinely
+absent — `eval-llm-reports.yml` says in its own header that it "never gates a PR".
+
+Assume the 20 over-report. Check the capability before acting on any of them.
+
+
+---
+
+# Original document (superseded — read the correction above first)
+
 ## Why this run was the first
 
 `NOTION_QUEUE_TOKEN` had been stale since **2026-06-04**. Every query 404'd, and the script
