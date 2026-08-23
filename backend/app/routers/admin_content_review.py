@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ...database import db
+from ...db.policies import UnquotedApprovalError
 from ..auth_deps import require_admin
 from ..services.fact_evidence import NO_SOURCE, UNVERIFIED, VERIFIED, check_evidence
 
@@ -194,7 +195,12 @@ def decide(body: DecideRequest, user: Dict[str, Any] = Depends(require_admin)) -
         # with no reason is unreviewable later and teaches the extractor nothing.
         raise HTTPException(status_code=400, detail="notes are required when rejecting")
 
-    db.update_requirement_fact_status(body.fact_ids, new_status, reviewer, body.notes)
+    try:
+        db.update_requirement_fact_status(body.fact_ids, new_status, reviewer, body.notes)
+    except UnquotedApprovalError as exc:
+        # [AIQ-2124] A reviewer approving a batch needs to know WHICH fact lacks its quote —
+        # a 500 would tell them only that something broke, and the batch would look applied.
+        raise HTTPException(status_code=422, detail=str(exc))
     for fid in body.fact_ids:
         _audit(fid, {"status": new_status, "notes": body.notes}, reviewer)
     return {"ok": True, "count": len(body.fact_ids), "status": new_status}
