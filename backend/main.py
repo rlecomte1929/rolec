@@ -5613,6 +5613,36 @@ def claim_assignment(
     effective = _effective_user(user, UserRole.EMPLOYEE)
     claim_req_id = getattr(request.state, "request_id", None) or ""
     assignment = db.get_assignment_by_id(assignment_id)
+
+    # [BUG-260804-1327] "the displayed code is not accepted". Three different values are
+    # called "case code" and this endpoint used to accept only one of them:
+    #   - assignment_claim_invites.token — what assignment_invite_email.py actually mails
+    #     the employee, verbatim, under the words "link it manually with this case code";
+    #   - the dashboard's 8-char Reference (formatCaseReference) — display only;
+    #   - case_assignments.id — the only thing this lookup understood.
+    # So the employee pasted the code from their email, got a bare 404, and had no way to
+    # link their own case. Resolve the token to its assignment and carry on.
+    #
+    # The token is the RIGHT key to add: assignment_claim_invites.token is unique-constrained
+    # (and therefore indexed), so the lookup is exact and collision-free. The 8-char Reference
+    # deliberately is NOT accepted — case_assignments.id is TEXT with 8 non-uuid rows in prod,
+    # the Reference is derived from case_id (a different id space), and `LIKE '%suffix'` is
+    # unindexable, case-sensitive and genuinely collision-prone on a brute-forceable endpoint.
+    #
+    # SECURITY: this only resolves WHICH assignment is meant. Every identity check below still
+    # runs unchanged, so this path stays strictly stricter than claim-by-token, where
+    # possession of the token is the whole proof.
+    claimed_via_token = False
+    if not assignment:
+        invite = db.get_claim_invite_by_token(assignment_id)
+        invite_assignment_id = str((invite or {}).get("assignment_id") or "").strip()
+        if invite_assignment_id:
+            resolved = db.get_assignment_by_id(invite_assignment_id)
+            if resolved:
+                assignment = resolved
+                assignment_id = invite_assignment_id
+                claimed_via_token = True
+
     if not assignment:
         identity_event(
             "identity.claim.manual.failed",
@@ -5621,7 +5651,13 @@ def claim_assignment(
             assignment_id=assignment_id,
             auth_user_id=effective.get("id"),
         )
-        raise HTTPException(status_code=404, detail="Assignment not found")
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "We couldn't find that case code. Use the code from HR's invitation email — "
+                "the short reference shown on your dashboard is a display label, not a code you can enter."
+            ),
+        )
 
     user_identifiers = _validated_employee_claim_identifiers(
         effective,
@@ -5711,7 +5747,9 @@ def claim_assignment(
         claim_req_id=claim_req_id,
         principal_email=effective.get("email"),
         principal_username=effective.get("username"),
-        case_event_payload={},
+        # [BUG-260804-1327] Record which spelling of "case code" the employee actually
+        # pasted, so we can see whether anyone still succeeds with the raw assignment id.
+        case_event_payload={"code_form": "invite_token" if claimed_via_token else "assignment_id"},
     )
     return {"success": True, "assignmentId": assignment_id}
 

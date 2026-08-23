@@ -114,8 +114,11 @@ function ManualClaimInstructions({ signedInPrincipal }: { signedInPrincipal: str
           <strong className="text-[#0b2b43]">Your email:</strong> The work email HR used when they set up your move.
         </li>
         <li>
-          <strong className="text-[#0b2b43]">Code from HR:</strong> The case code HR sent you (looks like a long series
-          of letters and numbers).
+          {/* [BUG-260804-1327] Name the source explicitly. Reporters kept trying the short
+              Reference shown on the dashboard, which is a display label and is not accepted. */}
+          <strong className="text-[#0b2b43]">Code from HR:</strong> The case code in HR&apos;s invitation{' '}
+          <strong className="text-[#0b2b43]">email</strong> (a long series of letters and numbers). The short
+          reference shown on a case card is a label, not this code.
         </li>
       </ol>
       {signedInPrincipal ? (

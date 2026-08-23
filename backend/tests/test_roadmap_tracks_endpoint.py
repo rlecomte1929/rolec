@@ -51,6 +51,7 @@ CREATE TABLE form_templates (
   trigger_rules TEXT NOT NULL DEFAULT '[]', source_url TEXT,
   verification_status TEXT DEFAULT 'representative',
   source_language TEXT NOT NULL DEFAULT 'en',
+  original_pdf_url TEXT,  -- [BUG-260706-ECA9] selected by _load_case_form_summaries
   sections TEXT NOT NULL DEFAULT '[]'
 );
 CREATE TABLE roadmap_steps (id TEXT PRIMARY KEY, case_id TEXT, title TEXT, track_id TEXT);

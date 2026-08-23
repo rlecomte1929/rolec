@@ -47,6 +47,10 @@ export interface DossierFormTemplate {
   /** [S1] Ordered section layout. Array order IS display order. Empty means "group by
    *  fields[].section", which is what every template except RP-NO-DATASHEET does today. */
   sections?: DossierFormSection[] | null;
+  /** [BUG-260706-ECA9] True when the template actually has an original PDF attached.
+   *  Only 1 of 86 production templates does, so the dossier must not offer
+   *  "View original PDF" unless this is true — the endpoint 404s otherwise. */
+  has_original_pdf?: boolean;
 }
 
 /** [S1] A section of a data sheet: one authority, one appointment.
