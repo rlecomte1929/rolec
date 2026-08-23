@@ -109,7 +109,10 @@ def test_happy_path_create_view_decide_sign(corridor):
 
     # The raw token is returned once, and is NOT the stored hash.
     assert token and len(token) >= 32
+    # Path AND host. Asserting only the suffix is how the api.relopass.com bug shipped:
+    # `endswith("/attest/<token>")` is true of a URL nobody can open.
     assert created["review_url"].endswith(f"/attest/{token}")
+    assert created["review_url"].startswith("https://relopass.com/"), created["review_url"]
 
     # Default scoping drops the operational HOUSING item.
     assert created["request"]["item_count"] == 3
@@ -529,3 +532,42 @@ def test_attestation_tables_disable_implicit_returning():
             f"{model.__tablename__} re-enabled implicit_returning — multi-row INSERT will "
             "fail on Postgres with a sentinel-matching error"
         )
+
+
+# ── the reviewer link must point at the PUBLIC WEB APP ───────────────────────────────
+#
+# [ATT-1] `/attest/:token` is a client-side SPA route. review_url was built from
+# `request.base_url` — whatever host served the API call, which in production is
+# https://api.relopass.com, a host that does not serve the SPA:
+#
+#     https://relopass.com/attest/<token>      -> 200, renders
+#     https://api.relopass.com/attest/<token>  -> 405
+#     https://app.relopass.com/attest/<token>  -> 403   (HR host, not this one)
+#
+# Measured 2026-08-23 on a real request during the ATT-1 activation dry run. The admin page
+# shows this link ONCE, above "This link is shown once and cannot be recovered" — so a
+# reviewer got a dead link and the token could not be reissued without a new request.
+
+
+def test_review_url_points_at_the_web_app_not_the_api(corridor):
+    """Fails against the previous implementation, which returned the API host."""
+    created = _create(corridor["country"])
+    url = created["review_url"]
+    assert url.startswith("https://relopass.com/attest/"), url
+    assert "api.relopass.com" not in url
+    assert "app.relopass.com" not in url
+
+
+def test_review_url_host_is_configurable(corridor, monkeypatch):
+    """A preview or staging deploy must be able to point the link at its own web host."""
+    monkeypatch.setenv("APP_WEB_BASE_URL", "https://staging.example.com/")
+    created = _create(corridor["country"])
+    assert created["review_url"].startswith("https://staging.example.com/attest/")
+    assert "//attest/" not in created["review_url"]
+
+
+def test_review_url_does_not_follow_the_request_host(corridor):
+    """The regression itself: TestClient serves on http://testserver, and the old code
+    pasted that into the link. The link must be independent of who called the API."""
+    created = _create(corridor["country"])
+    assert "testserver" not in created["review_url"], created["review_url"]
