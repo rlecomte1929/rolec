@@ -10,6 +10,7 @@ from fastapi import APIRouter, Header, HTTPException, Depends
 
 from ..db import SessionLocal
 from ...database import db, Database
+from ...db.policies import UnquotedApprovalError
 from .. import crud, schemas, models
 from ..services.research import run_country_research
 from ..services import requirements_builder
@@ -700,7 +701,10 @@ def approve_requirement_facts(payload: dict, user: dict = Depends(require_admin)
     if not fact_ids:
         raise HTTPException(status_code=400, detail="fact_ids required")
     actor_id = user.get("id") or "admin"
-    db.update_requirement_fact_status(fact_ids, "approved", actor_id)
+    try:
+        db.update_requirement_fact_status(fact_ids, "approved", actor_id)
+    except UnquotedApprovalError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     for fid in fact_ids:
         _audit_postgres(
             entity_type="requirement_facts",
