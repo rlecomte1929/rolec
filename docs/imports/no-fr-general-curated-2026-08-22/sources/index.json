@@ -1,0 +1,23 @@
+{
+  "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000006302521": {
+    "bytes_fetched": 5695,
+    "file": "5d40b6bde3871821.txt",
+    "is_pdf": false,
+    "sha256_of_text": "c0d4a33b6c671a0574a8e6a2cbc53e0ed5b7f15a0ca8678ef1f31c8e599d893e",
+    "text_chars": 38
+  },
+  "https://www.service-public.fr/particuliers/vosdroits/F16003": {
+    "bytes_fetched": 143900,
+    "file": "88768866c8a9345a.txt",
+    "is_pdf": false,
+    "sha256_of_text": "b88e1e9fd19d3428f3e9ba189ea442966988ff2d5a520cb7285a26d1e74971b5",
+    "text_chars": 27617
+  },
+  "https://www.service-public.fr/particuliers/vosdroits/F2728": {
+    "bytes_fetched": 383363,
+    "file": "25b7e5b125f8f188.txt",
+    "is_pdf": false,
+    "sha256_of_text": "617fa2a1f9abd7d92fdca0040d11a9802d3d2915f410744a074deaded5ff4b8a",
+    "text_chars": 105040
+  }
+}
