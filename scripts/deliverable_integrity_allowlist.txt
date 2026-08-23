@@ -302,3 +302,9 @@ AIQ-234:frontend/src/features/platform-v2/policy-builder/PolicyDocumentsPage.tsx
 # 750 · AI-W2.1 — Migration: unified agent_runs table with RLS
 750:supabase/migrations/20260531000000_agent_runs.sql
 
+
+# 2026-08-23 — investigated, not a leak. The note's path uses `tests/`; this repo's frontend
+# convention is `__tests__/`, and the file is tracked at
+# frontend/src/pages/admin/__tests__/AdminVettingQueue.test.tsx. Two trailing segments differ, so
+# the suffix resolver cannot (and should not) match it.
+1893:frontend/src/pages/admin/tests/AdminVettingQueue.test.tsx

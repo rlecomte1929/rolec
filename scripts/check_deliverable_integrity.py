@@ -46,6 +46,21 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 _DEFAULT_DATABASE_ID = "3bc887c6-4d48-8089-8188-fcf2dc3edc1b"
 _NOTION_VERSION = "2022-06-28"
 
+
+# Tasks below this id are a pre-convention backlog: they are REPORTED but do not fail the build.
+#
+# Not an arbitrary line. After the history fix and the two path resolvers, the residue is 33
+# claimed paths across 18 tasks, and 17 of those tasks sit in the narrow id band 540–750 — one
+# era of work, before the `[AIQ-nnnn]` commit-subject convention took hold (the lowest id ever
+# used in a commit subject is 279, and tagging only becomes routine around 800+). For that band
+# "no implementing commit" is not evidence of anything, so failing on it would make the guard
+# permanently red for a question it cannot answer.
+#
+# Allowlisting them instead would be worse: an allowlist entry reads as "someone checked this and
+# it is fine", and nobody has. Reporting them keeps the number visible and lets it fall only when
+# a human genuinely resolves one.
+_PRE_CONVENTION_MAX_ID = 800
+
 # Task types that produce a file deliverable (others — Research, Competitive
 # Analysis — may live only in Notion and are skipped).
 _FILE_PRODUCING_TYPES = {
@@ -198,16 +213,103 @@ def is_shallow(root: Path) -> bool:
 
 
 def paths_ever_added(root: Path) -> Set[str]:
-    """Every repo-relative path added in any commit on any branch.
+    """Every repo-relative path added in any commit reachable from any ref OR from HEAD.
 
     One `git log` for the whole repo rather than one per candidate: measured at
     24,983 paths / 1.3s / 1.8 MB locally, which is cheap enough for CI.
+
+    HEAD IS PASSED EXPLICITLY, and that is the whole point. `actions/checkout` leaves a PR build
+    on a DETACHED HEAD; `--all` enumerates refs, and when the workspace carries no local branch
+    or remote-tracking ref it matches nothing and this returns the EMPTY SET. Nothing is shallow,
+    so `is_shallow()` sees no problem, and every claimed deliverable that is not tracked today
+    lands in `missing` — a full page of confident phantoms.
+
+    Measured on 2026-08-23: the guard reported 110 missing deliverables, of which **71 were added
+    on a branch in this repo's own history** (`backend/app/routers/hr_rfq.py`, for one — added
+    2026-05-18, deleted 2026-07-22). Adding HEAD costs nothing when refs exist, because the
+    commits are already covered.
+
+    `--no-renames` matters just as much. With rename detection on, git reports a rename as `R`,
+    so the NEW path never appears under `--diff-filter=A` and a file sitting in the working tree
+    can be absent from its own history: 191 tracked files, here. With it off, a rename is an add
+    plus a delete, and every one of the 5,197 tracked files is accounted for — which is what
+    makes `history_is_complete` an exact invariant rather than a threshold.
     """
     res = subprocess.run(
-        ["git", "log", "--all", "--diff-filter=A", "--name-only", "--format="],
+        ["git", "log", "--all", "HEAD", "--no-renames",
+         "--diff-filter=A", "--name-only", "--format="],
         cwd=str(root), capture_output=True, text=True, check=True,
     )
     return {line.strip() for line in res.stdout.splitlines() if line.strip()}
+
+
+def history_is_complete(ever_added: Set[str], tracked: Set[str]) -> bool:
+    """Every file tracked today must have been added at some point.
+
+    An exact invariant rather than a threshold: if a path is in the working tree, a commit added
+    it, so `tracked - ever_added` is empty on any repository with usable history. When it is not,
+    the history scan is incomplete however non-shallow the clone looks, and the ever-existed
+    check would manufacture phantoms out of files that are sitting right there.
+
+    This is the same discipline as `assert_non_degenerate` for the Notion query: refuse to emit a
+    verdict the evidence cannot support.
+    """
+    return not (tracked - ever_added)
+
+
+_MIGRATION_RE = re.compile(r"^supabase/migrations/(\d{6,})_(?P<name>.+\.sql)$")
+
+
+def resolve_restamped_migration(path: str, candidates: Set[str]) -> Optional[str]:
+    """A migration re-stamped to a later timestamp is the SAME migration.
+
+    This repo requires every migration to be stamped above BOTH the highest repo file version
+    and the prod ledger max, so a collision forces a re-stamp before merge — the note records
+    the timestamp the author first wrote, and the tree carries the one that landed. Measured
+    2026-08-23: 17 of the guard's 110 findings are exactly this, including
+    `20260927000000_test_drive_tester_contact.sql` claimed against
+    `20261013000000_test_drive_tester_contact.sql` tracked.
+
+    A migration's identity is its NAME. Comparing the full path was wrong by construction, and
+    the git-history check cannot rescue it because the re-stamped file is a different filename
+    that was only ever added under its final name.
+
+    Ambiguity is refused: if two migrations share a name, no resolution is offered rather than
+    guessing which one the note meant.
+    """
+    m = _MIGRATION_RE.match(path)
+    if not m:
+        return None
+    name = m.group("name")
+    hits = sorted(
+        c for c in candidates
+        if (mc := _MIGRATION_RE.match(c)) and mc.group("name") == name
+    )
+    return hits[0] if len(hits) == 1 else None
+
+
+def resolve_by_path_suffix(path: str, candidates: Set[str], min_segments: int = 2) -> Optional[str]:
+    """Resolve a path whose prefix is wrong but whose tail is unmistakable.
+
+    `backend/services/ai_trace_logger.py` was never a path in this repo; the file has always
+    been `backend/app/services/ai_trace_logger.py`. The note was written from memory, one
+    directory out. Same for `scripts/rag_eval_harness.py` (tracked under `backend/scripts/`) and
+    `pages/admin/tests/` (tracked as `__tests__/`).
+
+    Requires at least two trailing segments to match, so a bare `README.md` or `base.py` — which
+    exist in dozens of directories — can never resolve. And requires the match to be UNIQUE:
+    where several files share the tail, the note is genuinely ambiguous and gets no resolution
+    rather than an arbitrary one.
+    """
+    parts = [seg for seg in path.split("/") if seg]
+    for n in range(min(len(parts), 4), min_segments - 1, -1):
+        tail = "/" + "/".join(parts[-n:])
+        hits = sorted(c for c in candidates if ("/" + c).endswith(tail))
+        if len(hits) == 1:
+            return hits[0]
+        if len(hits) > 1:
+            return None      # ambiguous at the longest tail — do not fall back to a shorter one
+    return None
 
 
 def check_tasks(
@@ -264,6 +366,20 @@ def check_tasks(
 
             if ever_added is not None and path in ever_added:
                 moved.append(row)
+                continue
+
+            # The path was never a path in this repo — but the FILE may still be here under a
+            # name the note got wrong. Both resolvers below are conservative: unique match or
+            # nothing. They feed `moved` because that bucket already means exactly this — the
+            # work shipped and the recorded path is stale.
+            pool = set(tracked_files) | (ever_added or set())
+            hit = resolve_restamped_migration(path, pool)
+            if hit:
+                moved.append({**row, "resolved_to": hit, "why": "migration re-stamped"})
+                continue
+            hit = resolve_by_path_suffix(path, pool)
+            if hit:
+                moved.append({**row, "resolved_to": hit, "why": "path prefix in the note is wrong"})
                 continue
 
             missing.append(row)
@@ -496,6 +612,15 @@ def main() -> int:
             "actions/checkout for this job.",
         )
     ever_added = paths_ever_added(root)
+    if not history_is_complete(ever_added, tracked):
+        unseen = len(tracked - ever_added)
+        return _not_measured(
+            "history-incomplete",
+            f"{unseen} of {len(tracked)} tracked file(s) do not appear as added anywhere in the "
+            f"scanned history, so the ever-existed check cannot run and every stale path would "
+            f"be reported as a phantom. Ensure the job checks out with `fetch-depth: 0` and that "
+            f"a ref (not only a detached HEAD) is present.",
+        )
 
     try:
         tasks, done_seen, fp_seen, with_notes = fetch_done_tasks(token, args.database_id)
@@ -528,16 +653,40 @@ def main() -> int:
               f"removed. Not a failure:\n")
         for m in moved:
             print(f"  {m['aiq'] or '(no id)'}  {m['path']}")
+            if m.get("resolved_to"):
+                print(f"      -> {m['resolved_to']}   ({m['why']})")
 
     if not missing:
         print(f"\n[PASS] every claimed deliverable either exists today or existed once "
               f"({len(allowlist)} allowlisted).")
         return 0
 
-    print(f"\n[{'FAIL' if args.strict else 'WARN'}] {len(missing)} claimed "
+    def _is_pre_convention(row: Dict[str, str]) -> bool:
+        aiq = str(row.get("aiq") or "")
+        return aiq.isdigit() and int(aiq) <= _PRE_CONVENTION_MAX_ID
+
+    legacy = [m for m in missing if _is_pre_convention(m)]
+    current = [m for m in missing if not _is_pre_convention(m)]
+
+    if legacy:
+        tasks = len({m["aiq"] for m in legacy})
+        print(f"\n[BACKLOG] {len(legacy)} claimed deliverable(s) across {tasks} task(s) at or "
+              f"below AIQ-{_PRE_CONVENTION_MAX_ID} never existed in any commit. Reported, NOT "
+              f"failed on: these predate the commit-subject convention, so nothing here can be "
+              f"confirmed or refuted from the repo alone. Not allowlisted — an allowlist entry "
+              f"would claim someone checked them.\n")
+        for m in legacy:
+            print(f"  {m['aiq'] or '(no id)'}  {m['path']}")
+
+    if not current:
+        print(f"\n[PASS] no claimed deliverable after AIQ-{_PRE_CONVENTION_MAX_ID} is unaccounted "
+              f"for ({len(allowlist)} allowlisted, {len(legacy)} in the pre-convention backlog).")
+        return 0
+
+    print(f"\n[{'FAIL' if args.strict else 'WARN'}] {len(current)} claimed "
           f"deliverable(s) marked Done that NEVER existed in any commit on any branch "
           f"(allowlist in scripts/deliverable_integrity_allowlist.txt):\n")
-    for m in missing:
+    for m in current:
         print(f"  {m['aiq'] or '(no id)'}  {m['path']}")
         print(f"      task: {m['title']}")
         print(f"      {m['url']}")
