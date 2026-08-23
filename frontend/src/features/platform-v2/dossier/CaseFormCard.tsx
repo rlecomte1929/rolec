@@ -448,14 +448,20 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form, initialExpande
                 )}
               </div>
             ) : null}
-            {/* [P2-4] "View original" — opens OriginalPdfDrawer with signed URL */}
-            <Button unstyled
-              type="button"
-              onClick={() => setShowOriginal(true)}
-              className="text-sm text-[#0b2b43] hover:underline"
-            >
-              View original PDF
-            </Button>
+            {/* [P2-4] "View original" — opens OriginalPdfDrawer with signed URL.
+                [BUG-260706-ECA9] Only when one is actually attached. This was rendered
+                unconditionally, but the endpoint 404s when form_templates.original_pdf_url
+                is null — true for 85 of 86 production templates — so the overwhelming
+                majority of users clicked a button that could only fail. */}
+            {form.template.has_original_pdf ? (
+              <Button unstyled
+                type="button"
+                onClick={() => setShowOriginal(true)}
+                className="text-sm text-[#0b2b43] hover:underline"
+              >
+                View original PDF
+              </Button>
+            ) : null}
             {/* AIQ-1274: form version metadata hidden from employees. */}
           </div>
 
