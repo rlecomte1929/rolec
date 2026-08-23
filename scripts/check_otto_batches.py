@@ -16,7 +16,16 @@ Run from the project root::
 It needs nothing outside the standard library and touches no network or database,
 so it runs in any checkout and in CI.
 
-What is checked, in three sections:
+What is checked, in four sections:
+
+0. EVIDENCE CITATION QUALITY, per record, for EVERY batch.
+   Runs before the otto-loader dispatch below, because it keys on ``source_url`` and
+   ``evidence_group`` -- fields every batch carries whatever its schema -- rather than
+   on the v6 record contract. A ``source_url`` must be specific enough to state a rule:
+   a homepage, a bare language root and a contact-directory record are all impeccably
+   official and evidence nothing. Any ``evidence_group`` a record declares must map
+   each claim element to real quotes, so a composite claim cannot be carried by one
+   necessary component.
 
 1. DELIVERY CONTRACT, per record.
    ``applies_to.nationality`` present and drawn from {EEA, EU, non-EEA, non-EU} --
@@ -95,6 +104,30 @@ OFFICIAL_HOSTS = {
 
 MIN_QUOTE_CHARS = 25
 
+#: A publisher's front door. Matched against the WHOLE normalised path, never as a
+#: substring -- a real page at ``/accueil/services/cotisations`` states a rule and is a
+#: perfectly good citation; a citation of ``/accueil`` is a citation of a doormat.
+#: A query or fragment does not rescue one: ``https://www.ameli.fr/?x=1`` is still the
+#: homepage.
+HOMEPAGE_PATHS = {
+    "", "/accueil", "/home", "/index", "/index.html", "/index.htm", "/index.aspx",
+    "/index.php", "/inicio", "/portada", "/start", "/forside", "/startseite",
+}
+
+#: A lone language segment is a front door too (``/en``, ``/fr``, ``/pt-br``).
+LANGUAGE_ROOT_RE = re.compile(r"^/[a-z]{2}(-[a-z]{2})?$")
+
+#: Directory and contact-record routes. These are official, and genuinely useful for
+#: working out WHICH authority is responsible -- but they state no rule, so they cannot
+#: be the evidence for one. The row must cite the substantive page.
+DIRECTORY_HOSTS = {
+    "lannuaire.service-public.gouv.fr",
+    "annuaire-entreprises.data.gouv.fr",
+}
+DIRECTORY_PATH_RE = re.compile(
+    r"^/(annuaire|centres?-contact|contacts?|directory|nous-contacter)(/|$)"
+)
+
 
 class Result:
     """Collects PASS/FAIL/SKIP lines for one batch and remembers whether it failed."""
@@ -148,6 +181,156 @@ def is_official(url: str) -> bool:
     if host in OFFICIAL_HOSTS:
         return True
     return any(host == s.lstrip(".") or host.endswith(s) for s in OFFICIAL_HOST_SUFFIXES)
+
+
+def url_specificity_failure(url: str) -> Optional[str]:
+    """Why this URL cannot evidence a normative fact, or None if it can.
+
+    Being on an official host is necessary and nowhere near sufficient. A homepage, a
+    language root and a contact-directory record are all impeccably official and none
+    of them states a rule, so a fact citing one has, in practice, no evidence at all --
+    while looking perfectly cited in every report we produce.
+
+    Deterministic and offline: this runs before anything is fetched, so a row that can
+    never be evidenced costs no request.
+
+    The whole-path matching is the part worth not getting wrong. Rejecting any path
+    that CONTAINS "accueil" would throw away
+    ``.../accueil/services/cotisations-et-declarations``, a real page stating a real
+    obligation. Only the exact front door is refused.
+    """
+    if not url or not url.startswith("https://"):
+        return "not an absolute https URL"
+
+    m = re.match(r"^https://([^/?#]*)([^?#]*)", url)
+    if not m:
+        return "unparseable URL"
+    netloc, raw_path = m.group(1), m.group(2)
+
+    if "@" in netloc:
+        return "embeds credentials in the URL"
+
+    host = netloc.lower()
+    # Normalise for comparison only: lowercase, and drop one trailing slash so
+    # "/accueil/" and "/accueil" are the same front door.
+    path = raw_path.lower()
+    if len(path) > 1 and path.endswith("/"):
+        path = path[:-1]
+    if path == "/":
+        path = ""
+
+    if path in HOMEPAGE_PATHS:
+        return "cites the site front door (%s), not a page that states the rule" % (raw_path or "/")
+    if LANGUAGE_ROOT_RE.match(path):
+        return "cites a language root (%s), not a page that states the rule" % raw_path
+    if host in DIRECTORY_HOSTS or DIRECTORY_PATH_RE.match(path):
+        return "cites a directory/contact record (%s), which states no rule" % (raw_path or "/")
+    return None
+
+
+def evidence_group_failure(rec: Dict[str, Any]) -> Optional[str]:
+    """Why this record's ``evidence_group`` is malformed, or None.
+
+    A composite claim -- "you must register AND declare within 30 days" -- is often only
+    provable across two sentences. The failure this contract exists to stop is a single
+    NECESSARY COMPONENT promoted as if it proved the whole claim: a quote saying a
+    service covers an employer situation does not say the employer must register, and a
+    batch can carry the first while asserting the second.
+
+    So a record may declare an explicit evidence group, and the group must state which
+    quote covers which element of the claim. That mapping is what makes the later
+    semantic check answerable at all -- without it there is no way to ask "is every
+    material element supported" and nowhere to record the answer.
+
+    Only the SHAPE is enforced here, because only shape is decidable offline. Whether a
+    quote actually supports an element is a judgement, and it belongs to the
+    adjudication worker and ultimately a human. A well-formed group that is wrong is
+    still wrong; this check only guarantees the question can be posed.
+
+    Opt-in. A record without ``evidence_group`` is a single-quote record and is not
+    failed -- a batch is never failed for a convention it never claimed.
+    """
+    group = rec.get("evidence_group")
+    if group is None:
+        return None
+    if not isinstance(group, dict):
+        return "evidence_group must be an object"
+
+    quotes = group.get("quotes")
+    if not isinstance(quotes, list) or len(quotes) < 2:
+        return "evidence_group.quotes must list at least 2 quotes (one quote is not a group)"
+
+    ids: List[str] = []
+    for i, q in enumerate(quotes):
+        if not isinstance(q, dict):
+            return "evidence_group.quotes[%d] must be an object" % i
+        qid = str(q.get("id") or "").strip()
+        if not qid:
+            return "evidence_group.quotes[%d] has no id" % i
+        if not str(q.get("quote") or "").strip():
+            return "evidence_group.quotes[%s] has an empty quote" % qid
+        ids.append(qid)
+    dupes = sorted({i for i in ids if ids.count(i) > 1})
+    if dupes:
+        return "evidence_group.quotes has duplicate ids: %s" % dupes
+
+    covers = group.get("covers")
+    if not isinstance(covers, dict) or not covers:
+        return ("evidence_group.covers must map each claim element to the quote ids "
+                "that evidence it")
+    for element, refs in covers.items():
+        if not isinstance(refs, list) or not refs:
+            return "evidence_group.covers[%r] lists no quote id" % element
+        unknown = [str(x) for x in refs if str(x) not in ids]
+        if unknown:
+            return "evidence_group.covers[%r] references unknown quote id(s) %s" % (element, unknown)
+
+    # The flat evidence_quote is what the loader persists and what every downstream
+    # report shows. If it is not one of the group's quotes, the record says two
+    # different things about its own evidence.
+    flat = str(rec.get("evidence_quote") or "").strip()
+    if flat and flat not in {str(q.get("quote") or "").strip() for q in quotes}:
+        return "evidence_quote is not one of the evidence_group quotes"
+    return None
+
+
+def check_citations(r: Result, records: List[Dict[str, Any]]) -> None:
+    """Section 0 -- runs for EVERY batch, whatever contract it declares.
+
+    Deliberately not part of ``check_contract``. That function grades the otto-loader
+    v6 record shape and is skipped for a batch that never claimed it (#1990, and
+    rightly). But ``source_url`` and ``evidence_group`` are not v6 fields: every batch
+    on disk carries ``source_url`` regardless of its schema, and an unspecific citation
+    is exactly as worthless in a batch of a different shape. Grading these here keeps
+    #1990's lesson -- do not judge a batch by another batch's schema -- while not
+    letting a batch skip the one check that is about evidence itself.
+    """
+    r.section("SECTION 0: EVIDENCE CITATION QUALITY")
+    n = len(records)
+
+    unspecific = [(rec.get("fact_key") or rec.get("fact_uid"), why) for rec, why in
+                  ((rec, url_specificity_failure(str(rec.get("source_url") or ""))) for rec in records)
+                  if why]
+    r.check(not unspecific,
+            "every source_url is specific enough to evidence a rule "
+            "(not a homepage, language root or contact directory)",
+            "%d/%d ok" % (n - len(unspecific), n)
+            + ("; first: %s" % "; ".join("%s: %s" % (k, w) for k, w in unspecific[:3])
+               if unspecific else ""))
+
+    grouped = [rec for rec in records if rec.get("evidence_group") is not None]
+    if grouped:
+        malformed = [(rec.get("fact_key") or rec.get("fact_uid"), why) for rec, why in
+                     ((rec, evidence_group_failure(rec)) for rec in grouped) if why]
+        r.check(not malformed,
+                "every declared evidence_group maps each claim element to real quotes",
+                "%d/%d grouped record(s) well-formed" % (len(grouped) - len(malformed), len(grouped))
+                + ("; first: %s" % "; ".join("%s: %s" % (k, w) for k, w in malformed[:3])
+                   if malformed else ""))
+    else:
+        r.skip("evidence_group shape",
+               "no record declares one - composite claims are the author's call, and a "
+               "batch is not failed for a convention it never claimed")
 
 
 def load_stream(path: str) -> Tuple[List[Dict[str, Any]], int, bytes]:
@@ -478,6 +661,8 @@ def check_batch(batch_id: str) -> Result:
             "%s, %d records" % (os.path.basename(stream_path), len(records)))
     if not r.check(bool(records), "fact stream is not empty"):
         return r
+
+    check_citations(r, records)
 
     # Sections 1-3 grade a batch against the otto-loader v6 delivery contract: record-level
     # `target_table`, `applies_to.nationality`, `fact_type` from the loader's set,
