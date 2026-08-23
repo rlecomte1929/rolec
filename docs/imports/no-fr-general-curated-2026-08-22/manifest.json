@@ -17,7 +17,7 @@
   "origin_candidates": 3,
   "deferred": 1,
   "artifact": "no-fr-general-curated-2026-08-22.ndjson",
-  "sha256": "cad28a780c638efbe7a157d12d6a902430a57b0f418ecdb6805ddf3dfc28b463",
+  "sha256": "5da4ae6b1c7a8db51b6c9b52f0ec4933149d09aec9fcd2b8f31c0ed9625f7a65",
   "review_status_all": "pending",
   "verification_status_all": "representative",
   "scope": "Curated, nationality-scoped subset of Otto's refused general batch. Covers employed-mover destination requirements only; steps routed to pathway-graph candidates, origin-side duties routed to corridors/<id>/facts.yaml candidates, self-employment sub-corpus deferred to the Otto re-delivery (AIQ-1833). Must reconcile: curated + steps + origin + deferred == raw_record_count (twinned records counted once via their base fact_key).",
@@ -25,5 +25,14 @@
   "non_obvious_count": 8,
   "timing_count": 5,
   "enrichment_script": "scripts/enrich_curated_batches_non_obvious_2026_08_22.py",
-  "enrichment_note": "non_obvious / non_obvious_note / timing added 2026-08-22 by editorial judgement over the already-cited facts. No fact_text, source_url or evidence_quote was modified; every timing restates a deadline the fact already states. quote_verbatim_confirmed remains false pending human confirmation."
+  "enrichment_note": "non_obvious / non_obvious_note / timing added 2026-08-22 by editorial judgement over the already-cited facts. No fact_text, source_url or evidence_quote was modified; every timing restates a deadline the fact already states. quote_verbatim_confirmed remains false pending human confirmation.",
+  "evidence_repair": {
+    "batch": "no-fr-evidence-repair-2026-08-23",
+    "patch_artifact": "raw/no-fr-evidence-repair-2026-08-23.ndjson",
+    "records_patched": 12,
+    "quotes_verbatim_confirmed": 10,
+    "quotes_unconfirmed": 7,
+    "confirmed_by": "scripts/verify_batch_quotes.py --stamp, against the live pages 2026-08-23",
+    "note": "quote_verbatim_confirmed records OUR check, not the patch's claim. no_fr_non_eea_worker_work_permit_required kept its original citation: the patch's replacement page does not carry the claim."
+  }
 }
