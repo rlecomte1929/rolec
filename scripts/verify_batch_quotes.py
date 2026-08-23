@@ -81,6 +81,9 @@ def norm(s: str) -> str:
     s = s.replace("/", " ")
     s = re.sub(r"\s+", " ", s)
     s = re.sub(r"\s+([,.;:!?)])", r"\1", s)
+    # French elision across a tag boundary: service-public.fr and CLEISS render "L' article"
+    # where the sentence reads "l'article", because the elided article sits in its own element.
+    s = re.sub(r"(')\s+", r"\1", s)
     return s.strip().lower()
 
 
