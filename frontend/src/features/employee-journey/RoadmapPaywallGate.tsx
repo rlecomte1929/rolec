@@ -31,11 +31,21 @@ interface RoadmapPaywallGateProps {
   destCountry?: string | null;
 }
 
+/**
+ * What unlocking actually gives you.
+ *
+ * Every line names something the product genuinely produces — the served requirement set,
+ * the `non_obvious` flag, the move-date-anchored ordering, the curated vendors, the
+ * owner tagging. Nothing here promises an OUTCOME ("never miss a deadline", "guaranteed
+ * approval"): the product cannot control an embassy's queue, and a paywall is the worst
+ * possible place to make a promise we cannot keep.
+ */
 const FEATURES = [
-  'All requirements in chronological order, anchored to your move date',
-  'Feasibility flags — see immediately if any windows are tight or already missed',
+  'Every requirement for your corridor, in the order they have to happen',
+  'The easy-to-miss ones flagged — the steps people only discover when they are already late',
+  'Anchored to your move date, so you can see which windows are tight and which have passed',
   'Recommended vendors per category: movers, immigration lawyers, tax advisors, schools',
-  'Responsible-party tagging on every item (HR / you / both)',
+  'Who owns each item — you, your HR team, or both',
 ] as const;
 
 export const RoadmapPaywallGate: React.FC<RoadmapPaywallGateProps> = ({
@@ -84,9 +94,18 @@ export const RoadmapPaywallGate: React.FC<RoadmapPaywallGateProps> = ({
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-navy-50 border border-navy-100 mb-4">
           <Lock className="w-7 h-7 text-navy-700" aria-hidden />
         </div>
-        <h2 className="text-2xl font-semibold text-navy-800 mb-2">Your roadmap is ready to unlock</h2>
+        {/* Fear first, then relief. Relocations rarely fail at the start — they fail in
+            week seven, on a step nobody mentioned, whose deadline has already passed. That
+            is the thing worth paying to avoid, and it is what the roadmap is FOR. Leading
+            with the deliverable ("your roadmap is ready") describes the artefact and skips
+            the reason anyone wants it. */}
+        <h2 className="text-2xl font-semibold text-navy-800 mb-2">
+          Most moves don&rsquo;t go wrong at the start
+        </h2>
         <p className="text-base text-slate-600 max-w-md mx-auto">
-          Get your full, personalised step-by-step plan for moving to {destination}.
+          They go wrong in week seven, on the step nobody mentioned — the registration with
+          a deadline that has already passed. Your {destination} roadmap lists those steps
+          now, while there is still time to act on them.
         </p>
       </div>
 
@@ -94,7 +113,7 @@ export const RoadmapPaywallGate: React.FC<RoadmapPaywallGateProps> = ({
       <div className="rounded-xl border border-accent-200 bg-accent-50 p-5 mb-6">
         <div className="flex items-center gap-3 mb-4">
           <Shield className="w-5 h-5 text-accent-600 flex-shrink-0" aria-hidden />
-          <h3 className="font-semibold text-navy-800">Full roadmap + vendor recommendations</h3>
+          <h3 className="font-semibold text-navy-800">What unlocking gives you</h3>
         </div>
         <ul className="space-y-2">
           {FEATURES.map((line) => (
