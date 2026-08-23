@@ -39,8 +39,11 @@ SCHEMA = [
         id TEXT PRIMARY KEY, entity_id TEXT, fact_id TEXT, reviewer_user_id TEXT NOT NULL,
         action TEXT NOT NULL, notes TEXT, created_at TEXT,
         previous_fact_text TEXT, new_fact_text TEXT)""",
+    # Both source-text columns, because the router now resolves between them: neither is
+    # reliably the fuller one (the enterprise.gov.ie permit pages hold the real page in
+    # text_content and 308 chars of cookie banner in the excerpt).
     """CREATE TABLE knowledge_docs (
-        id TEXT PRIMARY KEY, content_excerpt TEXT, last_verified_at TEXT)""",
+        id TEXT PRIMARY KEY, content_excerpt TEXT, text_content TEXT, last_verified_at TEXT)""",
 ]
 
 # Long enough to clear MIN_USABLE_SOURCE_CHARS, and containing the supported quote.
@@ -70,8 +73,9 @@ class ContentReviewTests(unittest.TestCase):
             for ddl in SCHEMA:
                 conn.execute(text(ddl))
             conn.execute(text(
-                "INSERT INTO knowledge_docs (id, content_excerpt, last_verified_at) "
-                "VALUES (:i, :x, '2026-08-12')"), {"i": DOC, "x": SOURCE})
+                "INSERT INTO knowledge_docs (id, content_excerpt, text_content, "
+                "last_verified_at) VALUES (:i, :x, :b, '2026-08-12')"),
+                {"i": DOC, "x": SOURCE, "b": ""})
             conn.execute(text(
                 "INSERT INTO requirement_entities (id, destination_country, domain_area, "
                 "topic_key, title) VALUES (:i,'NO','registration','no.d_number','D number')"),
@@ -117,6 +121,39 @@ class ContentReviewTests(unittest.TestCase):
         bad = self._one(items, INVENTED)
         self.assertEqual(bad["evidence_status"], "unverified")
         self.assertEqual(bad["evidence_context"], "")
+
+    def test_the_quote_is_found_when_the_excerpt_captured_only_a_cookie_banner(self):
+        """`knowledge_docs` has two source-text columns and neither is reliably the fuller one.
+
+        Measured on production 2026-08-23: the enterprise.gov.ie permit pages hold 17,333
+        characters in `text_content` and **308 characters of cookie banner** in
+        `content_excerpt`. Reading the excerpt alone marks nine served Critical Skills
+        Employment Permit facts unverified — on the first real customer's corridor — and shows
+        the reviewer "no source" for a page that plainly carries the claim.
+        """
+        cookie = "Our website uses cookies to enhance your browsing experience. " * 6
+        page = ("The Critical Skills Employment Permit is designed to attract highly skilled "
+                "people. Because the skills are identified as being in short supply, a Labour "
+                "Market Needs Test is not required. Eligible occupations are listed separately. "
+                ) * 4
+        quote = "a Labour Market Needs Test is not required"
+        doc, fact = str(uuid.uuid4()), str(uuid.uuid4())
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO knowledge_docs (id, content_excerpt, text_content, "
+                "last_verified_at) VALUES (:i,:x,:b,'2026-08-20')"),
+                {"i": doc, "x": cookie, "b": page})
+            conn.execute(text(
+                "INSERT INTO requirement_facts (id, entity_id, fact_type, fact_key, fact_text, "
+                "applies_to, required_fields, source_doc_id, source_url, evidence_quote, "
+                "confidence, status) VALUES "
+                "(:i,:e,'eligibility','csep_no_lmnt','No LMNT is required.','{}','[]',:d,"
+                "'https://enterprise.gov.ie/x',:q,'high','pending')"),
+                {"i": fact, "e": ENTITY, "d": doc, "q": quote})
+
+        item = self._one(self._list(dest="NO")["items"], fact)
+        self.assertEqual(item["evidence_status"], "verified")
+        self.assertIn("short supply", item["evidence_context"])
 
     def test_search_and_pagination(self):
         self.assertEqual([i["id"] for i in self._list(q="costs NOK")["items"]], [INVENTED])

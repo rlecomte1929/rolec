@@ -25,7 +25,13 @@ from ...database import db
 from ...db.policies import UnattestedLawyerReviewError, UnquotedApprovalError
 from ..services import lawyer_review_gate
 from ..auth_deps import require_admin
-from ..services.fact_evidence import NO_SOURCE, UNVERIFIED, VERIFIED, check_evidence
+from ..services.fact_evidence import (
+    NO_SOURCE,
+    UNVERIFIED,
+    VERIFIED,
+    best_source_text,
+    check_evidence,
+)
 
 from ..services.audit_log_service import ACTION_UPDATE, ACTOR_HUMAN, insert_audit_log
 
@@ -117,6 +123,12 @@ def list_facts(
                        f.reviewed_by, f.reviewed_at, f.created_at,
                        e.destination_country, e.topic_key, e.domain_area,
                        kd.content_excerpt, kd.last_verified_at,
+                       -- Both source-text columns: neither is reliably the fuller
+                       -- one. The enterprise.gov.ie permit pages hold 17k chars in
+                       -- text_content and 308 chars of cookie banner in the excerpt,
+                       -- while across the corpus the excerpt is usually the better.
+                       -- best_source_text() takes the longer of the two.
+                       kd.text_content,
                        -- [AIQ-2046] applies_to is where `needs_lawyer_review` lives. Without
                        -- it the reviewer saw strictly LESS provenance than the employee who
                        -- then read the row, and could not honour a flag they were never shown.
@@ -133,7 +145,7 @@ def list_facts(
 
     items = []
     for r in rows:
-        check = check_evidence(r[3], r[15])
+        check = check_evidence(r[3], best_source_text(r[15], r[17]))
         items.append({
             "id": str(r[0]),
             "fact_text": r[1],
@@ -156,7 +168,7 @@ def list_facts(
             # [AIQ-2046] Surfaced so the reviewer can SEE the flag they are meant to
             # honour. The gate that refuses the approval lives in db/policies.py; this
             # is what stops the refusal being a surprise.
-            "needs_lawyer_review": lawyer_review_gate.carries_lawyer_review_flag(r[17]),
+            "needs_lawyer_review": lawyer_review_gate.carries_lawyer_review_flag(r[18]),
         })
 
     return {"items": items, "total": int(total), "limit": limit, "offset": offset}

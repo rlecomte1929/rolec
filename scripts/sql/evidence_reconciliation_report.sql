@@ -7,17 +7,24 @@
 -- `content_excerpt` is the evidence column: it is what `admin_content_review` shows a reviewer,
 -- what `backfill_fact_evidence.py` writes, and what `content_sha256` hashes (measured
 -- 2026-08-23: of 267 documents with a hash, 254 match the excerpt and 23 match text_content).
--- `text_content` is the original ingest's column, since unmaintained — 638 of 758 documents hold
--- under 200 characters there. Checking a quote against `text_content` therefore reports a false
--- catastrophe; this report uses `content_excerpt` and falls back to `text_content`, the same
--- precedence `admin.py` and `official_ingest_service.py` already use.
+-- `text_content` came from the original ingest. Across the corpus the excerpt is the fuller
+-- column (257 of 758 usable vs 120), so checking a quote against `text_content` alone reports a
+-- false catastrophe.
+--
+-- But NEITHER column is reliably better. The enterprise.gov.ie permit pages hold 17,333 / 19,568
+-- / 9,909 / 5,242 characters in `text_content` and **308 characters of cookie banner** in the
+-- excerpt. Measured over the 196 served facts: excerpt-first evidences 129, longest-wins
+-- evidences 142, and the 13 recovered sit in IE, SG and US — the Irish ones being CSEP facts on
+-- the first real customer's corridor. So take the LONGER of the two, matching
+-- `fact_evidence.best_source_text()`.
 --
 -- NORMALISATION. Markup only, never words — and bullets BEFORE whitespace, because removing a
 -- bullet after collapsing leaves a double space and a true quote reads as missing.
 WITH src AS (
   SELECT f.id, f.fact_key, f.status, f.evidence_verified, f.evidence_quote,
          e.destination_country,
-         coalesce(nullif(k.content_excerpt, ''), k.text_content) AS source_text
+         CASE WHEN length(coalesce(k.text_content,'')) > length(coalesce(k.content_excerpt,''))
+              THEN k.text_content ELSE k.content_excerpt END AS source_text
   FROM requirement_facts f
   JOIN requirement_entities e ON e.id = f.entity_id
   LEFT JOIN knowledge_docs k ON k.id = f.source_doc_id

@@ -19,6 +19,25 @@ mistake: the hash is fine, it just describes the other column.
 `content_excerpt`; `admin.py` and `official_ingest_service.py` already use
 `content_excerpt or text_content`. The only thing reading the wrong column was the ad-hoc census.
 
+## The rule that looked right and was not
+
+The first read of this said "`content_excerpt` is the evidence column, prefer it". The data
+disagrees. The `enterprise.gov.ie` permit pages hold **17,333 / 19,568 / 9,909 / 5,242** characters
+in `text_content` and **308 characters of cookie banner** in `content_excerpt` — the capture landed
+the consent notice and stopped.
+
+Measured over the 196 served facts:
+
+| resolution | evidenced |
+|---|---:|
+| `content_excerpt` first | 129 |
+| **longer of the two** | **142** |
+
+The 13 recovered sit in **IE, SG and US**, the Irish ones being Critical Skills Employment Permit
+facts on the first real customer's corridor. So `fact_evidence.best_source_text()` takes the
+longer column. Length is a crude proxy for substance, but the thing it guards against is a
+boilerplate stub, and a stub is always the short one.
+
 ## Baseline — the 196 facts currently served to users
 
 Measured with `scripts/sql/evidence_reconciliation_report.sql`.
