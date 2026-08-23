@@ -17,6 +17,10 @@ vi.mock('../../api/adminFeedback', () => ({
   dismissFeedback: vi.fn().mockResolvedValue(undefined),
   deleteFeedback: vi.fn().mockResolvedValue(undefined),
   advanceState: vi.fn(),
+  bulkTriageFeedback: vi.fn(),
+  triggerFix: vi.fn(),
+  autoAttempt: vi.fn(),
+  EvalGateError: class extends Error {},
 }));
 import * as feedbackApi from '../../api/adminFeedback';
 import { FeedbackTab } from './FeedbackTab';
@@ -374,3 +378,75 @@ describe('FeedbackTab — Dispatched view (D2)', () => {
     );
   });
 });
+
+
+// ── Bulk triage ─────────────────────────────────────────────────────────────
+// 69 items and no way to act on more than one at a time was the reported gap.
+describe('FeedbackTab — bulk triage', () => {
+  beforeEach(() => {
+    (feedbackApi.listFeedback as ReturnType<typeof vi.fn>).mockResolvedValue(MOCK_ITEMS);
+    (feedbackApi.bulkTriageFeedback as ReturnType<typeof vi.fn>).mockResolvedValue({
+      updated: 2,
+      rejected: [],
+    });
+  });
+
+  it('shows no bar until something is selected', async () => {
+    render(<MemoryRouter><FeedbackTab /></MemoryRouter>);
+    await screen.findByText('Button is broken');
+    expect(screen.queryByTestId('bulk-action-bar')).not.toBeInTheDocument();
+  });
+
+  it('applies one status to every selected row, keyed by stream and id', async () => {
+    render(<MemoryRouter><FeedbackTab /></MemoryRouter>);
+    await screen.findByText('Button is broken');
+
+    fireEvent.click(screen.getByLabelText('Select all'));
+    expect(await screen.findByTestId('bulk-action-bar')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Mark Closed \(2\)/ }));
+
+    await waitFor(() =>
+      expect(feedbackApi.bulkTriageFeedback).toHaveBeenCalledWith(
+        [
+          { stream: 'product', source_id: 'aaaa-1111' },
+          { stream: 'helpfulness', source_id: 'bbbb-2222' },
+        ],
+        'closed',
+      ),
+    );
+  });
+
+  it('carries the count in the button label', async () => {
+    render(<MemoryRouter><FeedbackTab /></MemoryRouter>);
+    await screen.findByText('Button is broken');
+    fireEvent.click(screen.getByLabelText('Select report-001'));
+    expect(
+      await screen.findByRole('button', { name: /Mark Reviewed \(1\)/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('surfaces a partial failure instead of reporting success', async () => {
+    (feedbackApi.bulkTriageFeedback as ReturnType<typeof vi.fn>).mockResolvedValue({
+      updated: 1,
+      rejected: [{ stream: 'helpfulness', source_id: 'bbbb-2222', reason: 'write failed' }],
+    });
+    render(<MemoryRouter><FeedbackTab /></MemoryRouter>);
+    await screen.findByText('Button is broken');
+    fireEvent.click(screen.getByLabelText('Select all'));
+    fireEvent.click(screen.getByRole('button', { name: /Mark Closed \(2\)/ }));
+    expect(await screen.findByText(/1 of 2 could not be updated/i)).toBeInTheDocument();
+  });
+
+  it('does not report success when the whole call fails', async () => {
+    (feedbackApi.bulkTriageFeedback as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('network'),
+    );
+    render(<MemoryRouter><FeedbackTab /></MemoryRouter>);
+    await screen.findByText('Button is broken');
+    fireEvent.click(screen.getByLabelText('Select all'));
+    fireEvent.click(screen.getByRole('button', { name: /Mark Closed \(2\)/ }));
+    expect(await screen.findByText(/nothing was updated/i)).toBeInTheDocument();
+  });
+});
+

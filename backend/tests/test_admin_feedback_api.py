@@ -475,3 +475,124 @@ def test_delete_non_product_refused(admin_client):
 def test_dismiss_and_delete_require_admin(non_admin_client):
     assert non_admin_client.post("/api/admin/feedback/product/f-001/dismiss", json={"dismissed": True}).status_code == 403
     assert non_admin_client.delete("/api/admin/feedback/product/f-001").status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Bulk triage + the resolution-wipe it would otherwise have amplified
+# ---------------------------------------------------------------------------
+
+
+def test_a_status_change_no_longer_wipes_the_resolution(admin_client, db_session):
+    """The console's ONLY caller sends {status} alone, and owner/resolution default to
+    None on TriageUpdate — so the upsert used to null them both. Every dropdown change
+    silently erased a resolution somebody had written, and a bulk close would have
+    erased N at once. FAILS on origin/main."""
+    admin_client.patch(
+        "/api/admin/feedback/product/f-001",
+        json={"status": "reviewed", "owner": "Romain", "resolution": "Fixed in #2024"},
+    )
+    resp = admin_client.patch("/api/admin/feedback/product/f-001", json={"status": "closed"})
+    assert resp.status_code == 200
+
+    row = db_session.execute(
+        text("SELECT status, owner, resolution FROM feedback_status "
+             "WHERE stream='product' AND source_id='f-001'")
+    ).first()
+    assert row[0] == "closed", "the status must still change"
+    assert row[1] == "Romain", "owner must survive a status-only update"
+    assert row[2] == "Fixed in #2024", "resolution must survive a status-only update"
+
+
+def test_bulk_triage_applies_one_status_to_many_items(admin_client, db_session):
+    resp = admin_client.post(
+        "/api/admin/feedback/bulk-triage",
+        json={
+            "status": "closed",
+            "items": [
+                {"stream": "product", "source_id": "f-001"},
+                {"stream": "ai_answers", "source_id": "h-001"},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["updated"] == 2
+    assert resp.json()["rejected"] == []
+
+    rows = db_session.execute(
+        text("SELECT stream, status FROM feedback_status ORDER BY stream")
+    ).all()
+    assert {(r[0], r[1]) for r in rows} == {("ai_answers", "closed"), ("product", "closed")}
+
+
+def test_bulk_triage_is_keyed_on_stream_and_id_not_id_alone(admin_client, db_session):
+    """feedback_status is keyed (stream, source_id); the console unions five streams, so
+    the same id can exist in more than one. Setting product/x must not touch hr/x."""
+    admin_client.post(
+        "/api/admin/feedback/bulk-triage",
+        json={"status": "closed", "items": [{"stream": "product", "source_id": "dup"}]},
+    )
+    admin_client.post(
+        "/api/admin/feedback/bulk-triage",
+        json={"status": "reviewed", "items": [{"stream": "hr_case_notes", "source_id": "dup"}]},
+    )
+    rows = dict(
+        db_session.execute(
+            text("SELECT stream, status FROM feedback_status WHERE source_id='dup'")
+        ).all()
+    )
+    assert rows == {"product": "closed", "hr_case_notes": "reviewed"}
+
+
+def test_bulk_triage_does_not_wipe_resolutions(admin_client, db_session):
+    """The whole reason the wipe had to be fixed first: closing 40 items must not erase
+    40 resolutions."""
+    admin_client.patch(
+        "/api/admin/feedback/product/f-001",
+        json={"status": "reviewed", "owner": "Romain", "resolution": "keep me"},
+    )
+    admin_client.post(
+        "/api/admin/feedback/bulk-triage",
+        json={"status": "closed", "items": [{"stream": "product", "source_id": "f-001"}]},
+    )
+    row = db_session.execute(
+        text("SELECT status, owner, resolution FROM feedback_status "
+             "WHERE stream='product' AND source_id='f-001'")
+    ).first()
+    assert row == ("closed", "Romain", "keep me")
+
+
+def test_bulk_triage_rejects_an_invalid_status(admin_client):
+    resp = admin_client.post(
+        "/api/admin/feedback/bulk-triage",
+        json={"status": "dispatched", "items": [{"stream": "product", "source_id": "f-001"}]},
+    )
+    assert resp.status_code == 400
+
+
+def test_bulk_triage_reports_what_it_dropped(admin_client):
+    """Best-effort, but never silent — admin_review_queue's bulk-status discards
+    failures and a caller cannot tell partial from complete."""
+    resp = admin_client.post(
+        "/api/admin/feedback/bulk-triage",
+        json={
+            "status": "closed",
+            "items": [
+                {"stream": "product", "source_id": "f-001"},
+                {"stream": "", "source_id": ""},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["updated"] == 1
+    assert len(body["rejected"]) == 1
+    assert body["rejected"][0]["reason"]
+
+
+def test_bulk_triage_with_no_items_is_a_noop(admin_client):
+    resp = admin_client.post(
+        "/api/admin/feedback/bulk-triage", json={"status": "closed", "items": []}
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"updated": 0, "rejected": []}
+

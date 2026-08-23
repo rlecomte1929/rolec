@@ -14,6 +14,7 @@ import { Badge } from '../antigravity/Badge';
 import {
   listFeedback,
   triageFeedback,
+  bulkTriageFeedback,
   getFeedbackScreenshot,
   saveDispatchContext,
   dispatchPreview,
@@ -34,6 +35,9 @@ import { getApiErrorMessage } from '../../utils/apiDetail';
 import { isTriggerFixEnabled } from '../../featureFlags';
 import type { ClientContext } from '../../lib/diagnostics';
 import { posthogPersonUrl } from '../../lib/posthogLinks';
+import { Checkbox } from '../antigravity';
+import { BulkActionBar, type BulkActionResult } from '../antigravity/BulkActionBar';
+import { useRowSelection } from '../../hooks/useRowSelection';
 import { ProgressStrip } from './ProgressStrip';
 import { NewFeedbackModal } from './NewFeedbackModal';
 
@@ -514,6 +518,53 @@ export function FeedbackTab() {
     return true;
   });
 
+  // ── Bulk triage ───────────────────────────────────────────────────────────
+  // Selection is scoped to `displayed` (the client-filtered list), NOT `rows`.
+  // Every filter on this page is client-side, so selecting over `rows` would let a
+  // "select all" act on items the admin cannot see. The filter signature is passed as
+  // `syncTo`, so changing any filter clears the selection rather than carrying hidden
+  // rows into the next action.
+  const filterSignature = `${activeStream}|${filterStatus}|${reporterFilter}|${messageFilter}|${showDismissed}`;
+  const { selectedRows, allVisibleSelected, isSelected, toggle, toggleAll, clear } =
+    useRowSelection(displayed, (r) => r.id, filterSignature);
+  const [bulkResult, setBulkResult] = useState<BulkActionResult>('idle');
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [bulkDone, setBulkDone] = useState<string>('');
+  const bulkBusy = bulkResult === 'busy';
+
+  const applyBulkStatus = async (status: TriageStatus) => {
+    const targets = selectedRows.map((r) => ({ stream: r.stream, source_id: r.id }));
+    if (targets.length === 0) return;
+    setBulkResult('busy');
+    setBulkError(null);
+    try {
+      const res = await bulkTriageFeedback(targets, status);
+      const ok = new Set(
+        targets
+          .filter((t) => !res.rejected.some((x) => x.stream === t.stream && x.source_id === t.source_id))
+          .map((t) => t.source_id),
+      );
+      // Patch locally — every mutation on this page does, and a bulk refetch would
+      // re-pull the whole list to learn what we already know.
+      setRows((prev) => prev.map((r) => (ok.has(r.id) ? { ...r, status } : r)));
+      if (res.rejected.length > 0) {
+        // Deliberately do NOT clear on failure. The bar only renders while something is
+        // selected, so clearing here would unmount the very message explaining what went
+        // wrong — and it would throw away the selection the admin needs in order to
+        // retry. Clear only when everything landed.
+        setBulkResult('error');
+        setBulkError(`${res.rejected.length} of ${targets.length} could not be updated.`);
+      } else {
+        clear();
+        setBulkResult('done');
+        setBulkDone(`${res.updated} updated.`);
+      }
+    } catch {
+      setBulkResult('error');
+      setBulkError('Could not apply the change — nothing was updated.');
+    }
+  };
+
   const counts = {
     all:      rows.length,
     new:      rows.filter((r) => r.status === 'new' || r.status === null).length,
@@ -754,10 +805,44 @@ export function FeedbackTab() {
         </>
       )}
 
+      {activeStream !== 'dispatched' && (
+        <BulkActionBar
+          count={selectedRows.length}
+          busy={bulkBusy}
+          result={bulkResult}
+          successMessage={bulkDone}
+          errorMessage={bulkError}
+          onClear={clear}
+        >
+          {(['new', 'reviewed', 'acted_on', 'closed'] as TriageStatus[]).map((st) => (
+            <button
+              key={st}
+              type="button"
+              disabled={bulkBusy}
+              onClick={() => void applyBulkStatus(st)}
+              className="rounded-md border border-[#d1d5db] bg-white px-2.5 py-1 text-sm text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white disabled:opacity-50"
+            >
+              {/* The count is in the label on purpose: it is what makes a count
+                  regression impossible to miss, and it is what the vetting-queue
+                  tests assert on. */}
+              {bulkBusy ? 'Applying…' : `Mark ${STATUS_LABEL[st]} (${selectedRows.length})`}
+            </button>
+          ))}
+        </BulkActionBar>
+      )}
+
       {/* Table — normal (non-dispatched) mode */}
       {activeStream !== 'dispatched' && displayed.length > 0 && (
         <div className="rounded-lg border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-[100px_110px_minmax(0,1fr)_140px_120px_120px_140px_110px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+          <div className="grid grid-cols-[36px_100px_110px_minmax(0,1fr)_140px_120px_120px_140px_110px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+            <div className="px-2 py-2.5 flex items-center">
+              <Checkbox
+                aria-label="Select all"
+                checked={allVisibleSelected}
+                disabled={bulkBusy}
+                onChange={(e) => toggleAll(e.target.checked)}
+              />
+            </div>
             <div className="px-3 py-2.5">ID</div>
             <div className="px-3 py-2.5">Stream</div>
             <div className="px-3 py-2.5">Text</div>
@@ -777,7 +862,7 @@ export function FeedbackTab() {
               return (
                 <div key={row.id}>
                   <div
-                    className="grid grid-cols-[100px_110px_minmax(0,1fr)_140px_120px_120px_140px_110px] items-center hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="grid grid-cols-[36px_100px_110px_minmax(0,1fr)_140px_120px_120px_140px_110px] items-center hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => setExpanded(isExpanded ? null : row.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -789,6 +874,20 @@ export function FeedbackTab() {
                     tabIndex={0}
                     aria-expanded={isExpanded}
                   >
+                    <div className="px-2 py-2.5 flex items-center">
+                      <Checkbox
+                        aria-label={`Select ${row.source_ref ?? row.id}`}
+                        checked={isSelected(row.id)}
+                        disabled={bulkBusy}
+                        onChange={() => toggle(row.id)}
+                        // The row itself is the expand/collapse control, so the click
+                        // must stop here — otherwise ticking a box also opens the row.
+                        // On the input, not a wrapper div: the checkbox is the
+                        // interactive element and already handles its own keyboard.
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      />
+                    </div>
                     <div className="px-3 py-2.5 flex items-center gap-1">
                       <span className="font-mono text-[10.5px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                         {/* TD-FIX-5 (AIQ-1506): full report_id — see note above. */}
