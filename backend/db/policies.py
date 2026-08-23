@@ -28,8 +28,20 @@ from typing import Callable
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import ProgrammingError
 
+from backend.app.services import lawyer_review_gate
+
 class UnquotedApprovalError(ValueError):
     """[AIQ-2124] Raised when an approval would promote a fact carrying no evidence quote."""
+
+
+class UnattestedLawyerReviewError(ValueError):
+    """[AIQ-2046] Raised when an approval would publish a fact the research pipeline
+    flagged `needs_lawyer_review`, without a counsel attestation to discharge it.
+
+    A SEPARATE axis from UnquotedApprovalError, and easy to conflate with it. The quote
+    gate asks "is there evidence for this claim?"; this asks "has a lawyer confirmed the
+    claim itself?". A fact can pass either and fail the other.
+    """
 
 log = logging.getLogger(__name__)
 
@@ -1476,6 +1488,42 @@ class PoliciesMixin:
                 + " — supply the verbatim sentence from the cited page first"
             )
 
+    def _assert_no_fact_needs_lawyer_review(self, fact_ids: List[str]) -> None:
+        """[AIQ-2046] Raise unless every id is free of an undischarged `needs_lawyer_review`.
+
+        The flag is the research pipeline saying a lawyer must read this claim before
+        anyone relies on it. Until now nothing enforced that anywhere: on the sibling
+        `requirement_items` table, 9 IRELAND rows were approved in a single scripted call
+        at one identical microsecond on 2026-08-21 — 4 of them flagged — with no warning
+        and no log. The reviewer could not have honoured the flag; the queue never showed
+        it to them.
+
+        Mirrors `_assert_every_fact_has_a_quote` deliberately: precondition OUTSIDE the
+        transaction, whole batch refused, offending ids named. A half-applied approval
+        leaves the reviewer unable to tell what landed.
+
+        Truth is decided in PYTHON, not SQL, for the same reason the quote gate gives —
+        and here additionally because the flag is nested inside JSON whose shape differs
+        between the two tables that carry it (see services/lawyer_review_gate).
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT id, applies_to FROM requirement_facts WHERE id IN :ids"
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": list(fact_ids)},
+            ).fetchall()
+        flagged = sorted(
+            str(r[0]) for r in rows
+            if lawyer_review_gate.carries_lawyer_review_flag(r[1])
+        )
+        if flagged:
+            raise UnattestedLawyerReviewError(
+                "cannot approve a requirement fact flagged needs_lawyer_review: "
+                + ", ".join(flagged)
+                + " — obtain counsel sign-off before publishing it, or reject it"
+            )
+
     def update_requirement_fact_status(
         self,
         fact_ids: List[str],
@@ -1508,6 +1556,10 @@ class PoliciesMixin:
             return
         if status == "approved":
             self._assert_every_fact_has_a_quote(fact_ids)
+            # [AIQ-2046] Second, independent gate. Evidence and legal sign-off are
+            # different questions — a fact can carry a perfect verbatim quote and still
+            # be a claim only a lawyer should publish.
+            self._assert_no_fact_needs_lawyer_review(fact_ids)
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             for fid in fact_ids:

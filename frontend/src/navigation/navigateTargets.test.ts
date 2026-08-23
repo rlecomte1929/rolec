@@ -119,16 +119,13 @@ describe('navigate() targets resolve to real routes', () => {
   /**
    * `<Link to>` and `<a href>` fail the same way navigate() does, and were never covered.
    *
-   * KNOWN_BROKEN is not an accepted exception — it is one real bug that needs a decision
-   * this guard cannot make. `/terms` is the "Terms of Service" link on the signup consent
-   * line, and there is no Terms page anywhere in the repo or in production (relopass.com
-   * /terms returns the marketing homepage, byte-identical to a nonsense path, while
-   * /privacy returns a real 12KB page). Writing terms of service is a legal act and
-   * deleting the reference changes what the user is consenting to, so neither belongs in
-   * an agent's diff. Tracked in AIQ-1950; delete this entry when the page exists or the
-   * copy changes — do not add to it.
+   * KNOWN_BROKEN is now EMPTY, as its own instruction required: "delete this entry when
+   * the page exists or the copy changes". [AIQ-2059] changed the copy — the signup form no
+   * longer claims the user agreed to a Terms of Service that was never written — so the
+   * one entry is retired rather than carried. Do not add to it; a dead link is a bug to
+   * fix, not an exception to register.
    */
-  const KNOWN_BROKEN = new Set(['/terms']);
+  const KNOWN_BROKEN = new Set<string>();
 
   it('no <Link to>/<a href> points at a path the router cannot match', () => {
     const dead: string[] = [];
@@ -149,11 +146,15 @@ describe('navigate() targets resolve to real routes', () => {
     ).toEqual([]);
   });
 
-  it('the link guard still sees the one link we know is broken', () => {
-    // Without this, deleting the AuthScreen link would leave KNOWN_BROKEN as a permanent
-    // lie and the next real break could be waved through as "already known".
+  it('the signup form does not claim agreement to terms that do not exist', () => {
+    // [AIQ-2059] The inverse of the assertion this replaces. That one pinned the broken
+    // link in place so KNOWN_BROKEN could not become a lie; this one stops the claim
+    // coming back while /terms still resolves to nothing.
     const authScreen = readFileSync(join(SRC, 'features/platform-v2/auth/AuthScreen.tsx'), 'utf8');
-    expect(authScreen).toContain('href="/terms"');
-    expect(resolves('/terms', routePaths)).toBe(false);
+    expect(authScreen).not.toContain('href="/terms"');
+    expect(authScreen).not.toContain('Terms of Service');
+    // The privacy half is a real page and must survive.
+    expect(authScreen).toContain('href="/privacy"');
+    expect(resolves('/privacy', routePaths)).toBe(true);
   });
 });
