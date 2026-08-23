@@ -63,6 +63,10 @@ _AUTHORITATIVE_DDL: List[Tuple[str, Tuple[str, ...]]] = [
     # if a future create_all ever renders them.
     ("20261120000000_attestation_promotion_policy.sql", ()),
     ("20261121000000_attestation_case_scope.sql", ()),
+    # Creates case_entitlement_grants and ALTERs relocation_cases. It owns the grants table;
+    # relocation_cases belongs to an older migration, so the ADD COLUMN IF NOT EXISTS clauses
+    # replay harmlessly on whatever create_all rendered.
+    ("20261122000000_case_funding_source_and_grants.sql", ("case_entitlement_grants",)),
 ]
 
 #: Supabase ships these; a bare postgres:16 container does not. The migration GRANTs to them
