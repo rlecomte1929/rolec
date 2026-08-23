@@ -1406,8 +1406,15 @@ class PoliciesMixin:
         "Otto bridge capture, unverified — see source_url"; all 705 store a quote that is not a
         substring of it, and 246 of those are approved.
 
-        Only `FALSE` is excluded, deliberately. `NULL` means never checked, not wrong: 247
-        approved facts are unchecked, and dropping them would empty the surface on no evidence.
+        TWO exclusions, and they are different claims. `evidence_verified = FALSE` means the
+        quote is provably not in the source. A BLANK `evidence_quote` means there is no claim
+        to check at all, while a source_url still renders beside the fact — a citation
+        supporting nothing, which reads as more trustworthy than no citation. Both are
+        withheld; see the filter below.
+
+        `NULL` verification is NOT excluded, deliberately. It means never checked, not wrong:
+        247 approved facts are unchecked, and dropping them would empty the surface on no
+        evidence.
         Narrowing "unknown" is the backfill's job (`backend/scripts/backfill_fact_evidence.py`),
         not this reader's.
 
@@ -1422,6 +1429,22 @@ class PoliciesMixin:
                 "AND COALESCE(f.evidence_verified, TRUE) = TRUE"
             ), {"dest": destination_country}).fetchall()
         items = self._rows_to_list(rows)
+        # [AIQ-2124, read half] A fact with a source_url and NO evidence quote must not serve.
+        #
+        # #2022 closed the WRITE side — an approval now refuses a fact carrying no quote. It
+        # did not retract the ones already approved, and 9 of them still serve (measured
+        # 2026-08-23: SG 6, IE 3 of 205 served catalog-wide). Those are the worst shape a
+        # served fact can take: a citation link next to a claim the citation does not
+        # support. It reads as MORE trustworthy than an uncited fact, not less.
+        #
+        # `check_evidence` already draws this exact line — "a fact with no quote can never be
+        # machine-verified … That belongs in front of a human" — so this is the reader
+        # honouring a rule the evidence layer already states, not a new policy.
+        #
+        # Emptiness is decided in PYTHON for the same reason #2022 gives: both Postgres and
+        # SQLite TRIM() strip spaces only, so a quote of "\n\t" survives `TRIM(...) = ''` on
+        # both engines and would walk straight through a SQL predicate.
+        items = [i for i in items if str(i.get("evidence_quote") or "").strip()]
         for item in items:
             item["applies_to"] = self._json_load(item.get("applies_to")) or {}
             item["required_fields"] = self._json_load(item.get("required_fields")) or []
