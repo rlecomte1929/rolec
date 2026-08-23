@@ -222,16 +222,12 @@ def _build_context(
         or (row["origin_country_code"] or "").strip()
     ).upper() or None
 
-    # visa_type: [P1-04] an EEA national relocating to another EEA country uses
-    # the registration scheme (not a work permit), regardless of work purpose.
-    # Otherwise map the relocation purpose to the trigger-rule vocabulary.
+    # visa_type: [P1-04] an EEA NATIONAL relocating to another EEA country uses the
+    # registration scheme (not a work permit), regardless of work purpose — but the
+    # deciding fact is the person's nationality, not the two country codes. See
+    # `_resolve_visa_type`, which is where that is now settled and tested.
     purpose = (row["purpose"] or "").strip()
-    if origin_country in _EEA_COUNTRIES and dest_country in _EEA_COUNTRIES:
-        visa_type = "eea_registration"
-    else:
-        visa_type = _purpose_to_visa_type(
-            purpose or (basics.get("purpose") or "").strip()
-        )
+    visa_type = _resolve_visa_type(origin_country, dest_country, purpose, draft)
 
     return {
         "case_uuid":        case_uuid,
@@ -251,7 +247,71 @@ def _build_context(
 # [AIQ-1795b] Moved to a dependency-free module so a CI guard can import the set without
 # importing this engine (and therefore SQLAlchemy). The alias is kept because several tests
 # and services already read `trigger_engine._EEA_COUNTRIES`; there is still exactly one copy.
-from .eea_countries import EEA_COUNTRIES as _EEA_COUNTRIES  # noqa: E402
+from .eea_countries import EEA_COUNTRIES as _EEA_COUNTRIES
+from .nationality_class import THIRD_COUNTRY, classify_best  # noqa: E402
+
+
+def _resolve_visa_type(
+    origin_country: Optional[str],
+    dest_country: Optional[str],
+    purpose: str,
+    draft: Dict[str, Any],
+) -> Optional[str]:
+    """Which track is this mover on — EEA registration, or a permit?
+
+    Free movement is a right of the PERSON, not a property of the route. This used to read
+
+        if origin_country in _EEA_COUNTRIES and dest_country in _EEA_COUNTRIES:
+            visa_type = "eea_registration"
+
+    whose own comment said "an EEA **national**" while the code compared two COUNTRIES. Spain
+    and Ireland are both EEA, so a Venezuelan moving Madrid→Dublin was typed a free mover, and
+    `20261025000000_fam_reunion_eea_gate_es_nl_no.sql` — which gates `eea_registration` out of
+    every family-reunification template — then withheld the forms her family actually needs.
+    `nationality_class.classify_best` has always answered this correctly; nothing here called it.
+
+    THE ASYMMETRY IS THE DESIGN. Geography still decides the *candidate* answer; nationality can
+    only ever REVOKE it, and only on positive knowledge that the mover is third-country. An
+    absent or unrecognised nationality keeps exactly today's behaviour.
+
+    Guessing the other way would be worse than the bug. Handing a family-reunification
+    application to an EU citizen who has a treaty right not to file one is precisely the harm
+    AIQ-1795/1795b/1795c were written to stop, and `form_templates` carries two mutually
+    exclusive tracks — so "unknown → don't suppress" does not mean "show a little more", it
+    means serve BOTH tracks and let the employee pick the wrong one.
+
+    Measured on production 2026-08-23: of 1,046 `wizard_cases` with both ends in the EEA, 1,025
+    carry a nationality and **14 are third-country** (13 Indian → IE, 1 Venezuelan → IE). Those
+    14 are the whole behaviour change; 21 unknown-nationality cases are deliberately untouched.
+    """
+    both_ends_eea = origin_country in _EEA_COUNTRIES and dest_country in _EEA_COUNTRIES
+    if both_ends_eea and not _is_third_country_mover(draft, dest_country):
+        return "eea_registration"
+
+    basics = draft.get("relocationBasics") if isinstance(draft, dict) else None
+    fallback = (basics or {}).get("purpose") if isinstance(basics, dict) else ""
+    return _purpose_to_visa_type(purpose or (fallback or "").strip())
+
+
+def _is_third_country_mover(draft: Dict[str, Any], dest_country: Optional[str]) -> bool:
+    """True only when we POSITIVELY know this mover has no free-movement right here.
+
+    BOTH nationalities, because rights are cumulative — the same rule `rules_engine` and
+    `applies_to_matcher` already follow. A Venezuelan/Italian dual national exercises Italian
+    free movement; judging them on whichever passport intake happened to record first hands
+    them a permit track they must not apply for.
+
+    Never raises: a malformed draft is an unknown nationality, and unknown means "leave the
+    answer alone".
+    """
+    profile = draft.get("employeeProfile") if isinstance(draft, dict) else None
+    if not isinstance(profile, dict):
+        return False
+    nationalities = (
+        profile.get("nationality"),
+        profile.get("second_nationality") or profile.get("secondNationality"),
+    )
+    return classify_best(nationalities, dest_country) == THIRD_COUNTRY
 
 
 def _purpose_to_visa_type(purpose: str) -> Optional[str]:
