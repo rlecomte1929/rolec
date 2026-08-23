@@ -1,0 +1,1675 @@
+DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                    Page 1 of 53   
+ 
+ 
+ 
+National Policy  ☐   National Procedure  ☐  National Protocol  ☐   National Guideline  ☒    
+National Clinical Guideline  ☐ 
+ 
+HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+  
+DOCUMENT GOVERNANCE 1 
+Document Owner (post title): General Manager 
+Document Owner name: Audrey Bohan 
+Document Owner email:   
+(Generic email addresses only for the Repository) 
+eligibility.guidelines@hse.ie 
+Document Commissioner(s):   
+(Name and post holder title): 
+Shaun Flanagan 
+Assistant National Director 
+Date Document Approved: 
+(Formal ratification by the Governance/Steering Group) 
+01/04/2026 
+Document Approved by: 
+(Name and title of post holder) 
+Audrey Bohan 
+General Manager 
+Document Approver Sign-off:  
+(e-signature) 
+ 
+Document Approver Registration number:                   
+(where applicable) 
+N/A 
+Development Group Name: Eligibility Unit 
+Development Group Chairperson: Audrey Bohan  
+Additional headings can be inserted if required   
+ 
+DOCUMENT MANAGEMENT 2 
+Date effective from:  01/04/2026 
+Date set for next review: 01/04/2029 
+Your Reference No: (if applicable) N/A 
+Current version no:  0 
+ 
+Archived version no:   N/A 
+Note:  Original document is Version 0.  First revision is Version 1.  Second revision is Version 2, and so 
+on. 
+Note:  HSE National 3PGs should be formally reviewed every 3 years, unless new legislative/regulatory 
+or emerging issues/research/technology/audit etc. dictates sooner.  
+ 
+ 
+  
+ 
+1 Records the governance and approval of the document. 
+2 Records the control information about the document. 
+
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 2 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  
+Whilst printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to 
+secondary electronic/other locations which are accessible by staff or the public.    
+   
+VERSION CONTROL UPDATE 3 
+ 
+Version No. 
+(most recent version 
+first) 
+Date 
+reviewed 
+(most recent date 
+first) 
+Comments 
+(1 sentence max, if required)  
+0 01/04/2026 Original publication 
+ 
+ 
+PUBLICATION INFORMATION 4  
+ 
+Topic:     
+Medical Card and GP Visit Card Assessment 
+National Group:         
+HSE Primary Care Reimbursement Service – Eligibility Unit 
+ 
+Short summary:   
+These guidelines provide information on how Medical Card and GP Visit Card applications are 
+processed and how eligibility is granted.  
+ 
+Description:  
+The Eligibility Unit assists people in finding out if they are eligible for a Medical Card or a GP 
+Visit Card. We have developed this guide for Medical Cards and GP Visit Cards so you can 
+understand:   
+• if you qualify   
+• what is covered   
+• how to apply   
+• how we make a decision on your application  
+• and how to appeal a decision you are unhappy with.   
+ 
+ 
+ 
+  
+ 
+3 Records details of the document review, even if no changes are made.  
+4 Records the document information required for publication on the HSE National Central Repository.  
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 3 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  
+Whilst printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to 
+secondary electronic/other locations which are accessible by staff or the public.    
+   
+Contents  
+1. Welcome to this guide ...................................................................................................... 6 
+2. Who can get a Medical Card or GP Visit Card? ............................................................... 6 
+Who is eligible for a Medical Card or GP Visit Card? ....................................................... 7 
+What other healthcare schemes are available? ................................................................ 9 
+Health Amendment Act Card (HAA Card) ..................................................................... 9 
+The Redress for Women Resident in Certain Institutions Scheme ............................... 9 
+The Mother and Baby in Institutions Scheme (MBS) .................................................... 9 
+Drugs Payment Scheme (DPS) .................................................................................. 10 
+Long-Term Illness Scheme (LTI Scheme) ................................................................... 10 
+3. What does a card cover? ............................................................................................... 11 
+General practitioner (family doctor) and Diabetes Cycle of Care ................................ 12 
+Drugs, medicines and medical appliances .................................................................. 12 
+Dental treatments ........................................................................................................ 12 
+Eye care ...................................................................................................................... 12 
+Hearing services ......................................................................................................... 12 
+Maternity Cash Grant .................................................................................................. 13 
+4. How to apply for a card .................................................................................................. 13 
+Apply online ................................................................................................................ 13 
+Postal applications ...................................................................................................... 13 
+5. How we assess your income and expenses ................................................................... 14 
+What income is assessable? .......................................................................................... 15 
+Social welfare payments assessed if you have other income ..................................... 15 
+Income we do not assess ............................................................................................... 16 
+Compensation payments that are not assessable .......................................................... 16 
+Social welfare and other state payments that we don’t assess ....................................... 17 
+Rental Income we do not assess .................................................................................... 18 
+How we calculate your income and expenses.................................................................... 19 
+How we calculate this ..................................................................................................... 19 
+Basic rates weekly income limits ........................................................................................ 20 
+Amounts for dependent children ........................................................................................ 24 
+Assessing income for self-employed people ...................................................................... 25 
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 4 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  
+Whilst printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to 
+secondary electronic/other locations which are accessible by staff or the public.    
+   
+All pages of your NOA ................................................................................................. 25 
+No Net tax Liability ...................................................................................................... 25 
+Income from self-employment listed on your P21 ....................................................... 25 
+Business open less than one year .................................................................................. 25 
+If your business recently stopped trading ....................................................................... 25 
+Notice of assessment ..................................................................................................... 26 
+How we calculate your income based on your notice of assessment ................................. 26 
+How your spouse/partner’s pay affects your assessment ............................................... 27 
+How your savings will be assessed ................................................................................ 27 
+How trade capital allowances affect your assessment ................................................... 27 
+If you don’t have a Form 11 Return Summary or assessment notice ............................. 27 
+Other income .................................................................................................................. 27 
+Savings and Investments ................................................................................................ 30 
+How we assess your Savings and Investments .............................................................. 30 
+Examples; ....................................................................................................................... 31 
+The documents you should include with your application ............................................... 32 
+How we assess property other than the family home ..................................................... 32 
+Allowable expenses ........................................................................................................... 33 
+Let’s look at each of the above in turn. ........................................................................... 34 
+Rent ............................................................................................................................ 34 
+Mortgage ..................................................................................................................... 35 
+Mortgage protection and life assurance ...................................................................... 36 
+Home insurance .......................................................................................................... 36 
+Childcare ..................................................................................................................... 37 
+Maintenance payments to someone else .................................................................... 37 
+Nursing home or private nursing and homecare costs ................................................ 37 
+Travel to work (public transport, driving and carpooling) ............................................. 38 
+Public Transport .......................................................................................................... 38 
+Driving ......................................................................................................................... 39 
+Carpooling ................................................................................................................... 39 
+6. Applications for 16-25-year olds ..................................................................................... 40 
+Your parents or guardians have a Medical Card or GP Visit Card .................................. 40 
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 5 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  
+Whilst printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to 
+secondary electronic/other locations which are accessible by staff or the public.    
+   
+Your parents or guardians don’t have a Medical Card or GP Visit Card and you are 
+financially independent ............................................................................................... 40 
+If you are financially dependent on your parents or guardians .................................... 40 
+If you are independent or dependent on your parents or guardians and you live away 
+from the family home .................................................................................................. 41 
+7. Applicants whose income is above the qualifying financial threshold ............................. 42 
+8. (a) Keeping your card if you join a scheme .................................................................... 43 
+Which schemes are approved? ...................................................................................... 43 
+What if my spouse or partner goes to work? .................................................................. 43 
+What if my spouse or partner is working? ....................................................................... 44 
+Can I change schemes? ................................................................................................. 44 
+(b) Keeping your card if you get a job ................................................................................ 44 
+What if my spouse or partner is working? ....................................................................... 45 
+What happens at the end of the three-year retention period? ......................................... 45 
+9. How does my eligibility change if I am in long-stay care? .............................................. 46 
+Private nursing homes .................................................................................................... 46 
+Long-stay services .......................................................................................................... 46 
+Children’s residential centres .......................................................................................... 46 
+Foster care ..................................................................................................................... 46 
+10. Applying for a card under EU regulation....................................................................... 47 
+Applying for a Medical Card and GP Visit Card .............................................................. 47 
+Frontier workers .......................................................................................................... 48 
+Posted workers ........................................................................................................... 48 
+Pensioners .................................................................................................................. 48 
+Dependants living in Ireland ........................................................................................ 49 
+What happens when my application under EU regulations is assessed? ....................... 49 
+I am not sure if I qualify under EU regulations ................................................................ 50 
+11. Reassessments and appeals ....................................................................................... 51 
+Having your application reassessed ............................................................................... 51 
+Appealing a decision ...................................................................................................... 51 
+How to make an appeal .................................................................................................. 53 
+ 
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 6 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  
+Whilst printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to 
+secondary electronic/other locations which are accessible by staff or the public.    
+   
+1. Welcome to this guide   
+At the Health Service Executive (HSE), we are legally responsible, under the Health Act   
+2004, to manage and deliver health services. The Eligibility Unit within the HSE, 
+we assist people in finding out if they are eligible for a medical card or a GP visit 
+card. We have developed this guide for Medical Cards and GP Visit Cards so 
+you can understand:   
+• if you qualify   
+• what is covered   
+• how to apply   
+• how your application will be decided and   
+• how to appeal a decision you are unhappy with.   
+We have included examples to help you understand. Each example is shown 
+with this symbol .   
+   
+2. Who can get a Medical Card or GP Visit Card?   
+Anyone who is ‘ordinarily resident’ in the Republic of Ireland can apply for a 
+Medical Card or GP Visit Card. This includes families, single people, 
+including those working full or part-time or not at all. ‘Ordinarily resident’ 
+means that you are living here and intend to live here for at least one year. 
+As part of your application, you will have to provide evidence that you own or 
+rent accommodation and it is your family home.   
+If you are a student   
+If you are a student studying abroad, you must return to Ireland at least once a 
+week to be considered ordinarily resident. As part of your application, you may 
+have to provide evidence such as airline tickets.   
+ 
+ 
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 7 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  
+Whilst printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to 
+secondary electronic/other locations which are accessible by staff or the public.    
+   
+If you are a non EU/EEA or Switzerland   
+We may contact the Irish Naturalisation and Immigration Service (INIS) to get copies 
+of documents that prove:   
+• you and your dependants are ordinarily resident or   
+• your visa permits you to apply for a Medical Card or GP Visit Card.   
+Who is eligible for a Medical Card or GP Visit Card?   
+You will be able to get a Medical Card or GP Visit Card in these situations.   
+• When your finances – income and outgoings – are assessed, and you meet 
+the income requirements.   
+• You don’t meet the income requirements, but you have a medical condition 
+or conditions that make paying for healthcare difficult. The National 
+Eligibility Unit will look at your situation and decide if you should have a 
+Medical Card or GP Visit Card. This is often called a discretionary card.   
+• You automatically qualify and may not have to do a means test. This 
+includes:   
+o People who are taking part in certain government work schemes or returning  
+to work   
+o Some people affected by the drug Thalidomide   
+If your mother took Thalidomide while she was pregnant with you and 
+living in Ireland and you have been affected by the drug, you 
+automatically qualify. If your mother was outside of Ireland when she took 
+the drug, you do not automatically qualify and will be subject to full 
+means assessment.    
+o Women affected by symphysiotomy   
+o Children under 18 who have been diagnosed with cancer within the last five 
+years  
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 8 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  
+Whilst printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to 
+secondary electronic/other locations which are accessible by staff or the public.    
+   
+o Children in foster or residential care   
+o People who qualify under EU Regulations 
+o Children whose parents get a Domiciliary Care Allowance for them   
+o GP Visit Card for people getting Carers Allowance or Carers Benefit.     
+For any of the situations listed above, you may not have to do a means test. You 
+will still need to apply and we may need documentary evidence.   
+If you are an applicant for international protection living solely on a direct 
+provision payment you will need to complete an application form and we will 
+need documentary evidence.    
+Over 70   
+If you are 70 or over, you can apply for an Over 70’s Medical Card or GP 
+Visit Card. If your income is above the financial threshold and you cannot get 
+a Medical Card based on this assessment, you will be awarded an Over70s 
+GP Visit Card. You don’t need to send an additional application for this. To 
+learn more about financial thresholds go to website  
+https://www.hse.ie/eng/cards-schemes/medical-card/medical-card-for-over70s/    
+The means test for the Over 70’s Medical Card is based on gross income from all 
+sources with the exception of;   
+• Household Benefits awarded by DEASP (electricity, gas costs and television licence)  
+• Free Fuel Allowance   
+• Telephone Support Allowance   
+• Living Alone Allowance   
+• Savings, up to €36,000 for single applicant, €72,000 for married/co-hab couple   
+• Additional property if generating no rental income  
+• Specific Compensation Awards/Redress Awards  
+   
+Children under 8   
+Children under 8 can get a GP Visit Card. This covers:   
+• all visits to your child’s family doctor   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 9 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  
+Whilst printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to 
+secondary electronic/other locations which are accessible by staff or the public.    
+   
+• assessments at age 2 and 5 and   
+• all healthcare for children with asthma and   
+• out-of-hours urgent GP care   
+What other healthcare schemes are available?   
+There are other healthcare schemes to make the cost of health and medical care more 
+affordable for all. These include:   
+Health Amendment Act Card (HAA Card)   
+If you were given blood or blood products in Ireland and you developed hepatitis C 
+from them, you are entitled to a HAA Card and a range of services. Contact your 
+local health office for details of the documentary proof you need to register for a 
+card.    
+The Redress for Women Resident in Certain Institutions Scheme   
+From July 2015, legislation was introduced to make certain health services 
+available without charge to many women who were admitted to and worked in 
+certain institutions.    
+You do not need to apply for this scheme. We will contact you when the  
+Department of Justice and Equality tell us you have been accepted to join it.   
+The Mother and Baby in Institutions Scheme (MBS) 
+From March 2024, legislation was introduced to make certain health services 
+available without charge to many women and/or their dependent (s), who 
+were admitted to and/or worked in certain institutions. 
+You do not need to apply for this scheme. We will contact you when the 
+Department of Children, Equality, Disability, Integration and Youth tell us you 
+have been accepted to join it.   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 10 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  
+Whilst printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to 
+secondary electronic/other locations which are accessible by staff or the public.    
+   
+Drugs Payment Scheme (DPS)   
+The Drug Payment Scheme (DPS) pays pharmacists to supply medicines to 
+individuals and families where they cost more than a certain amount each month.    
+Long-Term Illness Scheme (LTI Scheme)   
+If you have one or more illnesses specified you are entitled to certain drugs, 
+medicines and appliances under the LTI Scheme free of charge. This applies 
+no matter what your income. You can get an application form and further 
+information from www.hse.ie or your local community health office.    
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 11 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+3. What does a card cover?   
+What a Medical Card or a GP Visit Card covers   
+    
+   
+  
+Medical Card   GP Visit Card   
+General practitioner service (family doctor) and   
+Diabetes Cycle of Care   
+  
+✓   ✓   
+Drugs, medicines and appliances that are 
+reimbursed (cost paid back) under the General  
+Medicines Scheme (GMS)    
+✓      
+Certain services that are part of the Dental   
+Treatment Services Scheme (DTSS)   ✓      
+Certain eye (ophthalmic) services and appliances   
+✓      
+Certain hearing (aural) services and appliances   
+✓      
+Maternity cash grant   ✓      
+Below we give you more detail on each of the services and appliances listed above.   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 12 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+General practitioner (family doctor) and Diabetes Cycle of Care   
+You will not have to pay for the services your family doctor provides, including the 
+Diabetes Cycle of Care for people over 18 with type 2 diabetes.    
+Your family doctor must have a contract with the HSE to provide services to Medical   
+Card holders. If they do not, you cannot register with that GP for medical card services.    
+Drugs, medicines and medical appliances   
+There is a prescription charge for each item dispensed, up to a maximum amount each 
+month, for each person or family.   
+Dental treatments   
+If you are eligible for a Medical Card, you can get certain dental services under the Dental 
+Treatment Services Scheme (DTSS). These include: oral examination, restorations as part 
+of emergency treatment, extractions and dentures. You can find further information on 
+dental services from your local community health office.   
+Eye care   
+If you have a Medical Card, you can get certain eye treatments from optometrists or 
+ophthalmologists (eye doctors), including:   
+• eye exams   
+• certain prescribed spectacles and other eye appliances.   
+Hearing services   
+If you have a Medical Card, you can get:   
+• hearing tests   
+• hearing aids   
+• hearing aid repairs.   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 13 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Maternity Cash Grant   
+If you have a Medical Card, you can get the Maternity Cash Grant of €10.16 when you 
+have a child. You are entitled to this, but you need to apply to get it.   
+ 
+Need further information?   
+If you need further information on the services above, please contact your local community 
+health office.   
+ 
+4. How to apply for a card   
+Apply online   
+The quickest way to get a Medical Card or GP Visit Card is to apply online at 
+www.mymedicalcard.ie.   
+For the people included in your application, you will need to provide:   
+• PPS numbers   
+• dates of birth   
+• income and expense details   
+Make sure that all your information is correct and upload all supporting documentation.   
+Postal applications   
+To apply for a medical card by post, please follow these four steps.   
+1. Get the form by:   
+o downloading it in English or Irish from www.hse.ie/eng/cardsschemes/medical-
+card/how-to-apply/ or  o calling us on  
+0818 22 4478 to ask us to send you a form in the post.   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 14 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+2. Read the form and, if you have any questions about the form, call us before you fill it 
+out. Use the number in step 1.   
+3. Fill in all relevant information.   
+4. Check it and post your completed form and all supporting documentation to us:   
+The Eligibility Unit PO Box 11745 Dublin 11 D11 XKF3   
+   
+  
+Save yourself time   
+We will process your application form within 15 working days providing you supply us with 
+all relevant information and supporting documentation.    
+    
+5. How we assess your income and expenses   
+When you apply for a Medical Card or GP Visit Card, we assess your income to find out if 
+you qualify for a card. If you have a spouse or partner, we consider your combined 
+income.    
+If your means are above the HSE’s Financial Guidelines to qualify for a Medical Card or 
+GP Visit Card, we may consider your social and medical situation to decide if you would 
+have considerable trouble paying for medical care for you and your family.    
+When we assess your income, we divide it into two types:    
+• assessable    
+• non-assessable.    
+We include assessable income in your means test. We do not include non-assessable 
+income in your means test.    
+All or some of your income from social welfare payments?   
+If all of your income comes from social welfare payments, you will get a Medical Card even 
+if your income is above the income threshold.    
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 15 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+If you receive a social welfare payment that is less than the maximum weekly rate, you will 
+need to explain why you get a smaller payment. If it is because you have other income, 
+you will need to provide evidence of that other income.    
+What income is assessable?   
+These types of income are assessable.   
+• Wages, income if self-employed or income from pensions   
+• Income from fees or commissions   
+• Income from holding an office or directorship, such as a payment to a board member 
+other than expenses   
+• Income from royalties and annuities   
+• Payments under a settlement, covenant (agreement) or from an estate   
+• Rental income from property other than the family home, with costs deducted   
+• Savings and investments   
+• Social security payments from a country outside the EU   
+• Some social welfare payments   
+• The value of a property, other than the family home, that is capable of being leased or 
+sold   
+• Maintenance payments   
+• Scholarships and Stipends (educational stipends for applicants in receipt of Disability   
+Allowance is exempt up to a maximum of €20,000 per annum for 4 years)   
+Social welfare payments assessed if you have other income   
+If your income is from social welfare payments and other sources, some of your social 
+welfare payments will be assessed.   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 16 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+  Adoptive Benefit   
+Blind Pension   
+Carer’s Benefit   
+Disability Allowance   
+Health and Safety Benefit   
+Humanitarian Assistance Scheme   
+Illness Benefit   
+Incapacity Supplement   
+  
+Widow’s, Widower’s Surviving Civil 
+Partner’s Pension – Contributory  
+Widow’s, Widower’s Surviving Civil  
+Partner’s Pension – Non 
+Contributory  
+  
+  Invalidity Pension   
+Jobseekers Allowance   
+Jobseekers Benefit   
+Maternity Benefit   
+Paternity Benefit  
+One-Parent Family Benefit   
+Orphan’s Pension   
+State Pension — Contributory   
+State Pension — Non-Contributory   
+  
+The following outline income we a) do not assess and b) income that we do assess.    
+Income we do not assess    
+These types of payment are not assessable   
+• Some compensation payments   
+• Some social welfare payments   
+• Some rental income   
+Compensation payments that are not assessable   
+• Compensation awards to people who have contracted hepatitis C from contaminated 
+blood products within the Republic of Ireland, together with income from the investment 
+of that money.   
+• Compensation awards paid by the Residential Institutions Redress Board.    
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 17 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+• Prescribed repayments under Section 8 of the Health (Repayment Scheme) Act 2006 
+made to:   
+o a living person   
+o the spouse or former spouse of a living or deceased relevant person or   
+o a living child of a relevant person by virtue of Section 9 (8).   
+• Ex-gratia (extra) payments approved by the Lourdes Hospital Redress Board under the 
+terms of the Lourdes Hospital Redress Scheme 2007.   
+• Compensation awards payable under the Redress for Women in Certain Institutions 
+Act 2015.   
+• Compensation awards payable to families of Stardust  
+• Payments for participation in the Sodium Valproate Inquiry 
+ 
+Social welfare and other state payments that we don’t assess   
+  Blind Welfare Allowance   
+Carer’s Allowance   
+Carer’s Support Grant   
+Child Benefit   
+Domiciliary Care Allowance   
+Make Work Pay for persons in receipt of  
+Disability Allowance   
+Working Family Payment   
+Foster Care Allowance   
+Fuel Allowance   
+Guardian’s Payments   
+  Internship top up payment   
+Island Allowance   
+Living Alone Increase   
+Mobility Allowance   
+Over 80 Allowance   
+Rehabilitation Maintenance Allowance   
+Standardised National Aftercare Allowance   
+Supplementary Welfare Allowance   
+SUSI grant.   
+Educational Stipend for persons in receipt of  
+Disability Allowance (up to a maximum of  
+€20,000 per annum for 4 years)   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 18 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Rental Income we do not assess   
+• Accommodation Recognition Payment (for hosting international protection applicants 
+from Ukraine)   
+• Rent-a-Room, up to a maximum of €14,000 per annum  
+Income we assess   
+Wages    
+You must provide a payslip as proof of wages. This payslip must be dated within the last 
+three months from when your application is received. We can only accept P60s within the 
+first three months of the year, as a P60 only refers to your earnings for the previous year.    
+Casual work where part-time jobseekers allowance   
+If you are a casual worker receiving a part-time jobseekers allowance, we will calculate 
+your wages based on the average wages earned and average jobseekers payment.    
+Private and occupation pensions    
+If you have private or occupation pension, you must provide a payslip as proof of the 
+amount paid to you. This payslip must be dated within the last 12 months from when we 
+received your application. We can only accept a P60 for the most current calendar year.    
+Maintenance payments   
+If you are getting a maintenance payment, you must provide evidence of this. The 
+evidence we accept is a current court order or maintenance agreement detailing the 
+amount.    
+If your maintenance agreement is less than 12 months old, we can accept that. If it is older 
+than 12 months, you must provide evidence of the amount you receive by providing:   
+• a bank statement dated within three months showing your three most recent payments 
+or    
+• a letter from the person who pays the maintenance detailing what they pay you and 
+how often they make payments.  This letter must be signed and dated within the last 
+three months.   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 19 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Property (other than principal private residence)   
+If you rent it    
+If the property, in addition to your principal private residence, is rented out to another 
+person you must send us the following two documents:   
+• a copy of the tenancy agreement   
+• a recent bank statement dated within last six months with account holder’s name 
+visible. This statement must show at least three payments of rental income that you 
+received or your most recent Notice of Assessment from Revenue.   
+If you don’t rent out your additional property   
+If the additional property is not rented, you must provide a valuation of the property by a 
+certified auctioneer. This valuation will be assessed under the Savings and Investments 
+Rules.    
+How we calculate your income and expenses    
+Your qualifying financial threshold is the amount you can earn a week and still qualify for a 
+card.   
+How we calculate this   
+Your qualifying financial threshold is worked out by adding the following three amounts:   
+• a basic rate — an amount of money depending on your circumstances, and   
+• the amount for each child dependant, and   
+• the amount for allowable expenses or income.   
+The three amounts are added together to give you a qualifying financial threshold. This 
+figure is the most you can earn after taxes (your net weekly income) and still qualify for a 
+Medical Card. If you do not qualify for a Medical Card, we will automatically assess you for 
+a GP Visit Card.   
+ There are examples at the end of this section.      
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 20 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Basic rates weekly income limits   
+If you are under 70   
+ 
+Single person living alone   
+ 
+   Medical Card   GP Visit Card   
+Under 66 years   
+  
+€184.00   N/A   
+66-69 years   
+€201.50   
+N/A   
+Up to 69 years   NA   
+€418.00   
+  
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 21 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+If you are 70 or over (gross scheme only)   
+ 
+  
+   Medical Card   GP Visit Card   
+Single person aged 70 or over     
+Below €550   
+Over €550   
+Universal GP Visit   
+Card   
+Married or co-habiting couples 
+aged 70 or over   
+Below €1050   
+Over €1050   
+Universal GP Visit   
+Card   
+  
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 22 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Single person living with family   
+ 
+  
+   Medical Card   GP Visit Card   
+Under 66 years   
+  
+€164.00   N/A   
+66 years or older   
+€173.50   
+N/A   
+Up to 69 years   N/A   
+€373.00   
+  
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 23 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Married couples / co-habiting couples or single-parent families with 
+dependent children   
+ 
+   Medical Card   GP Visit Card   
+Under 66 years   
+ 
+€266.50   N/A   
+66 years or older   
+€298.00   
+N/A   
+Up to 69 years   N/A   
+€607.00   
+   
+  
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 24 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Amounts for dependent children   
+What is covered by a Medical Card or a GP Visit Card for dependent 
+children   
+ 
+   
+Medical Card   GP Visit Card   
+First two children under 16 and 
+financially dependent on the 
+applicant.   
+ 
+€38.00   €57.00   
+Three or more children under 
+16 and financially dependent 
+on the applicant.   
+€41.00   €61.50   
+First two children over 16 and 
+financially dependent on the 
+applicant.   
+€39.00   €58.50   
+Three or more children over 16 
+and financially dependent on 
+the applicant.   
+€42.50   €64.00   
+A dependant over 16 who is in 
+full-time third-level education 
+and does not have a grant.   
+€78.00   
+   
+   
+   
+   
+€117.00   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 25 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Assessing income for self-employed people   
+To assess your income as a self-employed person, we will need evidence of all your work, 
+both self-employed and for other employers.    
+All pages of your NOA   
+All pages of your most recent Notice of Assessment (NOA) or your Acknowledgement of 
+Self-Assessment, which you may have received from Revenue.    
+These pages should include a Revenue Indicative Calculation. If Revenue did not include 
+the indicative calculation, you should send us a copy of the Income Tax Return (Form 11) 
+which you last submitted to Revenue.    
+If you are registered to use ROS (Revenue’s Online Service for the self-employed), you 
+should be able to find copies of your NOA, Acknowledgment of Assessment, Revenue 
+Indicative Calculation and Income Tax Return  in your ROS Inbox.   
+No Net tax Liability   
+If Revenue advised you that you have No Net tax Liability (NNL) for your self-employment 
+income, you must provide a set of accounts signed off by your accountant.    
+Income from self-employment listed on your P21   
+If your income from self-employment is listed on your PAYE End of Year Statement (P21), 
+please submit this to us. If you are registered for myAccount (Revenue’s online service for 
+employees) and also registered to receive your correspondence electronically, you may 
+get this statement in your My Documents section.   
+Business open less than one year   
+If your business is open less than one year, please provide a set of accounts signed off by 
+your accountant.    
+If your business recently stopped trading   
+If your business has recently stopped trading, please provide a self declaration letter of 
+date you were last self-employed.   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 26 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Notice of assessment   
+If you filed a paper Form 11 with Revenue, they sent you a paper notice of assessment.   
+Give us a copy of this. If you do not have it, contact Revenue and ask for a copy. If 
+Revenue told you that you have no net tax liability (NNL) for your income from self-
+employment, please send us a set of accounts. These accounts must be signed off by 
+your accountant.    
+ 
+How we calculate your income based on your notice of assessment   
+This is how we assess your income based on your notice of assessment. We take 
+information from the panels on the notice and use it to calculate your weekly income.   
+Example   
+  
+Total of Panel 1   €31,264.00   
+Amounts we deduct     
+Panel 2: Trade capital allowance   
+Panel 4: Income tax payable   
+Panel 6: PRSI, USC, levies on self   
+Panel 7: PRSI, USC, levies on spouse/partner   
+– €1,504.20   
+   
+– €1,376.60   
+   
+– €1,376.60  
+ 
+– €625.20   
+Total deductions   €4,882.60   
+Your total assessable income   €26,381.40   
+Your weekly assessable income (your assessable 
+income divided by 52)   
+€507.33   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 27 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+How your spouse/partner’s pay affects your assessment   
+If your spouse/partner is working and pays PAYE tax, you need to give us a copy of their 
+most recent payslip, must be dated within last 3 months. The information on this payslip 
+will be used instead of the figure from Panel 7 of your notice of assessment.    
+How your savings will be assessed    
+If Panel 1 of your notice of assessment includes income from savings, we will not use this 
+figure. Instead, we will assess your savings using our standard assessment for savings.    
+How trade capital allowances affect your assessment    
+Trade capital allowances are costs and expenses you can claim against your profits to 
+reduce the amount of tax you pay. You provide this information to Revenue when you file 
+your Form 11 Return Summary. We use the trade capital allowances figure to reduce your 
+assessable income.    
+If you don’t have a Form 11 Return Summary or assessment notice   
+If you have not received a Form 11 Return Summary or a notice of assessment, the HSE 
+may consider taking income details from your most recent trading accounts. If we do this, 
+we will use the adjusted net profit as your assessable income. Adjusted net profit is your 
+income less any expenses allowed by Revenue.    
+Ask your accountant for details of your adjusted net profit and tax, PRSI and USC 
+payments. Please ask your accountant to put this information on their official letterhead.   
+   
+Other income   
+You might have income from sources that are not listed here. If you do, and if that income 
+is less than €3,175, you need to get a P21 end-of-year statement from Revenue.    
+  
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 28 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Example 1   
+Siobhan is 32 and lives with her 11-year-old daughter. She has rent of €100 monthly.   
+   
+Medical Card   GP Visit Card   
+Basic rate allowance   €266.50   €607.00   
+Dependant is one child   €38.00   €57.00   
+Weekly rent   €23.08   €23.08   
+Qualifying financial threshold   
+(totals of three items)   
+€327.58   €687.08   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 29 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+   
+    
+Example 2   
+James 35 and Ciara 38 are a married couple. They have three kids aged 4, 10 and 17   
+(17 year old in secondary school). They have a mortgage of €967.00 monthly and both 
+have travel expenses of €20.00 each. They have childcare costs of €50.00 weekly as both 
+parents are working.   
+   
+Medical Card   GP Visit Card   
+Basic rate allowance   €266.50   €607.00   
+Dependant two children under 16   €38.00 + €38.00   €57.00 + €57.00   
+Dependant one child over 16   €39.00   €58.50   
+Weekly mortgage   €223.15   €223.15   
+Travel to work    €20.00 + €20.00   €20.00 + €20.00   
+Childcare   €50.00   €50.00   
+Qualifying financial threshold   
+(total of the six items)   
+€694.65   €1092.65   
+     
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 30 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+ 
+Savings and Investments    
+How we assess your Savings and Investments  
+There are two ways we can assess savings and investments.   
+• 1) You can give us a Certificate of Interest of all your savings or 2) You can give us 
+copies of bank statements showing the current balance on your account or accounts.    
+• We can calculate your weekly income from savings and investments using the rules 
+shown here.    
+• If applicant holds stocks/shares, we require a copy of their current Share Certificates 
+showing shareholdings.    
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 31 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+ 
+Examples;  
+Single Person  
+If you have savings of €50,000, the total you will be assessed on is €14,000. This is 
+because we do not assess your first €36,000 of savings.  
+Your weekly income from them would be €18.00   
+• Up to €36,000 – Nil  
+• €36,001 to €46,000 – we add €1 for every €1000 weekly = €10 weekly  
+• €46,001 to €56,000 – we add €2 for every €1000 weekly = €8 weekly  
+ 
+ 
+
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 32 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Couple  
+If you have savings of €90,000 the total you will be assessed on is €18,000. This is 
+because we do not assess your first €72,000 of savings.  
+Your weekly income from them would be €26.00 weekly   
+• Up to €72,000 – Nil  
+• €72,001 to €82,000 – we add €1 for every €1000 weekly = €10 weekly  
+• €82,001 to €90,000 – we add €2 for every €1000 weekly = €16 weekly  
+  
+The documents you should include with your application   
+For evidence of your savings and investments, give us copies of bank statements showing 
+the current balance on your account or accounts.   
+There are other kinds of income, including settlements such as Ward of Court, which may 
+be included as assessable income and treated like savings. Please contact us for more 
+information.   
+How we assess property other than the family home   
+We assess the value of the property using these rules.    
+Single person   Value of income each week from the property   
+Up to €36,000   Not assessed   
+€36,001–€46,000   €1 for every €1,000    
+€46,001–€56,000   €2 for every €1,000   
+More than €56,000   €4 for every €1,000   
+Couple   Value of income each week from the property   
+Up to €72,000   Not assessed   
+€72,001–€82,000   €1 for every €1,000    
+€82,001–€92,000   €2 for every €1,000   
+More than €92,000   €4 for every €1,000   
+If you have savings and investments and property, we will deduct the non-assessable limit 
+only once.   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 33 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Example   
+  
+  
+Single person   
+  
+Value of savings   
+€40,000   
+Value of property   
+€80,000   
+Deduction for non-assessable income   
+€36,000   
+Total you will be assessed on   
+€84,000   
+Allowable expenses   
+These are your allowable expenses.    
+• Rent   
+• Mortgage payments.   
+• Mortgage protection payments and life assurance payments in relation to mortgage 
+protection.   
+• Home insurance.   
+• Childcare.   
+• Maintenance payments to someone else.   
+• Nursing home or home care costs.   
+• Travel to work.   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 34 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Let’s look at each of the above in turn.    
+Rent   
+What is allowed?   
+Housing Assistance Payment (HAP) will be deducted from the figure.  If a family member is 
+living with you and they contribute to household expenses, this is not deducted from your 
+allowable rent.    
+The documents you should include with your application   
+Documents that show clear evidence of the rent you currently pay:   
+• Letter from your landlord detailing the rent you pay and how often you pay it – this letter 
+must be dated within last 3 months and signed by the landlord or   
+• one of the following three documents (dated within the last 12 months):   
+o tenancy agreement   
+o rent book   
+o HAP agreement (Housing Assistance Payment agreement)  
+and   
+• a recent bank statement (dated within last 6 months and with the account holder’s 
+name is visible).   
+Whatever you send us must show the amount of rent paid with 3 consecutive 
+payments dated within the last 6 months.   
+ Example   
+  
+Weekly rent   €120.00   
+Rent Supplement / HAP   – €20.00   
+  
+Amount of rent that will be allowed   €100.00   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 35 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Mortgage   
+What is allowed?   
+Two types of mortgage payment are allowed.   
+• Reasonable payments after mortgage allowance and tax relief have been deducted   
+• Reasonable payments on land or property that is not the family home.   
+  
+The documents you should include with your application   
+Evidence of your mortgage payments. Send us one of the three documents below please.    
+• Letter from mortgage provider dated within last 3 months detailing repayment amount 
+and frequency of payment or   
+• recent bank statement (dated within last 6 months and where account holder’s name is 
+visible) showing when your mortgage was paid for at least 3 months, where it is clear 
+that the payment is for mortgage or   
+• recent mortgage account statement (dated within last 6 months and where account 
+holder's name is visible) showing recent deductions.    
+ Example   
+  
+  
+Weekly cost of the mortgage   €600   
+Tax relief   
+€50   
+Mortgage allowance   
+€550   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 36 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Mortgage protection and life assurance   
+What is allowed   
+• Reasonable payments on a mortgage protection policy   
+• Reasonable payments on a life assurance policy for mortgage protection.   
+ 
+The documents you should include with your application   
+Evidence of your mortgage protection payments. Please send us one of the two 
+documents below.     
+• Annual letter from protection provider detailing how much you pay them and how often. 
+This should be dated within last 12 months or   
+• recent bank statement showing instances of protection payment being made for at least 
+3 months (this must be dated within the past 6 months) – if it is not clear that 
+payments on the bank statement are for mortgage protection, you need to send 
+us a letter from the insurance provider to confirm the reason for the cover.   
+Home insurance   
+What is allowed   
+Reasonable payments on a home insurance policy.   
+The documents you should include with your application   
+Evidence of home insurance. Please send us one of the following four documents.   
+• Annual letter from insurance provider detailing repayment amount and frequency  
+(should be dated within last 12 months) or    
+• recent bank statement showing instances of protection payment being made for at least 
+3 months (this must be dated within the past 6 months).   
+ 
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 37 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+If it is not clear tha t payments on the bank statement are for house insurance, you 
+must send us a letter from the insurance provider to confirm the reason for the cover 
+or   
+• a recent certificate from the insurance provider confirming payment or   
+• a bank statement showing payment – this bank statement must be from the last 6 
+months.   
+Childcare   
+What is allowed   
+If parents or guardians are working, studying or in training, childcare costs are included.   
+If your family has extra needs, these will also be considered.    
+The document you should include with your application as evidence of what you 
+pay for childcare:   
+• letter, dated within the last 3 months, from your childcare provider detailing weekly 
+or monthly cost of childcare.   
+Maintenance payments to someone else   
+If you make maintenance payments, these are included in your expenses.    
+The documents you should include with your application   
+• A copy of the current maintenance agreement or   
+• a letter from the person who gets the maintenance – this letter must be signed and 
+dated . It must detail the payment amount and how often you pay.    
+Nursing home or private nursing and homecare costs   
+This only applies to the applicant or spouse named on the application.   
+Any amount the HSE pays toward these costs will be deducted from your allowable 
+expenses.    
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 38 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+The documents you should include with your application   
+• A recent letter from the nursing home confirming payment, or   
+• a receipt from the nursing home – this receipt must be from the last three months.   
+If all your income is from social welfare or HSE allowances and payments, you will get a 
+Medical Card even if your income is higher than the qualifying financial threshold.   
+   
+ Example   
+  
+  
+Weekly cost of the nursing home, private 
+nurse or homecare   
+€150   
+HSE contribution to this cost   
+€50   
+Amount that will be allowed   
+€100   
+ 
+Travel to work (public transport, driving and carpooling)   
+Public Transport   
+What is allowed   
+Your costs for travelling to work by public transport    
+  
+The documents you should include with your application  Public 
+transport receipts   
+  
+ 
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 39 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Driving   
+What is allowed   
+Costs of driving to work by private car. The following will be considered:   
+• the number of days you work each week   
+• the distance between your home and your work – this will be valued at 18c per km.   
+You or your partner must own the vehicle you use. If your employer provides you with a 
+vehicle such as a car or van, you cannot include your travel costs.    
+If you and your partner drive to work in separate cars, you can include expenses for both 
+vehicles with your application.   
+The documents you should include with your application   
+A copy of the vehicle registration certificate for the vehicle. If you use more than one 
+vehicle, provide copies of certificates for each vehicle.   
+Carpooling   
+What is allowed   
+Reasonable contributions for carpooling   
+The documents you should include with your application   
+A letter or other document that shows how much and how often you pay your contribution.    
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 40 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+6. Applications for 16-25-year olds   
+If you have been included on your family's current Medical Card or GP Visit Card, we will 
+send you your own card when you turn 16 (valid to parent or guardians expiry date). How 
+you are assessed after same will depend on whether you are financially independent or 
+dependent.  
+Your parents or guardians have a Medical Card or GP Visit Card   
+If you are financially dependent on your parents or guardians, your application will involve 
+an assessment of your parents or guardians means.    
+Your parents or guardians don’t have a Medical Card or GP Visit Card 
+and you are financially independent   
+If you are financially independent you can apply for a Medical Card or GP Visit Card in 
+your own right and will be assessed in your own right. Therefore, if your parents or 
+guardians don’t have a Medical Card or GP Visit Card and you are financially independent 
+you can apply for a card and the decision will be independent of your parents or guardians 
+eligibility status.   
+If you are financially dependent on your parents or guardians   
+If you are financially dependent on your parents or guardians and they don’t qualify 
+automatically for a Medical Card or GP Visit Card on a specific ground, any discretionary 
+award does require the HSE to consider their individual medical circumstances in the 
+context of your parents or guardians means (or vice versa). This does require both yourself 
+and your parents to apply for a card but HSE Medical Officers will review any specific 
+medical information provided (as they do for all cases) and will make an individualised 
+recommendation (as they do for all discretionary recommendations).    
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 41 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+If you are independent or dependent on your parents or guardians and 
+you live away from the family home   
+If you live away from the family home but ordinarily resident in Rep of Ireland, then on your 
+application you should list a family doctor near where you live most of the year, not near 
+your family and the above methods of assessment will be carried out.      
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 42 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+7. Applicants whose income is above the 
+qualifying financial threshold   
+You may still be able to claim a Medical or GP Visit Card even if your income is above the 
+limit.   
+If you do not qualify for a card based on a means test, the HSE can consider if the cost of 
+meeting your or your family’s medical and other health needs is fair and reasonable 
+despite your income. This is often called a discretionary card and you would usually only 
+apply for one after your application has been turned down on income grounds alone.    
+If you apply for a discretionary card, medical officers will assess your application to see 
+whether they think you should have either a Medical Card or GP Visit Card.    
+The Medical Officer will consider if having to pay medical bills for yourself or your 
+dependants is likely to cause you undue financial hardship. They will consider things like 
+the cost of GP visits, medical and surgical services for you and your dependants.    
+Before you are told the medical officer’s decision, it is reviewed by a deciding officer, who 
+also considers your financial and medical circumstances.    
+The Eligibility Unit may also get more information from your health professionals 
+like:   
+• Your family doctor   
+• Hospital doctors involved in your care   
+• Your public health nurse   
+• Your social worker   
+• Your therapy service providers   
+• Your pharmacist.   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 43 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+8. (a) Keeping your card if you join a scheme   
+Which schemes are approved?   
+• Back to Education Allowance   
+• Back to Work Allowance   
+• Back to Work Enterprise   
+Allowance   
+• Community Employment   
+• Community Services Programme   
+• Education, Training and 
+Development Option   
+• Fáilte Ireland and Teagasc 
+courses    
+• SOLAS non-apprenticeship 
+courses   
+• Job Initiative   
+• Local Employment Service courses   
+• Part-time education option   
+• Part-time job incentive   
+• Revenue Job Assist   
+• Rural Social Scheme   
+• Vocational Training and Opportunities 
+Scheme (VTOS)   
+• Youthreach   
+• YESS Scheme.   
+   
+If you are on a scheme, do not have a Medical Card and would have qualified for a card 
+before you joined the scheme, you should apply for a card. You and your adult and child 
+dependants should have a card until you finish the scheme.   
+Applicants taking up a job under Wage Subsidy Scheme are entitled to keep their card for 
+three years from starting date. After those three years, normal assessment rules apply, the 
+same as for people working full time in paid employment.    
+ 
+What if my spouse or partner goes to work?   
+If you have a card and your spouse or partner who is dependent on you goes to work, you 
+and your family will still keep your card until date of renewal.   
+ 
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 44 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+What if my spouse or partner is working?   
+Adult and child dependents of a person covered by the scheme, who are financially 
+dependent on that person, will also qualify for Medical Cards. However in cases where the 
+spouse/partner of the eligible person covered by the scheme is financially independent, 
+the dependants in that household are not deemed to be solely dependent on the eligible 
+person.   
+Can I change schemes?   
+If you have a card and you move from one scheme to another, you may keep your card for 
+the duration of the scheme.     
+If you leave the scheme before it’s finished, your financial means may be reassessed.   
+ 
+(b) Keeping your card if you get a job   
+Applicants who are unemployed taking up new employment or self-employment can keep 
+their Medical Card for three years provided that they held eligibility, were unemployed, 
+closed off/signed off from claim/scheme and continuously received any of the following 
+allowances or benefits at the full rate applicable to them for period of 12 months or more 
+before they started work (see note below).     
+• Jobseekers Allowance   
+• Jobseekers Benefit   
+• One Parent Family Payment   
+• Back to Work Family Dividend   
+• Illness Benefit   
+• Invalidity Pension   
+• Disability Allowance   
+• Blind Pension   
+• Employment Incentive Schemes or Educational Opportunity Schemes (excluding Wage 
+Subsidy Scheme)   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 45 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Applicants may change employment in these three years, but the new job must have 
+begun immediately after the old job finished. If the applicant becomes unemployed before 
+the three years have ended, they are no longer eligible for a card under retention.    
+*Note: The applicant’s 12-month period can be made up of a number of allowances or 
+benefits provided that they are paid continuously at the full rate available to the applicant. 
+For example: 6 months Jobseekers Allowance followed immediately by 6 months on an 
+Employment Incentive Scheme and then followed immediately by new employment or self-
+employment.   
+ 
+What if my spouse or partner is working?   
+Adult and child dependents of a person covered by retention, who are financially 
+dependent on that person, will also qualify for Medical Cards. However in cases where the 
+spouse/partner of the eligible person covered by retention is financially independent, the 
+dependants in that household are not deemed to be solely dependent on the eligible 
+person.   
+What happens at the end of the three-year retention period?   
+After three years, if you keep working, you must complete a review application form.    
+      
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 46 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+9. How does my eligibility change if I am in 
+long-stay care?   
+Private nursing homes    
+If you are in a private nursing home and you think you might qualify for a card, please 
+apply.   
+Long-stay services   
+If your care centre provides medical and surgical services in the centre, you will not need 
+to attend your family doctor, and you will not need to use your card. Long-stay patients 
+may still use their card for other services, such as dental or optical.    
+If your family doctor does treat you but you could have got the treatment in your centre, 
+your card will not cover it.   
+How does my eligibility change if I am in residential care?   
+Children’s residential centres   
+All young people in residential care are eligible for a Medical Card of their own but they 
+need to apply for it. Their application must also include a letter from a Tusla social worker.    
+Foster care    
+All children in foster care are eligible for a Medical Card of their own but they need to apply 
+for it. Their application must also include a letter from a Tusla social worker.    
+  
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 47 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+10. Applying for a card under EU regulation   
+You are entitled to healthcare in EU countries if you are from:   
+• an EU country    
+• a country in the European Economic Area (EEA), or 
+  Switzerland.   
+ 
+You can access healthcare in Ireland with a Medical Card or a European Health Insurance 
+Card (EHIC) issued in your country.   
+To get a Medical Card, you must fill in a completed Medical Card Application Form and an 
+E-Form or an S-Form then send them in to the Health Services Executive.   
+An E-Form is issued in your country and confirms that you are part of a health insurance 
+scheme in another state in the EU. The HSE will also fill in parts of the E-Form.   
+You may qualify for a Medical Card if your country confirms that you are entitled to 
+healthcare here. If so, you will not need to provide us with a financial assessment. 
+However, if you are working here, you may not qualify for a Medical Card under EU 
+legislation. But you may still qualify for an Irish means-tested Medical Card.   
+Applying for a Medical Card and GP Visit Card   
+To apply for your card, fill in the Medical Card and GP Visit Card Application Form (MC1).  
+You do not need to fill in all the parts of the form. Fill in these parts.    
+• Part 1 — Declaration and Consent   
+• Part 2 & 3 — Personal Details (include spouse/partner and dependents where 
+applicable)   
+• Part 4 — EU Regulations   
+• Part 6 — Family income. In most cases, instead of filling out Part 6, include an E- 
+Form. But if your spouse or partner pays PRSI, you will need to apply as a family and 
+include all your family income and expenses.   
+• Part 8 — Doctor of Choice   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 48 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+You must include an E-Form with your application. There are different types of E-Form, 
+depending on your situation.   
+Frontier workers    
+Frontier workers living in Ireland who are employed elsewhere in the EU but return here at 
+least once a week are eligible for a Medical Card. You will need form S1 or E106 from the 
+country where you work.     
+The dependants of frontier workers are also entitled to a Medical Card if they are not linked 
+to Irish Social Security legislation.    
+Posted workers   
+Posted workers who are employed in one EU member state and sent by their employer to 
+work in another member state qualify for a Medical Card. You will need form S1 or E106 
+from the country where you work.    
+The dependants of posted workers are also entitled to a Medical Card if the dependants 
+are not working here and are not subject to Irish social security legislation. To qualify, they 
+must also be ordinarily resident in Ireland (see page 7).   
+Pensioners   
+Pensioners qualify under the EU regulations if they:   
+• get a qualifying pension from another EU or EEA member State or Switzerland    
+• live in Ireland, and   
+• are not entitled to a contributory welfare payment or Irish pension and do not pay PRSI.   
+You will need form S1 or E121 from your country.   
+If you are from the UK and get a UK social security pension, you do not need form S1 or   
+E121. However, you do need a recent letter from the UK’s Department for Works and 
+Pensions detailing how much they pay you and how often this is paid.    
+ 
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 49 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+The dependants of a pensioner are also entitled to a Medical Card if those dependants are 
+not linked to the Irish Social Security System (Irish Social Security legislation).    
+Dependants living in Ireland   
+The dependants of frontier workers, posted workers and pensioners are entitled to a 
+Medical Card in Ireland if:    
+• they are not working in Ireland, and   
+• are not entitled or receiving a contributory welfare payment and does not pay PRSI.   
+You will need form S1 or E109 from your own country.   
+If you are from the UK, you do not need form S1 or E109. Instead, you need evidence of 
+your employment or self employment in the UK.   
+What happens when my application under EU regulations is assessed?   
+When the Eligibility Unit receives your application for a card under EU regulations, they will 
+check that you:   
+• are not eligible for a contributory social welfare payment from Ireland, and  
+• do not pay PRSI.   
+If you and your spouse or partner meet these requirements, you are entitled to a Medical 
+Card under EU regulations. You and your family will receive cards.   
+If you and your spouse or partner do not meet these requirements, you are not entitled to a 
+Medical Card under EU regulations. In this case, you will be asked for information about 
+your family income and expenses. Then the Eligibility Unit will assess your application on 
+financial grounds.   
+If you meet these requirements but your spouse or partner does not, you will get a Medical 
+Card but your spouse or partner and family will not. You will be asked for information about 
+your family income and expenses. Then the Eligibility Unit will assess your spouse or 
+partner and family on means assessment.   
+ 
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 50 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+Under EU Regulations, we must tell the authorities in your country about our decision.   
+There is a section on your S1 or E Form that we will return to your country.    
+I am not sure if I qualify under EU regulations   
+If you are from one of these countries, you may qualify for a Medical Card under EU 
+regulations.   
+   
+  Austria   
+   Greece   
+   Netherlands   
+  Belgium   
+   Hungary   
+   Norway   
+  Bulgaria   
+   Iceland   
+   Poland   
+  Cyprus (Southern)   
+   Ireland   
+   Portugal   
+  Czech Republic   
+   Italy   
+   Romania   
+  Denmark   
+   Latvia   
+   Slovakia   
+  Estonia   
+   Lichtenstein   
+   Slovenia   
+  Finland   
+   Lithuania   
+   Spain   
+  France   
+   Luxembourg   
+   Sweden   
+  Germany   
+   Malta   
+   Switzerland   
+        
+  
+  United Kingdom   
+(including Gibraltar)   
+   
+   
+   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 51 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+11. Reassessments and appeals   
+Having your application reassessed   
+We will write to tell you the decision on your application for a Medical Card or GP Visit 
+Card. We will also send you a financial statement that shows how your means were 
+assessed.   
+If you think this financial statement is wrong, you can ask the Eligibility Unit to reassess 
+your application with additional information not sent or missed in your original application. 
+You need to provide this information within three weeks from the date of the letter.   
+Here are some of the new types of information you may provide for your reassessment.   
+• Documents that show how your situation has changed since you applied for a card.    
+• A letter or report from your GP or consultant about:  
+o your medical condition; and   
+o the number of time you or your dependants visited the doctor or hospital in the past 
+12 months.    
+• Details of your medications, medical appliances and other information.   
+• Additional expenses you have for your medical conditions and other health-related 
+costs.   
+• Change in your income or outgoings.   
+Appealing a decision   
+If you disagree with a decision about your application for a card, you can appeal the 
+decision through the National Appeals Office.   
+If you have new information you should ask for a reassessment, which is a new and 
+separate procedure to an appeal.   
+After your appeal has arrived at the HSE, they will write to confirm that they have received 
+it. They will then ask the Eligibility Unit to send them your file.   
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 52 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+HSE staff who were not involved in assessing your original application will be involved in 
+the appeal.    
+The staff are only allowed to consider your appeal based on the information you supplied 
+to the medical officer who made the original decision.    
+They will keep two things in mind when they reconsider your case.   
+1. Were your income and expenses properly assessed?   
+2. Are you in a category of people who are exempt from the financial means assessment?   
+They will also pay attention to your:    
+• right to privacy, impartiality and respect   
+• age   
+• ability to communicate   
+• mobility issues you may have, such as a wheelchair   
+• ability to understand legislation, regulations and procedures.   
+The HSE appeals officer who does the review cannot consider any new documentation, 
+such as payslips or new information about your health or social circumstances. If you 
+have new information, you should not appeal a decision – you should ask for a 
+reassessment.   
+The staff member deciding on your appeal will decide one of three things.   
+• The decision is correct.   
+• The decision is wrong.   
+• Your application should be reassessed.   
+If we need more information, we will write to you. If we decide that your application should 
+be reassessed, we will send your file to the Eligibility Unit to be reassessed.    
+We will write to you to let you know what we have decided about your appeal.    
+ DOC TITLE: HSE National Assessment Guidelines for Medical Card and GP Visit Card 
+VERSION NO:   0    EFFECTIVE FROM DATE:   01/04/2026     REVISION DUE DATE:   01/04/2029 
+                                                Page 53 of 53   
+This is a controlled document and must always be accessed from the HSE National Central Repository.  Whilst 
+printing is permitted, printed copies are not controlled.   Controlled documents must never be saved to secondary 
+electronic/other locations which are accessible by staff or the public.    
+  
+How to make an appeal   
+To make an appeal, write by letter or email to the address below. Please clearly explain 
+why you are appealing the decision.   
+Ms Mary Doran  
+HSE  
+An Cloghar  
+Ballyshannon Health Campus  
+College Street  
+Ballyshannon  
+Co Donegal  
+Email: nationalappeals@hse.ie  
+  
