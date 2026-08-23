@@ -196,3 +196,93 @@ class UnmeasurableExitsThree(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TheDeliverableCanaryMustNotFireOnAHealthyScan(unittest.TestCase):
+    """The bug this class exists for was in the CANARY, not in the queue.
+
+    Shipped in the same change that added `assert_non_degenerate`: `fetch_done_tasks`
+    appended tasks as {title, aiq, url, paths} — with NO `notes` key — while the canary
+    asserted `any(t.get("notes", "").strip() ...)`. Every healthy run therefore raised
+    "NOT ONE had Execution Notes" and exited 3.
+
+    It went unnoticed because the tests handed `assert_non_degenerate` synthetic dicts
+    that DID carry a `notes` key. That is the identical mistake
+    `test_the_CALL_SITE_reads_fable_not_just_the_helper` was written to catch one function
+    over, and it was not applied here. So these tests drive the real
+    `fetch_done_tasks` against a stubbed HTTP response instead of hand-built rows.
+
+    The canary was also asking the wrong question. A task only reaches `tasks` if paths
+    were parsed OUT of its notes, so notes are non-empty for every member by construction
+    — the check could never fail for a real reason. Meanwhile the blindness it was meant
+    to catch (Execution Notes renamed -> every note empty -> no paths -> no tasks) fell
+    through to the Task Type branch and got misdiagnosed as a Task Type rename. It now
+    counts the two stages separately.
+    """
+
+    def _page(self, *, task_type="Backend Implementation", notes="CREATED: `backend/x.py`"):
+        return {
+            "url": "https://notion.so/p",
+            "properties": {
+                "fable": _title_prop("AIQ-1 t"),
+                "Task Type": {"select": {"name": task_type}},
+                "Execution Notes": {"rich_text": [{"plain_text": notes}]},
+            },
+        }
+
+    def _run(self, pages):
+        """Drive the REAL fetch_done_tasks against a stubbed Notion response."""
+        import io, json
+        from contextlib import contextmanager
+        from unittest import mock
+
+        payload = json.dumps({"results": pages, "has_more": False}).encode()
+
+        @contextmanager
+        def fake_urlopen(req, timeout=None):
+            yield io.BytesIO(payload)
+
+        with mock.patch.object(deliverable.urllib.request, "urlopen", fake_urlopen):
+            return deliverable.fetch_done_tasks("tok", "db")
+
+    def test_a_healthy_scan_does_not_raise(self):
+        """600 ordinary Done rows with real notes. Before the fix this raised."""
+        tasks, done_seen, fp_seen, with_notes = self._run([self._page() for _ in range(600)])
+        self.assertEqual(done_seen, 600)
+        self.assertEqual(fp_seen, 600)
+        self.assertEqual(with_notes, 600)
+        deliverable.assert_non_degenerate(tasks, done_seen, fp_seen, with_notes)  # must not raise
+
+    def test_the_call_site_actually_populates_notes(self):
+        """The precise omission. Asserted on the REAL return value, not a fixture."""
+        tasks, *_ = self._run([self._page()])
+        self.assertTrue(tasks, "the page should have produced a task")
+        self.assertIn("notes", tasks[0], "fetch_done_tasks must carry the notes it parsed")
+        self.assertIn("CREATED:", tasks[0]["notes"])
+
+    def test_notes_all_empty_is_reported_as_a_NOTES_problem_not_a_task_type_one(self):
+        """The blindness the canary is actually for: the property renamed."""
+        pages = [self._page(notes="") for _ in range(600)]
+        tasks, done_seen, fp_seen, with_notes = self._run(pages)
+        self.assertEqual(fp_seen, 600)
+        self.assertEqual(with_notes, 0)
+        with self.assertRaises(deliverable.QueueUnavailable) as ctx:
+            deliverable.assert_non_degenerate(tasks, done_seen, fp_seen, with_notes)
+        self.assertIn("Execution Notes", ctx.exception.detail)
+        self.assertNotIn("Task Type", ctx.exception.detail)
+
+    def test_task_type_renamed_is_still_reported_as_a_task_type_problem(self):
+        pages = [self._page(task_type="Something Unknown") for _ in range(600)]
+        tasks, done_seen, fp_seen, with_notes = self._run(pages)
+        self.assertEqual(fp_seen, 0)
+        with self.assertRaises(deliverable.QueueUnavailable) as ctx:
+            deliverable.assert_non_degenerate(tasks, done_seen, fp_seen, with_notes)
+        self.assertIn("Task Type", ctx.exception.detail)
+
+    def test_notes_present_but_carrying_no_paths_is_NOT_degenerate(self):
+        """A legitimately empty result. Notes were read; they just named no files."""
+        pages = [self._page(notes="Investigated; nothing shipped.") for _ in range(600)]
+        tasks, done_seen, fp_seen, with_notes = self._run(pages)
+        self.assertEqual(tasks, [])
+        self.assertEqual(with_notes, 600)
+        deliverable.assert_non_degenerate(tasks, done_seen, fp_seen, with_notes)  # must not raise

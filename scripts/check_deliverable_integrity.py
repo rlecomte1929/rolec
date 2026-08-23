@@ -227,30 +227,42 @@ class QueueUnavailable(RuntimeError):
         self.detail = detail
 
 
-def assert_non_degenerate(tasks: List[Dict[str, Any]], done_seen: int) -> None:
+def assert_non_degenerate(
+    tasks: List[Dict[str, Any]],
+    done_seen: int,
+    file_producing_seen: Optional[int] = None,
+    with_notes: Optional[int] = None,
+) -> None:
     """Refuse to call a degenerate scan clean.
 
     A renamed property does not raise — it yields "" for every row, every count becomes 0,
     and that reads exactly like a healthy queue. `Task Title` -> `fable` drifted this way and
     nobody noticed. Each assertion below is a way this guard could go quietly blind.
     """
+    # Older callers passed only (tasks, done_seen). Derive the two finer counts from the
+    # task list in that case: every task in the list survived BOTH filters by definition.
+    if file_producing_seen is None:
+        file_producing_seen = len(tasks)
+    if with_notes is None:
+        with_notes = sum(1 for t in tasks if str(t.get("notes") or "").strip())
+
     if done_seen < MIN_EXPECTED_DONE_ROWS:
         raise QueueUnavailable(
             "schema-drift",
             f"only {done_seen} Done row(s) returned; expected at least "
             f"{MIN_EXPECTED_DONE_ROWS}. The Status filter or the database id is probably wrong.",
         )
-    if done_seen and not tasks:
+    if done_seen and not file_producing_seen:
         raise QueueUnavailable(
             "schema-drift",
             f"{done_seen} Done rows returned but NOT ONE survived the Task Type filter — "
             "the `Task Type` property has probably been renamed or its vocabulary changed.",
         )
-    if tasks and not any(t.get("notes", "").strip() for t in tasks):
+    if file_producing_seen and not with_notes:
         raise QueueUnavailable(
             "schema-drift",
-            f"{len(tasks)} file-producing task(s) returned but NOT ONE had Execution Notes — "
-            "this guard parses ONLY that property, so it would examine nothing.",
+            f"{file_producing_seen} file-producing task(s) returned but NOT ONE had Execution "
+            "Notes — this guard parses ONLY that property, so it would examine nothing.",
         )
 
 
@@ -290,7 +302,9 @@ def _unique_id(prop: Optional[Dict[str, Any]]) -> str:
     return f"{prefix}-{number}" if prefix else str(number)
 
 
-def fetch_done_tasks(token: str, database_id: str) -> Tuple[List[Dict[str, Any]], int]:
+def fetch_done_tasks(
+    token: str, database_id: str
+) -> Tuple[List[Dict[str, Any]], int, int, int]:
     """Query the AI Work Queue for Status=Done file-producing tasks and extract
     their deliverable paths. Paginated."""
     url = f"https://api.notion.com/v1/databases/{database_id}/query"
@@ -300,7 +314,9 @@ def fetch_done_tasks(token: str, database_id: str) -> Tuple[List[Dict[str, Any]]
         "Content-Type": "application/json",
     }
     tasks: List[Dict[str, Any]] = []
-    done_seen = 0          # PRE-filter count, for the non-degeneracy canary
+    done_seen = 0              # PRE-filter count, for the non-degeneracy canary
+    file_producing_seen = 0    # survived the Task Type filter
+    with_notes = 0             # ...and had a non-empty Execution Notes
     cursor: Optional[str] = None
     while True:
         body: Dict[str, Any] = {
@@ -321,11 +337,14 @@ def fetch_done_tasks(token: str, database_id: str) -> Tuple[List[Dict[str, Any]]
             task_type = _select(props.get("Task Type"))
             if task_type and task_type not in _FILE_PRODUCING_TYPES:
                 continue
+            file_producing_seen += 1
             # Scan ONLY Execution Notes — the record of what was actually built
             # (CREATED:/MODIFIED: claims). Expected Output is the spec and is full
             # of *suggested* paths that get renamed on commit, which produced the
             # bulk of false positives on the first live run.
             note_text = _rich_text(props.get("Execution Notes"))
+            if note_text.strip():
+                with_notes += 1
             paths = extract_deliverable_paths(note_text)
             if not paths:
                 continue
@@ -335,6 +354,10 @@ def fetch_done_tasks(token: str, database_id: str) -> Tuple[List[Dict[str, Any]]
                 "aiq": _unique_id(props.get("ID")) or _rich_text(props.get("ID")),
                 "url": page.get("url", ""),
                 "paths": paths,
+                # Carried so assert_non_degenerate can tell "we read the notes and they
+                # held no paths" from "we never read the notes at all". Omitting this is
+                # what made the canary fire on every healthy run.
+                "notes": note_text,
             })
 
         if not payload.get("has_more"):
@@ -343,7 +366,7 @@ def fetch_done_tasks(token: str, database_id: str) -> Tuple[List[Dict[str, Any]]
     # `done_seen` is the PRE-filter count. assert_non_degenerate needs it to tell
     # "no Done tasks produce files" (fine) from "the Task Type filter matched nothing
     # because the property was renamed" (blind).
-    return tasks, done_seen
+    return tasks, done_seen, file_producing_seen, with_notes
 
 
 # --------------------------------------------------------------------------- #
@@ -371,8 +394,8 @@ def main() -> int:
     tracked = tracked_files(root)
 
     try:
-        tasks, done_seen = fetch_done_tasks(token, args.database_id)
-        assert_non_degenerate(tasks, done_seen)
+        tasks, done_seen, fp_seen, with_notes = fetch_done_tasks(token, args.database_id)
+        assert_non_degenerate(tasks, done_seen, fp_seen, with_notes)
     except QueueUnavailable as exc:
         return _not_measured(exc.kind, exc.detail)
     except urllib.error.HTTPError as exc:
