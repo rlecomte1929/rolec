@@ -22,7 +22,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ...database import db
-from ...db.policies import UnquotedApprovalError
+from ...db.policies import UnattestedLawyerReviewError, UnquotedApprovalError
+from ..services import lawyer_review_gate
 from ..auth_deps import require_admin
 from ..services.fact_evidence import NO_SOURCE, UNVERIFIED, VERIFIED, check_evidence
 
@@ -115,7 +116,11 @@ def list_facts(
                        f.confidence, f.status, f.evidence_verified, f.evidence_offset,
                        f.reviewed_by, f.reviewed_at, f.created_at,
                        e.destination_country, e.topic_key, e.domain_area,
-                       kd.content_excerpt, kd.last_verified_at
+                       kd.content_excerpt, kd.last_verified_at,
+                       -- [AIQ-2046] applies_to is where `needs_lawyer_review` lives. Without
+                       -- it the reviewer saw strictly LESS provenance than the employee who
+                       -- then read the row, and could not honour a flag they were never shown.
+                       f.applies_to
                   FROM requirement_facts f
                   JOIN requirement_entities e ON e.id = f.entity_id
              LEFT JOIN knowledge_docs kd ON kd.id = f.source_doc_id
@@ -148,6 +153,10 @@ def list_facts(
             "topic_key": r[13],
             "domain_area": r[14],
             "source_last_verified": str(r[16]) if r[16] else None,
+            # [AIQ-2046] Surfaced so the reviewer can SEE the flag they are meant to
+            # honour. The gate that refuses the approval lives in db/policies.py; this
+            # is what stops the refusal being a surprise.
+            "needs_lawyer_review": lawyer_review_gate.carries_lawyer_review_flag(r[17]),
         })
 
     return {"items": items, "total": int(total), "limit": limit, "offset": offset}
@@ -197,9 +206,10 @@ def decide(body: DecideRequest, user: Dict[str, Any] = Depends(require_admin)) -
 
     try:
         db.update_requirement_fact_status(body.fact_ids, new_status, reviewer, body.notes)
-    except UnquotedApprovalError as exc:
-        # [AIQ-2124] A reviewer approving a batch needs to know WHICH fact lacks its quote —
-        # a 500 would tell them only that something broke, and the batch would look applied.
+    except (UnquotedApprovalError, UnattestedLawyerReviewError) as exc:
+        # [AIQ-2124/2046] A reviewer approving a batch needs to know WHICH fact failed and
+        # why — a 500 would tell them only that something broke, and the batch would look
+        # applied. Both gates name their offending ids in the message.
         raise HTTPException(status_code=422, detail=str(exc))
     for fid in body.fact_ids:
         _audit(fid, {"status": new_status, "notes": body.notes}, reviewer)
