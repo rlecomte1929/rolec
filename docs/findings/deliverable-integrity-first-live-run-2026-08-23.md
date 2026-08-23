@@ -17,16 +17,15 @@ Scanned 481 Done file-producing task(s).
 
 ## "110 phantom deliverables" was the wrong headline
 
-The 110 double-counts across tasks: **97 unique paths**. Classifying every one against git
-history:
+Taken from the guard's own output on a full-history checkout, which classified **87** claims:
 
 | category | count | what it means |
 |---|---:|---|
-| existed once, later renamed or removed | **64** | the work **shipped**; the path went stale |
-| underscore-mangled by Notion | **10** | **the file exists** — `backend/eval/init.py` is really `backend/eval/__init__.py` |
-| never existed in any commit on any branch | **23** | the real phantom set, across **15** tasks |
+| existed once, later renamed or removed | **51** | the work **shipped**; the path went stale |
+| underscore-mangled by Notion | **13** | **the file exists** — `backend/eval/init.py` is really `backend/eval/__init__.py` |
+| never existed in any commit on any branch | **23** | the real phantom set, across **12** tasks |
 
-**~76% were not phantom Done at all.** They were the guard asking the wrong question: *"is this a
+**~74% were not phantom Done at all.** They were the guard asking the wrong question: *"is this a
 tracked file today"* rather than *"did this deliverable ever ship"*. Files legitimately move, and a
 refactor three months later does not retroactively make a shipped deliverable a lie.
 
@@ -56,6 +55,21 @@ shipped. The corrected split is 64/10/23.
 job's checkout now sets `fetch-depth: 0`, and the script refuses to run shallow (exit 3) rather
 than trust a truncated history.
 
+
+> **Two reconstruction errors, both recorded because they are the same class of mistake.**
+>
+> 1. A first pass ran `git log --all --diff-filter=A -- <path>` **per path** and reported
+>    62/10/25. That form applies history simplification and misses a file added on a merged side
+>    branch: two migrations returned 0 commits that way but 1 under `--full-history`, and their
+>    adding commit `ded8c5e5` is an ancestor of `origin/main`. They shipped.
+> 2. A second pass rebuilt the list by parsing a **truncated** CI log, and produced 23 findings
+>    that were the wrong 23 — task `541`, for instance, actually fails on
+>    `.github/workflows/ai-eval-gate.yml`, not the path the partial log showed.
+>
+> The numbers in this document are taken **verbatim from the guard's own output** on a
+> full-history checkout. Reconstructing what a tool would say, instead of running it and reading
+> the answer, is what produced both errors.
+
 ## The 23 that never existed
 
 Each is allowlisted under an `<aiq>:<path>` key scoped to the task that made the claim, so the
@@ -64,133 +78,113 @@ suppression cannot leak to another task claiming the same path. The Notion cards
 
 The largest cluster is an entire eval workstream marked Done with nothing shipped.
 
-### 623 · AI-W7.2 — LLM-as-judge for assistant tone, groundedness, actionability
+### 575 · AI-W6.2 — Correction-to-gold-fixture promotion script
 
-<https://app.notion.com/p/AI-W7-2-LLM-as-judge-for-assistant-tone-groundedness-actionability-402887c64d4883479c2a019f6fb2db7e>
+<https://app.notion.com/p/AI-W6-2-Correction-to-gold-fixture-promotion-script-da5887c64d488375ad5301d509ebf307>
 
-Claimed 7 deliverable(s), none of which ever existed:
+Claimed 5 deliverable(s), none of which ever existed:
 
-- `backend/eval/judges/base.py`
-- `backend/eval/judges/calibration.py`
-- `backend/eval/judges/groundedness.py`
-- `backend/eval/judges/init.py`
-- `backend/eval/judges/tone.py`
-- `backend/tests/fixtures/judges/labelled_examples.json`
-- `backend/tests/test_judges.py`
+- `backend/app/services/correction_anonymizer.py`
+- `backend/app/services/correction_promotion.py`
+- `backend/scripts/promote_correction_to_gold.py`
+- `backend/tests/fixtures/pilot/promoted/README.md`
+- `backend/tests/test_promote_correction.py`
 
-### 714 · P3-01b · Build context-precision evaluator
+### 552 · AI-W5.1 — Extraction Agent runtime + versioning semantics
 
-<https://app.notion.com/p/P3-01b-Build-context-precision-evaluator-b3e887c64d4883b8910601a238b0a800>
+<https://app.notion.com/p/AI-W5-1-Extraction-Agent-runtime-versioning-semantics-69e887c64d488372b28e010000bdafa8>
+
+Claimed 3 deliverable(s), none of which ever existed:
+
+- `backend/app/services/extraction_agent.py`
+- `backend/tests/test_extraction_agent_runtime.py`
+- `supabase/migrations/20260601000000_extraction_agents.sql`
+
+### 111 · IMM-10 · Frontend — wire Step 4 'Immigration' in employee journey wizard
+
+<https://app.notion.com/p/IMM-10-Frontend-wire-Step-4-Immigration-in-employee-journey-wizard-fa7887c64d4883f996b481423ade90c5>
 
 Claimed 2 deliverable(s), none of which ever existed:
 
-- `scripts/eval_context_precision.py`
-- `scripts/rag_eval_harness.py`
+- `backend/tests/test_immigration_requirements_summary.py`
+- `frontend/src/features/immigration/ImmigrationStep.tsx`
 
-### 617 · AI-W2.2 — Adapter: ai_trace_logger.TraceSession → agent_runs writer
+### 188 · IMM-16 · Backend — immutable data access audit log (DB trigger)
 
-<https://app.notion.com/p/AI-W2-2-Adapter-ai_trace_logger-TraceSession-agent_runs-writer-b5d887c64d4883babd2c813f21190d51>
+<https://app.notion.com/p/IMM-16-Backend-immutable-data-access-audit-log-DB-trigger-8ec887c64d488315b54401b17798b408>
 
 Claimed 2 deliverable(s), none of which ever existed:
 
-- `backend/app/services/agent_run_writer.py`
-- `backend/tests/test_agent_run_writer.py`
-
-### 698 · [BUG-A] Fix GET /api/company/branding-config returning 500 — missing branding_config column
-
-<https://app.notion.com/p/BUG-A-Fix-GET-api-company-branding-config-returning-500-missing-branding_config-column-81b887c64d4883efae9c0190e1d53d8c>
-
-Claimed 1 deliverable(s), none of which ever existed:
-
-- `supabase/migrations/20260527_add_company_branding_config.sql`
-
-### 665 · P3-01c · Build factual-consistency evaluator
-
-<https://app.notion.com/p/P3-01c-Build-factual-consistency-evaluator-f10887c64d48828d87d001690d624308>
-
-Claimed 1 deliverable(s), none of which ever existed:
-
-- `scripts/eval_factual_consistency.py`
-
-### 601 · P1-04a · Build specialist_review_events analytics schema + ETL view
-
-<https://app.notion.com/p/P1-04a-Build-specialist_review_events-analytics-schema-ETL-view-90a887c64d488228abde818681bd3d68>
-
-Claimed 1 deliverable(s), none of which ever existed:
-
-- `supabase/migrations/20260604120000_specialist_review_calibration_view.sql`
-
-### 750 · AI-W2.1 — Migration: unified agent_runs table with RLS
-
-<https://app.notion.com/p/AI-W2-1-Migration-unified-agent_runs-table-with-RLS-18c887c64d4883809486012e7de21c71>
-
-Claimed 1 deliverable(s), none of which ever existed:
-
-- `supabase/migrations/20260531000000_agent_runs.sql`
-
-### 565 · C2-06 · Policy-versus-reality gap detector (entitlement gaps with clause citations)
-
-<https://app.notion.com/p/C2-06-Policy-versus-reality-gap-detector-entitlement-gaps-with-clause-citations-fd8887c64d4882fcad4881c5567949ae>
-
-Claimed 1 deliverable(s), none of which ever existed:
-
-- `backend/relopass/policy_evidence/models.py`
-
-### 580 · AI-I.5 — Remove/avoid LangGraph dependency; commit FastAPI + Pydantic pipeline pattern
-
-<https://app.notion.com/p/AI-I-5-Remove-avoid-LangGraph-dependency-commit-FastAPI-Pydantic-pipeline-pattern-65d887c64d4882e4815c814156a821fe>
-
-Claimed 1 deliverable(s), none of which ever existed:
-
-- `audit/ADR-001-no-langgraph.md`
+- `docs/privacy/immigration-data-access-log.md`
+- `supabase/migrations/20260605500000_imm16_profile_access_audit_trigger.sql`
 
 ### 541 · AI-W3.4 — Promptfoo PR-gate CI workflow
 
 <https://app.notion.com/p/AI-W3-4-Promptfoo-PR-gate-CI-workflow-551887c64d488341b82e012254891375>
 
-Claimed 1 deliverable(s), none of which ever existed:
+Claimed 2 deliverable(s), none of which ever existed:
 
-- `backend/prompts/promptfooconfig.yaml`
+- `.github/test-events/sample-pr.json`
+- `.github/workflows/ai-eval-gate.yml`
 
-### 540 · Test runner: stop sending invite emails to fake @testco.com domains (kills Resend sender reputation)
+### 545 · AI-W7.1 — Eligibility-reasoning LLM node (Claude Sonnet via Bedrock Frankfurt)
 
-<https://app.notion.com/p/Test-runner-stop-sending-invite-emails-to-fake-testco-com-domains-kills-Resend-sender-reputation-85e887c64d488276973d01b8d6d1d33f>
+<https://app.notion.com/p/AI-W7-1-Eligibility-reasoning-LLM-node-Claude-Sonnet-via-Bedrock-Frankfurt-019887c64d488255934f8160b560b67e>
 
-Claimed 1 deliverable(s), none of which ever existed:
+Claimed 2 deliverable(s), none of which ever existed:
 
-- `scripts/relopass_api_runner.js`
+- `backend/relopass/agents/eligibility_reasoner.py`
+- `backend/tests/test_eligibility_reasoner.py`
 
-### 577 · C2-02b-FOLLOWUP · Agent wiring + AgentRegistry registration (tax_cert_{fr,de,no}.py)
+### 592 · C1-07P · Prompt engineering: LLM entity-resolution fallback (structured output)
 
-<https://app.notion.com/p/C2-02b-FOLLOWUP-Agent-wiring-AgentRegistry-registration-tax_cert_-fr-de-no-py-831887c64d488350a374819a77d8c95e>
+<https://app.notion.com/p/C1-07P-Prompt-engineering-LLM-entity-resolution-fallback-structured-output-4a1887c64d488382a65981e62b8e8a36>
 
-Claimed 1 deliverable(s), none of which ever existed:
+Claimed 2 deliverable(s), none of which ever existed:
 
-- `backend/relopass/agents/extraction/tax_cert_findings.py`
+- `prompts/entity/resolver_v1.eval.md`
+- `prompts/entity/resolver_v1.txt`
 
-### 319 · FOUNDATION-1A · Design & create events + daily_summaries schema
+### 332 · [P4-3] 'Add document' — ad-hoc forms outside the registry
 
-<https://app.notion.com/p/FOUNDATION-1A-Design-create-events-daily_summaries-schema-f66887c64d488399a69381da9881b67c>
-
-Claimed 1 deliverable(s), none of which ever existed:
-
-- `supabase/migrations/20260523000000_analytics_events_and_daily_summaries.sql`
-
-### 145 · IMM-18 · Backend — data erasure workflow + retention automation
-
-<https://app.notion.com/p/IMM-18-Backend-data-erasure-workflow-retention-automation-7de887c64d488382990381e959c2e128>
+<https://app.notion.com/p/P4-3-Add-document-ad-hoc-forms-outside-the-registry-4be887c64d48821595b2014ba6c9d1c6>
 
 Claimed 1 deliverable(s), none of which ever existed:
 
-- `supabase/migrations/20260605700000_imm18_retention_automation.sql`
+- `supabase/migrations/20260605600000_case_forms_adhoc.sql`
 
-### 144 · IMM-17 · Backend — right-to-access data export endpoint
+### 555 · AI-W5.2 — PASSPORT_TD3 extraction agent (deterministic MRZ + LLM for non-MRZ fields)
 
-<https://app.notion.com/p/IMM-17-Backend-right-to-access-data-export-endpoint-a30887c64d4882fab84901f8dabaaa41>
+<https://app.notion.com/p/AI-W5-2-PASSPORT_TD3-extraction-agent-deterministic-MRZ-LLM-for-non-MRZ-fields-d05887c64d4883a58f4b010551924d8b>
 
 Claimed 1 deliverable(s), none of which ever existed:
 
-- `supabase/migrations/20260605600000_imm17_erasure_requests.sql`
+- `backend/tests/test_passport_td3_agent.py`
+
+### 574 · C2-01 · FamilyMember + spouse/child document types (MARRIAGE_CERT, BIRTH_CERT, FOSTER_CARE_ORDER)
+
+<https://app.notion.com/p/C2-01-FamilyMember-spouse-child-document-types-MARRIAGE_CERT-BIRTH_CERT-FOSTER_CARE_ORDER-fa5887c64d488398857e01d287b0c57a>
+
+Claimed 1 deliverable(s), none of which ever existed:
+
+- `supabase/migrations/20260602000000_rce_family_document_types_seed.sql`
+
+### 620 · AI-W3.5 — Nightly full-corpus eval job + Langfuse leaderboard
+
+<https://app.notion.com/p/AI-W3-5-Nightly-full-corpus-eval-job-Langfuse-leaderboard-366887c64d4882bb99b6815310fbd134>
+
+Claimed 1 deliverable(s), none of which ever existed:
+
+- `.github/workflows/ai-eval-nightly.yml`
+
+### 627 · AI-W5.4 — DIPLOMA extraction agent
+
+<https://app.notion.com/p/AI-W5-4-DIPLOMA-extraction-agent-1e6887c64d4882059782011d1981145d>
+
+Claimed 1 deliverable(s), none of which ever existed:
+
+- `prompts/extraction/diploma_v1.txt`
+
 ## What this does not say
 
 These 23 are **historical** — May–June 2026 workstreams (`AI-W*`, `C2-*`, `IMM-*`, `P3-*`,

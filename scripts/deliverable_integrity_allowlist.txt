@@ -176,81 +176,76 @@ AIQ-121:backend/app/routers/hr_rfq.py  # SHIPPED THEN REMOVED: the original AIQ-
 AIQ-1682:backend/app/routers/hr_rfq.py  # SHIPPED THEN REMOVED: S2 (AIQ-1682, #1642) trimmed hr_rfq.py to a read-only GET; S3 (AIQ-1683, #1645) then deleted the whole file when rfq_requests was archived. S2's MODIFIED claim was correct at merge time; the file was removed one step later.
 AIQ-234:frontend/src/features/platform-v2/policy-builder/PolicyDocumentsPage.tsx  # BUILT BUT NEVER WIRED, THEN REMOVED: the P2-8 document-management screen was written and the task closed, but the page was never mounted — hrPolicyBuilderDocuments was declared in routes.ts and never added to App.tsx, and the backend it calls (/api/hr/policy-builder/documents) does not exist (prod returns 405, control endpoint 200). The wider P2-6/P2-8 pipeline was a UI-only shell: sibling PolicyReviewQueuePage likewise unmounted, and public.policy_facts sits at 0 rows with nothing to populate it. Deleted as unreachable dead code in #1844; document -> publish is covered by HrPolicyBuilderV2Page's "Import from document" on the live Benefits summary tab. NOTE: unlike the SHIPPED-THEN-REMOVED entries above, this deliverable never reached a user — the Done status was optimistic. Left allowlisted rather than reopened because the decision was to delete, not to finish it.
 
+
 # ── 2026-08-23 · first live run after NOTION_QUEUE_TOKEN was refreshed ─────────
 #
-# The secret had been stale since 2026-06-04, so this guard had been reporting a
-# pass on a queue it could not read. When it finally ran it flagged 110 claims
-# across 97 unique paths. Classifying every one against git history:
+# The secret had been stale since 2026-06-04, so this guard reported a pass on a
+# queue it could not read for nearly three months. This block is the backlog that
+# surfaced when it could finally see, taken VERBATIM from the guard's own output
+# rather than reconstructed by hand.
 #
-#     64  existed and were later renamed or removed — the work SHIPPED
-#     10  resolve once Notion's eaten underscores are restored — the file EXISTS
-#     23  never existed in any commit on any branch  <-- only these are listed here
+# The run classified 87 claims:
+#     51  existed and were later renamed or removed — the work SHIPPED   [INFO]
+#     13  resolve once Notion's eaten underscores are restored — file EXISTS [WARN]
+#     23  never existed in any commit on any branch   <-- only these are listed
 #
-# The first two categories are NOT allowlisted: the guard was fixed to stop asking
-# 'is this a tracked file today' and start asking 'did this deliverable ever ship'.
-# Suppressing them here would have grown this file by 74 entries needing perpetual
+# The first two are NOT allowlisted. The guard was changed to stop asking 'is this
+# a tracked file today' and start asking 'did this deliverable ever ship', so they
+# resolve automatically. Listing them would have added 64 entries needing perpetual
 # upkeep and left every future refactor tripping the same way.
 #
-# Verified with a single sweep, NOT a per-path query:
+# History comes from ONE sweep, not a per-path query:
 #     git log --all --diff-filter=A --name-only --format=
 # A per-path `git log -- <path>` applies history simplification and misses a file
-# added on a merged side branch; that mistake cost two of these entries on the
-# first pass.
+# added on a merged side branch.
 #
-# Full analysis, with the 15 tasks and what each claimed:
+# Full analysis and the 12 tasks:
 #     docs/findings/deliverable-integrity-first-live-run-2026-08-23.md
-# The Notion cards were flipped off Done the same day.
 
-# 623 · AI-W7.2 — LLM-as-judge for assistant tone, groundedness, actionability
-623:backend/eval/judges/base.py
-623:backend/eval/judges/calibration.py
-623:backend/eval/judges/groundedness.py
-623:backend/eval/judges/init.py
-623:backend/eval/judges/tone.py
-623:backend/tests/fixtures/judges/labelled_examples.json
-623:backend/tests/test_judges.py
+# 575 · AI-W6.2 — Correction-to-gold-fixture promotion script
+575:backend/app/services/correction_anonymizer.py
+575:backend/app/services/correction_promotion.py
+575:backend/scripts/promote_correction_to_gold.py
+575:backend/tests/fixtures/pilot/promoted/README.md
+575:backend/tests/test_promote_correction.py
 
-# 714 · P3-01b · Build context-precision evaluator
-714:scripts/eval_context_precision.py
-714:scripts/rag_eval_harness.py
+# 552 · AI-W5.1 — Extraction Agent runtime + versioning semantics
+552:backend/app/services/extraction_agent.py
+552:backend/tests/test_extraction_agent_runtime.py
+552:supabase/migrations/20260601000000_extraction_agents.sql
 
-# 617 · AI-W2.2 — Adapter: ai_trace_logger.TraceSession → agent_runs writer
-617:backend/app/services/agent_run_writer.py
-617:backend/tests/test_agent_run_writer.py
+# 111 · IMM-10 · Frontend — wire Step 4 'Immigration' in employee journey wizard
+111:backend/tests/test_immigration_requirements_summary.py
+111:frontend/src/features/immigration/ImmigrationStep.tsx
 
-# 698 · [BUG-A] Fix GET /api/company/branding-config returning 500 — missing branding_config col
-698:supabase/migrations/20260527_add_company_branding_config.sql
-
-# 665 · P3-01c · Build factual-consistency evaluator
-665:scripts/eval_factual_consistency.py
-
-# 601 · P1-04a · Build specialist_review_events analytics schema + ETL view
-601:supabase/migrations/20260604120000_specialist_review_calibration_view.sql
-
-# 750 · AI-W2.1 — Migration: unified agent_runs table with RLS
-750:supabase/migrations/20260531000000_agent_runs.sql
-
-# 565 · C2-06 · Policy-versus-reality gap detector (entitlement gaps with clause citations)
-565:backend/relopass/policy_evidence/models.py
-
-# 580 · AI-I.5 — Remove/avoid LangGraph dependency; commit FastAPI + Pydantic pipeline pattern
-580:audit/ADR-001-no-langgraph.md
+# 188 · IMM-16 · Backend — immutable data access audit log (DB trigger)
+188:docs/privacy/immigration-data-access-log.md
+188:supabase/migrations/20260605500000_imm16_profile_access_audit_trigger.sql
 
 # 541 · AI-W3.4 — Promptfoo PR-gate CI workflow
-541:backend/prompts/promptfooconfig.yaml
+541:.github/test-events/sample-pr.json
+541:.github/workflows/ai-eval-gate.yml
 
-# 540 · Test runner: stop sending invite emails to fake @testco.com domains (kills Resend sender
-540:scripts/relopass_api_runner.js
+# 545 · AI-W7.1 — Eligibility-reasoning LLM node (Claude Sonnet via Bedrock Frankfurt)
+545:backend/relopass/agents/eligibility_reasoner.py
+545:backend/tests/test_eligibility_reasoner.py
 
-# 577 · C2-02b-FOLLOWUP · Agent wiring + AgentRegistry registration (tax_cert_{fr,de,no}.py)
-577:backend/relopass/agents/extraction/tax_cert_findings.py
+# 592 · C1-07P · Prompt engineering: LLM entity-resolution fallback (structured output)
+592:prompts/entity/resolver_v1.eval.md
+592:prompts/entity/resolver_v1.txt
 
-# 319 · FOUNDATION-1A · Design & create events + daily_summaries schema
-319:supabase/migrations/20260523000000_analytics_events_and_daily_summaries.sql
+# 332 · [P4-3] 'Add document' — ad-hoc forms outside the registry
+332:supabase/migrations/20260605600000_case_forms_adhoc.sql
 
-# 145 · IMM-18 · Backend — data erasure workflow + retention automation
-145:supabase/migrations/20260605700000_imm18_retention_automation.sql
+# 555 · AI-W5.2 — PASSPORT_TD3 extraction agent (deterministic MRZ + LLM for non-MRZ fields)
+555:backend/tests/test_passport_td3_agent.py
 
-# 144 · IMM-17 · Backend — right-to-access data export endpoint
-144:supabase/migrations/20260605600000_imm17_erasure_requests.sql
+# 574 · C2-01 · FamilyMember + spouse/child document types (MARRIAGE_CERT, BIRTH_CERT, FOSTER_
+574:supabase/migrations/20260602000000_rce_family_document_types_seed.sql
+
+# 620 · AI-W3.5 — Nightly full-corpus eval job + Langfuse leaderboard
+620:.github/workflows/ai-eval-nightly.yml
+
+# 627 · AI-W5.4 — DIPLOMA extraction agent
+627:prompts/extraction/diploma_v1.txt
 
