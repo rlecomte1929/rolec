@@ -20,6 +20,7 @@ import type {
   RelocationPlanViewResponseDTO,
   RelocationPlanPhaseDTO,
   RelocationPlanPhaseTaskDTO,
+  RelocationPlanTaskStatusWire,
 } from '../../../types/relocationPlanView';
 import {
   phaseIcon, titlesByCode, actionableTasks, hrHandledTasks, resolveBlockedBy,
@@ -58,6 +59,15 @@ export interface RoadmapTemplateProps {
    * assert_roadmap_released). A disabled button is not a security control.
    */
   pendingReview?: boolean;
+  /**
+   * [AIQ-2057] Tick a step off. Absent → the plan renders read-only exactly as before,
+   * which is what every non-employee surface wants.
+   */
+  onToggleComplete?: (task: RelocationPlanPhaseTaskDTO) => void;
+  /** Optimistic statuses to render instead of the fetched ones, keyed by task_id. */
+  statusOverrides?: Record<string, RelocationPlanTaskStatusWire>;
+  /** Tasks with a write in flight — their control is disabled and shows a spinner. */
+  savingTaskIds?: Set<string>;
 }
 
 const TONE_CHIP: Record<RowTone, string> = {
@@ -74,6 +84,23 @@ function Chip({ tone, children }: { tone: RowTone; children: React.ReactNode }) 
       {children}
     </span>
   );
+}
+
+/**
+ * [AIQ-2057] Whose step is this to tick?
+ *
+ * Only the employee's own work, and only once HR has released the plan. An HR- or
+ * provider-owned milestone is somebody else's to close — letting the employee mark it done
+ * would put a false completion in front of the person actually responsible for it. And while
+ * `pendingReview` holds, the server refuses the write anyway (`assert_roadmap_released` 409s),
+ * so offering the control would only manufacture an error.
+ */
+export function canEmployeeToggle(
+  task: RelocationPlanPhaseTaskDTO,
+  pendingReview: boolean,
+): boolean {
+  if (pendingReview) return false;
+  return task.owner === 'employee' || task.owner === 'joint';
 }
 
 function StatusIcon({ task }: { task: RelocationPlanPhaseTaskDTO }) {
@@ -294,17 +321,40 @@ function SourceDisclosure({ confidence }: { confidence: StepConfidence }) {
 }
 
 function TaskRow({
-  task, titles, onCta, confidence,
-}: { task: RelocationPlanPhaseTaskDTO; titles: Record<string, string>; onCta: (t: RelocationPlanPhaseTaskDTO) => void; confidence?: StepConfidence }) {
+  task, titles, onCta, confidence, onToggleComplete, saving, pendingReview,
+}: {
+  task: RelocationPlanPhaseTaskDTO;
+  titles: Record<string, string>;
+  onCta: (t: RelocationPlanPhaseTaskDTO) => void;
+  confidence?: StepConfidence;
+  onToggleComplete?: (t: RelocationPlanPhaseTaskDTO) => void;
+  saving?: boolean;
+  pendingReview?: boolean;
+}) {
   const st = rowStatus(task);
   const blocked = resolveBlockedBy(task, titles);
   const docs = docCount(task);
   const done = task.status === 'completed';
   const actionable = st.tone === 'ready' || (st.tone === 'progress' && (task.owner === 'employee' || task.owner === 'joint'));
+  const tickable = Boolean(onToggleComplete) && canEmployeeToggle(task, Boolean(pendingReview));
 
   return (
     <div className={`flex items-start gap-3 border-l-2 py-3 pl-3 ${actionable ? 'border-teal-400' : 'border-transparent'}`}>
-      <StatusIcon task={task} />
+      {tickable ? (
+        <button
+          type="button"
+          onClick={() => onToggleComplete?.(task)}
+          disabled={saving}
+          aria-pressed={done}
+          aria-label={done ? `Mark “${task.title}” as not done` : `Mark “${task.title}” as done`}
+          title={done ? 'Mark as not done' : 'Mark as done'}
+          className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-1 disabled:opacity-60"
+        >
+          <StatusIcon task={task} />
+        </button>
+      ) : (
+        <StatusIcon task={task} />
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className={`text-[14px] font-semibold ${done ? 'text-slate-400 line-through' : 'text-[#0b2b43]'}`}>
@@ -350,8 +400,17 @@ function TaskRow({
 }
 
 function PhaseSection({
-  phase, titles, onCta, defaultOpen, confidenceByTitle,
-}: { phase: RelocationPlanPhaseDTO; titles: Record<string, string>; onCta: (t: RelocationPlanPhaseTaskDTO) => void; defaultOpen: boolean; confidenceByTitle?: ConfidenceByTitle }) {
+  phase, titles, onCta, defaultOpen, confidenceByTitle, onToggleComplete, savingTaskIds, pendingReview,
+}: {
+  phase: RelocationPlanPhaseDTO;
+  titles: Record<string, string>;
+  onCta: (t: RelocationPlanPhaseTaskDTO) => void;
+  defaultOpen: boolean;
+  confidenceByTitle?: ConfidenceByTitle;
+  onToggleComplete?: (t: RelocationPlanPhaseTaskDTO) => void;
+  savingTaskIds?: Set<string>;
+  pendingReview?: boolean;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   const pct = Math.round((phase.completion_ratio ?? 0) * 100);
   const Icon = phaseIcon(phase.phase_key);
@@ -391,6 +450,9 @@ function PhaseSection({
               titles={titles}
               onCta={onCta}
               confidence={confidenceByTitle?.[normalizeStepTitle(t.title)]}
+              onToggleComplete={onToggleComplete}
+              saving={savingTaskIds?.has(t.task_id)}
+              pendingReview={pendingReview}
             />
           ))}
         </div>
@@ -401,10 +463,72 @@ function PhaseSection({
 
 // ── Root ─────────────────────────────────────────────────────────────────────
 
+/**
+ * [AIQ-2057] Overlay optimistic statuses on a fetched plan, recomputing the derived counts.
+ *
+ * Returns the SAME object when there is nothing to override, so the memo chain downstream
+ * (`titlesByCode`, `actionableTasks`, …) keeps its identity and nothing re-renders for a
+ * read-only surface that never passes overrides at all.
+ */
+export function applyStatusOverrides(
+  view: RelocationPlanViewResponseDTO,
+  overrides: Record<string, RelocationPlanTaskStatusWire> | undefined,
+): RelocationPlanViewResponseDTO {
+  if (!overrides || Object.keys(overrides).length === 0) return view;
+
+  let touched = false;
+  const phases = view.phases.map((phase) => {
+    const tasks = phase.tasks.map((t) => {
+      const next = overrides[t.task_id];
+      if (!next || next === t.status) return t;
+      touched = true;
+      return { ...t, status: next };
+    });
+    if (tasks === phase.tasks) return phase;
+    const completed = tasks.filter((t) => t.status === 'completed').length;
+    const total = tasks.length;
+    return {
+      ...phase,
+      tasks,
+      task_counts: { ...phase.task_counts, completed, total },
+      completion_ratio: total > 0 ? completed / total : phase.completion_ratio,
+    };
+  });
+  if (!touched) return view;
+
+  const all = phases.flatMap((p) => p.tasks);
+  const completedTasks = all.filter((t) => t.status === 'completed').length;
+  const blockedTasks = all.filter((t) => t.status === 'blocked').length;
+  return {
+    ...view,
+    phases,
+    summary: {
+      ...view.summary,
+      completed_tasks: completedTasks,
+      total_tasks: all.length,
+      blocked_tasks: blockedTasks,
+      // `deriveCanonicalProgress` reads the RATIO for the headline percentage and the COUNT
+      // for the "x of y done" line beside it. Updating one and not the other puts two
+      // disagreeing numbers in the same hero.
+      completion_ratio: all.length > 0 ? completedTasks / all.length : view.summary.completion_ratio,
+    },
+  };
+}
+
+
 export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
-  data, header, caseId, onCta, validated, validatedAt, validating, onValidate, confidenceByTitle,
+  data: fetched, header, caseId, onCta, validated, validatedAt, validating, onValidate, confidenceByTitle,
   pendingReview = false,
+  onToggleComplete, statusOverrides, savingTaskIds,
 }) => {
+  // [AIQ-2057] Apply the optimistic ticks over the fetched plan, so the whole view — row
+  // status, phase counters, the hero percentage — moves together the moment the employee
+  // clicks. Recomputing the counters here rather than only restyling the row is what stops
+  // "3 of 8 done" disagreeing with the ticks directly beneath it.
+  const data = useMemo(
+    () => applyStatusOverrides(fetched, statusOverrides),
+    [fetched, statusOverrides],
+  );
   const titles = useMemo(() => titlesByCode(data.phases), [data.phases]);
   const actionable = useMemo(() => actionableTasks(data.phases, 3), [data.phases]);
   const hrHandled = useMemo(() => hrHandledTasks(data.phases), [data.phases]);
@@ -485,6 +609,9 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
             onCta={onCta}
             defaultOpen={p.status === 'active' || (activeIdx === -1 && i === 0)}
             confidenceByTitle={confidenceByTitle}
+            onToggleComplete={onToggleComplete}
+            savingTaskIds={savingTaskIds}
+            pendingReview={pendingReview}
           />
         ))}
       </div>
