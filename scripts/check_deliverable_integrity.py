@@ -40,7 +40,7 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # AI Work Queue (Notion). Database id from references/notion-schema.md.
 _DEFAULT_DATABASE_ID = "3bc887c6-4d48-8089-8188-fcf2dc3edc1b"
@@ -204,6 +204,68 @@ def tracked_files(root: Path) -> Set[str]:
 # --------------------------------------------------------------------------- #
 
 
+#: Exit codes. 3 separates "measured, clean" from "could not measure" — this guard used to
+#: collapse both into 0. On 2026-08-23 its CI log read
+#:     [WARN] Notion query failed (HTTP Error 404: Not Found); skipping (exit 0).
+#: and it reported PASS on every PR while examining nothing.
+EXIT_OK = 0
+EXIT_VIOLATION = 1
+EXIT_NOT_MEASURED = 3
+
+#: The server-side filter is `Status = Done`, which held ~1,530 rows on 2026-08-23. This floor
+#: applies to that PRE-filter count, not to the file-producing subset, which is legitimately
+#: much smaller and would make a floor a false-positive machine.
+MIN_EXPECTED_DONE_ROWS = 500
+
+
+class QueueUnavailable(RuntimeError):
+    """The queue could not be measured. NEVER report this as a pass."""
+
+    def __init__(self, kind: str, detail: str) -> None:
+        super().__init__(f"{kind}: {detail}")
+        self.kind = kind
+        self.detail = detail
+
+
+def assert_non_degenerate(tasks: List[Dict[str, Any]], done_seen: int) -> None:
+    """Refuse to call a degenerate scan clean.
+
+    A renamed property does not raise — it yields "" for every row, every count becomes 0,
+    and that reads exactly like a healthy queue. `Task Title` -> `fable` drifted this way and
+    nobody noticed. Each assertion below is a way this guard could go quietly blind.
+    """
+    if done_seen < MIN_EXPECTED_DONE_ROWS:
+        raise QueueUnavailable(
+            "schema-drift",
+            f"only {done_seen} Done row(s) returned; expected at least "
+            f"{MIN_EXPECTED_DONE_ROWS}. The Status filter or the database id is probably wrong.",
+        )
+    if done_seen and not tasks:
+        raise QueueUnavailable(
+            "schema-drift",
+            f"{done_seen} Done rows returned but NOT ONE survived the Task Type filter — "
+            "the `Task Type` property has probably been renamed or its vocabulary changed.",
+        )
+    if tasks and not any(t.get("notes", "").strip() for t in tasks):
+        raise QueueUnavailable(
+            "schema-drift",
+            f"{len(tasks)} file-producing task(s) returned but NOT ONE had Execution Notes — "
+            "this guard parses ONLY that property, so it would examine nothing.",
+        )
+
+
+def _not_measured(kind: str, detail: str) -> int:
+    """Report an unmeasurable run as exit 3, never as a pass."""
+    print(f"[SKIP:{kind}] {detail}")
+    print("NOT A PASS — nothing was measured.")
+    if kind == "no-access":
+        print("  Fix: share the AI Work Queue database with this integration "
+              "(Notion -> database -> ... -> Connections).")
+    elif kind == "no-token":
+        print("  Fix: export NOTION_TOKEN (CI maps secrets.NOTION_QUEUE_TOKEN to it).")
+    return EXIT_NOT_MEASURED
+
+
 def _rich_text(prop: Optional[Dict[str, Any]]) -> str:
     if not prop:
         return ""
@@ -228,7 +290,7 @@ def _unique_id(prop: Optional[Dict[str, Any]]) -> str:
     return f"{prefix}-{number}" if prefix else str(number)
 
 
-def fetch_done_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
+def fetch_done_tasks(token: str, database_id: str) -> Tuple[List[Dict[str, Any]], int]:
     """Query the AI Work Queue for Status=Done file-producing tasks and extract
     their deliverable paths. Paginated."""
     url = f"https://api.notion.com/v1/databases/{database_id}/query"
@@ -238,6 +300,7 @@ def fetch_done_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
         "Content-Type": "application/json",
     }
     tasks: List[Dict[str, Any]] = []
+    done_seen = 0          # PRE-filter count, for the non-degeneracy canary
     cursor: Optional[str] = None
     while True:
         body: Dict[str, Any] = {
@@ -253,6 +316,7 @@ def fetch_done_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
             payload = json.loads(resp.read().decode("utf-8"))
 
         for page in payload.get("results", []):
+            done_seen += 1
             props = page.get("properties", {})
             task_type = _select(props.get("Task Type"))
             if task_type and task_type not in _FILE_PRODUCING_TYPES:
@@ -266,7 +330,8 @@ def fetch_done_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
             if not paths:
                 continue
             tasks.append({
-                "title": _rich_text(props.get("Task Title")),
+                # The title property of this database is `fable`, not "Task Title".
+                "title": _rich_text(props.get("fable")),
                 "aiq": _unique_id(props.get("ID")) or _rich_text(props.get("ID")),
                 "url": page.get("url", ""),
                 "paths": paths,
@@ -275,7 +340,10 @@ def fetch_done_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
         if not payload.get("has_more"):
             break
         cursor = payload.get("next_cursor")
-    return tasks
+    # `done_seen` is the PRE-filter count. assert_non_degenerate needs it to tell
+    # "no Done tasks produce files" (fine) from "the Task Type filter matched nothing
+    # because the property was renamed" (blind).
+    return tasks, done_seen
 
 
 # --------------------------------------------------------------------------- #
@@ -296,18 +364,22 @@ def main() -> int:
 
     token = os.environ.get("NOTION_TOKEN")
     if not token:
-        print("[SKIP] NOTION_TOKEN not set — deliverable-integrity check skipped.")
-        return 0
+        return _not_measured("no-token", "NOTION_TOKEN is not set.")
 
     root = Path(args.root).resolve()
     allowlist = load_allowlist(root / "scripts" / "deliverable_integrity_allowlist.txt")
     tracked = tracked_files(root)
 
     try:
-        tasks = fetch_done_tasks(token, args.database_id)
-    except (urllib.error.URLError, urllib.error.HTTPError) as exc:
-        print(f"[WARN] Notion query failed ({exc}); skipping (exit 0).")
-        return 0
+        tasks, done_seen = fetch_done_tasks(token, args.database_id)
+        assert_non_degenerate(tasks, done_seen)
+    except QueueUnavailable as exc:
+        return _not_measured(exc.kind, exc.detail)
+    except urllib.error.HTTPError as exc:
+        kind = "no-access" if exc.code in (401, 403, 404) else "unreachable"
+        return _not_measured(kind, f"HTTP {exc.code} querying database {args.database_id}.")
+    except urllib.error.URLError as exc:
+        return _not_measured("unreachable", str(exc))
 
     missing = check_tasks(tasks, tracked, allowlist)
 

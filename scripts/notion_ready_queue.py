@@ -111,7 +111,11 @@ def query_queue(token: str, status: str, db_id: str = QUEUE_DB_ID) -> list[dict]
                 {
                     "aiq": _unique_id(props.get("ID") or props.get("userDefined:ID")),
                     "page_id": page.get("id", ""),
-                    "title": _plain_text(props.get("Task Title") or props.get("Name")),
+                    # `fable` is this database's title property. "Task Title"/"Name" do not
+                    # exist on it, so both fallbacks resolved to None and every row came back
+                    # with an empty title — `--next` printed "AIQ-1234 |  | url" and `--cc-next`
+                    # emitted "title": "" into the nightly dispatcher.
+                    "title": _plain_text(props.get("fable")),
                     "priority": _plain_text(props.get("Priority")),
                     "complexity": _plain_text(props.get("Estimated Complexity")),
                     "autonomy_tier": _plain_text(props.get("Autonomy Tier")),
