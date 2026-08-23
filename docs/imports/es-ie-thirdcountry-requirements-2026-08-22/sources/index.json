@@ -1,0 +1,72 @@
+{
+  "https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/": {
+    "bytes_fetched": 45562,
+    "file": "fad170788effcb62.txt",
+    "is_pdf": false,
+    "sha256_of_text": "8f62a4a341956d47fdb2ea5b92996e4054def29fc5bc961100249d5da0d6f805",
+    "text_chars": 21772
+  },
+  "https://services.mywelfare.ie/en/topics/identity-services/personal-public-service-pps-number/": {
+    "bytes_fetched": 132264,
+    "file": "d00045c9a8ba37da.txt",
+    "is_pdf": false,
+    "sha256_of_text": "9f29de0062bf0e4c1ba6e266cfc968dd5161c6942bcabfe01d02b59909babc18",
+    "text_chars": 36971
+  },
+  "https://www.irishimmigration.ie/registering-your-immigration-permission/": {
+    "bytes_fetched": 1668678,
+    "file": "07f586fce1b3f287.txt",
+    "is_pdf": false,
+    "sha256_of_text": "57d6b08b94daf2baf93e2ef9d13b2876e861d2467330cd57b014c182643be9d7",
+    "text_chars": 6342
+  },
+  "https://www.irishimmigration.ie/registering-your-immigration-permission/frequently-asked-questions-for-registration/": {
+    "bytes_fetched": 1796393,
+    "file": "ee41465e49df09c8.txt",
+    "is_pdf": false,
+    "sha256_of_text": "9842782aacdc86008f988f3f90002b2352d0c4f25e06e8c7e12379b32cbea009",
+    "text_chars": 42271
+  },
+  "https://www.irishimmigration.ie/registering-your-immigration-permission/how-to-register-your-immigration-permission-for-the-first-time/required-documents/": {
+    "bytes_fetched": 1813733,
+    "file": "52de117e3fb7dbfb.txt",
+    "is_pdf": false,
+    "sha256_of_text": "56bae950396d26abcaada8e061a65e42e97da9b67eb137f6d0f9811c82f07b85",
+    "text_chars": 80760
+  },
+  "https://www.revenue.ie/en/jobs-and-pensions/emergency-tax/emergency-tax-rules.aspx": {
+    "bytes_fetched": 71045,
+    "file": "dc9250c842354177.txt",
+    "is_pdf": false,
+    "sha256_of_text": "c43b4a1cbdfa47128b14800c668816797ac98dc61fbe4fa1d06e0ff5ac087846",
+    "text_chars": 10887
+  },
+  "https://www.revenue.ie/en/jobs-and-pensions/emergency-tax/index.aspx": {
+    "bytes_fetched": 66976,
+    "file": "6e6555566f836211.txt",
+    "is_pdf": false,
+    "sha256_of_text": "5f3e5b4b775f196c1b50a7dc201c707ae7b9291aa59335292d449a33ad744e3a",
+    "text_chars": 8412
+  },
+  "https://www.revenue.ie/en/jobs-and-pensions/starting-your-first-job/index.aspx": {
+    "bytes_fetched": 66545,
+    "file": "89fb31e608d4ab42.txt",
+    "is_pdf": false,
+    "sha256_of_text": "7829d0f5de53bd2b3a7570464be81614d7135d238a5492020107cd7d0c65a3ef",
+    "text_chars": 8024
+  },
+  "https://www.revenue.ie/en/jobs-and-pensions/tax-residence/index.aspx": {
+    "bytes_fetched": 69088,
+    "file": "4330750b6fa37acd.txt",
+    "is_pdf": false,
+    "sha256_of_text": "260ce5381d5b4806601b055be130b4d900b9ad95b6e5a3b950d6623a2ec18016",
+    "text_chars": 9036
+  },
+  "https://www2.healthservice.hse.ie/files/690/": {
+    "bytes_fetched": 718361,
+    "file": "257dd0f2b2ca81c9.txt",
+    "is_pdf": true,
+    "sha256_of_text": "6357028209477ed7455685902d0515b491ef3a8b864788f01037ec26ccb3727a",
+    "text_chars": 93976
+  }
+}
