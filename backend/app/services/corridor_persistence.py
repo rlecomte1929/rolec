@@ -28,13 +28,14 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from sqlalchemy import text
 
 from ...database import db
 from ...relopass.corridors.loader import CorridorAgent
 from ...relopass.corridors.scheduler import compute_deadlines, schedule_steps
+from .source_url_reachability import assert_source_urls_resolve, probe_url
 
 # Stable namespace so every derived id is reproducible across runs/environments.
 _NS = uuid.uuid5(uuid.NAMESPACE_URL, "https://relopass.com/rce")
@@ -207,16 +208,39 @@ def persist_corridor_case(
     case_id: Optional[uuid.UUID] = None,
     target_arrival_date: date,
     status: str = "ACTIVE",
+    source_url_probe: Optional[Callable[[str], Any]] = None,
+    allow_unverified_source_urls: bool = False,
 ) -> Dict[str, int]:
     """Persist the corridor + case into ``rce.*``. Idempotent (ON CONFLICT).
 
     Returns a count summary per table. ``case_id`` defaults to a deterministic id
     derived from the corridor so repeated seeds reuse the same demo case.
+
+    Every rule version's ``source_url`` is resolved BEFORE anything is written, and a
+    404/410 aborts the whole call. See the gate below.
     """
     if case_id is None:
         case_id = uuid.uuid5(_NS, f"case:{corridor.corridor_id}:default")
     rows = build_rce_rows(
         corridor, case_id=case_id, target_arrival_date=target_arrival_date, status=status
+    )
+
+    # ── Citation gate ────────────────────────────────────────────────────────
+    # A citation is what makes a rule defensible, so a citation that 404s is worse than
+    # no rule at all: it invites a reader to check our work and hands them a dead link.
+    # 20 of the 34 rule versions in production carry one today, all produced by
+    # `derive_source_url`'s final fallback (see its docstring). This stops the next one.
+    #
+    # Deliberately OUTSIDE `db.engine.begin()`. Probing inside the transaction would hold
+    # a database transaction open across a network call to a third-party government site.
+    #
+    # `allow_unverified_source_urls` covers only the third state — timeout/DNS/5xx, where
+    # we did not find out. It can never let a 404 through; that raises regardless.
+    _probe = source_url_probe or probe_url
+    assert_source_urls_resolve(
+        [rv.get("source_url") for rv in rows.rule_versions],
+        probe=_probe,
+        allow_unverified=allow_unverified_source_urls,
     )
 
     with db.engine.begin() as conn:
