@@ -1,3 +1,15 @@
+-- SUPERSEDED — do not extend this file.
+--
+-- This query carried a hand-rolled copy of the quote normaliser, and it lagged behind
+-- `backend/app/services/fact_evidence.normalise` twice in one day: it under-verified 9 Irish
+-- facts, then 3 French ones, each time looking like a data problem and each time being a
+-- normalisation problem. A normaliser expressed twice is a normaliser that disagrees with
+-- itself.
+--
+-- Use `scripts/evidence_reconciliation_report.py`, which calls the one definition. Kept here
+-- only so the SQL shape of the census is readable at a glance; the numbers it produces are NOT
+-- authoritative.
+--
 -- Evidence reconciliation scoreboard.
 --
 -- WHAT THIS ANSWERS: of the requirement_facts we are serving RIGHT NOW, how many carry a quote

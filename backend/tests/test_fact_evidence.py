@@ -311,3 +311,69 @@ def test_a_quote_only_in_text_content_still_verifies_through_the_resolver():
             + quote + ". Eligible occupations are listed separately. ") * 3
     assert check_evidence(quote, excerpt).status != VERIFIED
     assert check_evidence(quote, best_source_text(excerpt, body)).status == VERIFIED
+
+
+# ---------------------------------------------------------------------------
+# normalise() is the ONLY quote normaliser. Each fold below cost a real false
+# negative before it existed; each non-fold protects a word or a guard.
+# ---------------------------------------------------------------------------
+
+
+def test_normalise_folds_a_list_bullet():
+    assert normalise("prove: • you are resident or • your visa permits") == \
+           "prove: you are resident or your visa permits"
+
+
+def test_normalise_folds_the_service_public_template_token():
+    """service-public.fr prints a literal `titleContent` inside its own sentences."""
+    assert normalise("un salarié étranger (UE + EEE + Suisse) : titleContent en France") == \
+           "un salarié étranger (UE + EEE + Suisse): en France"
+
+
+def test_normalise_closes_a_space_before_punctuation():
+    """What stripping an <a> or <li> around the mark leaves behind."""
+    assert normalise("note : if you are") == "note: if you are"
+    assert normalise("the Department (DSP) .") == "the Department (DSP)."
+
+
+def test_normalise_closes_french_elision_split_across_a_tag():
+    """CLEISS renders "L' article" for "l'article"; this alone had a genuine, verbatim CLEISS
+    sentence recorded as fabricated."""
+    assert normalise("L' article 11 du règlement") == "L'article 11 du règlement"
+
+
+def test_normalise_does_not_touch_a_hyphen_inside_a_word():
+    """Folding every dash would merge "e-mail" into "e mail" — a word, not markup."""
+    assert "e-mail" in normalise("send an e-mail today")
+
+
+def test_normalise_keeps_a_whitespace_delimited_dash():
+    """Deliberate. It is markup by the same argument, but `_SEGMENT_SPLIT` keys on it, and
+    folding it stops the recomposed-quote rule discriminating (see the planted-error suite)."""
+    assert " - " in normalise("if you: - attend an ID check")
+
+
+def test_normalise_keeps_a_slash():
+    """The batch copy folded "/" to a space, which destroys "and/or"."""
+    assert "and/or" in normalise("the spouse and/or partner")
+
+
+def test_normalise_bullet_fold_runs_before_the_whitespace_collapse():
+    """Order matters: collapse first and removing a bullet leaves a double space, so a true
+    quote reads as missing."""
+    assert "  " not in normalise("prove: • you and • your dependants")
+
+
+def test_the_batch_checker_delegates_to_this_normaliser():
+    """There is one definition. `verify_batch_quotes.norm` may only add the case-fold."""
+    import importlib.util
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    spec = importlib.util.spec_from_file_location("vbq", root / "scripts" / "verify_batch_quotes.py")
+    vbq = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vbq)
+    for sample in ("L' article 11 (CE) n° 883/2004",
+                   "prove: • you and • your dependants",
+                   "note : if you are",
+                   "send an e-mail today"):
+        assert vbq.norm(sample) == normalise(sample).lower(), sample
