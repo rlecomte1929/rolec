@@ -120,6 +120,22 @@ export async function getFeedbackScreenshot(
   return data.screenshot_url ?? data.screenshot_data ?? null;
 }
 
+/**
+ * Apply one status to many items in a single request.
+ *
+ * Keyed on (stream, id) PAIRS, not bare ids: feedback_status is keyed that way and the
+ * console unions five streams, so an id alone is ambiguous.
+ *
+ * Best-effort — the response names what it could not write, rather than returning a
+ * bare count that cannot distinguish partial from complete.
+ */
+export async function bulkTriageFeedback(
+  items: Array<{ stream: string; source_id: string }>,
+  status: TriageStatus,
+): Promise<{ updated: number; rejected: Array<{ stream: string; source_id: string; reason: string }> }> {
+  return apiPost('/api/admin/feedback/bulk-triage', { items, status });
+}
+
 export async function triageFeedback(
   stream: FeedbackStream,
   id: string,

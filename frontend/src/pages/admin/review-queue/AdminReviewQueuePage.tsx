@@ -5,6 +5,8 @@ import { Input } from '../../../components/antigravity/Input';
 import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { ReviewQueuePriorityBadge } from '../../../components/admin/review-queue/ReviewQueuePriorityBadge';
 import { ReviewQueueStatusBadge } from '../../../components/admin/review-queue/ReviewQueueStatusBadge';
+import { BulkActionBar, type BulkActionResult } from '../../../components/antigravity/BulkActionBar';
+import { useRowSelection } from '../../../hooks/useRowSelection';
 import { adminReviewQueueAPI, adminCollaborationAPI } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
 import { ThreadSummaryBadge } from '../../../components/admin/collaboration/ThreadSummaryBadge';
@@ -64,7 +66,44 @@ export const AdminReviewQueuePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [backfillLoading, setBackfillLoading] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // [BULK] This page already HAD checkboxes, a select-all and two backend bulk routes —
+  // and nothing wired them together, so ticking every box did nothing at all. Swapped
+  // onto the shared hook so the selection also clears when the filters change.
+  const filterSignature = searchParams.toString();
+  const {
+    selectedRows, allVisibleSelected, isSelected,
+    toggle: toggleSelect, toggleAll, clear: clearSelection,
+  } = useRowSelection(items, (i) => i.id, filterSignature);
+  const [bulkResult, setBulkResult] = useState<BulkActionResult>('idle');
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [bulkDone, setBulkDone] = useState('');
+  const bulkBusy = bulkResult === 'busy';
+
+  const applyBulkStatus = async (next: string) => {
+    const ids = selectedRows.map((r) => r.id);
+    if (ids.length === 0) return;
+    setBulkResult('busy');
+    setBulkError(null);
+    try {
+      const res = (await adminReviewQueueAPI.bulkStatus(ids, next)) as { updated_count?: number };
+      const updated = res?.updated_count ?? 0;
+      await load();
+      if (updated < ids.length) {
+        // bulk-status returns only a count and DISCARDS which ids failed, so the most
+        // honest thing we can say is how many did not land. Reporting plain success
+        // here would be a lie the endpoint cannot support.
+        setBulkResult('error');
+        setBulkError(`${ids.length - updated} of ${ids.length} could not be updated.`);
+      } else {
+        clearSelection();
+        setBulkResult('done');
+        setBulkDone(`${updated} updated.`);
+      }
+    } catch {
+      setBulkResult('error');
+      setBulkError('Could not apply the change — nothing was updated.');
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,20 +176,6 @@ export const AdminReviewQueuePage: React.FC = () => {
     } finally {
       setBackfillLoading(false);
     }
-  };
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === items.length) setSelectedIds(new Set());
-    else setSelectedIds(new Set(items.map((i) => i.id)));
   };
 
   const formatAge = (createdAt?: string) => {
@@ -303,6 +328,30 @@ export const AdminReviewQueuePage: React.FC = () => {
           <div className="rounded-lg bg-red-50 p-3 text-red-700">{error}</div>
         )}
 
+        <BulkActionBar
+          count={selectedRows.length}
+          busy={bulkBusy}
+          result={bulkResult}
+          successMessage={bulkDone}
+          errorMessage={bulkError}
+          onClear={clearSelection}
+        >
+          {/* Four of the ten statuses, not all ten. These are the verdicts a reviewer
+              actually applies to a GROUP; a bar with ten buttons is not a bulk action,
+              it is a menu. Per-item nuance stays on the detail page. */}
+          {(['triaged', 'resolved', 'rejected', 'deferred'] as const).map((st) => (
+            <button
+              key={st}
+              type="button"
+              disabled={bulkBusy}
+              onClick={() => void applyBulkStatus(st)}
+              className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-sm text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white disabled:opacity-50"
+            >
+              {bulkBusy ? 'Applying…' : `Mark ${st.replace(/_/g, ' ')} (${selectedRows.length})`}
+            </button>
+          ))}
+        </BulkActionBar>
+
         {loading ? (
           <div className="py-12 text-center text-slate-500">Loading...</div>
         ) : (
@@ -312,8 +361,9 @@ export const AdminReviewQueuePage: React.FC = () => {
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">
                     <Checkbox
-                      checked={items.length > 0 && selectedIds.size === items.length}
-                      onChange={toggleSelectAll}
+                      checked={allVisibleSelected}
+                      disabled={bulkBusy}
+                      onChange={(e) => toggleAll(e.target.checked)}
                     />
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">Title</th>
@@ -339,7 +389,7 @@ export const AdminReviewQueuePage: React.FC = () => {
                     <tr key={it.id} className="hover:bg-slate-50">
                       <td className="px-3 py-2">
                         <Checkbox
-                          checked={selectedIds.has(it.id)}
+                          checked={isSelected(it.id)}
                           onChange={() => toggleSelect(it.id)}
                         />
                       </td>
