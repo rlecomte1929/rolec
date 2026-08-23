@@ -159,6 +159,11 @@ class CheckTasksTests(unittest.TestCase):
     def setUp(self):
         self.tracked = {"backend/app/services/landed.py", "prompts/ok.txt"}
 
+    # These four pass `ever_added=None` (the default), i.e. no git history. That is
+    # deliberate: with no history the guard keeps its original present-tense semantics
+    # and an absent path is still `missing`, so these fixtures keep asserting exactly
+    # what they always did. The history-aware behaviour is covered separately in
+    # backend/tests/test_notion_guards_measure_something.py.
     def test_present_path_passes_missing_path_is_flagged(self):
         tasks = [
             {"aiq": "AIQ-1", "title": "Landed task", "url": "u1",
@@ -166,7 +171,7 @@ class CheckTasksTests(unittest.TestCase):
             {"aiq": "AIQ-2", "title": "Leaked task", "url": "u2",
              "paths": ["backend/scripts/never_landed.py"]},
         ]
-        missing = cdi.check_tasks(tasks, self.tracked, allowlist=set())
+        missing, _moved, _mangled = cdi.check_tasks(tasks, self.tracked, allowlist=set())
         self.assertEqual(len(missing), 1)
         self.assertEqual(missing[0]["aiq"], "AIQ-2")
         self.assertEqual(missing[0]["path"], "backend/scripts/never_landed.py")
@@ -179,13 +184,14 @@ class CheckTasksTests(unittest.TestCase):
             {"aiq": "AIQ-709", "title": "P3-01c factual evaluator", "url": "u",
              "paths": ["backend/scripts/eval_factual_consistency.py"]},
         ]
-        missing = cdi.check_tasks(tasks, tracked_files=set(), allowlist=set())
+        missing, _moved, _mangled = cdi.check_tasks(
+            tasks, tracked_files=set(), allowlist=set())
         self.assertEqual({m["aiq"] for m in missing}, {"AIQ-490", "AIQ-709"})
 
     def test_allowlist_suppresses_bare_path(self):
         tasks = [{"aiq": "AIQ-2", "title": "x", "url": "u",
                   "paths": ["backend/scripts/never_landed.py"]}]
-        missing = cdi.check_tasks(
+        missing, _moved, _mangled = cdi.check_tasks(
             tasks, self.tracked, allowlist={"backend/scripts/never_landed.py"}
         )
         self.assertEqual(missing, [])
@@ -193,7 +199,7 @@ class CheckTasksTests(unittest.TestCase):
     def test_allowlist_suppresses_aiq_scoped_key(self):
         tasks = [{"aiq": "AIQ-2", "title": "x", "url": "u",
                   "paths": ["backend/scripts/never_landed.py"]}]
-        missing = cdi.check_tasks(
+        missing, _moved, _mangled = cdi.check_tasks(
             tasks, self.tracked, allowlist={"AIQ-2:backend/scripts/never_landed.py"}
         )
         self.assertEqual(missing, [])

@@ -1096,6 +1096,13 @@ jobs:
     if: ${{ vars.NOTION_QUEUE_TOKEN_SET == 'true' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The guard asks whether a claimed deliverable EVER existed, via
+          # `git log --all --diff-filter=A`. On a shallow clone that returns almost
+          # nothing and every deliverable looks like it never shipped, so this job
+          # must keep actions/checkout fetch-depth: 0. The script also refuses to
+          # run shallow (exit 3) rather than trust a truncated history.
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
