@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { CityPicker, CountryPicker } from '../../../components/location';
 import { Link } from 'react-router-dom';
 import { Input } from '../../../components/antigravity/Input';
 import { AdminLayout } from '../AdminLayout';
@@ -117,20 +118,12 @@ export const AdminStagingEvents: React.FC = () => {
             <option value="ignored">ignored</option>
             <option value="error">error</option>
           </select>
-          <Input unstyled
-            type="text"
-            placeholder="Country"
-            value={filters.country_code}
-            onChange={(v) => setFilters((f) => ({ ...f, country_code: v }))}
-            className="w-24 rounded border border-slate-300 px-2 py-1 text-sm"
-          />
-          <Input unstyled
-            type="text"
-            placeholder="City"
-            value={filters.city_name}
-            onChange={(v) => setFilters((f) => ({ ...f, city_name: v }))}
-            className="w-32 rounded border border-slate-300 px-2 py-1 text-sm"
-          />
+          <div className="w-40">
+            <CountryPicker value={filters.country_code} onChange={(v) => setFilters((f) => ({ ...f, country_code: v }))} valueMode="code" placeholder="Country" testId="staging-ev-country" />
+          </div>
+          <div className="w-40">
+            <CityPicker value={filters.city_name} onChange={(v) => setFilters((f) => ({ ...f, city_name: v }))} placeholder="City" testId="staging-ev-city" />
+          </div>
           <Link
             to={buildRoute('adminStagingDashboard')}
             className="text-sm text-[#0b2b43] hover:underline"

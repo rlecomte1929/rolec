@@ -20,6 +20,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { CityPicker, CountryPicker } from '../../components/location';
 import { Input } from '../../components/antigravity/Input';
 import { Alert, Badge, Button, Card, LoadingButton } from '../../components/antigravity';
 import api from '../../api/client';
@@ -135,13 +136,14 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor="im-city" className="block text-xs font-medium text-[#374151] mb-1">City</label>
-          <Input id="im-city" unstyled
-            type="text"
+          {/* The old sibling <label htmlFor="im-city"> pointed at an id the picker does not
+              render — an orphaned label announces nothing. The picker owns its label. */}
+          <CityPicker
+            label="City"
             value={value.city || ''}
             onChange={(v) => upd('city', v)}
-            className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
-            placeholder="City"
+            country={value.country || ''}
+            testId="im-city"
           />
         </div>
         <div>
@@ -156,13 +158,11 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
         </div>
       </div>
       <div>
-        <label htmlFor="im-country" className="block text-xs font-medium text-[#374151] mb-1">Country</label>
-        <Input id="im-country" unstyled
-          type="text"
+        <CountryPicker
+          label="Country"
           value={value.country || ''}
           onChange={(v) => upd('country', v)}
-          className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43]"
-          placeholder="Country (e.g. France, United Kingdom)"
+          testId="im-country"
         />
       </div>
       {showDates && (

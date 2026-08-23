@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { CityPicker, CountryPicker } from '../../components/location';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
-import { Input } from '../../components/antigravity/Input';
 import {
   discoverSuppliers,
   getDiscoveryStatus,
@@ -114,8 +114,8 @@ export const DiscoverSection: React.FC = () => {
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
-        <Input label="City" value={city} onChange={setCity} placeholder="Oslo" />
-        <Input label="Country" value={country} onChange={setCountry} placeholder="Norway" />
+        <CityPicker label="City" value={city} onChange={setCity} country={country} testId="discover-city" />
+        <CountryPicker label="Country" value={country} onChange={setCountry} testId="discover-country" />
         <Button variant="secondary" size="sm" onClick={search} disabled={loading || noBudget || !city.trim() || !country.trim()}>
           {loading ? 'Searching…' : noBudget ? 'Daily limit reached' : 'Search'}
         </Button>

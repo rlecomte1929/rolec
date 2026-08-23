@@ -34,6 +34,10 @@ export function Combobox({ value, onChange, options, label, placeholder, disable
   const filtered = (q ? options.filter((o) => o.toLowerCase().includes(q)) : options).slice(0, 50);
   return (
     <div ref={ref}>
+      {/* `htmlFor`-less labels are not associated with their control: a screen reader
+          announces nothing, and getByLabelText cannot find the input. The Input below
+          forwards native attributes, so aria-label is the smallest correct association
+          — no id plumbing through a shared component. */}
       {label && <label className="block text-sm font-medium text-navy-800 mb-1">{label}</label>}
       <div className="relative">
         <Input
@@ -43,6 +47,7 @@ export function Combobox({ value, onChange, options, label, placeholder, disable
           disabled={disabled}
           fullWidth={fullWidth}
           data-testid={testId}
+          aria-label={label}
           autoComplete="off"
           onFocus={() => { if (!disabled) setOpen(true); }}
         />

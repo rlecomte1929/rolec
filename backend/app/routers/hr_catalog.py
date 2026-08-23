@@ -24,6 +24,10 @@ from ..auth_deps import require_admin_or_hr
 from ...database import db
 from ..db import SessionLocal
 from ..services import service_catalog, vendor_curation
+# The canonicaliser that decides whether two spellings are the same city. Imported
+# from the module that owns it so this filter and list_curation cannot drift apart
+# again — they disagreeing is the bug this fixes.
+from ..services.vendor_curation import _canon_city
 from ..services.audit_log_service import (
     ACTION_DELETE,
     ACTION_INSERT,
@@ -207,15 +211,30 @@ def get_curation_view(
     # category has no rows tagged with a city, every row applies everywhere
     # (e.g. movers / banks). Filtering strictly on city would hide them and
     # leave HR with "0 items" for categories that in fact have a full list.
+    # `limit` is applied BEFORE the city filter below, so a category that outgrows it loses
+    # whole cities silently — no error, just an empty curation screen. Measured 2026-08-23:
+    # legal_admin held 183 active items against the old cap of 200 (92%). Raised well clear
+    # of the largest category rather than left as a tripwire one scrape away from firing.
     all_active = service_catalog.list_items(
         category=category,
         country=country,
         active_only=True,
-        limit=200,
+        limit=2000,
     )
     has_geo_rows = any(m.get("city") for m in all_active)
     if has_geo_rows and destination_city:
-        master_items = [m for m in all_active if m.get("city") == destination_city]
+        # Canonical comparison, NOT `==`. This filter was a raw string equality while
+        # `vendor_curation.list_curation` — called a few lines below, in the SAME request —
+        # canonicalises the city for exactly the stated reason (AIQ-1457: "so casing/
+        # whitespace/diacritic differences between HR's picker city and the employee's
+        # intake city don't hide curated vendors"). The two halves of one screen disagreed
+        # about what a city IS.
+        #
+        # It cost a real user 29 vendors: the destination allowlist held Dublin as both
+        # 'Dublin' and 'dublin', the picker offered both, and choosing the lower-cased one
+        # returned zero master items while 29 sat curated and selected=true underneath.
+        want = _canon_city(destination_city)
+        master_items = [m for m in all_active if _canon_city(m.get("city")) == want]
     else:
         master_items = all_active
     # Defensive de-dupe by name: two seed batches inserted the same vendors with

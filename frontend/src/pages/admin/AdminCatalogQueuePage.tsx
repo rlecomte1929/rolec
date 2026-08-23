@@ -4,6 +4,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { CityPicker, CountryPicker } from '../../components/location';
 import { Input } from '../../components/antigravity/Input';
 import { Alert, Button, Card } from '../../components/antigravity';
 import {
@@ -382,20 +383,11 @@ export const AdminCatalogQueuePage: React.FC = () => {
           Adding a row here is the same as approving a pending ticket.
         </p>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-[2fr,2fr,3fr,auto] gap-3 items-end">
-          <Input unstyled
-            type="text"
-            placeholder="City (e.g. Munich)"
-            value={newCity}
-            onChange={(v) => setNewCity(v)}
-            className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
-          />
-          <Input unstyled
-            type="text"
-            placeholder="Country (e.g. Germany)"
-            value={newCountry}
-            onChange={(v) => setNewCountry(v)}
-            className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
-          />
+          {/* Free text here is how `catalog_destination_allowlist` grew three Dublins
+              ('dublin/ireland', 'Dublin/IE', 'Dublin/Ireland') and hid 29 curated vendors.
+              This form is the writer, so it is the right place to stop it. */}
+          <CityPicker value={newCity} onChange={setNewCity} country={newCountry} testId="allowlist-city" />
+          <CountryPicker value={newCountry} onChange={setNewCountry} testId="allowlist-country" />
           <Input unstyled
             type="text"
             placeholder="Notes (optional)"
