@@ -191,6 +191,34 @@ def _context_around(n_source: str, idx: int, span: int) -> str:
     return ("…" if start > 0 else "") + n_source[start:end] + ("…" if end < len(n_source) else "")
 
 
+def best_source_text(content_excerpt: Optional[str], text_content: Optional[str]) -> str:
+    """The archived text most likely to actually contain the quote.
+
+    `knowledge_docs` carries two source-text columns written by different code paths, and
+    NEITHER is reliably the better one:
+
+      * `content_excerpt` is what `backfill_fact_evidence.py` writes and what `content_sha256`
+        hashes. Across the corpus it is the fuller column — 257 of 758 documents are usable
+        there against 120 for `text_content`.
+      * `text_content` came from the original ingest. For the `enterprise.gov.ie` permit pages
+        it holds 17,333 / 19,568 / 9,909 / 5,242 characters of real content while the excerpt
+        holds **308 characters of cookie banner** — the capture landed the consent notice and
+        stopped.
+
+    Preferring either column outright loses evidence. Measured on production 2026-08-23 over the
+    196 served facts: excerpt-first evidences 129, longest-wins evidences **142**, and the 13
+    recovered are in IE, SG and US — the Irish ones being Critical Skills Employment Permit facts
+    on the first real customer's corridor.
+
+    So: take the longer. Length is a crude proxy for substance, but the failure it guards against
+    is a boilerplate stub, and a stub is always the short one. This resolves the read; it does not
+    write, so no capture is discarded and a later re-fetch of either column still wins on merit.
+    """
+    excerpt = content_excerpt or ""
+    body = text_content or ""
+    return body if len(body) > len(excerpt) else excerpt
+
+
 def check_evidence(quote: Optional[str], source_text: Optional[str]) -> EvidenceCheck:
     """Verdict for one (quote, archived source text) pair."""
     n_source = normalise(source_text or "")

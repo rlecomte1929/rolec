@@ -13,6 +13,7 @@ from __future__ import annotations
 import pytest
 
 from backend.app.services.fact_evidence import (
+    best_source_text,
     NO_SOURCE,
     TRANSLATED,
     UNVERIFIED,
@@ -269,3 +270,44 @@ class TestNormalise:
 
     def test_empty_input_is_safe(self):
         assert normalise("") == "" and normalise(None) == ""
+
+
+# ---------------------------------------------------------------------------
+# best_source_text — `knowledge_docs` has two source-text columns and neither
+# is reliably the fuller one.
+# ---------------------------------------------------------------------------
+
+
+def test_best_source_text_takes_the_longer_column():
+    assert best_source_text("short", "a much longer body of text") == "a much longer body of text"
+    assert best_source_text("a much longer excerpt of text", "tiny") == "a much longer excerpt of text"
+
+
+def test_best_source_text_handles_the_enterprise_gov_ie_shape():
+    """The case that motivated it: the excerpt captured the consent notice and stopped, while
+    text_content holds the permit page. Preferring the excerpt loses 9 served Irish facts."""
+    cookie_banner = "Our website uses cookies to enhance your browsing experience " * 5
+    real_page = "Because the skills are identified as being in short supply, " * 60
+    assert best_source_text(cookie_banner, real_page) == real_page
+
+
+def test_best_source_text_missing_columns_do_not_raise():
+    assert best_source_text(None, None) == ""
+    assert best_source_text(None, "body") == "body"
+    assert best_source_text("excerpt", None) == "excerpt"
+
+
+def test_best_source_text_a_tie_keeps_the_excerpt():
+    """Equal length is no reason to switch column; the excerpt is the maintained one."""
+    assert best_source_text("abcd", "wxyz") == "abcd"
+
+
+def test_a_quote_only_in_text_content_still_verifies_through_the_resolver():
+    """End to end: the resolver is what makes check_evidence see the Irish CSEP quotes."""
+    quote = "a Labour Market Needs Test is not required"
+    excerpt = "Our website uses cookies to enhance your browsing experience."
+    body = ("The Critical Skills Employment Permit is designed to attract highly skilled people. "
+            "Because the skills are identified as being in short supply, "
+            + quote + ". Eligible occupations are listed separately. ") * 3
+    assert check_evidence(quote, excerpt).status != VERIFIED
+    assert check_evidence(quote, best_source_text(excerpt, body)).status == VERIFIED
