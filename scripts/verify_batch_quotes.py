@@ -36,8 +36,11 @@ import html
 import json
 import re
 import subprocess
-import unicodedata
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from backend.app.services.fact_evidence import normalise as _normalise  # noqa: E402
 
 UA = "Mozilla/5.0 (compatible; ReloPass-evidence-check/1.0)"
 
@@ -68,23 +71,18 @@ def to_text(raw: bytes) -> str:
 
 
 def norm(s: str) -> str:
-    s = unicodedata.normalize("NFKC", s)
-    s = re.sub(r"[‘’ʼ′']", "'", s)
-    s = re.sub(r"[“”]", '"', s)
-    s = re.sub(r"[‐-―\-]", " ", s)
-    s = s.replace(" ", " ")
-    s = re.sub(r"[•·▪◦]", " ", s)
-    # service-public.fr renders a literal `titlecontent` template token inside its sentences
-    # (a tooltip anchor). It is site furniture, not text a reader or a researcher ever sees.
-    s = re.sub(r"\btitlecontent\b", " ", s, flags=re.I)
-    # A researcher copying a bulleted list flattens it with "/" where the page uses list items.
-    s = s.replace("/", " ")
-    s = re.sub(r"\s+", " ", s)
-    s = re.sub(r"\s+([,.;:!?)])", r"\1", s)
-    # French elision across a tag boundary: service-public.fr and CLEISS render "L' article"
-    # where the sentence reads "l'article", because the elided article sits in its own element.
-    s = re.sub(r"(')\s+", r"\1", s)
-    return s.strip().lower()
+    """Delegates. There is one quote normaliser and it lives with the evidence semantics.
+
+    This function used to carry its own copy, and it drifted: it folded every dash and every
+    "/" into a space, which merges "e-mail" into "e mail" and destroys "and/or". Those change
+    words, not markup. Meanwhile a third, hand-rolled SQL copy lagged behind BOTH and
+    under-verified 9 Irish facts and then 3 French ones on consecutive runs — each time looking
+    like a data problem and each time being a normalisation problem.
+
+    `fact_evidence.normalise` is now the definition; this only adds the case-fold, because that
+    module deliberately preserves case so a reviewer is shown the real sentence.
+    """
+    return _normalise(s).lower()
 
 
 def main() -> int:
