@@ -12,12 +12,22 @@ public corridor endpoint and the rules engine. The employee dossier reads a *dif
 `list_approved_requirement_facts`. So the existing `--promote` tooling cannot land a batch where
 a mover would see it, and until now nothing could.
 
-WHY NOT `ON CONFLICT`. Verified against production 2026-08-23: `requirement_facts`,
-`requirement_entities` and `knowledge_docs` each carry a PRIMARY KEY on a `gen_random_uuid()`
-`id` and NO other unique constraint. There is nothing to conflict on, so a naive re-run inserts
-every row again, silently. Idempotency therefore comes from a DETERMINISTIC id — uuid5 over the
-natural key — plus a `WHERE NOT EXISTS` guard on that id. Re-running is a no-op, and the guard is
-what makes it one; the id alone would raise instead.
+IDEMPOTENCY, and a correction. An earlier revision claimed none of these tables had a unique key
+beyond the PK. That is true only of `requirement_facts` and `knowledge_packs`. Checking
+`pg_constraint` alone missed two UNIQUE INDEXES that are not constraint-backed:
+
+    knowledge_docs        UNIQUE (source_url)
+    requirement_entities  UNIQUE (destination_country, topic_key)
+
+which matters for more than tidiness. Two of this batch's ten source URLs already have a
+document, so guarding on a DERIVED id inserts a second row for a URL that already exists — and
+every fact citing one of those documents would point at an id that is not there.
+
+So the guard is on the NATURAL key wherever one exists, and foreign keys are resolved by natural
+key at apply time via a subquery rather than by the derived id. A pre-existing document or entity
+is therefore reused, not duplicated, and the generator still needs no database connection.
+`requirement_facts` has only its PK, so there the derived uuid5 and a `NOT EXISTS` on
+`(entity_id, fact_key)` do the work.
 
 THREE INVARIANTS, each enforced by construction rather than by care:
   * INSERT only. No UPDATE is emitted anywhere, so the 25 IE rows that already carry a
@@ -188,7 +198,7 @@ def main() -> int:
         }
         facts.append({
             "id": str(uuid.uuid5(NS, f"fact:{dest}:{ent['topic_key']}:{r['fact_key']}")),
-            "entity_id": ent_id, "source_doc_id": docs[url]["id"],
+            "dest": dest, "topic_key": ent["topic_key"],
             "fact_type": r["fact_type"], "fact_key": r["fact_key"],
             "fact_text": r["fact_text"], "applies_to": r.get("applies_to") or {},
             "required_fields": r.get("required_fields") or [],
@@ -223,7 +233,8 @@ def main() -> int:
             f"SELECT {q(doc['id'])}::uuid, {q(doc['pack_id'])}::uuid, {q(doc['title'])},\n"
             f"       {q(doc['publisher'])}, {q(doc['source_url'])},\n"
             f"       {q(doc['text_content'])}, {q(doc['content_sha256'])}, 'fetched', now()\n"
-            f"WHERE NOT EXISTS (SELECT 1 FROM public.knowledge_docs WHERE id = {q(doc['id'])}::uuid);{note}")
+            f"WHERE NOT EXISTS (SELECT 1 FROM public.knowledge_docs\n"
+            f"                   WHERE source_url = {q(doc['source_url'])});{note}")
     out.append("")
 
     for ent in entities.values():
@@ -231,7 +242,9 @@ def main() -> int:
             f"INSERT INTO public.requirement_entities (id, destination_country, domain_area, topic_key, title, status)\n"
             f"SELECT {q(ent['id'])}::uuid, {q(ent['destination_country'])}, {q(ent['domain_area'])},\n"
             f"       {q(ent['topic_key'])}, {q(ent['title'])}, {q(ent['status'])}\n"
-            f"WHERE NOT EXISTS (SELECT 1 FROM public.requirement_entities WHERE id = {q(ent['id'])}::uuid);")
+            f"WHERE NOT EXISTS (SELECT 1 FROM public.requirement_entities\n"
+            f"                   WHERE destination_country = {q(ent['destination_country'])}\n"
+            f"                     AND topic_key = {q(ent['topic_key'])});")
     out.append("")
 
     for f in facts:
@@ -239,11 +252,19 @@ def main() -> int:
             f"INSERT INTO public.requirement_facts (id, entity_id, source_doc_id, fact_type, fact_key,\n"
             f"                                      fact_text, applies_to, required_fields, source_url,\n"
             f"                                      evidence_quote, confidence, status, evidence_verified)\n"
-            f"SELECT {q(f['id'])}::uuid, {q(f['entity_id'])}::uuid, {q(f['source_doc_id'])}::uuid,\n"
+            f"SELECT {q(f['id'])}::uuid,\n"
+            f"       (SELECT id FROM public.requirement_entities\n"
+            f"         WHERE destination_country = {q(f['dest'])} AND topic_key = {q(f['topic_key'])}),\n"
+            f"       (SELECT id FROM public.knowledge_docs WHERE source_url = {q(f['source_url'])}),\n"
             f"       {q(f['fact_type'])}, {q(f['fact_key'])}, {q(f['fact_text'])},\n"
             f"       {q(f['applies_to'])}, {q(f['required_fields'])}, {q(f['source_url'])},\n"
             f"       {q(f['evidence_quote'])}, {q(f['confidence'])}, 'pending', NULL\n"
-            f"WHERE NOT EXISTS (SELECT 1 FROM public.requirement_facts WHERE id = {q(f['id'])}::uuid);")
+            f"WHERE NOT EXISTS (\n"
+            f"    SELECT 1 FROM public.requirement_facts rf\n"
+            f"     WHERE rf.fact_key = {q(f['fact_key'])}\n"
+            f"       AND rf.entity_id = (SELECT id FROM public.requirement_entities\n"
+            f"                            WHERE destination_country = {q(f['dest'])}\n"
+            f"                              AND topic_key = {q(f['topic_key'])}));")
 
     out += pack_stmts + [""] + doc_stmts + [""] + entity_stmts + [""] + fact_stmts
     out += ["", "COMMIT;"]
