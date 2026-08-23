@@ -34,15 +34,34 @@
 -- so that enabling a gate is always its own reviewed step.
 
 -- ── 1. funding_source + sponsor_id on the canonical case ────────────────────────────────
-
-ALTER TABLE public.relocation_cases
-    ADD COLUMN IF NOT EXISTS funding_source text NOT NULL DEFAULT 'employer';
-
-ALTER TABLE public.relocation_cases
-    ADD COLUMN IF NOT EXISTS sponsor_id text;
+--
+-- GUARDED ON THE TABLE EXISTING, and that is not defensive padding. `relocation_cases` is an
+-- OUT-OF-BAND table: it is created by neither `models.py` nor any migration in this repo, so
+-- it exists in production and nowhere else. The Postgres parity lane builds its schema from
+-- `create_all` plus replayed migrations, so an unguarded ALTER aborts the replay with
+-- UndefinedTable and takes every test in that lane down with it — which is exactly what the
+-- first revision of this migration did.
+--
+-- In production the table is present and every statement below runs. Where it is absent the
+-- migration is a no-op that says so.
 
 DO $$
 BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'relocation_cases'
+    ) THEN
+        RAISE NOTICE
+            'public.relocation_cases absent (it is created out-of-band, not by any migration) '
+            '— skipping funding_source/sponsor_id. This is expected outside production.';
+        RETURN;
+    END IF;
+
+    ALTER TABLE public.relocation_cases
+        ADD COLUMN IF NOT EXISTS funding_source text NOT NULL DEFAULT 'employer';
+    ALTER TABLE public.relocation_cases
+        ADD COLUMN IF NOT EXISTS sponsor_id text;
+
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'relocation_cases_funding_source_check'
     ) THEN
@@ -50,13 +69,10 @@ BEGIN
             ADD CONSTRAINT relocation_cases_funding_source_check
             CHECK (funding_source IN ('employer', 'self', 'sponsor', 'internal'));
     END IF;
-END $$;
 
--- A sponsor_id is meaningful only for a sponsored case, and a sponsored case must name its
--- sponsor. Without this pairing "who is covering this move?" has no reliable answer at the
--- moment the UI has to say it out loud.
-DO $$
-BEGIN
+    -- A sponsor_id is meaningful only for a sponsored case, and a sponsored case must name
+    -- its sponsor. Without this pairing "who is covering this move?" has no reliable answer
+    -- at the moment the UI has to say it out loud.
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'relocation_cases_sponsor_id_pairing_check'
     ) THEN
@@ -69,15 +85,24 @@ BEGIN
     END IF;
 END $$;
 
-COMMENT ON COLUMN public.relocation_cases.funding_source IS
-    'Who pays for this case: employer | self | sponsor | internal. A FUNDING ARRANGEMENT, '
-    'never a property of the person. Do not add a column recording the mover''s status.';
-COMMENT ON COLUMN public.relocation_cases.sponsor_id IS
-    'The programme covering a sponsored case. Required when funding_source = ''sponsor'', '
-    'NULL otherwise.';
-
-CREATE INDEX IF NOT EXISTS idx_relocation_cases_funding_source
-    ON public.relocation_cases (funding_source);
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'relocation_cases'
+          AND column_name = 'funding_source'
+    ) THEN
+        COMMENT ON COLUMN public.relocation_cases.funding_source IS
+            'Who pays for this case: employer | self | sponsor | internal. A FUNDING '
+            'ARRANGEMENT, never a property of the person. Do not add a column recording '
+            'the mover''s status.';
+        COMMENT ON COLUMN public.relocation_cases.sponsor_id IS
+            'The programme covering a sponsored case. Required when funding_source = '
+            '''sponsor'', NULL otherwise.';
+        CREATE INDEX IF NOT EXISTS idx_relocation_cases_funding_source
+            ON public.relocation_cases (funding_source);
+    END IF;
+END $$;
 
 -- ── 2. append-only entitlement grant log ────────────────────────────────────────────────
 --
