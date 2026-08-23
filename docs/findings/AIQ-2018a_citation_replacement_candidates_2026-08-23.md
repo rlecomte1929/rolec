@@ -141,3 +141,44 @@ SELECT count(*) FROM rce.rule_versions WHERE source_url LIKE '%/Teilliste_%';  -
 ```
 
 Confirm all 20, or name the ones to hold back and I will write only the rest.
+
+---
+
+# ✅ APPLIED — 2026-08-23, confirmed by Romain
+
+All 20 replacements were written to `rce.rule_versions`, keyed on `rule_version_id`, with the
+`WHERE` clause additionally requiring `source_url LIKE '%/Teilliste_%'` so the write could only
+ever touch a fabricated row.
+
+## Re-verified immediately before writing
+
+- **19 of 20** candidates returned HTTP 200 on a fresh probe.
+- **Legifrance** returned 403 again — a bot block, not an absence. Its content was re-fetched and
+  confirms Article 4 B of the Code général des impôts, opening *"Sont considérées comme ayant leur
+  domicile fiscal en France au sens de l'article 4 A :"*, and the page states it is **in force
+  since 16/02/2025** (modified by Law 2025-127 of 14 February 2025).
+- All 20 `rule_version_id`s still matched the proposal exactly, and prod still held 34 rule
+  versions with 20 `Teilliste_` rows — nothing had drifted since the proposal was written.
+
+That 403 is exactly the case the #2039 reachability gate was designed for: only 404/410 count as
+DEAD, never 403, because a bot block would otherwise reject the official source.
+
+## Post-write verification
+
+| check | result |
+|---|---|
+| `Teilliste_` rows remaining | **0** (was 20) |
+| `rule_versions` total | **34** — unchanged: corrected, not deleted |
+| rows with NULL/empty `source_url` | 0 |
+| distinct citation hosts | 9 |
+
+**The defect class is eliminated, not just the instances.** 11 rows still cite
+`gesetze-im-internet.de`, and every one is genuinely German law — AufenthG §18/§18b/§18g/§27/§82,
+BeschV §6, BMG §17, FreizügG/EU §2 and §5, SGB V §193. No Norwegian, Spanish, Dutch, Swiss or
+French statute points at the German federal law portal any more.
+
+## What still stands
+
+The write-path gate from #2039 prevents a *new* unreachable citation being persisted. The
+underlying pressure — `rce.rule_versions.source_url` is NOT NULL, so `derive_source_url` must
+invent something — is **not** fixed by this. That is card 2018b, and it remains open.
