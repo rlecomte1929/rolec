@@ -880,26 +880,33 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
               source and approve providers for this destination — once approved you can
               populate every service category with one click.
             </p>
-            <label className="mt-4 block text-sm font-medium text-[#0b2b43]">
-              City
+            {/* Pass `label` to the picker rather than wrapping it in a bare <label>.
+                A <label> around a custom component associates with nothing: the control it
+                wraps is several layers down, so a screen reader announces no name and
+                getByLabelText cannot find it — which is why jsx-a11y/label-has-associated-control
+                errors here. Combobox already renders the visible label AND forwards
+                `aria-label` to its Input (see the note in Combobox.tsx), so this is a real
+                association, not a lint silencer. */}
+            <div className="mt-4">
               <CityPicker
                 value={newCity}
                 onChange={setNewCity}
                 country={newCountry}
+                label="City"
                 disabled={requesting}
                 testId="request-destination-city"
                 placeholder={newCountry ? 'Select or type a city…' : 'Pick a country first'}
               />
-            </label>
-            <label className="mt-3 block text-sm font-medium text-[#0b2b43]">
-              Country
+            </div>
+            <div className="mt-3">
               <CountryPicker
                 value={newCountry}
                 onChange={setNewCountry}
+                label="Country"
                 disabled={requesting}
                 testId="request-destination-country"
               />
-            </label>
+            </div>
             <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
               <Button
                 variant="outline"
