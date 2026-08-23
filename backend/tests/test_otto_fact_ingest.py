@@ -627,3 +627,47 @@ class _Rows:
 
     def scalar(self):
         return self._rows[0][0] if self._rows else None
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        # CLEISS is the French liaison body for international social security. It publishes the
+        # coordination and totalisation rules for a move between France and another state —
+        # the single most load-bearing source for an inbound EEA corridor — and it scored
+        # UNOFFICIAL, so every fact citing it was thrown away before staging.
+        "https://www.cleiss.fr/docs/regimes/regime_norvege.html",
+        # The CAF is the family-benefits arm of the Sécurité sociale, publishing its own
+        # entitlement conditions.
+        "https://www.caf.fr/allocataires/caf-de-paris",
+    ],
+)
+def test_the_french_social_security_bodies_are_official(url):
+    """The fourth time this list was too narrow, and the tell was the same each time: the
+    rejects clustered by country. A NO->FR batch researched from CLEISS would have lost its
+    entire social-security half at import, silently, at exit 0."""
+    assert classify_source(url) == OFFICIAL
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.dublincity.ie/residential/housing",
+        "https://about.leapcard.ie/",
+        "https://www.transportforireland.ie/fares/",
+    ],
+)
+def test_the_irish_municipal_and_transport_publishers_are_official(url):
+    """City-level settle-in content has no home otherwise: the council runs its own services
+    and the NTA sets the fares it publishes, the same reasoning that admits rundfunkbeitrag.de.
+    """
+    assert classify_source(url) == OFFICIAL
+
+
+def test_admitting_those_did_not_admit_the_whole_fr_or_ie_tld():
+    """The opposite error to the one above, and the one that would let a relocation vendor
+    publish a legal requirement."""
+    assert classify_source("https://www.expat-in-paris.fr/social-security") == UNOFFICIAL
+    assert classify_source("https://notcleiss.fr/regimes") == UNOFFICIAL
+    assert classify_source("https://www.dublin-movers.ie/leap-card-guide") == UNOFFICIAL
+    assert classify_source("https://not-dublincity.ie/housing") == UNOFFICIAL

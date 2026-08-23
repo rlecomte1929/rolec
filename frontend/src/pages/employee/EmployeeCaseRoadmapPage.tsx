@@ -21,6 +21,7 @@ import { isRoadmapPaywallEnabled } from '../../featureFlags';
 import { RuleUpdateBanner } from '../../features/platform-v2/roadmap/RuleUpdateBanner';
 import { CorridorAdvisories } from '../../features/platform-v2/roadmap/CorridorAdvisories';
 import { useEmployeeRelocationPlanPageData } from '../../features/relocation-plan-employee/useEmployeeRelocationPlanPageData';
+import { useMilestoneCompletion } from '../../features/relocation-plan-employee/useMilestoneCompletion';
 import { useRelocationPlanCtaHandler } from '../../features/relocation-plan-employee/relocationPlanCtaNavigate';
 import {
   RoadmapTemplate,
@@ -88,6 +89,17 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
 
   const { data, loading, error, refetch, ensureDefaultsAndReload } =
     useEmployeeRelocationPlanPageData(caseId);
+
+  // [AIQ-2057] The plan was readable but not workable — nothing in the employee UI ever
+  // called the milestone PATCH that already existed. This is the affordance that turns
+  // 16 milestones into something to work through.
+  const completion = useMilestoneCompletion(caseId, refetch);
+  // Fresh data has landed, so the optimistic ticks have been superseded by the real thing.
+  useEffect(() => {
+    if (data) completion.clearOverrides();
+    // Only when a new plan object arrives; clearOverrides is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   // AIQ-1435: journey funnel — roadmap completed once the plan data has loaded.
   const roadmapCompletedRef = useRef(false);
@@ -412,7 +424,19 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
             onValidate={onValidate}
             confidenceByTitle={confidenceByTitle}
             pendingReview={pendingReview}
+            onToggleComplete={(t) => void completion.toggle(t.task_id, t.status)}
+            statusOverrides={completion.statusOverrides}
+            savingTaskIds={completion.savingTaskIds}
           />
+          {completion.error && (
+            <div
+              role="alert"
+              data-testid="milestone-save-error"
+              className="mt-3 rounded-xl border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]"
+            >
+              {completion.error}
+            </div>
+          )}
         </div>
         {selection && (
           <ExplainTermPopover selection={selection} assignmentId={caseId ?? ''} onClose={clear} />
