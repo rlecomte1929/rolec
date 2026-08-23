@@ -22,11 +22,14 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 # [AUDIT-C1.6a] imports for appended policies methods
 from typing import Callable
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import ProgrammingError
+
+class UnquotedApprovalError(ValueError):
+    """[AIQ-2124] Raised when an approval would promote a fact carrying no evidence quote."""
 
 log = logging.getLogger(__name__)
 
@@ -1424,6 +1427,32 @@ class PoliciesMixin:
             item["required_fields"] = self._json_load(item.get("required_fields")) or []
         return items
 
+    def _assert_every_fact_has_a_quote(self, fact_ids: List[str]) -> None:
+        """[AIQ-2124] Raise unless every id carries a non-blank `evidence_quote`.
+
+        Whitespace counts as blank — a quote of three spaces defeats a NOT NULL check while
+        being exactly as unverifiable as an empty one.
+
+        Emptiness is decided in PYTHON, not in SQL. Both Postgres and SQLite `TRIM()` strip
+        spaces only, so a quote of "\n\t" survives `TRIM(...) = ''` on both engines and would
+        walk straight through this gate. `str.strip()` removes all whitespace and cannot drift
+        between the CI dialect and production.
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT id, evidence_quote FROM requirement_facts WHERE id IN :ids"
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": list(fact_ids)},
+            ).fetchall()
+        missing = sorted(str(r[0]) for r in rows if not str(r[1] or "").strip())
+        if missing:
+            raise UnquotedApprovalError(
+                "cannot approve a requirement fact with no evidence_quote: "
+                + ", ".join(missing)
+                + " — supply the verbatim sentence from the cited page first"
+            )
+
     def update_requirement_fact_status(
         self,
         fact_ids: List[str],
@@ -1431,8 +1460,31 @@ class PoliciesMixin:
         reviewer_user_id: str,
         notes: Optional[str] = None,
     ) -> None:
+        """Move facts between pending / approved / rejected, recording each decision.
+
+        [AIQ-2124] APPROVAL REQUIRES A QUOTE. A fact with an empty `evidence_quote` can never
+        be evidenced: `check_evidence('', page)` has nothing to match, so it sits at
+        `evidence_verified = NULL` however often the backfill runs — while
+        `list_approved_requirement_facts` serves it (NULL is admitted deliberately, AIQ-1887)
+        and the dossier renders a source link beside it. The link says somebody opened that
+        page and found the claim. Nobody did.
+
+        Measured on production 2026-08-23: 15 approved facts are served with no quote at all
+        (SG 6, DK 4, IE 4, PT 1) — four of them on the first real customer's corridor.
+
+        The gate is on APPROVAL only. A pending fact with no quote yet is a normal
+        mid-authoring state, and the reviewer is precisely the person who should have to
+        supply the quote before promoting it. Rejection and demotion are never blocked: a bad
+        fact must always be able to leave the queue, and gating its exit on evidence would
+        trap the facts most in need of removal.
+
+        Refuses the WHOLE batch before writing anything. A half-applied approval leaves the
+        reviewer unable to tell what landed.
+        """
         if not fact_ids:
             return
+        if status == "approved":
+            self._assert_every_fact_has_a_quote(fact_ids)
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             for fid in fact_ids:
