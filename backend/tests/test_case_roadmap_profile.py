@@ -27,9 +27,19 @@ class BuildCaseProfileTests(unittest.TestCase):
         self.assertEqual(classification.corridor, "FR→NO")
         self.assertEqual(classification.pathway_type, "eu_free_movement")
 
-    def test_nationality_defaults_to_origin(self):
+    def test_nationality_does_NOT_default_to_origin(self):
+        """Was `test_nationality_defaults_to_origin`, asserting the opposite.
+
+        The origin fallback was removed deliberately: it answered a missing
+        nationality with a guess, and read 410 prod cases as EU free movers on
+        the strength of their origin country alone. An unknown nationality now
+        stays unknown, and unknown is not free movement — the same direction
+        `nationality_class` already takes. See
+        test_case_profile_nationality_source.AnUnknownNationalityFailsSafe.
+        """
         profile, _ = crp.build_case_profile(_case("FR", "NO"))
-        self.assertTrue(profile.is_eea)
+        self.assertEqual(profile.nationality, "")
+        self.assertFalse(profile.is_eea)
 
     def test_missing_country_returns_none(self):
         self.assertIsNone(crp.build_case_profile(_case("FR", None)))

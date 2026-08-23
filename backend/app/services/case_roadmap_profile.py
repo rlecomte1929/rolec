@@ -82,18 +82,24 @@ def build_case_profile(
         return None
 
     # Read nationality from wherever the draft records it — `employee_nationality`
-    # is the single source for that, shared with wizard_draft_mapper. This module
-    # used to read `relocationBasics.nationality` / `personalInfo.nationality`,
-    # neither of which production writes (0 of 1,948 drafts on 2026-08-23), so the
-    # origin fallback below fired for every case and 42 movers were classified into
-    # the wrong free-movement class — 14 of them third-country nationals on ES->IE
-    # told they had free movement into Ireland.
+    # is the single source for that, shared with wizard_draft_mapper.
     #
-    # The origin fallback is KEPT, and only for a draft that records no nationality
-    # at all (514 prod cases). Dropping it would flip those to third-country
-    # treatment, which is a decision about live roadmaps rather than a read-path
-    # fix; see test_case_profile_nationality_source.ScopeBoundary.
-    nationality = employee_nationality(draft) or origin_raw
+    # An unknown nationality stays unknown. This used to fall back to `origin_raw`
+    # ("an EEA-corridor mover is typically a national of the origin"), which
+    # answered a missing fact with a guess and read 410 prod cases as EU free
+    # movers on the strength of their origin country alone. The two errors are not
+    # symmetric: wrongly granting free movement DROPS required steps and the mover
+    # finds out when they cannot legally start work, while wrongly denying it adds
+    # steps that prove unnecessary. Only one of those is recoverable by the person
+    # reading the roadmap.
+    #
+    # This also matches what the rest of the stack already does with an unknown
+    # nationality — `nationality_class.classify` returns None and keeps the FULL
+    # requirement list rather than fabricating "nothing required", and
+    # `detect_regime` documents that an incomplete profile returns "unknown"
+    # rather than raising. `origin_country` is still passed below: that one is
+    # genuinely known.
+    nationality = employee_nationality(draft)
     regime = _router.detect_regime(
         nationality=nationality,
         destination_country=dest_raw,
