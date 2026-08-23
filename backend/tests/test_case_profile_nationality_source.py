@@ -111,22 +111,69 @@ class TheIrishFreeMovementFlip(unittest.TestCase):
         self.assertTrue(profile.is_eea)
 
 
-class ScopeBoundary(unittest.TestCase):
+class AnUnknownNationalityFailsSafe(unittest.TestCase):
+    """Was `ScopeBoundary`, which pinned the origin fallback and recorded the
+    decision as deliberately unmade. It is now made: unknown fails safe.
 
-    def test_absent_nationality_still_falls_back_to_origin_UNCHANGED(self):
-        """DELIBERATELY pins the CURRENT behaviour for the 514 prod cases that
-        record no nationality anywhere, so this change is provably confined to
-        cases where a nationality EXISTS and was being ignored.
+    MEASURED (prod, 2026-08-23) before deciding. 513 drafts record no nationality
+    at any of the four paths. Only 419 carry BOTH an origin and a destination, and
+    `build_case_profile` returns None without both — so 419 is the real reach, not
+    513. Of those, 410 have an EEA origin and therefore flipped: France 384, FR 19,
+    ES 3, and one each of NL / Norway / Spain / Germany. The remaining 9 already
+    classified third-country and do not move. 403 of the 410 are French-origin,
+    i.e. the seeded France corridor bulk rather than 403 distinct real movers.
 
-        Removing the fallback would flip those 514 to third-country treatment
-        (127 France->Germany cases alone). That is arguably the safer default —
-        `nationality_class` already holds that an unknown nationality keeps the
-        full requirement list — but it is a behavioural decision about live
-        roadmaps, not a read-path bug, and it is not made here."""
+    WHY THIS DIRECTION. The two errors are not symmetric. Wrongly granting free
+    movement DROPS required steps — an Irish employment permit, a residence
+    permission — and the mover discovers it when they cannot legally start work.
+    Wrongly denying it ADDS steps that turn out to be unnecessary. Only one of
+    those is recoverable by the person reading the roadmap.
+
+    It also stops being an invention. `nationality_class.classify` already returns
+    None on an unknown nationality and keeps the full requirement list rather than
+    fabricating "nothing required"; `detect_regime` documents that an incomplete
+    profile returns "unknown" rather than raising. Substituting the origin country
+    was the one place that answered an unknown with a guess, and it is the same
+    class of inference PR #2021 removed one layer up.
+    """
+
+    def test_absent_nationality_is_NOT_replaced_by_the_origin_country(self):
         profile, _ = build_case_profile(_case({}, origin="FR", dest="DE"))
+        self.assertEqual(
+            profile.nationality, "",
+            "a case that records no nationality must report no nationality, not 'FR'",
+        )
+
+    def test_absent_nationality_is_not_free_movement(self):
+        """The 410. A French-origin case with no nationality no longer reads as an
+        EU free mover on the strength of its origin alone."""
+        profile, _ = build_case_profile(_case({}, origin="FR", dest="DE"))
+        self.assertFalse(profile.is_eea)
+
+    def test_a_non_EEA_origin_with_no_nationality_is_unchanged(self):
+        """The other 9 — already third-country, and they must stay put. Without
+        this the suite could not tell 'fails safe' from 'flipped everything'."""
+        profile, _ = build_case_profile(_case({}, origin="IN", dest="DE"))
+        self.assertFalse(profile.is_eea)
+
+    def test_a_RECORDED_nationality_still_decides_and_can_still_be_free_movement(self):
+        """The discriminator for this change. If failing safe were implemented as
+        `is_eea = False`, this would fail — and it would silently strip free
+        movement from the 1,385 cases that correctly have it."""
+        profile, _ = build_case_profile(
+            _case({"employeeProfile": {"nationality": "FR"}}, origin="FR", dest="DE")
+        )
         self.assertEqual(profile.nationality, "FR")
         self.assertTrue(profile.is_eea)
 
+    def test_the_corridor_is_still_built_so_the_roadmap_still_generates(self):
+        """Failing safe must not fail CLOSED. Dropping the fallback must not make
+        `build_case_profile` return None and silently disable roadmap generation
+        for all 419."""
+        mapping = build_case_profile(_case({}, origin="FR", dest="DE"))
+        self.assertIsNotNone(mapping)
+        _, classification = mapping
+        self.assertEqual(classification.corridor, "FR→DE")
 
     def test_junk_nationality_is_NOT_treated_as_the_origin_country(self):
         """`nationality` is unvalidated free text and prod holds ~19 junk values
@@ -150,12 +197,14 @@ class ScopeBoundary(unittest.TestCase):
         self.assertFalse(profile.is_eea)
 
     def test_whitespace_only_nationality_counts_as_absent(self):
-        """An LLM or a form that "fills in" a field with a space must not defeat
-        the fallback silently — `.strip()` is client-side for exactly this."""
+        """A form or an LLM that "fills in" the field with a space must not read as
+        a recorded nationality. `.strip()` is client-side for exactly this — the
+        server-side `is_empty` would call "   " populated."""
         profile, _ = build_case_profile(
             _case({"employeeProfile": {"nationality": "   "}}, origin="FR", dest="DE")
         )
-        self.assertEqual(profile.nationality, "FR")
+        self.assertEqual(profile.nationality, "")
+        self.assertFalse(profile.is_eea)
 
 
 if __name__ == "__main__":
