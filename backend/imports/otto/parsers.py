@@ -91,6 +91,15 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # France
     "service-public.fr", "legifrance.gouv.fr", "urssaf.fr", "ameli.fr",
     "impots.gouv.fr", "france-visas.gouv.fr", "ofii.fr",
+    # France — the two social-security bodies a mover actually deals with, neither of which
+    # sits under `gouv.fr`. CLEISS is the French liaison body for international social
+    # security: it publishes the coordination and totalisation rules for a move between
+    # France and another state, which is the single most load-bearing source for an inbound
+    # EEA corridor, and it scored UNOFFICIAL. The CAF is the family-benefits arm of the
+    # Sécurité sociale and publishes its own entitlement conditions. Both publish the rule
+    # rather than restating one. This is the fourth time this list has been too narrow, and
+    # the failure mode is always the same: the rejects cluster by country.
+    "cleiss.fr", "caf.fr",
     # Norway
     "udi.no", "skatteetaten.no", "politiet.no", "nav.no", "altinn.no", "lovdata.no",
     "helsenorge.no", "brreg.no", "folkeregisteret.no",
@@ -119,6 +128,13 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # portals, and MyWelfare is where a PPSN application is actually made. Each publishes its
     # own rule rather than restating one, which is the line this list draws.
     "hse.ie", "rtb.ie", "ndls.ie", "rsa.ie", "welfare.ie", "mywelfare.ie",
+    # Ireland — municipal and transport, for city-level settle-in content. Same call as
+    # `madrid.es` and `service.berlin.de` below and above: Dublin City Council runs and
+    # publishes its own services rather than restating a national rule. Transport for Ireland
+    # and the Leap card scheme are operated by the National Transport Authority, which sets
+    # and publishes the fare and card rules it describes — the same reasoning that admits
+    # `rundfunkbeitrag.de`, the body that levies the fee it explains.
+    "dublincity.ie", "transportforireland.ie", "leapcard.ie", "nationaltransport.ie",
     # Denmark. Denmark uses no governmental suffix at all, so the suffix rule scored the
     # national tax authority itself as a relocation blog and rejected it.
     "skat.dk",
