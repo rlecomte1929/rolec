@@ -98,6 +98,63 @@ def _readable(text: str) -> str:
     return text.strip()
 
 
+#: `requirement_entities.domain_area` is NOT NULL and CHECK-constrained. The ES→IE batch carries
+#: it per record; the NO→FR batch does not carry it at all. Rather than default everything to
+#: `other`, derive it from the topic key WHERE THE KEY ITSELF STATES IT — `french_tax_domicile_eea`
+#: says tax, `a1_posted_worker_eea` says social security. That is derivation from a delivered
+#: field, which is allowed and recorded; inventing a classification the batch never expressed is
+#: not. A key that states nothing lands in `other`, which means "this batch did not classify it",
+#: not "we decided it is miscellaneous".
+_DOMAIN_KEYWORDS = (
+    ("social_security", "social_security"),
+    ("a1_posted_worker", "social_security"),
+    ("tax", "tax"),
+    ("residence_card", "immigration"),
+    ("work_authorization", "immigration"),
+    ("visa", "immigration"),
+    ("registration", "registration"),
+    ("health", "healthcare"),
+)
+
+
+def derive_domain_area(topic_key: str, explicit: Optional[str] = None) -> str:
+    """The record's own `domain_area` when it has one, else what the topic key states."""
+    if explicit:
+        return explicit
+    key = topic_key.lower()
+    for needle, domain in _DOMAIN_KEYWORDS:
+        if needle in key:
+            return domain
+    return "other"
+
+
+def read_entity(rec: dict) -> dict:
+    """Both batch vocabularies, because two exist and neither is going away.
+
+    ES→IE nests the entity (`entity.topic_key`); NO→FR is flat (`entity_topic_key`), which is
+    what `backend/imports/otto/parsers.read_jsonl` requires and what the ES→IE file had to be
+    converted into. A promoter that understands only one of them makes the other unpromotable
+    for a reason that has nothing to do with the facts.
+    """
+    nested = rec.get("entity")
+    if isinstance(nested, dict):
+        return {
+            "destination_country": rec.get("destination_country") or nested.get("destination_country"),
+            "topic_key": nested.get("topic_key"),
+            "title": nested.get("title") or nested.get("topic_key"),
+            "domain_area": derive_domain_area(nested.get("topic_key") or "", nested.get("domain_area")),
+        }
+    topic = rec.get("entity_topic_key")
+    if not topic:
+        raise SystemExit("record has neither a nested `entity` nor `entity_topic_key`")
+    return {
+        "destination_country": rec.get("destination_country"),
+        "topic_key": topic,
+        "title": rec.get("entity_title") or topic,
+        "domain_area": derive_domain_area(topic, rec.get("domain_area")),
+    }
+
+
 def _pdf_title(text: str) -> str | None:
     first = next((l.strip() for l in text.splitlines() if l.strip()), "")
     first = re.sub(r"^DOC TITLE:\s*", "", first, flags=re.I).strip()
@@ -137,6 +194,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("batch_dir", type=Path)
     ap.add_argument("--out", type=Path, help="write SQL here instead of stdout")
+    ap.add_argument("--skip-unverified", action="store_true",
+                    help="promote only the facts whose quote verifies against the captured "
+                         "source, and report the rest instead of refusing the whole batch")
     ap.add_argument("--split-dir", type=Path,
                     help="also write one file per statement group, for applying in chunks")
     args = ap.parse_args()
@@ -159,15 +219,22 @@ def main() -> int:
         raise SystemExit("no captured text for: " + ", ".join(missing_src))
     unverified = [r["fact_key"] for r in rows
                   if v.norm(r["evidence_quote"] or "") not in pages[r["source_url"]]]
-    if unverified:
+    if unverified and not args.skip_unverified:
         raise SystemExit(f"{len(unverified)} quote(s) do not appear on their cited page: {unverified}")
+    if unverified:
+        # Held back, not silently dropped: a fact whose quote is not on the page it cites has no
+        # business reaching a mover, and the batch's other facts should not be hostage to it.
+        print(f"-- HELD BACK ({len(unverified)}): quote not found on the cited page")
+        for k in unverified:
+            print(f"--   {k}")
+        rows = [r for r in rows if r["fact_key"] not in set(unverified)]
 
     dest = rows[0]["destination_country"]
     packs, docs, entities, facts = {}, {}, {}, []
 
     for r in rows:
-        ent = r["entity"]
-        domain = PACK_DOMAIN[ent["domain_area"]]
+        ent = read_entity(r)
+        domain = PACK_DOMAIN.get(ent["domain_area"], "other")
         pack_id = str(uuid.uuid5(NS, f"pack:{dest}:{domain}"))
         packs[(dest, domain)] = pack_id
 
