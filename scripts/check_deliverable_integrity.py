@@ -150,32 +150,124 @@ def extract_deliverable_paths(note_text: str) -> List[str]:
     return out
 
 
+# ── Was this deliverable ever real? ──────────────────────────────────────────
+#
+# The guard used to ask "is this a tracked file TODAY". For a check whose job is
+# "did this Done task's claimed deliverable actually ship", that is the wrong
+# question: files legitimately move, and a refactor three months later does not
+# retroactively make a shipped deliverable a lie.
+#
+# Measured on 2026-08-23 against the first live run: of 97 flagged paths, 62 had
+# existed and been renamed or deleted since. Suppressing those in the allowlist
+# would have grown it from 150 to 212 entries and left every future refactor
+# tripping the same way.
+
+_MANGLE_RULES = (
+    # Notion renders a BARE `__init__.py` / `__tests__` as markdown bold and eats the
+    # underscores, so the stored text is `init.py` / `tests/`. CLAUDE.md tells authors
+    # to wrap paths in backticks for exactly this reason, but ~1,800 historical cards
+    # cannot be re-edited, so the guard has to be robust to it.
+    (re.compile(r"(^|/)init_?\.py$"), r"\1__init__.py"),
+    (re.compile(r"(^|/)tests/"), r"\1__tests__/"),
+)
+
+
+def demangled_variants(path: str) -> List[str]:
+    """Candidate paths with Notion's eaten underscores restored. Never includes *path*."""
+    out: List[str] = []
+    for rx, repl in _MANGLE_RULES:
+        cand = rx.sub(repl, path)
+        if cand != path and cand not in out:
+            out.append(cand)
+    return out
+
+
+def is_shallow(root: Path) -> bool:
+    """True when the clone has no full history.
+
+    Critical. `git log --all` on a shallow clone returns almost nothing, so the
+    ever-existed check would classify EVERY deliverable as never-existed — 97
+    confident false phantoms on the run that motivated this. The caller turns this
+    into exit 3, because a check that cannot measure must say so.
+    """
+    res = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=str(root), capture_output=True, text=True,
+    )
+    return res.stdout.strip() == "true"
+
+
+def paths_ever_added(root: Path) -> Set[str]:
+    """Every repo-relative path added in any commit on any branch.
+
+    One `git log` for the whole repo rather than one per candidate: measured at
+    24,983 paths / 1.3s / 1.8 MB locally, which is cheap enough for CI.
+    """
+    res = subprocess.run(
+        ["git", "log", "--all", "--diff-filter=A", "--name-only", "--format="],
+        cwd=str(root), capture_output=True, text=True, check=True,
+    )
+    return {line.strip() for line in res.stdout.splitlines() if line.strip()}
+
+
 def check_tasks(
     tasks: List[Dict[str, Any]],
     tracked_files: Set[str],
     allowlist: Set[str],
-) -> List[Dict[str, str]]:
-    """Return the list of missing deliverables (one per task+path).
+    ever_added: Optional[Set[str]] = None,
+) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]]]:
+    """Classify every claimed deliverable into three buckets.
 
-    A task dict has: ``title``, ``aiq``, ``url``, ``paths`` (list[str]). A path
-    is "missing" when it is not a tracked file and neither the bare path nor the
-    ``<aiq>:<path>`` key is allowlisted.
+    Returns ``(missing, moved, mangled)``:
+
+    * **missing** — never existed in any commit on any branch. The only FAILING
+      bucket, and the only one that means a Done task claimed something untrue.
+    * **moved** — not present today, but it WAS added at some point. The work
+      shipped and the path went stale. Reported, never failed on.
+    * **mangled** — resolves once Notion's eaten underscores are restored. Passes,
+      but warns, so the badly-authored card gets fixed instead of the guard
+      quietly absorbing it forever.
+
+    A task dict has ``title``, ``aiq``, ``url``, ``paths``. ``ever_added`` is the
+    output of :func:`paths_ever_added`; pass ``None`` to skip the history check
+    (present-day behaviour only).
+
+    Order of resolution matters: allowlist BEFORE history, so an explicitly
+    baselined entry stays silent rather than reappearing as a "moved" line.
     """
     missing: List[Dict[str, str]] = []
+    moved: List[Dict[str, str]] = []
+    mangled: List[Dict[str, str]] = []
     for t in tasks:
         aiq = str(t.get("aiq") or "")
         for path in t.get("paths") or []:
-            if path in tracked_files:
-                continue
-            if path in allowlist or f"{aiq}:{path}" in allowlist:
-                continue
-            missing.append({
+            row = {
                 "aiq": aiq,
                 "title": str(t.get("title") or ""),
                 "path": path,
                 "url": str(t.get("url") or ""),
-            })
-    return missing
+            }
+            if path in tracked_files:
+                continue
+            if path in allowlist or f"{aiq}:{path}" in allowlist:
+                continue
+
+            # Notion ate the underscores? Resolve, but say so.
+            hit = next(
+                (c for c in demangled_variants(path)
+                 if c in tracked_files or (ever_added is not None and c in ever_added)),
+                None,
+            )
+            if hit:
+                mangled.append({**row, "resolved_to": hit})
+                continue
+
+            if ever_added is not None and path in ever_added:
+                moved.append(row)
+                continue
+
+            missing.append(row)
+    return missing, moved, mangled
 
 
 def load_allowlist(path: Path) -> Set[str]:
@@ -393,6 +485,18 @@ def main() -> int:
     allowlist = load_allowlist(root / "scripts" / "deliverable_integrity_allowlist.txt")
     tracked = tracked_files(root)
 
+    # A shallow clone has no history, so `git log --all` returns almost nothing and
+    # every deliverable would look like it never existed. Refuse rather than emit a
+    # verdict we cannot support: `actions/checkout` must set `fetch-depth: 0`.
+    if is_shallow(root):
+        return _not_measured(
+            "shallow-clone",
+            "the clone is shallow, so git history is unavailable and every claimed "
+            "deliverable would be reported as never-existing. Set `fetch-depth: 0` on "
+            "actions/checkout for this job.",
+        )
+    ever_added = paths_ever_added(root)
+
     try:
         tasks, done_seen, fp_seen, with_notes = fetch_done_tasks(token, args.database_id)
         assert_non_degenerate(tasks, done_seen, fp_seen, with_notes)
@@ -404,16 +508,34 @@ def main() -> int:
     except urllib.error.URLError as exc:
         return _not_measured("unreachable", str(exc))
 
-    missing = check_tasks(tasks, tracked, allowlist)
+    missing, moved, mangled = check_tasks(tasks, tracked, allowlist, ever_added)
 
     print(f"Scanned {len(tasks)} Done file-producing task(s).")
+
+    # Neither of these fails the build. They are reported because silently absorbing
+    # them is how a guard stops telling you anything.
+    if mangled:
+        print(f"\n[WARN] {len(mangled)} claimed path(s) resolve only once Notion's eaten "
+              f"underscores are restored. The file EXISTS; the card's path is mis-stored "
+              f"because it was written without backticks (see CLAUDE.md):\n")
+        for m in mangled:
+            print(f"  {m['aiq'] or '(no id)'}  {m['path']}")
+            print(f"      -> {m['resolved_to']}")
+            print(f"      task: {m['title']}")
+    if moved:
+        print(f"\n[INFO] {len(moved)} claimed deliverable(s) are not present today but WERE "
+              f"added at some point — the work shipped and the path later moved or was "
+              f"removed. Not a failure:\n")
+        for m in moved:
+            print(f"  {m['aiq'] or '(no id)'}  {m['path']}")
+
     if not missing:
-        print(f"[PASS] every claimed deliverable is a tracked file "
+        print(f"\n[PASS] every claimed deliverable either exists today or existed once "
               f"({len(allowlist)} allowlisted).")
         return 0
 
     print(f"\n[{'FAIL' if args.strict else 'WARN'}] {len(missing)} claimed "
-          f"deliverable(s) marked Done but NOT in the repo "
+          f"deliverable(s) marked Done that NEVER existed in any commit on any branch "
           f"(allowlist in scripts/deliverable_integrity_allowlist.txt):\n")
     for m in missing:
         print(f"  {m['aiq'] or '(no id)'}  {m['path']}")

@@ -286,3 +286,118 @@ class TheDeliverableCanaryMustNotFireOnAHealthyScan(unittest.TestCase):
         self.assertEqual(tasks, [])
         self.assertEqual(with_notes, 600)
         deliverable.assert_non_degenerate(tasks, done_seen, fp_seen, with_notes)  # must not raise
+
+
+class TheGuardAsksWhetherTheDeliverableEverShipped(unittest.TestCase):
+    """"Is this a tracked file TODAY" was the wrong question.
+
+    The guard exists to answer "did this Done task's claimed deliverable actually ship".
+    Present-tense existence is a different question: files legitimately move, and a
+    refactor three months later does not retroactively make a shipped deliverable a lie.
+
+    Measured on the first live run after the token was refreshed (2026-08-23), of 97
+    unique flagged paths: 64 had been added at some point and later renamed or removed,
+    10 resolve once Notion's eaten underscores are restored, and only 23 never existed
+    in any commit on any branch. Baselining all 97 would have grown the allowlist from
+    150 to 247 entries and left every future refactor tripping the same way.
+    """
+
+    TRACKED = {"backend/app/real.py", "backend/eval/__init__.py",
+               "frontend/src/pages/admin/__tests__/X.test.tsx"}
+    EVER = TRACKED | {"backend/app/moved_away.py"}
+
+    def _run(self, path, allowlist=frozenset(), ever=None):
+        tasks = [{"aiq": "AIQ-1", "title": "t", "url": "u", "paths": [path]}]
+        return deliverable.check_tasks(
+            tasks, self.TRACKED, set(allowlist),
+            self.EVER if ever is None else ever,
+        )
+
+    def test_a_path_present_today_passes(self):
+        missing, moved, mangled = self._run("backend/app/real.py")
+        self.assertEqual((missing, moved, mangled), ([], [], []))
+
+    def test_a_path_that_shipped_and_later_moved_is_reported_but_NOT_a_failure(self):
+        """The 64. This is the whole point of the change."""
+        missing, moved, mangled = self._run("backend/app/moved_away.py")
+        self.assertEqual(missing, [], "a deliverable that shipped is not a broken claim")
+        self.assertEqual(len(moved), 1)
+        self.assertEqual(moved[0]["path"], "backend/app/moved_away.py")
+
+    def test_a_path_that_NEVER_existed_still_FAILS(self):
+        """The discriminator. Without this the fix is 'pass everything', which is
+        exactly as useless as the guard being blind was."""
+        missing, moved, mangled = self._run("backend/app/never_was.py")
+        self.assertEqual(len(missing), 1)
+        self.assertEqual((moved, mangled), ([], []))
+
+    def test_underscores_eaten_by_notion_resolve_AND_warn(self):
+        """The 10. Notion renders a bare __init__.py as bold and drops the underscores,
+        so the card stores `init.py`. The file exists; the card is mis-stored."""
+        missing, moved, mangled = self._run("backend/eval/init.py")
+        self.assertEqual((missing, moved), ([], []))
+        self.assertEqual(len(mangled), 1)
+        self.assertEqual(mangled[0]["resolved_to"], "backend/eval/__init__.py")
+
+    def test_double_underscore_tests_dir_also_resolves(self):
+        missing, moved, mangled = self._run("frontend/src/pages/admin/tests/X.test.tsx")
+        self.assertEqual((missing, moved), ([], []))
+        self.assertEqual(mangled[0]["resolved_to"],
+                         "frontend/src/pages/admin/__tests__/X.test.tsx")
+
+    def test_a_mangled_looking_path_that_resolves_to_NOTHING_still_fails(self):
+        """`init.py` must not become a free pass. If neither the literal path nor the
+        de-mangled one ever existed, it is still a phantom."""
+        missing, moved, mangled = self._run("backend/nowhere/init.py")
+        self.assertEqual(len(missing), 1)
+        self.assertEqual(mangled, [])
+
+    def test_the_allowlist_is_consulted_BEFORE_history(self):
+        """An explicitly baselined entry stays silent rather than resurfacing as an
+        [INFO] 'moved' line every run."""
+        missing, moved, mangled = self._run(
+            "backend/app/moved_away.py", allowlist={"AIQ-1:backend/app/moved_away.py"})
+        self.assertEqual((missing, moved, mangled), ([], [], []))
+
+    def test_no_history_supplied_falls_back_to_present_day_semantics(self):
+        """Back-compat, and it fails CLOSED: a caller that cannot supply history gets
+        the old strict behaviour, never a silent pass."""
+        missing, moved, mangled = deliverable.check_tasks(
+            [{"aiq": "A", "title": "t", "url": "u", "paths": ["backend/app/moved_away.py"]}],
+            self.TRACKED, set(), None)
+        self.assertEqual(len(missing), 1, "with no history, an absent path is still missing")
+        self.assertEqual((moved, mangled), ([], []))
+
+    def test_demangled_variants_never_returns_the_input(self):
+        self.assertNotIn("a/b.py", deliverable.demangled_variants("a/b.py"))
+        self.assertEqual(deliverable.demangled_variants("a/b.py"), [])
+
+
+class AShallowCloneIsNotMeasurable(unittest.TestCase):
+    """The dangerous failure mode of the history check.
+
+    `git log --all` on a shallow clone returns almost nothing, so EVERY claimed
+    deliverable would be classified as never-existing — 97 confident false phantoms on
+    the run that motivated this change. The job's checkout must set `fetch-depth: 0`,
+    and the script must refuse rather than trust a truncated history.
+    """
+
+    def test_is_shallow_reads_git_rather_than_guessing(self):
+        from unittest import mock
+        with mock.patch.object(deliverable.subprocess, "run") as run:
+            run.return_value = mock.Mock(stdout="true\n")
+            self.assertTrue(deliverable.is_shallow(__import__("pathlib").Path(".")))
+            run.return_value = mock.Mock(stdout="false\n")
+            self.assertFalse(deliverable.is_shallow(__import__("pathlib").Path(".")))
+
+    def test_shallow_is_reported_as_NOT_MEASURED_not_as_a_verdict(self):
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            code = deliverable._not_measured(
+                "shallow-clone", "the clone is shallow, so git history is unavailable")
+        out = buf.getvalue()
+        self.assertEqual(code, deliverable.EXIT_NOT_MEASURED)
+        self.assertEqual(code, 3)
+        self.assertIn("NOT A PASS", out)
