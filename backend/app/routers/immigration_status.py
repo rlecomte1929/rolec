@@ -19,6 +19,8 @@ immigration.py router is retained but no longer wired.
 from __future__ import annotations
 
 import logging
+import re as _re
+from datetime import date as _date
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -71,6 +73,18 @@ class MilestoneUpdate(BaseModel):
     target_date: Optional[str] = None
     notes: Optional[str] = None
     evidence_url: Optional[str] = None
+
+
+class ImmigrationCaseDatesUpdate(BaseModel):
+    """[AIQ-2136] The dates an immigration case learns AFTER it is created.
+
+    Every field is Optional AND we distinguish "absent" from "explicitly null" via
+    `model_fields_set`, because clearing a wrong expiry has to be possible — a permit
+    date entered by mistake must not be permanent.
+    """
+    permit_expiry_date: Optional[str] = None
+    expected_submission_date: Optional[str] = None
+    expected_grant_date: Optional[str] = None
 
 
 class ImmigrationCaseCreate(BaseModel):
@@ -411,6 +425,131 @@ def create_immigration_case(
     log.info("Immigration case created: %s for case_id %s by HR %s",
              imm_case_id, body.case_id, hr_user.get("id"))
     return _serialize_imm_case(row)
+
+
+_DATE_RE = _re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _validated_date(field: str, value: Optional[str]) -> Optional[str]:
+    """ISO calendar date, or None. Anything else is refused rather than stored.
+
+    compliance_evaluator does date ARITHMETIC on permit_expiry_date
+    (`(actual - today).days`), so a malformed value does not fail loudly — it makes the
+    rule silently stop firing. Reject at the boundary.
+    """
+    if value is None:
+        return None
+    v = str(value).strip()
+    if not v:
+        return None
+    if not _DATE_RE.match(v):
+        raise HTTPException(
+            status_code=422,
+            detail=f"{field} must be an ISO date (YYYY-MM-DD), got {value!r}.",
+        )
+    try:
+        _date.fromisoformat(v)
+    except ValueError:
+        raise HTTPException(
+            status_code=422, detail=f"{field} is not a real date: {value!r}."
+        )
+    return v
+
+
+@router.patch("/hr/immigration/cases/{immigration_case_id}")
+def update_immigration_case_dates(
+    immigration_case_id: str,
+    body: ImmigrationCaseDatesUpdate,
+    hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """[AIQ-2136] Set the dates an immigration case learns after creation.
+
+    WHY THIS EXISTS. `permit_expiry_date` had NO write path anywhere in the backend —
+    no UPDATE statement, and the create endpoint omits the column — so the value could
+    only ever be set by hand in the database. Measured on production 2026-08-23: 0 of 4
+    immigration cases carried one, and `compliance_alerts` held 0 rows.
+
+    That one gap kept a whole finished vertical dormant: a seeded 60-day
+    `date_threshold` rule, compliance_evaluator, GET /api/compliance/alerts, the HR risk
+    dashboard's "Upcoming visa / permit expirations" section, the case-detail "Permit
+    expiry" field, and the AIQ-1860 expiry nudge. All shipped, all empty, all waiting
+    on this.
+
+    A PATCH rather than extending POST: an expiry is known when the permit is GRANTED,
+    not when the case is opened, and a create-only field would strand the cases that
+    already exist.
+
+    Only fields PRESENT in the request body are written, so a caller setting one date
+    cannot blank the others — the same lesson as the feedback console, where an
+    unconditional upsert silently erased every resolution.
+    """
+    sent = body.model_fields_set
+    if not sent:
+        raise HTTPException(status_code=400, detail="No fields to update.")
+
+    updates: Dict[str, Any] = {}
+    for field in ("permit_expiry_date", "expected_submission_date", "expected_grant_date"):
+        if field in sent:
+            updates[field] = _validated_date(field, getattr(body, field))
+
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT * FROM public.immigration_cases WHERE id = :id"),
+            {"id": immigration_case_id},
+        ).mappings().first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Immigration case not found.")
+
+        # Tenant scoping on the WRITE. HR may only touch their own company's cases;
+        # an admin (whose org_id resolves empty) is not restricted. Reads on the sibling
+        # GET are unscoped today — a pre-existing gap, deliberately not widened here.
+        is_admin = bool(hr_user.get("is_admin")) or str(hr_user.get("role") or "").upper() == "ADMIN"
+        if not is_admin and org_id:
+            owner = conn.execute(
+                text(
+                    # CAST(), not `id::text` — the Postgres cast operator is a syntax
+                    # error on SQLite, where this repo's tests run.
+                    "SELECT company_id FROM public.relocation_cases "
+                    "WHERE CAST(id AS TEXT) = :case_id LIMIT 1"
+                ),
+                {"case_id": str(row["case_id"])},
+            ).mappings().first()
+            if owner and str(owner["company_id"]) != str(org_id):
+                raise HTTPException(
+                    status_code=404, detail="Immigration case not found."
+                )
+
+        set_sql = ", ".join(f"{k} = :{k}" for k in updates)
+        params: Dict[str, Any] = dict(updates)
+        params["id"] = immigration_case_id
+        params["now"] = _now_iso()
+        conn.execute(
+            text(
+                f"UPDATE public.immigration_cases SET {set_sql}, updated_at = :now "
+                "WHERE id = :id"
+            ),
+            params,
+        )
+        try:
+            insert_audit_log(
+                conn,
+                entity_type="immigration_case",
+                entity_id=immigration_case_id,
+                action_type=ACTION_UPDATE,
+                actor_id=str(hr_user.get("id") or ""),
+                actor_type=ACTOR_HUMAN,
+                new_value=updates,
+            )
+        except Exception:  # noqa: BLE001 - an audit failure must not lose the update
+            log.warning("immigration case %s: audit write failed", immigration_case_id)
+
+        updated = conn.execute(
+            text("SELECT * FROM public.immigration_cases WHERE id = :id"),
+            {"id": immigration_case_id},
+        ).mappings().first()
+
+    return _serialize_imm_case(updated)
 
 
 @router.get("/hr/immigration/cases/{immigration_case_id}")
