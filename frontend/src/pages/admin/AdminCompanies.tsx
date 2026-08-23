@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { CountryPicker } from '../../components/location';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Checkbox } from '../../components/antigravity/Checkbox';
@@ -664,11 +665,11 @@ export const AdminCompanies: React.FC = () => {
                     </td>
                     <td className="py-3 pr-4 text-[#374151]">
                       {editingId === c.id ? (
-                        <Input unstyled
+                        <CountryPicker
                           value={editDraft.country !== undefined ? editDraft.country : (c.country || '')}
                           onChange={(v) => setEditDraft((d) => ({ ...d, country: v }))}
-                          className="rounded border border-[#d1d5db] px-2 py-0.5 text-xs w-28"
                           placeholder="Country"
+                          testId={`company-country-${c.id}`}
                         />
                       ) : (
                         c.country || '-'

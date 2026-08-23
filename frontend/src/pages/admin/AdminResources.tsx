@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { CountryPicker } from '../../components/location';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
 import { Card, Button } from '../../components/antigravity';
@@ -139,12 +140,9 @@ export const AdminResources: React.FC = () => {
               placeholder="Search title"
               className="rounded border border-slate-200 px-3 py-2 text-sm w-48"
             />
-            <Input unstyled
-              value={filters.country_code}
-              onChange={(v) => setFilters((f) => ({ ...f, country_code: v }))}
-              placeholder="Country"
-              className="rounded border border-slate-200 px-3 py-2 text-sm w-24"
-            />
+            <div className="w-40">
+              <CountryPicker value={filters.country_code} onChange={(v) => setFilters((f) => ({ ...f, country_code: v }))} valueMode="code" placeholder="Country" testId="resources-country" />
+            </div>
             <select
               value={filters.category_id}
               onChange={(e) => setFilters((f) => ({ ...f, category_id: e.target.value }))}
