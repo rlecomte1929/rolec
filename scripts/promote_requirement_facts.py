@@ -69,6 +69,25 @@ def _norm_module():
     return mod
 
 
+def _readable(text: str) -> str:
+    """Collapse the whitespace an HTML-to-text pass leaves behind.
+
+    Stripping tags turns a page's markup into long runs of spaces and blank lines: the smallest
+    of these documents is 7 KB of which most is nothing. Storing that verbatim makes a document
+    a human cannot read and a payload several times larger than the content.
+
+    Only whitespace is touched — never a word, never punctuation — so this cannot turn an
+    unsupported quote into a supported one. `verify_batch_quotes.norm()` already collapses
+    whitespace on both sides before comparing, so every quote that verified against the raw
+    capture verifies against this, and the caller re-checks all of them anyway. The raw capture
+    stays in the batch's `sources/` directory; this is what goes in the database.
+    """
+    text = re.sub(r"[^\S\n]+", " ", text)
+    text = re.sub(r" ?\n ?", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 def _pdf_title(text: str) -> str | None:
     first = next((l.strip() for l in text.splitlines() if l.strip()), "")
     first = re.sub(r"^DOC TITLE:\s*", "", first, flags=re.I).strip()
@@ -144,7 +163,7 @@ def main() -> int:
 
         url = r["source_url"]
         if url not in docs:
-            text = texts[url]
+            text = _readable(texts[url])
             docs[url] = {
                 "id": str(uuid.uuid5(NS, f"doc:{url}")),
                 "pack_id": pack_id,
@@ -241,12 +260,12 @@ def main() -> int:
         for stale in d.glob("*.sql"):
             stale.unlink()
         (d / "01_packs_entities.sql").write_text(
-            ";\n".join(pack_stmts + entity_stmts) + ";\n")
+            "\n".join(pack_stmts + entity_stmts) + "\n")
         for i, stmt in enumerate(doc_stmts, 1):
-            (d / f"02_doc_{i:02d}.sql").write_text(stmt + ";\n")
+            (d / f"02_doc_{i:02d}.sql").write_text(stmt + "\n")
         for i in range(0, len(fact_stmts), 8):
             (d / f"03_facts_{i // 8 + 1:02d}.sql").write_text(
-                ";\n".join(fact_stmts[i:i + 8]) + ";\n")
+                "\n".join(fact_stmts[i:i + 8]) + "\n")
         n = len(list(d.glob("*.sql")))
         total = len(pack_stmts) + len(entity_stmts) + len(doc_stmts) + len(fact_stmts)
         print(f"split into {n} chunk file(s) under {args.split_dir} covering {total} statements")
