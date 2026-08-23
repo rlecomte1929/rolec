@@ -28,6 +28,7 @@ import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
 import { RoadmapReviewPanel } from '../components/case/RoadmapReviewPanel';
 import { AssignmentExceptionsPanel } from '../components/case/AssignmentExceptionsPanel';
 import { CaseVendorsPanel } from '../components/case/CaseVendorsPanel';
+import { VisaExpiryNudge } from '../components/case/VisaExpiryNudge';
 import { CaseBudgetPanel } from '../components/case/CaseBudgetPanel';
 
 const statusBadge = (status?: AssignmentStatus) => {
@@ -423,6 +424,18 @@ export const HrCaseSummary: React.FC = () => {
               title="Shared relocation plan"
               subtitle="Same phased roadmap the employee sees (flattened here for HR edits). Owner, due dates, and status stay in sync; overdue and blocked highlight risk."
             >
+              {/* [AIQ-1860] Ambient next-best-action, above the plan it acts on.
+                  Renders nothing unless this case has an open visa/permit expiry
+                  alert, so it costs an empty div on every other case.
+                  TODO [AIQ-1860-FU]: point the CTA at a real renewal flow once one
+                  exists — today it hands HR to the risk dashboard, which is the
+                  only shipped surface that lists permit expirations. */}
+              {assignment.caseId && (
+                <VisaExpiryNudge
+                  caseId={assignment.caseId}
+                  onStartRenewal={() => safeNavigate(navigate, 'hrRisk')}
+                />
+              )}
               <CaseTimeline
                 assignmentId={assignment.id}
                 ensureDefaults
