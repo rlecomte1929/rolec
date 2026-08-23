@@ -168,6 +168,56 @@ def load_allowlist(path: Path) -> Set[str]:
 # --------------------------------------------------------------------------- #
 
 
+#: Exit codes. 3 is the one that matters: it separates "measured, clean" from "could not
+#: measure", which this guard used to collapse into 0. On 2026-08-23 the CI job log read
+#:     [WARN] Notion query failed (HTTP Error 404: Not Found); skipping (exit 0).
+#: and the check reported PASS on every PR while examining nothing at all.
+EXIT_OK = 0
+EXIT_VIOLATION = 1
+EXIT_NOT_MEASURED = 3
+
+#: Below this row count the scan is degenerate and its "0 violations" means nothing. The queue
+#: held ~2,140 rows on 2026-08-23; 500 is a floor, not a target.
+MIN_EXPECTED_ROWS = 500
+
+
+class QueueUnavailable(RuntimeError):
+    """The queue could not be measured. NEVER report this as a pass."""
+
+    def __init__(self, kind: str, detail: str) -> None:
+        super().__init__(f"{kind}: {detail}")
+        self.kind = kind
+        self.detail = detail
+
+
+def assert_non_degenerate(tasks: List[Dict[str, Any]]) -> None:
+    """Refuse to call a degenerate scan clean.
+
+    A renamed property does not raise — it silently yields "" for every row, and every
+    downstream count becomes 0, which reads exactly like a healthy queue. That is precisely
+    how the `Task Title` -> `fable` drift went unnoticed: the guard was green because it was
+    looking at nothing. These assertions are what make that failure loud.
+    """
+    if len(tasks) < MIN_EXPECTED_ROWS:
+        raise QueueUnavailable(
+            "schema-drift",
+            f"only {len(tasks)} row(s) returned; expected at least {MIN_EXPECTED_ROWS}. "
+            "A filter or the database id is probably wrong.",
+        )
+    if not any(t.get("title", "").strip() for t in tasks):
+        raise QueueUnavailable(
+            "schema-drift",
+            f"{len(tasks)} rows returned but NOT ONE had a title — the title property has "
+            "probably been renamed (it is `fable`, not `Task Title`/`Name`).",
+        )
+    if not any(t.get("status", "").strip() for t in tasks):
+        raise QueueUnavailable(
+            "schema-drift",
+            f"{len(tasks)} rows returned but NOT ONE had a Status — the property has "
+            "probably been renamed or changed type (it is a `select`, not a `status`).",
+        )
+
+
 def _rich_text(prop: Optional[Dict[str, Any]]) -> str:
     if not prop:
         return ""
@@ -178,6 +228,33 @@ def _rich_text(prop: Optional[Dict[str, Any]]) -> str:
 def _select(prop: Optional[Dict[str, Any]]) -> str:
     sel = (prop or {}).get("select")
     return (sel or {}).get("name", "") if sel else ""
+
+
+def extract_task(page: Dict[str, Any]) -> Dict[str, Any]:
+    """Flatten one Notion page into the fields this guard needs. PURE — unit-tested.
+
+    Extracted from the fetch loop deliberately. While this lived inside the network call it
+    could not be tested, and the property name it reads drifted without a single test noticing:
+    the title property here is **`fable`**, not "Task Title". Reading the wrong key yields ""
+    for EVERY row (a missing property is None, and every extractor turns None into ""), so
+    `parse_title_tag` returned None for every row, `status_by_tag` was empty, and NO dependency
+    edge could ever resolve. The guard then printed "[PASS] no false-ready tasks" about a queue
+    it had not examined.
+
+    `backend/tests/test_notion_work_queue_target.py` already pins `fable` for the WRITE path.
+    Making this function pure is what lets the READ path be pinned too.
+    """
+    props = page.get("properties", {})
+    title = _rich_text(props.get("fable"))
+    return {
+        "tag": parse_title_tag(title),
+        "title": title,
+        "aiq": _rich_text(props.get("ID")) or str(props.get("ID", "")),
+        "url": page.get("url", ""),
+        "status": _select(props.get("Status")),
+        "dependencies": _rich_text(props.get("Dependencies")),
+        "notes": _rich_text(props.get("Execution Notes")),
+    }
 
 
 def fetch_all_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
@@ -201,17 +278,7 @@ def fetch_all_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
             payload = json.loads(resp.read().decode("utf-8"))
 
         for page in payload.get("results", []):
-            props = page.get("properties", {})
-            title = _rich_text(props.get("Task Title"))
-            tasks.append({
-                "tag": parse_title_tag(title),
-                "title": title,
-                "aiq": _rich_text(props.get("ID")) or str(props.get("ID", "")),
-                "url": page.get("url", ""),
-                "status": _select(props.get("Status")),
-                "dependencies": _rich_text(props.get("Dependencies")),
-                "notes": _rich_text(props.get("Execution Notes")),
-            })
+            tasks.append(extract_task(page))
 
         if not payload.get("has_more"):
             break
@@ -222,6 +289,23 @@ def fetch_all_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
 # --------------------------------------------------------------------------- #
 # CLI                                                                         #
 # --------------------------------------------------------------------------- #
+
+
+def _not_measured(kind: str, detail: str) -> int:
+    """Report an unmeasurable run as exit 3, never as a pass.
+
+    The remediation is printed because the commonest cause is fixable in one click: the
+    integration simply has not been given access to the database (Notion -> the database ->
+    Connections). That was the live state on 2026-08-23, and it read as green for weeks.
+    """
+    print(f"[SKIP:{kind}] {detail}")
+    print("NOT A PASS — nothing was measured.")
+    if kind == "no-access":
+        print("  Fix: share the AI Work Queue database with this integration "
+              "(Notion -> database -> ... -> Connections).")
+    elif kind == "no-token":
+        print("  Fix: export NOTION_TOKEN (CI maps secrets.NOTION_QUEUE_TOKEN to it).")
+    return EXIT_NOT_MEASURED
 
 
 def main() -> int:
@@ -237,17 +321,21 @@ def main() -> int:
 
     token = os.environ.get("NOTION_TOKEN")
     if not token:
-        print("[SKIP] NOTION_TOKEN not set — queue-status-hygiene check skipped.")
-        return 0
+        return _not_measured("no-token", "NOTION_TOKEN is not set.")
 
     root = Path(args.root).resolve()
     allowlist = load_allowlist(root / "scripts" / "queue_status_allowlist.txt")
 
     try:
         tasks = fetch_all_tasks(token, args.database_id)
-    except (urllib.error.URLError, urllib.error.HTTPError) as exc:
-        print(f"[WARN] Notion query failed ({exc}); skipping (exit 0).")
-        return 0
+        assert_non_degenerate(tasks)
+    except QueueUnavailable as exc:
+        return _not_measured(exc.kind, exc.detail)
+    except urllib.error.HTTPError as exc:
+        kind = "no-access" if exc.code in (401, 403, 404) else "unreachable"
+        return _not_measured(kind, f"HTTP {exc.code} querying database {args.database_id}.")
+    except urllib.error.URLError as exc:
+        return _not_measured("unreachable", str(exc))
 
     flagged = find_false_ready(tasks, allowlist)
 
