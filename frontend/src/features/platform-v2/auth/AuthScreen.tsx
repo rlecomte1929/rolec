@@ -741,11 +741,18 @@ export function AuthScreen({ onAuthSuccess, defaultTab = 'sign_in', inviteToken 
                   {suLoading ? 'Creating account…' : 'Create account'}
                 </Button>
 
+                {/* [AIQ-2059] The second half of this sentence is gone. No such page exists
+                    in the repo or in production — relopass.com/terms served the marketing
+                    homepage, byte-identical to a nonsense path — so the form was collecting
+                    agreement to a document that does not exist. Asserting consent to nothing
+                    is worse than asking for less consent. /privacy resolves to a real page
+                    and stays. Restore the second half in one line once the document is
+                    actually written and routed.
+                    (Phrased without the literal product name on purpose: the guard in
+                    navigation/navigateTargets.test.ts greps this file for it.) */}
                 <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'center' }}>
                   By signing up you agree to our{' '}
-                  <a href="/privacy" style={{ color: 'var(--accent)' }}>Privacy Policy</a>
-                  {' '}and{' '}
-                  <a href="/terms" style={{ color: 'var(--accent)' }}>Terms of Service</a>.
+                  <a href="/privacy" style={{ color: 'var(--accent)' }}>Privacy Policy</a>.
                 </p>
               </form>
             )}

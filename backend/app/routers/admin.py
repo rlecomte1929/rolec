@@ -10,12 +10,13 @@ from fastapi import APIRouter, Header, HTTPException, Depends
 
 from ..db import SessionLocal
 from ...database import db, Database
-from ...db.policies import UnquotedApprovalError
+from ...db.policies import UnattestedLawyerReviewError, UnquotedApprovalError
 from .. import crud, schemas, models
 from ..services.research import run_country_research
 from ..services import requirements_builder
 from ..services.official_ingest_service import ingest_url_to_knowledge_doc
 from ..services import verification_guard
+from ..services import lawyer_review_gate
 from ..services.audit_log_service import (
     ACTION_INSERT,
     ACTION_UPDATE,
@@ -273,6 +274,29 @@ def review_country_requirement(
         if item is None or (item.country_code or "").upper() != country_code.strip().upper():
             raise HTTPException(status_code=404, detail="Requirement not found for this country")
         before = item.review_status
+
+        # [AIQ-2046] A claim the research pipeline flagged `needs_lawyer_review` may not
+        # be PUBLISHED until counsel has actually signed it off. Approving is what makes
+        # a row readable by employees and by the public corridor endpoint, so this is the
+        # last point at which the flag can still mean anything.
+        #
+        # Checked on approval only. Rejecting or withdrawing a flagged row must stay
+        # possible — gating a claim's EXIT on legal sign-off would trap precisely the
+        # claims most in need of removal. Same reasoning as the evidence_quote gate in
+        # db/policies.py.
+        if status == "approved" and lawyer_review_gate.blocks_approval(
+            attestation_status=item.attestation_status,
+            blobs=(item.citations_json, item.applies_to_nationality_classes_json),
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"requirement {requirement_id} is flagged needs_lawyer_review and has no "
+                    f"counsel attestation (attestation_status={item.attestation_status!r}). "
+                    "Obtain sign-off via the attestation flow before approving, or reject it."
+                ),
+            )
+
         item.review_status = status
         item.reviewed_by = str(actor) if actor else None
         item.reviewed_at = datetime.utcnow()
@@ -703,7 +727,7 @@ def approve_requirement_facts(payload: dict, user: dict = Depends(require_admin)
     actor_id = user.get("id") or "admin"
     try:
         db.update_requirement_fact_status(fact_ids, "approved", actor_id)
-    except UnquotedApprovalError as exc:
+    except (UnquotedApprovalError, UnattestedLawyerReviewError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     for fid in fact_ids:
         _audit_postgres(
