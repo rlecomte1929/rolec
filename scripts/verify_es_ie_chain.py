@@ -162,6 +162,36 @@ def _seed_fixture() -> str:
     return (out.stdout.strip().splitlines() or [""])[-1].strip()
 
 
+def deployed_commit() -> str:
+    """The commit the API is actually RUNNING, from /health.
+
+    WHY THIS IS IN THE HEADER. On 2026-08-23 a run was read as "the fix did not work" when
+    the fix simply had not finished deploying — Render was still building it, and the run
+    measured the previous release. The three red stages were correct about the code that was
+    live and useless as a verdict on the code we had merged, and the next move would have
+    been hunting a bug that did not exist.
+
+    A verifier that cannot say WHICH BUILD it measured produces confident, wrong conclusions.
+    """
+    _st, payload = call("GET", "/health")
+    if isinstance(payload, dict):
+        return str(payload.get("commit") or "")[:8] or "unknown"
+    return "unknown"
+
+
+def local_head() -> str:
+    """The commit this checkout expects, so a mismatch is visible without a second command."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True,
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        )
+        return (out.stdout or "").strip()[:8] or "unknown"
+    except Exception:  # noqa: BLE001
+        return "unknown"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Verify the ES→IE chain end to end")
     ap.add_argument("--seed", action="store_true",
@@ -188,7 +218,18 @@ def main() -> int:
         print(f"{RED}  no fixture case — set RELOPASS_ESIE_CASE_ID or run with --seed{RESET}")
         return 1
 
-    print(f"\n  ES→IE chain verification  ({API}, case {case_id[:8]})\n")
+    api_commit, want_commit = deployed_commit(), local_head()
+    print(f"\n  ES→IE chain verification  ({API}, case {case_id[:8]})")
+    print(f"  API is running {api_commit}; this checkout is {want_commit}")
+    if api_commit not in ("unknown", want_commit):
+        # Not fatal: verifying an older build is a legitimate thing to do deliberately. But
+        # it must never be SILENT, because every failure below then has two possible causes.
+        print(
+            f"{RED}  ⚠ MISMATCH — the API is not running this checkout's code.{RESET}\n"
+            f"{DIM}    Any failure below may be the deploy lagging, not a real defect."
+            f" Wait for {want_commit} to go live and re-run before drawing a conclusion.{RESET}"
+        )
+    print()
 
     # ── 1. credentials ────────────────────────────────────────────────────────────
     hr = login(HR_EMAIL, HR_PASS)
