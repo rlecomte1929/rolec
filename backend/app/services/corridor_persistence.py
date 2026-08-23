@@ -25,10 +25,13 @@ fully unit-testable; ``persist_corridor_case`` is the thin DB-writing wrapper.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Dict, List, Optional
+
+log = logging.getLogger(__name__)
 
 from sqlalchemy import text
 
@@ -59,12 +62,24 @@ def _deadline_uuid(case_id: uuid.UUID, step_uuid: uuid.UUID) -> uuid.UUID:
     return uuid.uuid5(_NS, f"deadline:{case_id}:{step_uuid}")
 
 
-def derive_source_url(rule_id: str, legal_reference: str) -> str:
-    """Best-effort canonical URL for a legal reference (NOT NULL column).
+def derive_source_url(rule_id: str, legal_reference: str) -> Optional[str]:
+    """The canonical URL for a legal reference, or None when we do not know one.
 
-    German statutes resolve to gesetze-im-internet.de; the EU Blue Card directive
-    to EUR-Lex. Anything unrecognised falls back to a gesetze-im-internet search
-    so the column is always a usable, non-empty link.
+    RETURNS None RATHER THAN INVENTING. This function used to end in a catch-all that
+    manufactured a URL for anything it did not recognise:
+
+        https://www.gesetze-im-internet.de/Teilliste_{quote_plus(ref)}.html
+
+    That is a German statute host, applied to EVERY unrecognised reference — so an
+    Irish, Norwegian or Spanish rule was cited to a German government page that does
+    not exist. docs/findings/AIQ-2010-rule-source-url-audit.md:39-51 catalogues the
+    resulting 404s, and #1888 recorded them without removing the cause. The old
+    docstring called the result "a usable, non-empty link"; it was non-empty, which is
+    not the same as usable.
+
+    Only mappings that genuinely resolve are kept. A caller that gets None MUST NOT
+    write a row with a placeholder — see build_rce_rows, which skips instead. An absent
+    citation is a visible gap; a fabricated one is a lie that looks like evidence.
     """
     ref = legal_reference or ""
     if "2021/1883" in ref or rule_id.startswith("EU_"):
@@ -81,9 +96,7 @@ def derive_source_url(rule_id: str, legal_reference: str) -> str:
         if m:
             return f"https://www.gesetze-im-internet.de/aufenthg_2004/__{m.group(1)}.html"
         return "https://www.gesetze-im-internet.de/aufenthg_2004/"
-    from urllib.parse import quote_plus
-
-    return f"https://www.gesetze-im-internet.de/Teilliste_{quote_plus(ref)}.html"
+    return None
 
 
 @dataclass
@@ -116,7 +129,6 @@ def build_rce_rows(
     rule_version_by_rule: Dict[str, uuid.UUID] = {}
     for rule in corridor.applicable_rules:
         rv_id = _rule_version_uuid(rule.rule_id)
-        rule_version_by_rule[rule.rule_id] = rv_id
         rows.rules.append(
             {
                 "rule_id": rule.rule_id,
@@ -125,6 +137,27 @@ def build_rce_rows(
                 "description": rule.summary,
             }
         )
+        source_url = derive_source_url(rule.rule_id, rule.legal_reference)
+        if not source_url:
+            # No known-good URL, so no rule_version row. The rule itself is still
+            # recorded (rows.rules has no source column) — what is withheld is the
+            # CITABLE artifact, which is the honest reading of the NOT NULL on
+            # rce.rule_versions.source_url: a citation you cannot source is not a row.
+            #
+            # Deliberately NOT registered in rule_version_by_rule. That map is the
+            # citation guard below (`s.cite not in rule_version_by_rule`), so leaving
+            # it out is what makes the cascade correct — registering the id here would
+            # let a STEP citation point at a rule_version that was never written, i.e.
+            # a dangling FK.
+            log.warning(
+                "corridor_persistence: no known source URL for rule_id=%s "
+                "legal_reference=%r — rule_version and any citation to it are SKIPPED, "
+                "not fabricated",
+                rule.rule_id,
+                rule.legal_reference,
+            )
+            continue
+        rule_version_by_rule[rule.rule_id] = rv_id
         rows.rule_versions.append(
             {
                 "rule_version_id": rv_id,
@@ -132,7 +165,7 @@ def build_rce_rows(
                 "version_label": _RULE_VERSION_LABEL,
                 "effective_from": _RULE_EFFECTIVE_FROM,
                 "predicate_dsl": _PREDICATE_PLACEHOLDER,
-                "source_url": derive_source_url(rule.rule_id, rule.legal_reference),
+                "source_url": source_url,
             }
         )
 
@@ -183,7 +216,21 @@ def build_rce_rows(
     # ── STEP citations (only steps that explicitly cite a rule) ──────────────
     legal_ref_by_rule = {r.rule_id: r.legal_reference for r in corridor.applicable_rules}
     for s in corridor.step_graph:
+        # Covers BOTH "step cites nothing" and "the cited rule had no sourceable
+        # URL, so its rule_version was skipped above".
         if not s.cite or s.cite not in rule_version_by_rule:
+            continue
+        source_url = derive_source_url(s.cite, legal_ref_by_rule.get(s.cite, ""))
+        if not source_url:
+            # Unreachable while the map is the sole gate, but belt-and-braces: a
+            # citation row whose source_url had to be invented is worse than no
+            # citation, because it renders to the user as evidence.
+            log.warning(
+                "corridor_persistence: step %s cites rule %s with no known source URL "
+                "— citation SKIPPED",
+                s.step_id,
+                s.cite,
+            )
             continue
         rows.citations.append(
             {
@@ -192,7 +239,7 @@ def build_rce_rows(
                 "output_id": step_uuid_by_key[s.step_id],
                 "rule_version_id": rule_version_by_rule[s.cite],
                 "legal_reference": legal_ref_by_rule.get(s.cite),
-                "source_url": derive_source_url(s.cite, legal_ref_by_rule.get(s.cite, "")),
+                "source_url": source_url,
             }
         )
 
