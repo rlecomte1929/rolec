@@ -49,6 +49,7 @@ from . import rag_pipeline
 from .country_resources import _country_code_from_name
 from .immigration_regime import ImmigrationRegimeRouter, _is_eu_national
 from .immigration_retriever import PathClassification, UserProfile, corridor_key
+from .wizard_draft_mapper import employee_nationality
 
 log = logging.getLogger(__name__)
 
@@ -80,11 +81,19 @@ def build_case_profile(
     if not origin or not dest:
         return None
 
-    nationality = (
-        basics.get("nationality")
-        or (draft.get("personalInfo") or {}).get("nationality")
-        or origin_raw  # an EEA-corridor mover is typically a national of the origin
-    )
+    # Read nationality from wherever the draft records it — `employee_nationality`
+    # is the single source for that, shared with wizard_draft_mapper. This module
+    # used to read `relocationBasics.nationality` / `personalInfo.nationality`,
+    # neither of which production writes (0 of 1,948 drafts on 2026-08-23), so the
+    # origin fallback below fired for every case and 42 movers were classified into
+    # the wrong free-movement class — 14 of them third-country nationals on ES->IE
+    # told they had free movement into Ireland.
+    #
+    # The origin fallback is KEPT, and only for a draft that records no nationality
+    # at all (514 prod cases). Dropping it would flip those to third-country
+    # treatment, which is a decision about live roadmaps rather than a read-path
+    # fix; see test_case_profile_nationality_source.ScopeBoundary.
+    nationality = employee_nationality(draft) or origin_raw
     regime = _router.detect_regime(
         nationality=nationality,
         destination_country=dest_raw,

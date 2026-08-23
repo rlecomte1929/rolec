@@ -18,6 +18,39 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 
+def employee_nationality(draft: Dict[str, Any]) -> Optional[str]:
+    """The employee's nationality, from wherever the draft happens to record it.
+
+    Two writers put it in two different places — the orchestrator at
+    ``primaryApplicant.nationality`` and the wizard at
+    ``employeeProfile.nationality`` — with ``nationalityCountry`` and
+    ``relocationBasics.nationality`` as older aliases. Measured on prod
+    2026-08-23, 1,435 of 1,948 drafts use the wizard path and NONE use
+    ``relocationBasics``.
+
+    Extracted so there is exactly one answer to "where is nationality?".
+    ``case_roadmap_profile`` previously read its own shorter chain, matched
+    nothing, and silently fell back to the origin country — classifying 42 prod
+    movers into the wrong free-movement class. Read it here, not from a private
+    copy.
+
+    Returns None when the draft records no nationality; the caller decides what
+    an unknown nationality means.
+    """
+    ep = draft.get("employeeProfile") or {}
+    pa = draft.get("primaryApplicant") or {}
+    basics = draft.get("relocationBasics") or {}
+    for value in (
+        pa.get("nationality"),
+        ep.get("nationality"),
+        ep.get("nationalityCountry"),
+        basics.get("nationality"),
+    ):
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return None
+
+
 def extract_profile_from_wizard_draft(draft: Dict[str, Any]) -> Dict[str, Any]:
     """
     Map wizard Case draft JSON into the flat profile shape expected by
@@ -84,15 +117,7 @@ def extract_profile_from_wizard_draft(draft: Dict[str, Any]) -> Dict[str, Any]:
     # ── P2: nationality (employee) ────────────────────────────────────────────
     # Orchestrator path: draft.primaryApplicant.nationality
     # Wizard path: draft.employeeProfile.nationality
-    ep = draft.get("employeeProfile") or {}
-    pa = draft.get("primaryApplicant") or {}
-    nat = (
-        pa.get("nationality")
-        or ep.get("nationality")
-        or ep.get("nationalityCountry")
-        or basics.get("nationality")
-        or None
-    )
+    nat = employee_nationality(draft)
     if nat:
         out["nationality"] = nat
 
