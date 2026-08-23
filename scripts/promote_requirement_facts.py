@@ -108,6 +108,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("batch_dir", type=Path)
     ap.add_argument("--out", type=Path, help="write SQL here instead of stdout")
+    ap.add_argument("--split-dir", type=Path,
+                    help="also write one file per statement group, for applying in chunks")
     args = ap.parse_args()
 
     v = _norm_module()
@@ -185,8 +187,10 @@ def main() -> int:
         "",
     ]
 
+    pack_stmts, doc_stmts, entity_stmts, fact_stmts = [], [], [], []
+
     for (d, domain), pid in sorted(packs.items(), key=lambda kv: kv[0][1]):
-        out.append(
+        pack_stmts.append(
             f"INSERT INTO public.knowledge_packs (id, destination_country, domain, version, status)\n"
             f"SELECT {q(pid)}::uuid, {q(d)}, {q(domain)}, 1, 'active'\n"
             f"WHERE NOT EXISTS (SELECT 1 FROM public.knowledge_packs WHERE id = {q(pid)}::uuid);")
@@ -194,7 +198,7 @@ def main() -> int:
 
     for doc in docs.values():
         note = "  -- PDF, extracted with pypdf" if doc["is_pdf"] else ""
-        out.append(
+        doc_stmts.append(
             f"INSERT INTO public.knowledge_docs (id, pack_id, title, publisher, source_url,\n"
             f"                                   text_content, content_sha256, fetch_status, fetched_at)\n"
             f"SELECT {q(doc['id'])}::uuid, {q(doc['pack_id'])}::uuid, {q(doc['title'])},\n"
@@ -204,7 +208,7 @@ def main() -> int:
     out.append("")
 
     for ent in entities.values():
-        out.append(
+        entity_stmts.append(
             f"INSERT INTO public.requirement_entities (id, destination_country, domain_area, topic_key, title, status)\n"
             f"SELECT {q(ent['id'])}::uuid, {q(ent['destination_country'])}, {q(ent['domain_area'])},\n"
             f"       {q(ent['topic_key'])}, {q(ent['title'])}, {q(ent['status'])}\n"
@@ -212,7 +216,7 @@ def main() -> int:
     out.append("")
 
     for f in facts:
-        out.append(
+        fact_stmts.append(
             f"INSERT INTO public.requirement_facts (id, entity_id, source_doc_id, fact_type, fact_key,\n"
             f"                                      fact_text, applies_to, required_fields, source_url,\n"
             f"                                      evidence_quote, confidence, status, evidence_verified)\n"
@@ -222,8 +226,30 @@ def main() -> int:
             f"       {q(f['evidence_quote'])}, {q(f['confidence'])}, 'pending', NULL\n"
             f"WHERE NOT EXISTS (SELECT 1 FROM public.requirement_facts WHERE id = {q(f['id'])}::uuid);")
 
+    out += pack_stmts + [""] + doc_stmts + [""] + entity_stmts + [""] + fact_stmts
     out += ["", "COMMIT;"]
     sql = "\n".join(out) + "\n"
+
+    if args.split_dir:
+        # Written from the structured statements, never by re-splitting the emitted SQL. A
+        # naive split on ";\n" loses a statement here: one page's text_content contains that
+        # exact sequence, so the boundary is not a boundary. Chunks are FK-ordered, and every
+        # statement is NOT EXISTS-guarded, so applying them as separate transactions is safe
+        # and re-running any chunk is a no-op.
+        d = args.split_dir if args.split_dir.is_absolute() else REPO / args.split_dir
+        d.mkdir(parents=True, exist_ok=True)
+        for stale in d.glob("*.sql"):
+            stale.unlink()
+        (d / "01_packs_entities.sql").write_text(
+            ";\n".join(pack_stmts + entity_stmts) + ";\n")
+        for i, stmt in enumerate(doc_stmts, 1):
+            (d / f"02_doc_{i:02d}.sql").write_text(stmt + ";\n")
+        for i in range(0, len(fact_stmts), 8):
+            (d / f"03_facts_{i // 8 + 1:02d}.sql").write_text(
+                ";\n".join(fact_stmts[i:i + 8]) + ";\n")
+        n = len(list(d.glob("*.sql")))
+        total = len(pack_stmts) + len(entity_stmts) + len(doc_stmts) + len(fact_stmts)
+        print(f"split into {n} chunk file(s) under {args.split_dir} covering {total} statements")
     if args.out:
         (args.out if args.out.is_absolute() else REPO / args.out).write_text(sql)
         print(f"wrote {args.out}  ({len(packs)} packs, {len(docs)} docs, {len(entities)} entities, {len(facts)} facts)")
