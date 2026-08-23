@@ -60,7 +60,7 @@ def _seed_engine():
             "CREATE TABLE requirement_facts ("
             " id TEXT PRIMARY KEY, entity_id TEXT, status TEXT,"
             " evidence_verified BOOLEAN, applies_to TEXT, required_fields TEXT,"
-            " fact_key TEXT)"
+            " fact_key TEXT, evidence_quote TEXT)"
         ))
         conn.execute(text(
             "INSERT INTO requirement_entities (id, destination_country) VALUES ('e1','NO')"
@@ -74,8 +74,12 @@ def _seed_engine():
             conn.execute(
                 text(
                     "INSERT INTO requirement_facts"
-                    " (id, entity_id, status, evidence_verified, fact_key)"
-                    " VALUES (:id,'e1','approved',:v,:id)"
+                    " (id, entity_id, status, evidence_verified, fact_key, evidence_quote)"
+                    # AIQ-2124 read half: the reader now also withholds a fact whose
+                    # evidence_quote is blank. These fixtures never set one — they exist to
+                    # test the evidence_verified axis, and a missing quote was incidental.
+                    # Give them a quote so they keep testing what they mean to test.
+                    " VALUES (:id,'e1','approved',:v,:id,'a verbatim sentence')"
                 ),
                 {"id": fid, "v": verified},
             )
