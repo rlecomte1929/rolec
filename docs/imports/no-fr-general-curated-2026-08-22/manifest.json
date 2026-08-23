@@ -17,7 +17,7 @@
   "origin_candidates": 3,
   "deferred": 1,
   "artifact": "no-fr-general-curated-2026-08-22.ndjson",
-  "sha256": "5da4ae6b1c7a8db51b6c9b52f0ec4933149d09aec9fcd2b8f31c0ed9625f7a65",
+  "sha256": "c56178dc4df012449fe30f025ce749af587c36da9234e14097033394960b7551",
   "review_status_all": "pending",
   "verification_status_all": "representative",
   "scope": "Curated, nationality-scoped subset of Otto's refused general batch. Covers employed-mover destination requirements only; steps routed to pathway-graph candidates, origin-side duties routed to corridors/<id>/facts.yaml candidates, self-employment sub-corpus deferred to the Otto re-delivery (AIQ-1833). Must reconcile: curated + steps + origin + deferred == raw_record_count (twinned records counted once via their base fact_key).",
@@ -30,9 +30,17 @@
     "batch": "no-fr-evidence-repair-2026-08-23",
     "patch_artifact": "raw/no-fr-evidence-repair-2026-08-23.ndjson",
     "records_patched": 12,
-    "quotes_verbatim_confirmed": 10,
-    "quotes_unconfirmed": 7,
+    "quotes_verbatim_confirmed": 13,
+    "quotes_unconfirmed": 4,
     "confirmed_by": "scripts/verify_batch_quotes.py --stamp, against the live pages 2026-08-23",
     "note": "quote_verbatim_confirmed records OUR check, not the patch's claim. no_fr_non_eea_worker_work_permit_required kept its original citation: the patch's replacement page does not carry the claim."
+  },
+  "scope_tagging": {
+    "patch": "no-fr-card6-patch-2026-08-23",
+    "records_tagged": 12,
+    "audience_scope": 5,
+    "nationality_determined": 7,
+    "untagged": 5,
+    "note": "untagged records are the 5 the patch could not reach; they carry nationality 'EEA' and are gated by class, so they do not reach an own-national. Tagging them needs the same source pass the other 12 had."
   }
 }
