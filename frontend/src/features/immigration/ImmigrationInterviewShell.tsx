@@ -136,8 +136,10 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor="im-city" className="block text-xs font-medium text-[#374151] mb-1">City</label>
+          {/* The old sibling <label htmlFor="im-city"> pointed at an id the picker does not
+              render — an orphaned label announces nothing. The picker owns its label. */}
           <CityPicker
+            label="City"
             value={value.city || ''}
             onChange={(v) => upd('city', v)}
             country={value.country || ''}
@@ -156,8 +158,8 @@ const AddressEditor: React.FC<AddressEditorProps> = ({ value, onChange, showDate
         </div>
       </div>
       <div>
-        <label htmlFor="im-country" className="block text-xs font-medium text-[#374151] mb-1">Country</label>
         <CountryPicker
+          label="Country"
           value={value.country || ''}
           onChange={(v) => upd('country', v)}
           testId="im-country"
