@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CountryPicker } from '../../components/location';
 import { Alert, Badge, Button, Card, Input } from '../../components/antigravity';
 import { CountryMultiSelect } from '../policy-config/CountryMultiSelect';
 import {
@@ -249,8 +250,11 @@ export function ImmigrationAnswerPanel(
           ) : (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <Input aria-label="From country" placeholder="From (e.g. IN)" value={from} onChange={(v) => setFrom(v)} />
-                <Input aria-label="To country" placeholder="To (e.g. DE)" value={to} onChange={(v) => setTo(v)} />
+                {/* Labels kept verbatim ("From country"/"To country"): they are the
+                    accessible names the existing tests and screen readers already rely on.
+                    Changing a control's type should not rename it. */}
+                <CountryPicker label="From country" value={from} onChange={setFrom} testId="imm-answer-from" />
+                <CountryPicker label="To country" value={to} onChange={setTo} testId="imm-answer-to" />
               </div>
               {corridorFields}
             </div>

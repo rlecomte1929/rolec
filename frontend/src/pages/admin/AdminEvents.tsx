@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { CityPicker, CountryPicker } from '../../components/location';
 import { Link } from 'react-router-dom';
-import { Input } from '../../components/antigravity/Input';
 import { Card, Button } from '../../components/antigravity';
 import { StatusBadge } from '../../components/admin/resources/StatusBadge';
 import { EventRowActions } from '../../components/admin/resources/EventRowActions';
@@ -104,18 +104,15 @@ export const AdminEvents: React.FC = () => {
   return (
     <AdminLayout title="Events" subtitle="Manage country events">
       <div className="flex flex-wrap gap-2 mb-4">
-        <Input unstyled
-          value={filters.country_code}
-          onChange={(v) => setFilters((f) => ({ ...f, country_code: v }))}
-          placeholder="Country"
-          className="rounded border border-slate-200 px-3 py-2 text-sm w-24"
-        />
-        <Input unstyled
-          value={filters.city}
-          onChange={(v) => setFilters((f) => ({ ...f, city: v }))}
-          placeholder="City"
-          className="rounded border border-slate-200 px-3 py-2 text-sm w-32"
-        />
+        {/* Filters key on ISO country_code — valueMode="code" so the dropdown stores
+            what the query expects. A picker that stores a NAME here would silently match
+            nothing, which is no better than the free-text box it replaces. */}
+        <div className="w-40">
+          <CountryPicker value={filters.country_code} onChange={(v) => setFilters((f) => ({ ...f, country_code: v }))} valueMode="code" placeholder="Country" testId="events-country" />
+        </div>
+        <div className="w-40">
+          <CityPicker value={filters.city} onChange={(v) => setFilters((f) => ({ ...f, city: v }))} placeholder="City" testId="events-city" />
+        </div>
         <select value={filters.event_type} onChange={(e) => setFilters((f) => ({ ...f, event_type: e.target.value }))} className="rounded border border-slate-200 px-3 py-2 text-sm">
           <option value="">Event type</option>
           {EVENT_TYPES.map((t) => (

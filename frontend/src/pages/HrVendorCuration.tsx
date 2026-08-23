@@ -13,6 +13,7 @@ import { Info } from 'lucide-react';
 import { Checkbox } from '../components/antigravity/Checkbox';
 import { Input } from '../components/antigravity/Input';
 import { AppShell } from '../components/AppShell';
+import { CityPicker, CountryPicker, canonPlace } from '../components/location';
 import { Alert, Button, Card } from '../components/antigravity';
 import {
   addCustomVendor,
@@ -90,6 +91,17 @@ const CATEGORY_OPTIONS: { value: string; label: string }[] = [
 
 /** Sentinel value for the dropdown's "Request a new destination" option. */
 const REQUEST_NEW_VALUE = '__request_new__';
+
+/** Prefer a full country NAME over an ISO code, and a title-cased spelling over a lower-cased
+ *  one — the convention 71 of 74 allowlist countries already follow. Used to pick which
+ *  spelling represents a country once duplicates are collapsed. */
+function _betterCountryLabel(candidate: string, current: string): boolean {
+  const isCode = (v: string) => v.trim().length === 2;
+  if (isCode(candidate) !== isCode(current)) return !isCode(candidate);
+  const titled = (v: string) => v.trim().slice(0, 1) === v.trim().slice(0, 1).toUpperCase();
+  if (titled(candidate) !== titled(current)) return titled(candidate);
+  return false;
+}
 
 function destinationKey(d: { city: string; country: string }): string {
   return `${d.city}|${d.country}`;
@@ -197,18 +209,31 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
   // AIQ-1444 pt2: distinct countries (A-Z) for the country dropdown, and the
   // cities (A-Z) available under the currently-selected country for the dependent
   // city dropdown.
-  const countryOptions = useMemo(
-    () =>
-      Array.from(new Set(destinations.map((d) => d.country))).sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [destinations],
-  );
+  // De-duped by CANONICAL key, not by exact string. The allowlist held Ireland as 'IE',
+  // 'Ireland' and 'ireland', so a raw Set offered three Irelands — and picking the
+  // lower-cased one sent destination_city='dublin', which the master-item filter then
+  // failed to match, hiding 29 curated vendors. One entry per country, and the
+  // best-formed spelling wins (title-cased full name over an ISO code).
+  const countryOptions = useMemo(() => {
+    const best = new Map<string, string>();
+    for (const d of destinations) {
+      const key = canonPlace(d.country);
+      if (!key) continue;
+      const current = best.get(key);
+      if (current === undefined || _betterCountryLabel(d.country, current)) {
+        best.set(key, d.country);
+      }
+    }
+    return Array.from(best.values()).sort((a, b) => a.localeCompare(b));
+  }, [destinations]);
 
+  // Canonical match, so a country picked as 'Ireland' still finds a row stored as 'ireland'.
   const citiesForCountry = useMemo(
     () =>
       selectedCountry
-        ? sortedDestinations.filter((d) => d.country === selectedCountry)
+        ? sortedDestinations.filter(
+            (d) => canonPlace(d.country) === canonPlace(selectedCountry),
+          )
         : [],
     [sortedDestinations, selectedCountry],
   );
@@ -857,24 +882,22 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
             </p>
             <label className="mt-4 block text-sm font-medium text-[#0b2b43]">
               City
-              <Input unstyled
-                type="text"
-                className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
+              <CityPicker
                 value={newCity}
-                onChange={(v) => setNewCity(v)}
-                placeholder="e.g. Tokyo"
+                onChange={setNewCity}
+                country={newCountry}
                 disabled={requesting}
+                testId="request-destination-city"
+                placeholder={newCountry ? 'Select or type a city…' : 'Pick a country first'}
               />
             </label>
             <label className="mt-3 block text-sm font-medium text-[#0b2b43]">
               Country
-              <Input unstyled
-                type="text"
-                className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
+              <CountryPicker
                 value={newCountry}
-                onChange={(v) => setNewCountry(v)}
-                placeholder="e.g. Japan"
+                onChange={setNewCountry}
                 disabled={requesting}
+                testId="request-destination-country"
               />
             </label>
             <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
