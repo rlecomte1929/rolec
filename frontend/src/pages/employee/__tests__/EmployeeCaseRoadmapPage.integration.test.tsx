@@ -242,3 +242,39 @@ describe('resolveRoadmapBuildVariant — terminal state mapping (AIQ-1377)', () 
     expect(resolveRoadmapBuildVariant(true, false)).toBe('empty');
   });
 });
+
+// ── [BUG-260817-4CD6] "chat disappeared" ─────────────────────────────────────
+// The policy-assistant FAB was mounted ONLY in the final happy-path return, so every
+// early return dropped it — including the "building your roadmap" state, which can hold
+// for the whole ~60s retry window and is terminal when generation fails. The chat
+// vanished at precisely the moment someone wants to ask why their roadmap is empty.
+describe('EmployeeCaseRoadmapPage — the assistant survives every state', () => {
+  it('keeps the chat reachable while the roadmap is still building', async () => {
+    vi.useFakeTimers();
+    try {
+    fetchRelocationPlanView.mockReset();
+    fetchRelocationPlanView.mockRejectedValue(new Error('down'));
+    renderPage();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+
+    // Precondition: we really are in the non-happy branch.
+    expect(screen.getByText(/building your roadmap/i)).toBeInTheDocument();
+    // The bug: this was absent.
+    expect(screen.getByTestId('policy-assistant-fab')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still offers it on the ready roadmap (no regression)', async () => {
+    fetchRelocationPlanView.mockReset();
+    fetchRelocationPlanView.mockResolvedValue(READY_PLAN);
+    renderPage();
+
+    await screen.findAllByText('Apply for work visa');
+    expect(screen.getByTestId('policy-assistant-fab')).toBeInTheDocument();
+  });
+});
+
