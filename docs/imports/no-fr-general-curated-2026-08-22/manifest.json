@@ -11,13 +11,13 @@
   "nationality_class": "MIXED — per-record applies_to.nationality (EEA / non-EEA; universal facts are twinned)",
   "target_table": "public.requirement_items (via otto_staging; candidates only)",
   "target_country_code": "FRANCE",
-  "record_count": 17,
+  "record_count": 16,
   "raw_record_count": 20,
   "step_candidates": 0,
   "origin_candidates": 3,
   "deferred": 1,
   "artifact": "no-fr-general-curated-2026-08-22.ndjson",
-  "sha256": "5da4ae6b1c7a8db51b6c9b52f0ec4933149d09aec9fcd2b8f31c0ed9625f7a65",
+  "sha256": "a5d3fbf129ff4874cda8c6df770137843741595edbec80cd0c05aead4e4b6ff3",
   "review_status_all": "pending",
   "verification_status_all": "representative",
   "scope": "Curated, nationality-scoped subset of Otto's refused general batch. Covers employed-mover destination requirements only; steps routed to pathway-graph candidates, origin-side duties routed to corridors/<id>/facts.yaml candidates, self-employment sub-corpus deferred to the Otto re-delivery (AIQ-1833). Must reconcile: curated + steps + origin + deferred == raw_record_count (twinned records counted once via their base fact_key).",
@@ -30,9 +30,26 @@
     "batch": "no-fr-evidence-repair-2026-08-23",
     "patch_artifact": "raw/no-fr-evidence-repair-2026-08-23.ndjson",
     "records_patched": 12,
-    "quotes_verbatim_confirmed": 10,
-    "quotes_unconfirmed": 7,
+    "quotes_verbatim_confirmed": 12,
+    "quotes_unconfirmed": 4,
     "confirmed_by": "scripts/verify_batch_quotes.py --stamp, against the live pages 2026-08-23",
     "note": "quote_verbatim_confirmed records OUR check, not the patch's claim. no_fr_non_eea_worker_work_permit_required kept its original citation: the patch's replacement page does not carry the claim."
+  },
+  "scope_tagging": {
+    "records_tagged": 16,
+    "audience_scope": 4,
+    "nationality_determined": 12,
+    "untagged": 0,
+    "note": "all records tagged; the final five carried across from their already-tagged siblings on the eea_residence_card entity."
+  },
+  "scenario": {
+    "reference_case": "944a3820-4369-417b-bdcc-63e67c5aca1c (NO→FR, Oslo→Paris)",
+    "branch": "permanent France-based work, NOT a posting",
+    "consequence": "the A1/posted-worker record is assertion_mode=conditional; French social security applies under Reg. 883/2004 art. 11(3)(a)",
+    "case_data_gap": "the case stores nationality=NULL, so the matcher fails open and would serve all records until the profile is hydrated"
+  },
+  "deduplication": {
+    "dropped": "no_fr_france_tax_domicile_trigger_cgf_4b__non_eea",
+    "reason": "byte-identical to the _eea twin in fact_text, evidence_quote and source_url; CGI art. 4B does not vary by nationality"
   }
 }

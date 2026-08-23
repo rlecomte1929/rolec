@@ -33,6 +33,14 @@ _NAT_LABEL_TO_CLASS = {
     "non-EU": THIRD_COUNTRY,
     "EEA": EU_EEA,
     "EU": EU_EEA,
+    # Spelled-out variants. An unrecognised label fails OPEN (see `nationality_applies`), which
+    # is right for a label we cannot interpret but wrong for one that plainly means EU_EEA: the
+    # NO→FR batch delivered "EEA/EU/Swiss" and six nationality_determined records silently
+    # reached every mover, including the returning own-national they do not apply to. Failing
+    # open is the anti-silence contract, not a licence to leave a known vocabulary unmapped.
+    "EEA/EU/Swiss": EU_EEA,
+    "EU/EEA/Swiss": EU_EEA,
+    "EEA/EU": EU_EEA,
 }
 
 
