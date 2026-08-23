@@ -69,14 +69,18 @@ CASE_ID = os.environ.get("RELOPASS_ESIE_CASE_ID", "")
 GREEN, RED, DIM, RESET = "\033[92m", "\033[91m", "\033[2m", "\033[0m"
 _failures: list[str] = []
 
-# The seed markers #2002 removed. Any of these on a FRESH case means the regression is back.
+# The invented VALUES #2002 removed. Any of these on a FRESH case means the regression is back.
 #
-# On a LEGACY case this check is a true positive, not a false alarm: the 2,002 cases created
-# before #2002 still carry the seed until backend/scripts/clear_seed_family_profile.py is run
-# against them. Verified 2026-08-22 — a Testing April case from before the fix reports
-# `budgetMonthlySGD`, correctly. So judge this stage against the fixture (--seed), and read a
-# hit on an old case as "that row needs the backfill", not "the fix regressed".
-SEED_MARKERS = ("Singapore", "Oslo", "budgetMonthlySGD")
+# `budgetMonthlySGD` was on this list and should not have been. It is a currency-locked KEY
+# NAME whose value is null; #2002 deliberately left it alone, because renaming a wire field is
+# a contract change and not part of a P1 bug fix. Asserting on it made this stage fail on a
+# case created seconds earlier — a false alarm about the product, caused by the test. Judge
+# invented CONTENT, not the schema's vocabulary.
+#
+# On a LEGACY case a hit here is still a true positive: the 2,002 cases created before #2002
+# carry the seed until backend/scripts/clear_seed_family_profile.py runs against them. Read it
+# as "that row needs the backfill", not "the fix regressed".
+SEED_MARKERS = ("Singapore", "Oslo", '"familySize": 4')
 
 # The CSEP journey a third-country national on ES→IE must be given. Substrings, because the
 # titles carry punctuation and detail that is allowed to change.

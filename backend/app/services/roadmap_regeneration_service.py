@@ -245,9 +245,8 @@ def regenerate_case_milestones(
     return plan
 
 
-def _load_draft(db: Any, case_id: str) -> Dict[str, Any]:
-    """Best-effort wizard draft for a case. Degrades to {} rather than raising: a case with
-    no draft still regenerates, it just gets the generic pack (which is what it has now)."""
+def _wizard_draft(case_id: str) -> Dict[str, Any]:
+    """The nested CaseDraftDTO from `wizard_cases`, or {} when there is no row."""
     try:
         from ..db import SessionLocal
         from .. import crud as app_crud
@@ -259,5 +258,74 @@ def _load_draft(db: Any, case_id: str) -> Dict[str, Any]:
             raw = json.loads(getattr(case, "draft_json", None) or "{}")
             return raw if isinstance(raw, dict) else {}
     except Exception:  # pragma: no cover - defensive, mirrors the seeding sites
-        log.warning("roadmap regenerate: could not load draft case_id=%s", case_id, exc_info=True)
+        log.warning("roadmap regenerate: could not load wizard draft case_id=%s", case_id, exc_info=True)
         return {}
+
+
+def _assignment_intake_draft(db: Any, case_id: str) -> Dict[str, Any]:
+    """The assignment's FLAT snake_case intake draft, converted to the nested shape.
+
+    Two stores hold a case's intake and they are not the same table:
+
+        wizard_cases.draft_json          nested camelCase  (the v1 wizard)
+        case_assignments.intake_draft    flat snake_case   (the v2 Pathway wizard,
+                                                            and the HR contract prefill)
+
+    `intake_draft_to_case_draft` is the server-authoritative bridge between them (AIQ-1311),
+    written so the backend can work "straight from the reliable assignment autosave instead
+    of depending on the frontend having patched the right wizard_cases row".
+    """
+    try:
+        assignment = db.get_assignment_by_case_id(case_id)
+        if not assignment:
+            return {}
+        raw = assignment.get("intake_draft")
+        if isinstance(raw, str):
+            raw = json.loads(raw or "{}")
+        if not isinstance(raw, dict) or not raw:
+            return {}
+        from backend.intake_draft_to_case_draft import intake_draft_to_case_draft
+
+        converted = intake_draft_to_case_draft(raw)
+        return converted if isinstance(converted, dict) else {}
+    except Exception:  # pragma: no cover - defensive; a bad draft must not stop regeneration
+        log.warning(
+            "roadmap regenerate: could not load intake draft case_id=%s", case_id, exc_info=True
+        )
+        return {}
+
+
+def _load_draft(db: Any, case_id: str) -> Dict[str, Any]:
+    """The best available intake for a case, across BOTH stores.
+
+    WHY THIS READS TWO PLACES. Regeneration used to read `wizard_cases` alone. The HR
+    contract prefill writes `case_assignments.intake_draft`. Different tables, so they never
+    met: an end-to-end run on 2026-08-23 prefilled a fresh ES→IE case with
+    origin_country=ES / dest_country=IE / nationality=VE, regeneration then read an ABSENT
+    wizard row, saw no corridor, and produced the generic 16-step pack — while everything it
+    needed sat one table over. Both features' unit tests passed, because each was tested
+    against its own store.
+
+    The wizard draft WINS where it has a value: it is the employee's own answer, and an HR
+    extraction is a proposal about them. The intake draft only fills what is missing — which
+    today is usually everything, because most cases have no wizard row at all.
+    """
+    wizard = _wizard_draft(case_id)
+    intake = _assignment_intake_draft(db, case_id)
+    if not intake:
+        return wizard
+    if not wizard:
+        return intake
+
+    # Section-wise merge: keep every wizard value, add only keys it does not have. A whole
+    # section present but EMPTY in the wizard draft (the `_default_wizard_draft` skeleton
+    # writes `{}` x4) must not shadow a populated one.
+    merged: Dict[str, Any] = dict(intake)
+    for section, value in wizard.items():
+        if isinstance(value, dict) and isinstance(merged.get(section), dict):
+            combined = dict(merged[section])
+            combined.update({k: v for k, v in value.items() if v not in (None, "", [], {})})
+            merged[section] = combined
+        elif value not in (None, "", [], {}):
+            merged[section] = value
+    return merged
