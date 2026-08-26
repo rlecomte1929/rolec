@@ -17,8 +17,11 @@ name: Notification outbox dispatch
 
 on:
   schedule:
-    # Every 15 minutes, offset off the top of the hour to avoid the cron pileup.
-    - cron: "7,22,37,52 * * * *"
+    # Hourly, offset off the top of the hour to avoid the cron pileup. Was every 15min
+    # (4x the billed minutes, each run charged at GitHub's 1-minute minimum) for a queue
+    # that has delivered 6 rows in its lifetime. The latency that actually matters is
+    # covered by dispatch_outbox_soon(), which fires on write; this cron is the safety net.
+    - cron: "7 * * * *"
   workflow_dispatch:
 
 concurrency:
