@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from ..models import Supplier, SupplierServiceCapability, SupplierScoringMetadata
 from .supplier_validation import (
     check_duplicate_capability,
+    normalize_country_code,
     validate_active_supplier_requirements,
     validate_capability,
     validate_supplier_create,
@@ -453,7 +454,9 @@ def create_supplier(session: Session, data: Dict[str, Any]) -> Dict[str, Any]:
             supplier_id=sid,
             service_category=c.get("service_category", "general"),
             coverage_scope_type=c.get("coverage_scope_type", "country"),
-            country_code=c.get("country_code"),
+            # Normalised like add_capability / update_capability already do — this
+            # path wrote it verbatim, which is how ' no ' / 'Norway' could be stored.
+            country_code=normalize_country_code(c.get("country_code")),
             city_name=c.get("city_name"),
             specialization_tags=_serialize_json_array(c.get("specialization_tags") or []),
             min_budget=c.get("min_budget"),
