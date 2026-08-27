@@ -114,7 +114,7 @@ export function TestDriveFrictionPrompt({ idleMs = 90_000 }: TestDriveFrictionPr
           type="button"
           onClick={() => record('dismissed')}
           aria-label="Dismiss"
-          className="text-gray-400 hover:text-gray-600"
+          className="text-gray-500 hover:text-gray-600"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -143,13 +143,13 @@ export function TestDriveFrictionPrompt({ idleMs = 90_000 }: TestDriveFrictionPr
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Anything else? (optional)"
-          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-800 placeholder-gray-300 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-800 placeholder-gray-500 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
         />
         <div className="flex items-center justify-between">
           <button
             type="button"
             onClick={() => record('dismissed')}
-            className="text-xs text-gray-400 hover:text-gray-600"
+            className="text-xs text-gray-500 hover:text-gray-600"
           >
             Skip
           </button>

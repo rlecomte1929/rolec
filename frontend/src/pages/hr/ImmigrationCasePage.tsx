@@ -96,7 +96,7 @@ export const ImmigrationCasePage: React.FC = () => {
   if (loading) {
     return (
       <AppShell title="Immigration case">
-        <p className="text-[#94a3b8] p-8">Loading…</p>
+        <p className="text-slate-500 p-8">Loading…</p>
       </AppShell>
     );
   }
@@ -140,7 +140,7 @@ export const ImmigrationCasePage: React.FC = () => {
             <h1 className="text-2xl font-semibold text-[#f1f5f9]">
               Immigration case
             </h1>
-            <p className="text-[#94a3b8] text-sm mt-1">
+            <p className="text-slate-500 text-sm mt-1">
               {immCase.corridor_from} → {immCase.corridor_to} ·{' '}
               {PERMIT_LABELS[immCase.permit_type] ?? immCase.permit_type}
             </p>
@@ -171,7 +171,7 @@ export const ImmigrationCasePage: React.FC = () => {
 
         {/* Timeline */}
         <Card className="p-6 mb-6">
-          <h2 className="text-sm font-semibold text-[#94a3b8] uppercase tracking-wider mb-6">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-6">
             Permit pipeline
           </h2>
           <ol className="relative border-l border-[#334155] space-y-0">
@@ -227,7 +227,7 @@ export const ImmigrationCasePage: React.FC = () => {
 
         {/* Key dates */}
         <Card className="p-6 mb-6">
-          <h2 className="text-sm font-semibold text-[#94a3b8] uppercase tracking-wider mb-4">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">
             Key dates
           </h2>
           <dl className="grid grid-cols-2 gap-4 text-sm">
@@ -262,7 +262,7 @@ export const ImmigrationCasePage: React.FC = () => {
 
         {/* BL-OCR.4 / AIQ-750 — uploaded documents + AI extraction status */}
         <Card className="p-6 mb-6">
-          <h2 className="text-sm font-semibold text-[#94a3b8] uppercase tracking-wider mb-4">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">
             Documents
           </h2>
           <CaseDocumentsPanel caseId={immCase.case_id} />
@@ -272,7 +272,7 @@ export const ImmigrationCasePage: React.FC = () => {
             Separate card from Documents above because it reads a different
             backend (rce) with its own document-id space; see the panel header. */}
         <Card className="p-6 mb-6">
-          <h2 className="text-sm font-semibold text-[#94a3b8] uppercase tracking-wider mb-4">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">
             Extracted data
           </h2>
           <CaseExtractedDataPanel caseId={immCase.case_id} />

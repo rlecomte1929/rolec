@@ -163,7 +163,7 @@ export const HrCaseReview: React.FC = () => {
 
               <div className="mt-4 pt-4 border-t border-[#e2e8f0]">
                 <div className="text-xs font-medium text-[#6b7280] mb-2">Previous feedback</div>
-                {feedback.length === 0 && <div className="text-xs text-[#9ca3af]">No feedback yet.</div>}
+                {feedback.length === 0 && <div className="text-xs text-gray-500">No feedback yet.</div>}
                 {feedback.map((f) => (
                   <div key={f.id} className="mb-3 text-sm">
                     <div className="text-[#6b7280]">

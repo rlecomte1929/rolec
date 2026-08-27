@@ -66,7 +66,7 @@ function SetupProgressSummary({ status }: { status: SetupStatus }) {
             {done ? (
               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
             ) : (
-              <Circle className="h-4 w-4 shrink-0 text-slate-300" aria-hidden />
+              <Circle className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
             )}
             <span className={done ? 'text-slate-700' : 'font-medium text-slate-900'}>
               {label}
@@ -134,7 +134,7 @@ function SetupAnswerCard({
           <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Question</div>
           <p className="text-sm text-slate-800 mt-0.5">{question}</p>
         </div>
-        <span className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400" aria-hidden>
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500" aria-hidden>
           <ArrowRight className={`h-4 w-4 transition-transform ${collapsed ? '' : 'rotate-90'}`} />
         </span>
       </div>
@@ -289,7 +289,7 @@ export const SetupAssistantPanel: React.FC<{
                   className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3.5 text-left text-sm font-medium text-slate-700 transition-colors hover:border-[#0b2b43]/25 hover:bg-slate-50 disabled:opacity-50"
                 >
                   <span className="min-w-0 leading-snug">{s}</span>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
                 </Button>
               </li>
             ))}
@@ -307,7 +307,7 @@ export const SetupAssistantPanel: React.FC<{
           rows={inSheetLike ? (isEmptyState ? 3 : 5) : 3}
           maxLength={4000}
           placeholder={SETUP_ASSISTANT_PLACEHOLDER}
-          className={`w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300 disabled:opacity-60${inSheetLike ? ' min-h-[5rem]' : ''}`}
+          className={`w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300 disabled:opacity-60${inSheetLike ? ' min-h-[5rem]' : ''}`}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           disabled={submitting}

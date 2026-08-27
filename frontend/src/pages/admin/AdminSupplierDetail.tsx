@@ -410,21 +410,21 @@ export const AdminSupplierDetail: React.FC = () => {
                     {display.website}
                   </a>
                 ) : (
-                  <span className="text-[#9ca3af]"> - </span>
+                  <span className="text-gray-500"> - </span>
                 )}
               </dd>
             </div>
             <div>
               <dt className="text-[#6b7280]">Email</dt>
-              <dd>{display.contact_email || <span className="text-[#9ca3af]"> - </span>}</dd>
+              <dd>{display.contact_email || <span className="text-gray-500"> - </span>}</dd>
             </div>
             <div>
               <dt className="text-[#6b7280]">Phone</dt>
-              <dd>{display.contact_phone || <span className="text-[#9ca3af]"> - </span>}</dd>
+              <dd>{display.contact_phone || <span className="text-gray-500"> - </span>}</dd>
             </div>
             <div>
               <dt className="text-[#6b7280]">Source</dt>
-              <dd>{display.source || <span className="text-[#9ca3af]"> - </span>}</dd>
+              <dd>{display.source || <span className="text-gray-500"> - </span>}</dd>
             </div>
             <div>
               <dt className="text-[#6b7280]">Source URL</dt>
@@ -439,7 +439,7 @@ export const AdminSupplierDetail: React.FC = () => {
                     {display.source_url}
                   </a>
                 ) : (
-                  <span className="text-[#9ca3af]"> - </span>
+                  <span className="text-gray-500"> - </span>
                 )}
               </dd>
             </div>

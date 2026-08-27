@@ -232,20 +232,20 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
               </p>
               {(state === 'open' || state === 'error' || state === 'submitting') && (
                 <Button unstyled onClick={() => setState('reports')}
-                  className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2 transition-colors"
+                  className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2 transition-colors"
                   aria-label="My reports">
                   My reports
                 </Button>
               )}
               {state === 'reports' && (
                 <Button unstyled onClick={() => setState('open')}
-                  className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2 transition-colors">
+                  className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2 transition-colors">
                   ← Write feedback
                 </Button>
               )}
             </div>
             <Button unstyled onClick={close}
-              className="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
+              className="text-gray-500 hover:text-gray-600 transition-colors" aria-label="Close">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -260,11 +260,11 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
               </svg>
               <p className="text-sm font-medium text-gray-900">Received — thank you!</p>
               {reportId && (
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-500">
                   Reference: <span className="font-mono font-semibold text-gray-600">{reportId}</span>
                 </p>
               )}
-              <p className="text-xs text-gray-400">We&apos;ll look into it.</p>
+              <p className="text-xs text-gray-500">We&apos;ll look into it.</p>
               {storageNote && (
                 <p className="mt-1 text-[11px] text-gray-500 leading-snug">
                   Screenshot saved. Image storage: <span className="font-semibold">{storageNote.remaining_mb} MB</span> left
@@ -274,7 +274,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
               <button
                 type="button"
                 onClick={() => setState('reports')}
-                className="mt-1 text-xs text-gray-400 underline underline-offset-2 hover:text-gray-600 transition-colors"
+                className="mt-1 text-xs text-gray-500 underline underline-offset-2 hover:text-gray-600 transition-colors"
               >
                 View my reports
               </button>
@@ -285,7 +285,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
           {state === 'reports' && (
             <div className="px-4 py-4 max-h-72 overflow-y-auto">
               {reportsLoading && (
-                <p className="text-xs text-gray-400 text-center py-4">Loading…</p>
+                <p className="text-xs text-gray-500 text-center py-4">Loading…</p>
               )}
               {reportsError && !reportsLoading && (
                 <p className="text-xs text-red-500 text-center py-4">
@@ -293,7 +293,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
                 </p>
               )}
               {!reportsLoading && !reportsError && reports !== null && reports.length === 0 && (
-                <p className="text-xs text-gray-400 text-center py-4">No reports yet.</p>
+                <p className="text-xs text-gray-500 text-center py-4">No reports yet.</p>
               )}
               {!reportsLoading && !reportsError && reports !== null && reports.length > 0 && (
                 <ul className="space-y-2">
@@ -347,7 +347,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
                   category === 'idea' ? 'What would make this more useful?' :
                   "What's on your mind?"
                 }
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 text-gray-800 placeholder-gray-300 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 text-gray-800 placeholder-gray-500 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submit(); }}
@@ -356,7 +356,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
 
               {/* Transparency: only shown when we are actually recording (bug + consent). */}
               {category === 'bug' && getAnalyticsConsent() === 'granted' && (
-                <p className="text-[10.5px] text-gray-400">
+                <p className="text-[10.5px] text-gray-500">
                   To help us debug, we capture a short screen replay of this session.
                 </p>
               )}
@@ -417,7 +417,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
               </div>
 
               {/* Page context badge */}
-              <div className="flex items-center gap-1.5 text-[10.5px] text-gray-400">
+              <div className="flex items-center gap-1.5 text-[10.5px] text-gray-500">
                 <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
                 </svg>
@@ -430,7 +430,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
 
               {/* Footer */}
               <div className="flex items-center justify-between pt-0.5">
-                <p className="text-xs text-gray-300">⌘ Enter to send</p>
+                <p className="text-xs text-gray-500">⌘ Enter to send</p>
                 <Button unstyled
                   onClick={submit}
                   disabled={!message.trim() || state === 'submitting'}

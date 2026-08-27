@@ -157,7 +157,7 @@ export const NotificationBell: React.FC = () => {
                       {n.snippet}
                     </div>
                     <div
-                      className="text-[10px] text-[#94a3b8] mt-1"
+                      className="text-[10px] text-slate-500 mt-1"
                       title={new Date(n.created_at).toLocaleString()}
                     >
                       {formatRelative(n.created_at)}

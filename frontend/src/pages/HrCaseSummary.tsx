@@ -253,7 +253,7 @@ export const HrCaseSummary: React.FC = () => {
         >
           ← Dashboard
         </Link>
-        <span aria-hidden="true" className="text-[#94a3b8]"> / </span>
+        <span aria-hidden="true" className="text-slate-500"> / </span>
         <span className="text-[#475569]" aria-current="page">{headerName}</span>
       </nav>
       {displayedError && (

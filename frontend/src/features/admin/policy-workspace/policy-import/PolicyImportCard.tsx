@@ -10,7 +10,7 @@ const INTRO =
 export const PolicyImportCard: React.FC = () => (
   <Card padding="md" className="border-[#eef2f7] bg-[#fafbfc]/80 shadow-none">
     <div className="space-y-5">
-      <p className="text-xs text-[#94a3b8] leading-relaxed max-w-3xl">{INTRO}</p>
+      <p className="text-xs text-slate-500 leading-relaxed max-w-3xl">{INTRO}</p>
       <PolicyImportSteps />
       <PolicyImportNote />
       <PolicyImportCTA />

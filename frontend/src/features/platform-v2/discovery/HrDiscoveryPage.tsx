@@ -125,7 +125,7 @@ function DiscoveryBanner() {
           { k: 'Est. cost',    v: '€680' },
         ].map(({ k, v }) => (
           <div key={k} className="text-center">
-            <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">{k}</div>
+            <div className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">{k}</div>
             <div className="text-sm font-bold text-gray-900 tabular-nums">{v}</div>
           </div>
         ))}
@@ -160,7 +160,7 @@ function RequirementsTab({
       <div className="flex items-center justify-between mb-3">
         <div>
           <span className="text-sm font-semibold text-gray-900">Extracted requirements</span>
-          <span className="ml-2 text-xs text-gray-400">{REQUIREMENTS.length} nodes · cross-referenced from 6 official sources</span>
+          <span className="ml-2 text-xs text-gray-500">{REQUIREMENTS.length} nodes · cross-referenced from 6 official sources</span>
         </div>
         <div className="flex items-center gap-2">
           <Button unstyled
@@ -195,7 +195,7 @@ function RequirementsTab({
               }`}
             >
               {/* index */}
-              <span className="flex-shrink-0 w-6 text-xs font-mono font-bold text-gray-300 pt-0.5 select-none">
+              <span className="flex-shrink-0 w-6 text-xs font-mono font-bold text-gray-500 pt-0.5 select-none">
                 {String(r.id).padStart(2, '0')}
               </span>
 
@@ -206,10 +206,10 @@ function RequirementsTab({
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${CAT_COLORS[r.cat] ?? 'bg-gray-100 text-gray-600'}`}>
                     {r.cat}
                   </span>
-                  <span className="text-xs text-gray-400">👤 {r.owner}</span>
-                  <span className="text-xs text-gray-400">⏱ {r.time}</span>
+                  <span className="text-xs text-gray-500">👤 {r.owner}</span>
+                  <span className="text-xs text-gray-500">⏱ {r.time}</span>
                   {r.deps.length > 0 && (
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-gray-500">
                       depends on {r.deps.map((d) => `#${String(d).padStart(2, '0')}`).join(', ')}
                     </span>
                   )}
@@ -218,14 +218,14 @@ function RequirementsTab({
                       conditional · {r.conditional}
                     </span>
                   )}
-                  {src && <span className="text-xs text-gray-300">· {src.init}</span>}
+                  {src && <span className="text-xs text-gray-500">· {src.init}</span>}
                 </div>
               </div>
 
               {/* confidence */}
               <div className="flex-shrink-0 text-right">
                 <ConfBar pct={r.conf} />
-                <div className="text-[10px] text-gray-400 mt-0.5">confidence</div>
+                <div className="text-[10px] text-gray-500 mt-0.5">confidence</div>
               </div>
             </div>
           );
@@ -253,10 +253,10 @@ function TimelineTab() {
       <div className="flex flex-col gap-0 divide-y divide-gray-100">
         {TIMELINE_PHASES.map((p, i) => (
           <div key={i} className="grid gap-4 items-center py-3" style={{ gridTemplateColumns: '90px 1fr 160px' }}>
-            <span className="font-mono text-xs font-bold text-gray-400">{p.wk}</span>
+            <span className="font-mono text-xs font-bold text-gray-500">{p.wk}</span>
             <div>
               <div className="text-sm font-semibold text-gray-900">{p.t}</div>
-              <div className="text-xs text-gray-400 mt-0.5">
+              <div className="text-xs text-gray-500 mt-0.5">
                 Requirements: {p.reqs.map((r) => `#${String(r).padStart(2, '0')}`).join(', ')}
               </div>
             </div>
@@ -321,7 +321,7 @@ function SourcesTab() {
           ))}
         </tbody>
       </table>
-      <div className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400 flex items-center gap-2">
+      <div className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-500 flex items-center gap-2">
         🛡 Sources cached daily · last sync 03:14
       </div>
     </div>
@@ -334,7 +334,7 @@ function ActivityLog() {
       {LOG_ENTRIES.map((entry, i) => (
         <div
           key={i}
-          className={`flex gap-3 py-0.5 ${i === LOG_ENTRIES.length - 1 ? 'text-white' : 'text-gray-400'}`}
+          className={`flex gap-3 py-0.5 ${i === LOG_ENTRIES.length - 1 ? 'text-white' : 'text-gray-500'}`}
         >
           <span className="text-gray-600 flex-shrink-0">{entry.ts}</span>
           <span>

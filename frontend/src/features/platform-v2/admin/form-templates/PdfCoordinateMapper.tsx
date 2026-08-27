@@ -333,7 +333,7 @@ export const PdfCoordinateMapper: React.FC<PdfCoordinateMapperProps> = ({
 
         {/* PDF size readout (helps verify scale) */}
         {pdfWidth != null && pdfHeight != null && (
-          <span className="text-[10px] text-slate-400 font-mono">
+          <span className="text-[10px] text-slate-500 font-mono">
             {Math.round(pdfWidth)} × {Math.round(pdfHeight)} pt
           </span>
         )}
@@ -515,7 +515,7 @@ export const FieldSelector: React.FC<FieldSelectorProps> = ({
                 {f.label || f.id}
               </span>
               {f.id !== f.label && (
-                <span className="text-[11px] text-slate-400 font-mono leading-tight block">
+                <span className="text-[11px] text-slate-500 font-mono leading-tight block">
                   {f.id}
                 </span>
               )}

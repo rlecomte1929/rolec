@@ -216,7 +216,7 @@ function NotLinked({ label = 'Not set', title }: { label?: string; title?: strin
   return (
     <span
       title={title || 'Not yet linked to Supabase — placeholder.'}
-      className="text-[12.5px] text-slate-400"
+      className="text-[12.5px] text-slate-500"
     >
       {label}
     </span>
@@ -228,7 +228,7 @@ function Flag({ iso2, raw }: { iso2: string | null; raw?: string | null }) {
     // BRAND-5: muted intentional empty — show the raw value if we have one
     // (even unresolved, it's information), otherwise "Not set", never "tbd".
     return (
-      <span title={raw ? `Unknown country code: ${raw}` : 'No country recorded'} className="text-slate-400">
+      <span title={raw ? `Unknown country code: ${raw}` : 'No country recorded'} className="text-slate-500">
         {raw ? raw : 'Not set'}
       </span>
     );
@@ -522,12 +522,12 @@ export function MobilityControlCenterV2Page() {
         // BRAND-5: when neither side is known, a single intentional label reads
         // better than "Not set › Not set".
         if (!(row.originCountry || '').trim() && !(row.destCountry || '').trim()) {
-          return <span className="text-[12.5px] text-slate-400">Route not set</span>;
+          return <span className="text-[12.5px] text-slate-500">Route not set</span>;
         }
         return (
           <div className="flex items-center gap-2 text-[12.5px] text-slate-700">
             <Flag iso2={o} raw={row.originCountry} />
-            <span className="text-slate-400">›</span>
+            <span className="text-slate-500">›</span>
             <Flag iso2={d} raw={row.destCountry} />
           </div>
         );
@@ -705,7 +705,7 @@ export function MobilityControlCenterV2Page() {
         {execSummary &&
           !(displayKpis && displayKpis.activeCases === 0 && displayKpis.atRiskCount === 0 && displayKpis.completedCount === 0) && (
           <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Executive summary</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Executive summary</p>
             <p className="mt-1 text-[13px] leading-relaxed text-slate-700">{execSummary}</p>
           </div>
         )}
@@ -780,14 +780,14 @@ export function MobilityControlCenterV2Page() {
           <div className="space-y-3">
             <SidebarCard eyebrow="Corridor mix">
               {corridorMix.length === 0 ? (
-                <p className="text-[12px] text-slate-400">Corridors appear once a case has an origin and destination country.</p>
+                <p className="text-[12px] text-slate-500">Corridors appear once a case has an origin and destination country.</p>
               ) : (
                 <ul className="space-y-1.5">
                   {corridorMix.map((c) => (
                     <li key={`${c.origin ?? c.rawOrigin}-${c.dest ?? c.rawDest}`} className="flex items-center justify-between text-[12.5px]">
                       <span className="flex items-center gap-2 text-slate-700">
                         <Flag iso2={c.origin} raw={c.rawOrigin} />
-                        <span className="text-slate-400">›</span>
+                        <span className="text-slate-500">›</span>
                         <Flag iso2={c.dest} raw={c.rawDest} />
                       </span>
                       <span className="tabular-nums text-slate-500">{c.count}</span>
@@ -799,7 +799,7 @@ export function MobilityControlCenterV2Page() {
 
             <SidebarCard eyebrow="Risk feed">
               {riskFeed.length === 0 ? (
-                <p className="text-[12px] text-slate-400">All cases on track.</p>
+                <p className="text-[12px] text-slate-500">All cases on track.</p>
               ) : (
                 <ul className="space-y-2">
                   {riskFeed.map((row) => {
@@ -827,7 +827,7 @@ export function MobilityControlCenterV2Page() {
 
             <SidebarCard eyebrow="Pending approvals">
               {approvals.length === 0 ? (
-                <p className="text-[12px] text-slate-400">No pending approvals.</p>
+                <p className="text-[12px] text-slate-500">No pending approvals.</p>
               ) : (
                 <ul className="space-y-2">
                   {approvals.slice(0, 5).map((a) => (

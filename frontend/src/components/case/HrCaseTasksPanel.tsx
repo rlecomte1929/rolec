@@ -384,7 +384,7 @@ export const HrCaseTasksPanel: React.FC<HrCaseTasksPanelProps> = ({ caseId, coor
     return (
       <Card padding="lg">
         <div className="text-sm font-semibold text-[#0b2b43] mb-3">Employee tasks</div>
-        <div className="text-sm text-[#94a3b8]">Loading tasks…</div>
+        <div className="text-sm text-slate-500">Loading tasks…</div>
       </Card>
     );
   }
@@ -438,7 +438,7 @@ export const HrCaseTasksPanel: React.FC<HrCaseTasksPanelProps> = ({ caseId, coor
 
       {/* Task list — pending/revision first, then submitted, then approved */}
       {!data || data.tasks.length === 0 ? (
-        <div className="text-sm text-[#94a3b8]">No tasks assigned yet.</div>
+        <div className="text-sm text-slate-500">No tasks assigned yet.</div>
       ) : (
         <div className="space-y-2">
           {[...data.tasks]

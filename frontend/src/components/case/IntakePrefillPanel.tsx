@@ -97,7 +97,7 @@ export function ConfidenceDot({ score }: { score: number | undefined }) {
   return (
     <span className="inline-flex items-center gap-1" title={`Model confidence ${pct}%`}>
       <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
-      <span className="text-[10px] text-[#94a3b8]">{pct}%</span>
+      <span className="text-[10px] text-slate-500">{pct}%</span>
     </span>
   );
 }
@@ -188,7 +188,7 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
         ))}
       </div>
 
-      <p className="text-xs text-[#94a3b8]">
+      <p className="text-xs text-slate-500">
         Confidence is how directly the document stated a value — a hint for what to
         double-check, not an approval. Correct anything that is wrong, then confirm.
       </p>
@@ -277,7 +277,7 @@ export const IntakePrefillPanel: React.FC<IntakePrefillPanelProps> = ({ caseId }
     <Card padding="lg" className="border border-[#e2e8f0]">
       <div className="mb-4">
         <div className="text-sm font-semibold text-[#0b2b43]">Prefill intake from a document</div>
-        <p className="text-xs text-[#94a3b8] mt-0.5">
+        <p className="text-xs text-slate-500 mt-0.5">
           Upload the employment contract or offer letter. You review every field before
           anything is saved.
         </p>
@@ -355,7 +355,7 @@ export const IntakePrefillPanel: React.FC<IntakePrefillPanelProps> = ({ caseId }
             Saved: {result.written_fields.map((f) => FIELD_LABELS[f] || f).join(', ') || '—'}
           </div>
           {result.skipped_fields.length > 0 && (
-            <div className="text-xs text-[#94a3b8]">
+            <div className="text-xs text-slate-500">
               Left blank: {result.skipped_fields.map((f) => FIELD_LABELS[f] || f).join(', ')}
             </div>
           )}

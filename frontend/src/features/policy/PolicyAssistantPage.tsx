@@ -117,7 +117,7 @@ export function QuestionTileGrid({ tiles, disabled, onTileClick }: QuestionTileG
           className="flex min-h-[5rem] flex-col items-start justify-between rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-left text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-[#0b2b43]/25 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30 disabled:opacity-50"
         >
           <span className="leading-snug">{tile}</span>
-          <ArrowRight className="mt-2 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+          <ArrowRight className="mt-2 h-4 w-4 shrink-0 text-slate-500" aria-hidden />
         </Button>
       ))}
     </div>
@@ -188,7 +188,7 @@ export function ResponseCard({ turn }: ResponseCardProps) {
           aria-label="Discuss this with HR"
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:border-[#0b2b43]/25 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30"
         >
-          <MessageSquare className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+          <MessageSquare className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
           Discuss with HR →
         </a>
 
@@ -389,7 +389,7 @@ export const PolicyAssistantPage: React.FC<PolicyAssistantPageProps> = ({ assign
               disabled={submitting || noAssignment}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-full resize-y rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-400 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 disabled:opacity-60"
+              className="w-full resize-y rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-500 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 disabled:opacity-60"
             />
 
             <Button unstyled

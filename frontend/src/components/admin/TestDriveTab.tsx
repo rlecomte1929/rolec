@@ -195,7 +195,7 @@ export function TestDriveTab() {
       {/* TD-FIX-3 (AIQ-1504): record invites sent — gives the funnel a denominator. */}
       <RecordInvitesForm onRecorded={() => void load()} />
 
-      {loading && <p className="text-sm text-gray-400">Loading…</p>}
+      {loading && <p className="text-sm text-gray-500">Loading…</p>}
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
           <p className="text-sm text-red-700">{error}</p>
@@ -210,7 +210,7 @@ export function TestDriveTab() {
           {!segment && (split.prospect || split.internal) && (
             <Section title="Prospect vs internal">
               <div className="overflow-hidden rounded-lg border border-gray-200">
-                <div className="grid grid-cols-[1.4fr_1fr_1fr] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                <div className="grid grid-cols-[1.4fr_1fr_1fr] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-500">
                   <span>Metric</span><span>Prospect</span><span>Internal</span>
                 </div>
                 <div className="divide-y divide-gray-100">
@@ -249,7 +249,7 @@ export function TestDriveTab() {
             ] as const).map(({ label, value, color }) => (
               <div key={label} className="rounded-lg border border-gray-200 px-4 py-3 bg-white">
                 <p className={`text-2xl font-bold ${color}`}>{value}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{label}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{label}</p>
               </div>
             ))}
           </div>
@@ -271,7 +271,7 @@ export function TestDriveTab() {
               <EmptyRow text="No follow-ups yet — pilot interest, value-rejecters and early dropouts surface here." />
             ) : (
               <div className="rounded-lg border border-gray-200 overflow-hidden">
-                <div className="grid grid-cols-[1.2fr_1.5fr_0.9fr_0.9fr_90px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                <div className="grid grid-cols-[1.2fr_1.5fr_0.9fr_0.9fr_90px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-500">
                   <span>Name</span><span>Why follow up</span><span>Corridor</span><span>Segment</span><span>Reach out</span>
                 </div>
                 <div className="divide-y divide-gray-100">
@@ -282,7 +282,7 @@ export function TestDriveTab() {
                     >
                       <div className="min-w-0">
                         <div className="truncate text-gray-900">{r.tester_name || '—'}</div>
-                        <div className="truncate text-[11px] text-gray-400">{r.tester_email}</div>
+                        <div className="truncate text-[11px] text-gray-500">{r.tester_email}</div>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {r.reasons.map((reason) => (
@@ -301,7 +301,7 @@ export function TestDriveTab() {
                           Email →
                         </a>
                       ) : (
-                        <span className="text-gray-300">—</span>
+                        <span className="text-gray-500">—</span>
                       )}
                     </div>
                   ))}
@@ -318,7 +318,7 @@ export function TestDriveTab() {
                 <strong className="text-gray-900">
                   {Math.round((funnel.clicked / funnel.invited) * 100)}%
                 </strong>{' '}
-                <span className="text-gray-400">
+                <span className="text-gray-500">
                   ({funnel.clicked} clicked / {funnel.invited} invited)
                 </span>
               </p>
@@ -347,7 +347,7 @@ export function TestDriveTab() {
               <EmptyRow text="No stage transitions recorded yet." />
             ) : (
               <div className="rounded-lg border border-gray-200 overflow-hidden">
-                <div className="grid grid-cols-[1.7fr_110px_90px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                <div className="grid grid-cols-[1.7fr_110px_90px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-500">
                   <span>Stage</span><span>Median time</span><span>Drop-off</span>
                 </div>
                 <div className="divide-y divide-gray-100">
@@ -358,7 +358,7 @@ export function TestDriveTab() {
                     >
                       <span className="text-gray-700">{t.from_stage} → {t.to_stage}</span>
                       <span className="text-gray-900">{fmtDuration(t.median_seconds)}</span>
-                      <span className={t.drop_off_pct && t.drop_off_pct > 0 ? 'font-medium text-amber-600' : 'text-gray-400'}>
+                      <span className={t.drop_off_pct && t.drop_off_pct > 0 ? 'font-medium text-amber-600' : 'text-gray-500'}>
                         {t.drop_off_pct == null ? '—' : `${t.drop_off_pct}%`}
                       </span>
                     </div>
@@ -374,13 +374,13 @@ export function TestDriveTab() {
               <EmptyRow text="No pilot interest yet." />
             ) : (
               <div className="rounded-lg border border-gray-200 overflow-hidden">
-                <div className="grid grid-cols-[1fr_1.4fr_1fr_90px_130px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                <div className="grid grid-cols-[1fr_1.4fr_1fr_90px_130px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-500">
                   <span>Name</span><span>Company / role</span><span>Corridor</span><span>Interest</span><span>Thank-you</span>
                 </div>
                 <div className="divide-y divide-gray-100">
                   {data.pilot_leads.map((r, i) => (
                     <div key={i} className="grid grid-cols-[1fr_1.4fr_1fr_90px_130px] px-3 py-2 text-sm items-center">
-                      <span className="text-gray-900">{r.tester_name || '—'}<span className="block text-[11px] text-gray-400">{r.tester_email}</span></span>
+                      <span className="text-gray-900">{r.tester_name || '—'}<span className="block text-[11px] text-gray-500">{r.tester_email}</span></span>
                       <span className="text-gray-600">{r.tester_company_role || '—'}{r.tester_sector ? ` · ${r.tester_sector}` : ''}</span>
                       <span className="text-gray-600">{corridorLabel(r.corridor_id)}</span>
                       <Badge variant={r.pilot_interest === 'yes' ? 'success' : 'warning'} size="sm">{r.pilot_interest}</Badge>
@@ -400,13 +400,13 @@ export function TestDriveTab() {
               <EmptyRow text="No survey responses yet." />
             ) : (
               <div className="rounded-lg border border-gray-200 overflow-hidden">
-                <div className="grid grid-cols-[1fr_1.4fr_1fr_70px_130px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-400">
+                <div className="grid grid-cols-[1fr_1.4fr_1fr_70px_130px] bg-gray-50 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-500">
                   <span>Name</span><span>Company / role</span><span>Corridor</span><span>Q1</span><span>Thank-you</span>
                 </div>
                 <div className="divide-y divide-gray-100">
                   {data.completions.map((r, i) => (
                     <div key={i} className="grid grid-cols-[1fr_1.4fr_1fr_70px_130px] px-3 py-2 text-sm items-center">
-                      <span className="text-gray-900">{r.tester_name || '—'}<span className="block text-[11px] text-gray-400">{r.tester_email}</span></span>
+                      <span className="text-gray-900">{r.tester_name || '—'}<span className="block text-[11px] text-gray-500">{r.tester_email}</span></span>
                       <span className="text-gray-600">{r.tester_company_role || '—'}{r.tester_sector ? ` · ${r.tester_sector}` : ''}</span>
                       <span className="text-gray-600">{corridorLabel(r.corridor_id)}</span>
                       <span className="text-gray-600">{r.q1_overall ?? '—'}</span>
@@ -417,7 +417,7 @@ export function TestDriveTab() {
                             href={replayUrl(r.session_id)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[11px] text-gray-400 hover:text-[#1f8e8b] hover:underline"
+                            className="text-[11px] text-gray-500 hover:text-[#1f8e8b] hover:underline"
                           >
                             Replay ↗
                           </a>
@@ -439,7 +439,7 @@ export function TestDriveTab() {
                 {data.testimonials.map((t, i) => (
                   <div key={i} className="rounded-lg border border-gray-200 bg-white px-4 py-3">
                     <p className="text-sm text-gray-900">“{t.testimonial}”</p>
-                    <p className="mt-1 text-xs text-gray-400">{t.tester_name || 'Anonymous'}{t.tester_company_role ? ` · ${t.tester_company_role}` : ''} · {corridorLabel(t.corridor_id)}</p>
+                    <p className="mt-1 text-xs text-gray-500">{t.tester_name || 'Anonymous'}{t.tester_company_role ? ` · ${t.tester_company_role}` : ''} · {corridorLabel(t.corridor_id)}</p>
                   </div>
                 ))}
               </div>
@@ -486,7 +486,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // TD-12: one-click thank-you from Romain's own mailbox. Renders a mailto link when the
 // tester left an email, else a dash. Shared by the Pilot leads + Completions tables.
 function ThankYouButton({ email, name }: { email: string | null; name: string | null }) {
-  if (!email) return <span className="text-[11px] text-gray-300">—</span>;
+  if (!email) return <span className="text-[11px] text-gray-500">—</span>;
   return (
     <a
       href={thankYouMailto(email, name)}

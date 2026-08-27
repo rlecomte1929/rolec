@@ -151,7 +151,7 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
             </span>
           ))}
           {requiredGuidance.remaining > 0 && (
-            <span className="text-slate-400"> +{requiredGuidance.remaining} more</span>
+            <span className="text-slate-500"> +{requiredGuidance.remaining} more</span>
           )}
         </p>
       )}
@@ -185,7 +185,7 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
               <li key={req.key} className="flex items-center gap-2 text-sm">
                 <span
                   className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] ${
-                    provided ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
+                    provided ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
                   }`}
                   aria-hidden="true"
                 >
@@ -210,9 +210,9 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
 
       {/* Uploaded documents */}
       {loading ? (
-        <p className="text-xs text-slate-400">Loading documents…</p>
+        <p className="text-xs text-slate-500">Loading documents…</p>
       ) : docs.length === 0 ? (
-        <p className="text-xs text-slate-400">No documents uploaded yet.</p>
+        <p className="text-xs text-slate-500">No documents uploaded yet.</p>
       ) : (
         <ul className="flex flex-col gap-1">
           {docs.map((d) => (
@@ -235,13 +235,13 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({
                 </span>
               )}
               {d.size_bytes != null && (
-                <span className="text-[11px] text-slate-400 shrink-0">{formatSize(d.size_bytes)}</span>
+                <span className="text-[11px] text-slate-500 shrink-0">{formatSize(d.size_bytes)}</span>
               )}
               <Button unstyled
                 type="button"
                 onClick={() => void handleDelete(d.id)}
                 disabled={busy}
-                className="ml-auto shrink-0 text-xs text-slate-400 hover:text-rose-600 disabled:opacity-50"
+                className="ml-auto shrink-0 text-xs text-slate-500 hover:text-rose-600 disabled:opacity-50"
                 aria-label={`Delete ${d.file_name}`}
               >
                 Remove

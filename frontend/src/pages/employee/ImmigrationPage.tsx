@@ -157,7 +157,7 @@ export const ImmigrationPage: React.FC = () => {
           >
             Manage my data
           </Button>
-          <p className="text-xs text-[#94a3b8] mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             View, download, or request deletion of the data we hold for you.
           </p>
         </div>
@@ -175,7 +175,7 @@ export const ImmigrationPage: React.FC = () => {
               notified of any next steps.
             </p>
             {interviewPct < 100 && (
-              <p className="text-xs text-[#94a3b8] mt-2">
+              <p className="text-xs text-slate-500 mt-2">
                 You can return to this page at any time to complete remaining optional sections.
               </p>
             )}
@@ -208,11 +208,11 @@ function StepPip({ label, title, done, active }: { label: string; title: string;
       <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-semibold ${
         done ? 'bg-[#eaf5f4] text-[#1f8e8b]'
              : active ? 'bg-[#0b2b43] text-white'
-             : 'bg-[#e2e8f0] text-[#94a3b8]'
+             : 'bg-[#e2e8f0] text-slate-500'
       }`}>
         {done ? '✓' : label}
       </div>
-      <span className={`text-[10px] ${active ? 'text-[#0b2b43] font-medium' : 'text-[#94a3b8]'}`}>{title}</span>
+      <span className={`text-[10px] ${active ? 'text-[#0b2b43] font-medium' : 'text-slate-500'}`}>{title}</span>
     </div>
   );
 }

@@ -140,7 +140,7 @@ export function SavedDossiersPanel({ caseId, onChanged }: SavedDossiersPanelProp
             {/* Header row */}
             <div className="flex items-start justify-between gap-3 px-4 py-3.5">
               <div className="flex items-start gap-3 min-w-0">
-                <FileText className="h-4 w-4 text-slate-400 flex-none mt-0.5" />
+                <FileText className="h-4 w-4 text-slate-500 flex-none mt-0.5" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-slate-800 truncate">{pkg.name}</span>

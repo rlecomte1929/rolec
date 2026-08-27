@@ -145,7 +145,7 @@ function RateProviderControl({ supplierId, caseId }: { supplierId: string; caseI
             unstyled
             disabled={saving}
             aria-label={`${n} star${n > 1 ? 's' : ''}`}
-            className={`px-0.5 text-base leading-none ${n <= hover ? 'text-amber-500' : 'text-[#cbd5e1]'} hover:text-amber-500`}
+            className={`px-0.5 text-base leading-none ${n <= hover ? 'text-amber-500' : 'text-slate-500'} hover:text-amber-500`}
             onMouseEnter={() => setHover(n)}
             onMouseLeave={() => setHover(0)}
             onClick={() => send(n)}
@@ -409,7 +409,7 @@ function RecCard({
             onChange={(e) => setOverrideReason(e.target.value)}
             rows={2}
             placeholder="Explain why this option fits this case better."
-            className="mt-2 w-full rounded-md border border-accent-200 px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-accent-200 resize-none bg-white"
+            className="mt-2 w-full rounded-md border border-accent-200 px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-200 resize-none bg-white"
           />
           <div className="mt-2 flex items-center justify-between gap-3">
             <p className="text-[11px] text-accent-500">Logged for human oversight audit · EU AI Act Art. 14</p>
@@ -711,7 +711,7 @@ export const RecommendationResults: React.FC<Props> = ({
             {category === 'living_areas' && res.recommendations.length > 0 && (
               <React.Suspense
                 fallback={
-                  <div className="h-[360px] mb-4 rounded-xl border border-[#e2e8f0] bg-slate-50 flex items-center justify-center text-sm text-[#94a3b8]">
+                  <div className="h-[360px] mb-4 rounded-xl border border-[#e2e8f0] bg-slate-50 flex items-center justify-center text-sm text-slate-500">
                     Loading map…
                   </div>
                 }

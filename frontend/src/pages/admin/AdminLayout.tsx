@@ -61,10 +61,10 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
         {/* Top bar */}
         <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-1.5 text-sm text-slate-500">
-            <span className="text-slate-400">ReloPass admin</span>
+            <span className="text-slate-500">ReloPass admin</span>
             {title && (
               <>
-                <span className="text-slate-300">/</span>
+                <span className="text-slate-500">/</span>
                 <span className="text-slate-700 font-medium">{title}</span>
               </>
             )}
@@ -72,7 +72,7 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
           <div className="flex items-center gap-3">
             {/* SHELL-1: removed the non-functional Download button + the hard-coded "3"
                badge (fake UI). */}
-            <Button unstyled aria-label="Notifications" className="text-slate-400 hover:text-slate-600 transition-colors">
+            <Button unstyled aria-label="Notifications" className="text-slate-500 hover:text-slate-600 transition-colors">
               <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
@@ -167,7 +167,7 @@ const AdminAccountMenu: React.FC<{ name: string; initials: string }> = ({ name, 
         <div className="w-7 h-7 rounded-full bg-[#0b2b43] flex items-center justify-center text-[11px] font-bold text-white shrink-0">
           {initials}
         </div>
-        <svg className={`w-3 h-3 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={`w-3 h-3 text-slate-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </Button>
@@ -176,7 +176,7 @@ const AdminAccountMenu: React.FC<{ name: string; initials: string }> = ({ name, 
         <div role="menu" className="absolute right-0 top-full mt-1 z-30 w-52 rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5">
           <div className="border-b border-slate-100 px-3 py-2">
             <p className="text-sm font-medium text-slate-800 truncate">{name}</p>
-            <p className="text-[11px] text-slate-400">Admin · superuser</p>
+            <p className="text-[11px] text-slate-500">Admin · superuser</p>
           </div>
           <Button unstyled
             type="button"
@@ -185,7 +185,7 @@ const AdminAccountMenu: React.FC<{ name: string; initials: string }> = ({ name, 
             disabled={signingOut}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
           >
-            <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             {signingOut ? 'Signing out…' : 'Sign out'}
@@ -282,7 +282,7 @@ const CompanySwitcher: React.FC = () => {
           {initials}
         </div>
         <span className="text-sm font-medium text-slate-800 flex-1 truncate">{displayName}</span>
-        <svg className={`w-3 h-3 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={`w-3 h-3 text-slate-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </Button>
@@ -303,7 +303,7 @@ const CompanySwitcher: React.FC = () => {
             {/* eslint-enable jsx-a11y/no-autofocus */}
           </div>
           {filtered.length === 0 ? (
-            <div className="px-3 py-3 text-xs text-slate-400">No tenants match.</div>
+            <div className="px-3 py-3 text-xs text-slate-500">No tenants match.</div>
           ) : (
             filtered.map((c) => {
               const isSelected = c.id === selectedCompany?.id;
@@ -319,7 +319,7 @@ const CompanySwitcher: React.FC = () => {
                   </div>
                   <span className="flex-1 truncate font-medium text-slate-800">{c.name}</span>
                   {c.country && (
-                    <span className="text-[10px] text-slate-400">{c.country}</span>
+                    <span className="text-[10px] text-slate-500">{c.country}</span>
                   )}
                   {isSelected && (
                     <span className="text-accent-600 text-[11px]" aria-label="selected">✓</span>

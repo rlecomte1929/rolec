@@ -58,7 +58,7 @@ function KpiTile({
       >
         {value}
       </div>
-      {hint && <div className="mt-1 text-xs text-[#94a3b8]">{hint}</div>}
+      {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
     </Card>
   );
 }
@@ -224,7 +224,7 @@ export const BenefitComparisonDashboard: React.FC<{
                   <tr key={row.serviceKey} className="align-top">
                     <td className="px-4 py-3">
                       <div className="font-medium text-[#0b2b43]">{row.label}</div>
-                      <div className="mt-0.5 text-xs text-[#94a3b8]">{row.explanation}</div>
+                      <div className="mt-0.5 text-xs text-slate-500">{row.explanation}</div>
                     </td>
                     <td className="px-4 py-3 tabular-nums text-[#1e293b]">
                       {formatMoney(row.policyCap, row.currency)}
@@ -277,7 +277,7 @@ export const BenefitComparisonDashboard: React.FC<{
                             </Button>
                           );
                         }
-                        return <span className="text-xs text-[#cbd5e1]">—</span>;
+                        return <span className="text-xs text-slate-500">—</span>;
                       })()}
                     </td>
                   </tr>
@@ -300,7 +300,7 @@ export const BenefitComparisonDashboard: React.FC<{
                 <li key={row.serviceKey} className="flex items-center justify-between gap-4 py-2.5">
                   <div className="min-w-0">
                     <div className="font-medium text-[#0b2b43]">{row.label}</div>
-                    <div className="text-xs text-[#94a3b8]">
+                    <div className="text-xs text-slate-500">
                       {row.coverage === 'uncovered'
                         ? 'Not covered by your policy'
                         : 'Above your policy cap'}
@@ -317,7 +317,7 @@ export const BenefitComparisonDashboard: React.FC<{
       )}
 
       {/* (5) Policy version + effective date footer — always visible */}
-      <footer className="border-t border-[#e2e8f0] pt-3 text-xs text-[#94a3b8]">
+      <footer className="border-t border-[#e2e8f0] pt-3 text-xs text-slate-500">
         {policy && (policy.version != null || policy.effectiveDate || policy.companyName) ? (
           <>
             Based on {policy.companyName ? `${policy.companyName} ` : ''}relocation policy

@@ -14,9 +14,9 @@ export const PlatformSidebarPreview: React.FC = () => {
         <div className="border-b border-slate-200 bg-white px-8 py-4">
           <div className="flex items-center gap-2 text-[12.5px] text-slate-500">
             <span>Aurora Energy</span>
-            <span className="text-slate-300">/</span>
+            <span className="text-slate-500">/</span>
             <span>HR Operations</span>
-            <span className="text-slate-300">/</span>
+            <span className="text-slate-500">/</span>
             <span className="font-medium text-slate-800">Mobility control</span>
           </div>
         </div>

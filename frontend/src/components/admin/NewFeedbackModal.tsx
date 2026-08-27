@@ -157,7 +157,7 @@ export function NewFeedbackModal({ open, onClose, onCreated }: Props) {
         </label>
 
         <label className="block text-sm">
-          <span className="block mb-1 text-slate-600">Dispatch context * <span className="text-slate-400">(makes it dispatch-ready)</span></span>
+          <span className="block mb-1 text-slate-600">Dispatch context * <span className="text-slate-500">(makes it dispatch-ready)</span></span>
           <textarea value={dispatchContext} onChange={(e) => setDispatchContext(e.target.value)} rows={3}
             className="w-full border border-slate-200 rounded px-2 py-1.5 text-sm" />
         </label>

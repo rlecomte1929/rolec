@@ -71,7 +71,7 @@ export const ImmigrationAssistantPage: React.FC = () => {
         {resolved ? (
           <ImmigrationAnswerPanel caseId={primaryCaseId} caseContext={caseContext} />
         ) : (
-          <p className="text-sm text-slate-400">Loading your move details…</p>
+          <p className="text-sm text-slate-500">Loading your move details…</p>
         )}
       </Container>
     </AppShell>

@@ -170,7 +170,7 @@ export const PlatformSidebar: React.FC<PlatformSidebarProps> = ({
         />
         {!collapsed && (
           <div className="text-[14.5px] font-semibold tracking-tight text-slate-900">
-            ReloPass <span className="font-medium text-slate-400">/ Platform</span>
+            ReloPass <span className="font-medium text-slate-500">/ Platform</span>
           </div>
         )}
       </div>
@@ -183,22 +183,22 @@ export const PlatformSidebar: React.FC<PlatformSidebarProps> = ({
         {!collapsed && (
           <>
             <span className="flex-1 truncate font-medium text-slate-800">{workspace.name}</span>
-            <ChevronsUpDown size={12} className="text-slate-400" />
+            <ChevronsUpDown size={12} className="text-slate-500" />
           </>
         )}
       </div>
 
       {/* Search */}
-      <div className={`mx-2 mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12.5px] text-slate-400 focus-within:border-blue-400 focus-within:bg-white ${collapsed ? 'justify-center px-1.5' : ''}`}>
+      <div className={`mx-2 mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12.5px] text-slate-500 focus-within:border-blue-400 focus-within:bg-white ${collapsed ? 'justify-center px-1.5' : ''}`}>
         <Search size={13} />
         {!collapsed && (
           <>
             <Input unstyled
               type="text"
               placeholder="Search cases, vendors…"
-              className="min-w-0 flex-1 border-0 bg-transparent text-[12.5px] text-slate-800 outline-none placeholder:text-slate-400"
+              className="min-w-0 flex-1 border-0 bg-transparent text-[12.5px] text-slate-800 outline-none placeholder:text-slate-500"
             />
-            <span className="rounded border border-slate-200 bg-white px-1 py-px font-mono text-[10px] text-slate-400">⌘K</span>
+            <span className="rounded border border-slate-200 bg-white px-1 py-px font-mono text-[10px] text-slate-500">⌘K</span>
           </>
         )}
       </div>
@@ -208,7 +208,7 @@ export const PlatformSidebar: React.FC<PlatformSidebarProps> = ({
         {resolvedSections.map((section) => (
           <div key={section.label}>
             {!collapsed && (
-              <div className="px-2.5 pb-1.5 pt-3.5 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-slate-400">
+              <div className="px-2.5 pb-1.5 pt-3.5 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-slate-500">
                 {section.label}
               </div>
             )}
@@ -287,7 +287,7 @@ export const PlatformSidebar: React.FC<PlatformSidebarProps> = ({
                 <div className="truncate text-[12.5px] font-medium text-slate-900">{user.name}</div>
                 <div className="truncate text-[11px] text-slate-500">{user.role}</div>
               </div>
-              <ChevronRight size={14} className="text-slate-400" />
+              <ChevronRight size={14} className="text-slate-500" />
             </>
           )}
         </div>

@@ -111,7 +111,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
                 )}
               </Button>
               {draftPdfGeneratedAt && !isDownloadingPdf && (
-                <span className="text-[10px] text-slate-400 mt-0.5">
+                <span className="text-[10px] text-slate-500 mt-0.5">
                   Last generated: {new Date(draftPdfGeneratedAt).toLocaleString()}
                 </span>
               )}

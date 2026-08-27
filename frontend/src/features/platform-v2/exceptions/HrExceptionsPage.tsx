@@ -130,15 +130,15 @@ function ExcRow({ r, active, onClick }: { r: ExcRequest; active: boolean; onClic
         </div>
         <div className="text-sm text-slate-800 truncate">
           <strong>{r.benefit}</strong>
-          <span className="text-slate-400"> · </span>
+          <span className="text-slate-500"> · </span>
           <span className="text-slate-500">{r.requested.value}</span>
         </div>
-        <div className="mt-1 text-xs text-slate-400 truncate leading-relaxed">{r.justification}</div>
+        <div className="mt-1 text-xs text-slate-500 truncate leading-relaxed">{r.justification}</div>
       </div>
 
       {/* Right meta */}
       <div className="flex flex-col items-end gap-1.5 shrink-0">
-        <span className="text-xs text-slate-400">{r.submittedAgo}</span>
+        <span className="text-xs text-slate-500">{r.submittedAgo}</span>
         <StatusBadge status={r.status} />
       </div>
     </Button>
@@ -169,13 +169,13 @@ function ExcDetail({
       <div className="flex-1 flex items-center justify-center text-center p-8">
         <div>
           <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-6 h-6 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
           <p className="text-sm font-medium text-slate-700">Select a request</p>
           {/* RTL: change 'on the left' to 'on the right' for Arabic/Hebrew locales */}
-          <p className="text-xs text-slate-400 mt-1 max-w-[260px]">Choose a request on the left to see the full context, justification, and decision history.</p>
+          <p className="text-xs text-slate-500 mt-1 max-w-[260px]">Choose a request on the left to see the full context, justification, and decision history.</p>
         </div>
       </div>
     );
@@ -199,27 +199,27 @@ function ExcDetail({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-900">{r.employee.name}</p>
-          <p className="text-xs text-slate-400 mt-0.5">{r.employee.role}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{r.employee.role}</p>
         </div>
         <div className="text-right shrink-0">
           <StatusBadge status={r.status} />
-          <p className="text-[10px] text-slate-400 mt-1.5">{r.id} · case {r.employee.caseId}</p>
+          <p className="text-[10px] text-slate-500 mt-1.5">{r.id} · case {r.employee.caseId}</p>
         </div>
       </div>
 
       <div className="px-6 py-5 space-y-6">
         {/* Requested change */}
         <section>
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Requested change</h3>
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Requested change</h3>
           <div className="flex items-stretch gap-3">
             <div className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">Current policy</p>
+              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1">Current policy</p>
               <p className="text-sm font-semibold text-slate-800">{r.current.value}</p>
               {r.current.sub && (
-                <p className="text-xs text-slate-400 mt-0.5">{r.current.sub}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{r.current.sub}</p>
               )}
             </div>
-            <div className="flex items-center text-slate-300">
+            <div className="flex items-center text-slate-500">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
@@ -236,9 +236,9 @@ function ExcDetail({
 
         {/* Justification */}
         <section>
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Employee justification</h3>
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Employee justification</h3>
           <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-            <p className="text-xs text-slate-400 mb-1.5">{firstName} wrote:</p>
+            <p className="text-xs text-slate-500 mb-1.5">{firstName} wrote:</p>
             <p className="text-sm text-slate-700 leading-relaxed">{r.justification}</p>
           </div>
         </section>
@@ -273,7 +273,7 @@ function ExcDetail({
         {/* Decision panel */}
         {!decided && !submitted && (
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Your decision</h3>
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Your decision</h3>
             <div className="flex gap-3 mb-4">
               <Button unstyled
                 onClick={() => setIntent('approve')}
@@ -284,13 +284,13 @@ function ExcDetail({
                 }`}
               >
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${intent === 'approve' ? 'bg-emerald-500' : 'bg-slate-100'}`}>
-                  <svg className={`w-4 h-4 ${intent === 'approve' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className={`w-4 h-4 ${intent === 'approve' ? 'text-white' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
                 <div>
                   <p className={`text-sm font-semibold ${intent === 'approve' ? 'text-emerald-800' : 'text-slate-700'}`}>Approve</p>
-                  <p className="text-xs text-slate-400">Grant the requested change</p>
+                  <p className="text-xs text-slate-500">Grant the requested change</p>
                 </div>
               </Button>
 
@@ -303,13 +303,13 @@ function ExcDetail({
                 }`}
               >
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${intent === 'reject' ? 'bg-rose-500' : 'bg-slate-100'}`}>
-                  <svg className={`w-4 h-4 ${intent === 'reject' ? 'text-white' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className={`w-4 h-4 ${intent === 'reject' ? 'text-white' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </div>
                 <div>
                   <p className={`text-sm font-semibold ${intent === 'reject' ? 'text-rose-800' : 'text-slate-700'}`}>Reject</p>
-                  <p className="text-xs text-slate-400">Keep current policy as-is</p>
+                  <p className="text-xs text-slate-500">Keep current policy as-is</p>
                 </div>
               </Button>
             </div>
@@ -321,7 +321,7 @@ function ExcDetail({
                     Comment to {firstName}
                     {intent === 'reject'
                       ? <span className="text-rose-500 ml-1">*</span>
-                      : <span className="text-slate-400 ml-1">(optional — but recommended)</span>}
+                      : <span className="text-slate-500 ml-1">(optional — but recommended)</span>}
                   </span>
                   <textarea
                     value={note}
@@ -332,11 +332,11 @@ function ExcDetail({
                         ? 'e.g. Approved. The new cap is effective for your case only — your roadmap will update automatically.'
                         : 'Explain why this can\'t be approved and propose an alternative if possible. This text is sent back to the employee.'
                     }
-                    className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-200 resize-none"
+                    className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 resize-none"
                   />
                 </label>
                 <div className="flex items-center gap-3">
-                  <p className="text-xs text-slate-400 flex-1">{firstName} will be notified via in-app + email.</p>
+                  <p className="text-xs text-slate-500 flex-1">{firstName} will be notified via in-app + email.</p>
                   <Button unstyled
                     onClick={() => { setIntent(null); setNote(''); }}
                     className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 transition-colors"
@@ -361,7 +361,7 @@ function ExcDetail({
         {/* Decision result */}
         {(decided || submitted) && (
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Decision</h3>
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Decision</h3>
             <div className={`rounded-lg border px-4 py-3 ${
               (r.status === 'approved' || (submitted && intent === 'approve'))
                 ? 'border-emerald-200 bg-emerald-50'
@@ -388,7 +388,7 @@ function ExcDetail({
 
         {/* Audit trail */}
         <section>
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Audit trail</h3>
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Audit trail</h3>
           <div className="space-y-3">
             {[
               ...r.audit,
@@ -407,7 +407,7 @@ function ExcDetail({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="text-xs font-semibold text-slate-700">{event.who}</span>
-                    <span className="text-xs text-slate-400">{event.when}</span>
+                    <span className="text-xs text-slate-500">{event.when}</span>
                   </div>
                   <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{event.what}</p>
                   {event.quote && (
@@ -688,7 +688,7 @@ export function HrExceptionsPage({ embedded = false }: { embedded?: boolean } = 
             </span>
           )}
           <Button unstyled className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             Export
@@ -713,7 +713,7 @@ export function HrExceptionsPage({ embedded = false }: { embedded?: boolean } = 
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-400 mb-3">Across {counts.all} cases · live</p>
+            <p className="text-xs text-slate-500 mb-3">Across {counts.all} cases · live</p>
             <div className="flex gap-1 -mb-px">
               {TABS.map((tab) => (
                 <Button unstyled
@@ -722,11 +722,11 @@ export function HrExceptionsPage({ embedded = false }: { embedded?: boolean } = 
                   className={`px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 transition-colors ${
                     filter === tab.key
                       ? 'border-slate-900 text-slate-900'
-                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-600'
                   }`}
                 >
                   {tab.label}
-                  <span className={`ml-1.5 text-[10px] ${filter === tab.key ? 'text-slate-500' : 'text-slate-300'}`}>
+                  <span className={`ml-1.5 text-[10px] ${filter === tab.key ? 'text-slate-500' : 'text-slate-500'}`}>
                     {counts[tab.key]}
                   </span>
                 </Button>
@@ -738,7 +738,7 @@ export function HrExceptionsPage({ embedded = false }: { embedded?: boolean } = 
           <div className="flex-1 overflow-y-auto">
             {loadState === 'loading' ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-6 py-10">
-                <p className="text-sm text-slate-400">Loading exception requests…</p>
+                <p className="text-sm text-slate-500">Loading exception requests…</p>
               </div>
             ) : loadState === 'error' ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-6 py-10">
@@ -746,7 +746,7 @@ export function HrExceptionsPage({ embedded = false }: { embedded?: boolean } = 
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p className="text-sm text-slate-500">Couldn&apos;t load exception requests.</p>
-                <p className="text-xs text-slate-400 mt-0.5">Refresh to try again.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Refresh to try again.</p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-6 py-10">
@@ -754,7 +754,7 @@ export function HrExceptionsPage({ embedded = false }: { embedded?: boolean } = 
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p className="text-sm text-slate-500">No {filter} requests.</p>
-                <p className="text-xs text-slate-400 mt-0.5">Exception requests from employees will appear here.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Exception requests from employees will appear here.</p>
               </div>
             ) : (
               filtered.map((r) => (

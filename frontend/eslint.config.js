@@ -28,6 +28,7 @@ import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import importPlugin from 'eslint-plugin-import';
 import noClickableDiv from './eslint-rules/no-clickable-div.js';
+import noLowContrastText from './eslint-rules/no-low-contrast-text.js';
 
 export default tseslint.config(
   {
@@ -74,6 +75,7 @@ export default tseslint.config(
       local: {
         rules: {
           'no-clickable-div': noClickableDiv,
+          'no-low-contrast-text': noLowContrastText,
         },
       },
       // react-hooks plugin (v7). NOTE: v7's `recommended` also enables the new
@@ -98,6 +100,9 @@ export default tseslint.config(
        * WCAG 2.1 SC 2.1.1 (Keyboard). Hard accessibility blocker.
        */
       'local/no-clickable-div': 'error',
+      // A11Y-2 / AIQ-1211. The convention has been in DESIGN.md since June and
+      // usage still grew 76% because nothing enforced it. Auto-fixable.
+      'local/no-low-contrast-text': 'error',
 
       /**
        * AUDIT-A8: ban direct console.* in app code — use src/lib/logger.ts
@@ -162,11 +167,15 @@ export default tseslint.config(
       local: {
         rules: {
           'no-clickable-div': noClickableDiv,
+          'no-low-contrast-text': noLowContrastText,
         },
       },
     },
     rules: {
       'local/no-clickable-div': 'error',
+      // A11Y-2 / AIQ-1211. The convention has been in DESIGN.md since June and
+      // usage still grew 76% because nothing enforced it. Auto-fixable.
+      'local/no-low-contrast-text': 'error',
     },
   },
 
@@ -212,6 +221,9 @@ export default tseslint.config(
       // — Accessibility epic (clickable-div + jsx-a11y) —
       // Epic C / R-CLICK: DRAINED to 0 + re-promoted to 'error' (with its ride-along rules below).
       'local/no-clickable-div': 'error',
+      // A11Y-2 / AIQ-1211. The convention has been in DESIGN.md since June and
+      // usage still grew 76% because nothing enforced it. Auto-fixable.
+      'local/no-low-contrast-text': 'error',
       // label-has-associated-control: DRAINED to 0 + re-promoted to 'error' (Epic C / R1).
       // controlComponents recognises the antigravity wrappers that render native form controls.
       // Select (antigravity) is NOT listed — it doesn't expose id, so pairs use native <select> with id instead.

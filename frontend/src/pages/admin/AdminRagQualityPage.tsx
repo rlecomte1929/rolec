@@ -60,7 +60,7 @@ const SliceBreakdown: React.FC<{ metric: RagEvalMetric }> = ({ metric }) => {
       )}
       <table className="w-full text-xs">
         <thead>
-          <tr className="text-left text-slate-400">
+          <tr className="text-left text-slate-500">
             <th className="py-1 pr-2 font-medium">Corridor</th>
             <th className="py-1 pr-2 font-medium">Employee type</th>
             <th className="py-1 pr-2 font-medium">Recall vs HLP</th>
@@ -90,7 +90,7 @@ const SliceBreakdown: React.FC<{ metric: RagEvalMetric }> = ({ metric }) => {
           })}
         </tbody>
       </table>
-      <p className="text-[11px] text-slate-400">
+      <p className="text-[11px] text-slate-500">
         Recall per (corridor × employee-type) slice against the lawyer-verified HLP baseline.
         The chart plots the worst slice, never an average.
       </p>
@@ -106,7 +106,7 @@ const MetricCard: React.FC<{ metric: RagEvalMetric }> = ({ metric }) => {
       <div className="flex items-start justify-between mb-3">
         <div>
           <h2 className="text-base font-semibold text-slate-900">{metric.label}</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             {isSliced ? 'Worst slice' : 'Latest'}{' '}
             <span className="font-semibold text-slate-700">{fmtPct(metric.latest)}</span>
             {' · '}target ≥ {fmtPct(metric.threshold)}
@@ -154,7 +154,7 @@ export const AdminRagQualityPage: React.FC = () => {
       title="RAG quality"
       subtitle="Retrieval & generation health over time — context precision, factual consistency, outcome accuracy, and non-obvious recall per corridor × employee-type slice (worst slice first, never an average) against their alert thresholds."
     >
-      {loading && <p className="text-sm text-slate-400">Loading…</p>}
+      {loading && <p className="text-sm text-slate-500">Loading…</p>}
 
       {error && (
         <Alert variant="error" title="Failed to load">

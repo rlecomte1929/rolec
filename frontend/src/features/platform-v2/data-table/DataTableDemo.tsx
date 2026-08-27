@@ -72,13 +72,13 @@ function Pill({ children, className = '' }: { children: React.ReactNode; classNa
 
 function SeatCell({ count, limit }: { count: number; limit: number | null }) {
   if (limit == null) {
-    return <div className="text-[12.5px] tabular-nums text-slate-700">{count} <span className="text-slate-400">/ —</span></div>;
+    return <div className="text-[12.5px] tabular-nums text-slate-700">{count} <span className="text-slate-500">/ —</span></div>;
   }
   const pct = limit > 0 ? Math.min(100, Math.round((count / limit) * 100)) : 0;
   const barColor = pct > 90 ? 'bg-rose-500' : pct > 75 ? 'bg-amber-500' : 'bg-emerald-500';
   return (
     <div className="min-w-[6rem] space-y-1">
-      <div className="text-[12.5px] tabular-nums text-slate-700">{count} <span className="text-slate-400">/ {limit}</span></div>
+      <div className="text-[12.5px] tabular-nums text-slate-700">{count} <span className="text-slate-500">/ {limit}</span></div>
       <div className="h-1 w-full overflow-hidden rounded-full bg-slate-100">
         <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
       </div>
@@ -153,7 +153,7 @@ export function DataTableDemo() {
   return (
     <div className="px-6 py-8">
       <div className="mb-6">
-        <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
+        <div className="text-[11px] font-medium uppercase tracking-widest text-slate-500">
           ReloPass · /dev/data-table-demo
         </div>
         <div className="mt-1.5 flex items-baseline gap-3">

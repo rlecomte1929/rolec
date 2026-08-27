@@ -151,7 +151,7 @@ function TaskCard({ task, onUpdated }: TaskCardProps) {
         {task.due_date && (
           <span
             className={`text-xs ${
-              overdue ? "text-amber-600 font-semibold" : "text-gray-400"
+              overdue ? "text-amber-600 font-semibold" : "text-gray-500"
             }`}
           >
             Due {task.due_date}
@@ -232,7 +232,7 @@ function ProviderRow({ provider, onUpdated }: ProviderRowProps) {
               )}
             </div>
           )}
-          <span className="text-gray-400 text-sm">{expanded ? "▲" : "▼"}</span>
+          <span className="text-gray-500 text-sm">{expanded ? "▲" : "▼"}</span>
         </div>
       </Button>
 
@@ -266,7 +266,7 @@ function ProviderRow({ provider, onUpdated }: ProviderRowProps) {
       {expanded && (
         <div className="px-4 pb-4">
           {provider.tasks.length === 0 ? (
-            <p className="text-sm text-gray-400 italic py-2">No tasks assigned to this provider.</p>
+            <p className="text-sm text-gray-500 italic py-2">No tasks assigned to this provider.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
               {provider.tasks.map((task: ProviderTask) => (
@@ -364,7 +364,7 @@ function AssignTaskModal({ caseId, providers, onClose, onAssigned }: AssignTaskM
           <Button unstyled
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none focus:outline-none"
+            className="text-gray-500 hover:text-gray-600 text-xl leading-none focus:outline-none"
             aria-label="Close modal"
           >
             ×
@@ -404,14 +404,14 @@ function AssignTaskModal({ caseId, providers, onClose, onAssigned }: AssignTaskM
               onChange={(v) => setTitle(v)}
               placeholder="e.g. Confirm lease agreement"
               required
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
 
           {/* Description */}
           <div className="flex flex-col gap-1">
             <label htmlFor="at-description" className="text-sm font-medium text-gray-700">
-              Description <span className="text-gray-400 font-normal">(optional)</span>
+              Description <span className="text-gray-500 font-normal">(optional)</span>
             </label>
             <textarea
               id="at-description"
@@ -419,14 +419,14 @@ function AssignTaskModal({ caseId, providers, onClose, onAssigned }: AssignTaskM
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="Additional details for the provider…"
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
 
           {/* Due date */}
           <div className="flex flex-col gap-1">
             <label htmlFor="at-due" className="text-sm font-medium text-gray-700">
-              Due date <span className="text-gray-400 font-normal">(optional)</span>
+              Due date <span className="text-gray-500 font-normal">(optional)</span>
             </label>
             <Input unstyled
               id="at-due"
@@ -888,7 +888,7 @@ export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelP
             📋
           </span>
           <p className="text-gray-600 font-medium">No providers assigned yet</p>
-          <p className="text-gray-400 text-sm mt-1">
+          <p className="text-gray-500 text-sm mt-1">
             Use &ldquo;Invite Provider&rdquo; to add one, then assign tasks here.
           </p>
         </div>

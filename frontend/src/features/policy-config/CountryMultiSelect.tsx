@@ -94,7 +94,7 @@ export const CountryMultiSelect: React.FC<Props> = ({
         } : {})}
       >
         {value.length === 0 && !open && (
-          <span className="text-sm text-[#9ca3af]">
+          <span className="text-sm text-gray-500">
             {placeholder || 'Select countries (search by name or ISO code)…'}
           </span>
         )}

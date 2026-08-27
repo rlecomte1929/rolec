@@ -55,7 +55,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       </button>
       {items.map((it, i) =>
         it === 'ellipsis' ? (
-          <span key={`e${i}`} aria-hidden="true" className="px-1 text-[#94a3b8]">…</span>
+          <span key={`e${i}`} aria-hidden="true" className="px-1 text-slate-500">…</span>
         ) : (
           <button
             key={it}

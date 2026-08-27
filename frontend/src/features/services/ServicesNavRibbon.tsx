@@ -37,7 +37,7 @@ export const ServicesNavRibbon: React.FC = () => {
         return (
           <React.Fragment key={step.key}>
             {idx > 0 && (
-              <span className="text-[#94a3b8] text-xs mx-1" aria-hidden>
+              <span className="text-slate-500 text-xs mx-1" aria-hidden>
                 ›
               </span>
             )}

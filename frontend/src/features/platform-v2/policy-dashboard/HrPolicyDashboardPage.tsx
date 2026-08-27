@@ -73,7 +73,7 @@ function isOverCap(e: ExceptionRequest): boolean {
 
 // White → deep red scale matching the task spec's five bands.
 function heatStyle(pct: number): string {
-  if (pct === 0) return 'bg-white text-slate-300 border border-slate-100';
+  if (pct === 0) return 'bg-white text-slate-500 border border-slate-100';
   if (pct <= 25) return 'bg-amber-50 text-amber-700 border border-amber-100';
   if (pct <= 50) return 'bg-amber-100 text-amber-800 border border-amber-200';
   if (pct <= 75) return 'bg-orange-200 text-orange-900 border border-orange-300';
@@ -326,12 +326,12 @@ export function HrPolicyDashboardPage() {
                       <td className="px-4 py-3 font-mono text-xs">
                         {r.overCapDelta > 0
                           ? <span className="text-rose-600">+{fmtMoney(r.overCapDelta, r.currency)}</span>
-                          : <span className="text-slate-300">—</span>}
+                          : <span className="text-slate-500">—</span>}
                       </td>
                       <td className="px-4 py-3">
                         {r.pendingCount > 0
                           ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">{r.pendingCount}</span>
-                          : <span className="text-slate-300 text-xs">0</span>}
+                          : <span className="text-slate-500 text-xs">0</span>}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(r.status)}`}>{r.status}</span>

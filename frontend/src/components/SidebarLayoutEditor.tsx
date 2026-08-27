@@ -49,7 +49,7 @@ const SortableRow: React.FC<{ id: string; label: string }> = ({ id, label }) => 
         {...attributes}
         {...listeners}
         aria-label={`Drag ${label}`}
-        className="cursor-grab touch-none text-slate-400 hover:text-slate-600 active:cursor-grabbing"
+        className="cursor-grab touch-none text-slate-500 hover:text-slate-600 active:cursor-grabbing"
       >
         <GripVertical size={13} />
       </button>
@@ -104,7 +104,7 @@ export const SidebarLayoutEditor: React.FC<{
     <div className="px-2 pb-2">
       {sectionTitle && (
         <div className="px-1 pt-3 pb-1">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{sectionTitle}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">{sectionTitle}</span>
         </div>
       )}
       <DndContext
@@ -141,7 +141,7 @@ export const SidebarLayoutEditor: React.FC<{
                             setDraftName(entry.group);
                           }}
                           title="Rename section"
-                          className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-600"
+                          className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-600"
                         >
                           {entry.group || 'Ungrouped'}
                         </button>

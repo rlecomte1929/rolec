@@ -633,7 +633,7 @@ export const PackageSummary: React.FC<Props> = ({
                           if (isHrViewer) {
                             return (
                               <span
-                                className="ml-auto text-xs text-[#94a3b8]"
+                                className="ml-auto text-xs text-slate-500"
                                 title="Resolve in HR Command Center → Exceptions queue."
                               >
                                 Resolve in HR queue
@@ -702,7 +702,7 @@ export const PackageSummary: React.FC<Props> = ({
             </p>
           )}
           {!capsLoading && packageItems.length > 0 && (
-            <p className="text-xs text-[#94a3b8]">{SERVICES_CURRENCY_FOOTNOTE}</p>
+            <p className="text-xs text-slate-500">{SERVICES_CURRENCY_FOOTNOTE}</p>
           )}
         </>
       )}

@@ -168,7 +168,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
           <Button unstyled
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-[#94a3b8] hover:bg-[#f1f5f9] transition-colors"
+            className="rounded-lg p-2 text-slate-500 hover:bg-[#f1f5f9] transition-colors"
             aria-label="Close"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -258,7 +258,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
             <div className="py-12 text-center">
               <div className="text-4xl mb-3">🔍</div>
               <p className="text-sm font-medium text-[#374151]">No vendors found</p>
-              <p className="text-xs text-[#94a3b8] mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 Try removing a filter or{' '}
                 <Button unstyled
                   type="button"
@@ -338,7 +338,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-[#e2e8f0] bg-[#f8fafc] text-xs text-[#94a3b8]">
+        <div className="px-6 py-3 border-t border-[#e2e8f0] bg-[#f8fafc] text-xs text-slate-500">
           {vendors.length > 0 && `${vendors.length} vendor${vendors.length !== 1 ? 's' : ''} shown`}
         </div>
       </div>

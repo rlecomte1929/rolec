@@ -438,7 +438,7 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
                     </span>
                     <span
                       className={`text-sm font-medium truncate ${
-                        isDone ? 'text-[#94a3b8] line-through' : 'text-[#0b2b43]'
+                        isDone ? 'text-slate-500 line-through' : 'text-[#0b2b43]'
                       }`}
                     >
                       {m.title}

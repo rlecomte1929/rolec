@@ -14,7 +14,7 @@ import { buildRoute } from '../../navigation/routes';
 import { AdminLayout } from './AdminLayout';
 
 function JsonBlock({ value }: { value: unknown }) {
-  if (value == null) return <span className="text-[#9ca3af]"> - </span>;
+  if (value == null) return <span className="text-gray-500"> - </span>;
   try {
     const s = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
     return (
@@ -31,7 +31,7 @@ function ReadinessItem({ ok, label, emptyText }: { ok: boolean; label: string; e
   return (
     <div className="flex gap-2 py-2 border-b border-[#f1f5f9] last:border-0">
       <span
-        className={`shrink-0 w-5 text-center ${ok ? 'text-emerald-600' : 'text-[#94a3b8]'}`}
+        className={`shrink-0 w-5 text-center ${ok ? 'text-emerald-600' : 'text-slate-500'}`}
         aria-label={ok ? 'Yes' : 'No'}
       >
         {ok ? '✓' : '—'}

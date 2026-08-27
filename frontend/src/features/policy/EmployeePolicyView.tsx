@@ -234,7 +234,7 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
             if you have benefit questions in the meantime.
           </p>
           {(assignmentLabel !== '—' || familyLabel !== '—') && (
-            <p className="text-xs text-[#94a3b8] mt-4">
+            <p className="text-xs text-slate-500 mt-4">
               Context we used: {assignmentLabel} · {familyLabel}
             </p>
           )}

@@ -52,7 +52,7 @@ const fieldClass =
 const selectClass =
   'w-full appearance-none rounded-lg bg-[#374151] border border-[#4b5563] text-[#f1f5f9] px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-[#3b82f6] cursor-pointer';
 
-const labelClass = 'block text-sm font-medium text-[#cbd5e1] mb-1';
+const labelClass = 'block text-sm font-medium text-slate-500 mb-1';
 
 // Wrapper that adds a custom dropdown chevron for appearance-none selects
 const SelectWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -155,7 +155,7 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
           <h2 className="text-xl font-semibold text-[#f1f5f9] mb-2">
             Immigration case created
           </h2>
-          <p className="text-[#94a3b8] mb-6">
+          <p className="text-slate-500 mb-6">
             Track permit progress from the status timeline.
           </p>
           <div className="flex gap-3 justify-center">
@@ -190,7 +190,7 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
         <h1 className="text-2xl font-semibold text-[#f1f5f9] mb-1">
           Open immigration case
         </h1>
-        <p className="text-[#94a3b8] mb-8">
+        <p className="text-slate-500 mb-8">
           Create a permit tracking record for an employee relocation.
         </p>
 
@@ -249,7 +249,7 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
               </label>
               <div
                 id="imm-corridor"
-                className="rounded-lg bg-[#1f2937] border border-[#374151] text-[#9ca3af] px-3 py-2 text-sm"
+                className="rounded-lg bg-[#1f2937] border border-[#374151] text-gray-500 px-3 py-2 text-sm"
               >
                 {corridorDisplay}
               </div>

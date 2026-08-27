@@ -127,10 +127,10 @@ const InlineSelect: React.FC<InlineSelectProps> = ({ value, options, onSave, pla
         onClick={() => setEditing(true)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }}
       >
-        <span className={value ? 'text-[#374151]' : 'text-[#9ca3af]'}>
+        <span className={value ? 'text-[#374151]' : 'text-gray-500'}>
           {value ? label : (placeholder ?? '—')}
         </span>
-        <svg className="opacity-0 group-hover:opacity-100 text-[#9ca3af] flex-shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <svg className="opacity-0 group-hover:opacity-100 text-gray-500 flex-shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       </span>
     );
   }
@@ -162,15 +162,15 @@ const ExpandRow: React.FC<{ emp: HrCompanyEmployee; colSpan: number }> = ({ emp,
     <td colSpan={colSpan - 1} className="px-4 py-4">
       <div className="grid grid-cols-4 gap-x-8 gap-y-3 text-sm">
         <div>
-          <p className="text-xs text-[#9ca3af] mb-1">Employee ID</p>
+          <p className="text-xs text-gray-500 mb-1">Employee ID</p>
           <p className="font-mono text-xs text-[#6b7280] truncate">{emp.profile_id}</p>
         </div>
         <div>
-          <p className="text-xs text-[#9ca3af] mb-1">Email</p>
+          <p className="text-xs text-gray-500 mb-1">Email</p>
           <p className="text-[#374151] truncate">{emp.email || '—'}</p>
         </div>
         <div>
-          <p className="text-xs text-[#9ca3af] mb-1">Member since</p>
+          <p className="text-xs text-gray-500 mb-1">Member since</p>
           <p className="text-[#374151]">
             {new Date(emp.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
@@ -178,7 +178,7 @@ const ExpandRow: React.FC<{ emp: HrCompanyEmployee; colSpan: number }> = ({ emp,
         <div>
           {emp.relocation_case_id ? (
             <>
-              <p className="text-xs text-[#9ca3af] mb-1">Active case</p>
+              <p className="text-xs text-gray-500 mb-1">Active case</p>
               <Link
                 to={buildRoute('hrCaseSummary', { caseId: emp.relocation_case_id })}
                 className="text-xs text-[#185FA5] hover:underline"
@@ -189,8 +189,8 @@ const ExpandRow: React.FC<{ emp: HrCompanyEmployee; colSpan: number }> = ({ emp,
             </>
           ) : (
             <>
-              <p className="text-xs text-[#9ca3af] mb-1">Relocation case</p>
-              <p className="text-xs text-[#9ca3af]">No active case</p>
+              <p className="text-xs text-gray-500 mb-1">Relocation case</p>
+              <p className="text-xs text-gray-500">No active case</p>
             </>
           )}
         </div>
@@ -350,7 +350,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
   }
 
   if (isLoading) {
-    return <div className="text-sm text-[#9ca3af] p-4">Loading team…</div>;
+    return <div className="text-sm text-gray-500 p-4">Loading team…</div>;
   }
 
   const COLS = ['', 'Employee', 'Assignment', 'Level', 'Status', 'Case', ''];
@@ -376,7 +376,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
           <div key={m.label} className="bg-[#f9fafb] border border-[#e5e7eb] rounded-xl px-4 py-3">
             <p className="text-xs text-[#6b7280] mb-1">{m.label}</p>
             <p className="text-2xl font-medium text-[#0b2b43]">{m.value}</p>
-            {m.sub && <p className="text-xs text-[#9ca3af] mt-1">{m.sub}</p>}
+            {m.sub && <p className="text-xs text-gray-500 mt-1">{m.sub}</p>}
           </div>
         ))}
       </div>
@@ -385,13 +385,13 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {/* search */}
         <div className="relative flex-1 min-w-[180px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <Input unstyled
             type="text"
             value={search}
             onChange={(v) => { setSearch(v); setPage(1); }}
             placeholder="Search by name, email, level…"
-            className="w-full pl-8 pr-3 py-2 text-sm border border-[#e5e7eb] rounded-lg bg-white placeholder:text-[#9ca3af] text-[#0b2b43] focus:outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]"
+            className="w-full pl-8 pr-3 py-2 text-sm border border-[#e5e7eb] rounded-lg bg-white placeholder:text-gray-500 text-[#0b2b43] focus:outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]"
           />
         </div>
 
@@ -426,7 +426,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
         ))}
 
         {activeFilters > 0 && (
-          <Button unstyled onClick={clearFilters} className="text-xs text-[#9ca3af] hover:text-[#374151] underline-offset-2 hover:underline transition-colors">
+          <Button unstyled onClick={clearFilters} className="text-xs text-gray-500 hover:text-[#374151] underline-offset-2 hover:underline transition-colors">
             Clear {activeFilters} filter{activeFilters > 1 ? 's' : ''}
           </Button>
         )}
@@ -453,7 +453,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
 
       {/* results count */}
       {(search || activeFilters > 0) && (
-        <p className="text-xs text-[#9ca3af] mb-2">
+        <p className="text-xs text-gray-500 mb-2">
           {filtered.length} result{filtered.length !== 1 ? 's' : ''} · {employees.length} total
         </p>
       )}
@@ -500,7 +500,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COLS.length} className="px-4 py-10 text-center text-sm text-[#9ca3af]">
+                  <td colSpan={COLS.length} className="px-4 py-10 text-center text-sm text-gray-500">
                     {search || activeFilters > 0 ? 'No employees match your filters.' : 'No employees yet.'}
                   </td>
                 </tr>
@@ -542,7 +542,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                         {/* name */}
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2 min-w-0">
-                            <svg className={`flex-shrink-0 text-[#9ca3af] transition-transform ${isExpanded ? 'rotate-180' : ''}`} width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                            <svg className={`flex-shrink-0 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
                             <div
                               className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium"
                               style={hasProfile ? { background: av.bg, color: av.color } : { background: '#f3f4f6', color: '#9ca3af' }}
@@ -554,12 +554,12 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                                 <>
                                   <p className="text-sm font-medium text-[#0b2b43] truncate">{name}</p>
                                   {emp.email && emp.full_name && (
-                                    <p className="text-xs text-[#9ca3af] truncate">{emp.email}</p>
+                                    <p className="text-xs text-gray-500 truncate">{emp.email}</p>
                                   )}
                                 </>
                               ) : (
                                 <>
-                                  <p className="text-xs font-mono text-[#9ca3af] truncate">{emp.profile_id.slice(0, 20)}…</p>
+                                  <p className="text-xs font-mono text-gray-500 truncate">{emp.profile_id.slice(0, 20)}…</p>
                                   <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] rounded bg-[#FAEEDA] text-[#854F0B]">Profile pending</span>
                                 </>
                               )}
@@ -609,7 +609,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                               Active
                             </Link>
                           ) : (
-                            <span className="text-xs text-[#9ca3af]">—</span>
+                            <span className="text-xs text-gray-500">—</span>
                           )}
                         </td>
 
@@ -618,14 +618,14 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                           <div className="flex items-center gap-1 justify-end">
                             <Link
                               to={buildRoute('hrEmployeeDetail', { id: emp.id })}
-                              className="p-1 rounded text-[#9ca3af] hover:text-[#185FA5] hover:bg-[#E6F1FB] transition-colors"
+                              className="p-1 rounded text-gray-500 hover:text-[#185FA5] hover:bg-[#E6F1FB] transition-colors"
                               title="Edit employee"
                             >
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                             </Link>
                             <Button unstyled
                               onClick={() => setPendingDelete([emp.id])}
-                              className="p-1 rounded text-[#9ca3af] hover:text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors"
+                              className="p-1 rounded text-gray-500 hover:text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors"
                               title="Remove employee"
                             >
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
@@ -645,7 +645,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
 
         {/* pagination footer */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-[#e5e7eb] bg-white">
-          <span className="text-xs text-[#9ca3af]">
+          <span className="text-xs text-gray-500">
             {filtered.length === 0
               ? '0 employees'
               : `${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, filtered.length)} of ${filtered.length}`}

@@ -189,7 +189,7 @@ export function ImmigrationAnswerPanel(
         <div className="mt-1">
           <CountryMultiSelect value={nationalities} onChange={setNationalities} />
         </div>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs text-slate-500">
           Pre-filled from your intake — add more if you hold multiple nationalities.
         </p>
       </div>
@@ -212,7 +212,7 @@ export function ImmigrationAnswerPanel(
             />
           </div>
         ) : (
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-slate-500">
             Not sure of your permit type? That&apos;s fine — the assistant will help determine it.
           </p>
         )}
@@ -261,7 +261,7 @@ export function ImmigrationAnswerPanel(
           )}
           <textarea
             aria-label="Your question"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-accent-500"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
             rows={3}
             placeholder="e.g. What documents do I need? · Does my company cover temporary housing?"
             value={query}
@@ -286,7 +286,7 @@ export function ImmigrationAnswerPanel(
             <Button variant="primary" onClick={() => void ask()} disabled={!canAsk || loading}>
               {loading ? 'Asking…' : 'Ask'}
             </Button>
-            <span className="text-xs text-gray-400">Grounded + cited · always confirm with the cited source</span>
+            <span className="text-xs text-gray-500">Grounded + cited · always confirm with the cited source</span>
           </div>
         </div>
       </Card>

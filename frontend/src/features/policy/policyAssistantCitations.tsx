@@ -122,7 +122,7 @@ const CitationChip: React.FC<CitationChipProps> = ({ index, chunk, rawId, onActi
   // Unknown chunk id (no metadata available): render as muted superscript.
   if (!chunk) {
     return (
-      <sup className="text-[10px] text-slate-400 align-super ml-0.5" aria-hidden="true">
+      <sup className="text-[10px] text-slate-500 align-super ml-0.5" aria-hidden="true">
         [{index}]
       </sup>
     );

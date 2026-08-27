@@ -741,7 +741,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
               ))}
               <option value={REQUEST_NEW_VALUE}>+ Request a new destination…</option>
             </select>
-            <p className="mt-1 text-xs text-[#94a3b8]">
+            <p className="mt-1 text-xs text-slate-500">
               HR can pick from supported destinations only. New destinations need admin approval.
             </p>
           </label>
@@ -749,7 +749,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
             <span className="text-sm font-medium text-[#0b2b43]">City</span>
             <select
               aria-label="Destination city"
-              className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43] disabled:bg-[#f1f5f9] disabled:text-[#94a3b8]"
+              className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43] disabled:bg-[#f1f5f9] disabled:text-slate-500"
               value={selectedDestinationKey}
               onChange={(e) => onPickDestination(e.target.value)}
               disabled={destinationsLoading || !selectedCountry}
@@ -804,7 +804,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
         {quota && (
           <p className="mt-3 flex items-start gap-1.5 text-xs text-[#64748b]">
             <Info
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#94a3b8]"
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500"
               aria-hidden="true"
             />
             <span
@@ -1100,7 +1100,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
                         </span>
                       )}
                       {row.source === 'hr_promoted' && (
-                        <span className="ml-2 text-xs text-[#94a3b8]">Added by your team</span>
+                        <span className="ml-2 text-xs text-slate-500">Added by your team</span>
                       )}
                       {pending && (
                         <span className="ml-2 inline-flex items-center rounded-full border border-[#fde68a] bg-[#fef9c3] px-2 py-0.5 text-xs font-medium text-[#854d0e]">

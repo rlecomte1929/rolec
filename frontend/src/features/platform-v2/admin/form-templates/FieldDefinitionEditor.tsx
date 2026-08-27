@@ -221,7 +221,7 @@ const FieldRow: React.FC<FieldRowProps> = ({ dndId, field, disabled, onChange, o
         {...sortable.listeners}
         disabled={disabled}
         aria-label="Drag to reorder"
-        className="col-span-1 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing disabled:cursor-not-allowed"
+        className="col-span-1 flex items-center justify-center text-slate-500 hover:text-slate-600 cursor-grab active:cursor-grabbing disabled:cursor-not-allowed"
         // Don't trigger the parent click — dnd attaches its own listeners.
         onClick={(e) => e.preventDefault()}
       >

@@ -73,11 +73,11 @@ export function AdminCompanyProfilePage() {
             <Link to="/admin/companies-v2" className="text-accent-600 hover:underline">
               ← Companies
             </Link>
-            <span className="text-slate-300">/</span>
+            <span className="text-slate-500">/</span>
             <Link to={`/admin/companies/${companyId}`} className="text-accent-600 hover:underline">
               {tenantName}
             </Link>
-            <span className="text-slate-300">/</span>
+            <span className="text-slate-500">/</span>
             <span className="text-slate-700">Profile</span>
           </nav>
         }

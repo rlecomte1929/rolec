@@ -110,7 +110,7 @@ export function TemplateManager({ open, onClose }: TemplateManagerProps): React.
         {!isFormOpen && (
           <>
             {templates.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">No templates yet.</p>
+              <p className="text-sm text-gray-500 text-center py-6">No templates yet.</p>
             ) : (
               <div className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
                 {templates.map((t) => (
@@ -129,7 +129,7 @@ export function TemplateManager({ open, onClose }: TemplateManagerProps): React.
             )}
 
             <div className="flex justify-between items-center pt-2">
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-500">
                 Tokens: <code className="bg-gray-100 px-1 rounded">{'{{full_name}}'}</code>{' '}
                 <code className="bg-gray-100 px-1 rounded">{'{{company_name}}'}</code>{' '}
                 <code className="bg-gray-100 px-1 rounded">{'{{job_title}}'}</code>{' '}
@@ -205,7 +205,7 @@ export function TemplateManager({ open, onClose }: TemplateManagerProps): React.
                   placeholder={'Hi {{full_name}},\n\nI noticed your role at {{company_name}}…'}
                   rows={10}
                 />
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   Use <code>{'{{full_name}}'}</code>, <code>{'{{company_name}}'}</code>, <code>{'{{job_title}}'}</code>, <code>{'{{corridor_relevance}}'}</code> as tokens.
                 </p>
               </div>
@@ -262,9 +262,9 @@ function TemplateRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-sm font-medium text-gray-800 truncate">{t.name}</span>
-          <span className="text-xs text-gray-400 flex-shrink-0">{typeLabel}</span>
+          <span className="text-xs text-gray-500 flex-shrink-0">{typeLabel}</span>
         </div>
-        <p className="text-xs text-gray-400 truncate">{t.body_template.slice(0, 80)}…</p>
+        <p className="text-xs text-gray-500 truncate">{t.body_template.slice(0, 80)}…</p>
       </div>
 
       <div className="flex items-center gap-1 flex-shrink-0">
@@ -275,7 +275,7 @@ function TemplateRow({
           className={`text-xs px-2 py-1 rounded-full border font-medium transition-colors ${
             t.is_active
               ? 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100'
-              : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'
+              : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
           }`}
         >
           {t.is_active ? 'Active' : 'Inactive'}
@@ -283,7 +283,7 @@ function TemplateRow({
 
         <button
           onClick={onEdit}
-          className="p-1.5 text-gray-400 hover:text-navy-700 rounded hover:bg-gray-100 transition-colors"
+          className="p-1.5 text-gray-500 hover:text-navy-700 rounded hover:bg-gray-100 transition-colors"
           title="Edit template"
         >
           <Pencil className="w-3.5 h-3.5" />
@@ -301,7 +301,7 @@ function TemplateRow({
             </button>
             <button
               onClick={onCancelDelete}
-              className="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors"
+              className="p-1 text-gray-500 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors"
               title="Cancel"
             >
               <X className="w-3.5 h-3.5" />
@@ -310,7 +310,7 @@ function TemplateRow({
         ) : (
           <button
             onClick={onDelete}
-            className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors"
+            className="p-1.5 text-gray-500 hover:text-red-600 rounded hover:bg-red-50 transition-colors"
             title="Delete template"
           >
             <Trash2 className="w-3.5 h-3.5" />

@@ -13,9 +13,9 @@ import { AdminLayout } from './AdminLayout';
 
 const StatTile: React.FC<{ label: string; value: string; hint?: string }> = ({ label, value, hint }) => (
   <Card padding="md" className="border border-slate-200">
-    <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+    <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
     <p className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{value}</p>
-    {hint && <p className="mt-0.5 text-[11px] text-slate-400">{hint}</p>}
+    {hint && <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p>}
   </Card>
 );
 
@@ -82,7 +82,7 @@ export const AdminAssistantAnalyticsPage: React.FC = () => {
                         <span className="truncate text-sm font-medium text-slate-800">{t.topic}</span>
                         {t.refusal > 0 && <Badge variant="warning" size="sm">{t.refusal} refused</Badge>}
                       </div>
-                      <p className="mt-0.5 text-xs text-slate-400">
+                      <p className="mt-0.5 text-xs text-slate-500">
                         {t.asked.toLocaleString()} asked · {t.supported} supported · {t.unsupported} unsupported
                       </p>
                     </div>
@@ -92,7 +92,7 @@ export const AdminAssistantAnalyticsPage: React.FC = () => {
                   </div>
                 ))}
               </div>
-              <p className="mt-4 text-xs text-slate-400">Bar = support rate for the topic. Ranked by questions asked.</p>
+              <p className="mt-4 text-xs text-slate-500">Bar = support rate for the topic. Ranked by questions asked.</p>
             </Card>
           )}
         </>

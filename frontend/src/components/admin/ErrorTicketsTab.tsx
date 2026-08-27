@@ -106,10 +106,10 @@ function ExpandedLogs({ fingerprint }: { fingerprint: string }) {
   }, [fingerprint]);
 
   if (loading) {
-    return <p className="text-xs text-gray-400 py-4 px-6">Loading events...</p>;
+    return <p className="text-xs text-gray-500 py-4 px-6">Loading events...</p>;
   }
   if (logs.length === 0) {
-    return <p className="text-xs text-gray-400 py-4 px-6">No events found.</p>;
+    return <p className="text-xs text-gray-500 py-4 px-6">No events found.</p>;
   }
 
   return (
@@ -122,12 +122,12 @@ function ExpandedLogs({ fingerprint }: { fingerprint: string }) {
           <div className="flex items-center justify-between gap-4">
             <span className="text-gray-500 text-xs">{fmtDate(log.created_at)}</span>
             {log.component_name && (
-              <span className="text-xs text-gray-400">in {log.component_name}</span>
+              <span className="text-xs text-gray-500">in {log.component_name}</span>
             )}
           </div>
           <p className="text-gray-800 font-medium break-words">{log.message}</p>
           {log.url && (
-            <p className="text-xs text-gray-400 break-all">{log.url}</p>
+            <p className="text-xs text-gray-500 break-all">{log.url}</p>
           )}
           {log.stack && (
             <pre className="text-xs text-gray-500 bg-gray-50 rounded p-3 overflow-x-auto whitespace-pre-wrap max-h-40">
@@ -139,9 +139,9 @@ function ExpandedLogs({ fingerprint }: { fingerprint: string }) {
               <p className="text-xs font-medium text-gray-500 mb-1">Breadcrumbs</p>
               <ol className="space-y-0.5">
                 {log.breadcrumbs.map((b, i) => (
-                  <li key={i} className="text-xs text-gray-400">
+                  <li key={i} className="text-xs text-gray-500">
                     {b.type === 'navigation' ? '→' : '!'} {b.message}
-                    <span className="ml-2 text-gray-300">{fmtRelative(b.timestamp)}</span>
+                    <span className="ml-2 text-gray-500">{fmtRelative(b.timestamp)}</span>
                   </li>
                 ))}
               </ol>
@@ -235,7 +235,7 @@ export function ErrorTicketsTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <p className="text-sm text-gray-400">Loading error tickets...</p>
+        <p className="text-sm text-gray-500">Loading error tickets...</p>
       </div>
     );
   }
@@ -266,7 +266,7 @@ export function ErrorTicketsTab() {
         </div>
         <Button unstyled
           onClick={load}
-          className="text-xs text-gray-400 hover:text-gray-600 underline"
+          className="text-xs text-gray-500 hover:text-gray-600 underline"
         >
           Refresh
         </Button>
@@ -296,7 +296,7 @@ export function ErrorTicketsTab() {
           <p className="text-sm font-medium text-gray-600 mb-1">
             {filter === 'all' ? 'No errors recorded yet.' : `No ${STATUS_LABELS[filter].toLowerCase()} tickets.`}
           </p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500">
             {filter === 'all' ? 'The capture layer is active — errors will appear here when they occur.' : ''}
           </p>
         </div>
@@ -316,7 +316,7 @@ export function ErrorTicketsTab() {
                   {/* Expand toggle */}
                   <Button unstyled
                     onClick={() => setExpandedId(isExpanded ? null : ticket.id)}
-                    className="mt-0.5 text-gray-300 hover:text-gray-500 flex-shrink-0"
+                    className="mt-0.5 text-gray-500 hover:text-gray-500 flex-shrink-0"
                     aria-label={isExpanded ? 'Collapse' : 'Expand'}
                   >
                     <svg
@@ -338,18 +338,18 @@ export function ErrorTicketsTab() {
                     </div>
 
                     {/* Meta */}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                       <span>
                         <span className="font-medium text-gray-500">{ticket.event_count}</span> events
                       </span>
                       <span>First: {fmtDate(ticket.first_seen)}</span>
                       <span>Last: {fmtRelative(ticket.last_seen)}</span>
-                      <span className="font-mono text-gray-300">{ticket.fingerprint.slice(0, 8)}</span>
+                      <span className="font-mono text-gray-500">{ticket.fingerprint.slice(0, 8)}</span>
                     </div>
 
                     {/* Status controls */}
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-gray-400">Status:</span>
+                      <span className="text-xs text-gray-500">Status:</span>
                       {(['open', 'in_progress', 'resolved'] as TicketStatus[]).map((s) => (
                         <Button unstyled
                           key={s}
@@ -358,14 +358,14 @@ export function ErrorTicketsTab() {
                           className={`text-xs px-2 py-0.5 rounded border transition-colors ${
                             ticket.status === s
                               ? `${STATUS_STYLES[s]} border-transparent cursor-default`
-                              : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'
+                              : 'border-gray-200 text-gray-500 hover:text-gray-600 hover:border-gray-300'
                           }`}
                         >
                           {STATUS_LABELS[s]}
                         </Button>
                       ))}
                       {isSaving && (
-                        <span className="text-xs text-gray-300">Saving...</span>
+                        <span className="text-xs text-gray-500">Saving...</span>
                       )}
                     </div>
 
@@ -374,7 +374,7 @@ export function ErrorTicketsTab() {
                       <textarea
                         rows={2}
                         placeholder="Add notes (fix applied, root cause, PR link...)"
-                        className="w-full text-xs border border-gray-200 rounded px-3 py-2 text-gray-600 placeholder-gray-300 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
+                        className="w-full text-xs border border-gray-200 rounded px-3 py-2 text-gray-600 placeholder-gray-500 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
                         value={editingNotes[ticket.id] ?? ticket.notes ?? ''}
                         onChange={(e) =>
                           setEditingNotes((prev) => ({ ...prev, [ticket.id]: e.target.value }))
@@ -386,7 +386,7 @@ export function ErrorTicketsTab() {
                           }
                         }}
                       />
-                      <p className="text-xs text-gray-300 mt-0.5">⌘ Enter to save</p>
+                      <p className="text-xs text-gray-500 mt-0.5">⌘ Enter to save</p>
                     </div>
                   </div>
                 </div>

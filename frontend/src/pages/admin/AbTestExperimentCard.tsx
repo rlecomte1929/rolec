@@ -177,7 +177,7 @@ export const AbTestExperimentCard: React.FC<Props> = ({
       {/* Header */}
       <div className="px-5 py-4 flex items-start justify-between gap-3 border-b border-slate-100">
         <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">
             Feature Flag
           </p>
           <h3 className="text-sm font-semibold text-slate-900 font-mono">{flag_name}</h3>
@@ -247,7 +247,7 @@ export const AbTestExperimentCard: React.FC<Props> = ({
                           Yes
                         </span>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-slate-500">—</span>
                       )}
                     </td>
                   </tr>
@@ -258,7 +258,7 @@ export const AbTestExperimentCard: React.FC<Props> = ({
         </div>
       ) : (
         <div className="px-5 py-6 text-center">
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             {flag.enabled
               ? 'No friction analysis data yet — the daily job runs at 04:00 UTC.'
               : 'Enable this flag in Edge Config to start collecting data.'}

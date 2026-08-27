@@ -179,7 +179,7 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
           >
             ✕
           </Button>

@@ -680,7 +680,7 @@ function ResourceCard({ resource }: { resource: PublicResource }) {
         {tier && (
           <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${tier.cls}`}>{tier.label}</span>
         )}
-        {updatedAt && <span className="text-xs text-[#94a3b8]">Updated {formatRelativeTime(updatedAt)}</span>}
+        {updatedAt && <span className="text-xs text-slate-500">Updated {formatRelativeTime(updatedAt)}</span>}
       </div>
     ) : null;
 
@@ -719,7 +719,7 @@ function ResourceCard({ resource }: { resource: PublicResource }) {
           href={`mailto:support@relopass.com?subject=Stale+link+report&body=${encodeURIComponent(
             `${resource.title} — ${url}`,
           )}`}
-          className="text-xs text-[#94a3b8] hover:text-[#64748b] mt-1 inline-block"
+          className="text-xs text-slate-500 hover:text-[#64748b] mt-1 inline-block"
         >
           Report stale link
         </a>
@@ -748,7 +748,7 @@ function EventCard({ event }: { event: PublicEvent }) {
       {event.description && (
         <p className="text-sm text-[#6b7280] mt-1 line-clamp-2">{event.description}</p>
       )}
-      {event.venueName && <p className="text-xs text-[#94a3b8] mt-1">{event.venueName}</p>}
+      {event.venueName && <p className="text-xs text-slate-500 mt-1">{event.venueName}</p>}
       <p className="text-sm font-medium text-[#0b2b43] mt-2">{formatEventDate(event.startDatetime)}</p>
       {event.priceText && !event.isFree && <p className="text-sm text-[#6b7280]">{event.priceText}</p>}
       {url && (

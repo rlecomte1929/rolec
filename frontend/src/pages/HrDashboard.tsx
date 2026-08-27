@@ -818,13 +818,13 @@ export const HrDashboard: React.FC = () => {
                     <div>
                       {(() => {
                         const d = destinationCell(assignment);
-                        return <div className={`text-sm ${d.isEmpty ? 'text-slate-400' : 'text-[#0b2b43]'}`}>{d.text}</div>;
+                        return <div className={`text-sm ${d.isEmpty ? 'text-slate-500' : 'text-[#0b2b43]'}`}>{d.text}</div>;
                       })()}
                     </div>
                     <div>
                       {(() => {
                         const r = routeCell(assignment);
-                        return <div className={`text-sm ${r.isEmpty ? 'text-slate-400' : 'text-[#0b2b43]'}`}>{r.text}</div>;
+                        return <div className={`text-sm ${r.isEmpty ? 'text-slate-500' : 'text-[#0b2b43]'}`}>{r.text}</div>;
                       })()}
                     </div>
                     <div className="flex flex-wrap items-center gap-1">
@@ -835,7 +835,7 @@ export const HrDashboard: React.FC = () => {
                         const submitted = formatSubmitted(assignment.submittedAt);
                         return submitted
                           ? <div className="text-sm text-[#0b2b43]">{submitted}</div>
-                          : <div className="text-sm text-slate-400">—</div>;
+                          : <div className="text-sm text-slate-500">—</div>;
                       })()}
                     </div>
                     <div>
@@ -849,9 +849,9 @@ export const HrDashboard: React.FC = () => {
                     <div>
                       {assignment.complianceStatus?.trim()
                         ? <span className="text-sm text-[#0b2b43] capitalize">{assignment.complianceStatus.replace(/_/g, ' ')}</span>
-                        : <span className="text-sm text-slate-400">—</span>}
+                        : <span className="text-sm text-slate-500">—</span>}
                     </div>
-                    <div className="text-right text-[#94a3b8] text-lg">
+                    <div className="text-right text-slate-500 text-lg">
                       {isManageMode ? '' : '→'}
                     </div>
                   </div>

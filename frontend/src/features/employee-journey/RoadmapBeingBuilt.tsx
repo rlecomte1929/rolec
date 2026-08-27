@@ -180,7 +180,7 @@ export const RoadmapBeingBuilt: React.FC<RoadmapBeingBuiltProps> = ({
             key={track.name}
             className="flex items-center gap-3 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3"
           >
-            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-white text-[#94a3b8]">
+            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-white text-slate-500">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" aria-hidden="true">
                 {track.icon}
               </svg>
@@ -193,7 +193,7 @@ export const RoadmapBeingBuilt: React.FC<RoadmapBeingBuiltProps> = ({
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-xs text-[#94a3b8]">Steps will appear here once your plan is ready.</p>
+      <p className="mt-3 text-xs text-slate-500">Steps will appear here once your plan is ready.</p>
     </Card>
     )}
 

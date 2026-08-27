@@ -481,9 +481,9 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <h1 className="text-[14px] font-semibold text-gray-900 leading-none whitespace-nowrap">Policy Builder</h1>
             <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${statusColour}`}>{statusLbl}</span>
-            {version && <span className="text-[11px] text-gray-400 font-mono truncate">{version}</span>}
+            {version && <span className="text-[11px] text-gray-500 font-mono truncate">{version}</span>}
             {savedAt && (
-              <span className="text-[11px] text-gray-400 flex items-center gap-1 shrink-0">
+              <span className="text-[11px] text-gray-500 flex items-center gap-1 shrink-0">
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"/>
                 Saved {timeAgo(savedAt)}
               </span>
@@ -539,7 +539,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
             </Button>
             {/* Effective date — required by the publish pipeline */}
             <label className="flex items-center gap-1.5 text-[11px] text-gray-500 shrink-0">
-              <Clock size={12} className="text-gray-400"/>
+              <Clock size={12} className="text-gray-500"/>
               <input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)}
                 title="Effective date"
                 className="border border-gray-200 rounded px-2 py-1 text-[11px] bg-white focus:outline-none"/>
@@ -556,7 +556,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
 
       {/* ── Loading the company's existing policy (avoids a template-picker flash) ── */}
       {loadingDraft && tiers.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 gap-3 text-center text-gray-400">
+        <div className="flex flex-col items-center justify-center py-24 gap-3 text-center text-gray-500">
           <Clock size={20} className="animate-pulse"/>
           <p className="text-sm">Loading your policy…</p>
         </div>
@@ -623,13 +623,13 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
                       className="h-[41px] flex items-center gap-2 px-4 bg-gray-50 border-b border-gray-200 cursor-pointer select-none"
                       onClick={() => setCollapsed(c => ({ ...c, [cat.id]: !c[cat.id] }))}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCollapsed(c => ({ ...c, [cat.id]: !c[cat.id] })); } }}>
-                      {isCol ? <ChevronRight size={12} className="text-gray-400 flex-shrink-0"/> : <ChevronDown size={12} className="text-gray-400 flex-shrink-0"/>}
+                      {isCol ? <ChevronRight size={12} className="text-gray-500 flex-shrink-0"/> : <ChevronDown size={12} className="text-gray-500 flex-shrink-0"/>}
                       <span className="text-[11.5px] font-semibold text-gray-700 flex-1 truncate">{cat.t}</span>
-                      <span className="text-[10px] text-gray-400 font-medium bg-gray-200 px-1.5 py-0.5 rounded-full">{cat.benefits.length}</span>
+                      <span className="text-[10px] text-gray-500 font-medium bg-gray-200 px-1.5 py-0.5 rounded-full">{cat.benefits.length}</span>
                     </div>
                     {!isCol && cat.benefits.map(b => (
                       <div key={b.k} className="h-9 flex items-center gap-2 px-4 border-b border-gray-100 group">
-                        <Info size={11} className="text-gray-300 flex-shrink-0 group-hover:text-gray-400" aria-label={b.tip}/>
+                        <Info size={11} className="text-gray-500 flex-shrink-0 group-hover:text-gray-500" aria-label={b.tip}/>
                         <span className="text-[11.5px] text-gray-600 truncate" title={b.lbl}>{b.lbl}</span>
                       </div>
                     ))}
@@ -670,7 +670,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
                 onClick={addTier}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); addTier(); } }}
                 className="w-[52px] flex-shrink-0 flex items-center justify-center border-l border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors group">
-                <div className="flex flex-col items-center gap-1 text-gray-400 group-hover:text-blue-600">
+                <div className="flex flex-col items-center gap-1 text-gray-500 group-hover:text-blue-600">
                   <Plus size={18}/>
                   <span className="text-[10px] font-medium" style={{ writingMode: 'vertical-rl' }}>Add tier</span>
                 </div>
@@ -742,7 +742,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
             <div className="flex items-center gap-3 p-5 border-b border-gray-200">
               <Sparkles size={18} className="text-blue-600"/>
               <h2 className="text-base font-semibold text-gray-900 flex-1">Choose a template</h2>
-              <Button unstyled onClick={() => setTemplateOpen(false)} className="text-gray-400 hover:text-gray-700"><X size={16}/></Button>
+              <Button unstyled onClick={() => setTemplateOpen(false)} className="text-gray-500 hover:text-gray-700"><X size={16}/></Button>
             </div>
             <div className="p-5">
               <p className="text-[13px] text-gray-500 mb-4">Pick a starting point. You can fully customise every tier and benefit after applying.</p>
@@ -851,7 +851,7 @@ function PreviewModal({
               {result.rowCount} benefit row(s) · effective {effectiveDate}. This is exactly what will be saved/published to the policy matrix.
             </p>
           </div>
-          <Button unstyled onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={16}/></Button>
+          <Button unstyled onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={16}/></Button>
         </div>
         <div className="p-5 overflow-y-auto">
           {result.rowCount === 0 ? (
@@ -866,7 +866,7 @@ function PreviewModal({
                       <div key={`${b.benefit_key}-${i}`} className="flex items-start justify-between gap-4 px-3 py-2">
                         <div className="min-w-0">
                           <div className="text-[13px] text-gray-800">{b.benefit_label}</div>
-                          <div className="text-[11px] text-gray-400">{fmtTargeting(b)}</div>
+                          <div className="text-[11px] text-gray-500">{fmtTargeting(b)}</div>
                         </div>
                         <div className="text-[12px] font-medium text-gray-700 whitespace-nowrap">{fmtValue(b)}</div>
                       </div>
@@ -937,9 +937,9 @@ function TierColumn({ tier, categories, collapsed, currency, onRename, onModeCha
           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: tier.color }}/>
           <Input unstyled value={tier.name} onChange={v => onRename(v)}
             className="flex-1 min-w-0 text-[13px] font-semibold text-gray-900 bg-transparent border-none outline-none"/>
-          <Button unstyled className="text-gray-400 hover:text-gray-600 text-lg leading-none">⋯</Button>
+          <Button unstyled className="text-gray-500 hover:text-gray-600 text-lg leading-none">⋯</Button>
         </div>
-        <div className="flex items-center gap-1 text-[11px] text-gray-400 mb-2">
+        <div className="flex items-center gap-1 text-[11px] text-gray-500 mb-2">
           <Users size={11}/>
           {tier.emp ? `${tier.emp} employee${tier.emp > 1 ? 's' : ''}` : '0 employees'}
         </div>
@@ -964,7 +964,7 @@ function TierColumn({ tier, categories, collapsed, currency, onRename, onModeCha
             <span className="text-gray-500">Budget</span>
             <Input unstyled type="number" value={tier.lump} onChange={v => onLumpChange(Number(v))}
               className="w-20 border border-gray-200 rounded px-1.5 py-0.5 text-[11.5px] focus:outline-none focus:border-blue-400"/>
-            <span className="text-gray-400">{cur}/yr</span>
+            <span className="text-gray-500">{cur}/yr</span>
           </div>
         )}
       </div>
@@ -992,7 +992,7 @@ function TierColumn({ tier, categories, collapsed, currency, onRename, onModeCha
           <span className="text-gray-500">{isLump ? 'Lump-sum budget' : 'Est. annual cost'}</span>
           <span className="font-bold text-gray-900">{fmt(total)}</span>
         </div>
-        <div className="flex items-center gap-2 text-[10.5px] text-gray-400">
+        <div className="flex items-center gap-2 text-[10.5px] text-gray-500">
           <span>vs other tiers</span>
           <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full rounded-full transition-all" style={{ width: pct + '%', background: tier.color }}/>
@@ -1028,7 +1028,7 @@ function Cell({ v, lump, onChange, cur }: CellProps) {
   if (lump) {
     const inc: LumpInc = v.lump_inc || (v.covered ? 'included' : 'excluded');
     const next: LumpInc = inc === 'included' ? 'optional' : inc === 'optional' ? 'excluded' : 'included';
-    const style = inc === 'included' ? 'bg-blue-50 text-blue-700 border-blue-200' : inc === 'optional' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-400 border-gray-200';
+    const style = inc === 'included' ? 'bg-blue-50 text-blue-700 border-blue-200' : inc === 'optional' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-500 border-gray-200';
     return (
       <div className="h-9 flex items-center justify-center border-b border-gray-100 px-2">
         <Button unstyled onClick={() => onChange({ lump_inc: next })}
@@ -1044,7 +1044,7 @@ function Cell({ v, lump, onChange, cur }: CellProps) {
   return (
     <div className={`h-9 flex items-center gap-1 border-b border-gray-100 px-1.5 group ${!v.covered ? 'bg-gray-50/50' : ''}`}>
       <Button unstyled onClick={() => onChange({ covered: !v.covered })}
-        className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-[11px] font-bold border transition-colors ${v.covered ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 text-gray-300 hover:border-gray-400'}`}>
+        className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-[11px] font-bold border transition-colors ${v.covered ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 text-gray-500 hover:border-gray-400'}`}>
         {v.covered ? '✓' : '—'}
       </Button>
       {v.covered && (
@@ -1059,7 +1059,7 @@ function Cell({ v, lump, onChange, cur }: CellProps) {
               <div className="flex items-center gap-0.5">
                 <Input unstyled type="number" value={v.amount} onChange={v => onChange({ amount: Number(v) })}
                   className="w-14 text-[11px] border border-gray-200 rounded px-1 py-0 focus:outline-none focus:border-blue-400"/>
-                <span className="text-[10px] text-gray-400">{cur}</span>
+                <span className="text-[10px] text-gray-500">{cur}</span>
               </div>
               <select value={v.freq} onChange={e => onChange({ freq: e.target.value as Freq })}
                 className="text-[9.5px] border border-gray-200 rounded px-0.5 py-0 bg-white focus:outline-none">
@@ -1071,17 +1071,17 @@ function Cell({ v, lump, onChange, cur }: CellProps) {
             <div className="flex items-center gap-0.5">
               <Input unstyled type="number" value={v.amount} onChange={v => onChange({ amount: Number(v) })}
                 className="w-10 text-[11px] border border-gray-200 rounded px-1 py-0 focus:outline-none focus:border-blue-400"/>
-              <span className="text-[10px] text-gray-400">%</span>
+              <span className="text-[10px] text-gray-500">%</span>
             </div>
           )}
           {v.value_type === 'text' && (
             <div className="flex items-center gap-0.5">
               <Input unstyled type="number" value={v.amount} onChange={v => onChange({ amount: Number(v) })}
                 className="w-8 text-[11px] border border-gray-200 rounded px-1 py-0 focus:outline-none focus:border-blue-400"/>
-              <span className="text-[9.5px] text-gray-400">days</span>
+              <span className="text-[9.5px] text-gray-500">days</span>
             </div>
           )}
-          {v.value_type === 'none' && <span className="text-[10.5px] text-gray-400 flex-1">Service</span>}
+          {v.value_type === 'none' && <span className="text-[10.5px] text-gray-500 flex-1">Service</span>}
           {v.cap && <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1 py-0 rounded" title="Cap rule attached">CAP</span>}
           {v.conditions && <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1 py-0 rounded" title="Conditional">IF</span>}
           {v.source === 'extracted_llm' && typeof v.field_confidence === 'number' && (
@@ -1089,7 +1089,7 @@ function Cell({ v, lump, onChange, cur }: CellProps) {
           )}
         </>
       )}
-      <Button unstyled className="ml-auto opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 flex-shrink-0">
+      <Button unstyled className="ml-auto opacity-0 group-hover:opacity-100 text-gray-500 hover:text-gray-600 flex-shrink-0">
         <Pencil size={10}/>
       </Button>
     </div>
@@ -1147,7 +1147,7 @@ function RulesDrawer({ tier, allTiers, onChange, onClose }: RulesDrawerProps) {
               An employee matching <strong>all three</strong> criteria is assigned to this tier.
             </div>
           </div>
-          <Button unstyled onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={16}/></Button>
+          <Button unstyled onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={16}/></Button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
@@ -1361,7 +1361,7 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
         <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
           <Upload size={18} className="text-blue-600"/>
           <h2 className="text-base font-semibold text-gray-900 flex-1">Import policy from document</h2>
-          <Button unstyled onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={16}/></Button>
+          <Button unstyled onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={16}/></Button>
         </div>
 
         {/* Stepper */}
@@ -1372,8 +1372,8 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
             const done = stepNum > idx;
             return (
               <React.Fragment key={lbl}>
-                <div className={`flex items-center gap-2 text-[12px] font-medium ${active ? 'text-blue-600' : done ? 'text-green-600' : 'text-gray-400'}`}>
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold border-2 ${active ? 'border-blue-600 bg-blue-600 text-white' : done ? 'border-green-600 bg-green-600 text-white' : 'border-gray-300 text-gray-400'}`}>
+                <div className={`flex items-center gap-2 text-[12px] font-medium ${active ? 'text-blue-600' : done ? 'text-green-600' : 'text-gray-500'}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold border-2 ${active ? 'border-blue-600 bg-blue-600 text-white' : done ? 'border-green-600 bg-green-600 text-white' : 'border-gray-300 text-gray-500'}`}>
                     {done ? <Check size={10}/> : idx}
                   </div>
                   {lbl}
@@ -1407,9 +1407,9 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
                   onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                   onDragLeave={() => setDragOver(false)}
                   onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}>
-                  <Upload size={28} className="text-gray-300"/>
+                  <Upload size={28} className="text-gray-500"/>
                   <div className="text-sm font-semibold text-gray-700">Drop your policy document here</div>
-                  <div className="text-[12px] text-gray-400">PDF or Word (.docx) · max 50 MB</div>
+                  <div className="text-[12px] text-gray-500">PDF or Word (.docx) · max 50 MB</div>
                   <Button unstyled className="text-[12px] text-blue-600 font-medium hover:underline">Browse files</Button>
                 </div>
               ) : (
@@ -1419,9 +1419,9 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
                   </div>
                   <div className="flex-1">
                     <div className="text-[13px] font-semibold text-gray-900">{file.name}</div>
-                    <div className="text-[11.5px] text-gray-400">{fmtSize(file.size)} · ready to extract</div>
+                    <div className="text-[11.5px] text-gray-500">{fmtSize(file.size)} · ready to extract</div>
                   </div>
-                  <Button unstyled onClick={() => { setFile(null); setUploadError(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="text-gray-400 hover:text-gray-600"><X size={16}/></Button>
+                  <Button unstyled onClick={() => { setFile(null); setUploadError(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="text-gray-500 hover:text-gray-600"><X size={16}/></Button>
                 </div>
               )}
               {uploadError && (
@@ -1447,7 +1447,7 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
                   {stage.lbl}
                 </div>
               </div>
-              <p className="text-[12px] text-gray-400 max-w-sm text-center">
+              <p className="text-[12px] text-gray-500 max-w-sm text-center">
                 Reading your document and extracting benefit rules. This can take up to a minute for a full policy.
               </p>
             </div>
@@ -1489,7 +1489,7 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
                   )}
                   {unmapped.length > 0 && (
                     <div className="mt-2 w-full max-w-md text-left">
-                      <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                      <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
                         Extracted terms with no automatic mapping ({unmapped.length})
                       </div>
                       <div className="flex flex-wrap gap-1.5">
@@ -1513,7 +1513,7 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
                           <Check size={14} className="text-green-600 flex-shrink-0"/>
                           <div className="min-w-0">
                             <div className="text-[13px] text-gray-800 truncate">{meta?.lbl || k}</div>
-                            {meta?.cat && <div className="text-[11px] text-gray-400">{meta.cat}</div>}
+                            {meta?.cat && <div className="text-[11px] text-gray-500">{meta.cat}</div>}
                           </div>
                         </div>
                       );
@@ -1521,7 +1521,7 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
                   </div>
                   {unmapped.length > 0 && (
                     <div className="mt-4">
-                      <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                      <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                         Couldn&apos;t auto-map ({unmapped.length}) — add these manually on the canvas
                       </div>
                       <div className="flex flex-wrap gap-1.5">
@@ -1539,7 +1539,7 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
 
         {/* Footer */}
         <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-200">
-          {step === 'upload' && <Button unstyled onClick={onClose} className="text-[13px] text-gray-400 hover:text-gray-600">Cancel</Button>}
+          {step === 'upload' && <Button unstyled onClick={onClose} className="text-[13px] text-gray-500 hover:text-gray-600">Cancel</Button>}
           <div className="flex-1"/>
           {step === 'upload' && (
             <Button unstyled disabled={!file} onClick={handleStartExtraction}
@@ -1547,10 +1547,10 @@ export function ImportFlow({ onClose, onImported }: ImportFlowProps) {
               Start extraction →
             </Button>
           )}
-          {step === 'processing' && <span className="text-[13px] text-gray-400">Processing…</span>}
+          {step === 'processing' && <span className="text-[13px] text-gray-500">Processing…</span>}
           {step === 'error' && (
             <>
-              <Button unstyled onClick={onClose} className="text-[13px] text-gray-400 hover:text-gray-600">Close</Button>
+              <Button unstyled onClick={onClose} className="text-[13px] text-gray-500 hover:text-gray-600">Close</Button>
               <Button unstyled onClick={() => { setErrorMsg(null); setDocId(null); setStep('upload'); }}
                 className="px-5 py-2 bg-navy-800 text-white rounded-lg text-sm font-semibold hover:bg-navy-900">
                 Try again
@@ -1680,9 +1680,9 @@ function ContextSidebar({ focusedBenefit, focusedTier, currency, onClose, onAppl
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-start justify-between mb-1">
           <div className="text-[13px] font-semibold text-gray-900">Market context</div>
-          <Button unstyled onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={14}/></Button>
+          <Button unstyled onClick={onClose} className="text-gray-500 hover:text-gray-600"><X size={14}/></Button>
         </div>
-        <div className="text-[11.5px] text-gray-400 mb-3">{lbl}{focusedTier ? ` · ${focusedTier.name}` : ''}</div>
+        <div className="text-[11.5px] text-gray-500 mb-3">{lbl}{focusedTier ? ` · ${focusedTier.name}` : ''}</div>
         <select value={country} onChange={e => setCountry(e.target.value)}
           className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] bg-white focus:outline-none">
           {BENCH_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
@@ -1692,7 +1692,7 @@ function ContextSidebar({ focusedBenefit, focusedTier, currency, onClose, onAppl
       <div className="flex border-b border-gray-200">
         {(['bench','providers','historical'] as const).map(t => (
           <Button unstyled key={t} onClick={() => setTab(t)}
-            className={`flex-1 py-2 text-[11.5px] font-medium transition-colors ${tab === t ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+            className={`flex-1 py-2 text-[11.5px] font-medium transition-colors ${tab === t ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-600'}`}>
             {t === 'bench' ? 'Benchmarks' : t === 'providers' ? `Providers (${providers.length})` : 'History'}
           </Button>
         ))}
@@ -1700,7 +1700,7 @@ function ContextSidebar({ focusedBenefit, focusedTier, currency, onClose, onAppl
 
       <div className="flex-1 overflow-y-auto p-4">
         {!focusedBenefit && (
-          <div className="text-center py-8 text-[12.5px] text-gray-400">
+          <div className="text-center py-8 text-[12.5px] text-gray-500">
             <div className="text-2xl mb-2">👈</div>
             Hover over a benefit cell to see live market context.
           </div>
@@ -1732,12 +1732,12 @@ function ContextSidebar({ focusedBenefit, focusedTier, currency, onClose, onAppl
                   {verdict.txt}
                 </div>
               )}
-              <div className="mt-3 text-[11px] text-gray-400">
+              <div className="mt-3 text-[11px] text-gray-500">
                 Based on {data.providers} active suppliers + historical assignments in {ctryName}.
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 text-[12.5px] text-gray-400">
+            <div className="text-center py-8 text-[12.5px] text-gray-500">
               <div className="text-2xl mb-2">📊</div>
               No benchmark data for <strong>{lbl}</strong> in {ctryName} yet.
             </div>
@@ -1746,7 +1746,7 @@ function ContextSidebar({ focusedBenefit, focusedTier, currency, onClose, onAppl
 
         {focusedBenefit && tab === 'providers' && (
           providers.length === 0 ? (
-            <div className="text-center py-8 text-[12.5px] text-gray-400">
+            <div className="text-center py-8 text-[12.5px] text-gray-500">
               <div className="text-2xl mb-2">🏢</div>
               No active providers found in {ctryName} for this service.
             </div>
@@ -1776,9 +1776,9 @@ function ContextSidebar({ focusedBenefit, focusedTier, currency, onClose, onAppl
 
         {focusedBenefit && tab === 'historical' && (
           <div>
-            <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Selection rate</div>
+            <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Selection rate</div>
             <p className="text-[12.5px] text-gray-600 mb-4">Of <strong>12 employees</strong> who had this benefit available in {ctryName}, <strong>9 (75%)</strong> used it.</p>
-            <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Actual spend distribution</div>
+            <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Actual spend distribution</div>
             <div className="space-y-1 mb-4">
               {[['Min','€1,400/mo'],['Median','€2,200/mo'],['Max','€3,600/mo']].map(([k,v]) => (
                 <div key={k} className="flex items-center justify-between text-[12px]">
@@ -1792,7 +1792,7 @@ function ContextSidebar({ focusedBenefit, focusedTier, currency, onClose, onAppl
                 </div>
               )}
             </div>
-            <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Last 5 selections (anonymised)</div>
+            <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Last 5 selections (anonymised)</div>
             <div className="space-y-2">
               {[
                 { ref:'Employee A', dest:'Berlin',    type:'Long-term', sel:'€2,100/mo' },
@@ -1816,7 +1816,7 @@ function ContextSidebar({ focusedBenefit, focusedTier, currency, onClose, onAppl
             className="w-full py-2 text-[12.5px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors">
             Apply median ({cur}{data.avg.toLocaleString()}) to this tier
           </Button>
-          <div className="mt-2 text-[10.5px] text-gray-400 text-center">Benchmarks are indicative, sourced from the ReloPass network. Not legal or tax advice.</div>
+          <div className="mt-2 text-[10.5px] text-gray-500 text-center">Benchmarks are indicative, sourced from the ReloPass network. Not legal or tax advice.</div>
         </div>
       )}
     </div>

@@ -100,7 +100,7 @@ export const StepTiers: React.FC<Props> = ({ tiers, onChange, onNext }) => {
             className="border border-slate-200 rounded-lg p-4 bg-white space-y-4"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                 Tier {idx + 1}
               </span>
               {tiers.length > 1 && (
@@ -136,7 +136,7 @@ export const StepTiers: React.FC<Props> = ({ tiers, onChange, onNext }) => {
             <div>
               <label htmlFor={`st-desc-${idx}`} className="block text-sm font-medium text-slate-700 mb-1">
                 Description
-                <span className="ml-1 text-xs font-normal text-slate-400">(optional)</span>
+                <span className="ml-1 text-xs font-normal text-slate-500">(optional)</span>
                 <Tip text="A short note for HR explaining who this tier covers." />
               </label>
               <Input
