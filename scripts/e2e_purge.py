@@ -55,7 +55,9 @@ CASE_CHILDREN = [
     ("employee_answers", "assignment_id", "assignment"),
     ("compliance_reports", "assignment_id", "assignment"),
     ("compliance_runs", "assignment_id", "assignment"),
-    ("policy_exceptions", "assignment_id", "assignment"),
+    # policy_exceptions is keyed on case_id, not assignment_id — the old entry raised
+    # 42703 on every run and was swallowed, so its test rows were never purged.
+    ("policy_exceptions", "case_id", "case"),
     ("compliance_actions", "assignment_id", "assignment"),
     ("assignment_invites", "case_id", "case"),
     ("case_assignments", "case_id", "case"),
@@ -65,8 +67,12 @@ CASE_CHILDREN = [
     ("case_participants", "case_id", "case"),
     ("case_milestones", "case_id", "case"),
     ("notifications", "case_id", "case"),
-    ("rfq_requests", "case_id", "case"),
-    ("case_outcomes", "case_id", "case"),
+    # rfq_requests was renamed to rfq_requests_legacy; the live RFQ system is
+    # rfqs / rfq_items / rfq_recipients. The old entry raised 42P01 every run, so the
+    # live tables were never purged at all (rfq_items + rfq_recipients follow by FK).
+    ("rfqs", "case_id", "case"),
+    # case_outcomes has no case_id column (42703 every run). Dropped rather than guessed
+    # at: the table is empty, and inventing a join key is how the auth.users bug started.
     ("case_escalations", "case_id", "case"),
     ("case_notes", "case_id", "case"),
 ]
@@ -82,12 +88,18 @@ _ASSIGNMENT_CASE_MATCH = "ARRAY[case_id::text, canonical_case_id::text] && %s::t
 _ASSIGNMENT_IDS_SUBQ = f"SELECT id::text FROM case_assignments WHERE {_ASSIGNMENT_CASE_MATCH}"
 
 
+# Tables carrying BOTH case_id and canonical_case_id. _ASSIGNMENT_CASE_MATCH is already
+# generic over the pair; it was simply never applied beyond case_assignments. rfqs needs it:
+# 24 of its 30 rows resolve only through canonical_case_id.
+CANONICAL_AWARE = ("case_assignments", "rfqs")
+
+
 def _case_child_where(table: str, col: str, src: str) -> str:
     """WHERE clause selecting the case-child rows to purge for the bound case-id array
     (one %s ::text[]). case_assignments is matched canonical-aware (case_id OR
     canonical_case_id); assignment-scoped children resolve through the same canonical-aware
     set, so neither the assignment nor its children can be orphaned by the purge."""
-    if table == "case_assignments":
+    if table in CANONICAL_AWARE:
         return _ASSIGNMENT_CASE_MATCH
     if src == "case":
         return f"{col}::text = ANY(%s)"

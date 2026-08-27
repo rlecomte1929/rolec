@@ -245,3 +245,37 @@ class FkDiscoverySourceTest(unittest.TestCase):
         e2e_purge.referencing_fks(cur, ["users"])
         sql = cur.calls[0][0]
         self.assertIn("nspname AS referenced_schema", sql)
+
+
+class CaseChildrenSchemaRotTest(unittest.TestCase):
+    """Three CASE_CHILDREN entries pointed at a renamed table or a column that does not
+    exist. guarded() swallowed 42P01/42703 on every run, so they were invisible until the
+    swallow log landed — and their rows were never purged. Verified against prod 2026-08-27:
+    rfq_requests -> renamed rfq_requests_legacy; policy_exceptions is keyed on case_id;
+    case_outcomes has no case_id at all.
+    """
+
+    def _tables(self):
+        return [t for t, _c, _s in e2e_purge.CASE_CHILDREN]
+
+    def test_renamed_and_phantom_tables_are_gone(self):
+        for dead in ("rfq_requests", "case_outcomes"):
+            self.assertNotIn(dead, self._tables(), f"{dead} does not exist in prod")
+
+    def test_live_rfq_table_is_purged(self):
+        self.assertIn("rfqs", self._tables(), "the live RFQ table was never being purged")
+
+    def test_policy_exceptions_is_keyed_on_case_id(self):
+        entry = [e for e in e2e_purge.CASE_CHILDREN if e[0] == "policy_exceptions"]
+        self.assertEqual(entry, [("policy_exceptions", "case_id", "case")])
+
+    def test_rfqs_is_matched_canonical_aware(self):
+        """24 of 30 rfqs resolve only via canonical_case_id — a plain case_id match
+        would silently leave them behind, which is how this class of bug recurs."""
+        where = e2e_purge._case_child_where("rfqs", "case_id", "case")
+        self.assertIn("canonical_case_id", where)
+
+    def test_plain_case_children_are_unchanged(self):
+        self.assertEqual(
+            e2e_purge._case_child_where("case_milestones", "case_id", "case"),
+            "case_id::text = ANY(%s)")
