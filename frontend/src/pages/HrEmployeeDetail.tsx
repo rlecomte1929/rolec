@@ -145,6 +145,13 @@ export const HrEmployeeDetail: React.FC = () => {
         ) : (
           <Card padding="lg">
             <div className="space-y-4">
+              {/* Name and email are NOT editable here, and are labelled as such rather than
+                  made to look like inputs. PATCH /api/hr/employees/{id} accepts only band /
+                  assignment_type / status (backend/main.py), and the email is the account's
+                  auth identifier under the hybrid auth model — changing it is an identity
+                  operation needing verification, not an inline field edit. Presenting these
+                  as plain text beside three editable selects read as "everything here is
+                  editable"; the caption removes that expectation. */}
               <div>
                 <div className="text-xs text-[#6b7280] uppercase tracking-wide">Name</div>
                 <div className="font-medium text-[#0b2b43]">
@@ -155,6 +162,10 @@ export const HrEmployeeDetail: React.FC = () => {
                 <div className="text-xs text-[#6b7280] uppercase tracking-wide">Email</div>
                 <div className="text-[#0b2b43]">{employee.email || '-'}</div>
               </div>
+              <p className="text-xs text-slate-500">
+                Name and email come from the employee&rsquo;s own account and can&rsquo;t be changed
+                here. The fields below are editable.
+              </p>
               <div>
                 <div className="text-xs text-[#6b7280] uppercase tracking-wide">Employee level</div>
                 <select

@@ -486,6 +486,7 @@ export const HrDashboard: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3 mb-2">
           <Input unstyled
             id="hr-search"
+            aria-label="Search cases"
             value={search}
             onChange={(event) => setSearch(event)}
             placeholder="Search cases..."
