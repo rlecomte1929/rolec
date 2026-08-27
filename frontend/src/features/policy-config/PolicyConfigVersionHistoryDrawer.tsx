@@ -64,16 +64,16 @@ export const PolicyConfigVersionHistoryDrawer: React.FC<Props> = ({
                     </div>
                     <div className="text-[#64748b] text-xs space-y-0.5">
                       <div>
-                        <span className="text-[#94a3b8]">Effective date:</span> {v.effective_date || '—'}
+                        <span className="text-slate-500">Effective date:</span> {v.effective_date || '—'}
                       </div>
                       <div>
-                        <span className="text-[#94a3b8]">Created:</span> {formatTs(v.created_at)}
+                        <span className="text-slate-500">Created:</span> {formatTs(v.created_at)}
                       </div>
                       <div>
-                        <span className="text-[#94a3b8]">Published:</span> {formatTs(v.published_at)}
+                        <span className="text-slate-500">Published:</span> {formatTs(v.published_at)}
                       </div>
                       <div>
-                        <span className="text-[#94a3b8]">Created by:</span> {v.created_by || '—'}
+                        <span className="text-slate-500">Created by:</span> {v.created_by || '—'}
                       </div>
                     </div>
                     {canOpenSnapshot && (

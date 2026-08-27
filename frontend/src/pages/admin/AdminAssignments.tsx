@@ -919,7 +919,7 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
                       <Button size="sm" variant="outline" onClick={doUnlockCase} disabled={!reason.trim() || unlockBusy}>
                         {unlockBusy ? 'Unlocking…' : 'Unlock case (reactivate)'}
                       </Button>
-                      <span className="text-xs text-[#94a3b8]">case status: {detail.case_status ?? '—'}</span>
+                      <span className="text-xs text-slate-500">case status: {detail.case_status ?? '—'}</span>
                     </div>
                   )}
                   {unlockMsg && <p className="text-xs text-[#6b7280]">{unlockMsg}</p>}

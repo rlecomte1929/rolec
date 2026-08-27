@@ -155,7 +155,7 @@ export const NotificationsBell: React.FC = () => {
         aria-label={unread > 0 ? `Notifications (${unread} unread)` : 'Notifications'}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="relative grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+        className="relative grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
       >
         <Bell className="h-4 w-4" aria-hidden="true" />
         {unread > 0 && (
@@ -176,11 +176,11 @@ export const NotificationsBell: React.FC = () => {
         >
           <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-2.5">
             <span className="text-[13px] font-semibold text-[#0b2b43]">Notifications</span>
-            {unread > 0 && <span className="text-[11px] text-slate-400">{unread} unread</span>}
+            {unread > 0 && <span className="text-[11px] text-slate-500">{unread} unread</span>}
           </div>
           <div className="max-h-96 overflow-y-auto">
             {items.length === 0 ? (
-              <div className="px-3.5 py-6 text-center text-[12.5px] text-slate-400">No notifications yet</div>
+              <div className="px-3.5 py-6 text-center text-[12.5px] text-slate-500">No notifications yet</div>
             ) : (
               items.map((n) => (
                 <button
@@ -194,7 +194,7 @@ export const NotificationsBell: React.FC = () => {
                   <span className="flex w-full items-center gap-2">
                     {!n.read_at && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-teal-500" />}
                     <span className="flex-1 text-[13px] font-semibold text-[#0b2b43]">{n.title}</span>
-                    <span className="shrink-0 text-[11px] text-slate-400">{formatRelative(n.created_at)}</span>
+                    <span className="shrink-0 text-[11px] text-slate-500">{formatRelative(n.created_at)}</span>
                   </span>
                   {n.body && <span className="line-clamp-2 text-[12px] text-slate-500">{n.body}</span>}
                 </button>

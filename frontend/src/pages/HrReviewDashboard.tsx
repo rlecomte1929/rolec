@@ -64,7 +64,7 @@ export const HrReviewDashboard: React.FC = () => {
                   <div className="text-sm text-[#6b7280] mt-1">
                     {c.origin} → {c.destination}
                   </div>
-                  <div className="text-xs text-[#9ca3af] mt-1">
+                  <div className="text-xs text-gray-500 mt-1">
                     Target: {formatDate(c.targetMoveDate)} · Updated: {formatDate(c.lastUpdated)}
                   </div>
                 </div>

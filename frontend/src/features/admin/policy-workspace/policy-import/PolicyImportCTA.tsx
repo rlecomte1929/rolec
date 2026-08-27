@@ -51,7 +51,7 @@ export const PolicyImportCTA: React.FC = () => {
           {analyzing ? 'Analyzing…' : 'Upload internal policy'}
         </Button>
         {analyzing && (
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-slate-500">
             Extracting with Fable 5 — this may take up to 30 seconds for large documents.
           </span>
         )}

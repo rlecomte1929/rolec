@@ -90,7 +90,7 @@ export const ErasureRequestsPage: React.FC = () => {
             <h1 className="text-2xl font-semibold text-[#f1f5f9]">
               GDPR erasure requests
             </h1>
-            <p className="text-[#94a3b8] text-sm mt-1">
+            <p className="text-slate-500 text-sm mt-1">
               Employee right-to-erasure requests awaiting review (GDPR Art. 17).
             </p>
           </div>
@@ -104,10 +104,10 @@ export const ErasureRequestsPage: React.FC = () => {
         )}
 
         {loading ? (
-          <p className="text-[#94a3b8]">Loading…</p>
+          <p className="text-slate-500">Loading…</p>
         ) : requests.length === 0 ? (
           <Card className="p-6">
-            <p className="text-[#94a3b8]">No pending erasure requests. 🎉</p>
+            <p className="text-slate-500">No pending erasure requests. 🎉</p>
           </Card>
         ) : (
           <div className="space-y-4">
@@ -122,12 +122,12 @@ export const ErasureRequestsPage: React.FC = () => {
                       <p className="text-sm text-[#f1f5f9] font-medium">
                         Case {req.case_id}
                       </p>
-                      <p className="text-xs text-[#94a3b8] mt-1">
+                      <p className="text-xs text-slate-500 mt-1">
                         Requested {formatDate(req.requested_at)}
                         {' · due '}{formatDate(req.statutory_due_at)}
                       </p>
                       {req.reason && (
-                        <p className="text-sm text-[#cbd5e1] mt-2">
+                        <p className="text-sm text-slate-500 mt-2">
                           “{req.reason}”
                         </p>
                       )}

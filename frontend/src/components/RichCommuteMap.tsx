@@ -238,7 +238,7 @@ export function RichCommuteMap({ officeAddress, commuteMins, commuteMode, hasChi
   if (loading) {
     return (
       <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-gray-950 flex items-center justify-center" style={{ height: 300 }}>
-        <div className="text-center text-gray-400">
+        <div className="text-center text-gray-500">
           <div className="text-2xl mb-2 animate-pulse">🗺️</div>
           <div className="text-xs">Loading map…</div>
           {officeAddress && <div className="text-[10px] text-gray-500 mt-1">{officeAddress}</div>}
@@ -345,7 +345,7 @@ export function RichCommuteMap({ officeAddress, commuteMins, commuteMode, hasChi
                 <div className="font-semibold text-green-700 mb-0.5">🏫 {s.tags.name || 'School'}</div>
                 {s.tags.amenity && <div className="text-gray-500 capitalize">{s.tags.amenity.replace('_', ' ')}</div>}
                 {s.tags['addr:street'] && (
-                  <div className="text-gray-400 mt-0.5">{s.tags['addr:street']}</div>
+                  <div className="text-gray-500 mt-0.5">{s.tags['addr:street']}</div>
                 )}
               </div>
             </Popup>
@@ -366,7 +366,7 @@ export function RichCommuteMap({ officeAddress, commuteMins, commuteMode, hasChi
                   {t.tags.railway?.includes('station') ? '🚉' : '🚌'} {t.tags.name || 'Transit stop'}
                 </div>
                 {t.tags.ref && <div className="text-gray-500">Line {t.tags.ref}</div>}
-                {t.tags.network && <div className="text-gray-400">{t.tags.network}</div>}
+                {t.tags.network && <div className="text-gray-500">{t.tags.network}</div>}
               </div>
             </Popup>
           </CircleMarker>
@@ -390,7 +390,7 @@ export function RichCommuteMap({ officeAddress, commuteMins, commuteMode, hasChi
                   <div className="text-gray-500 capitalize">{s.tags.leisure.replace(/_/g, ' ')}</div>
                 )}
                 {s.tags['addr:street'] && (
-                  <div className="text-gray-400 mt-0.5">{s.tags['addr:street']}</div>
+                  <div className="text-gray-500 mt-0.5">{s.tags['addr:street']}</div>
                 )}
               </div>
             </Popup>

@@ -112,7 +112,7 @@ export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => 
               </span>
             )}
           </div>
-          <p className="text-xs text-[#94a3b8] mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Benefit-level exceptions flagged for this assignment
           </p>
         </div>
@@ -192,7 +192,7 @@ export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => 
                 {(row.current_value || row.requested_value) && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-lg bg-[#f8fafc] px-3 py-2 border border-[#e2e8f0]">
-                      <div className="text-xs font-medium text-[#94a3b8] mb-1">Current</div>
+                      <div className="text-xs font-medium text-slate-500 mb-1">Current</div>
                       <div className="text-xs text-[#334155] font-mono break-all">
                         {fmtVal(row.current_value)}
                       </div>
@@ -279,7 +279,7 @@ export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => 
                             <span className="font-medium text-[#334155]">{ev.action}</span>
                             {ev.actor && <span> by {ev.actor}</span>}
                             {ev.note && <span> — {ev.note}</span>}
-                            <span className="ml-2 text-[#94a3b8]">{fmtTs(ev.ts)}</span>
+                            <span className="ml-2 text-slate-500">{fmtTs(ev.ts)}</span>
                           </li>
                         ))}
                       </ol>

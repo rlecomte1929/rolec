@@ -199,7 +199,7 @@ export function AIDecisionsAuditPage() {
         </div>
         <details className="mt-2 group">
           <summary className="inline-flex items-center gap-1.5 cursor-pointer list-none text-sm font-medium text-slate-600 hover:text-navy-800 [&::-webkit-details-marker]:hidden">
-            <span className="text-slate-400 transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
+            <span className="text-slate-500 transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
             How this works
           </summary>
           <div className="mt-2 max-w-3xl space-y-2 text-sm text-slate-500 leading-relaxed">
@@ -295,7 +295,7 @@ export function AIDecisionsAuditPage() {
         {!loading && !error && visibleRecords.length === 0 && (
           <div className="text-center py-10">
             <p className="text-sm text-slate-500">No AI decisions recorded yet.</p>
-            <p className="text-xs text-slate-400 mt-1">As HR admins accept, override, or reject AI recommendations, they will appear here.</p>
+            <p className="text-xs text-slate-500 mt-1">As HR admins accept, override, or reject AI recommendations, they will appear here.</p>
           </div>
         )}
         {!loading && !error && visibleRecords.length > 0 && (
@@ -336,7 +336,7 @@ export function AIDecisionsAuditPage() {
                               className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ring-1 transition-colors ${
                                 priorLoaded
                                   ? 'bg-accent-50 text-accent-700 ring-accent-200 hover:bg-accent-100 cursor-pointer'
-                                  : 'bg-slate-50 text-slate-400 ring-slate-200 cursor-not-allowed'
+                                  : 'bg-slate-50 text-slate-500 ring-slate-200 cursor-not-allowed'
                               }`}
                             >
                               ← prior
@@ -350,7 +350,7 @@ export function AIDecisionsAuditPage() {
                         </span>
                       </td>
                       <td className="py-3 pr-3 text-xs text-slate-600 max-w-md">
-                        {r.reason ? <span className="italic">&quot;{r.reason}&quot;</span> : <span className="text-slate-300">—</span>}
+                        {r.reason ? <span className="italic">&quot;{r.reason}&quot;</span> : <span className="text-slate-500">—</span>}
                       </td>
                     </tr>
                   );

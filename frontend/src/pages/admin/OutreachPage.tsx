@@ -159,16 +159,16 @@ export function OutreachPage(): React.ReactElement {
 
       {/* Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-gray-400 text-sm">Loading…</div>
+        <div className="flex items-center justify-center py-16 text-gray-500 text-sm">Loading…</div>
       ) : displayProspects.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Send className="w-10 h-10 text-gray-300 mb-4" />
+          <Send className="w-10 h-10 text-gray-500 mb-4" />
           {filterFollowUp ? (
             <p className="text-gray-500 font-medium">No follow-ups due right now.</p>
           ) : (
             <>
               <p className="text-gray-500 font-medium mb-1">No prospects yet</p>
-              <p className="text-gray-400 text-sm">Click &quot;+ Add prospect&quot; to get started.</p>
+              <p className="text-gray-500 text-sm">Click &quot;+ Add prospect&quot; to get started.</p>
             </>
           )}
         </div>
@@ -205,7 +205,7 @@ export function OutreachPage(): React.ReactElement {
         <div className="mt-3 text-center">
           <button
             onClick={() => setShowArchived((v) => !v)}
-            className="text-xs text-gray-400 hover:text-gray-600 underline"
+            className="text-xs text-gray-500 hover:text-gray-600 underline"
           >
             {showArchived ? 'Hide archived / not interested' : 'Show archived / not interested'}
           </button>
@@ -219,7 +219,7 @@ export function OutreachPage(): React.ReactElement {
         <div className="mt-8" data-testid="td-referrals">
           <div className="mb-2 flex items-baseline gap-2">
             <h2 className="text-sm font-semibold text-navy-900">Referrals from the test campaign</h2>
-            <span className="text-xs text-gray-400">{referrals.length} recommended</span>
+            <span className="text-xs text-gray-500">{referrals.length} recommended</span>
           </div>
           <p className="mb-3 text-xs text-gray-500">
             People a tester recommended you contact. Nothing here has been messaged — adding one
@@ -259,7 +259,7 @@ export function OutreachPage(): React.ReactElement {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {added ? (
-                          <span className="text-xs text-gray-400">Already a prospect</span>
+                          <span className="text-xs text-gray-500">Already a prospect</span>
                         ) : (
                           <button
                             onClick={() => addReferralAsProspect(r)}
@@ -333,7 +333,7 @@ function ProspectRow({
             {p.corridor_relevance}
           </span>
         ) : (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-500">—</span>
         )}
       </td>
       <td className="px-4 py-3">
@@ -342,7 +342,7 @@ function ProspectRow({
       <td className="px-4 py-3 text-gray-500">
         {p.message_sent_at
           ? new Date(p.message_sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-          : <span className="text-gray-300">—</span>
+          : <span className="text-gray-500">—</span>
         }
       </td>
       <td className="px-4 py-3">
@@ -351,7 +351,7 @@ function ProspectRow({
             {days}d{daysOverdue ? ' ⚠' : ''}
           </span>
         ) : (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-500">—</span>
         )}
       </td>
       <td className="px-4 py-3">
@@ -385,7 +385,7 @@ const STATUS_CLASSES: Record<ProspectStatus, string> = {
   follow_up_sent:  'bg-yellow-50 text-yellow-700',
   converted:       'bg-teal-50 text-teal-700',
   not_interested:  'bg-red-50 text-red-600',
-  archived:        'bg-gray-100 text-gray-400',
+  archived:        'bg-gray-100 text-gray-500',
 };
 
 function StatusPill({ status }: { status: ProspectStatus }): React.ReactElement {

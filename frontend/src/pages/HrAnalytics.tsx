@@ -442,7 +442,7 @@ export const HrAnalytics: React.FC = () => {
 
         {/* Data freshness note */}
         {!loading && ws?.computed_at && (
-          <p className="text-xs text-[#9ca3af] text-right">
+          <p className="text-xs text-gray-500 text-right">
             Stats last computed:{' '}
             {new Date(ws.computed_at).toLocaleDateString('en-US', {
               year: 'numeric',

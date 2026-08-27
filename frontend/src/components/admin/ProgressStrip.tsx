@@ -98,7 +98,7 @@ export function ProgressStrip({ status, tier }: {
                 </span>
                 <span
                   className={`text-[11px] ${
-                    state === 'pending' ? 'text-gray-400' : 'font-medium text-gray-700'
+                    state === 'pending' ? 'text-gray-500' : 'font-medium text-gray-700'
                   }`}
                 >
                   {STEP_LABEL[s]}

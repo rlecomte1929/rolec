@@ -140,7 +140,7 @@ export const HrPolicyCapsSection: React.FC<HrPolicyCapsSectionProps> = ({ caseId
               <tr key={cap.benefit_key} className="border-b border-slate-100 last:border-b-0">
                 <td className="py-2.5 pr-4 font-medium text-slate-900">
                   {cap.name}
-                  {cap.notes ? <span className="block text-[11px] text-slate-400">{cap.notes}</span> : null}
+                  {cap.notes ? <span className="block text-[11px] text-slate-500">{cap.notes}</span> : null}
                 </td>
                 <td className="py-2.5 pr-4 text-slate-600">{labelCategory(cap.category)}</td>
                 <td className="py-2.5">

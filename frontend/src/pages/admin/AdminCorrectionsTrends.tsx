@@ -219,7 +219,7 @@ const ChartCard: React.FC<ChartCardProps> = ({ heading, description, groupBy, wi
       <h2 className="text-base font-semibold text-slate-900">{heading}</h2>
       <p className="text-sm text-slate-500 mt-0.5 mb-4">{description}</p>
       {loading && (
-        <div className="py-16 text-center text-sm text-slate-400" role="status">
+        <div className="py-16 text-center text-sm text-slate-500" role="status">
           Loading…
         </div>
       )}

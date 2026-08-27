@@ -74,7 +74,7 @@ export const AdvisorsPanel: React.FC<Props> = ({
       <div className="flex items-center justify-between px-5 py-4 border-b border-[#f1f5f9]">
         <div>
           <div className="text-sm font-semibold text-[#0b2b43]">Immigration advisors</div>
-          <p className="text-xs text-[#94a3b8] mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             {destinationCountry
               ? `Matched for ${originCountry ? `${originCountry} → ` : ''}${destinationCountry}`
               : 'Global coverage'}
@@ -166,7 +166,7 @@ export const AdvisorsPanel: React.FC<Props> = ({
 
                 {/* Languages */}
                 {adv.languages.length > 0 && (
-                  <div className="mt-1.5 text-xs text-[#94a3b8]">
+                  <div className="mt-1.5 text-xs text-slate-500">
                     Languages: {adv.languages.join(', ').toUpperCase()}
                   </div>
                 )}

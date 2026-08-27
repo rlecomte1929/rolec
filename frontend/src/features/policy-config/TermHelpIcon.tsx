@@ -22,7 +22,7 @@ export const TermHelpIcon: React.FC<Props> = ({ glossaryId, className }) => {
     >
       <Button unstyled
         type="button"
-        className="inline-flex rounded-full p-0.5 text-[#94a3b8] hover:text-[#0b2b43] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43] focus-visible:ring-offset-1"
+        className="inline-flex rounded-full p-0.5 text-slate-500 hover:text-[#0b2b43] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43] focus-visible:ring-offset-1"
         aria-label={`About ${entry.term}`}
       >
         <HelpCircle className="w-4 h-4" aria-hidden />

@@ -247,7 +247,7 @@ export const Dashboard: React.FC = () => {
                       <span className={`text-lg ${
                         task.status === 'done' ? 'text-[#1f8e8b]' :
                         task.status === 'in_progress' ? 'text-[#7a5e2a]' :
-                        'text-[#9ca3af]'
+                        'text-gray-500'
                       }`}>
                         {getTaskStatusIcon(task.status)}
                       </span>

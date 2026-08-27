@@ -23,7 +23,7 @@ interface ModuleCardProps {
 // read as 'no number yet' (a muted dash), not the amber 'Unavailable' alarm we
 // reserve for the top KPI tiles. A dash here is unambiguous because the card
 // links to the detail page that owns the real number.
-const MUTED_DASH = <span className="text-slate-300">—</span>;
+const MUTED_DASH = <span className="text-slate-500">—</span>;
 
 export const ModuleCard: React.FC<ModuleCardProps> = ({ testId, to, icon, title, subtitle, metric, rows = [], loading }) => (
   <Link data-testid={testId} to={to} className="block bg-white rounded-xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-sm transition-all">
@@ -34,7 +34,7 @@ export const ModuleCard: React.FC<ModuleCardProps> = ({ testId, to, icon, title,
         </div>
         <div>
           <p className="text-sm font-semibold text-slate-900">{title}</p>
-          <p className="text-xs text-slate-400">{subtitle}</p>
+          <p className="text-xs text-slate-500">{subtitle}</p>
         </div>
       </div>
       <span className="text-2xl font-semibold text-slate-900">

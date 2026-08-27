@@ -245,7 +245,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             <div className="text-sm font-semibold text-[#0b2b43] mb-3">Phase progression</div>
             <div className="space-y-3">
               {detail.phases.length === 0 ? (
-                <div className="text-sm text-[#94a3b8]">No phases defined yet.</div>
+                <div className="text-sm text-slate-500">No phases defined yet.</div>
               ) : (
                 detail.phases.map((ph) => (
                   <div key={ph.phase} className="border-l-2 border-[#e2e8f0] pl-4">
@@ -256,7 +256,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                           <span className={t.status === 'overdue' ? 'text-[#ef4444] font-medium' : ''}>
                             {t.title}
                           </span>
-                          <span className="text-xs text-[#94a3b8]">{statusLabel(t.status)}</span>
+                          <span className="text-xs text-slate-500">{statusLabel(t.status)}</span>
                           {t.due_date && <span className="text-xs">· {t.due_date}</span>}
                         </li>
                       ))}
@@ -321,12 +321,12 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
           <Card padding="lg" className="lg:col-span-2">
             <div className="text-sm font-semibold text-[#0b2b43] mb-3">Activity log</div>
             {detail.events.length === 0 ? (
-              <div className="text-sm text-[#94a3b8]">No events yet.</div>
+              <div className="text-sm text-slate-500">No events yet.</div>
             ) : (
               <ul className="space-y-3">
                 {detail.events.map((e, i) => (
                   <li key={i} className="flex gap-3 text-sm">
-                    <span className="text-[#94a3b8] shrink-0">
+                    <span className="text-slate-500 shrink-0">
                       {e.created_at ? new Date(e.created_at).toLocaleString() : '-'}
                     </span>
                     <span className="font-medium text-[#4b5563]">{e.event_type}</span>
@@ -363,7 +363,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm font-semibold text-[#0b2b43]">Immigration status</div>
-              <p className="text-xs text-[#94a3b8] mt-0.5">Documents, risk flags and employee interview progress</p>
+              <p className="text-xs text-slate-500 mt-0.5">Documents, risk flags and employee interview progress</p>
             </div>
           </div>
           <ImmigrationStatusPanel
@@ -410,7 +410,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
               <div className="text-sm font-semibold text-[#0b2b43]">Employee quote requests</div>
               {/* Since AIQ-1681 HR no longer runs procurement: the employee picks the
                   providers and submits the RFQ, and HR reviews it here as the payer. */}
-              <p className="text-xs text-[#94a3b8] mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 Providers the employee asked to quote for this case
               </p>
             </div>

@@ -16,7 +16,7 @@ export const PolicyImportStepItem: React.FC<Props> = ({ icon, title, description
     </div>
     <div className="min-w-0 space-y-0.5">
       <p className="text-xs font-medium text-[#64748b]">{title}</p>
-      <p className="text-xs text-[#94a3b8] leading-snug">{description}</p>
+      <p className="text-xs text-slate-500 leading-snug">{description}</p>
     </div>
   </div>
 );

@@ -834,7 +834,7 @@ export const EmployeeJourney: React.FC = () => {
                       </div>
                     ) : null}
                     {st ? (
-                      <div className="text-xs text-[#94a3b8]">{claimStateLabel(st)}</div>
+                      <div className="text-xs text-slate-500">{claimStateLabel(st)}</div>
                     ) : null}
                   </div>
                   <div className="flex sm:flex-col sm:justify-center shrink-0">

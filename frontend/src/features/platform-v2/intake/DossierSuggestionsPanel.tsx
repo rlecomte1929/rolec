@@ -122,7 +122,7 @@ export function DossierSuggestionsPanel({ caseId }: { caseId: string }) {
                   <div className="text-sm text-gray-800">{s.question_text}</div>
                   {s.sources && s.sources.length > 0 && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <span className="text-[10px] uppercase tracking-wide text-gray-400">Source</span>
+                      <span className="text-[10px] uppercase tracking-wide text-gray-500">Source</span>
                       {s.sources.map((src, sIdx) =>
                         src.url ? (
                           <a

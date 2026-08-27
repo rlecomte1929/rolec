@@ -117,7 +117,7 @@ export const HrEmployeeDetail: React.FC = () => {
           >
             ← Employees
           </Link>
-          <span className="text-[#9ca3af]">·</span>
+          <span className="text-gray-500">·</span>
           <Link to={buildRoute('hrPolicy')} className="text-sm text-[#6b7280] hover:text-[#0b2b43]">
             Policy
           </Link>

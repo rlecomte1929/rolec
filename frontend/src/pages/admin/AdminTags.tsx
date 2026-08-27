@@ -142,7 +142,7 @@ export const AdminTags: React.FC = () => {
               <div>
                 <span className="font-medium">{t.label}</span>
                 <span className="text-slate-500 ml-2">({t.key})</span>
-                {t.tag_group && <span className="text-slate-400 ml-2">[{t.tag_group}]</span>}
+                {t.tag_group && <span className="text-slate-500 ml-2">[{t.tag_group}]</span>}
               </div>
               {editing === t.id ? (
                 <div className="flex gap-2 flex-wrap">

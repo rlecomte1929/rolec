@@ -63,7 +63,7 @@ export const AdminWorkflowFunnelPage: React.FC = () => {
                     <span className="tabular-nums text-slate-500">
                       {s.count.toLocaleString()}
                       {s.conversion_from_prev_pct != null && (
-                        <span className="ml-2 text-xs text-slate-400">{s.conversion_from_prev_pct}% from prev</span>
+                        <span className="ml-2 text-xs text-slate-500">{s.conversion_from_prev_pct}% from prev</span>
                       )}
                     </span>
                   </div>
@@ -79,7 +79,7 @@ export const AdminWorkflowFunnelPage: React.FC = () => {
               );
             })}
           </div>
-          <p className="mt-4 text-xs text-slate-400">
+          <p className="mt-4 text-xs text-slate-500">
             Bars are scaled to the largest stage. “% from prev” is conversion from the preceding stage.
           </p>
         </Card>

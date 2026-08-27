@@ -408,7 +408,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
           )}
           <Badge variant={STATUS_BADGE_VARIANT[dStatus]}>{STATUS_LABEL[dStatus]}</Badge>
           <svg
-            className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${expanded ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-slate-500 transition-transform shrink-0 ${expanded ? 'rotate-180' : ''}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -443,14 +443,14 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
           {/* [P4-3] Ad-hoc notes */}
           {isAdhoc && form.notes && (
             <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Notes</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Notes</span>
               <p className="mt-0.5 whitespace-pre-wrap">{form.notes}</p>
             </div>
           )}
 
           {/* Loading indicator for comments + events */}
           {loadingData && (
-            <p className="text-xs text-slate-400">Loading history…</p>
+            <p className="text-xs text-slate-500">Loading history…</p>
           )}
 
           {/* ── History timeline ──────────────────────────────────────── */}
@@ -462,7 +462,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                   <li key={ev.id} className="flex items-start gap-2 text-xs text-slate-600">
                     <span className="mt-0.5 w-2 h-2 rounded-full bg-slate-300 shrink-0" />
                     <div>
-                      <span className="text-slate-400">
+                      <span className="text-slate-500">
                         {new Date(ev.created_at).toLocaleString()} ·{' '}
                       </span>
                       {ev.event_type === 'status_change' ? (
@@ -470,19 +470,19 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                           <span className="font-medium text-slate-700">
                             {ev.from_status} → {ev.to_status}
                           </span>
-                          {ev.actor_name && <span className="text-slate-400"> by {ev.actor_name}</span>}
+                          {ev.actor_name && <span className="text-slate-500"> by {ev.actor_name}</span>}
                           {ev.note && <span className="ml-1 italic text-slate-500">&quot;{ev.note}&quot;</span>}
                         </>
                       ) : ev.event_type === 'flagged' ? (
                         <>
                           <span className="font-medium text-amber-600">Flagged</span>
-                          {ev.actor_name && <span className="text-slate-400"> by {ev.actor_name}</span>}
+                          {ev.actor_name && <span className="text-slate-500"> by {ev.actor_name}</span>}
                           {ev.note && <span className="ml-1 italic text-slate-500">&quot;{ev.note}&quot;</span>}
                         </>
                       ) : ev.event_type === 'unflagged' ? (
                         <>
                           <span className="font-medium text-slate-600">Flag cleared</span>
-                          {ev.actor_name && <span className="text-slate-400"> by {ev.actor_name}</span>}
+                          {ev.actor_name && <span className="text-slate-500"> by {ev.actor_name}</span>}
                         </>
                       ) : (
                         <span className="font-medium text-slate-700">{ev.event_type}</span>
@@ -498,13 +498,13 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
           <div>
             <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Comments</h3>
             {!loadingData && comments.length === 0 && (
-              <p className="text-xs text-slate-400 mb-2">No comments yet.</p>
+              <p className="text-xs text-slate-500 mb-2">No comments yet.</p>
             )}
             {!loadingData && comments.map((c) => (
               <div key={c.id} className="mb-2 rounded bg-slate-50 border border-slate-100 px-3 py-2">
                 <div className="flex items-center justify-between mb-0.5">
                   <span className="text-xs font-medium text-slate-700">{c.author_name ?? 'Unknown'}</span>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-slate-500">
                     {new Date(c.created_at).toLocaleString()}
                   </span>
                 </div>
@@ -550,12 +550,12 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                     View PDF
                   </a>
                 ) : (
-                  <span className="text-xs text-slate-400">No PDF attached</span>
+                  <span className="text-xs text-slate-500">No PDF attached</span>
                 )}
                 <label
                   className={`px-2.5 py-1 rounded text-xs font-medium border cursor-pointer transition-colors
                     ${replacingPdf
-                      ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-wait'
+                      ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-wait'
                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
                 >
                   {replacingPdf ? 'Uploading…' : 'Replace PDF'}
@@ -589,7 +589,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
                     }}
                     className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors
                       ${opt.value === form.status
-                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                        ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed'
                         : opt.value === 'approved'
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                           : opt.value === 'rejected'

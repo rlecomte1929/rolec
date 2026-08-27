@@ -173,7 +173,7 @@ export const ImmigrationConsentScreen: React.FC<ImmigrationConsentScreenProps> =
         )}
 
         <div className="mt-6 flex items-center justify-between gap-3 border-t border-[#e2e8f0] pt-4">
-          <p className="text-xs text-[#94a3b8]">
+          <p className="text-xs text-slate-500">
             Consent recorded with version {CONSENT_TEXT_VERSION}. You can review or withdraw consent
             from your account settings.
           </p>

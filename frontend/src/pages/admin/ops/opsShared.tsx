@@ -146,7 +146,7 @@ export function Kpi({ label, value, sub, tone = 'default', onHold = false }: Kpi
           </span>
         )}
       </div>
-      <div className={`mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums ${onHold ? 'text-slate-400' : valueColor[tone]}`}>
+      <div className={`mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums ${onHold ? 'text-slate-500' : valueColor[tone]}`}>
         {value}
       </div>
       <div className="mt-1.5 truncate text-[11px] text-slate-500">{sub}</div>

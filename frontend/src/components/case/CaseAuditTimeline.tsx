@@ -197,7 +197,7 @@ export function CaseAuditTimeline({ caseId }: { caseId: string }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium capitalize text-[#0b2b43]">{verbLabel(e)}</span>
                       <Badge variant={actionTone(e.action_type)} size="sm">{e.action_type}</Badge>
-                      <span className="text-[11px] text-slate-400">{e.entity_type}</span>
+                      <span className="text-[11px] text-slate-500">{e.entity_type}</span>
                     </div>
                     <div className="text-xs text-slate-500">
                       {e.actor_name || e.actor_id || 'system'} · {formatTs(e.created_at)}
@@ -215,7 +215,7 @@ export function CaseAuditTimeline({ caseId }: { caseId: string }) {
                             Reverse
                           </Button>
                         )}
-                        {!canReverse && <span className="text-[11px] text-slate-400">Reversed</span>}
+                        {!canReverse && <span className="text-[11px] text-slate-500">Reversed</span>}
                       </div>
                     )}
 

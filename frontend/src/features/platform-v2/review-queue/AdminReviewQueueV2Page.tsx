@@ -301,7 +301,7 @@ export function AdminReviewQueueV2Page() {
         sortValue: (it) => (it.assigned_to_user_id ? ownerInitials(it.assigned_to_user_id) : ''),
         cell: (it) => {
           if (!it.assigned_to_user_id) {
-            return <span className="text-[12px] italic text-slate-400">Unassigned</span>;
+            return <span className="text-[12px] italic text-slate-500">Unassigned</span>;
           }
           return (
             <div className="flex items-center gap-1.5">
@@ -344,7 +344,7 @@ export function AdminReviewQueueV2Page() {
       <div className="px-6 py-6">
         {/* Header */}
         <div className="mb-5">
-          <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
+          <div className="text-[11px] font-medium uppercase tracking-widest text-slate-500">
             ReloPass · /admin/review-queue
           </div>
           <div className="mt-1.5 flex flex-wrap items-baseline gap-3">

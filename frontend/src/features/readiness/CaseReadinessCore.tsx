@@ -275,7 +275,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
                   r.source_title
                 )}
                 {r.source_last_reviewed_at && (
-                  <span className="text-[#94a3b8]"> · Last reviewed {r.source_last_reviewed_at}</span>
+                  <span className="text-slate-500"> · Last reviewed {r.source_last_reviewed_at}</span>
                 )}
               </li>
             ))}
@@ -366,7 +366,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
                                     {row.primary_reference.source_title || 'Source'}
                                   </a>
                                   {row.primary_reference.reference_strength && (
-                                    <span className="text-[#94a3b8]"> ({row.primary_reference.reference_strength})</span>
+                                    <span className="text-slate-500"> ({row.primary_reference.reference_strength})</span>
                                   )}
                                 </p>
                               )}

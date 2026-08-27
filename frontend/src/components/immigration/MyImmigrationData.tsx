@@ -420,7 +420,7 @@ export const MyImmigrationData: React.FC = () => {
             >
               {downloading ? 'Preparing…' : 'Download my data'}
             </Button>
-            <p className="text-xs text-[#94a3b8] mt-4">{RETENTION_NOTICE}</p>
+            <p className="text-xs text-slate-500 mt-4">{RETENTION_NOTICE}</p>
           </Card>
 
           {/* Deletion */}

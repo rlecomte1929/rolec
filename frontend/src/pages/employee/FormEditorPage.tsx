@@ -505,7 +505,7 @@ export const FormEditorPage: React.FC = () => {
               caseId &&
               navigate(buildRoute('employeeCaseDossier', { caseId }))
             }
-            className="shrink-0 text-slate-400 hover:text-slate-700 transition-colors"
+            className="shrink-0 text-slate-500 hover:text-slate-700 transition-colors"
             aria-label="Back to dossier"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -513,7 +513,7 @@ export const FormEditorPage: React.FC = () => {
             </svg>
           </Button>
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase leading-none mb-0.5">
+            <p className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase leading-none mb-0.5">
               ReloPass · Dossier & Forms
             </p>
             <h1 className="text-base font-semibold text-slate-900 truncate leading-tight">
@@ -535,7 +535,7 @@ export const FormEditorPage: React.FC = () => {
                 ? 'text-rose-600'
                 : saveStatus === 'saved'
                   ? 'text-emerald-600'
-                  : 'text-slate-400'
+                  : 'text-slate-500'
             }`}
           >
             {saveIndicatorLabel}

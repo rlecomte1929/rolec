@@ -257,7 +257,7 @@ export const CitationBlock: React.FC<CitationBlockProps> = ({
                       {citeIndex}
                     </Button>
                   ) : (
-                    <span className="text-[#9ca3af] text-[10px] ml-0.5">[{citeIndex}]</span>
+                    <span className="text-gray-500 text-[10px] ml-0.5">[{citeIndex}]</span>
                   )}
                 </sup>
               );
@@ -278,7 +278,7 @@ export const CitationBlock: React.FC<CitationBlockProps> = ({
             >
               <span>
                 Policy sources{' '}
-                <span className="text-[#9ca3af] font-normal">
+                <span className="text-gray-500 font-normal">
                   ({displayedCitations.length})
                 </span>
               </span>

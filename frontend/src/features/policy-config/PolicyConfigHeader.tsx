@@ -187,7 +187,7 @@ export const PolicyConfigHeader: React.FC<Props> = ({
           <div className="font-medium text-[#0b2b43]">
             {lastSavedAt ? formatSavedAt(lastSavedAt) : '—'}
             {!lastSavedAt && (
-              <span className="text-[#94a3b8] font-normal ml-1">(appears after a successful save)</span>
+              <span className="text-slate-500 font-normal ml-1">(appears after a successful save)</span>
             )}
           </div>
         </div>

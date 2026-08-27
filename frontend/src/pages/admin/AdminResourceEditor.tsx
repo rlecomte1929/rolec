@@ -570,7 +570,7 @@ export const AdminResourceEditor: React.FC = () => {
                     {entry.change_summary && (
                       <span className="text-slate-500 truncate max-w-xs">{entry.change_summary}</span>
                     )}
-                    <span className="text-slate-400 text-xs">
+                    <span className="text-slate-500 text-xs">
                       {entry.created_at ? new Date(entry.created_at).toLocaleString() : ''}
                     </span>
                   </div>

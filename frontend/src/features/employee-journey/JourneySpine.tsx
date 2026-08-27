@@ -67,7 +67,7 @@ const Station: React.FC<{
       ? 'bg-[#1f8e8b] border-[#1f8e8b] text-white'
       : kind === 'active'
         ? 'bg-[#0b2b43] border-[#0b2b43] text-white ring-4 ring-[#e6f4f3]'
-        : 'bg-white border-[#e2e8f0] text-[#94a3b8]';
+        : 'bg-white border-[#e2e8f0] text-slate-500';
   return (
     <li className={`relative pl-12 ${last ? '' : 'pb-5'}`}>
       {/* connector line to the next station */}
@@ -164,7 +164,7 @@ export const JourneySpine: React.FC<JourneySpineProps> = ({
       {/* Services & policy */}
       <Station kind={servicesDone ? 'done' : servicesActive ? 'active' : 'locked'} glyph={servicesDone ? '✓' : '2'}>
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`font-semibold text-sm ${servicesActive ? 'text-[#0b2b43]' : 'text-[#94a3b8]'}`}>
+          <span className={`font-semibold text-sm ${servicesActive ? 'text-[#0b2b43]' : 'text-slate-500'}`}>
             Services &amp; policy
           </span>
           <StatusPill status={servicesDone ? 'done' : servicesActive ? 'ready' : 'upcoming'}>
@@ -182,7 +182,7 @@ export const JourneySpine: React.FC<JourneySpineProps> = ({
           </div>
         ) : (
           <div className="mt-1">
-            <div className="text-xs text-[#94a3b8]">Opens after intake</div>
+            <div className="text-xs text-slate-500">Opens after intake</div>
             <Button variant="ghost" size="sm" className="mt-1" onClick={onPreviewBenefits}>
               Preview benefits
             </Button>
@@ -193,13 +193,13 @@ export const JourneySpine: React.FC<JourneySpineProps> = ({
       {/* Roadmap */}
       <Station kind={onViewRoadmap ? 'active' : 'locked'} glyph="3" last>
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`font-semibold text-sm ${onViewRoadmap ? 'text-[#0b2b43]' : 'text-[#94a3b8]'}`}>Roadmap</span>
+          <span className={`font-semibold text-sm ${onViewRoadmap ? 'text-[#0b2b43]' : 'text-slate-500'}`}>Roadmap</span>
           <StatusPill status={onViewRoadmap ? 'ready' : 'upcoming'}>
             {onViewRoadmap ? 'Ready' : 'Locked'}
           </StatusPill>
         </div>
         <div className="mt-1">
-          <div className="text-xs text-[#94a3b8]">
+          <div className="text-xs text-slate-500">
             {onViewRoadmap ? 'Your step-by-step relocation roadmap is ready.' : 'Unlocks at the end, after intake.'}
           </div>
           {onViewRoadmap ? (

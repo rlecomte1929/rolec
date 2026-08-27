@@ -207,7 +207,7 @@ export function HrBacklogPage() {
                   {name ?? shortId(ident) ?? '—'}
                 </div>
                 {email && (
-                  <div className="truncate text-[11px] text-slate-400 max-w-[14rem]">{email}</div>
+                  <div className="truncate text-[11px] text-slate-500 max-w-[14rem]">{email}</div>
                 )}
               </div>
             </div>
@@ -296,7 +296,7 @@ export function HrBacklogPage() {
       <div className="px-6 py-6">
         {/* Header */}
         <div className="mb-5">
-          <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
+          <div className="text-[11px] font-medium uppercase tracking-widest text-slate-500">
             ReloPass · /hr/backlog
           </div>
           <div className="mt-1.5 flex flex-wrap items-baseline gap-3">

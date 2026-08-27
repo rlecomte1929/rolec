@@ -92,7 +92,7 @@ export const ProviderCoordinationPanel: React.FC<ProviderCoordinationPanelProps>
   if (loading) {
     return (
       <Card padding="lg">
-        <div className="text-sm text-[#94a3b8]">Loading provider coordination…</div>
+        <div className="text-sm text-slate-500">Loading provider coordination…</div>
       </Card>
     );
   }
@@ -130,7 +130,7 @@ export const ProviderCoordinationPanel: React.FC<ProviderCoordinationPanelProps>
         {providers.length === 0 ? (
           <div className="rounded-lg border border-dashed border-[#d1d5db] bg-[#f9fafb] px-6 py-8 text-center">
             <p className="text-sm text-[#6b7280]">No providers on this case yet.</p>
-            <p className="text-xs text-[#94a3b8] mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Click <span className="font-medium">+ Invite provider</span> to add one.
             </p>
           </div>

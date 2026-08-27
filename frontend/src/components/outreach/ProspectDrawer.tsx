@@ -250,7 +250,7 @@ export function ProspectDrawer({
                     href={prospect.linkedin_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-gray-400 hover:text-navy-600 flex-shrink-0"
+                    className="text-gray-500 hover:text-navy-600 flex-shrink-0"
                     title="Open LinkedIn profile"
                   >
                     <ExternalLink className="w-4 h-4" />
@@ -270,7 +270,7 @@ export function ProspectDrawer({
               </div>
               <button
                 onClick={onClose}
-                className="ml-4 p-1.5 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                className="ml-4 p-1.5 text-gray-500 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -297,11 +297,11 @@ export function ProspectDrawer({
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 ${
                             done
                               ? 'bg-navy-700 border-navy-700 text-white'
-                              : 'bg-white border-gray-300 text-gray-400'
+                              : 'bg-white border-gray-300 text-gray-500'
                           }`}>
                             {done ? '✓' : i + 1}
                           </div>
-                          <span className={`text-xs mt-1 whitespace-nowrap ${done ? 'text-navy-700 font-medium' : 'text-gray-400'}`}>
+                          <span className={`text-xs mt-1 whitespace-nowrap ${done ? 'text-navy-700 font-medium' : 'text-gray-500'}`}>
                             {step.label}
                           </span>
                         </div>
@@ -316,7 +316,7 @@ export function ProspectDrawer({
 
               {/* Notes */}
               <section>
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Notes</h3>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Notes</h3>
                 <Textarea
                   value={notes}
                   onChange={setNotes}
@@ -324,16 +324,16 @@ export function ProspectDrawer({
                   placeholder="Add context about this prospect…"
                   rows={2}
                 />
-                {savingNotes && <p className="text-xs text-gray-400 mt-1">Saving…</p>}
+                {savingNotes && <p className="text-xs text-gray-500 mt-1">Saving…</p>}
               </section>
 
               {/* Message draft */}
               <section>
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   {draftSent ? 'Message sent' : 'Current draft'}
                 </h3>
                 {loadingDraft ? (
-                  <p className="text-sm text-gray-400">Loading draft…</p>
+                  <p className="text-sm text-gray-500">Loading draft…</p>
                 ) : (
                   <>
                     <Textarea
@@ -375,7 +375,7 @@ export function ProspectDrawer({
                       )}
                     </div>
                     {draftSent && prospect.message_sent_at && (
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-gray-500 mt-1">
                         Sent {new Date(prospect.message_sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
                     )}
@@ -449,7 +449,7 @@ export function ProspectDrawer({
               {/* Reply thread */}
               <section>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Reply thread ({replies.length})
                   </h3>
                   <button
@@ -460,7 +460,7 @@ export function ProspectDrawer({
                   </button>
                 </div>
                 {replies.length === 0 ? (
-                  <p className="text-sm text-gray-400">No replies logged yet.</p>
+                  <p className="text-sm text-gray-500">No replies logged yet.</p>
                 ) : (
                   <div className="space-y-3">
                     {replies.map((r) => (
@@ -469,7 +469,7 @@ export function ProspectDrawer({
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${SENTIMENT_MAP[r.sentiment]}`}>
                             {SENTIMENT_LABELS[r.sentiment]}
                           </span>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-gray-500">
                             {new Date(r.replied_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                           </span>
                         </div>
@@ -478,7 +478,7 @@ export function ProspectDrawer({
                           <p className="mt-1.5 text-xs text-navy-700 font-medium">
                             → {r.next_action}
                             {r.next_action_due && (
-                              <span className="text-gray-400 font-normal ml-1">
+                              <span className="text-gray-500 font-normal ml-1">
                                 by {new Date(r.next_action_due).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                               </span>
                             )}
@@ -529,7 +529,7 @@ function StatusActionBar({
   if (ACTIONABLE_STATUSES.includes(prospect.status)) {
     return (
       <div className="flex items-center gap-2 px-6 py-3 border-b border-gray-100 bg-gray-50">
-        <span className="text-xs text-gray-400 mr-auto">Move to:</span>
+        <span className="text-xs text-gray-500 mr-auto">Move to:</span>
         <button
           onClick={() => act('converted')}
           disabled={acting !== null}
@@ -558,7 +558,7 @@ function StatusActionBar({
   if (TERMINAL_STATUSES.includes(prospect.status)) {
     return (
       <div className="flex items-center gap-2 px-6 py-3 border-b border-gray-100 bg-gray-50">
-        <span className="text-xs text-gray-400 mr-auto">This prospect is {prospect.status.replace('_', ' ')}.</span>
+        <span className="text-xs text-gray-500 mr-auto">This prospect is {prospect.status.replace('_', ' ')}.</span>
         <button
           onClick={() => act('flagged')}
           disabled={acting !== null}
@@ -593,7 +593,7 @@ const STATUS_MAP: Record<ProspectStatus, string> = {
   follow_up_sent:  'bg-yellow-50 text-yellow-700',
   converted:       'bg-teal-50 text-teal-700',
   not_interested:  'bg-red-50 text-red-600',
-  archived:        'bg-gray-100 text-gray-400',
+  archived:        'bg-gray-100 text-gray-500',
 };
 
 const SENTIMENT_LABELS: Record<string, string> = {
@@ -604,5 +604,5 @@ const SENTIMENT_MAP: Record<string, string> = {
   positive: 'bg-green-100 text-green-700',
   neutral:  'bg-gray-100 text-gray-600',
   negative: 'bg-red-100 text-red-700',
-  not_set:  'bg-gray-50 text-gray-400',
+  not_set:  'bg-gray-50 text-gray-500',
 };

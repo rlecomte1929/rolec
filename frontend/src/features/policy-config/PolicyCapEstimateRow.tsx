@@ -89,15 +89,15 @@ export const PolicyCapEstimateRow: React.FC<{
       </div>
       <dl className="mt-2 grid grid-cols-1 gap-1 text-xs text-[#4b5563] sm:grid-cols-3">
         <div>
-          <dt className="text-[#94a3b8]">Approved cap</dt>
+          <dt className="text-slate-500">Approved cap</dt>
           <dd className="font-medium text-[#0b2b43]">{cap ?? '—'}</dd>
         </div>
         <div>
-          <dt className="text-[#94a3b8]">Provider estimate</dt>
+          <dt className="text-slate-500">Provider estimate</dt>
           <dd className="font-medium text-[#0b2b43]">{est}</dd>
         </div>
         <div>
-          <dt className="text-[#94a3b8]">Difference</dt>
+          <dt className="text-slate-500">Difference</dt>
           <dd className="font-medium text-[#0b2b43]">
             {result.supported_comparison &&
             result.difference_amount != null &&

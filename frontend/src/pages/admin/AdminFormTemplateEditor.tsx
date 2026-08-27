@@ -294,7 +294,7 @@ export const AdminFormTemplateEditor: React.FC = () => {
                     isActive
                       ? 'text-[#0b2b43]'
                       : isDisabled
-                        ? 'text-slate-300 cursor-not-allowed'
+                        ? 'text-slate-500 cursor-not-allowed'
                         : 'text-slate-500 hover:text-slate-700'
                   }`}
                   title={isDisabled ? 'Save the template first' : undefined}
@@ -396,7 +396,7 @@ export const AdminFormTemplateEditor: React.FC = () => {
               {!isNew && (
                 <Card padding="lg">
                   <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-2">
-                    Trigger rules <span className="text-xs font-normal text-slate-400">(Phase 2C — read-only)</span>
+                    Trigger rules <span className="text-xs font-normal text-slate-500">(Phase 2C — read-only)</span>
                   </h2>
                   <pre className="text-xs bg-slate-50 border border-slate-200 rounded p-3 max-h-64 overflow-auto">
                     {JSON.stringify(triggerRules, null, 2)}
@@ -505,6 +505,6 @@ const Field: React.FC<{
       {required && <span className="text-rose-500 ml-0.5">*</span>}
     </label>
     {children}
-    {hint && <div className="mt-1 text-[11px] text-slate-400">{hint}</div>}
+    {hint && <div className="mt-1 text-[11px] text-slate-500">{hint}</div>}
   </div>
 );

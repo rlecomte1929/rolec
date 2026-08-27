@@ -115,9 +115,9 @@ export const AdminResearchRequestsPage: React.FC = () => {
         </div>
 
         {loading ? (
-          <p className="py-6 text-center text-sm text-[#94a3b8]">Loading…</p>
+          <p className="py-6 text-center text-sm text-slate-500">Loading…</p>
         ) : rows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-[#94a3b8]">No {tab.replace('_', ' ')} requests.</p>
+          <p className="py-6 text-center text-sm text-slate-500">No {tab.replace('_', ' ')} requests.</p>
         ) : (
           <Card padding="md">
             <ul className="divide-y divide-[#e2e8f0]">

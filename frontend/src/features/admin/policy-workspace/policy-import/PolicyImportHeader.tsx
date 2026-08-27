@@ -12,6 +12,6 @@ export const PolicyImportHeader: React.FC = () => (
       </h2>
       <ComingSoonBadge />
     </div>
-    <p className="text-xs text-[#94a3b8] max-w-2xl leading-snug">{SUBTITLE}</p>
+    <p className="text-xs text-slate-500 max-w-2xl leading-snug">{SUBTITLE}</p>
   </div>
 );

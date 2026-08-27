@@ -141,7 +141,7 @@ export function ComposeNewMessage({ open, isHr, onClose, onSent }: ComposeNewMes
             {recipientError}
           </p>
         ) : loadingRecipients ? (
-          <p className="text-sm text-slate-400">Loading recipients…</p>
+          <p className="text-sm text-slate-500">Loading recipients…</p>
         ) : recipients.length === 0 ? (
           <p className="text-sm text-slate-500">
             {isHr
@@ -184,7 +184,7 @@ export function ComposeNewMessage({ open, isHr, onClose, onSent }: ComposeNewMes
                 }}
                 rows={5}
                 placeholder="Write your message…"
-                className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+                className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-500 focus:border-slate-400 focus:outline-none"
               />
             </div>
 

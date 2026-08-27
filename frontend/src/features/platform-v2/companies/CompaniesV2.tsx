@@ -183,7 +183,7 @@ export function SeatCell({ count, limit }: SeatCellProps) {
   if (limit == null) {
     return (
       <div className="text-[12.5px] tabular-nums text-slate-700">
-        {count} <span className="text-slate-400">/ —</span>
+        {count} <span className="text-slate-500">/ —</span>
       </div>
     );
   }
@@ -193,7 +193,7 @@ export function SeatCell({ count, limit }: SeatCellProps) {
   return (
     <div className="min-w-[6rem] space-y-1">
       <div className="text-[12.5px] tabular-nums text-slate-700">
-        {count} <span className="text-slate-400">/ {limit}</span>
+        {count} <span className="text-slate-500">/ {limit}</span>
       </div>
       <div className="h-1 w-full overflow-hidden rounded-full bg-slate-100">
         <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
@@ -237,7 +237,7 @@ function DetailPanel({ company, onClose }: DetailPanelProps) {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
           >
             ✕
           </Button>
@@ -318,7 +318,7 @@ function DetailPanel({ company, onClose }: DetailPanelProps) {
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </div>
       <div className="leading-snug">{children}</div>
@@ -463,7 +463,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
     <div className="px-6 py-6">
       {/* Header */}
       <div className="mb-5">
-        <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
+        <div className="text-[11px] font-medium uppercase tracking-widest text-slate-500">
           ReloPass · /admin/companies/overview
         </div>
         <div className="mt-1.5 flex items-baseline gap-3">
@@ -654,14 +654,14 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
             <tbody className="divide-y divide-slate-100">
               {loading && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-500">
                     Loading companies…
                   </td>
                 </tr>
               )}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-500">
                     {anyFilter ? 'No companies match your filters.' : 'No companies yet.'}
                   </td>
                 </tr>
@@ -721,7 +721,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
                     </td>
                     <td className="pr-4 py-2.5 text-right">
                       {busyId === c.id ? (
-                        <span className="text-[11px] text-slate-400">…</span>
+                        <span className="text-[11px] text-slate-500">…</span>
                       ) : (
                         <RowActionMenu
                           onEdit={() => setEditTarget(c)}

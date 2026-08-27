@@ -63,7 +63,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="w-full resize-none rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-[15px] text-[#1A1A1A] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43] min-h-[44px] max-h-[120px]"
+            className="w-full resize-none rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-[15px] text-[#1A1A1A] placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/20 focus:border-[#0b2b43] min-h-[44px] max-h-[120px]"
             style={{ minHeight: '44px' }}
             aria-label="Message text"
           />
@@ -80,7 +80,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           </svg>
         </Button>
       </div>
-      <p className="mt-2 text-[11px] text-[#94a3b8] hidden sm:block" aria-hidden>
+      <p className="mt-2 text-[11px] text-slate-500 hidden sm:block" aria-hidden>
         Enter to send · Shift+Enter for new line
       </p>
     </div>

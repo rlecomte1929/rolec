@@ -101,7 +101,7 @@ export const CaseBudgetPanel: React.FC<CaseBudgetPanelProps> = ({ caseId }) => {
       </div>
 
       <div className="px-4 py-2.5 border-t border-[#f1f5f9] bg-[#f8fafc]">
-        <p className="text-xs text-[#94a3b8]">
+        <p className="text-xs text-slate-500">
           Estimates in EUR · Actuals depend on supplier quotes and currency fluctuation
         </p>
       </div>

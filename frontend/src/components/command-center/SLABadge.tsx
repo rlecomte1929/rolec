@@ -25,7 +25,7 @@ function daysLabel(days?: number | null): string | null {
 
 export const SLABadge: React.FC<SLABadgeProps> = ({ status, daysUntilMove, size = 'sm' }) => {
   if (!status || !(status in STYLES)) {
-    return <span className="text-[#9ca3af]">—</span>;
+    return <span className="text-gray-500">—</span>;
   }
   const s = STYLES[status as SlaStatus];
   const dl = daysLabel(daysUntilMove);

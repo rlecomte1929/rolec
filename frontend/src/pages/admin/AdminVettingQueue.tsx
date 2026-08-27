@@ -259,7 +259,7 @@ export const AdminVettingQueue: React.FC = () => {
             <span className="font-medium text-[#0b2b43]">{counts.countries}</span>{' '}
             {counts.countries === 1 ? 'country' : 'countries'}
           </span>
-          <span className="text-[#9ca3af]">
+          <span className="text-gray-500">
             {filtered.length} of {items.length} pending
           </span>
         </div>
@@ -334,7 +334,7 @@ export const AdminVettingQueue: React.FC = () => {
                         {row.city_name && ` • ${row.city_name}`}
                       </div>
                       {row.created_at && (
-                        <div className="text-xs text-[#9ca3af] mt-1">
+                        <div className="text-xs text-gray-500 mt-1">
                           Discovered {new Date(row.created_at).toLocaleDateString()}
                         </div>
                       )}
@@ -355,7 +355,7 @@ export const AdminVettingQueue: React.FC = () => {
                           {row.accreditation.valid_until &&
                             ` · expires ${row.accreditation.valid_until}`}
                           {row.accreditation.status === 'claimed' && (
-                            <span className="text-[#9ca3af]"> · unverified</span>
+                            <span className="text-gray-500"> · unverified</span>
                           )}
                         </div>
                       )}

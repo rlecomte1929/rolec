@@ -89,7 +89,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled, jus
           </div>
           <h3 className="font-medium text-slate-900">{task.title}</h3>
           {task.due_date && (
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Due {new Date(task.due_date).toLocaleDateString()}
             </p>
           )}
@@ -142,7 +142,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled, jus
             {submitting ? 'Submitting…' : 'Submit'}
           </Button>
           {submitDisabled && (
-            <p className="text-xs text-slate-400 mt-2">
+            <p className="text-xs text-slate-500 mt-2">
               Acknowledge the privacy notice above to submit.
             </p>
           )}
@@ -207,7 +207,7 @@ export const RoadmapStepCard: React.FC<{ step: RoadmapV2Step }> = ({ step }) => 
         </div>
         <h3 className="font-medium text-slate-900">{step.title}</h3>
         {step.due_date && (
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Due {new Date(step.due_date).toLocaleDateString()}
           </p>
         )}
@@ -367,7 +367,7 @@ export const EmployeeTaskPage: React.FC = () => {
         )}
 
         {loading ? (
-          <div className="text-center py-16 text-sm text-slate-400">Loading your tasks…</div>
+          <div className="text-center py-16 text-sm text-slate-500">Loading your tasks…</div>
         ) : bothEmpty && !error ? (
           <div className="text-center py-16">
             <p className="text-slate-500 text-sm">No tasks yet — your HR team hasn&rsquo;t assigned anything.</p>

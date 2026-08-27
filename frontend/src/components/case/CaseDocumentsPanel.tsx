@@ -158,7 +158,7 @@ export function CaseDocumentsPanel({ caseId, canUpload = false }: CaseDocumentsP
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <p className="mt-1 text-xs text-slate-400">Uploading… {progress}%</p>
+                <p className="mt-1 text-xs text-slate-500">Uploading… {progress}%</p>
               </div>
             )}
           </div>
@@ -182,7 +182,7 @@ export function CaseDocumentsPanel({ caseId, canUpload = false }: CaseDocumentsP
       )}
 
       {loading ? (
-        <p className="py-8 text-center text-sm text-slate-400">Loading documents…</p>
+        <p className="py-8 text-center text-sm text-slate-500">Loading documents…</p>
       ) : error ? (
         <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
           {error}
@@ -191,7 +191,7 @@ export function CaseDocumentsPanel({ caseId, canUpload = false }: CaseDocumentsP
           </Button>
         </div>
       ) : documents.length === 0 ? (
-        <p className="py-8 text-center text-sm text-slate-400">
+        <p className="py-8 text-center text-sm text-slate-500">
           No documents uploaded yet.
         </p>
       ) : (
@@ -209,7 +209,7 @@ export function CaseDocumentsPanel({ caseId, canUpload = false }: CaseDocumentsP
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-slate-900">{doc.file_name}</p>
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="mt-0.5 text-xs text-slate-500">
                       {formatBytes(doc.file_size_bytes)}
                       {doc.uploaded_at &&
                         ` · ${new Date(doc.uploaded_at).toLocaleDateString()}`}

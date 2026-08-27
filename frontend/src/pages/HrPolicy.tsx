@@ -478,11 +478,11 @@ function DetectedMetadataDisplay({ metadata }: { metadata: PolicyDocumentMetadat
         ))}
       </span>
     ) : (
-      <span className="text-[#9ca3af]"> - </span>
+      <span className="text-gray-500"> - </span>
     );
 
   const BoolBadge = ({ v }: { v: boolean }) => (
-    <span className={v ? 'text-[#059669] font-medium' : 'text-[#9ca3af]'}>
+    <span className={v ? 'text-[#059669] font-medium' : 'text-gray-500'}>
       {v ? 'Yes' : 'No'}
     </span>
   );
@@ -1103,7 +1103,7 @@ export function PolicyDocumentIntakeSection({
             {message}
           </Alert>
           {uploadRequestId && (
-            <div className="text-xs text-[#9ca3af] mt-1 font-mono">Request ID: {uploadRequestId}</div>
+            <div className="text-xs text-gray-500 mt-1 font-mono">Request ID: {uploadRequestId}</div>
           )}
         </div>
       )}

@@ -44,7 +44,7 @@ export const WizardStepIndicator: React.FC<Props> = ({ currentStep }) => {
                       'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors',
                       done    ? 'bg-[#0b2b43] text-white'        : '',
                       active  ? 'bg-[#1a5276] text-white ring-2 ring-[#0b2b43] ring-offset-2' : '',
-                      pending ? 'bg-slate-100 text-slate-400 border border-slate-200' : '',
+                      pending ? 'bg-slate-100 text-slate-500 border border-slate-200' : '',
                     ].join(' ')}
                   >
                     {done ? (
@@ -62,7 +62,7 @@ export const WizardStepIndicator: React.FC<Props> = ({ currentStep }) => {
                 </div>
                 {/* Label — hidden on mobile for steps 4–5 to avoid overflow */}
                 <div className="mt-1 text-center px-1 hidden sm:block">
-                  <p className={`text-xs font-medium leading-tight ${active ? 'text-[#0b2b43]' : done ? 'text-slate-600' : 'text-slate-400'}`}>
+                  <p className={`text-xs font-medium leading-tight ${active ? 'text-[#0b2b43]' : done ? 'text-slate-600' : 'text-slate-500'}`}>
                     {step.title}
                   </p>
                 </div>

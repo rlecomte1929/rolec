@@ -651,7 +651,7 @@ export const AdminMessages: React.FC = () => {
 
                   <div className="pt-3 border-t border-[#e5e7eb]">
                     <div className="text-xs text-[#6b7280] mb-1">Admin note / Escalation</div>
-                    <p className="text-sm text-[#9ca3af] italic">
+                    <p className="text-sm text-gray-500 italic">
                       Direct reply not implemented. Use the assignment or collaboration panel to respond.
                     </p>
                   </div>

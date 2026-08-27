@@ -110,7 +110,7 @@ function StatusIcon({ task }: { task: RelocationPlanPhaseTaskDTO }) {
   if (tone === 'wait') return <span className={`${base} bg-amber-50 text-amber-500`}><Lock size={13} /></span>;
   if (task.status === 'in_progress') return <span className={`${base} bg-sky-50 text-sky-500`}><Loader2 size={13} /></span>;
   if (tone === 'ready') return <span className={`${base} bg-teal-50 text-teal-500`}><Circle size={13} /></span>;
-  return <span className={`${base} bg-slate-100 text-slate-400`}><Clock size={13} /></span>;
+  return <span className={`${base} bg-slate-100 text-slate-500`}><Clock size={13} /></span>;
 }
 
 function OwnerPill({ owner }: { owner: RelocationPlanPhaseTaskDTO['owner'] }) {
@@ -309,7 +309,7 @@ function SourceDisclosure({ confidence }: { confidence: StepConfidence }) {
             <ExternalLink size={11} /> Official source
           </a>
           {confidence.sourceFetchedAt && (
-            <span className="ml-2 text-slate-400">
+            <span className="ml-2 text-slate-500">
               Verified {new Date(confidence.sourceFetchedAt).toLocaleDateString()}
             </span>
           )}
@@ -357,7 +357,7 @@ function TaskRow({
       )}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className={`text-[14px] font-semibold ${done ? 'text-slate-400 line-through' : 'text-[#0b2b43]'}`}>
+          <span className={`text-[14px] font-semibold ${done ? 'text-slate-500 line-through' : 'text-[#0b2b43]'}`}>
             {task.title}
           </span>
           {confidence && <ConfidenceBadge level={resolveConfidenceLevel(confidence)} size="sm" />}
@@ -380,7 +380,7 @@ function TaskRow({
       <div className="shrink-0 text-right">
         <Chip tone={st.tone}>{st.label}</Chip>
         <div
-          className={`mt-1 text-[11.5px] text-slate-400${task.due_date_is_suggested ? ' italic' : ''}`}
+          className={`mt-1 text-[11.5px] text-slate-500${task.due_date_is_suggested ? ' italic' : ''}`}
           title={task.due_date_is_suggested ? 'Auto-estimated from your move date' : undefined}
         >
           {formatDue(task)}
@@ -430,7 +430,7 @@ function PhaseSection({
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h3 className="text-[15.5px] font-bold text-[#0b2b43]">{phase.title}</h3>
-            <span className="text-[12px] text-slate-400">{phase.task_counts.completed} of {phase.task_counts.total} done</span>
+            <span className="text-[12px] text-slate-500">{phase.task_counts.completed} of {phase.task_counts.total} done</span>
           </div>
           <div className="mt-1.5 flex items-center gap-2">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
@@ -439,7 +439,7 @@ function PhaseSection({
             <span className="text-[11.5px] font-medium text-slate-500">{pct}%</span>
           </div>
         </div>
-        {open ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+        {open ? <ChevronUp size={18} className="text-slate-500" /> : <ChevronDown size={18} className="text-slate-500" />}
       </button>
       {open && (
         <div className="px-4 pb-3">
@@ -562,7 +562,7 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-[13px] font-semibold">
           <span className="rounded-md bg-[#0b2b43] px-3 py-1.5 text-white">Checklist</span>
-          <span className="px-3 py-1.5 text-slate-400" title="Coming soon">Timeline</span>
+          <span className="px-3 py-1.5 text-slate-500" title="Coming soon">Timeline</span>
         </div>
         <RoadmapActions caseId={caseId} />
       </div>
@@ -587,7 +587,7 @@ export const RoadmapTemplate: React.FC<RoadmapTemplateProps> = ({
       {hrHandled.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
           <div className="flex items-start gap-3">
-            <Clock size={16} className="mt-0.5 text-slate-400" />
+            <Clock size={16} className="mt-0.5 text-slate-500" />
             <div>
               <div className="text-[13.5px] font-semibold text-[#0b2b43]">
                 HR &amp; partners are handling {hrHandled.length} step{hrHandled.length === 1 ? '' : 's'} for you

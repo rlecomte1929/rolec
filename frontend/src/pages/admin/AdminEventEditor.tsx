@@ -423,7 +423,7 @@ export const AdminEventEditor: React.FC = () => {
                   <div key={i} className="flex flex-wrap gap-2 py-1 border-b border-slate-100 last:border-0">
                     <span className="font-medium">{String(entry.action_type)}</span>
                     {entry.previous_status && entry.new_status && <span className="text-slate-500">{entry.previous_status} → {entry.new_status}</span>}
-                    <span className="text-slate-400 text-xs">{entry.created_at ? new Date(entry.created_at).toLocaleString() : ''}</span>
+                    <span className="text-slate-500 text-xs">{entry.created_at ? new Date(entry.created_at).toLocaleString() : ''}</span>
                   </div>
                 ))}
               </div>

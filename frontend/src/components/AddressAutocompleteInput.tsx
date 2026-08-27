@@ -121,7 +121,7 @@ export function AddressAutocompleteInput({
               tabIndex={0}
               className="flex items-center gap-2 px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50"
             >
-              <span className="text-gray-400">📍</span>
+              <span className="text-gray-500">📍</span>
               <span className="flex-1">{s}</span>
             </div>
           ))}

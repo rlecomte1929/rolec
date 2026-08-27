@@ -172,7 +172,7 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
                   </span>
                 )}
             </div>
-            <div className="text-xs text-[#94a3b8] font-mono mt-0.5">{row.benefit_key}</div>
+            <div className="text-xs text-slate-500 font-mono mt-0.5">{row.benefit_key}</div>
             {serverError && (
               <p className="text-xs text-[#7a2a2a] mt-2 border border-[#fecaca] bg-[#fef2f2] rounded px-2 py-1">
                 {serverError}
@@ -220,7 +220,7 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-[#94a3b8]">Leave all unchecked to mean every assignment type.</p>
+              <p className="text-xs text-slate-500">Leave all unchecked to mean every assignment type.</p>
               {droppedAssignmentTokens.length > 0 && (
                 <p className="text-xs text-[#7a2a2a]">
                   Legacy values saved in the database were not recognized: {droppedAssignmentTokens.join(', ')}.
@@ -242,7 +242,7 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-[#94a3b8]">Leave all unchecked to mean every family situation.</p>
+              <p className="text-xs text-slate-500">Leave all unchecked to mean every family situation.</p>
               {droppedFamilyTokens.length > 0 && (
                 <p className="text-xs text-[#7a2a2a]">
                   Legacy values not recognized: {droppedFamilyTokens.join(', ')}. Re-select and save to update.
@@ -263,7 +263,7 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-[#94a3b8]">Leave all unchecked to mean every employee level.</p>
+              <p className="text-xs text-slate-500">Leave all unchecked to mean every employee level.</p>
               {droppedLevelTokens.length > 0 && (
                 <p className="text-xs text-[#7a2a2a]">
                   Legacy values not recognized: {droppedLevelTokens.join(', ')}. Re-select and save to update.

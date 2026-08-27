@@ -150,7 +150,7 @@ export const AdminPolicyAssistantGroundingSection: React.FC<{ companyId: string 
             <span className="text-slate-500">
               rev {String(s.revision_number ?? '?')} · {String(s.activation_state || s.status || '')}
             </span>
-            {s.created_at ? <span className="text-slate-400">{String(s.created_at)}</span> : null}
+            {s.created_at ? <span className="text-slate-500">{String(s.created_at)}</span> : null}
           </li>
         ))}
         {allSnapshots.length === 0 && <li className="text-slate-500">No snapshots yet.</li>}

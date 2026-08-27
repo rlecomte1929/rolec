@@ -235,7 +235,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
               >
                 <span className="text-xs leading-tight">{identity}</span>
                 {role && (
-                  <span className="text-[10px] uppercase tracking-wide text-slate-400 font-normal">
+                  <span className="text-[10px] uppercase tracking-wide text-slate-500 font-normal">
                     {role}
                   </span>
                 )}

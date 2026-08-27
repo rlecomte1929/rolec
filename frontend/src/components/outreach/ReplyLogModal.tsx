@@ -81,7 +81,7 @@ export function ReplyLogModal({ open, onClose, prospectId, messageId, onSave }: 
                 className={`flex-1 py-1.5 text-xs font-medium rounded border transition-all ${
                   form.sentiment === value
                     ? className
-                    : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300'
+                    : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
                 }`}
               >
                 {label}

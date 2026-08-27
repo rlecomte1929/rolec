@@ -183,7 +183,7 @@ export const ReadinessAndActionsBlock: React.FC<Props> = ({
                 </div>
                 {b.detail && <p className="text-xs text-[#64748b] mt-1">{b.detail}</p>}
                 {b.provenance_note && (
-                  <p className="text-xs italic text-[#94a3b8] mt-1">{b.provenance_note}</p>
+                  <p className="text-xs italic text-slate-500 mt-1">{b.provenance_note}</p>
                 )}
               </li>
             ))}
@@ -200,7 +200,7 @@ export const ReadinessAndActionsBlock: React.FC<Props> = ({
             {ui.next_actions.map((a, i) => (
               <li key={i} className="pl-1">
                 <span>{a.title}</span>
-                <span className="text-xs text-[#94a3b8] ml-1">({a.category})</span>
+                <span className="text-xs text-slate-500 ml-1">({a.category})</span>
                 {a.linked_tracker_task_type && (
                   <PlanJumpLink milestoneType={a.linked_tracker_task_type} label="Jump to plan task" />
                 )}

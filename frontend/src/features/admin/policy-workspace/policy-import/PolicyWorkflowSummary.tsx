@@ -21,7 +21,7 @@ export const PolicyWorkflowSummary: React.FC<Props> = ({ summary, elapsedMs, mod
             <p className="text-[12px] text-slate-500">Effective: {summary.effective_date}</p>
           )}
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-slate-400">
+        <div className="flex items-center gap-3 text-[11px] text-slate-500">
           <span>{summary.benefits_count} benefits extracted</span>
           <span>{(elapsedMs / 1000).toFixed(1)}s</span>
           {model && <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono">{model}</span>}
@@ -64,7 +64,7 @@ export const PolicyWorkflowSummary: React.FC<Props> = ({ summary, elapsedMs, mod
               </div>
             ))}
             {summary.timeline.length === 0 && (
-              <p className="text-[12px] text-slate-400">No timeline phases derived from policy.</p>
+              <p className="text-[12px] text-slate-500">No timeline phases derived from policy.</p>
             )}
           </div>
         </Card>
@@ -127,7 +127,7 @@ export const PolicyWorkflowSummary: React.FC<Props> = ({ summary, elapsedMs, mod
               ))}
             </div>
           )}
-          <p className="mt-2 text-[11px] text-slate-400">{summary.cost_summary.note}</p>
+          <p className="mt-2 text-[11px] text-slate-500">{summary.cost_summary.note}</p>
         </Card>
       </div>
     </div>

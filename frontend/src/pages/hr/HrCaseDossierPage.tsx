@@ -134,7 +134,7 @@ export const HrCaseDossierPage: React.FC = () => {
         {/* ── Header ────────────────────────────────────────────────────── */}
         <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase mb-1">
+            <p className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1">
               ReloPass · HR Dossier
             </p>
             <h1 className="text-2xl font-semibold text-slate-900">Dossier panel</h1>

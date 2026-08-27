@@ -195,7 +195,7 @@ export const PolicyBenefitsSummary: React.FC<{ companyId?: string | null }> = ({
                 {cat.display_name}
               </div>
               {cat.rows.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-[#9ca3af]">No values set for this category.</div>
+                <div className="px-4 py-3 text-sm text-gray-500">No values set for this category.</div>
               ) : (
                 // AIQ-1105: scannable table with explicit column headers (was a
                 // header-less 3-col grid). overflow-x-auto keeps it usable on

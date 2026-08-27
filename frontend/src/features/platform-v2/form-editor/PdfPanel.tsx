@@ -18,7 +18,7 @@ export const PdfPanel: React.FC<PdfPanelProps> = ({ url, formName }) => {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-slate-50 border border-slate-200 rounded-lg p-6 text-center">
         <svg
-          className="w-12 h-12 text-slate-300 mb-3"
+          className="w-12 h-12 text-slate-500 mb-3"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

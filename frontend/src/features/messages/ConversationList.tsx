@@ -85,7 +85,7 @@ function renderConversationRow(
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-2">
             <span className="font-semibold text-[#1A1A1A] truncate">{conv.other_participant_name}</span>
-            <span className="flex-shrink-0 text-[11px] text-[#94a3b8]">
+            <span className="flex-shrink-0 text-[11px] text-slate-500">
               {formatTime(conv.last_message_at)}
             </span>
           </div>
@@ -175,7 +175,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                 </div>
               ) : null}
               {block.conversations.length === 0 ? (
-                <div className="px-4 py-4 text-sm text-[#94a3b8] border-b border-[#e2e8f0]/80">
+                <div className="px-4 py-4 text-sm text-slate-500 border-b border-[#e2e8f0]/80">
                   {block.emptyHint ?? 'No threads in this section.'}
                 </div>
               ) : (

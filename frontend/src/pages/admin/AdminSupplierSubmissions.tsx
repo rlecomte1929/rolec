@@ -144,7 +144,7 @@ export const AdminSupplierSubmissions: React.FC = () => {
                       {row.country_code ? `, ${row.country_code}` : ''}
                       {row.contact_email ? ` · ${row.contact_email}` : ''}
                     </div>
-                    <div className="text-xs text-[#94a3b8] mt-1">
+                    <div className="text-xs text-slate-500 mt-1">
                       Company {row.company_id}
                       {row.created_supplier_id ? ` · supplier ${row.created_supplier_id}` : ''}
                     </div>

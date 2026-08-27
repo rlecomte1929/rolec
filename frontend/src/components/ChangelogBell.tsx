@@ -143,7 +143,7 @@ export const ChangelogBell: React.FC = () => {
         }
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="relative grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+        className="relative grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
       >
         {/* Sparkles-free megaphone-ish icon — clean lucide-style stroke */}
         <svg
@@ -180,7 +180,7 @@ export const ChangelogBell: React.FC = () => {
             <Button unstyled
               type="button"
               onClick={() => setOpen(false)}
-              className="text-xs text-slate-400 hover:text-slate-600"
+              className="text-xs text-slate-500 hover:text-slate-600"
               aria-label="Close"
             >
               Close
@@ -203,7 +203,7 @@ export const ChangelogBell: React.FC = () => {
                 <li key={entry.id} className="px-4 py-3">
                   <div className="flex items-baseline justify-between gap-2">
                     <h3 className="text-sm font-medium text-slate-900">{entry.title}</h3>
-                    <span className="text-[11px] text-slate-400 shrink-0">
+                    <span className="text-[11px] text-slate-500 shrink-0">
                       {formatDate(entry.date)}
                     </span>
                   </div>

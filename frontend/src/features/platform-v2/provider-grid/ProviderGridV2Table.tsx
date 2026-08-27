@@ -55,7 +55,7 @@ export function ProviderGridV2Table({ rows, emptyState }: ProviderGridV2TablePro
           <div>
             <div className="font-medium text-slate-900">{row.employee_name}</div>
             {row.employee_identifier && row.employee_identifier !== row.employee_name && (
-              <div className="text-[11px] text-slate-400 mt-0.5">{row.employee_identifier}</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">{row.employee_identifier}</div>
             )}
           </div>
         ),

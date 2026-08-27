@@ -250,7 +250,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           </div>
         </dl>
         {supportId && (
-          <div className="mt-4 pt-3 border-t border-[#e5e7eb] text-[11px] text-[#9ca3af] font-mono">
+          <div className="mt-4 pt-3 border-t border-[#e5e7eb] text-[11px] text-gray-500 font-mono">
             Support reference: {supportId}
           </div>
         )}
@@ -334,7 +334,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
               })}
             </div>
             {comparisonSubrules.length > 0 && (
-              <p className="text-[11px] text-[#9ca3af] mt-2">
+              <p className="text-[11px] text-gray-500 mt-2">
                 Comparison engine subrules (derived): {comparisonSubrules.length} atomic piece
                 {comparisonSubrules.length === 1 ? '' : 's'} — not shown as primary HR rows.
               </p>

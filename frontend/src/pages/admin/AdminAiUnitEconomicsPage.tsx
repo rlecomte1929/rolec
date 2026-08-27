@@ -15,9 +15,9 @@ const grams = (v: number): string => `${v.toLocaleString(undefined, { maximumFra
 
 const TotalCard: React.FC<{ label: string; value: string; sub?: string }> = ({ label, value, sub }) => (
   <Card className="border border-slate-200">
-    <p className="text-xs font-medium text-slate-400">{label}</p>
+    <p className="text-xs font-medium text-slate-500">{label}</p>
     <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
-    {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+    {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
   </Card>
 );
 
@@ -48,7 +48,7 @@ export const AdminAiUnitEconomicsPage: React.FC = () => {
       title="AI economics"
       subtitle="Per-call cost, tokens, and carbon for every AI feature, attributed by customer. Aggregated across all recorded usage."
     >
-      {loading && <p className="text-sm text-slate-400">Loading…</p>}
+      {loading && <p className="text-sm text-slate-500">Loading…</p>}
 
       {error && (
         <Alert variant="error" title="Failed to load">
@@ -93,7 +93,7 @@ export const AdminAiUnitEconomicsPage: React.FC = () => {
                   {data.rows.map((r, i) => (
                     <tr key={`${r.customer_id ?? '∅'}:${r.feature_key}:${i}`} className="border-b border-slate-100">
                       <td className="py-2 pr-4 text-slate-700">
-                        {r.customer_id ?? <span className="text-slate-400">—</span>}
+                        {r.customer_id ?? <span className="text-slate-500">—</span>}
                       </td>
                       <td className="py-2 pr-4 font-medium text-slate-900">{r.feature_key}</td>
                       <td className="py-2 pr-4 text-right tabular-nums text-slate-700">{int(r.n_calls)}</td>
