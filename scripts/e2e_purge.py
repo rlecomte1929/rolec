@@ -182,15 +182,26 @@ def referencing_fks(cur, referenced):
     discovered, then cascaded against public.users ids, which under the hybrid auth model
     are a different id space entirely.
     """
+    # pg_catalog, NOT information_schema. `constraint_column_usage` is ownership-filtered
+    # by PostgreSQL: it only exposes constraints whose REFERENCED table the current role
+    # owns. auth.users is owned by supabase_auth_admin, so the FK
+    # quote_messages.sender_user_id -> auth.users(id) was invisible to the app role and
+    # the referrer was silently never discovered. pg_catalog has no such filter.
+    # conkey[1]: every FK involved here is single-column.
     cur.execute(
-        """SELECT tc.table_name, kcu.column_name, ccu.table_schema, ccu.table_name
-           FROM information_schema.table_constraints tc
-           JOIN information_schema.key_column_usage kcu
-             ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
-           JOIN information_schema.constraint_column_usage ccu
-             ON tc.constraint_name = ccu.constraint_name AND tc.table_schema = ccu.table_schema
-           WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'
-             AND ccu.table_name = ANY(%s)""",
+        """SELECT lc.relname AS referencing_table,
+                  a.attname  AS referencing_col,
+                  rn.nspname AS referenced_schema,
+                  rc.relname AS referenced_table
+           FROM pg_constraint c
+           JOIN pg_class     lc ON lc.oid = c.conrelid
+           JOIN pg_namespace ln ON ln.oid = lc.relnamespace
+           JOIN pg_class     rc ON rc.oid = c.confrelid
+           JOIN pg_namespace rn ON rn.oid = rc.relnamespace
+           JOIN pg_attribute a  ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+           WHERE c.contype = 'f'
+             AND ln.nspname = 'public'
+             AND rc.relname = ANY(%s)""",
         (referenced,),
     )
     return cur.fetchall()

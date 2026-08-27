@@ -214,3 +214,34 @@ class StrictExitTest(unittest.TestCase):
     def test_clean_purge_is_success_either_way(self):
         self.assertEqual(e2e_purge.exit_code([], strict=True), 0)
         self.assertEqual(e2e_purge.exit_code([], strict=False), 0)
+
+
+class FkDiscoverySourceTest(unittest.TestCase):
+    """information_schema.constraint_column_usage is ownership-filtered: PostgreSQL only
+    exposes constraints whose REFERENCED table the current role owns. auth.users belongs
+    to supabase_auth_admin, so the FK quote_messages.sender_user_id -> auth.users(id) was
+    invisible to the app role and the referrer was never discovered — the purge ran, found
+    nothing to cascade, and still aborted on 23503. pg_catalog has no such filter.
+
+    Proven live 2026-08-27: with the information_schema query the run reported
+    `auth.users 23503 [quote_messages_sender_user_id_fkey]` and deleted 0 of 2,692.
+    """
+
+    class _FetchCursor(RecordingCursor):
+        def fetchall(self):
+            return []
+
+    def test_discovery_uses_pg_catalog_not_information_schema(self):
+        cur = self._FetchCursor()
+        e2e_purge.referencing_fks(cur, ["users"])
+        sql = cur.calls[0][0]
+        self.assertIn("pg_constraint", sql)
+        self.assertNotIn(
+            "constraint_column_usage", sql,
+            "ownership-filtered — it cannot see FKs onto auth.users")
+
+    def test_discovery_returns_the_referenced_schema(self):
+        cur = self._FetchCursor()
+        e2e_purge.referencing_fks(cur, ["users"])
+        sql = cur.calls[0][0]
+        self.assertIn("nspname AS referenced_schema", sql)
