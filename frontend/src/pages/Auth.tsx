@@ -324,7 +324,7 @@ export const Auth: React.FC = () => {
   // ── Invite flow ──────────────────────────────────────────────────────────────
   if (inviteMode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <main className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
         <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8">
           {inviteDone ? (
             <div className="text-center space-y-3">
@@ -378,13 +378,13 @@ export const Auth: React.FC = () => {
             </form>
           )}
         </div>
-      </div>
+      </main>
     );
   }
 
   // ── Main layout ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex overflow-hidden">
+    <main className="min-h-screen flex overflow-hidden">
 
       {/* ── Left: dark globe panel ── */}
       <div className="hidden lg:flex lg:flex-col lg:w-[58%] relative bg-[#061424] overflow-hidden select-none">
@@ -685,6 +685,6 @@ export const Auth: React.FC = () => {
 
         </div>
       </div>
-    </div>
+    </main>
   );
 };

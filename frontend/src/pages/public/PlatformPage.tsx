@@ -41,7 +41,11 @@ export const PlatformPage: React.FC = () => {
                   <CTAButton onClick={() => openDemoBooking('platform-hero')} variant="primary" size="lg">
                     {c.hero.primaryCta}
                   </CTAButton>
-                  <CTAButton to={buildRoute('howItWorks')} variant="outline" size="lg">
+                  {/* The label is 'Sign in' (platformContent.ts hero.secondaryCta), so it must
+                      go to the login screen. It pointed at /how-it-works, dropping anyone
+                      trying to log in from this page onto a marketing page instead. Same
+                      target as the footer CTA's sign-in below. */}
+                  <CTAButton to={`${buildRoute('auth')}?mode=login`} variant="outline" size="lg">
                     {c.hero.secondaryCta}
                   </CTAButton>
                 </>
