@@ -229,9 +229,50 @@ jobs:
   # sequentially instead of in parallel (slower wall-clock) — acceptable since
   # the goal here is billed-minutes, not latency. `main` is not branch-protected,
   # so the old job names were not required status checks.
+  # ── The fast gate ──────────────────────────────────────────────────────────────────
+  # Measured over 90d (2026-08-26): 92 of 616 monthly CI runs fail, and the jobs that fail
+  # most are the CHEAP ones — deliverable-integrity (17 of 52 sampled), route-auth (11),
+  # queue-status-hygiene (9), actionlint (8), gitleaks (5). Meanwhile ~8.3 billable minutes
+  # per doomed run went on frontend/backend/lighthouse jobs that PASSED inside a run already
+  # lost: ~770 min/month paid for a verdict that was already decided.
+  #
+  # Waiting is not billed, only compute is, so gating the expensive jobs on this costs
+  # nothing on a green run (a little extra wall-clock) and skips them entirely on a red one.
+  #
+  # `if: always()` is load-bearing: several upstreams are conditional (actionlint only on
+  # workflow diffs, route-auth only on backend diffs, the Notion checks only when the token
+  # var is set) and a SKIPPED need would otherwise cascade and disable the whole matrix.
+  # Skipped counts as a pass; only failure or cancellation stops the expensive work.
+  fast-gate:
+    name: Fast gate (cheap checks first)
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - actionlint
+      - secrets-scan
+      - repo-hygiene
+      - compliance-claims
+      - route-auth-check
+      - deliverable-integrity
+      - queue-status-hygiene
+    steps:
+      - name: Stop here if a cheap guard already failed
+        env:
+          RESULTS: ${{ join(needs.*.result, ',') }}
+        run: |
+          set -euo pipefail
+          echo "upstream results: $RESULTS"
+          case ",$RESULTS," in
+            *,failure,*|*,cancelled,*)
+              echo "::error::A cheap guard failed - skipping the expensive jobs."
+              exit 1
+              ;;
+          esac
+          echo "cheap guards clear - expensive jobs may run"
+
   frontend:
     name: Frontend (build, types, lint, unit)
-    needs: changes
+    needs: [changes, fast-gate]
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
@@ -306,7 +347,7 @@ jobs:
     # injects throwaway VITE_ vars. This preview+Playwright harness is what QG-9
     # (axe) and QG-13 (Lighthouse) reuse.
     name: E2E (Playwright smoke)
-    needs: changes
+    needs: [changes, fast-gate]
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
@@ -355,7 +396,7 @@ jobs:
     # AP-12's performance-audit (--with-lighthouse-results). Public, backend-free
     # pages only (/ and /auth — Lighthouse can't mock /api).
     name: Lighthouse (CWV budget)
-    needs: changes
+    needs: [changes, fast-gate]
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
@@ -396,7 +437,7 @@ jobs:
 
   backend-tests:
     name: Backend tests (deterministic P1 suite)
-    needs: changes
+    needs: [changes, fast-gate]
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     env:
@@ -495,7 +536,7 @@ jobs:
   # that conftest's _AUTHORITATIVE_DDL.
   backend-tests-postgres:
     name: Backend tests (Postgres 16 parity)
-    needs: changes
+    needs: [changes, fast-gate]
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     services:

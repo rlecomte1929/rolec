@@ -13,9 +13,13 @@ on:
         type: string
         default: "--project=public --project=provision --project=readiness --project=core --project=write-flow --project=deep --project=r4x-provision --project=run004x"
 
+# One campaign at a time, and only the newest deploy is worth smoke-testing: merges land
+# in batches, so 86% of runs were superseded within the hour (measured over 90d) while
+# still burning a full ~6.5 billable minutes each. Cancelling the in-flight run keeps the
+# post-deploy signal (the last merge's run always completes) and drops the redundant ones.
 concurrency:
   group: e2e-sentinel-campaign
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
