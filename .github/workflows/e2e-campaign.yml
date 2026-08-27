@@ -289,7 +289,13 @@ jobs:
       # is never wiped mid-run by an unrelated merge. Default 24h; override with the
       # E2E_PURGE_MIN_AGE_HOURS repo var. The manual full teardown (e2e-purge.yml) keeps
       # the un-guarded purge (no --min-age-hours) for a complete wipe.
+      # continue-on-error: the purge is now strict (it fails on residual), but this step
+      # is deliberately ordered BEFORE the gate below so a red campaign is fully reported
+      # first. A purge shortfall must surface as an annotation without hijacking the
+      # campaign's own pass/fail semantics — the manual e2e-purge.yml run is where a
+      # shortfall is meant to fail loudly.
       - name: Auto-delete is_test data
+        continue-on-error: true
         if: ${{ always() && vars.E2E_AUTODELETE_ENABLED == 'true' && env.DATABASE_URL != '' }}
         env:
           # repo var (admin-controlled), default 24h — passed via env, not inline in run:

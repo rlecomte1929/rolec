@@ -11,9 +11,18 @@ or real data.
 It also clears test accounts in `public.users` and `auth.users` (which have no
 `is_test` column) by the reserved synthetic domains `@testco.com` / `@probe.test`
 — these were previously left behind by the is_test-only purge, so auth/users rows
-accumulated run-over-run (AIQ-1383). `auth.users` deletion needs an elevated role;
-under the app role it is a tolerated no-op (the one-time prod purge uses a service
-role), and a residual count is reported rather than failing the job.
+accumulated run-over-run (AIQ-1383).
+
+`auth.users` was long assumed to need an elevated role. It does NOT. Measured
+2026-08-27: the bulk delete was aborting on 23503, because `quote_messages.sender_user_id`
+-> auth.users(id) is ON DELETE NO ACTION and 125 rows still referenced test users. It is
+ONE statement, so those 125 rows took all 2,692 with them, and guarded() swallowed 23503
+and 42501 identically — leaving "needs elevated role" printed as a hard-coded guess for
+five weeks while the job exited 0.
+
+Two consequences, both now fixed: the auth.users id space is bound separately from
+public.users (they are different id spaces under the hybrid auth model), and residual rows
+FAIL the run under --strict (the default) instead of being reported as a success.
 
 SAFE BY DEFAULT: runs in --dry-run mode (counts only). Pass --apply to delete.
 Deletes children before parents (no FK CASCADE in this schema), inside one
@@ -112,9 +121,29 @@ def scalar_guarded(cur, sql):
         return None
 
 
-def guarded(cur, sql, params=None):
+# Every swallow guarded() performs, with the pgcode that caused it. For five weeks the
+# purge printed "needs elevated role" while the real cause was a foreign key, because
+# 23503 and 42501 both became a bare `return None`. Recording the code is what makes the
+# next under-delivery diagnosable instead of a guess.
+_SWALLOWED: list = []
+
+
+def swallowed():
+    """The swallow log, in the order the statements ran."""
+    return list(_SWALLOWED)
+
+
+def reset_swallowed():
+    _SWALLOWED.clear()
+
+
+def guarded(cur, sql, params=None, label=None):
     """Run a statement in a savepoint; tolerate missing table/column AND a foreign-key
-    violation (the row is still referenced — a later cascade pass will clear it)."""
+    violation (the row is still referenced — a later cascade pass will clear it).
+
+    A tolerated failure is RECORDED in `_SWALLOWED` with its pgcode, so the summary can
+    say which of the four tolerated causes actually fired.
+    """
     cur.execute("SAVEPOINT s")
     try:
         # Pass NO params arg when there are none — `params or ()` (an empty tuple)
@@ -134,15 +163,27 @@ def guarded(cur, sql, params=None):
         # (42501: e.g. the app role can't delete from the auth schema — the one-time
         # prod purge runs via an elevated role; here it's a tolerated no-op).
         if e.pgcode in ("42P01", "42703", "23503", "42501"):
+            _SWALLOWED.append({
+                "label": label or sql.split()[2] if len(sql.split()) > 2 else (label or "?"),
+                "pgcode": e.pgcode,
+                "constraint": getattr(getattr(e, "diag", None), "constraint_name", None),
+            })
             return None
         raise
 
 
 def referencing_fks(cur, referenced):
-    """Return (referencing_table, referencing_col) for every FK pointing at any of
-    the `referenced` tables — so we can cascade-delete from the live schema."""
+    """Return (referencing_table, referencing_col, referenced_schema, referenced_table)
+    for every FK pointing at any of the `referenced` tables.
+
+    The schema is NOT decoration. `ccu.table_name` alone cannot tell `public.users` from
+    `auth.users`, and this repo has both. Binding the wrong one is the bug that left 2,692
+    test auth.users rows behind: the FK quote_messages.sender_user_id -> auth.users(id) was
+    discovered, then cascaded against public.users ids, which under the hybrid auth model
+    are a different id space entirely.
+    """
     cur.execute(
-        """SELECT tc.table_name, kcu.column_name
+        """SELECT tc.table_name, kcu.column_name, ccu.table_schema, ccu.table_name
            FROM information_schema.table_constraints tc
            JOIN information_schema.key_column_usage kcu
              ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
@@ -155,6 +196,33 @@ def referencing_fks(cur, referenced):
     return cur.fetchall()
 
 
+def build_referrer_ops(fk_rows, id_queries, skip=("profiles", "companies", "users")):
+    """Turn FK rows into DELETE ops, each bound to the id query for the schema+table it
+    actually references.
+
+    `id_queries` is keyed on (referenced_schema, referenced_table). A referent with no
+    entry yields NO op — an unknown FK is skipped, never guessed at with the closest
+    available id set, which is precisely how the auth/public mix-up went unnoticed.
+    """
+    ops = []
+    for tbl, col, ref_schema, ref_table in fk_rows:
+        if tbl in skip:
+            continue
+        idq = id_queries.get((ref_schema, ref_table))
+        if idq is None:
+            continue
+        ops.append((tbl, f"DELETE FROM {tbl} WHERE {col}::text IN ({idq})", None))
+    return ops
+
+
+def exit_code(residual, strict):
+    """0 clean; 1 when rows we meant to delete survived and --strict is on.
+
+    The run that left 2,692 auth.users rows exited 0 and was read as a success. Residual
+    is under-delivery, and under-delivery must be loud."""
+    return 1 if (residual and strict) else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="actually delete (default: dry-run)")
@@ -163,6 +231,12 @@ def main():
         help="protect is_test data younger than N hours (in-flight test-drive testers). "
              "0 (default) = purge everything, for the manual full teardown; the push-triggered "
              "E2E campaign passes a positive value so a live tester is never wiped mid-run.",
+    )
+    ap.add_argument(
+        "--no-strict", dest="strict", action="store_false", default=True,
+        help="warn instead of failing when rows we meant to delete survive. Strict is ON "
+             "by default: the run that left 2,692 auth.users rows exited 0 for five weeks "
+             "and was read as a success every time.",
     )
     args = ap.parse_args()
     dsn = os.environ.get("DATABASE_URL")
@@ -239,7 +313,7 @@ def main():
         print(f"  public.users (test domains)  {users_test if users_test is not None else 'n/a'}")
         print(f"  auth.users (test domains)    {auth_test if auth_test is not None else 'n/a (no auth-schema perm)'}")
         conn.rollback()
-        return
+        return 0
 
     # APPLY — one transaction. case children → both case tables → FK-derived cascade
     # of everything referencing the is_test profiles/companies → the profiles/companies.
@@ -261,12 +335,20 @@ def main():
         ops.append((table, f"DELETE FROM {table} WHERE {_case_child_where(table, col, src)}", (case_ids,)))
     ops.append(("relocation_cases", "DELETE FROM relocation_cases WHERE id::text = ANY(%s)", (case_ids,)))
     ops.append(("cases", "DELETE FROM cases WHERE id::text = ANY(%s)", (case_ids,)))
-    for ref, idq in (("profiles", prof_q), ("companies", comp_q), ("users", users_q)):
-        for tbl, col in referencing_fks(cur, [ref]):
-            if tbl not in ("profiles", "companies", "users"):
-                ops.append((tbl, f"DELETE FROM {tbl} WHERE {col}::text IN ({idq})", None))
+    # auth.users is a SEPARATE id space from public.users under the hybrid auth model.
+    # Its referrers (quote_messages.sender_user_id, quote_participants, vendor_users — all
+    # ON DELETE NO ACTION) must be cleared with auth ids, or the bulk auth.users delete
+    # aborts on 23503 and takes every other row with it: one statement, all-or-nothing.
+    auth_q = f"SELECT id::text FROM auth.users WHERE {TEST_EMAIL_PREDICATE}{AGE}"
+    id_queries = {
+        ("public", "profiles"): prof_q,
+        ("public", "companies"): comp_q,
+        ("public", "users"): users_q,
+        ("auth", "users"): auth_q,
+    }
+    ops += build_referrer_ops(referencing_fks(cur, ["profiles", "companies", "users"]), id_queries)
     # any table referencing either case table (catches case-children not hardcoded above)
-    for tbl, col in referencing_fks(cur, ["relocation_cases", "cases"]):
+    for tbl, col, _ref_schema, _ref_table in referencing_fks(cur, ["relocation_cases", "cases"]):
         if tbl not in ("profiles", "companies", "relocation_cases", "cases"):
             ops.append((tbl, f"DELETE FROM {tbl} WHERE {col}::text = ANY(%s)", (case_ids,)))
 
@@ -296,8 +378,14 @@ def main():
     # auth.users also cascades auth.* (identities/sessions) + any test profile.
     # guarded(): a no-perm auth delete (app role) is a tolerated no-op — the
     # elevated one-time purge clears auth.users.
-    bump("users", guarded(cur, f"DELETE FROM public.users WHERE {TEST_EMAIL_PREDICATE}{AGE}"))
-    bump("auth.users", guarded(cur, f"DELETE FROM auth.users WHERE {TEST_EMAIL_PREDICATE}{AGE}"))
+    bump("users", guarded(cur, f"DELETE FROM public.users WHERE {TEST_EMAIL_PREDICATE}{AGE}",
+                          label="public.users"))
+    # identities first — scripts/reset_demo.sh has always done this; the purge did not.
+    # (auth.identities is ON DELETE CASCADE, so this is belt-and-braces, not load-bearing.)
+    bump("auth.identities", guarded(cur, f"DELETE FROM auth.identities WHERE user_id::text IN ({auth_q})",
+                                    label="auth.identities"))
+    bump("auth.users", guarded(cur, f"DELETE FROM auth.users WHERE {TEST_EMAIL_PREDICATE}{AGE}",
+                               label="auth.users"))
 
     # Verify against the SAME scope we deleted (age-guarded), so "0 remaining" means
     # "every row we intended to delete is gone" — recent protected rows are expected to stay.
@@ -316,13 +404,28 @@ def main():
     if left_u:
         residual.append(f"public.users={left_u}")
     if left_a:
-        residual.append(f"auth.users={left_a} (needs elevated role)")
+        residual.append(f"auth.users={left_a}")
+    # Report the ACTUAL cause rather than the old hard-coded "needs elevated role" guess.
+    swallows = swallowed()
+    if swallows:
+        print("\nswallowed (tolerated) failures — this is the diagnosis:")
+        for rec in swallows:
+            why = {
+                "23503": "foreign key still referencing",
+                "42501": "insufficient privilege",
+                "42P01": "table does not exist",
+                "42703": "column does not exist",
+            }.get(rec["pgcode"], rec["pgcode"])
+            where = f" [{rec['constraint']}]" if rec.get("constraint") else ""
+            print(f"  {rec['label']:28} {rec['pgcode']}  {why}{where}")
     if residual:
-        # best-effort: bulk is cleared; warn (don't fail the job).
-        print(f"⚠ residual test rows remain ({'; '.join(residual)}) — bulk cleared.")
-    else:
-        print("✔ verified: is_test companies=0, profiles=0, test users/auth=0")
+        print(f"⚠ residual test rows remain ({'; '.join(residual)})")
+        if args.strict:
+            print("::error::purge under-delivered — see the swallowed-failures list above")
+        return exit_code(residual, args.strict)
+    print("✔ verified: is_test companies=0, profiles=0, test users/auth=0")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

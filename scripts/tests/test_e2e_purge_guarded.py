@@ -86,3 +86,131 @@ class CanonicalAwarePurgeTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _FKError(e2e_purge.psycopg2.Error):
+    """FK violation (23503) — what auth.users referrers actually raise."""
+    pgcode = "23503"
+    diag = types.SimpleNamespace(constraint_name="quote_messages_sender_user_id_fkey")
+
+
+class _PermError(e2e_purge.psycopg2.Error):
+    """insufficient_privilege (42501) — what the script ASSUMED was happening."""
+    pgcode = "42501"
+    diag = types.SimpleNamespace(constraint_name=None)
+
+
+class RaisingCursor:
+    """Cursor whose DELETEs blow up; SAVEPOINT/ROLLBACK bookkeeping still succeeds."""
+
+    def __init__(self, exc):
+        self.exc = exc
+        self.calls = []
+        self.rowcount = 0
+
+    def execute(self, sql, *args):
+        self.calls.append((sql, args))
+        if sql.strip().upper().startswith("DELETE"):
+            raise self.exc
+
+
+class AuthSchemaCascadeTest(unittest.TestCase):
+    """THE defect: 2,692 test auth.users rows survived every purge for 5 weeks.
+
+    `referencing_fks` matches on `ccu.table_name` with no schema filter, so the FK
+    `quote_messages.sender_user_id -> auth.users(id)` IS discovered when called with
+    ["users"] — but the generated DELETE bound `SELECT id FROM users` (public). Under
+    the hybrid auth model the Supabase auth uid is not the legacy public.users.id, so
+    the cascade cleared the wrong rows and left the 125 that block the bulk delete.
+
+    Measured 2026-08-27: 125 of 125 rows in quote_messages belong to test users.
+    """
+
+    PUBLIC_IDS = "SELECT id::text FROM users WHERE (email ILIKE '%@testco.com')"
+    AUTH_IDS = "SELECT id::text FROM auth.users WHERE (email ILIKE '%@testco.com')"
+
+    def _id_queries(self):
+        return {("public", "users"): self.PUBLIC_IDS, ("auth", "users"): self.AUTH_IDS}
+
+    def test_auth_referrer_binds_auth_ids_not_public_users(self):
+        fks = [("quote_messages", "sender_user_id", "auth", "users")]
+        ops = e2e_purge.build_referrer_ops(fks, self._id_queries())
+        self.assertEqual(len(ops), 1, "the auth.users referrer must produce a delete op")
+        sql = ops[0][1]
+        self.assertIn("FROM auth.users", sql, "must resolve ids from auth.users")
+        self.assertNotIn(
+            "FROM users WHERE", sql,
+            "binding public.users is the bug: the auth uid is not the legacy users.id")
+
+    def test_public_referrer_still_binds_public_ids(self):
+        fks = [("sessions", "user_id", "public", "users")]
+        ops = e2e_purge.build_referrer_ops(fks, self._id_queries())
+        self.assertIn("FROM users WHERE", ops[0][1])
+        self.assertNotIn("auth.users", ops[0][1])
+
+    def test_same_table_name_in_two_schemas_is_disambiguated(self):
+        """public.users and auth.users share a table_name — the schema must decide."""
+        fks = [("sessions", "user_id", "public", "users"),
+               ("quote_messages", "sender_user_id", "auth", "users")]
+        ops = dict((t, s) for t, s, _p in e2e_purge.build_referrer_ops(fks, self._id_queries()))
+        self.assertIn("FROM users WHERE", ops["sessions"])
+        self.assertIn("FROM auth.users", ops["quote_messages"])
+
+    def test_self_referential_tables_are_skipped(self):
+        fks = [("profiles", "id", "public", "users")]
+        self.assertEqual(e2e_purge.build_referrer_ops(fks, self._id_queries()), [])
+
+    def test_unknown_referent_is_ignored_not_guessed(self):
+        """An FK to a table we have no id query for must produce NO op — never a guess."""
+        fks = [("something", "col", "storage", "objects")]
+        self.assertEqual(e2e_purge.build_referrer_ops(fks, self._id_queries()), [])
+
+
+class GuardedRecordsWhyItSwallowedTest(unittest.TestCase):
+    """The purge printed 'needs elevated role' for FIVE WEEKS while the real cause was
+    a foreign key. guarded() collapsed 23503 and 42501 into the same bare `return None`,
+    so the operator had nothing to diagnose from. The reason must be recorded."""
+
+    def setUp(self):
+        e2e_purge.reset_swallowed()
+
+    def test_fk_violation_is_recorded_with_its_constraint(self):
+        cur = RaisingCursor(_FKError("boom"))
+        self.assertIsNone(e2e_purge.guarded(cur, "DELETE FROM auth.users", label="auth.users"))
+        rec = e2e_purge.swallowed()
+        self.assertEqual(len(rec), 1)
+        self.assertEqual(rec[0]["pgcode"], "23503")
+        self.assertEqual(rec[0]["constraint"], "quote_messages_sender_user_id_fkey")
+
+    def test_permission_error_is_recorded_distinctly_from_fk(self):
+        cur = RaisingCursor(_PermError("nope"))
+        e2e_purge.guarded(cur, "DELETE FROM auth.users", label="auth.users")
+        self.assertEqual(e2e_purge.swallowed()[0]["pgcode"], "42501")
+
+    def test_a_clean_delete_records_nothing(self):
+        cur = RecordingCursor()
+        e2e_purge.guarded(cur, "DELETE FROM x", label="x")
+        self.assertEqual(e2e_purge.swallowed(), [])
+
+    def test_an_unexpected_pgcode_still_raises(self):
+        class _Weird(e2e_purge.psycopg2.Error):
+            pgcode = "40001"
+            diag = types.SimpleNamespace(constraint_name=None)
+
+        with self.assertRaises(e2e_purge.psycopg2.Error):
+            e2e_purge.guarded(RaisingCursor(_Weird("serialization")), "DELETE FROM x")
+
+
+class StrictExitTest(unittest.TestCase):
+    """The job reported SUCCESS while leaving 2,692 rows. Residual must fail the run,
+    or the next silent under-delivery goes unnoticed exactly the same way."""
+
+    def test_residual_under_strict_is_a_failure(self):
+        self.assertNotEqual(e2e_purge.exit_code(["auth.users=2692"], strict=True), 0)
+
+    def test_residual_without_strict_still_warns_only(self):
+        self.assertEqual(e2e_purge.exit_code(["auth.users=2692"], strict=False), 0)
+
+    def test_clean_purge_is_success_either_way(self):
+        self.assertEqual(e2e_purge.exit_code([], strict=True), 0)
+        self.assertEqual(e2e_purge.exit_code([], strict=False), 0)
