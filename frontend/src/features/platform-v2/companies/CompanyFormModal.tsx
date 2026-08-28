@@ -34,7 +34,7 @@ function emptyForm(): FormPayload {
     name: '',
     country: '',
     size_band: '',
-    plan_tier: 'low',
+    plan_tier: 'starter',
     status: 'active',
     hr_seat_limit: '',
     employee_seat_limit: '',

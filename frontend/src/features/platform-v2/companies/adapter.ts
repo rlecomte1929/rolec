@@ -23,7 +23,7 @@ export type CompanyV2Tone = 'a' | 'b' | 'c' | 'd' | 'e' | 'f';
 export type CompanyV2Status = 'active' | 'inactive' | 'archived';
 
 /** Plan tier as exposed to V2 — narrowed string union. */
-export type CompanyV2PlanTier = 'low' | 'medium' | 'premium';
+export type CompanyV2PlanTier = 'starter' | 'growth' | 'enterprise';
 
 export interface CompanyV2 {
   id: string;
@@ -70,7 +70,7 @@ export interface CompanyV2 {
 // ── Adapter ─────────────────────────────────────────────────────────────────
 
 const VALID_STATUS = new Set<CompanyV2Status>(['active', 'inactive', 'archived']);
-const VALID_PLAN = new Set<CompanyV2PlanTier>(['low', 'medium', 'premium']);
+const VALID_PLAN = new Set<CompanyV2PlanTier>(['starter', 'growth', 'enterprise']);
 const TONES: readonly CompanyV2Tone[] = ['a', 'b', 'c', 'd', 'e', 'f'];
 
 /**
@@ -94,8 +94,8 @@ function narrowStatus(raw: AdminCompany['status']): CompanyV2Status {
 }
 
 function narrowPlan(raw: AdminCompany['plan_tier']): CompanyV2PlanTier {
-  const p = (raw ?? 'low').toString().toLowerCase();
-  return VALID_PLAN.has(p as CompanyV2PlanTier) ? (p as CompanyV2PlanTier) : 'low';
+  const p = (raw ?? 'starter').toString().toLowerCase();
+  return VALID_PLAN.has(p as CompanyV2PlanTier) ? (p as CompanyV2PlanTier) : 'starter';
 }
 
 /**

@@ -53,14 +53,14 @@ describe('s9g Companies · adapter', () => {
     const edge = SAMPLE.find((c) => c.id === 'co_real_unknown_enum')!;
     const v2 = toV2Shape(edge);
     expect(v2.status).toBe('active'); // 'SuspendedByBilling' → fallback
-    expect(v2.plan_tier).toBe('low'); // 'enterprise_v2' → fallback
+    expect(v2.plan_tier).toBe('starter'); // 'enterprise_v2' → fallback
   });
 
   it('lowercases case-shifted enums (e.g. "Active" → "active")', () => {
-    const shifted = { ...SAMPLE[0]!, status: 'Active', plan_tier: 'Premium' };
+    const shifted = { ...SAMPLE[0]!, status: 'Active', plan_tier: 'Enterprise' };
     const v2 = toV2Shape(shifted);
     expect(v2.status).toBe('active');
-    expect(v2.plan_tier).toBe('premium');
+    expect(v2.plan_tier).toBe('enterprise');
   });
 
   it('derives tone deterministically: same id → same tone, every time', () => {

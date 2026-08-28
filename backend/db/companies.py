@@ -939,8 +939,8 @@ class CompaniesMixin:
                 # If schema lookup fails, skip status update to avoid breaking writes.
                 pass
         if plan_tier is not None:
-            pt = (plan_tier or "low").lower()
-            if pt in ("low", "medium", "premium"):
+            pt = (plan_tier or "starter").lower()
+            if pt in ("starter", "growth", "enterprise"):
                 updates.append("plan_tier = :plan_tier")
                 params["plan_tier"] = pt
         if hr_seat_limit is not None:
