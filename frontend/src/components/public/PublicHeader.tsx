@@ -35,6 +35,8 @@ export const PublicHeader: React.FC = () => {
           >
             <img
               src={logoUrl}
+          width={122}
+          height={128}
               alt="ReloPass"
               className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl object-contain"
             />
