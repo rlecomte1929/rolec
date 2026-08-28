@@ -29,9 +29,9 @@ const TONE_LOGO: Record<CompanyV2Tone, string> = {
 };
 
 export const PLAN_PILL: Record<CompanyV2PlanTier, string> = {
-  premium: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  medium:  'bg-amber-50  text-amber-700  ring-amber-200',
-  low:     'bg-slate-100 text-slate-600  ring-slate-200',
+  enterprise: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  growth:     'bg-amber-50  text-amber-700  ring-amber-200',
+  starter:    'bg-slate-100 text-slate-600  ring-slate-200',
 };
 
 export const STATUS_PILL: Record<CompanyV2Status, string> = {
@@ -417,7 +417,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
       active: companies.filter((c) => c.status === 'active').length,
       inactive: companies.filter((c) => c.status === 'inactive').length,
       archived: companies.filter((c) => c.status === 'archived').length,
-      premium: companies.filter((c) => c.plan_tier === 'premium').length,
+      enterprise: companies.filter((c) => c.plan_tier === 'enterprise').length,
       hrUsers: sum('hr_users_count'),
       employees: sum('employee_count'),
       cases: sum('assignments_count'),
@@ -499,7 +499,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
         <Kpi label="Active" value={kpis.active} sub="live" tone="success" />
         <Kpi label="Inactive" value={kpis.inactive} sub="paused" tone="warning" />
         <Kpi label="Archived" value={kpis.archived} sub="soft-deleted" />
-        <Kpi label="Premium" value={kpis.premium} sub="top tier" tone="accent" />
+        <Kpi label="Enterprise" value={kpis.enterprise} sub="top tier" tone="accent" />
         <Kpi label="HR users" value={kpis.hrUsers} sub="across tenants" />
         <Kpi label="Employees" value={kpis.employees.toLocaleString()} sub="across tenants" />
         <Kpi label="Open cases" value={kpis.cases} sub="active mobility" tone="accent" />
@@ -540,9 +540,9 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
           >
             <option value="">All plans</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="premium">Premium</option>
+            <option value="starter">Starter</option>
+            <option value="growth">Growth</option>
+            <option value="enterprise">Enterprise</option>
           </select>
           <select
             value={filters.country}

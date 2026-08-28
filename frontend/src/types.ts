@@ -885,7 +885,9 @@ export interface AdminContextResponse {
   } | null;
 }
 
-export type CompanyPlanTier = 'low' | 'medium' | 'premium';
+// Must match backend/db/companies.py create_company/update_company. NOT the same field as
+// relopass-api-contracts.PlanTier ('basic'|'hr'|'admin'), which is the USER profile tier.
+export type CompanyPlanTier = 'starter' | 'growth' | 'enterprise';
 export type CompanyStatus = 'active' | 'inactive' | 'archived';
 
 export interface AdminCompany {

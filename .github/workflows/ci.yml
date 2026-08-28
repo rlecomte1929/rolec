@@ -229,6 +229,14 @@ jobs:
         run: python -m pip install --quiet pyyaml
       - name: Check no job's `if:` can be silently overridden by a skipped dependency
         run: python scripts/check_workflow_job_gating.py --root .
+      # companies.plan_tier was written as {starter,growth,enterprise} and read as
+      # {low,medium,premium}. Zero of 119 production rows matched, so the admin UI showed
+      # every company — including the 3 on `growth` — as bottom-tier "low", and
+      # update_company returned success having written nothing. A TS union cannot constrain
+      # Python; this reads both. Here, not in either test suite, because the frontend and
+      # backend path filters each skip for the other side's edits.
+      - name: Check the company plan-tier vocabulary agrees across Python and TypeScript
+        run: python scripts/check_plan_tier_contract.py --root .
 
   # Frontend build + type-check + lint + unit tests, consolidated into ONE job
   # (was three: frontend-build / frontend-checks / frontend-unit-tests).
