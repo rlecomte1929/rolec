@@ -253,7 +253,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                     <ul className="mt-1 space-y-1 text-sm text-[#6b7280]">
                       {ph.tasks.map((t, i) => (
                         <li key={i} className="flex items-center gap-2">
-                          <span className={t.status === 'overdue' ? 'text-[#ef4444] font-medium' : ''}>
+                          <span className={t.status === 'overdue' ? 'text-[#dc2626] font-medium' : ''}>
                             {t.title}
                           </span>
                           <span className="text-xs text-slate-500">{statusLabel(t.status)}</span>
@@ -279,7 +279,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
               </span>
             </div>
             {detail.tasksOverdue > 0 && (
-              <div className="mt-2 text-sm text-[#ef4444] font-medium">
+              <div className="mt-2 text-sm text-[#dc2626] font-medium">
                 {detail.tasksOverdue} overdue task(s)
               </div>
             )}
@@ -300,7 +300,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
               <div>Limit: {detail.budgetLimit != null ? detail.budgetLimit : '-'}</div>
               <div>Estimated: {detail.budgetEstimated != null ? detail.budgetEstimated : '-'}</div>
               {bStatus && (
-                <div className={`font-medium ${bStatus === 'Exceeded' ? 'text-[#ef4444]' : bStatus === 'Approaching' ? 'text-[#eab308]' : 'text-[#22c55e]'}`}>
+                <div className={`font-medium ${bStatus === 'Exceeded' ? 'text-[#dc2626]' : bStatus === 'Approaching' ? 'text-[#b45309]' : 'text-[#15803d]'}`}>
                   Status: {bStatus}
                 </div>
               )}

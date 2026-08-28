@@ -35,13 +35,34 @@ const BLOCKING_IMPACTS = new Set(['serious', 'critical']);
  * Bounded by a timeout: an intentionally infinite animation (a spinner, a pulse) would
  * otherwise hang the gate forever.
  */
-async function settleAnimations(page: Page, timeoutMs = 2000): Promise<void> {
+async function settleAnimations(page: Page, timeoutMs = 4000): Promise<void> {
   await page.evaluate(async (ms) => {
-    const finished = document.getAnimations().map((a) => a.finished.catch(() => undefined));
-    await Promise.race([
-      Promise.all(finished),
-      new Promise((resolve) => setTimeout(resolve, ms)),
-    ]);
+    const deadline = Date.now() + ms;
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
+    // Awaiting getAnimations() ONCE is not enough, and the difference is a flaky gate rather
+    // than a caught bug. A CSS transition only enters getAnimations() after it has started,
+    // so a scan that lands between mount and first frame sees an empty list, returns at once,
+    // and axe then measures a half-faded element: /hr/welcome reported 13 colour-contrast
+    // violations whose "foreground" values (#a2c8c8 for accent-600, #9eacb6 for navy-800)
+    // are composited mid-fade colours that exist in no stylesheet. Same phantom class the
+    // helper was added for. So: drain, yield a frame, and require the list to come back
+    // empty TWICE in a row before calling it settled.
+    let consecutiveClear = 0;
+    while (Date.now() < deadline && consecutiveClear < 2) {
+      const running = document.getAnimations();
+      if (running.length === 0) {
+        consecutiveClear += 1;
+        await frame();
+        continue;
+      }
+      consecutiveClear = 0;
+      await Promise.race([
+        Promise.all(running.map((a) => a.finished.catch(() => undefined))),
+        new Promise((r) => setTimeout(r, Math.max(0, deadline - Date.now()))),
+      ]);
+      await frame();
+    }
   }, timeoutMs);
 }
 
