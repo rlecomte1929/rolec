@@ -69,4 +69,52 @@ test.describe('QG-9 · runtime accessibility gate (axe — serious/critical only
     await expect(page.locator('#root *')).not.toHaveCount(0);
     await expectNoSeriousA11yViolations(page);
   });
+
+  // The admin tree was 0% measured until now, and the accent cluster is concentrated there
+  // (7 of the 45 accent-carrying files). These four need NO mocking: every /api call falls
+  // through mockApi's catch-all 404 and the page renders its empty state, which is a real
+  // state an admin sees. That is enough to reach the shell chrome — where the "NEW" sidebar
+  // badge sits on bg-accent-50 at 3.61:1, on EVERY one of these routes.
+  for (const [route, label] of [
+    ['/admin/test-drive', 'admin test-drive'],
+    ['/admin/feedback', 'admin feedback'],
+    ['/admin/content-review', 'admin content review'],
+    ['/admin/users', 'admin users'],
+  ] as const) {
+    test(`${label} (${route}) has no serious/critical a11y violations`, async ({ page }) => {
+      await seedAuth(page, 'ADMIN');
+      await page.goto(route);
+      await expect(page.locator('#root *')).not.toHaveCount(0);
+      await expectNoSeriousA11yViolations(page);
+    });
+  }
+
+  // The only route that renders AIRecommendationCard from mockable data. HrExceptionsPage
+  // also renders it, but hardcodes aiInsight: undefined for server data, so it is
+  // unreachable there; HrCaseSummary needs four endpoints. This needs one, and riskStatus
+  // 'red' is what mounts the card. budget* fields mount the budget status line.
+  test('HR command-center case detail has no serious/critical a11y violations', async ({ page }) => {
+    await seedAuth(page, 'HR');
+    await mockApi(page, {
+      '**/api/hr/command-center/cases/*': {
+        id: 'asg-e2e-1',
+        caseId: 'case-e2e-1',
+        employeeIdentifier: 'e2e@probe.test',
+        destCountry: 'IE',
+        destCity: 'Dublin',
+        status: 'active',
+        riskStatus: 'red',
+        budgetLimit: 1000,
+        budgetEstimated: 1500,
+        tasksTotal: 4,
+        tasksDone: 1,
+        tasksOverdue: 2,
+        phases: [{ phase: 'immigration', tasks: [{ title: 'Visa', status: 'overdue' }] }],
+        events: [{ event_type: 'created', description: 'Case created', created_at: '2026-08-01T00:00:00Z' }],
+      },
+    });
+    await page.goto('/hr/command-center/cases/asg-e2e-1');
+    await expect(page.getByText('Budget overview')).toBeVisible();
+    await expectNoSeriousA11yViolations(page);
+  });
 });

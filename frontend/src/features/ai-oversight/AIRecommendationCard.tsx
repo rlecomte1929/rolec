@@ -194,7 +194,7 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
                 {checkpointsSatisfied} of {checkpointsTotal} checkpoints satisfied
               </div>
               {typeof confidence === 'number' && (
-                <div className="flex items-center gap-1 text-xs text-accent-500 mt-1">
+                <div className="flex items-center gap-1 text-xs text-accent-600 mt-1">
                   <span>Confidence score: {Math.round(confidence * 100)}%</span>
                   <span
                     className="cursor-help select-none border border-accent-300 rounded-full w-3.5 h-3.5 inline-flex items-center justify-center text-[9px] leading-none"
@@ -210,12 +210,12 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
             <div className="flex items-baseline gap-2 mb-1">
               <span className="text-xs font-semibold text-accent-700 uppercase tracking-wider">{title}</span>
               {typeof confidence === 'number' && (
-                <span className="text-[10px] text-accent-500">{Math.round(confidence * 100)}% confidence</span>
+                <span className="text-[10px] text-accent-600">{Math.round(confidence * 100)}% confidence</span>
               )}
             </div>
           )}
           <div className="text-sm text-accent-800 leading-relaxed mt-1">{rationale}</div>
-          <p className="text-[11px] text-accent-500 mt-1">AI-generated · Your decision is required and logged for your EU AI Act audit trail.</p>
+          <p className="text-[11px] text-accent-600 mt-1">AI-generated · Your decision is required and logged for your EU AI Act audit trail.</p>
 
           {priorDecision && (
             <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
