@@ -99,6 +99,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
   const [setupAssistantOpen, setSetupAssistantOpen] = useState(false);
   const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
   const isHrRole = role === 'HR';
+  // Reserve the floating-control column only when one is actually rendered, so no page
+  // pays for a gutter it does not need. 6rem clears right-6 (24px) + the 56px button.
+  const fabGutter = isHrRole || isEmployeeRole ? ' lg:pr-24' : '';
 
   // GAP 10: Apply company branding CSS vars (primary_colour etc.) to :root
   useBrandingConfig();
@@ -282,7 +285,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
 
         {/* Main scrollable area */}
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto outline-none">
-          <div className={wide ? 'px-4 py-6 md:px-6' : 'px-4 py-6 md:px-8 md:py-7 max-w-7xl mx-auto'}>
+          {/* fabGutter: the floating controls (FeedbackWidget, PolicyAssistantFab,
+              SetupAssistantFab) occupy a fixed column 24-80px from the right edge and
+              z-40 above content, so a right-aligned button that scrolls into that column
+              gets its edge covered and its clicks swallowed. Reserving the column is the
+              fix; bottom padding is NOT, because the FABs float over the whole scrollport
+              and cover anything scrolled into the band, not just the last element. */}
+          <div
+            className={`${wide ? 'px-4 py-6 md:px-6' : 'px-4 py-6 md:px-8 md:py-7 max-w-7xl mx-auto'}${fabGutter}`}
+          >
             {title && (
               <div className="mb-6">
                 <Breadcrumb section={section} title={title} homeHref={homeHref} parent={parent} className="mb-3" />

@@ -700,7 +700,10 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             id="vp-cat-filter"
             value={catFilter}
             onChange={(e) => { setCatFilter(e.target.value); setOpenCats(new Set()); }}
-            className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
+            /* w-44: a native select sizes to its widest option, so this grew when the real
+               category names replaced the lone "All services" — shoving the Vendor input
+               right and wrapping the count span onto a second row. */
+            className="w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
           >
             <option value="all">All services</option>
             {(data?.categories ?? []).map((c) => (
@@ -708,22 +711,24 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             ))}
           </select>
         </div>
-        {regionOptions.length > 0 && (
-          <div className="flex items-center gap-2">
+        {/* Rendered unconditionally: regionOptions derives from the API response, so
+            gating on it made the whole ~150px group appear late and slide everything
+            after it sideways. Disabled while empty instead. */}
+        <div className="flex items-center gap-2">
             <label htmlFor="vp-region-filter" className="text-[12px] font-medium text-slate-500">Region</label>
             <select
               id="vp-region-filter"
               value={regionFilter}
               onChange={(e) => { setRegionFilter(e.target.value); setOpenCats(new Set()); }}
-              className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
+              disabled={regionOptions.length === 0}
+              className="w-40 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] disabled:opacity-60"
             >
               <option value="all">All regions</option>
               {regionOptions.map((code) => (
                 <option key={code} value={code}>{code}</option>
               ))}
             </select>
-          </div>
-        )}
+        </div>
         <div className="flex items-center gap-2">
           <label htmlFor="vp-vendor-filter" className="text-[12px] font-medium text-slate-500">Vendor</label>
           <input
