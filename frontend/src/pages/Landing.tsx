@@ -17,6 +17,7 @@ import { useDemoBooking } from '../hooks/useDemoBooking';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { emitMarketingEvent, readUtm } from '../analytics';
 import { landingContent } from './landing/landingContent';
+import { imgDimensions } from '../lib/publicImageDimensions';
 
 export const Landing: React.FC = () => {
   useRegisterNav('Landing', [
@@ -195,6 +196,8 @@ export const Landing: React.FC = () => {
           <FadeIn>
             <img
               src="/screenshot-hr-assignments.png"
+              {...imgDimensions("/screenshot-hr-assignments.png")}
+              decoding="async"
               alt="ReloPass — every relocation case, its tasks, providers and status on one record"
               className="w-full rounded-xl border border-marketing-border shadow-sm"
               loading="lazy"

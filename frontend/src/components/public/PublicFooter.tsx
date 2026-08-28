@@ -108,6 +108,8 @@ export const PublicFooter: React.FC = () => {
             </p>
             <img
               src="/relopass-full-logo.png?v=2"
+              width={200}
+              height={300}
               alt="ReloPass"
               className="h-20 w-auto sm:h-24"
             />

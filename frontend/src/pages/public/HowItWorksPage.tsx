@@ -10,6 +10,7 @@ import {
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { usePageMeta } from '../../hooks/usePageMeta';
 import { howItWorksContent } from './howItWorksContent';
+import { imgDimensions } from '../../lib/publicImageDimensions';
 
 export const HowItWorksPage: React.FC = () => {
   usePageMeta({
@@ -57,6 +58,8 @@ export const HowItWorksPage: React.FC = () => {
                   <div className={imageRight ? '' : 'lg:order-1'}>
                     <img
                       src={step.image}
+                      {...imgDimensions(step.image)}
+                      decoding="async"
                       alt={step.imageAlt}
                       loading="lazy"
                       className="w-full rounded-[10px] shadow-[0_8px_32px_rgba(0,0,0,0.10)] transition-transform duration-300 ease-out hover:scale-[1.02]"

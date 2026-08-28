@@ -663,6 +663,8 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
           <>
             <img
               src="/relopass-logo.png"
+              width={122}
+              height={128}
               alt="ReloPass"
               className="h-6 w-auto"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

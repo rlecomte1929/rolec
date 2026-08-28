@@ -13,6 +13,7 @@ import { buildRoute } from '../../navigation/routes';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { usePageMeta } from '../../hooks/usePageMeta';
 import { whyReloPassContent } from './whyReloPassContent';
+import { imgDimensions } from '../../lib/publicImageDimensions';
 
 export const WhyReloPassPage: React.FC = () => {
   usePageMeta({
@@ -146,6 +147,8 @@ export const WhyReloPassPage: React.FC = () => {
             {c.outcomes.image && (
               <img
                 src={c.outcomes.image}
+                {...imgDimensions(c.outcomes.image)}
+                decoding="async"
                 alt={c.outcomes.imageAlt}
                 className="w-full rounded-[10px] shadow-[0_8px_32px_rgba(0,0,0,0.10)] transition-transform duration-300 ease-out hover:scale-[1.02]"
                 loading="lazy"
