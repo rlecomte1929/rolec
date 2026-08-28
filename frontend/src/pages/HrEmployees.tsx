@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
-import { Alert, Button } from '../components/antigravity';
+import { Alert } from '../components/antigravity';
 import { hrAPI } from '../api/client';
 import type { HrCompanyEmployee } from '../types';
 import { buildRoute } from '../navigation/routes';
@@ -39,10 +39,12 @@ export const HrEmployees: React.FC = () => {
           <p className="text-sm text-[#6b7280]">
             View and manage employees. Click a row to expand details.
           </p>
-          <Link to={buildRoute('hrPolicy')}>
-            <Button variant="outline" size="sm">
-              Policy
-            </Button>
+          {/* Styled Link, not <Link><Button>. A <button> inside an <a> is invalid HTML
+              and axe flags it as nested-interactive: the button swallows the click and
+              screen readers announce two nested controls. Classes mirror
+              Button variant="outline" size="sm". */}
+          <Link to={buildRoute('hrPolicy')} className="inline-block font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 border-2 border-[#0b2b43] text-[#0b2b43] hover:bg-[#e6f2f4] focus:ring-[#0b2b43] px-3 py-1.5 text-sm">
+            Policy
           </Link>
         </div>
 
@@ -58,10 +60,8 @@ export const HrEmployees: React.FC = () => {
               Complete your company profile to view employees.
             </div>
             <div className="mt-3">
-              <Link to={buildRoute('hrCompanyProfile')}>
-                <Button variant="primary" size="sm">
-                  Set up company profile
-                </Button>
+              <Link to={buildRoute('hrCompanyProfile')} className="inline-block font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-[#0b2b43] text-white hover:bg-[#123651] focus:ring-[#0b2b43] px-3 py-1.5 text-sm">
+                Set up company profile
               </Link>
             </div>
           </div>

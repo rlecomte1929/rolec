@@ -8,7 +8,12 @@ export const landingContent = {
     headline: 'Run relocation as one process',
     subheadline:
       'Cases, documents, providers, and status in one place. Less thread-chasing and spreadsheet glue work.',
-    primaryCta: 'Book a demo',
+    // 'Get started', not 'Book a demo'. This CTA LINKS to /access, a hub whose own
+    // first option is another "Book a demo" that opens the modal — so the same label
+    // meant "open a modal" in the header and "go to a page and click it again" here.
+    // /access is now consistently "Get started" in header, footer and hero, and
+    // "Book a demo" means exactly one thing everywhere: it opens the modal.
+    primaryCta: 'Get started',
     secondaryCta: 'See the platform',
   },
 

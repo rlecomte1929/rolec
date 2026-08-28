@@ -199,6 +199,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         <PlatformShellSidebar
           role={sbRole}
           companySlot={role !== 'ADMIN' ? <CompanyBrand /> : null}
+          collapsedCompanySlot={role !== 'ADMIN' ? <CompanyBrand compact /> : null}
           user={{
             initials: userInitials,
             name: identity ? `${identity}` : 'ReloPass user',
@@ -231,9 +232,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
             <NotificationsBell />
             <ChangelogBell />
             <LogoutButton />
+            {/* The breadcrumb links to this same homeHref under the name "ReloPass",
+                while this one is named after the signed-in user — two links, one
+                destination, unrelated names (WCAG 3.2.4), and nothing here suggests it
+                navigates at all. The aria-label CONTAINS the visible text, so 2.5.3
+                Label in Name still holds. */}
             {identity && (
               <Link
                 to={homeHref}
+                aria-label={`${identity}${role ? `, ${role}` : ''} — go to dashboard`}
                 className="inline-flex flex-col items-end rounded-lg px-3 py-1.5 font-medium text-slate-900 hover:bg-slate-100 transition-colors"
               >
                 <span className="text-xs leading-tight">{identity}</span>

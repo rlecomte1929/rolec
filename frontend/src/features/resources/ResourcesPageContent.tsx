@@ -648,7 +648,8 @@ function ResourceSection({
 // NAV-002: trust-tier → labelled, colored badge (verified=teal, community=amber,
 // unverified=gray). Unknown/absent tiers render nothing.
 const TRUST_TIER_BADGE: Record<string, { label: string; cls: string }> = {
-  verified: { label: 'Verified', cls: 'bg-[#e0f2f1] text-[#1f8e8b]' },
+  // 3.42:1 on this tint — badge TEXT, so it needs 4.5:1. accent-700 gives 6.62:1.
+  verified: { label: 'Verified', cls: 'bg-[#e0f2f1] text-[#105d5b]' },
   community: { label: 'Community', cls: 'bg-[#fef3c7] text-[#92400e]' },
   unverified: { label: 'Unverified', cls: 'bg-[#f1f5f9] text-[#64748b]' },
 };
