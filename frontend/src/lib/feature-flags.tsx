@@ -162,16 +162,26 @@ export function FeatureFlagProvider({ children }: { children: ReactNode }) {
     // every page and floods the console. getSession() returns the session (with
     // its user) when one exists and null otherwise — falling back to the
     // ReloPass identity exactly as before, but without the network probe.
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      const userId = session?.user?.id ?? getAuthItem('relopass_email') ?? null;
+    // Both branches below resolve the SAME identity on a normal page load, and
+    // supabase-js fires INITIAL_SESSION on subscribe — so this used to invoke the
+    // get-feature-flags Edge Function 2-3x per load for one user. Track the identity we
+    // last loaded for and skip a repeat; a genuine sign-in/sign-out changes it and still
+    // re-resolves.
+    let lastLoadedUserId: string | null | undefined;
+    const loadOnce = (userId: string | null) => {
+      if (lastLoadedUserId === userId) return;
+      lastLoadedUserId = userId;
       void loadVariants(userId);
+    };
+
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      loadOnce(session?.user?.id ?? getAuthItem('relopass_email') ?? null);
     });
 
     // Re-resolve whenever the user signs in or out
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        const userId = session?.user?.id ?? getAuthItem('relopass_email') ?? null;
-                void loadVariants(userId);
+        loadOnce(session?.user?.id ?? getAuthItem('relopass_email') ?? null);
       },
     );
 

@@ -4175,7 +4175,16 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
     # first, so the company association resolves correctly even without a profiles row.
     db.ensure_hr_user_for_profile(uid, company_id)
     log.info("save_company_profile done user_id=%s company_id=%s", uid[:8] if uid else "?", company_id)
-    return {"ok": True, "company_id": company_id}
+    # Return the saved row, not just its id. The client previously had to issue a second
+    # GET /api/hr/company-profile purely to read back what it had just written — a
+    # serialized round trip (measured 1281ms POST + 1191ms GET) for data the server had
+    # in hand. `company` is ADDITIVE: an older frontend that ignores it still works.
+    try:
+        saved_company = db.get_company(company_id)
+    except Exception as exc:  # noqa: BLE001 — a read-back failure must not fail the save
+        log.warning("company-profile save: read-back failed for %s: %s", company_id, exc)
+        saved_company = None
+    return {"ok": True, "company_id": company_id, "company": saved_company}
 
 
 # ---------------------------------------------------------------------------

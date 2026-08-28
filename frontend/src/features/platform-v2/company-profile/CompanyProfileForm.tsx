@@ -564,7 +564,10 @@ export function CompanyProfileForm({
             <Button unstyled
               type="button"
               onClick={() => void saveNow()}
-              disabled={saving || !watchedName.trim()}
+              /* isDirty is already used at the status pill above; the button was the one
+                 place that ignored it, so 'Save profile' stayed clickable with nothing
+                 to save. */
+              disabled={saving || !isDirty || !watchedName.trim()}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[#0b2b43] px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-[#123651] focus:outline-none focus:ring-2 focus:ring-[#0b2b43] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckIcon className="h-3.5 w-3.5" /> Save profile
