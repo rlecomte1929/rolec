@@ -1,4 +1,10 @@
-import { supabase } from './supabase';
+// Imported dynamically, not statically. A static import here puts @supabase/supabase-js
+// in the eager app-shell graph, which makes Vite emit a <link rel=modulepreload> for the
+// 57 kB supabase-vendor chunk on every marketing page — downloaded by anonymous
+// visitors who never authenticate. api/supabase.ts is UNCHANGED and still creates the
+// client exactly once at module scope, so this resolves to the same singleton; multiple
+// createClient instances would share the sb-*-auth-token key and deadlock the Navigator
+// LockManager. Same pattern as components/NotificationsBell.tsx.
 
 export interface DemoBookingInput {
   firstName: string;
@@ -23,6 +29,7 @@ export type DemoBookingResult = DemoBookingSuccess | DemoBookingFailure;
 
 export async function submitDemoBooking(input: DemoBookingInput): Promise<DemoBookingResult> {
   try {
+    const { supabase } = await import('./supabase');
     const invokeResult = await supabase.functions.invoke('submit-demo-request', {
       body: {
         firstName: input.firstName,

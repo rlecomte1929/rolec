@@ -1,5 +1,11 @@
 import { logger } from '../lib/logger';
-import { supabase } from './supabase';
+// Imported dynamically, not statically. A static import here puts @supabase/supabase-js
+// in the eager app-shell graph, which makes Vite emit a <link rel=modulepreload> for the
+// 57 kB supabase-vendor chunk on every marketing page — downloaded by anonymous
+// visitors who never authenticate. api/supabase.ts is UNCHANGED and still creates the
+// client exactly once at module scope, so this resolves to the same singleton; multiple
+// createClient instances would share the sb-*-auth-token key and deadlock the Navigator
+// LockManager. Same pattern as components/NotificationsBell.tsx.
 import type { ApiErrorBody } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -14,6 +20,7 @@ type RpcResult<T> = {
 const isJwt = (value?: string | null) => typeof value === 'string' && value.split('.').length === 3;
 
 const callRpc = async <T>(fn: string, params: Record<string, unknown>): Promise<RpcResult<T>> => {
+  const { supabase } = await import('./supabase');
   const session = await supabase.auth.getSession();
   const accessToken = session.data?.session?.access_token || FALLBACK_ACCESS_TOKEN;
 
