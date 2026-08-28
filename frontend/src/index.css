@@ -28,7 +28,10 @@
   --marketing-surface-muted: #f1f5f7;
   --marketing-text: #1a2734;
   --marketing-text-muted: #4a5f73;
-  --marketing-text-subtle: #6b7c8f;
+  /* Was #6b7c8f: 4.28:1 on white, 4.09:1 on --marketing-surface-subtle and 3.90:1 on
+     --marketing-surface-muted — it failed AA on all three surfaces it is actually used on.
+     #5d6e80 clears 4.5:1 on every one (5.24 / 5.01 / 4.78). 17 usages inherit this. */
+  --marketing-text-subtle: #5d6e80;
   --marketing-border: #e4eaef;
   --marketing-border-subtle: #edf1f4;
 

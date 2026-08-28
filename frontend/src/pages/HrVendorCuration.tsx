@@ -1077,14 +1077,14 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
                       {accreditation.map((tag) => (
                         <span
                           key={tag}
-                          className="ml-1 inline-flex items-center rounded bg-[#eaf5f4] px-1.5 py-0.5 text-[10px] font-semibold text-[#1f8e8b]"
+                          className="ml-1 inline-flex items-center rounded bg-[#eaf5f4] px-1.5 py-0.5 text-[10px] font-semibold text-[#105d5b]"
                         >
                           {tag}
                         </span>
                       ))}
                       {row.verified ? (
                         <span
-                          className="ml-2 inline-flex items-center rounded-full bg-[#eaf5f4] px-2 py-0.5 text-[11px] font-semibold text-[#1f8e8b]"
+                          className="ml-2 inline-flex items-center rounded-full bg-[#eaf5f4] px-2 py-0.5 text-[11px] font-semibold text-[#105d5b]"
                           title="ReloPass has confirmed this provider's accreditation."
                         >
                           Verified

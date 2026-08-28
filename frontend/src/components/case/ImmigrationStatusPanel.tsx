@@ -296,7 +296,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
                     </span>
                   )}
                   {req.requires_translation && (
-                    <span className="rounded-full border border-[#d2eceb] bg-[#ebf7f6] px-2 py-0.5 text-xs text-[#1f8e8b]">
+                    <span className="rounded-full border border-[#d2eceb] bg-[#ebf7f6] px-2 py-0.5 text-xs text-[#105d5b]">
                       Translation
                     </span>
                   )}

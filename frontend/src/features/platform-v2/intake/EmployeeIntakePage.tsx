@@ -274,8 +274,11 @@ function FieldWrap({
         {prefill && (
           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent-100 text-accent-700 text-[10px] font-medium">
             🔒 HR pre-filled
+            {/* accent-500 (#1f8e8b) is 3.19:1 on this chip's accent-100 tint; accent-700 is
+                6.18:1. Note accent-500 as TEXT is only 3.96:1 even on white, so the other
+                `text-accent-500` sites are suspect too — this is the one axe measures. */}
             {onUnlock && (
-              <Button unstyled type="button" onClick={onUnlock} className="underline text-accent-500 hover:text-accent-700 ml-0.5">
+              <Button unstyled type="button" onClick={onUnlock} className="underline text-accent-700 hover:text-accent-800 ml-0.5">
                 Edit
               </Button>
             )}

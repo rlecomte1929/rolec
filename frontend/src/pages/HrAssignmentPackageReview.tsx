@@ -125,7 +125,7 @@ export const HrAssignmentPackageReview: React.FC = () => {
                 item.status === 'on_track' ? 'On track' : item.status === 'near_limit' ? 'Near limit' : 'Over limit';
               const statusClasses =
                 item.status === 'on_track'
-                  ? 'bg-[#eaf5f4] text-[#1f8e8b]'
+                  ? 'bg-[#eaf5f4] text-[#105d5b]'
                   : item.status === 'near_limit'
                   ? 'bg-[#fff7ed] text-[#9a3412]'
                   : 'bg-[#fef2f2] text-[#7a2a2a]';
