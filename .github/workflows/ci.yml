@@ -220,6 +220,15 @@ jobs:
       # only in a comment, so nothing stopped it. This is the enforcement.
       - name: Check no workflow derives a diff range from a stale base
         run: python scripts/check_workflow_base_sha.py
+      # #2062 added the `fast-gate` aggregator; the five expensive jobs behind it kept a
+      # bare `if:`, so GitHub's skip-propagation silently skipped all five on EVERY run for
+      # five days while every PR reported green (zero executions across 25 runs; 11 PRs
+      # merged untested). #2076 fixed the jobs. This stops the next one reintroducing it.
+      # Lives here, in the always-on job, because the shape can appear in any workflow.
+      - name: Install PyYAML for the job-gating guard
+        run: python -m pip install --quiet pyyaml
+      - name: Check no job's `if:` can be silently overridden by a skipped dependency
+        run: python scripts/check_workflow_job_gating.py --root .
 
   # Frontend build + type-check + lint + unit tests, consolidated into ONE job
   # (was three: frontend-build / frontend-checks / frontend-unit-tests).
@@ -248,6 +257,13 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     needs:
+      # `changes` is here to be CHECKED, not to be waited on. It has no `if:` so it cannot be
+      # skipped, but it CAN fail — it already did once, on the permissions error recorded at
+      # the top of this file. A failed `changes` empties every filter output, which silently
+      # skips all 17 guards gated on it AND the five expensive jobs, while this gate stayed
+      # green because the case below matches only `failure` and `cancelled` on its OWN needs.
+      # That is a fully green run in which almost nothing executed. Checked explicitly below.
+      - changes
       - actionlint
       - secrets-scan
       - repo-hygiene
@@ -259,9 +275,17 @@ jobs:
       - name: Stop here if a cheap guard already failed
         env:
           RESULTS: ${{ join(needs.*.result, ',') }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
         run: |
           set -euo pipefail
           echo "upstream results: $RESULTS"
+          echo "changes result:   $CHANGES_RESULT"
+          # Not folded into the case below: `changes` failing is not "a cheap guard failed",
+          # it means every path filter is empty and the whole run is scoped to nothing.
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "::error::Detect changes did not succeed ($CHANGES_RESULT) - every path filter is empty, so nothing downstream can run. Failing rather than reporting a green run that tested nothing."
+            exit 1
+          fi
           case ",$RESULTS," in
             *,failure,*|*,cancelled,*)
               echo "::error::A cheap guard failed - skipping the expensive jobs."
