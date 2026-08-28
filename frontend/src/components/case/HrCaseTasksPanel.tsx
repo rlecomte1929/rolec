@@ -31,7 +31,8 @@ const STATUS_COLOR: Record<string, string> = {
   pending: 'bg-[#f3f4f6] text-[#4b5563]',
   submitted: 'bg-[#eef4f8] text-[#1d4ed8]',
   revision_requested: 'bg-[#f6f2e9] text-[#7a5e2a]',
-  approved: 'bg-[#eef7f6] text-[#1f8e8b]',
+  // 3.64:1 on this tint — status TEXT, needs 4.5:1. accent-700 gives 7.04:1.
+  approved: 'bg-[#eef7f6] text-[#105d5b]',
 };
 
 function formatDue(iso: string | null | undefined): string {

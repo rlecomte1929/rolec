@@ -384,6 +384,8 @@ export interface PlatformShellSidebarProps {
   role: SidebarRole;
   /** Optional slot for the company widget under the brand (CompanySwitcher / CompanyBrand). */
   companySlot?: React.ReactNode;
+  /** Same brand, rendered mark-only for the 64px collapsed rail. */
+  collapsedCompanySlot?: React.ReactNode;
   /** Footer identity. Defaults to a sensible placeholder if absent. */
   user?: { initials: string; name: string; role: string };
 }
@@ -425,7 +427,12 @@ const SCROLL_KEY = 'platform_sidebar_scroll';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role, companySlot, user }) => {
+export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
+  role,
+  companySlot,
+  collapsedCompanySlot,
+  user,
+}) => {
   const location = useLocation();
   const asideRef = useRef<HTMLElement | null>(null);
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed());
@@ -696,8 +703,10 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
       </div>
 
       {/* Company switcher / brand */}
-      {!collapsed && companySlot && (
-        <div className="px-3 py-2 border-b border-slate-100">{companySlot}</div>
+      {companySlot && (
+        <div className={`${collapsed ? 'px-2 py-2 flex justify-center' : 'px-3 py-2'} border-b border-slate-100`}>
+          {collapsed ? collapsedCompanySlot ?? companySlot : companySlot}
+        </div>
       )}
 
       {/* AIQ-1453: removed the decorative non-functional "Search cases and providers"

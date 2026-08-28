@@ -10,6 +10,13 @@
 import { apiGet, apiPut } from './client';
 
 export interface BrandingConfig {
+  /**
+   * UNUSED. The endpoint returns these on every page load and nothing reads them:
+   * applyBrandingCssVars only applies the colour vars. The company logo that DOES render
+   * (CompanyBrand in the sidebar) comes from a different source — the HR company profile's
+   * `company.logo_url`. Either wire these up or stop returning them; do not assume they
+   * are live.
+   */
   logo_url: string | null;
   logo_dark_url: string | null;
   favicon_url: string | null;
