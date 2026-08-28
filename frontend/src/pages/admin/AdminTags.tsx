@@ -6,6 +6,7 @@ import { adminResourcesAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
+import { LoadErrorBanner, loadErrorMessage } from '../../components/LoadErrorBanner';
 
 type Tag = { id: string; key: string; label: string; tag_group?: string };
 
@@ -18,15 +19,18 @@ export const AdminTags: React.FC = () => {
   const [newLabel, setNewLabel] = useState('');
   const [newGroup, setNewGroup] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filterGroup, setFilterGroup] = useState('');
   const [search, setSearch] = useState('');
 
   const load = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await adminResourcesAPI.listTags(filterGroup || undefined);
       setItems((res.tags || []) as Tag[]);
-    } catch {
+    } catch (e) {
+      setLoadError(loadErrorMessage(e, "Couldn't load tags."));
       setItems([]);
     } finally {
       setLoading(false);
@@ -79,6 +83,7 @@ export const AdminTags: React.FC = () => {
 
   return (
     <AdminLayout title="Tags" subtitle="Manage resource tags">
+      <LoadErrorBanner message={loadError} onRetry={() => void load()} />
       <Link to={buildRoute('adminResources')} className="inline-block mb-4">
         <Button variant="secondary">← Back to Resources CMS</Button>
       </Link>
@@ -182,7 +187,7 @@ export const AdminTags: React.FC = () => {
             </div>
           ))}
         </div>
-        {filteredItems.length === 0 && !loading && (
+        {filteredItems.length === 0 && !loading && !loadError && (
           <div className="py-6 text-center text-slate-500">No tags yet.</div>
         )}
       </Card>
