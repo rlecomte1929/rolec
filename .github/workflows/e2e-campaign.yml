@@ -1,11 +1,24 @@
 name: E2E Sentinel Campaign
 
-# Runs on every deploy to main (post-deploy smoke, gated on a /health check) and
-# on manual dispatch. The whole job no-ops unless the repo variable
-# E2E_CAMPAIGN_ENABLED == 'true', so merging this file changes nothing until you opt in.
+# Runs twice daily against prod (gated on a /health check) and on manual dispatch.
+# The whole job no-ops unless the repo variable E2E_CAMPAIGN_ENABLED == 'true', so
+# merging this file changes nothing until you opt in.
+#
+# WAS `push: branches: [main]` until 2026-08-26 — one full campaign per merge. At ~10
+# billed minutes a run (3 of them the Render deploy-grace sleep below), the 178 pushes
+# in the five active days 19-23 Aug cost ~1,780 billed minutes on their own. Combined
+# with CI that overran the account's Actions allowance and every workflow in the repo
+# started failing instantly on a billing block.
+#
+# The trade is real and deliberate: a regression can now sit up to ~12h before the
+# campaign catches it, where per-push caught it in ~13 min. That is acceptable only
+# while the platform is pre-launch. RECONSIDER BEFORE REAL USERS ARRIVE — either put
+# the push trigger back (and budget for it) or move to an external post-deploy hook.
+# Merges that need immediate coverage can always `workflow_dispatch` on demand.
 on:
-  push:
-    branches: [main]
+  schedule:
+    # 06:40 and 18:40 UTC — offset off the hour to dodge the cron pileup.
+    - cron: "40 6,18 * * *"
   workflow_dispatch:
     inputs:
       projects:
@@ -46,9 +59,14 @@ jobs:
 
       # On a deploy, Render takes a few minutes to roll. Wait for the API to be
       # healthy (and, if the API exposes its commit, for the new SHA) before testing.
+      #
+      # The grace used to key off event_name == 'push'; that trigger is gone, so it now
+      # keys off "not a scheduled run" — i.e. a human dispatching straight after a merge
+      # still gets the deploy wait, while the twice-daily runs skip it. Prod has been up
+      # for hours by then, and skipping saves 3 of the run's ~10 billed minutes.
       - name: Wait for deploy / health
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event_name }}" != "schedule" ]; then
             echo "deploy grace: sleeping ${E2E_DEPLOY_GRACE:-180}s for Render to roll"
             sleep "${E2E_DEPLOY_GRACE:-180}"
           fi
