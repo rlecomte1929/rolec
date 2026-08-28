@@ -69,7 +69,7 @@ async function settleAnimations(page: Page, timeoutMs = 4000): Promise<void> {
 export async function expectNoSeriousA11yViolations(page: Page): Promise<void> {
   await settleAnimations(page);
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
     .analyze();
 
   const blocking = results.violations.filter((v) => BLOCKING_IMPACTS.has(v.impact ?? ''));
