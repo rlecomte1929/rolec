@@ -273,7 +273,14 @@ jobs:
   frontend:
     name: Frontend (build, types, lint, unit)
     needs: [changes, fast-gate]
-    if: needs.changes.outputs.frontend == 'true'
+    # `!cancelled()` is load-bearing, not decoration. `fast-gate` reaches `success` via
+    # its own `if: always()` even when some cheap guards were skipped — but a skip
+    # propagates transitively to GRANDCHILDREN unless they carry a status function, and
+    # actionlint/route-auth are skipped on almost every PR. Without this, all five
+    # expensive jobs skipped on every run from #2062 until this fix. Keep the explicit
+    # fast-gate result check: that is what still stops the expensive work when a cheap
+    # guard genuinely fails (fast-gate exits 1, result != 'success').
+    if: ${{ !cancelled() && needs.fast-gate.result == 'success' && needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -348,7 +355,14 @@ jobs:
     # (axe) and QG-13 (Lighthouse) reuse.
     name: E2E (Playwright smoke)
     needs: [changes, fast-gate]
-    if: needs.changes.outputs.frontend == 'true'
+    # `!cancelled()` is load-bearing, not decoration. `fast-gate` reaches `success` via
+    # its own `if: always()` even when some cheap guards were skipped — but a skip
+    # propagates transitively to GRANDCHILDREN unless they carry a status function, and
+    # actionlint/route-auth are skipped on almost every PR. Without this, all five
+    # expensive jobs skipped on every run from #2062 until this fix. Keep the explicit
+    # fast-gate result check: that is what still stops the expensive work when a cheap
+    # guard genuinely fails (fast-gate exits 1, result != 'success').
+    if: ${{ !cancelled() && needs.fast-gate.result == 'success' && needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -397,7 +411,14 @@ jobs:
     # pages only (/ and /auth — Lighthouse can't mock /api).
     name: Lighthouse (CWV budget)
     needs: [changes, fast-gate]
-    if: needs.changes.outputs.frontend == 'true'
+    # `!cancelled()` is load-bearing, not decoration. `fast-gate` reaches `success` via
+    # its own `if: always()` even when some cheap guards were skipped — but a skip
+    # propagates transitively to GRANDCHILDREN unless they carry a status function, and
+    # actionlint/route-auth are skipped on almost every PR. Without this, all five
+    # expensive jobs skipped on every run from #2062 until this fix. Keep the explicit
+    # fast-gate result check: that is what still stops the expensive work when a cheap
+    # guard genuinely fails (fast-gate exits 1, result != 'success').
+    if: ${{ !cancelled() && needs.fast-gate.result == 'success' && needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -438,7 +459,14 @@ jobs:
   backend-tests:
     name: Backend tests (deterministic P1 suite)
     needs: [changes, fast-gate]
-    if: needs.changes.outputs.backend == 'true'
+    # `!cancelled()` is load-bearing, not decoration. `fast-gate` reaches `success` via
+    # its own `if: always()` even when some cheap guards were skipped — but a skip
+    # propagates transitively to GRANDCHILDREN unless they carry a status function, and
+    # actionlint/route-auth are skipped on almost every PR. Without this, all five
+    # expensive jobs skipped on every run from #2062 until this fix. Keep the explicit
+    # fast-gate result check: that is what still stops the expensive work when a cheap
+    # guard genuinely fails (fast-gate exits 1, result != 'success').
+    if: ${{ !cancelled() && needs.fast-gate.result == 'success' && needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: sqlite:///./ci_test.db
@@ -537,7 +565,14 @@ jobs:
   backend-tests-postgres:
     name: Backend tests (Postgres 16 parity)
     needs: [changes, fast-gate]
-    if: needs.changes.outputs.backend == 'true'
+    # `!cancelled()` is load-bearing, not decoration. `fast-gate` reaches `success` via
+    # its own `if: always()` even when some cheap guards were skipped — but a skip
+    # propagates transitively to GRANDCHILDREN unless they carry a status function, and
+    # actionlint/route-auth are skipped on almost every PR. Without this, all five
+    # expensive jobs skipped on every run from #2062 until this fix. Keep the explicit
+    # fast-gate result check: that is what still stops the expensive work when a cheap
+    # guard genuinely fails (fast-gate exits 1, result != 'success').
+    if: ${{ !cancelled() && needs.fast-gate.result == 'success' && needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     services:
       postgres:
