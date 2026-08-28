@@ -50,7 +50,11 @@ export const CompanyBrand: React.FC = () => {
           : companyAPI.loading;
 
   if (loading || !company) {
-    return null;
+    // Hold the row's height instead of collapsing it. PlatformShellSidebar always renders
+    // the wrapper (px-3 py-2 + border), so returning null made it 17px tall and it jumped
+    // to 45px once the avatar (h-7 = 28px) mounted — pushing all 15 nav links down by
+    // exactly 28px after the company-profile response landed.
+    return <div className="h-7" aria-hidden />;
   }
 
   const nameRaw = (company as Record<string, unknown>).name;

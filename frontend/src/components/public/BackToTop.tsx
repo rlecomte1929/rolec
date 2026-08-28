@@ -51,7 +51,11 @@ export const BackToTop: React.FC = () => {
       onClick={scrollToTop}
       aria-label="Back to top"
       style={{ bottom: `${bottomOffset}px` }}
-      className="fixed right-4 sm:right-8 z-40 flex items-center gap-2 rounded-full border border-marketing-border bg-marketing-surface px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-medium text-marketing-text-muted shadow-sm transition-all duration-200 hover:border-marketing-border hover:bg-marketing-surface-muted hover:text-marketing-primary focus:outline-none focus:ring-2 focus:ring-marketing-accent focus:ring-offset-2 animate-fade-in"
+/* hidden below sm: at narrow widths the centred max-w-2xl forms reach within ~40px
+         of the right edge, so this 110px-wide control lands on top of their inputs and
+         swallows the clicks (reported against #inline-demo-company). It is a
+         convenience affordance; the form is not. */
+      className="hidden sm:flex fixed right-4 sm:right-8 z-40 items-center gap-2 rounded-full border border-marketing-border bg-marketing-surface px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-medium text-marketing-text-muted shadow-sm transition-all duration-200 hover:border-marketing-border hover:bg-marketing-surface-muted hover:text-marketing-primary focus:outline-none focus:ring-2 focus:ring-marketing-accent focus:ring-offset-2 animate-fade-in"
     >
       <svg
         className="h-4 w-4 shrink-0"

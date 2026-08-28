@@ -8,8 +8,12 @@ interface SectionHeaderProps {
   align?: 'left' | 'center';
   /** Max width of content for readability when centered */
   narrow?: boolean;
-  /** Heading element. Default h2; use h1 when this is the page's primary heading. */
-  as?: 'h1' | 'h2';
+  /**
+   * Heading element. Default h2; h1 when this is the page's primary heading; h3 for a
+   * sub-section. h3 exists because omitting it is what pushed pages to hand-roll their
+   * own headings and skip levels (WCAG 1.3.1).
+   */
+  as?: 'h1' | 'h2' | 'h3';
   className?: string;
 }
 

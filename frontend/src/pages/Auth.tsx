@@ -494,7 +494,14 @@ export const Auth: React.FC = () => {
             )}
           </div>
 
-          {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+          {/* Reserved slot. The panel above is `flex flex-col justify-center`, so inserting
+              an Alert re-centres the whole column: the heading rises and the form drops,
+              measured at 34px on the password field — the user's cursor moves out from
+              under them mid-typing. Holding the space means the error appears in place and
+              nothing else moves. min-h matches the rendered Alert + mb-4. */}
+          <div className="min-h-[3.75rem]">
+            {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+          </div>
 
           {/* ── Login form ── */}
           {mode === 'login' && (
