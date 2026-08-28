@@ -25,7 +25,6 @@ import { NotFoundRedirect } from './components/NotFoundRedirect';
 import { ROUTES as WIZARD_ROUTES } from './routes';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { DebugAuth } from './pages/DebugAuth';
-import { AssignmentDebugPage } from './pages/AssignmentDebugPage';
 import { PerfPanel } from './components/PerfPanel';
 import { FeatureFlagProvider } from './lib/feature-flags.tsx';
 
@@ -33,6 +32,12 @@ import { FeatureFlagProvider } from './lib/feature-flags.tsx';
 // These all land inside the existing <Suspense fallback={<RouteFallback />}> in App().
 // The async infrastructure is already present (151 other lazy() calls), so this
 // costs zero overhead while removing ~1500 lines of public-page code from the entry.
+// Dev-only: the page returns null unless DEV_TOOLS is on, but it was a STATIC import,
+// so it shipped to production and dragged AssignmentDebugPanel -> api/supabase into the
+// eager graph. lazy() like the other ~151 routes.
+const AssignmentDebugPage = lazy(() =>
+  import('./pages/AssignmentDebugPage').then((m) => ({ default: m.AssignmentDebugPage })),
+);
 const Landing = lazy(() => import('./pages/Landing').then((m) => ({ default: m.Landing })));
 const PlatformPage = lazy(() => import('./pages/public/PlatformPage').then((m) => ({ default: m.PlatformPage })));
 const HowItWorksPage = lazy(() => import('./pages/public/HowItWorksPage').then((m) => ({ default: m.HowItWorksPage })));

@@ -22,8 +22,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useLocation } from 'react-router-dom';
 import { getAuthItem } from '../utils/demo';
-import { supabase } from './supabase';
+// Imported dynamically, not statically — see api/demoBooking.ts. FeatureFlagProvider
+// wraps the whole router (App.tsx), so a static import here is the single biggest
+// reason @supabase/supabase-js lands in the eager graph and gets preloaded on
+// marketing pages. api/supabase.ts is unchanged: same module, same singleton.
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,9 +82,24 @@ async function resolveVariant(
   return 'control';
 }
 
+/** True when any auth artefact exists locally — ReloPass token or a Supabase session. */
+function hasAnySession(): boolean {
+  try {
+    if (getAuthItem('relopass_token')) return true;
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) return true;
+    }
+  } catch {
+    // Private mode / storage disabled — treat as anonymous rather than throwing.
+  }
+  return false;
+}
+
 // ─── Flag fetcher (internal) ──────────────────────────────────────────────────
 
 async function fetchAllFlags(): Promise<Record<string, FeatureFlag>> {
+  const { supabase } = await import('../api/supabase');
   const invokeResult = await supabase.functions.invoke('get-feature-flags');
   const data = invokeResult.data as { flags?: Record<string, FeatureFlag> } | null;
   const error: unknown = invokeResult.error;
@@ -155,7 +174,32 @@ export function FeatureFlagProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Do not touch Supabase at all for an anonymous visitor. loadVariants already returns
+  // early without a userId, but the getSession() call that resolves that userId is itself
+  // what pulls the 57 kB SDK chunk over the wire — on marketing pages, for people who have
+  // never signed in. Vite's __vitePreload injects a modulepreload link when the dynamic
+  // import runs, so moving the import off the eager graph was not enough on its own; the
+  // request has to not happen. e2e/bundle.spec.ts holds this.
+  //
+  // `armed` gates that. It starts true for anyone who already has a session, so a signed-in
+  // user's behaviour is byte-for-byte what it was: one setup, one subscription, at mount.
+  const [armed, setArmed] = useState(hasAnySession);
+
+  // Sign-in navigates client-side (useAuth -> safeNavigate), so the provider never
+  // remounts and the effect below would otherwise stay parked for the whole session.
+  // Re-check the cheap localStorage predicate on each navigation to catch that transition.
+  // This only ever flips false -> true; sign-out does a full document load.
+  const { pathname } = useLocation();
   useEffect(() => {
+    if (!armed && hasAnySession()) setArmed(true);
+  }, [pathname, armed]);
+
+  useEffect(() => {
+    if (!armed) {
+      setVariants({});
+      return;
+    }
+
     // Load variants for the current session immediately. Use getSession()
     // (local read, no network) rather than getUser() (network → auth/v1/user):
     // ReloPass-token users have no Supabase GoTrue session, so getUser() 403s on
@@ -174,19 +218,37 @@ export function FeatureFlagProvider({ children }: { children: ReactNode }) {
       void loadVariants(userId);
     };
 
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      loadOnce(session?.user?.id ?? getAuthItem('relopass_email') ?? null);
-    });
+    // The client now arrives asynchronously, so the subscription may not exist yet when
+    // React runs cleanup (a fast unmount, or StrictMode's double-invoke in dev). Track
+    // both the handle and a cancelled flag: whichever happens first, we neither leak a
+    // subscription nor call unsubscribe on undefined.
+    let cancelled = false;
+    let subscription: { unsubscribe: () => void } | undefined;
 
-    // Re-resolve whenever the user signs in or out
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+    void (async () => {
+      const { supabase } = await import('../api/supabase');
+      if (cancelled) return;
+
+      void supabase.auth.getSession().then(({ data: { session } }) => {
+        if (cancelled) return;
         loadOnce(session?.user?.id ?? getAuthItem('relopass_email') ?? null);
-      },
-    );
+      });
 
-    return () => subscription.unsubscribe();
-  }, []);
+      // Re-resolve whenever the user signs in or out
+      const listener = supabase.auth.onAuthStateChange((_event, session) => {
+        if (cancelled) return;
+        loadOnce(session?.user?.id ?? getAuthItem('relopass_email') ?? null);
+      });
+      // Unmounted while the import was in flight — tear down immediately.
+      if (cancelled) listener.data.subscription.unsubscribe();
+      else subscription = listener.data.subscription;
+    })();
+
+    return () => {
+      cancelled = true;
+      subscription?.unsubscribe();
+    };
+  }, [armed]);
 
   return (
     <FeatureFlagContext.Provider value={variants}>
