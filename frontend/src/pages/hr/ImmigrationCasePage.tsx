@@ -105,7 +105,7 @@ export const ImmigrationCasePage: React.FC = () => {
     return (
       <AppShell title="Immigration case">
         <div className="p-8">
-          <p className="text-[#fca5a5]">{error ?? 'Case not found.'}</p>
+          <p className="text-[#b91c1c]">{error ?? 'Case not found.'}</p>
           <Button className="mt-4" variant="ghost" onClick={() => navigate(-1)}>
             Go back
           </Button>
@@ -137,7 +137,7 @@ export const ImmigrationCasePage: React.FC = () => {
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-[#f1f5f9]">
+            <h1 className="text-2xl font-semibold text-[#0b2b43]">
               Immigration case
             </h1>
             <p className="text-slate-500 text-sm mt-1">
@@ -199,9 +199,9 @@ export const ImmigrationCasePage: React.FC = () => {
                       className={[
                         'text-sm font-medium',
                         isCurrent
-                          ? 'text-[#f1f5f9]'
+                          ? 'text-[#0b2b43]'
                           : isCompleted
-                          ? 'text-[#86efac]'
+                          ? 'text-[#15803d]'
                           : 'text-[#475569]',
                       ].join(' ')}
                     >
@@ -213,7 +213,7 @@ export const ImmigrationCasePage: React.FC = () => {
                       </Badge>
                     )}
                     {isCompleted && (
-                      <span className="text-xs text-[#4ade80]">✓</span>
+                      <span className="text-xs text-[#15803d]">✓</span>
                     )}
                     {isFuture && (
                       <span className="text-xs text-[#334155]">Pending</span>
@@ -233,27 +233,27 @@ export const ImmigrationCasePage: React.FC = () => {
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <dt className="text-[#64748b]">Expected submission</dt>
-              <dd className="text-[#f1f5f9] font-medium mt-0.5">
+              <dd className="text-[#0b2b43] font-medium mt-0.5">
                 {formatDate(immCase.expected_submission_date)}
               </dd>
             </div>
             <div>
               <dt className="text-[#64748b]">Expected grant</dt>
-              <dd className="text-[#f1f5f9] font-medium mt-0.5">
+              <dd className="text-[#0b2b43] font-medium mt-0.5">
                 {formatDate(immCase.expected_grant_date)}
               </dd>
             </div>
             {immCase.permit_expiry_date && (
               <div>
                 <dt className="text-[#64748b]">Permit expiry</dt>
-                <dd className="text-[#f1f5f9] font-medium mt-0.5">
+                <dd className="text-[#0b2b43] font-medium mt-0.5">
                   {formatDate(immCase.permit_expiry_date)}
                 </dd>
               </div>
             )}
             <div>
               <dt className="text-[#64748b]">Immigration partner</dt>
-              <dd className="text-[#f1f5f9] font-medium mt-0.5">
+              <dd className="text-[#0b2b43] font-medium mt-0.5">
                 {immCase.partner_name ?? '—'}
               </dd>
             </div>
