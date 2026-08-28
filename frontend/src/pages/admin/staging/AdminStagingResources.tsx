@@ -6,6 +6,7 @@ import { AdminLayout } from '../AdminLayout';
 import { adminStagingAPI, adminCollaborationAPI } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
 import { ThreadSummaryBadge } from '../../../components/admin/collaboration/ThreadSummaryBadge';
+import { LoadErrorBanner, loadErrorMessage } from '../../../components/LoadErrorBanner';
 
 type ResourceCandidate = {
   id: string;
@@ -27,6 +28,7 @@ export const AdminStagingResources: React.FC = () => {
   const [items, setItems] = useState<ResourceCandidate[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [threadSummaries, setThreadSummaries] = useState<Record<string, { comment_count: number; last_comment_at?: string; status?: string; is_unread?: boolean }>>({});
   const [filters, setFilters] = useState({
     status: '',
@@ -40,6 +42,7 @@ export const AdminStagingResources: React.FC = () => {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await adminStagingAPI.listResourceCandidates({
         status: filters.status || undefined,
@@ -61,7 +64,8 @@ export const AdminStagingResources: React.FC = () => {
       } else {
         setThreadSummaries({});
       }
-    } catch {
+    } catch (e) {
+      setLoadError(loadErrorMessage(e, "Couldn't load staged resource candidates."));
       setItems([]);
       setTotal(0);
       setThreadSummaries({});
@@ -99,6 +103,7 @@ export const AdminStagingResources: React.FC = () => {
       subtitle="Review and approve extracted resource candidates"
     >
       <div className="space-y-4">
+        <LoadErrorBanner message={loadError} onRetry={() => void load()} />
         <div className="flex flex-wrap items-center gap-2">
           <Input unstyled
             type="text"
@@ -138,7 +143,7 @@ export const AdminStagingResources: React.FC = () => {
 
         {loading ? (
           <div className="py-8 text-center text-slate-500">Loading...</div>
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && !loadError ? (
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center text-slate-600">
             No staged resource candidates found.
           </div>

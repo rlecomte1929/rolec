@@ -38,7 +38,9 @@ export const NotificationBell: React.FC = () => {
       const count = await getUnreadMessageCount();
       setUnreadCount(count);
     } catch {
-      setUnreadCount(0);
+      // Deliberately NOT setUnreadCount(0). Zeroing on failure told the user they had no
+      // unread messages when the endpoint was down — the one thing the bell exists to say,
+      // asserted from a failed request. Keep the last known value; the 60s poll recovers.
     }
   }, []);
 
@@ -47,7 +49,7 @@ export const NotificationBell: React.FC = () => {
       const list = await listUnreadMessageNotifications(20);
       setNotifications(list);
     } catch {
-      setNotifications([]);
+      // Same reasoning as fetchCount: an emptied list reads as "nothing unread".
     }
   }, []);
 

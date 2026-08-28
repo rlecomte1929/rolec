@@ -6,6 +6,7 @@ import { adminResourcesAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
+import { LoadErrorBanner, loadErrorMessage } from '../../components/LoadErrorBanner';
 
 type Source = { id: string; source_name: string; publisher?: string; source_type?: string; url?: string; trust_tier?: string; notes?: string; retrieved_at?: string };
 
@@ -20,13 +21,16 @@ export const AdminSources: React.FC = () => {
   const [newType, setNewType] = useState('community');
   const [newTrustTier, setNewTrustTier] = useState('T2');
   const [editing, setEditing] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await adminResourcesAPI.listSources();
       setItems((res.sources || []) as Source[]);
-    } catch {
+    } catch (e) {
+      setLoadError(loadErrorMessage(e, "Couldn't load sources."));
       setItems([]);
     } finally {
       setLoading(false);
@@ -75,6 +79,7 @@ export const AdminSources: React.FC = () => {
 
   return (
     <AdminLayout title="Sources" subtitle="Manage source records for provenance">
+      <LoadErrorBanner message={loadError} onRetry={() => void load()} />
       <Link to={buildRoute('adminResources')} className="inline-block mb-4">
         <Button variant="secondary">← Back to Resources CMS</Button>
       </Link>
@@ -211,7 +216,7 @@ export const AdminSources: React.FC = () => {
             </tbody>
           </table>
         </div>
-        {items.length === 0 && !loading && (
+        {items.length === 0 && !loading && !loadError && (
           <div className="py-6 text-center text-slate-500">No sources yet.</div>
         )}
       </Card>
