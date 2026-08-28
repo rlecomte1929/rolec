@@ -17,10 +17,10 @@ import { CompanyProfileForm } from './CompanyProfileForm';
  * the HR shell. The old PlatformSidebar (v2-preview) has been retired here.
  */
 export function CompanyProfileV2Page() {
-  const { company, loading, error, refresh } = useHrCompanyContext();
+  const { company, loading, error, refresh, applyCompany } = useHrCompanyContext();
 
   async function handleSave(payload: CompanyProfilePayload) {
-    await hrAPI.saveCompanyProfile(payload);
+    const saved = await hrAPI.saveCompanyProfile(payload);
     // AIQ-1223b: HR onboarding signal — first save reveals company size_band.
     // PII-free: presence flags + coarse size band enum only.
     trackCompanyProfileSaved({
@@ -29,7 +29,11 @@ export function CompanyProfileV2Page() {
       has_default_working_location: Boolean(payload.default_working_location),
       size_band: payload.size_band || undefined,
     });
-    await refresh();
+    // The save now returns the stored row, so the follow-up GET is unnecessary. Keep the
+    // refresh() fallback: this frontend and the backend deploy independently, and an
+    // older backend still answers with just {ok, company_id}.
+    if (saved?.company) applyCompany(saved.company);
+    else await refresh();
   }
 
   async function handleUploadLogo(file: File) {

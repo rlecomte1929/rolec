@@ -17,6 +17,12 @@ export interface HrCompanyContextValue {
   error: string | null;
   /** Refetch company profile. Call after save/upload. */
   refresh: () => Promise<void>;
+  /**
+   * Seed the context from a mutation's own response, so a save does not have to
+   * re-read what it just wrote. Falls back to refresh() when the server did not
+   * return the row (older backend) — see CompanyProfileV2Page.handleSave.
+   */
+  applyCompany: (company: Record<string, unknown>) => void;
 }
 
 const defaultValue: HrCompanyContextValue = {
@@ -25,6 +31,7 @@ const defaultValue: HrCompanyContextValue = {
   loading: false,
   error: null,
   refresh: async () => {},
+  applyCompany: () => {},
 };
 
 const HrCompanyContext = createContext<HrCompanyContextValue>(defaultValue);
@@ -106,12 +113,22 @@ export const HrCompanyContextProvider: React.FC<{ children: React.ReactNode }> =
     await fetchCompany();
   }, [fetchCompany]);
 
+  const applyCompany = useCallback((next: Record<string, unknown>) => {
+    // The cached GET is now stale relative to what we just stored; drop it so a later
+    // consumer does not read back the pre-save row from the 60s TTL.
+    invalidateApiCache('hr:company-profile');
+    invalidateApiCache('company:get');
+    setCompany(next);
+    setCompanyId((next.id as string) ?? null);
+  }, []);
+
   const value: HrCompanyContextValue = {
     companyId,
     company,
     loading,
     error,
     refresh,
+    applyCompany,
   };
 
   return (

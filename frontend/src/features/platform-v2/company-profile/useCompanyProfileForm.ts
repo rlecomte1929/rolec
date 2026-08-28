@@ -179,10 +179,16 @@ export function useCompanyProfileForm(
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const currentValues = getValues();
     const df = formState.dirtyFields;
+    // Nothing dirty means the debounced autosave already persisted everything, so this
+    // would POST (and then GET, via handleSave's refresh) purely to rewrite what is
+    // already stored. The old `: ['identity','location','hr']` fallback WAS that path —
+    // an explicit "save everything anyway" for a form with no pending edits.
+    if (Object.keys(df).length === 0) return;
     const sections = (Object.keys(SECTION_FIELDS) as SectionKey[]).filter((s) =>
       SECTION_FIELDS[s].some((f) => df[f]),
     );
-    await persist(currentValues, sections.length > 0 ? sections : ['identity', 'location', 'hr']);
+    if (sections.length === 0) return;
+    await persist(currentValues, sections);
   }, [getValues, formState.dirtyFields, persist]);
 
   const markSaved = useCallback(() => {

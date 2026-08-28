@@ -13,7 +13,7 @@ import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ChangelogBell } from '../ChangelogBell';
+import { ChangelogBell, __resetChangelogCacheForTests } from '../ChangelogBell';
 
 const SAMPLE_ENTRIES = [
   {
@@ -69,6 +69,7 @@ function installLocalStorageStub() {
 
 describe('ChangelogBell', () => {
   beforeEach(() => {
+    __resetChangelogCacheForTests();
     installLocalStorageStub();
     vi.restoreAllMocks();
   });
@@ -82,7 +83,9 @@ describe('ChangelogBell', () => {
     render(<ChangelogBell />);
     expect(screen.getByRole('button', { name: /what'?s new/i })).toBeInTheDocument();
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/changelog.json', { cache: 'no-store' });
+      // `cache: 'no-store'` was removed deliberately: it opted out of the HTTP cache for a
+      // static build artefact that is now memoised per session anyway.
+      expect(fetchMock).toHaveBeenCalledWith('/changelog.json');
     });
   });
 
@@ -131,5 +134,45 @@ describe('ChangelogBell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /what'?s new/i }));
     expect(await screen.findByText(/no updates yet/i)).toBeInTheDocument();
+  });
+});
+
+
+describe('ChangelogBell — fetches once per session, not per navigation', () => {
+  beforeEach(() => {
+    __resetChangelogCacheForTests();
+    localStorage.clear();
+  });
+  afterEach(() => cleanup());
+
+  /**
+   * AppShell is NOT a router layout — it is rendered inside 77 individual page components,
+   * so React Router unmounts and remounts it on every navigation. Combined with
+   * `cache: 'no-store'`, which explicitly opts out of the HTTP cache, that meant one
+   * network round trip for a static file on every single route change.
+   */
+  it('does not refetch when remounted (i.e. on every route change)', async () => {
+    const fetchMock = mockChangelogFetch();
+
+    const first = render(<ChangelogBell />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    first.unmount();
+
+    render(<ChangelogBell />);
+    await waitFor(() => expect(screen.getByRole('button', { name: /what's new/i })).toBeInTheDocument());
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('still populates entries on the remount from the cached payload', async () => {
+    mockChangelogFetch();
+    const first = render(<ChangelogBell />);
+    await waitFor(() => expect(screen.getByRole('button', { name: /what's new/i })).toBeInTheDocument());
+    first.unmount();
+
+    render(<ChangelogBell />);
+    fireEvent.click(await screen.findByRole('button', { name: /what's new/i }));
+    // A cache that returns nothing is worse than a refetch — prove the data survives.
+    expect(await screen.findByText('Estimate Review')).toBeInTheDocument();
   });
 });
