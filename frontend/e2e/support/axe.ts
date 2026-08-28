@@ -23,23 +23,32 @@ const BLOCKING_IMPACTS = new Set(['serious', 'critical']);
  * Call AFTER the page has settled (e.g. an `await expect(locator).toBeVisible()`)
  * so axe scans the fully-rendered DOM.
  */
+/**
+ * Wait for CSS transitions/animations to finish before scanning.
+ *
+ * Without this, axe samples elements mid-animation. The marketing pages wrap almost
+ * everything in `FadeIn` (a staggered opacity transition), and a scan taken during the
+ * ramp reports every faded element as a contrast failure — ~50 phantom violations in one
+ * 12-route sweep. Chromium's getAnimations() includes CSS transitions, which is what
+ * FadeIn uses.
+ *
+ * Bounded by a timeout: an intentionally infinite animation (a spinner, a pulse) would
+ * otherwise hang the gate forever.
+ */
+async function settleAnimations(page: Page, timeoutMs = 2000): Promise<void> {
+  await page.evaluate(async (ms) => {
+    const finished = document.getAnimations().map((a) => a.finished.catch(() => undefined));
+    await Promise.race([
+      Promise.all(finished),
+      new Promise((resolve) => setTimeout(resolve, ms)),
+    ]);
+  }, timeoutMs);
+}
+
 export async function expectNoSeriousA11yViolations(page: Page): Promise<void> {
+  await settleAnimations(page);
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-    // STILL excluded, but for a different and now-measured reason. The Tailwind
-    // muted-text tier is fixed (879 sites, enforced by local/no-low-contrast-text),
-    // yet a scan of 12 public routes with this rule ON still finds ~77 failures that
-    // a class sweep cannot reach:
-    //   ~50x  #c6cbd0 / #c1c7cb / #d1d9de / #b5bcc1 on near-white at 1.3-1.75:1
-    //         — not Tailwind classes; they come from CSS files or inline styles
-    //    12x  #1f8e8b (the BRAND teal) as link text on white = 3.96:1 — fixing this
-    //         is a brand decision, not a token swap
-    //     5x  #6b7c8f (--marketing-text-subtle) on white = 4.28:1 — the token itself
-    //         is marginally non-compliant and needs redefining
-    // Turning the rule on now would make the gate perma-red on causes this sweep was
-    // never going to address. Re-run the scan and drop this line once those three
-    // families are dealt with.
-    .disableRules(['color-contrast'])
     .analyze();
 
   const blocking = results.violations.filter((v) => BLOCKING_IMPACTS.has(v.impact ?? ''));

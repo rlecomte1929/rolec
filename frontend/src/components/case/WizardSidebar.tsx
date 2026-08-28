@@ -35,7 +35,7 @@ export const WizardSidebar: React.FC<WizardSidebarProps> = ({ currentStep, compl
                 <span
                   className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-semibold ${
                     isDone
-                      ? 'bg-[#eaf5f4] text-[#1f8e8b]'
+                      ? 'bg-[#eaf5f4] text-[#105d5b]'
                       : isCurrent
                       ? 'bg-[#0b2b43] text-white'
                       : 'bg-[#e2e8f0] text-[#6b7280]'

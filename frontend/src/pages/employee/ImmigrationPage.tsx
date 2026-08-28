@@ -206,7 +206,7 @@ function StepPip({ label, title, done, active }: { label: string; title: string;
   return (
     <div className="flex flex-col items-center gap-0.5">
       <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-semibold ${
-        done ? 'bg-[#eaf5f4] text-[#1f8e8b]'
+        done ? 'bg-[#eaf5f4] text-[#105d5b]'
              : active ? 'bg-[#0b2b43] text-white'
              : 'bg-[#e2e8f0] text-slate-500'
       }`}>

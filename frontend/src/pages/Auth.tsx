@@ -449,7 +449,10 @@ export const Auth: React.FC = () => {
             {(['login', 'register'] as const).map((m) => (
               <Button key={m} type="button" variant="ghost" onClick={() => { setMode(m); setError(''); }}
                 className={`flex-1 !py-1.5 text-sm !rounded-md transition-all ${
-                  mode === m ? '!bg-white shadow-sm !text-slate-900' : '!text-slate-500 hover:!text-slate-700 hover:!bg-transparent'
+                  // slate-500 on the bg-slate-100 track is 4.34:1 — under AA. slate-600 is
+                  // 6.92:1 there. (Reported separately as the "Create account tab toggle"
+                  // contrast bug.) The selected tab sits on white and is unaffected.
+                  mode === m ? '!bg-white shadow-sm !text-slate-900' : '!text-slate-600 hover:!text-slate-800 hover:!bg-transparent'
                 }`}>
                 {m === 'login' ? 'Sign in' : 'Create account'}
               </Button>

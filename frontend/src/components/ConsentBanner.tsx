@@ -56,7 +56,11 @@ export function ConsentBanner() {
           servers.{' '}
           <Link
             to="/privacy"
-            className="font-medium text-[#1f8e8b] underline underline-offset-2 hover:text-[#197c79]"
+            /* #1f8e8b is --rp-secondary from the PLATFORM palette and measures 3.96:1 on
+               white — below AA. This banner is a public surface, so it takes the marketing
+               accent (#197b78, 5.07:1). One node, but it renders on every public route via
+               App.tsx, which is why an axe sweep reported it 12 times. */
+            className="font-medium text-marketing-accent underline underline-offset-2 hover:text-[#167572]"
           >
             Privacy policy
           </Link>

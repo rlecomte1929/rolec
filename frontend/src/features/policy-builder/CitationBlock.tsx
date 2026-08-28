@@ -154,7 +154,7 @@ const CitationRow: React.FC<{ citation: Citation; id: string }> = ({ citation, i
         <span
           className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${
             isHighConfidence
-              ? 'bg-[#eaf5f4] text-[#1f8e8b]'
+              ? 'bg-[#eaf5f4] text-[#105d5b]'
               : 'bg-[#f4efe5] text-[#7a5e2a]'
           }`}
         >

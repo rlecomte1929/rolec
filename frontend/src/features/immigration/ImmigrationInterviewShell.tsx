@@ -637,7 +637,7 @@ export const ImmigrationInterviewShell: React.FC<ImmigrationInterviewShellProps>
                 isActive
                   ? 'bg-[#0b2b43] text-white'
                   : isDone
-                  ? 'bg-[#eaf5f4] text-[#1f8e8b]'
+                  ? 'bg-[#eaf5f4] text-[#105d5b]'
                   : 'bg-[#f1f5f9] text-[#64748b]'
               }`}
             >

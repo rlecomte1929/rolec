@@ -12,7 +12,7 @@ export const Badge: React.FC<BadgeProps> = ({
   size = 'md',
 }) => {
   const variants = {
-    success: 'bg-[#eaf5f4] text-[#1f8e8b]',
+    success: 'bg-[#eaf5f4] text-[#105d5b]',
     warning: 'bg-[#f4efe5] text-[#7a5e2a]',
     error: 'bg-[#f4e9e9] text-[#7a2a2a]',
     info: 'bg-[#eaf1f7] text-[#0b2b43]',
