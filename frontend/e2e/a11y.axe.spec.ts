@@ -52,4 +52,21 @@ test.describe('QG-9 · runtime accessibility gate (axe — serious/critical only
     await expect(page.getByRole('heading', { name: /detailed intake/i })).toBeVisible();
     await expectNoSeriousA11yViolations(page);
   });
+
+  // AIQ · accent-as-text contrast. These two orientation routes render the brand teal
+  // as body text and need no API at all, so they are the cheapest real coverage for the
+  // accent cluster. color-contrast is enabled (since #2070), so this measures it.
+  test('HR welcome page has no serious/critical a11y violations', async ({ page }) => {
+    await seedAuth(page, 'HR');
+    await page.goto('/hr/welcome');
+    await expect(page.locator('#root *')).not.toHaveCount(0);
+    await expectNoSeriousA11yViolations(page);
+  });
+
+  test('employee welcome page has no serious/critical a11y violations', async ({ page }) => {
+    await seedAuth(page, 'EMPLOYEE');
+    await page.goto('/employee/welcome');
+    await expect(page.locator('#root *')).not.toHaveCount(0);
+    await expectNoSeriousA11yViolations(page);
+  });
 });

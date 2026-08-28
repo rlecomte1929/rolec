@@ -51,7 +51,7 @@ export function HrWelcomePage() {
   if (isTestDrive) {
     return (
       <WelcomeShell onSkip={handleSkip}>
-        <p className="text-sm font-medium text-accent-500 uppercase tracking-wide mb-2">Welcome to ReloPass</p>
+        <p className="text-sm font-medium text-accent-600 uppercase tracking-wide mb-2">Welcome to ReloPass</p>
         <h1 className="text-2xl font-semibold text-navy-800 mb-3">Open your first relocation case</h1>
         <p className="text-sm text-slate-600 mb-6 max-w-lg">
           Your company and route are already set up for this test — you can go straight to the case, add the
@@ -101,7 +101,7 @@ export function HrWelcomePage() {
 
   return (
     <WelcomeShell onSkip={handleSkip}>
-      <p className="text-sm font-medium text-accent-500 uppercase tracking-wide mb-2">Welcome to ReloPass</p>
+      <p className="text-sm font-medium text-accent-600 uppercase tracking-wide mb-2">Welcome to ReloPass</p>
       <h1 className="text-2xl font-semibold text-navy-800 mb-3">Set up your company workspace</h1>
       <p className="text-sm text-slate-600 mb-10 max-w-lg">
         Before creating your first relocation case, a few things will make everything work better. You can do
