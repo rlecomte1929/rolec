@@ -52,9 +52,14 @@ export const AccessOptionCard: React.FC<AccessOptionCardProps> = ({
 
   return (
     <div className="rounded-xl border border-marketing-border bg-marketing-surface p-6 sm:p-8 flex flex-col">
-      <h3 className="text-marketing-h3 font-semibold text-marketing-primary">
+      {/* h2, not h3. /access has a single h1 ("Three ways in.") and these three cards are
+          its top-level sections, so an h3 here skipped a level (WCAG 1.3.1) — and the page's
+          only other body heading, "what the demo covers", is already an h2 that came AFTER
+          them, so the outline read h1 -> h3 -> h3 -> h3 -> h2. Visual size is set by
+          text-marketing-h3, not by the tag, exactly as the footer headings were fixed. */}
+      <h2 className="text-marketing-h3 font-semibold text-marketing-primary">
         {label}
-      </h3>
+      </h2>
       <p className="mt-2 text-sm text-marketing-text-muted leading-relaxed flex-1">
         {description}
       </p>
