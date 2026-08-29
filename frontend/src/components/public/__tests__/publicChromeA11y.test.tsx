@@ -15,8 +15,32 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DemoBookingProvider } from '../../../hooks/useDemoBooking';
+import { AccessPage } from '../../../pages/public/AccessPage';
 import { PlatformPage } from '../../../pages/public/PlatformPage';
 import { PublicLayout } from '../PublicLayout';
+
+// jsdom ships no matchMedia; FadeIn reads prefers-reduced-motion on mount. This lived
+// inside the /platform describe, which made every OTHER describe in this file silently
+// depend on /platform's beforeAll having run first — the /access outline test below passes
+// in a full-file run and throws when run on its own with -t. File-level, so the order of
+// describes cannot matter.
+beforeAll(() => {
+  if (!window.matchMedia) {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  }
+});
 
 describe('PublicLayout — keyboard bypass', () => {
   const renderLayout = () =>
@@ -53,25 +77,6 @@ describe('PublicLayout — keyboard bypass', () => {
 
 
 describe('/platform hero — "Sign in" must go to the login screen', () => {
-  beforeAll(() => {
-    // jsdom ships no matchMedia; FadeIn reads prefers-reduced-motion on mount.
-    if (!window.matchMedia) {
-      Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        value: (query: string) => ({
-          matches: false,
-          media: query,
-          onchange: null,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-          addListener: () => {},
-          removeListener: () => {},
-          dispatchEvent: () => false,
-        }),
-      });
-    }
-  });
-
   it('does not send the Sign in CTA to /how-it-works', () => {
     render(
       <MemoryRouter>
@@ -87,6 +92,39 @@ describe('/platform hero — "Sign in" must go to the login screen', () => {
     for (const link of signIns) {
       expect(link.getAttribute('href')).toMatch(/\/auth/);
       expect(link.getAttribute('href')).not.toMatch(/how-it-works/);
+    }
+  });
+});
+
+
+describe('/access — heading outline must not skip a level', () => {
+  it('goes h1 -> h2 with no h3 in between', () => {
+    // The three option cards ("Book a demo" / "Sign in" / "Create account") are the page's
+    // top-level sections under its single h1, but were marked h3 — so the outline jumped
+    // h1 -> h3 (WCAG 1.3.1). Worse, the page's one other body heading ("what the demo
+    // covers") is an h2 that renders AFTER them, so the first h2 was preceded by three h3s.
+    //
+    // Asserting the SEQUENCE rather than "no h3 exists": the defect is the gap between
+    // levels, and a sequence assertion still catches it if someone later adds a legitimate
+    // h3 nested under one of these h2s.
+    const { container } = render(
+      <MemoryRouter>
+        <DemoBookingProvider>
+          <AccessPage />
+        </DemoBookingProvider>
+      </MemoryRouter>,
+    );
+
+    const levels = Array.from(container.querySelectorAll('h1,h2,h3,h4,h5,h6')).map((h) =>
+      Number(h.tagName[1]),
+    );
+
+    expect(levels[0], 'page must open with its h1').toBe(1);
+    for (let i = 1; i < levels.length; i += 1) {
+      expect(
+        levels[i]! - levels[i - 1]!,
+        `heading ${i} (h${levels[i]}) skips a level after h${levels[i - 1]}: ${levels.join(' -> ')}`,
+      ).toBeLessThanOrEqual(1);
     }
   });
 });
