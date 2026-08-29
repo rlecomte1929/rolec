@@ -6,11 +6,14 @@
  *
  * WHY THIS RENDERS THE PAGE INSTEAD OF ASSERTING ON THE CONTENT MODULE.
  * PR #2074 tried to fix exactly this and changed nothing a visitor could see: it edited
- * `src/pages/public/landingContent.ts`, which has ZERO importers. The live copy is
- * `src/pages/landing/landingContent.ts`. Both files export `landingContent`, both contain a
+ * `src/pages/public/landingContent.ts`, which had ZERO importers. The live copy is
+ * `src/pages/landing/landingContent.ts`. Both exported `landingContent`, both had a
  * `hero.primaryCta`, and the dead one even held the *corrected* string — so the diff looked
  * right, review looked right, and the landing hero still read "Structure how you run
  * relocation. Start with one case." next to a nav link reading "Get started".
+ *
+ * The dead file has since been deleted, but the lesson stands and this test is what enforces
+ * it: assert against the RENDERED route, never against a content module by name.
  *
  * A content-module assertion would have passed against the dead file just as happily.
  * Rendering the route is the only form of this test that cannot be fooled by that.
