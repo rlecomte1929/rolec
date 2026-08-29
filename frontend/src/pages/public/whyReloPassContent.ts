@@ -11,7 +11,12 @@ export const whyReloPassContent = {
     subheadline:
       'Not because teams aren\'t capable. Because the tools aren\'t built for coordination.',
     primaryCta: 'Book a demo',
-    secondaryCta: 'See the platform',
+    // 'Platform', matching the nav and footer. WCAG 3.2.4: on /why this CTA, the header
+    // link and the footer link all go to /platform, and they read 'See the platform',
+    // 'Platform', 'Platform' — three controls, one destination, two names. Aligned to the
+    // nav's wording rather than the reverse: nav labels render on every public page and
+    // have to stay short, so changing the two CTA strings is the smaller blast radius.
+    secondaryCta: 'Platform',
     trustMicrocopy: '30-minute walkthrough. No commitment.',
   },
 
