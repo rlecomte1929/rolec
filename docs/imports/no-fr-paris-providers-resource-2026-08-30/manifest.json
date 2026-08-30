@@ -1,0 +1,33 @@
+{
+  "batch_id": "no-fr-paris-providers-resource-2026-08-30",
+  "corridor": "NO-FR",
+  "destination": "FR (Paris)",
+  "persona": "Denis (Oslo->Paris, French/EEA)",
+  "purpose": "Re-source the 4 Paris providers rejected from no-fr-paris-providers-2026-08-30 for bare/listing source_urls; land per-entity register pages.",
+  "source": "Otto (Audos) — FRANCE / PARIS PROVIDER thread, re-source round 2026-08-30",
+  "gcs": {
+    "providers_csv": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788104155964_icqrflti.csv",
+    "rejects_csv": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788104156558_ng5kpstn.csv"
+  },
+  "files": {
+    "providers.csv": {
+      "records": 4,
+      "sha256": "de245fc217a1cad9b832e7c34a51224bc730625efd7eedb5b8bb9696c5692bca"
+    },
+    "rejects.csv": {
+      "records": 0,
+      "sha256": "55882eaed12daf96c8cb139d7e059b1b9cd6ff29a443c55ccac213fe2249b30c"
+    }
+  },
+  "normalisation": "service_category values delivered as 'moving'/'housing' normalised to canonical 'movers'/'housing_agencies' (the vocabulary the brief specified and vendor_harvester/registry_sources use); nothing else changed.",
+  "landed": {
+    "staged": 3,
+    "duplicate": 1,
+    "rejected": 0,
+    "promoted_pending": 4,
+    "table": "public.supplier_service_capabilities (platform_vetting_status='pending')"
+  },
+  "flags": [
+    "1818 Immobilier website resolves to banqueprivee1818.com (private bank HNW property arm) — Otto flagged as premium/specialist, confirm standard-rental fit at vet time."
+  ]
+}
