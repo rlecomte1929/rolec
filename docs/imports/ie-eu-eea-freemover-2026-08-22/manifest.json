@@ -7,5 +7,5 @@
   "record_count": 11,
   "schema_version": "1.0",
   "target_directory": "docs/imports/ie-eu-eea-freemover-2026-08-22/",
-  "notes": "Flat schema. applies_to.nationality=EEA, applies_to.status=professional on all rows. evidence_quote candidates \u2014 human verification required before promote."
+  "notes": "Flat schema, nationality=EEA/status=professional. Claude-grounded: 10/11 quotes verbatim-verified against live official pages; 1 (bank proof-of-address) flagged for re-source. review_status=pending."
 }

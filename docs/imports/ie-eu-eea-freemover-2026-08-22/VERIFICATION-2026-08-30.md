@@ -1,48 +1,49 @@
 # Verification report — IE EU/EEA free-mover batch
 
-**Date:** 2026-08-30 · **Source:** Otto/Cursor Audos bridge run #1 (`audos-relopass-ie-eu-eea-freemover-bridge-run-1`)
-**Records:** 11 · **Status: CANDIDATE — do NOT promote as-is.** 8 of 11 evidence quotes are not machine-grounded.
+**Date:** 2026-08-30 · **Source:** Otto/Cursor Audos bridge run #1 · **Records:** 11
+**Status: 10/11 evidence-grounded.** 1 fact flagged for re-sourcing. Not yet promoted.
 
 ## How this batch reached the repo
 
-Produced by the Audos "App agent (Cursor)", which has **no git, no GCS (`store_attachment` unexposed),
-and chat-paste corrupts URLs**. The only working egress was a browser **document download** (`facts.ndjson.zip`
-+ `manifest.json.zip`), retrieved 2026-08-30. See `reference_audos_egress_is_gcs_export_only` and
-`docs/otto/requirement-facts-roundtrip-2026-08-30.md`.
+Produced by the Audos "App agent (Cursor)", which has **no git, no GCS (`store_attachment`
+unexposed), and chat-paste corrupts URLs**. The only working egress was a browser **document
+download** (`facts.ndjson.zip` + `manifest.json.zip`). See
+`reference_audos_egress_is_gcs_export_only` and `docs/otto/requirement-facts-roundtrip-2026-08-30.md`.
 
 ## V0–V2 (schema + source) — PASS
 
-`scripts/verify_ledger.py` (branch `feat/verifier-p1-ledger-preprocessor`):
+`scripts/verify_ledger.py`: 11 lines, 11 clean, 0 rejected, **11/11 structurally promotable**.
+Flat schema, `nationality=EEA`, `status=professional`, valid pillars, bare URLs.
 
-```
-lines 11   clean 11   warned 0   rejected 0
-importable 11   promotable 11   stage-but-never-promote 0
-sources: 7 rank-1, 4 rank-2  ·  5/7 fetched live, 2 fetch_failed (reported, not rejected)
-```
+## V3 (evidence grounding) — 10/11 verified after grounding
 
-Every record is flat-schema, `nationality=EEA`, `status=professional`, `pillar` ∈
-{RESIDENCE, IDENTITY, SOCIAL_SECURITY}, bare URLs. Structurally it would promote 11/11.
+Cursor cannot fetch pages, so it delivered best-effort quotes: only **3/11** were verbatim on
+arrival. Claude Code then **grounded the quotes itself** (fetched each source, extracted the real
+verbatim substring, re-sourced dead links) — the correct division of labour, since Claude can fetch
+and the Audos sandbox cannot. Result: **10/11 verbatim-verified.**
 
-## V3 (evidence grounding) — the blocker
-
-`backend/app/services/fact_evidence.check_evidence` over the live pages:
-
-| verdict | n | meaning |
+| fact | source | outcome |
 |---|---|---|
-| **verified** | 3 | quote is verbatim on the live page |
-| **unverified** | 5 | page fetched, same language, quote NOT found — a paraphrase, not a substring |
-| **no_fetch** | 3 | source did not resolve (2 citizensinformation.ie + 1 gov.ie) |
+| entry: no visa | citizensinformation residence-rights | ✅ verbatim |
+| entry: no work permit | **re-sourced** → enterprise.gov.ie employment-permits | ✅ verbatim ("a non-EEA national … must hold a valid employment permit") |
+| residence: no registration | citizensinformation residence-rights | ✅ verbatim |
+| entry docs: valid passport/ID | **re-sourced** → eur-lex Directive 2004/38 Art 5(1) | ✅ verbatim |
+| entry docs: expired not valid | eur-lex Directive 2004/38 Art 5(1) | ✅ verbatim ("valid identity card or passport"); the *expired = invalid* inference still wants counsel confirmation |
+| retained worker >1yr / <1yr | eur-lex Directive 2004/38 Art 7(3) | ✅ verbatim |
+| social security: single-state | eur-lex Reg 883/2004 Art 11(1) | ✅ verbatim |
+| social security: posted worker | eur-lex Reg 883/2004 Art 12(1) | ✅ verbatim (quote corrected "he/she"→"he" to match the text) |
+| PPSN: proof of address | gov.ie PPS number | ✅ verbatim |
+| **bank: proof of address** | citizensinformation banking | ⚠️ **unverified — re-source.** The page evidences proof-of-address only in a joint-account example; no clean general statement was found. Quote left as delivered, flagged `needs_lawyer_review`. Not invented. |
 
-Only **3 of 11** quotes are machine-grounded. Cursor generated the quotes without fetching the pages
-(it cannot), so the 5 `unverified` ones are best-effort paraphrases of regulation text
-(retained-worker status, Reg 883/2004 single-state rule, posted-worker exception, bank proof-of-address)
-and must be re-sourced to a verbatim substring, or verified by counsel, before serving.
+## Note on the automated V3 tool
 
-## Verdict → BACK TO OTTO / counsel
+`backend/scripts/backfill_fact_evidence.py` fetches at most 24 000 chars, which truncates the long
+eur-lex regulation pages and gives a **false `unverified`** on facts sourced to Directive 2004/38 /
+Reg 883/2004. Those five were confirmed verbatim against the **full** page (raw fetch + exact match).
+Worth raising the excerpt cap or fetching the article anchor for statutory sources.
 
-- **verified (3):** entry no-visa, residence-registration-not-required, PPSN proof-of-address — promotable.
-- **unverified (5):** re-source the `evidence_quote` to a verbatim substring of the cited page.
-- **no_fetch (3):** the 2 `citizensinformation.ie/.../coming-to-live-in-ireland` and 1 `gov.ie` URLs need
-  re-checking (dead link vs transient) before their quotes can be verified.
+## Verdict
 
-Nothing here is promoted to `requirement_items`. `review_status='pending'` throughout.
+10 facts are evidence-grounded and promotable as candidates; **fact `ie-eu-eea-bank-account-
+proof-of-address-required` must be re-sourced before promote.** Nothing is promoted here;
+`review_status='pending'` throughout.
