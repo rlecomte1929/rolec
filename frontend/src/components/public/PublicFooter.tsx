@@ -107,9 +107,9 @@ export const PublicFooter: React.FC = () => {
               © {new Date().getFullYear()} ReloPass. All rights reserved.
             </p>
             <img
-              src="/relopass-full-logo.png?v=2"
-              width={200}
-              height={300}
+              src="/relopass-full-logo.png?v=3"
+              width={128}
+              height={192}
               alt="ReloPass"
               className="h-20 w-auto sm:h-24"
             />
