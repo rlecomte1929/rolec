@@ -154,7 +154,7 @@ const CitationRow: React.FC<{ citation: Citation; id: string }> = ({ citation, i
         <span
           className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${
             isHighConfidence
-              ? 'bg-[#eaf5f4] text-[#1f8e8b]'
+              ? 'bg-[#eaf5f4] text-[#105d5b]'
               : 'bg-[#f4efe5] text-[#7a5e2a]'
           }`}
         >
@@ -257,7 +257,7 @@ export const CitationBlock: React.FC<CitationBlockProps> = ({
                       {citeIndex}
                     </Button>
                   ) : (
-                    <span className="text-[#9ca3af] text-[10px] ml-0.5">[{citeIndex}]</span>
+                    <span className="text-gray-500 text-[10px] ml-0.5">[{citeIndex}]</span>
                   )}
                 </sup>
               );
@@ -278,7 +278,7 @@ export const CitationBlock: React.FC<CitationBlockProps> = ({
             >
               <span>
                 Policy sources{' '}
-                <span className="text-[#9ca3af] font-normal">
+                <span className="text-gray-500 font-normal">
                   ({displayedCitations.length})
                 </span>
               </span>

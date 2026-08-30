@@ -196,9 +196,9 @@ export const InviteProviderModal: React.FC<InviteProviderModalProps> = ({
                 />
                 <div className="mt-3 space-y-1 max-h-60 overflow-y-auto">
                   {loadingProviders ? (
-                    <p className="text-sm text-[#94a3b8] py-4 text-center">Loading…</p>
+                    <p className="text-sm text-slate-500 py-4 text-center">Loading…</p>
                   ) : filteredProviders.length === 0 ? (
-                    <p className="text-sm text-[#94a3b8] py-4 text-center">No providers found.</p>
+                    <p className="text-sm text-slate-500 py-4 text-center">No providers found.</p>
                   ) : (
                     filteredProviders.map((p) => (
                       <Button unstyled

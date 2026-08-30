@@ -96,9 +96,9 @@ export const CoordinatorChatPanel: React.FC<Props> = ({ caseId }) => {
       )}
 
       <div className="max-h-80 space-y-2 overflow-y-auto pr-1" aria-live="polite">
-        {loading && <p className="text-[13px] text-[#94a3b8]">Loading…</p>}
+        {loading && <p className="text-[13px] text-slate-500">Loading…</p>}
         {!loading && msgs.length === 0 && (
-          <p className="text-[13px] text-[#94a3b8]">
+          <p className="text-[13px] text-slate-500">
             Ask the coordinator about this relocation — visa steps, housing, timelines, or the next best action.
           </p>
         )}
@@ -114,7 +114,7 @@ export const CoordinatorChatPanel: React.FC<Props> = ({ caseId }) => {
             </div>
           </div>
         ))}
-        {sending && <p className="text-[13px] text-[#94a3b8]">Coordinator is thinking…</p>}
+        {sending && <p className="text-[13px] text-slate-500">Coordinator is thinking…</p>}
         <div ref={bottomRef} />
       </div>
 

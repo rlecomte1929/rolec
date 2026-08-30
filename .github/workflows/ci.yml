@@ -220,6 +220,23 @@ jobs:
       # only in a comment, so nothing stopped it. This is the enforcement.
       - name: Check no workflow derives a diff range from a stale base
         run: python scripts/check_workflow_base_sha.py
+      # #2062 added the `fast-gate` aggregator; the five expensive jobs behind it kept a
+      # bare `if:`, so GitHub's skip-propagation silently skipped all five on EVERY run for
+      # five days while every PR reported green (zero executions across 25 runs; 11 PRs
+      # merged untested). #2076 fixed the jobs. This stops the next one reintroducing it.
+      # Lives here, in the always-on job, because the shape can appear in any workflow.
+      - name: Install PyYAML for the job-gating guard
+        run: python -m pip install --quiet pyyaml
+      - name: Check no job's `if:` can be silently overridden by a skipped dependency
+        run: python scripts/check_workflow_job_gating.py --root .
+      # companies.plan_tier was written as {starter,growth,enterprise} and read as
+      # {low,medium,premium}. Zero of 119 production rows matched, so the admin UI showed
+      # every company — including the 3 on `growth` — as bottom-tier "low", and
+      # update_company returned success having written nothing. A TS union cannot constrain
+      # Python; this reads both. Here, not in either test suite, because the frontend and
+      # backend path filters each skip for the other side's edits.
+      - name: Check the company plan-tier vocabulary agrees across Python and TypeScript
+        run: python scripts/check_plan_tier_contract.py --root .
 
   # Frontend build + type-check + lint + unit tests, consolidated into ONE job
   # (was three: frontend-build / frontend-checks / frontend-unit-tests).
@@ -229,10 +246,73 @@ jobs:
   # sequentially instead of in parallel (slower wall-clock) — acceptable since
   # the goal here is billed-minutes, not latency. `main` is not branch-protected,
   # so the old job names were not required status checks.
+  # ── The fast gate ──────────────────────────────────────────────────────────────────
+  # Measured over 90d (2026-08-26): 92 of 616 monthly CI runs fail, and the jobs that fail
+  # most are the CHEAP ones — deliverable-integrity (17 of 52 sampled), route-auth (11),
+  # queue-status-hygiene (9), actionlint (8), gitleaks (5). Meanwhile ~8.3 billable minutes
+  # per doomed run went on frontend/backend/lighthouse jobs that PASSED inside a run already
+  # lost: ~770 min/month paid for a verdict that was already decided.
+  #
+  # Waiting is not billed, only compute is, so gating the expensive jobs on this costs
+  # nothing on a green run (a little extra wall-clock) and skips them entirely on a red one.
+  #
+  # `if: always()` is load-bearing: several upstreams are conditional (actionlint only on
+  # workflow diffs, route-auth only on backend diffs, the Notion checks only when the token
+  # var is set) and a SKIPPED need would otherwise cascade and disable the whole matrix.
+  # Skipped counts as a pass; only failure or cancellation stops the expensive work.
+  fast-gate:
+    name: Fast gate (cheap checks first)
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      # `changes` is here to be CHECKED, not to be waited on. It has no `if:` so it cannot be
+      # skipped, but it CAN fail — it already did once, on the permissions error recorded at
+      # the top of this file. A failed `changes` empties every filter output, which silently
+      # skips all 17 guards gated on it AND the five expensive jobs, while this gate stayed
+      # green because the case below matches only `failure` and `cancelled` on its OWN needs.
+      # That is a fully green run in which almost nothing executed. Checked explicitly below.
+      - changes
+      - actionlint
+      - secrets-scan
+      - repo-hygiene
+      - compliance-claims
+      - route-auth-check
+      - deliverable-integrity
+      - queue-status-hygiene
+    steps:
+      - name: Stop here if a cheap guard already failed
+        env:
+          RESULTS: ${{ join(needs.*.result, ',') }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+        run: |
+          set -euo pipefail
+          echo "upstream results: $RESULTS"
+          echo "changes result:   $CHANGES_RESULT"
+          # Not folded into the case below: `changes` failing is not "a cheap guard failed",
+          # it means every path filter is empty and the whole run is scoped to nothing.
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "::error::Detect changes did not succeed ($CHANGES_RESULT) - every path filter is empty, so nothing downstream can run. Failing rather than reporting a green run that tested nothing."
+            exit 1
+          fi
+          case ",$RESULTS," in
+            *,failure,*|*,cancelled,*)
+              echo "::error::A cheap guard failed - skipping the expensive jobs."
+              exit 1
+              ;;
+          esac
+          echo "cheap guards clear - expensive jobs may run"
+
   frontend:
     name: Frontend (build, types, lint, unit)
-    needs: changes
-    if: needs.changes.outputs.frontend == 'true'
+    needs: [changes, fast-gate]
+    # `!cancelled()` is load-bearing, not decoration. `fast-gate` reaches `success` via
+    # its own `if: always()` even when some cheap guards were skipped — but a skip
+    # propagates transitively to GRANDCHILDREN unless they carry a status function, and
+    # actionlint/route-auth are skipped on almost every PR. Without this, all five
+    # expensive jobs skipped on every run from #2062 until this fix. Keep the explicit
+    # fast-gate result check: that is what still stops the expensive work when a cheap
+    # guard genuinely fails (fast-gate exits 1, result != 'success').
+    if: ${{ !cancelled() && needs.fast-gate.result == 'success' && needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -306,8 +386,15 @@ jobs:
     # injects throwaway VITE_ vars. This preview+Playwright harness is what QG-9
     # (axe) and QG-13 (Lighthouse) reuse.
     name: E2E (Playwright smoke)
-    needs: changes
-    if: needs.changes.outputs.frontend == 'true'
+    needs: [changes, fast-gate]
+    # `!cancelled()` is load-bearing, not decoration. `fast-gate` reaches `success` via
+    # its own `if: always()` even when some cheap guards were skipped — but a skip
+    # propagates transitively to GRANDCHILDREN unless they carry a status function, and
+    # actionlint/route-auth are skipped on almost every PR. Without this, all five
+    # expensive jobs skipped on every run from #2062 until this fix. Keep the explicit
+    # fast-gate result check: that is what still stops the expensive work when a cheap
+    # guard genuinely fails (fast-gate exits 1, result != 'success').
+    if: ${{ !cancelled() && needs.fast-gate.result == 'success' && needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -355,8 +442,15 @@ jobs:
     # AP-12's performance-audit (--with-lighthouse-results). Public, backend-free
     # pages only (/ and /auth — Lighthouse can't mock /api).
     name: Lighthouse (CWV budget)
-    needs: changes
-    if: needs.changes.outputs.frontend == 'true'
+    needs: [changes, fast-gate]
+    # `!cancelled()` is load-bearing, not decoration. `fast-gate` reaches `success` via
+    # its own `if: always()` even when some cheap guards were skipped — but a skip
+    # propagates transitively to GRANDCHILDREN unless they carry a status function, and
+    # actionlint/route-auth are skipped on almost every PR. Without this, all five
+    # expensive jobs skipped on every run from #2062 until this fix. Keep the explicit
+    # fast-gate result check: that is what still stops the expensive work when a cheap
+    # guard genuinely fails (fast-gate exits 1, result != 'success').
+    if: ${{ !cancelled() && needs.fast-gate.result == 'success' && needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -396,8 +490,15 @@ jobs:
 
   backend-tests:
     name: Backend tests (deterministic P1 suite)
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    needs: [changes, fast-gate]
+    # `!cancelled()` is load-bearing, not decoration. `fast-gate` reaches `success` via
+    # its own `if: always()` even when some cheap guards were skipped — but a skip
+    # propagates transitively to GRANDCHILDREN unless they carry a status function, and
+    # actionlint/route-auth are skipped on almost every PR. Without this, all five
+    # expensive jobs skipped on every run from #2062 until this fix. Keep the explicit
+    # fast-gate result check: that is what still stops the expensive work when a cheap
+    # guard genuinely fails (fast-gate exits 1, result != 'success').
+    if: ${{ !cancelled() && needs.fast-gate.result == 'success' && needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: sqlite:///./ci_test.db
@@ -495,8 +596,15 @@ jobs:
   # that conftest's _AUTHORITATIVE_DDL.
   backend-tests-postgres:
     name: Backend tests (Postgres 16 parity)
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    needs: [changes, fast-gate]
+    # `!cancelled()` is load-bearing, not decoration. `fast-gate` reaches `success` via
+    # its own `if: always()` even when some cheap guards were skipped — but a skip
+    # propagates transitively to GRANDCHILDREN unless they carry a status function, and
+    # actionlint/route-auth are skipped on almost every PR. Without this, all five
+    # expensive jobs skipped on every run from #2062 until this fix. Keep the explicit
+    # fast-gate result check: that is what still stops the expensive work when a cheap
+    # guard genuinely fails (fast-gate exits 1, result != 'success').
+    if: ${{ !cancelled() && needs.fast-gate.result == 'success' && needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -1096,6 +1204,13 @@ jobs:
     if: ${{ vars.NOTION_QUEUE_TOKEN_SET == 'true' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The guard asks whether a claimed deliverable EVER existed, via
+          # `git log --all --diff-filter=A`. On a shallow clone that returns almost
+          # nothing and every deliverable looks like it never shipped, so this job
+          # must keep actions/checkout fetch-depth: 0. The script also refuses to
+          # run shallow (exit 3) rather than trust a truncated history.
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v7
         with:

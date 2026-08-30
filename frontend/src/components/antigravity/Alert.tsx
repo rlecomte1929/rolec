@@ -28,7 +28,11 @@ export const Alert: React.FC<AlertProps> = ({
 }) => {
   const variants = {
     info: 'bg-[#eef4f8] border-[#c7d8e6] text-[#0b2b43]',
-    success: 'bg-[#eef7f6] border-[#c6e2df] text-[#1f8e8b]',
+    // accent-500 on this tint is 3.64:1 — below AA. accent-700 is 7.04:1. The #2069
+    // sweep missed it because it matched accent text only against a fixed list of
+    // tint backgrounds and #eef7f6 was not on it; Alert is a shared primitive, so
+    // this one line covers every success alert in the app.
+    success: 'bg-[#eef7f6] border-[#c6e2df] text-[#105d5b]',
     warning: 'bg-[#f6f2e9] border-[#e2d6bf] text-[#7a5e2a]',
     error: 'bg-[#f7eeee] border-[#e6c9c9] text-[#7a2a2a]',
   };

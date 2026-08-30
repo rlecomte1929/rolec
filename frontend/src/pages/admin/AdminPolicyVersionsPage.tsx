@@ -71,7 +71,7 @@ export const AdminPolicyVersionsPage: React.FC = () => {
           <option value="">Select a company…</option>
           {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <span className="text-sm text-slate-400">{versions.length} versions</span>
+        <span className="text-sm text-slate-500">{versions.length} versions</span>
       </div>
 
       {da && db && (
@@ -79,12 +79,12 @@ export const AdminPolicyVersionsPage: React.FC = () => {
           <div className="p-1 text-xs" data-testid="version-diff">
             <p className="mb-2 font-semibold text-navy-800">Compare v{da.version_number} ↔ v{db.version_number}</p>
             <div className="grid grid-cols-3 gap-2">
-              <div className="font-medium text-slate-400">Field</div>
+              <div className="font-medium text-slate-500">Field</div>
               <div className="font-medium text-slate-500">v{da.version_number}</div>
               <div className="font-medium text-slate-500">v{db.version_number}</div>
               {(['status', 'effective_date', 'expiry_date', 'created_at'] as (keyof PolicyVersion)[]).map((k) => (
                 <React.Fragment key={k}>
-                  <div className="text-slate-400">{k}</div>
+                  <div className="text-slate-500">{k}</div>
                   <div className={da[k] !== db[k] ? 'font-medium text-navy-800' : 'text-slate-600'}>{field(da, k)}</div>
                   <div className={da[k] !== db[k] ? 'font-medium text-navy-800' : 'text-slate-600'}>{field(db, k)}</div>
                 </React.Fragment>
@@ -96,7 +96,7 @@ export const AdminPolicyVersionsPage: React.FC = () => {
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-widest text-slate-400">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-widest text-slate-500">
             <tr>
               <th className="px-4 py-2">Diff</th>
               <th className="px-4 py-2">Version</th>
@@ -108,9 +108,9 @@ export const AdminPolicyVersionsPage: React.FC = () => {
           </thead>
           <tbody data-testid="version-rows">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">Loading…</td></tr>
             ) : versions.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">{companyId ? 'No versions.' : 'Select a company.'}</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">{companyId ? 'No versions.' : 'Select a company.'}</td></tr>
             ) : (
               versions.map((v) => (
                 <tr key={v.id} className="border-t border-slate-100">
@@ -120,7 +120,7 @@ export const AdminPolicyVersionsPage: React.FC = () => {
                   <td className="px-4 py-2 font-medium text-slate-700">v{v.version_number}</td>
                   <td className="px-4 py-2"><Badge variant={statusTone(v.status)} size="sm">{v.status}</Badge></td>
                   <td className="px-4 py-2 text-slate-500">{v.effective_date || '—'}</td>
-                  <td className="px-4 py-2 text-slate-400">{v.created_at ? v.created_at.slice(0, 10) : '—'}</td>
+                  <td className="px-4 py-2 text-slate-500">{v.created_at ? v.created_at.slice(0, 10) : '—'}</td>
                   <td className="px-4 py-2 text-right">
                     {v.status !== 'published' && (
                       <button className="text-xs font-medium text-accent-700 hover:text-accent-800" onClick={() => void onRollback(v)}>

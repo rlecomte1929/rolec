@@ -13,9 +13,9 @@ const pct = (v: number | null): string => (v === null || v === undefined ? '—'
 
 const Tile: React.FC<{ label: string; value: string; sub?: string }> = ({ label, value, sub }) => (
   <Card className="border border-slate-200">
-    <p className="text-xs font-medium text-slate-400">{label}</p>
+    <p className="text-xs font-medium text-slate-500">{label}</p>
     <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
-    {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+    {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
   </Card>
 );
 
@@ -51,7 +51,7 @@ export const AdminAutopilotMetricsPage: React.FC = () => {
       title="Autopilot"
       subtitle="Feedback → dedup → fix → merge funnel, cost against the monthly ceiling, and quality KPIs. Populates as the automation runs."
     >
-      {loading && <p className="text-sm text-slate-400">Loading…</p>}
+      {loading && <p className="text-sm text-slate-500">Loading…</p>}
 
       {error && <Alert variant="error" title="Failed to load">{error}</Alert>}
 
@@ -84,7 +84,7 @@ export const AdminAutopilotMetricsPage: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               {FUNNEL.map((f) => (
                 <div key={f.key} className="rounded-lg border border-slate-200 px-3 py-2 min-w-[92px]">
-                  <p className="text-xs text-slate-400">{f.label}</p>
+                  <p className="text-xs text-slate-500">{f.label}</p>
                   <p className="text-lg font-semibold text-slate-900 tabular-nums">{num(data.funnel[f.key] ?? 0)}</p>
                 </div>
               ))}

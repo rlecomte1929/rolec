@@ -23,15 +23,53 @@ const BLOCKING_IMPACTS = new Set(['serious', 'critical']);
  * Call AFTER the page has settled (e.g. an `await expect(locator).toBeVisible()`)
  * so axe scans the fully-rendered DOM.
  */
+/**
+ * Wait for CSS transitions/animations to finish before scanning.
+ *
+ * Without this, axe samples elements mid-animation. The marketing pages wrap almost
+ * everything in `FadeIn` (a staggered opacity transition), and a scan taken during the
+ * ramp reports every faded element as a contrast failure — ~50 phantom violations in one
+ * 12-route sweep. Chromium's getAnimations() includes CSS transitions, which is what
+ * FadeIn uses.
+ *
+ * Bounded by a timeout: an intentionally infinite animation (a spinner, a pulse) would
+ * otherwise hang the gate forever.
+ */
+async function settleAnimations(page: Page, timeoutMs = 4000): Promise<void> {
+  await page.evaluate(async (ms) => {
+    const deadline = Date.now() + ms;
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
+    // Awaiting getAnimations() ONCE is not enough, and the difference is a flaky gate rather
+    // than a caught bug. A CSS transition only enters getAnimations() after it has started,
+    // so a scan that lands between mount and first frame sees an empty list, returns at once,
+    // and axe then measures a half-faded element: /hr/welcome reported 13 colour-contrast
+    // violations whose "foreground" values (#a2c8c8 for accent-600, #9eacb6 for navy-800)
+    // are composited mid-fade colours that exist in no stylesheet. Same phantom class the
+    // helper was added for. So: drain, yield a frame, and require the list to come back
+    // empty TWICE in a row before calling it settled.
+    let consecutiveClear = 0;
+    while (Date.now() < deadline && consecutiveClear < 2) {
+      const running = document.getAnimations();
+      if (running.length === 0) {
+        consecutiveClear += 1;
+        await frame();
+        continue;
+      }
+      consecutiveClear = 0;
+      await Promise.race([
+        Promise.all(running.map((a) => a.finished.catch(() => undefined))),
+        new Promise((r) => setTimeout(r, Math.max(0, deadline - Date.now()))),
+      ]);
+      await frame();
+    }
+  }, timeoutMs);
+}
+
 export async function expectNoSeriousA11yViolations(page: Page): Promise<void> {
+  await settleAnimations(page);
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-    // color-contrast is excluded from this gate: it's a large, separately-owned
-    // design-system sweep (A11Y-2 / AIQ-1211 — ~490 `text-slate-400` usages),
-    // not a discrete regression. Keeping it here would make the gate perma-red
-    // and block unrelated PRs. The gate still enforces every OTHER serious/
-    // critical rule; drop this exclusion once A11Y-2 lands.
-    .disableRules(['color-contrast'])
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
     .analyze();
 
   const blocking = results.violations.filter((v) => BLOCKING_IMPACTS.has(v.impact ?? ''));

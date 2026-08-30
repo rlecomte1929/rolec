@@ -145,7 +145,7 @@ export const StepDocuments: React.FC<Props> = ({
               >
                 <div>
                   <span className="font-medium text-slate-800">{visa.label}</span>
-                  <span className="ml-2 text-xs text-slate-400">{visa.description}</span>
+                  <span className="ml-2 text-xs text-slate-500">{visa.description}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {selected.length > 0 && (
@@ -154,7 +154,7 @@ export const StepDocuments: React.FC<Props> = ({
                     </span>
                   )}
                   <svg
-                    className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -202,7 +202,7 @@ export const StepDocuments: React.FC<Props> = ({
                             <Button unstyled
                               type="button"
                               onClick={() => removeDoc(visa.key, d)}
-                              className="text-slate-400 hover:text-red-500 transition-colors ml-0.5"
+                              className="text-slate-500 hover:text-red-500 transition-colors ml-0.5"
                               aria-label={`Remove ${d}`}
                             >
                               ×
@@ -236,7 +236,7 @@ export const StepDocuments: React.FC<Props> = ({
 
                   {/* Summary */}
                   {selected.length > 0 && (
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-slate-500">
                       Required:{' '}
                       {selected.map((d) => docLabel(d)).join(', ')}
                     </p>

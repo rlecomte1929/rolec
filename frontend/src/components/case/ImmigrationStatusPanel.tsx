@@ -159,7 +159,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
 
   if (loading) {
     return (
-      <div className="py-6 text-center text-sm text-[#94a3b8]">
+      <div className="py-6 text-center text-sm text-slate-500">
         Loading immigration status…
       </div>
     );
@@ -192,7 +192,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
               ? `Immigration guidance for ${immData.corridor} isn't available yet`
               : "Immigration guidance for this corridor isn't available yet"}
           </p>
-          <p className="mt-1 text-xs text-[#94a3b8]">
+          <p className="mt-1 text-xs text-slate-500">
             We don&apos;t yet have a verified document checklist for this corridor and
             visa type, so none is shown.
           </p>
@@ -222,7 +222,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
           </p>
           {/* BUG-260706-4DE4: explain WHY it's empty and offer the action, instead of a
               bare "not started" that reads as broken. */}
-          <p className="mt-1 text-xs text-[#94a3b8]">
+          <p className="mt-1 text-xs text-slate-500">
             We publish verified document checklists per corridor and visa type. This
             case&apos;s corridor isn&apos;t covered yet — request it and our team will add the
             checklist here.
@@ -276,7 +276,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
 
       {/* ── 1. Document checklist ───────────────────────────────────────────── */}
       <section>
-        <div className="text-xs font-semibold uppercase tracking-wide text-[#94a3b8] mb-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
           Document checklist ({immData.document_count})
         </div>
         <ul className="space-y-2">
@@ -296,7 +296,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
                     </span>
                   )}
                   {req.requires_translation && (
-                    <span className="rounded-full border border-[#d2eceb] bg-[#ebf7f6] px-2 py-0.5 text-xs text-[#1f8e8b]">
+                    <span className="rounded-full border border-[#d2eceb] bg-[#ebf7f6] px-2 py-0.5 text-xs text-[#105d5b]">
                       Translation
                     </span>
                   )}
@@ -306,7 +306,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
                     </span>
                   )}
                 </div>
-                <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-[#94a3b8]">
+                <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-slate-500">
                   {req.freshness_days != null && (
                     <span>Valid ≤{req.freshness_days}d</span>
                   )}
@@ -330,7 +330,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
       {/* ── 2. Risk flags ──────────────────────────────────────────────────── */}
       {immData.risk_flags.length > 0 && (
         <section>
-          <div className="text-xs font-semibold uppercase tracking-wide text-[#94a3b8] mb-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
             Risk flags
           </div>
           <div className="space-y-2">
@@ -377,12 +377,12 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
 
       {/* ── 3. Interview progress ───────────────────────────────────────────── */}
       <section>
-        <div className="text-xs font-semibold uppercase tracking-wide text-[#94a3b8] mb-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
           Employee interview progress
         </div>
         <div className="rounded-lg border border-[#e2e8f0] bg-white px-4 py-3">
           {!interview?.has_session ? (
-            <p className="text-sm text-[#94a3b8]">Interview not started by employee yet.</p>
+            <p className="text-sm text-slate-500">Interview not started by employee yet.</p>
           ) : (
             <>
               <div className="flex items-center justify-between mb-2">
@@ -402,7 +402,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
                 />
               </div>
               {interview.last_active_at && (
-                <p className="mt-1.5 text-xs text-[#94a3b8]">
+                <p className="mt-1.5 text-xs text-slate-500">
                   Last active: {new Date(interview.last_active_at).toLocaleDateString()}
                 </p>
               )}
@@ -435,10 +435,10 @@ const QuickActions: React.FC<{
       type="button"
       disabled
       title="Form generation available in Phase 3"
-      className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-1.5 text-xs font-medium text-[#94a3b8] cursor-not-allowed"
+      className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-1.5 text-xs font-medium text-slate-500 cursor-not-allowed"
     >
       Generate pre-filled form
-      <span className="ml-1.5 rounded-full bg-[#f1f5f9] px-1.5 py-0.5 text-[10px] font-normal text-[#94a3b8]">
+      <span className="ml-1.5 rounded-full bg-[#f1f5f9] px-1.5 py-0.5 text-[10px] font-normal text-slate-500">
         Phase 3
       </span>
     </Button>

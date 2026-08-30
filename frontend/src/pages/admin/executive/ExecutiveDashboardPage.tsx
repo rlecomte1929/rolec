@@ -61,7 +61,7 @@ export const ExecutiveDashboardPage: React.FC = () => {
   // unavailable") after a 429. Use MetricValue's own documented override: a muted dash,
   // with the page-level error + Retry carrying the actual explanation.
   const failFallback = loadFailed
-    ? <span className="text-base font-medium text-slate-300">—</span>
+    ? <span className="text-base font-medium text-slate-500">—</span>
     : undefined;
 
   const cost = num(data?.ai_cost, 'total_cost_usd');
@@ -106,13 +106,13 @@ export const ExecutiveDashboardPage: React.FC = () => {
         <Card>
           <div className="p-1" data-testid="ai-health">
             <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">AI health</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">AI health</p>
               <Badge variant={source(data?.ai_health, loadFailed) === 'live' ? 'success' : 'neutral'} size="sm">{source(data?.ai_health, loadFailed)}</Badge>
             </div>
             <p className="mt-2 text-3xl font-semibold text-navy-800">
-              {num(data?.ai_health, 'score') ?? '—'}<span className="text-base text-slate-400"> / 100</span>
+              {num(data?.ai_health, 'score') ?? '—'}<span className="text-base text-slate-500"> / 100</span>
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-slate-500">
               {data?.ai_health?.healthy ?? '—'} of {data?.ai_health?.total ?? '—'} eval metrics healthy
             </p>
           </div>
@@ -121,7 +121,7 @@ export const ExecutiveDashboardPage: React.FC = () => {
         <Card>
           <div className="p-1" data-testid="reliability">
             <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Reliability</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Reliability</p>
               <Badge variant="warning" size="sm">not instrumented</Badge>
             </div>
             <p className="mt-2 text-xs text-slate-500">{data?.reliability?.note ?? 'Error rate / latency not tracked in-platform yet.'}</p>
@@ -131,7 +131,7 @@ export const ExecutiveDashboardPage: React.FC = () => {
         <Card>
           <div className="p-1" data-testid="nps">
             <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">NPS / CSAT</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">NPS / CSAT</p>
               <Badge variant="warning" size="sm">not instrumented</Badge>
             </div>
             <p className="mt-2 text-xs text-slate-500">{data?.nps?.note ?? 'No customer-satisfaction instrumentation yet.'}</p>

@@ -136,7 +136,7 @@ export const AdminSourceChangeReviewsPage: React.FC = () => {
                       {review.source_url}
                     </a>
                   )}
-                  <div className="mt-1 text-xs text-slate-400">
+                  <div className="mt-1 text-xs text-slate-500">
                     rule_version {review.rule_version_id || '-'}
                     {review.created_at ? ` · detected ${new Date(review.created_at).toLocaleString()}` : ''}
                   </div>
@@ -173,7 +173,7 @@ export const AdminSourceChangeReviewsPage: React.FC = () => {
 
               <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div>
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Before
                   </div>
                   <pre className="whitespace-pre-wrap rounded-lg bg-red-50 p-3 text-sm text-slate-700">
@@ -181,7 +181,7 @@ export const AdminSourceChangeReviewsPage: React.FC = () => {
                   </pre>
                 </div>
                 <div>
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     After
                   </div>
                   <pre className="whitespace-pre-wrap rounded-lg bg-green-50 p-3 text-sm text-slate-700">

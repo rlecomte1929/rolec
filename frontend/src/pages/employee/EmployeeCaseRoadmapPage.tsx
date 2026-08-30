@@ -345,11 +345,43 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     );
   }
 
+  // [BUG-260817-4CD6] "chat disappeared". The policy assistant used to be mounted ONLY in
+  // the final happy-path return, so every early return below silently dropped it — including
+  // the `!planReady` branch, which can hold for the full ~60s polling window and is terminal
+  // when generation fails. The chat vanished at exactly the moment someone most wants to ask
+  // why their roadmap is empty. Wrapping the branches in one shell keeps it reachable.
+  //
+  // The three paywall returns above are deliberately NOT wrapped: whether to offer chat on a
+  // commercial gate is a product decision, not a bug fix.
+  const withAssistant = (children: React.ReactNode) => (
+    <AppShell>
+      <PolicyAssistantDockedShell
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        title="Ask about your policy"
+        subtitle="Bounded Q&A on your published policy."
+        titleId="employee-roadmap-assistant-shell-title"
+        assistant={() => (
+          <EmployeePolicyAssistantPanel
+            assignmentId={caseId ?? ''}
+            assignmentLoading={false}
+            variant="embedded"
+          />
+        )}
+      >
+        {children}
+      </PolicyAssistantDockedShell>
+      <PolicyAssistantFab
+        label="Ask about your policy"
+        isPanelOpen={assistantOpen}
+        onClick={() => setAssistantOpen((v) => !v)}
+      />
+    </AppShell>
+  );
+
   if (loading && !data && !genStarted) {
-    return (
-      <AppShell>
-        <div style={{ padding: '24px', color: 'var(--text-muted)' }}>Loading roadmap…</div>
-      </AppShell>
+    return withAssistant(
+      <div style={{ padding: '24px', color: 'var(--text-muted)' }}>Loading roadmap…</div>,
     );
   }
 
@@ -362,16 +394,16 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     const errorStatus =
       (error as { response?: { status?: number } } | null)?.response?.status ?? null;
     const variant = resolveRoadmapBuildVariant(windowElapsed, error != null, errorStatus);
-    return (
-      <AppShell>
-        <div className="mx-auto max-w-5xl px-6 py-6">
-          <RoadmapBeingBuilt
-            variant={variant}
-            onMessageTeam={() => navigate(buildRoute('messages'))}
-            onRetry={variant === 'failed' ? retryFetch : variant === 'empty' ? retryGeneration : undefined}
-          />
-        </div>
-      </AppShell>
+    // [BUG-260817-4CD6] The branch that most needs the assistant: it holds for the whole
+    // retry window and is terminal on a failed or empty plan.
+    return withAssistant(
+      <div className="mx-auto max-w-5xl px-6 py-6">
+        <RoadmapBeingBuilt
+          variant={variant}
+          onMessageTeam={() => navigate(buildRoute('messages'))}
+          onRetry={variant === 'failed' ? retryFetch : variant === 'empty' ? retryGeneration : undefined}
+        />
+      </div>,
     );
   }
 

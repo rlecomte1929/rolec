@@ -231,7 +231,7 @@ function CoverageHeatmap({ coverage }: { coverage: CoverageEntry[] }) {
   const categories = [...new Set(coverage.map((c) => c.category))];
   const countries = [...new Set(coverage.map((c) => c.country))].sort();
   if (categories.length === 0 || countries.length === 0) {
-    return <div className="py-6 text-center text-[12px] text-slate-400">No coverage data available.</div>;
+    return <div className="py-6 text-center text-[12px] text-slate-500">No coverage data available.</div>;
   }
   const byKey = new Map(coverage.map((c) => [`${c.category}|${c.country}`, c]));
   const cellCls = (status: string | undefined) =>
@@ -243,7 +243,7 @@ function CoverageHeatmap({ coverage }: { coverage: CoverageEntry[] }) {
           <tr>
             <th />
             {countries.map((co) => (
-              <th key={co} className="px-1 text-[10px] font-medium text-slate-400">{co}</th>
+              <th key={co} className="px-1 text-[10px] font-medium text-slate-500">{co}</th>
             ))}
           </tr>
         </thead>
@@ -284,7 +284,7 @@ function CoverageHeatmap({ coverage }: { coverage: CoverageEntry[] }) {
 
 function Watchlist({ vendors }: { vendors: { vendor: FlatVendor; reasons: string[] }[] }) {
   if (vendors.length === 0) {
-    return <div className="py-6 text-center text-[12px] text-slate-400">No vendors need attention.</div>;
+    return <div className="py-6 text-center text-[12px] text-slate-500">No vendors need attention.</div>;
   }
   return (
     <ul className="divide-y divide-slate-100">
@@ -292,7 +292,7 @@ function Watchlist({ vendors }: { vendors: { vendor: FlatVendor; reasons: string
         <li key={`${vendor.id}-${vendor.category}`} className="flex items-center gap-3 px-1 py-2.5">
           <span className="min-w-0 flex-1">
             <span className="text-[13px] font-medium text-[#0b2b43]">{vendor.name}</span>
-            <span className="ml-2 text-[11px] text-slate-400">
+            <span className="ml-2 text-[11px] text-slate-500">
               {fmtCat(vendor.category)} · {fmtRating(vendor.rating)}★ · {fmtCost(vendor.cost_eur)} · {fmtSla(vendor.response_sla_hours)}
             </span>
           </span>
@@ -341,9 +341,9 @@ function Kpi({ label, value, sub, tone = 'default' }: {
     : tone === 'success' ? 'text-emerald-600' : 'text-slate-900';
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">{label}</p>
       <p className={`mt-1 text-[24px] font-semibold leading-none tabular-nums ${numCls}`}>{value}</p>
-      {sub && <p className="mt-1 text-[11px] text-slate-400">{sub}</p>}
+      {sub && <p className="mt-1 text-[11px] text-slate-500">{sub}</p>}
     </div>
   );
 }
@@ -351,7 +351,7 @@ function Kpi({ label, value, sub, tone = 'default' }: {
 // ── Vendor card ───────────────────────────────────────────────────────────────
 
 function VendorCard({ vendor }: { vendor: VendorEntry }) {
-  const ratingCls = vendor.rating == null ? 'text-slate-400'
+  const ratingCls = vendor.rating == null ? 'text-slate-500'
     : vendor.rating >= 4.3 ? 'text-emerald-700'
     : vendor.rating >= 3.8 ? 'text-amber-700'
     : 'text-red-600';
@@ -361,7 +361,7 @@ function VendorCard({ vendor }: { vendor: VendorEntry }) {
       {/* Header */}
       <div className="px-3 py-2.5 border-b border-slate-100">
         <p className="font-medium text-[#0b2b43] truncate" title={vendor.name}>{vendor.name}</p>
-        <p className="text-[11px] text-slate-400 mt-0.5 truncate">{vendor.location}</p>
+        <p className="text-[11px] text-slate-500 mt-0.5 truncate">{vendor.location}</p>
         <div className="flex items-center gap-2 mt-1.5">
           <span className={`text-[15px] font-semibold ${ratingCls}`}>{fmtRating(vendor.rating)}</span>
           {vendor.rating != null && <StarRow rating={vendor.rating} />}
@@ -372,31 +372,31 @@ function VendorCard({ vendor }: { vendor: VendorEntry }) {
       <div className="grid grid-cols-3 divide-x divide-slate-100 bg-slate-50">
         <div className="px-2 py-1.5 text-center">
           <p className="text-[13px] font-medium text-slate-800">{vendor.review_count}</p>
-          <p className="text-[10px] text-slate-400">reviews</p>
+          <p className="text-[10px] text-slate-500">reviews</p>
         </div>
         <div className="px-2 py-1.5 text-center">
           <p className="text-[13px] font-medium text-slate-800">{fmtCost(vendor.cost_eur)}</p>
-          <p className="text-[10px] text-slate-400">avg cost</p>
+          <p className="text-[10px] text-slate-500">avg cost</p>
         </div>
         <div className="px-2 py-1.5 text-center">
           <p className="text-[13px] font-medium text-slate-800">{fmtSla(vendor.response_sla_hours)}</p>
-          <p className="text-[10px] text-slate-400">response</p>
+          <p className="text-[10px] text-slate-500">response</p>
         </div>
       </div>
 
       {/* Reviews */}
       {vendor.recent_reviews.length === 0 ? (
-        <div className="px-3 py-2 text-[11px] text-slate-400 italic">No reviews yet</div>
+        <div className="px-3 py-2 text-[11px] text-slate-500 italic">No reviews yet</div>
       ) : (
         <div className="divide-y divide-slate-100">
-          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
             Recent reviews
           </p>
           {vendor.recent_reviews.map((r, idx) => (
             <div key={idx} className="px-3 py-2">
               <div className="flex items-center justify-between mb-0.5">
                 <StarRow rating={r.score} size={10} />
-                <span className="text-[10px] text-slate-400">{r.date}</span>
+                <span className="text-[10px] text-slate-500">{r.date}</span>
               </div>
               {r.comment && (
                 <p className="text-[11px] text-slate-500 leading-tight line-clamp-3">{r.comment}</p>
@@ -436,7 +436,7 @@ function CategoryRow({
       >
         <span className="flex-1 min-w-0">
           <span className="text-sm font-medium text-[#0b2b43]">{fmtCat(cat.category)}</span>
-          <span className="ml-2 text-[11px] text-slate-400">
+          <span className="ml-2 text-[11px] text-slate-500">
             {cat.vendor_count} vendor{cat.vendor_count !== 1 ? 's' : ''}
             {cat.avg_cost_eur != null ? ` · avg ${fmtCost(cat.avg_cost_eur)}/case` : ''}
           </span>
@@ -450,7 +450,7 @@ function CategoryRow({
           {meta.label}
         </span>
         <svg
-          className={`h-4 w-4 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
+          className={`h-4 w-4 text-slate-500 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
           viewBox="0 0 16 16" fill="none" aria-hidden="true"
         >
           <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
@@ -460,7 +460,7 @@ function CategoryRow({
       {open && (
         <div className="bg-slate-50 px-4 py-3 border-b border-slate-100">
           {filteredVendors.length === 0 ? (
-            <p className="text-sm text-slate-400 py-2">No vendors match the filter.</p>
+            <p className="text-sm text-slate-500 py-2">No vendors match the filter.</p>
           ) : (
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
               {filteredVendors.map((v) => (
@@ -700,7 +700,10 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             id="vp-cat-filter"
             value={catFilter}
             onChange={(e) => { setCatFilter(e.target.value); setOpenCats(new Set()); }}
-            className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
+            /* w-44: a native select sizes to its widest option, so this grew when the real
+               category names replaced the lone "All services" — shoving the Vendor input
+               right and wrapping the count span onto a second row. */
+            className="w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
           >
             <option value="all">All services</option>
             {(data?.categories ?? []).map((c) => (
@@ -708,22 +711,24 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             ))}
           </select>
         </div>
-        {regionOptions.length > 0 && (
-          <div className="flex items-center gap-2">
+        {/* Rendered unconditionally: regionOptions derives from the API response, so
+            gating on it made the whole ~150px group appear late and slide everything
+            after it sideways. Disabled while empty instead. */}
+        <div className="flex items-center gap-2">
             <label htmlFor="vp-region-filter" className="text-[12px] font-medium text-slate-500">Region</label>
             <select
               id="vp-region-filter"
               value={regionFilter}
               onChange={(e) => { setRegionFilter(e.target.value); setOpenCats(new Set()); }}
-              className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
+              disabled={regionOptions.length === 0}
+              className="w-40 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 shadow-none focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] disabled:opacity-60"
             >
               <option value="all">All regions</option>
               {regionOptions.map((code) => (
                 <option key={code} value={code}>{code}</option>
               ))}
             </select>
-          </div>
-        )}
+        </div>
         <div className="flex items-center gap-2">
           <label htmlFor="vp-vendor-filter" className="text-[12px] font-medium text-slate-500">Vendor</label>
           <input
@@ -732,7 +737,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             placeholder="Filter by name…"
             value={vendorFilter}
             onChange={(e) => setVendorFilter(e.target.value)}
-            className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] w-40"
+            className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] text-slate-700 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] w-40"
           />
         </div>
         {(catFilter !== 'all' || regionFilter !== 'all' || vendorFilter) && (
@@ -740,12 +745,12 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             unstyled
             type="button"
             onClick={() => { setCatFilter('all'); setRegionFilter('all'); setVendorFilter(''); setOpenCats(new Set()); }}
-            className="text-[12px] text-slate-400 hover:text-slate-600 underline-offset-2 hover:underline"
+            className="text-[12px] text-slate-500 hover:text-slate-600 underline-offset-2 hover:underline"
           >
             Clear filters
           </Button>
         )}
-        <span className="ml-auto text-[12px] text-slate-400">
+        <span className="ml-auto text-[12px] text-slate-500">
           {filteredCats.length} categor{filteredCats.length !== 1 ? 'ies' : 'y'}
           {' · '}
           {filteredCats.reduce((s, c) => s + c.vendors.filter((v) =>
@@ -760,7 +765,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
           <div className="mb-2">
             <p className="text-[13px] font-medium text-[#0b2b43]">Cases handled per month</p>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-500">
               From employee reviews · {catFilter !== 'all' ? fmtCat(catFilter) : 'all categories'}
             </p>
           </div>
@@ -775,14 +780,14 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
           <div className="mb-2">
             <p className="text-[13px] font-medium text-[#0b2b43]">Avg cost per case by category</p>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-500">
               Current pricing · cost history tracked per case from this point
             </p>
           </div>
           {loading ? (
             <div className="h-[124px] animate-pulse rounded bg-slate-100" />
           ) : costChartData.length === 0 ? (
-            <div className="flex h-[124px] items-center justify-center text-[12px] text-slate-400">
+            <div className="flex h-[124px] items-center justify-center text-[12px] text-slate-500">
               No cost data available for selected filter
             </div>
           ) : (
@@ -796,12 +801,12 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
           <div className="mb-2">
             <p className="text-[13px] font-medium text-[#0b2b43]">Cost trend</p>
-            <p className="text-[11px] text-slate-400">Avg vendor cost over time · {range}</p>
+            <p className="text-[11px] text-slate-500">Avg vendor cost over time · {range}</p>
           </div>
           {loading ? (
             <div className="h-[120px] animate-pulse rounded bg-slate-100" />
           ) : costTrendData.length < 2 ? (
-            <div className="flex h-[120px] items-center justify-center px-4 text-center text-[12px] text-slate-400">
+            <div className="flex h-[120px] items-center justify-center px-4 text-center text-[12px] text-slate-500">
               Collecting data — the trend line appears once the nightly snapshot has run for 2+ days.
             </div>
           ) : (
@@ -812,12 +817,12 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
           <div className="mb-2">
             <p className="text-[13px] font-medium text-[#0b2b43]">Avg review score</p>
-            <p className="text-[11px] text-slate-400">Mean vendor rating over time · {range}</p>
+            <p className="text-[11px] text-slate-500">Mean vendor rating over time · {range}</p>
           </div>
           {loading ? (
             <div className="h-[120px] animate-pulse rounded bg-slate-100" />
           ) : ratingTrendData.length < 2 ? (
-            <div className="flex h-[120px] items-center justify-center px-4 text-center text-[12px] text-slate-400">
+            <div className="flex h-[120px] items-center justify-center px-4 text-center text-[12px] text-slate-500">
               Collecting data — the trend line appears once the nightly snapshot has run for 2+ days.
             </div>
           ) : (
@@ -831,14 +836,14 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
           <div className="mb-2">
             <p className="text-[13px] font-medium text-[#0b2b43]">Cost vs rating</p>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-500">
               Each dot is a vendor · bottom-right = expensive and weak
             </p>
           </div>
           {loading ? (
             <div className="h-[200px] animate-pulse rounded bg-slate-100" />
           ) : scatterPoints.length === 0 ? (
-            <div className="flex h-[200px] items-center justify-center text-[12px] text-slate-400">
+            <div className="flex h-[200px] items-center justify-center text-[12px] text-slate-500">
               No vendors with both cost and rating data
             </div>
           ) : (
@@ -849,7 +854,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
           <div className="mb-2">
             <p className="text-[13px] font-medium text-[#0b2b43]">Watchlist</p>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-500">
               Vendors flagged for low rating, high cost, or slow response
             </p>
           </div>
@@ -865,7 +870,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
       <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
         <div className="mb-3">
           <p className="text-[13px] font-medium text-[#0b2b43]">Coverage by destination</p>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             Active vendors per category × country — red cells are where to qualify more
           </p>
         </div>
@@ -883,7 +888,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             <p className="text-[13px] font-medium text-[#0b2b43]">
               Vendor roster — click a category to expand
             </p>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-500">
               Ratings, costs, and recent employee reviews per vendor
             </p>
           </div>
@@ -909,7 +914,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
         )}
 
         {!loading && filteredCats.length === 0 && (
-          <div className="px-4 py-8 text-center text-sm text-slate-400">
+          <div className="px-4 py-8 text-center text-sm text-slate-500">
             No vendor categories found.
           </div>
         )}
@@ -960,7 +965,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
           aggregation. Ratings/review counts are indicative sample data; per-case
           prices and review history populate from real assignments over time. */}
       <details className="rounded-lg border border-slate-200 bg-white overflow-hidden text-[12px] text-slate-600">
-        <summary className="cursor-pointer px-4 py-3 font-medium text-[#0b2b43] marker:text-slate-400">
+        <summary className="cursor-pointer px-4 py-3 font-medium text-[#0b2b43] marker:text-slate-500">
           About this data
         </summary>
         <div className="border-t border-slate-100 px-4 py-3 space-y-2">

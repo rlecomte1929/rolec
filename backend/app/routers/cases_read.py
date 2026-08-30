@@ -340,6 +340,11 @@ class _DossierFormTemplate(BaseModel):
     # When != 'en' the dossier offers a label-only translation toggle; identifier
     # VALUES are never translated.
     source_language: Optional[str] = "en"
+    # [BUG-260706-ECA9] Whether form_templates.original_pdf_url is actually populated.
+    # The dossier offered "View original PDF" unconditionally, but only 1 of 86 templates
+    # in production carries an original, so 85 of 86 clicks hit the endpoint's 404. The
+    # card cannot know without being told — hence this flag rather than a UI guess.
+    has_original_pdf: bool = False
     # [P1-05 checklist] Required supporting documents, derived from the template
     # fields that carry requires_original=true. Each item: {"key","label","format"}
     # where format (from the field's optional doc_format) may be None. [AIQ-1257a]
@@ -622,6 +627,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             source_tier=(str(row["source_tier"]) if row.get("source_tier") is not None else None),  # [P3-04e-FU]
             verification_status=(row.get("template_verification_status") or "representative"),  # [WS1]
             source_language=(row.get("template_source_language") or "en"),  # [AIQ-1757]
+            has_original_pdf=bool(row.get("template_original_pdf_url")),  # [BUG-260706-ECA9]
             required_documents=required_documents,  # [P1-05 checklist]
             sections=_parse_sections(row.get("template_sections")),  # [S1]
         )
@@ -724,6 +730,10 @@ def _load_form_with_template(
                    -- lookup would silently find nothing and the sheet would render
                    -- English-only with no error to notice.
                    ft.source_language AS template_source_language,
+                   -- [BUG-260706-ECA9] Drives has_original_pdf so the dossier only offers
+                   -- "View original PDF" when one actually exists. Unselected, the flag is
+                   -- always false and the button would vanish for every form.
+                   ft.original_pdf_url AS template_original_pdf_url,
                    cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes
             FROM {_pg_table('case_forms')} cf
             -- [P4-3] LEFT JOIN so ad-hoc forms (form_template_id IS NULL) still appear.
@@ -1498,6 +1508,7 @@ def _load_case_form_summaries(
           ft.source_url AS template_source_url,
           ft.verification_status AS template_verification_status,
           ft.source_language AS template_source_language,
+          ft.original_pdf_url AS template_original_pdf_url,  -- [BUG-260706-ECA9]
           sp.last_fetched_at AS source_last_verified,
           sp.tier AS source_tier,
           rs.title AS roadmap_step_title,

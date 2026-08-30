@@ -219,26 +219,39 @@ export const AdminAssignments: React.FC = () => {
       subtitle="Select a company to view and manage assignments"
     >
       <Card padding="lg" className="mb-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+        {/* [BUG-260816-BEF6] "the employee field is overlaping the company name".
+            A grid item defaults to min-width:auto, and a <select> takes its intrinsic
+            width from its LONGEST OPTION. Company names here run to 34 chars
+            ("Google Ireland T18-A-1786634420882"), so the Company select grew past its
+            track and sat 50px UNDER the Employee search input — measured on production.
+            `min-w-0` lets the track shrink; `fullWidth` makes each control fill its own
+            track instead of its content. Both are needed: without min-w-0 the track
+            still sizes to the longest option. Any Select with long options in a grid
+            has the same failure mode. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end [&>*]:min-w-0">
           <Select
+            fullWidth
             label="Company"
             value={filters.company_id}
             onChange={(v) => setFilters((f) => ({ ...f, company_id: v }))}
             options={[{ value: '', label: 'Select company' }, ...companies.map((c) => ({ value: c.id, label: c.name ?? c.id }))]}
           />
           <Input
+            fullWidth
             label="Employee search"
             value={filters.employee_search}
             onChange={(v) => setFilters((f) => ({ ...f, employee_search: v }))}
             placeholder="Name or identifier"
           />
           <Select
+            fullWidth
             label="Status"
             value={filters.status}
             onChange={(v) => setFilters((f) => ({ ...f, status: v }))}
             options={STATUS_OPTIONS}
           />
           <Select
+            fullWidth
             label="Destination country"
             value={filters.destination_country}
             onChange={(v) => setFilters((f) => ({ ...f, destination_country: v }))}
@@ -906,7 +919,7 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
                       <Button size="sm" variant="outline" onClick={doUnlockCase} disabled={!reason.trim() || unlockBusy}>
                         {unlockBusy ? 'Unlocking…' : 'Unlock case (reactivate)'}
                       </Button>
-                      <span className="text-xs text-[#94a3b8]">case status: {detail.case_status ?? '—'}</span>
+                      <span className="text-xs text-slate-500">case status: {detail.case_status ?? '—'}</span>
                     </div>
                   )}
                   {unlockMsg && <p className="text-xs text-[#6b7280]">{unlockMsg}</p>}

@@ -259,6 +259,72 @@ def classify_source(source_url: str) -> str:
     return UNOFFICIAL
 
 
+# Single-segment paths that address a SITE rather than a rule. `classify_source` cannot see
+# these because it only ever looks at the host: `https://www.urssaf.fr/accueil` is served by a
+# statutory publisher and identifies nothing.
+_HOMEPAGE_SEGMENTS = frozenset(
+    {"accueil", "home", "index", "index.html", "index.htm", "en", "fr", "de", "no", "es", "nl"}
+)
+
+# A directory record — a contact card for an office — is not a normative page. The ws 630
+# fabrication was cited to one of these.
+_DIRECTORY_HOSTS = ("lannuaire.service-public.gouv.fr", "lannuaire.service-public.fr")
+_DIRECTORY_SEGMENTS = frozenset({"centres-contact", "annuaire"})
+
+#: Citation forms that are not URLs and resolve anyway. NOT REJECTED: a bare UUID. It looks like a dangling reference and is not one —
+# `requirement_items.citations_json` legitimately carries three formats (raw URL,
+# `source_records` UUID, `immigration_rule.*` corpus ref) and all three resolve. Checked
+# 2026-08-23: all four FRANCE rows citing a raw UUID resolve to a `source_records` row with a
+# real url, publisher_domain, published_date and snippet — they are the best-cited rows in the
+# set, not the worst. `scripts/check_requirement_provenance.py` refuses this check for the same
+# reason and says so: "A checker that demanded one format would flag 24 legitimate rows and be
+# switched off within a day." Zero of the 940 distinct `source_url` values in prod are a UUID,
+# so a rule here would fire on nothing while encoding a false premise for whoever copies it.
+_RESOLVABLE_NON_URL_REF = re.compile(
+    r"^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    r"|immigration_rule\.[\w.]+)$",
+    re.I,
+)
+
+
+def unspecific_citation_reason(source_url: str) -> Optional[str]:
+    """Why this citation cannot evidence a specific claim, or None when it can.
+
+    A companion to `classify_source`, which answers "is the publisher official?" and stops
+    there. Both questions have to be asked, because the existing checks are each blind to this
+    in a different way: the publisher test passes (a homepage on a statutory domain is on a
+    statutory domain), and the verbatim-quote test passes too, since navigation-menu words
+    really are on the page. Measured on the NO->FR corpus 2026-08-23: three SERVED FRANCE rows
+    cite a bare domain and two cite a bare UUID.
+
+        >>> unspecific_citation_reason(
+        ...     "https://www.service-public.gouv.fr/particuliers/vosdroits/F16003") is None
+        True
+        >>> "homepage" in unspecific_citation_reason("https://www.urssaf.fr/accueil")
+        True
+    """
+    raw = (source_url or "").strip()
+    if not raw:
+        return "no source_url"
+    if _RESOLVABLE_NON_URL_REF.match(raw):
+        return None
+
+    host = _host(raw)
+    if not host:
+        return "not a resolvable URL"
+
+    path = urlsplit(raw if "//" in raw else "//" + raw).path or ""
+    segments = [seg for seg in path.split("/") if seg]
+
+    if _matches(host, _DIRECTORY_HOSTS) or (segments and segments[0] in _DIRECTORY_SEGMENTS):
+        return "a directory contact record, not a normative page"
+    if not segments:
+        return "a bare domain with no path — identifies a site, not a rule"
+    if len(segments) == 1 and segments[0].lower() in _HOMEPAGE_SEGMENTS:
+        return "a homepage — identifies a site, not a rule"
+    return None
+
+
 def _humanise(topic_key: str) -> str:
     """`eu_free_movement_worker` -> `Eu free movement worker`, a last-resort entity title."""
     return re.sub(r"[_\-]+", " ", topic_key).strip().capitalize()
@@ -279,6 +345,9 @@ def grade(row: FactRow) -> FactRow:
             f"publisher {_host(row.source_url)!r} is not a statutory source "
             f"({row.source_class})"
         )
+    unspecific = unspecific_citation_reason(row.source_url)
+    if unspecific:
+        row.downgrades.append(f"source_url is {unspecific}")
     if not (row.evidence_quote or "").strip():
         row.downgrades.append("no evidence_quote — the claim cannot be re-checked from the row")
     # A batch that captured a quote but never re-read it against the page says so, via

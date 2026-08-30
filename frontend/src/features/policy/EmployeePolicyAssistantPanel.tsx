@@ -328,7 +328,7 @@ function AnswerResultCard({
                               {headline}
                             </div>
                             <Link2
-                              className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400 group-hover:text-[#0b2b43]"
+                              className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-500 group-hover:text-[#0b2b43]"
                               aria-hidden
                             />
                           </div>
@@ -639,7 +639,7 @@ export const EmployeePolicyAssistantPanel: React.FC<{
                     className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3.5 text-left text-sm font-medium text-slate-700 transition-colors hover:border-[#0b2b43]/25 hover:bg-slate-50 disabled:opacity-50"
                   >
                     <span className="min-w-0 leading-snug">{s}</span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                    <ArrowRight className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
                   </Button>
                 </li>
               ))}
@@ -658,7 +658,7 @@ export const EmployeePolicyAssistantPanel: React.FC<{
             rows={isEmptyState ? 3 : 6}
             maxLength={8000}
             placeholder={EMPLOYEE_POLICY_ASSISTANT_PLACEHOLDER}
-            className={`w-full resize-y rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-400 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 focus:shadow-[0_1px_2px_rgba(15,23,42,0.06)] disabled:opacity-60 ${
+            className={`w-full resize-y rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-500 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 focus:shadow-[0_1px_2px_rgba(15,23,42,0.06)] disabled:opacity-60 ${
               isEmptyState ? 'min-h-[5rem]' : 'min-h-[10rem]'
             }`}
             value={message}
@@ -804,7 +804,7 @@ export const EmployeePolicyAssistantPanel: React.FC<{
               aria-hidden
             >
               <span className="text-sm font-medium text-slate-500">No answers yet</span>
-              <span className="text-xs text-slate-400 max-w-xs leading-relaxed">
+              <span className="text-xs text-slate-500 max-w-xs leading-relaxed">
                 Ask a question above. Your answers will show here and stay on this device for this assignment.
               </span>
             </div>

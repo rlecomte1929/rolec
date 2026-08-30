@@ -175,3 +175,74 @@ AIQ-1676:supabase/migrations/20261004000000_cleanup_living_areas_supplier_shells
 AIQ-121:backend/app/routers/hr_rfq.py  # SHIPPED THEN REMOVED: the original AIQ-40-C HR RFQ router. Retired by AIQ-1683 (#1645) when the HR-initiated rfq_requests model was archived (rename → rfq_requests_legacy) and its last reader removed. Task correctly Done; guard can't see deleted history (same pattern as AIQ-1565/1001).
 AIQ-1682:backend/app/routers/hr_rfq.py  # SHIPPED THEN REMOVED: S2 (AIQ-1682, #1642) trimmed hr_rfq.py to a read-only GET; S3 (AIQ-1683, #1645) then deleted the whole file when rfq_requests was archived. S2's MODIFIED claim was correct at merge time; the file was removed one step later.
 AIQ-234:frontend/src/features/platform-v2/policy-builder/PolicyDocumentsPage.tsx  # BUILT BUT NEVER WIRED, THEN REMOVED: the P2-8 document-management screen was written and the task closed, but the page was never mounted — hrPolicyBuilderDocuments was declared in routes.ts and never added to App.tsx, and the backend it calls (/api/hr/policy-builder/documents) does not exist (prod returns 405, control endpoint 200). The wider P2-6/P2-8 pipeline was a UI-only shell: sibling PolicyReviewQueuePage likewise unmounted, and public.policy_facts sits at 0 rows with nothing to populate it. Deleted as unreachable dead code in #1844; document -> publish is covered by HrPolicyBuilderV2Page's "Import from document" on the live Benefits summary tab. NOTE: unlike the SHIPPED-THEN-REMOVED entries above, this deliverable never reached a user — the Done status was optimistic. Left allowlisted rather than reopened because the decision was to delete, not to finish it.
+
+
+# ── 2026-08-23 · first live run after NOTION_QUEUE_TOKEN was refreshed ─────────
+#
+# CORRECTED 2026-08-23 (second pass). The first version of this block listed 46
+# entries. It was wrong: the guard could not see git history (#2055) and I compounded
+# that by reconstructing lists by hand instead of reading the guard's output.
+#
+# With #2055 (history visible) and the migration-restamp rule, the 110 original claims
+# now resolve as:
+#     ~70  added at some point, later renamed or removed — the work SHIPPED   [INFO]
+#       6  a migration re-stamped before it landed — the file EXISTS          [WARN]
+#      13  Notion ate the underscores of __init__.py / __tests__ — EXISTS     [WARN]
+#      20  never added anywhere in this repo's history   <-- only these, below
+#
+# 26 entries were removed from this block, and 16 Notion cards that had been flipped
+# to Rejected on the strength of them were restored to Done.
+#
+# TWO GDPR MIGRATIONS WERE AMONG THE FALSE FINDINGS: IMM-17 erasure_requests and
+# IMM-18 retention_automation. Both shipped, both are live in production
+# (`erasure_requests` table; `fn_case_close_set_retention` +
+# `fn_immigration_retention_cleanup`), and both were briefly and wrongly reported as
+# never existing. See the findings doc for the full retraction.
+#
+# Verified with the guard itself, not by hand:
+#     git log --all HEAD --no-renames --diff-filter=A --name-only --format=
+#
+# docs/findings/deliverable-integrity-first-live-run-2026-08-23.md
+
+# 623 · AI-W7.2 — LLM-as-judge for assistant tone, groundedness, actionability
+623:backend/eval/judges/base.py
+623:backend/eval/judges/calibration.py
+623:backend/eval/judges/groundedness.py
+623:backend/eval/judges/init.py
+623:backend/eval/judges/tone.py
+623:backend/tests/fixtures/judges/labelled_examples.json
+623:backend/tests/test_judges.py
+
+# 541 · AI-W3.4 — Promptfoo PR-gate CI workflow
+541:.github/test-events/sample-pr.json
+541:.github/workflows/ai-eval-gate.yml
+541:backend/prompts/promptfooconfig.yaml
+
+# 617 · AI-W2.2 — Adapter: ai_trace_logger.TraceSession → agent_runs writer
+617:backend/app/services/agent_run_writer.py
+617:backend/tests/test_agent_run_writer.py
+
+# 540 · Test runner: stop sending invite emails to fake @testco.com domains (kills Resend send
+540:scripts/relopass_api_runner.js
+
+# 565 · C2-06 · Policy-versus-reality gap detector (entitlement gaps with clause citations)
+565:backend/relopass/policy_evidence/models.py
+
+# 577 · C2-02b-FOLLOWUP · Agent wiring + AgentRegistry registration (tax_cert_{fr,de,no}.py)
+577:backend/relopass/agents/extraction/tax_cert_findings.py
+
+# 580 · AI-I.5 — Remove/avoid LangGraph dependency; commit FastAPI + Pydantic pipeline pattern
+580:audit/ADR-001-no-langgraph.md
+
+# 620 · AI-W3.5 — Nightly full-corpus eval job + Langfuse leaderboard
+620:.github/workflows/ai-eval-nightly.yml
+
+# 698 · [BUG-A] Fix GET /api/company/branding-config returning 500 — missing branding_config c
+698:supabase/migrations/20260527_add_company_branding_config.sql
+
+# 714 · P3-01b · Build context-precision evaluator
+714:scripts/eval_context_precision.py
+
+# 750 · AI-W2.1 — Migration: unified agent_runs table with RLS
+750:supabase/migrations/20260531000000_agent_runs.sql
+

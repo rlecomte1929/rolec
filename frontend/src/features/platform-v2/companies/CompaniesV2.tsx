@@ -29,9 +29,9 @@ const TONE_LOGO: Record<CompanyV2Tone, string> = {
 };
 
 export const PLAN_PILL: Record<CompanyV2PlanTier, string> = {
-  premium: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  medium:  'bg-amber-50  text-amber-700  ring-amber-200',
-  low:     'bg-slate-100 text-slate-600  ring-slate-200',
+  enterprise: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  growth:     'bg-amber-50  text-amber-700  ring-amber-200',
+  starter:    'bg-slate-100 text-slate-600  ring-slate-200',
 };
 
 export const STATUS_PILL: Record<CompanyV2Status, string> = {
@@ -183,7 +183,7 @@ export function SeatCell({ count, limit }: SeatCellProps) {
   if (limit == null) {
     return (
       <div className="text-[12.5px] tabular-nums text-slate-700">
-        {count} <span className="text-slate-400">/ —</span>
+        {count} <span className="text-slate-500">/ —</span>
       </div>
     );
   }
@@ -193,7 +193,7 @@ export function SeatCell({ count, limit }: SeatCellProps) {
   return (
     <div className="min-w-[6rem] space-y-1">
       <div className="text-[12.5px] tabular-nums text-slate-700">
-        {count} <span className="text-slate-400">/ {limit}</span>
+        {count} <span className="text-slate-500">/ {limit}</span>
       </div>
       <div className="h-1 w-full overflow-hidden rounded-full bg-slate-100">
         <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
@@ -237,7 +237,7 @@ function DetailPanel({ company, onClose }: DetailPanelProps) {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
           >
             ✕
           </Button>
@@ -318,7 +318,7 @@ function DetailPanel({ company, onClose }: DetailPanelProps) {
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </div>
       <div className="leading-snug">{children}</div>
@@ -417,7 +417,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
       active: companies.filter((c) => c.status === 'active').length,
       inactive: companies.filter((c) => c.status === 'inactive').length,
       archived: companies.filter((c) => c.status === 'archived').length,
-      premium: companies.filter((c) => c.plan_tier === 'premium').length,
+      enterprise: companies.filter((c) => c.plan_tier === 'enterprise').length,
       hrUsers: sum('hr_users_count'),
       employees: sum('employee_count'),
       cases: sum('assignments_count'),
@@ -463,7 +463,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
     <div className="px-6 py-6">
       {/* Header */}
       <div className="mb-5">
-        <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
+        <div className="text-[11px] font-medium uppercase tracking-widest text-slate-500">
           ReloPass · /admin/companies/overview
         </div>
         <div className="mt-1.5 flex items-baseline gap-3">
@@ -499,7 +499,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
         <Kpi label="Active" value={kpis.active} sub="live" tone="success" />
         <Kpi label="Inactive" value={kpis.inactive} sub="paused" tone="warning" />
         <Kpi label="Archived" value={kpis.archived} sub="soft-deleted" />
-        <Kpi label="Premium" value={kpis.premium} sub="top tier" tone="accent" />
+        <Kpi label="Enterprise" value={kpis.enterprise} sub="top tier" tone="accent" />
         <Kpi label="HR users" value={kpis.hrUsers} sub="across tenants" />
         <Kpi label="Employees" value={kpis.employees.toLocaleString()} sub="across tenants" />
         <Kpi label="Open cases" value={kpis.cases} sub="active mobility" tone="accent" />
@@ -540,9 +540,9 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
           >
             <option value="">All plans</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="premium">Premium</option>
+            <option value="starter">Starter</option>
+            <option value="growth">Growth</option>
+            <option value="enterprise">Enterprise</option>
           </select>
           <select
             value={filters.country}
@@ -654,14 +654,14 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
             <tbody className="divide-y divide-slate-100">
               {loading && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-500">
                     Loading companies…
                   </td>
                 </tr>
               )}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-500">
                     {anyFilter ? 'No companies match your filters.' : 'No companies yet.'}
                   </td>
                 </tr>
@@ -721,7 +721,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
                     </td>
                     <td className="pr-4 py-2.5 text-right">
                       {busyId === c.id ? (
-                        <span className="text-[11px] text-slate-400">…</span>
+                        <span className="text-[11px] text-slate-500">…</span>
                       ) : (
                         <RowActionMenu
                           onEdit={() => setEditTarget(c)}

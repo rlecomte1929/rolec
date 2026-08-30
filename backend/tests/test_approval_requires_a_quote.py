@@ -50,7 +50,11 @@ def db():
         conn.execute(text(
             "CREATE TABLE requirement_facts ("
             " id TEXT PRIMARY KEY, entity_id TEXT, status TEXT, evidence_quote TEXT,"
-            " evidence_verified BOOLEAN, reviewed_by TEXT, reviewed_at TEXT, fact_key TEXT)"
+            " evidence_verified BOOLEAN, reviewed_by TEXT, reviewed_at TEXT, fact_key TEXT,"
+            # [AIQ-2046] The sibling gate (_assert_no_fact_needs_lawyer_review) reads this
+            # column in the same approval path, so the fixture needs it or every test here
+            # fails on a missing column rather than on the behaviour it is asserting.
+            " applies_to TEXT)"
         ))
         conn.execute(text(
             "CREATE TABLE requirement_reviews ("

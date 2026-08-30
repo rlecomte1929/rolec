@@ -37,7 +37,7 @@ export function WelcomeStepCard({ step, title, description, href, badge, note }:
           </div>
           <Link
             to={href}
-            className="shrink-0 self-center text-sm font-medium text-accent-500 hover:text-accent-600 transition-colors"
+            className="shrink-0 self-center text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
           >
             Get started →
           </Link>

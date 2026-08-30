@@ -141,7 +141,7 @@ export const CountryPicker: React.FC<{
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43] disabled:bg-[#f1f5f9] disabled:text-[#94a3b8]"
+          className="w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43] disabled:bg-[#f1f5f9] disabled:text-slate-500"
         >
           <option value="">{placeholder}</option>
           {COUNTRY_OPTIONS.map((c) => (
@@ -167,7 +167,7 @@ export const CountryPicker: React.FC<{
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43] disabled:bg-[#f1f5f9] disabled:text-[#94a3b8]"
+        className="w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43] disabled:bg-[#f1f5f9] disabled:text-slate-500"
       >
         <option value="">{placeholder}</option>
         {withCurrent.map((c) => (

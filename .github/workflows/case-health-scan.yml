@@ -30,13 +30,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # No-op unless explicitly enabled via repo vars (post-pilot).
-    if: ${{ vars.CASE_HEALTH_CRON_ENABLED == 'true' }}
     env:
       # Quoted env (not inlined into run:) per workflow-injection guidance.
       API_BASE: ${{ vars.CASE_HEALTH_API_BASE }}   # e.g. https://api.relopass.com
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
+      - name: Report gate state
+        env:
+          ENABLED: ${{ vars.CASE_HEALTH_CRON_ENABLED }}
+        run: |
+          set -euo pipefail
+          if [ "${ENABLED:-}" != "true" ]; then
+            {
+              echo "## Case-health scan: DISABLED"
+              echo ''
+              echo "\`vars.CASE_HEALTH_CRON_ENABLED\` is \`${ENABLED:-<unset>}\` — nothing ran."
+              echo "Case health is not being scanned, so degradations go unflagged."
+              echo "Set the repo variable to \`true\` to enable."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Case-health scan disabled::CASE_HEALTH_CRON_ENABLED is '${ENABLED:-<unset>}'; nothing ran."
+          fi
+
       - name: POST /api/crons/case-health-scan
+        if: ${{ vars.CASE_HEALTH_CRON_ENABLED == 'true' }}
         run: |
           set -euo pipefail
           if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then

@@ -14,6 +14,7 @@ import { buildRoute } from '../../navigation/routes';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { usePageMeta } from '../../hooks/usePageMeta';
 import { platformContent } from './platformContent';
+import { imgDimensions } from '../../lib/publicImageDimensions';
 
 export const PlatformPage: React.FC = () => {
   usePageMeta({
@@ -41,7 +42,11 @@ export const PlatformPage: React.FC = () => {
                   <CTAButton onClick={() => openDemoBooking('platform-hero')} variant="primary" size="lg">
                     {c.hero.primaryCta}
                   </CTAButton>
-                  <CTAButton to={buildRoute('howItWorks')} variant="outline" size="lg">
+                  {/* The label is 'Sign in' (platformContent.ts hero.secondaryCta), so it must
+                      go to the login screen. It pointed at /how-it-works, dropping anyone
+                      trying to log in from this page onto a marketing page instead. Same
+                      target as the footer CTA's sign-in below. */}
+                  <CTAButton to={`${buildRoute('auth')}?mode=login`} variant="outline" size="lg">
                     {c.hero.secondaryCta}
                   </CTAButton>
                 </>
@@ -75,6 +80,8 @@ export const PlatformPage: React.FC = () => {
                 {'image' in block && block.image && (
                   <img
                     src={block.image}
+                    {...imgDimensions(block.image)}
+                    decoding="async"
                     alt={'imageAlt' in block ? block.imageAlt : ''}
                     loading="lazy"
                     className="w-full rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,0.08)] mb-4 transition-transform duration-300 ease-out hover:scale-[1.02]"
@@ -104,6 +111,8 @@ export const PlatformPage: React.FC = () => {
                 </p>
                 <img
                   src={view.image}
+                  {...imgDimensions(view.image)}
+                  decoding="async"
                   alt={view.caption}
                   loading="lazy"
                   className="w-full rounded-[10px] shadow-[0_8px_32px_rgba(0,0,0,0.10)] transition-transform duration-300 ease-out hover:scale-[1.02]"

@@ -198,7 +198,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
           Filling one allowlists the destination and runs the scraper — no manual search.
         </p>
         {gaps.length === 0 ? (
-          <p className="text-sm text-[#94a3b8] py-2">
+          <p className="text-sm text-slate-500 py-2">
             {loading ? 'Loading…' : 'No uncovered demand right now. New gaps appear here as employees hit them.'}
           </p>
         ) : (
@@ -241,7 +241,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
           still missing catalog coverage. Pre-warm them here before employees hit an empty state.
         </p>
         {corridors.length === 0 ? (
-          <p className="text-sm text-[#94a3b8] py-2">
+          <p className="text-sm text-slate-500 py-2">
             {loading ? 'Loading…' : 'Every intake destination is covered. New corridors appear here as intake grows.'}
           </p>
         ) : (
@@ -259,7 +259,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-[#94a3b8]">Uncovered:</span>
+                  <span className="text-xs text-slate-500">Uncovered:</span>
                   {c.uncovered_categories.map((cat) => {
                     const key = `${cat}|${c.city}|${c.country}`;
                     return (
@@ -327,7 +327,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
                     <div className="min-w-0">
                       <div className="font-medium text-[#0b2b43]">
                         {t.city}, {t.country}
-                        <span className="ml-2 text-xs font-normal text-[#94a3b8]">
+                        <span className="ml-2 text-xs font-normal text-slate-500">
                           category: {t.category}
                         </span>
                         {onAllowlist && (
@@ -344,7 +344,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
                         <p className="mt-2 text-sm text-[#334155] whitespace-pre-line">{t.notes}</p>
                       )}
                       {t.status !== 'pending' && (
-                        <p className="mt-2 text-xs text-[#94a3b8]">
+                        <p className="mt-2 text-xs text-slate-500">
                           {t.status === 'approved' ? 'Approved' : 'Rejected'}{' '}
                           {t.resolved_at ? `· ${formatDate(t.resolved_at)}` : ''}
                           {t.resolved_by ? ` by ${t.resolved_by.slice(0, 8)}` : ''}
@@ -408,7 +408,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
               >
                 <div className="min-w-0">
                   <span className="font-medium text-[#0b2b43]">{e.city}, {e.country}</span>
-                  <span className="ml-2 text-xs text-[#94a3b8]">
+                  <span className="ml-2 text-xs text-slate-500">
                     added {formatDate(e.approved_at)}
                     {e.approved_by ? ` · by ${e.approved_by.slice(0, 8)}` : ''}
                   </span>

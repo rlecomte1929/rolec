@@ -127,7 +127,7 @@ export function ApprovalModal() {
           </div>
           <div className="flex-1">
             <h2 id="guardrail-title" className="text-base font-semibold text-slate-900">AI Spend Request</h2>
-            <p className="text-xs text-slate-400 font-mono mt-0.5">{current.function_name}</p>
+            <p className="text-xs text-slate-500 font-mono mt-0.5">{current.function_name}</p>
           </div>
           {queue.length > 1 && (
             <span className="text-xs font-semibold px-2 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-200">
@@ -177,7 +177,7 @@ export function ApprovalModal() {
           </Button>
         </div>
 
-        <p className="text-center text-xs text-slate-400 mt-3">
+        <p className="text-center text-xs text-slate-500 mt-3">
           Guardrail active · disable in Admin → Overview
         </p>
       </div>

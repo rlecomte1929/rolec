@@ -40,11 +40,26 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # AI Work Queue (Notion). Database id from references/notion-schema.md.
 _DEFAULT_DATABASE_ID = "3bc887c6-4d48-8089-8188-fcf2dc3edc1b"
 _NOTION_VERSION = "2022-06-28"
+
+
+# Tasks below this id are a pre-convention backlog: they are REPORTED but do not fail the build.
+#
+# Not an arbitrary line. After the history fix and the two path resolvers, the residue is 33
+# claimed paths across 18 tasks, and 17 of those tasks sit in the narrow id band 540–750 — one
+# era of work, before the `[AIQ-nnnn]` commit-subject convention took hold (the lowest id ever
+# used in a commit subject is 279, and tagging only becomes routine around 800+). For that band
+# "no implementing commit" is not evidence of anything, so failing on it would make the guard
+# permanently red for a question it cannot answer.
+#
+# Allowlisting them instead would be worse: an allowlist entry reads as "someone checked this and
+# it is fine", and nobody has. Reporting them keeps the number visible and lets it fall only when
+# a human genuinely resolves one.
+_PRE_CONVENTION_MAX_ID = 800
 
 # Task types that produce a file deliverable (others — Research, Competitive
 # Analysis — may live only in Notion and are skipped).
@@ -150,32 +165,225 @@ def extract_deliverable_paths(note_text: str) -> List[str]:
     return out
 
 
+# ── Was this deliverable ever real? ──────────────────────────────────────────
+#
+# The guard used to ask "is this a tracked file TODAY". For a check whose job is
+# "did this Done task's claimed deliverable actually ship", that is the wrong
+# question: files legitimately move, and a refactor three months later does not
+# retroactively make a shipped deliverable a lie.
+#
+# Measured on 2026-08-23 against the first live run: of 97 flagged paths, 62 had
+# existed and been renamed or deleted since. Suppressing those in the allowlist
+# would have grown it from 150 to 212 entries and left every future refactor
+# tripping the same way.
+
+_MANGLE_RULES = (
+    # Notion renders a BARE `__init__.py` / `__tests__` as markdown bold and eats the
+    # underscores, so the stored text is `init.py` / `tests/`. CLAUDE.md tells authors
+    # to wrap paths in backticks for exactly this reason, but ~1,800 historical cards
+    # cannot be re-edited, so the guard has to be robust to it.
+    (re.compile(r"(^|/)init_?\.py$"), r"\1__init__.py"),
+    (re.compile(r"(^|/)tests/"), r"\1__tests__/"),
+)
+
+
+def demangled_variants(path: str) -> List[str]:
+    """Candidate paths with Notion's eaten underscores restored. Never includes *path*."""
+    out: List[str] = []
+    for rx, repl in _MANGLE_RULES:
+        cand = rx.sub(repl, path)
+        if cand != path and cand not in out:
+            out.append(cand)
+    return out
+
+
+def is_shallow(root: Path) -> bool:
+    """True when the clone has no full history.
+
+    Critical. `git log --all` on a shallow clone returns almost nothing, so the
+    ever-existed check would classify EVERY deliverable as never-existed — 97
+    confident false phantoms on the run that motivated this. The caller turns this
+    into exit 3, because a check that cannot measure must say so.
+    """
+    res = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=str(root), capture_output=True, text=True,
+    )
+    return res.stdout.strip() == "true"
+
+
+def paths_ever_added(root: Path) -> Set[str]:
+    """Every repo-relative path added in any commit reachable from any ref OR from HEAD.
+
+    One `git log` for the whole repo rather than one per candidate: measured at
+    24,983 paths / 1.3s / 1.8 MB locally, which is cheap enough for CI.
+
+    HEAD IS PASSED EXPLICITLY, and that is the whole point. `actions/checkout` leaves a PR build
+    on a DETACHED HEAD; `--all` enumerates refs, and when the workspace carries no local branch
+    or remote-tracking ref it matches nothing and this returns the EMPTY SET. Nothing is shallow,
+    so `is_shallow()` sees no problem, and every claimed deliverable that is not tracked today
+    lands in `missing` — a full page of confident phantoms.
+
+    Measured on 2026-08-23: the guard reported 110 missing deliverables, of which **71 were added
+    on a branch in this repo's own history** (`backend/app/routers/hr_rfq.py`, for one — added
+    2026-05-18, deleted 2026-07-22). Adding HEAD costs nothing when refs exist, because the
+    commits are already covered.
+
+    `--no-renames` matters just as much. With rename detection on, git reports a rename as `R`,
+    so the NEW path never appears under `--diff-filter=A` and a file sitting in the working tree
+    can be absent from its own history: 191 tracked files, here. With it off, a rename is an add
+    plus a delete, and every one of the 5,197 tracked files is accounted for — which is what
+    makes `history_is_complete` an exact invariant rather than a threshold.
+    """
+    res = subprocess.run(
+        ["git", "log", "--all", "HEAD", "--no-renames",
+         "--diff-filter=A", "--name-only", "--format="],
+        cwd=str(root), capture_output=True, text=True, check=True,
+    )
+    return {line.strip() for line in res.stdout.splitlines() if line.strip()}
+
+
+def history_is_complete(ever_added: Set[str], tracked: Set[str]) -> bool:
+    """Every file tracked today must have been added at some point.
+
+    An exact invariant rather than a threshold: if a path is in the working tree, a commit added
+    it, so `tracked - ever_added` is empty on any repository with usable history. When it is not,
+    the history scan is incomplete however non-shallow the clone looks, and the ever-existed
+    check would manufacture phantoms out of files that are sitting right there.
+
+    This is the same discipline as `assert_non_degenerate` for the Notion query: refuse to emit a
+    verdict the evidence cannot support.
+    """
+    return not (tracked - ever_added)
+
+
+_MIGRATION_RE = re.compile(r"^supabase/migrations/(\d{6,})_(?P<name>.+\.sql)$")
+
+
+def resolve_restamped_migration(path: str, candidates: Set[str]) -> Optional[str]:
+    """A migration re-stamped to a later timestamp is the SAME migration.
+
+    This repo requires every migration to be stamped above BOTH the highest repo file version
+    and the prod ledger max, so a collision forces a re-stamp before merge — the note records
+    the timestamp the author first wrote, and the tree carries the one that landed. Measured
+    2026-08-23: 17 of the guard's 110 findings are exactly this, including
+    `20260927000000_test_drive_tester_contact.sql` claimed against
+    `20261013000000_test_drive_tester_contact.sql` tracked.
+
+    A migration's identity is its NAME. Comparing the full path was wrong by construction, and
+    the git-history check cannot rescue it because the re-stamped file is a different filename
+    that was only ever added under its final name.
+
+    Ambiguity is refused: if two migrations share a name, no resolution is offered rather than
+    guessing which one the note meant.
+    """
+    m = _MIGRATION_RE.match(path)
+    if not m:
+        return None
+    name = m.group("name")
+    hits = sorted(
+        c for c in candidates
+        if (mc := _MIGRATION_RE.match(c)) and mc.group("name") == name
+    )
+    return hits[0] if len(hits) == 1 else None
+
+
+def resolve_by_path_suffix(path: str, candidates: Set[str], min_segments: int = 2) -> Optional[str]:
+    """Resolve a path whose prefix is wrong but whose tail is unmistakable.
+
+    `backend/services/ai_trace_logger.py` was never a path in this repo; the file has always
+    been `backend/app/services/ai_trace_logger.py`. The note was written from memory, one
+    directory out. Same for `scripts/rag_eval_harness.py` (tracked under `backend/scripts/`) and
+    `pages/admin/tests/` (tracked as `__tests__/`).
+
+    Requires at least two trailing segments to match, so a bare `README.md` or `base.py` — which
+    exist in dozens of directories — can never resolve. And requires the match to be UNIQUE:
+    where several files share the tail, the note is genuinely ambiguous and gets no resolution
+    rather than an arbitrary one.
+    """
+    parts = [seg for seg in path.split("/") if seg]
+    for n in range(min(len(parts), 4), min_segments - 1, -1):
+        tail = "/" + "/".join(parts[-n:])
+        hits = sorted(c for c in candidates if ("/" + c).endswith(tail))
+        if len(hits) == 1:
+            return hits[0]
+        if len(hits) > 1:
+            return None      # ambiguous at the longest tail — do not fall back to a shorter one
+    return None
+
+
 def check_tasks(
     tasks: List[Dict[str, Any]],
     tracked_files: Set[str],
     allowlist: Set[str],
-) -> List[Dict[str, str]]:
-    """Return the list of missing deliverables (one per task+path).
+    ever_added: Optional[Set[str]] = None,
+) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]]]:
+    """Classify every claimed deliverable into three buckets.
 
-    A task dict has: ``title``, ``aiq``, ``url``, ``paths`` (list[str]). A path
-    is "missing" when it is not a tracked file and neither the bare path nor the
-    ``<aiq>:<path>`` key is allowlisted.
+    Returns ``(missing, moved, mangled)``:
+
+    * **missing** — never existed in any commit on any branch. The only FAILING
+      bucket, and the only one that means a Done task claimed something untrue.
+    * **moved** — not present today, but it WAS added at some point. The work
+      shipped and the path went stale. Reported, never failed on.
+    * **mangled** — resolves once Notion's eaten underscores are restored. Passes,
+      but warns, so the badly-authored card gets fixed instead of the guard
+      quietly absorbing it forever.
+
+    A task dict has ``title``, ``aiq``, ``url``, ``paths``. ``ever_added`` is the
+    output of :func:`paths_ever_added`; pass ``None`` to skip the history check
+    (present-day behaviour only).
+
+    Order of resolution matters: allowlist BEFORE history, so an explicitly
+    baselined entry stays silent rather than reappearing as a "moved" line.
     """
     missing: List[Dict[str, str]] = []
+    moved: List[Dict[str, str]] = []
+    mangled: List[Dict[str, str]] = []
     for t in tasks:
         aiq = str(t.get("aiq") or "")
         for path in t.get("paths") or []:
-            if path in tracked_files:
-                continue
-            if path in allowlist or f"{aiq}:{path}" in allowlist:
-                continue
-            missing.append({
+            row = {
                 "aiq": aiq,
                 "title": str(t.get("title") or ""),
                 "path": path,
                 "url": str(t.get("url") or ""),
-            })
-    return missing
+            }
+            if path in tracked_files:
+                continue
+            if path in allowlist or f"{aiq}:{path}" in allowlist:
+                continue
+
+            # Notion ate the underscores? Resolve, but say so.
+            hit = next(
+                (c for c in demangled_variants(path)
+                 if c in tracked_files or (ever_added is not None and c in ever_added)),
+                None,
+            )
+            if hit:
+                mangled.append({**row, "resolved_to": hit})
+                continue
+
+            if ever_added is not None and path in ever_added:
+                moved.append(row)
+                continue
+
+            # The path was never a path in this repo — but the FILE may still be here under a
+            # name the note got wrong. Both resolvers below are conservative: unique match or
+            # nothing. They feed `moved` because that bucket already means exactly this — the
+            # work shipped and the recorded path is stale.
+            pool = set(tracked_files) | (ever_added or set())
+            hit = resolve_restamped_migration(path, pool)
+            if hit:
+                moved.append({**row, "resolved_to": hit, "why": "migration re-stamped"})
+                continue
+            hit = resolve_by_path_suffix(path, pool)
+            if hit:
+                moved.append({**row, "resolved_to": hit, "why": "path prefix in the note is wrong"})
+                continue
+
+            missing.append(row)
+    return missing, moved, mangled
 
 
 def load_allowlist(path: Path) -> Set[str]:
@@ -204,6 +412,80 @@ def tracked_files(root: Path) -> Set[str]:
 # --------------------------------------------------------------------------- #
 
 
+#: Exit codes. 3 separates "measured, clean" from "could not measure" — this guard used to
+#: collapse both into 0. On 2026-08-23 its CI log read
+#:     [WARN] Notion query failed (HTTP Error 404: Not Found); skipping (exit 0).
+#: and it reported PASS on every PR while examining nothing.
+EXIT_OK = 0
+EXIT_VIOLATION = 1
+EXIT_NOT_MEASURED = 3
+
+#: The server-side filter is `Status = Done`, which held ~1,530 rows on 2026-08-23. This floor
+#: applies to that PRE-filter count, not to the file-producing subset, which is legitimately
+#: much smaller and would make a floor a false-positive machine.
+MIN_EXPECTED_DONE_ROWS = 500
+
+
+class QueueUnavailable(RuntimeError):
+    """The queue could not be measured. NEVER report this as a pass."""
+
+    def __init__(self, kind: str, detail: str) -> None:
+        super().__init__(f"{kind}: {detail}")
+        self.kind = kind
+        self.detail = detail
+
+
+def assert_non_degenerate(
+    tasks: List[Dict[str, Any]],
+    done_seen: int,
+    file_producing_seen: Optional[int] = None,
+    with_notes: Optional[int] = None,
+) -> None:
+    """Refuse to call a degenerate scan clean.
+
+    A renamed property does not raise — it yields "" for every row, every count becomes 0,
+    and that reads exactly like a healthy queue. `Task Title` -> `fable` drifted this way and
+    nobody noticed. Each assertion below is a way this guard could go quietly blind.
+    """
+    # Older callers passed only (tasks, done_seen). Derive the two finer counts from the
+    # task list in that case: every task in the list survived BOTH filters by definition.
+    if file_producing_seen is None:
+        file_producing_seen = len(tasks)
+    if with_notes is None:
+        with_notes = sum(1 for t in tasks if str(t.get("notes") or "").strip())
+
+    if done_seen < MIN_EXPECTED_DONE_ROWS:
+        raise QueueUnavailable(
+            "schema-drift",
+            f"only {done_seen} Done row(s) returned; expected at least "
+            f"{MIN_EXPECTED_DONE_ROWS}. The Status filter or the database id is probably wrong.",
+        )
+    if done_seen and not file_producing_seen:
+        raise QueueUnavailable(
+            "schema-drift",
+            f"{done_seen} Done rows returned but NOT ONE survived the Task Type filter — "
+            "the `Task Type` property has probably been renamed or its vocabulary changed.",
+        )
+    if file_producing_seen and not with_notes:
+        raise QueueUnavailable(
+            "schema-drift",
+            f"{file_producing_seen} file-producing task(s) returned but NOT ONE had Execution "
+            "Notes — this guard parses ONLY that property, so it would examine nothing.",
+        )
+
+
+def _not_measured(kind: str, detail: str) -> int:
+    """Report an unmeasurable run as exit 3, never as a pass."""
+    print(f"[SKIP:{kind}] {detail}")
+    print("NOT A PASS — nothing was measured.")
+    if kind == "no-access":
+        print("  Fix: share the AI Work Queue database with this integration "
+              "(Notion -> database -> ... -> Connections).")
+    elif kind == "no-token":
+        print("  Fix: export NOTION_TOKEN (CI maps secrets.NOTION_QUEUE_TOKEN to it).")
+    return EXIT_NOT_MEASURED
+
+
 def _rich_text(prop: Optional[Dict[str, Any]]) -> str:
     if not prop:
         return ""
@@ -228,7 +510,9 @@ def _unique_id(prop: Optional[Dict[str, Any]]) -> str:
     return f"{prefix}-{number}" if prefix else str(number)
 
 
-def fetch_done_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
+def fetch_done_tasks(
+    token: str, database_id: str
+) -> Tuple[List[Dict[str, Any]], int, int, int]:
     """Query the AI Work Queue for Status=Done file-producing tasks and extract
     their deliverable paths. Paginated."""
     url = f"https://api.notion.com/v1/databases/{database_id}/query"
@@ -238,6 +522,9 @@ def fetch_done_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
         "Content-Type": "application/json",
     }
     tasks: List[Dict[str, Any]] = []
+    done_seen = 0              # PRE-filter count, for the non-degeneracy canary
+    file_producing_seen = 0    # survived the Task Type filter
+    with_notes = 0             # ...and had a non-empty Execution Notes
     cursor: Optional[str] = None
     while True:
         body: Dict[str, Any] = {
@@ -253,29 +540,41 @@ def fetch_done_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
             payload = json.loads(resp.read().decode("utf-8"))
 
         for page in payload.get("results", []):
+            done_seen += 1
             props = page.get("properties", {})
             task_type = _select(props.get("Task Type"))
             if task_type and task_type not in _FILE_PRODUCING_TYPES:
                 continue
+            file_producing_seen += 1
             # Scan ONLY Execution Notes — the record of what was actually built
             # (CREATED:/MODIFIED: claims). Expected Output is the spec and is full
             # of *suggested* paths that get renamed on commit, which produced the
             # bulk of false positives on the first live run.
             note_text = _rich_text(props.get("Execution Notes"))
+            if note_text.strip():
+                with_notes += 1
             paths = extract_deliverable_paths(note_text)
             if not paths:
                 continue
             tasks.append({
-                "title": _rich_text(props.get("Task Title")),
+                # The title property of this database is `fable`, not "Task Title".
+                "title": _rich_text(props.get("fable")),
                 "aiq": _unique_id(props.get("ID")) or _rich_text(props.get("ID")),
                 "url": page.get("url", ""),
                 "paths": paths,
+                # Carried so assert_non_degenerate can tell "we read the notes and they
+                # held no paths" from "we never read the notes at all". Omitting this is
+                # what made the canary fire on every healthy run.
+                "notes": note_text,
             })
 
         if not payload.get("has_more"):
             break
         cursor = payload.get("next_cursor")
-    return tasks
+    # `done_seen` is the PRE-filter count. assert_non_degenerate needs it to tell
+    # "no Done tasks produce files" (fine) from "the Task Type filter matched nothing
+    # because the property was renamed" (blind).
+    return tasks, done_seen, file_producing_seen, with_notes
 
 
 # --------------------------------------------------------------------------- #
@@ -296,31 +595,98 @@ def main() -> int:
 
     token = os.environ.get("NOTION_TOKEN")
     if not token:
-        print("[SKIP] NOTION_TOKEN not set — deliverable-integrity check skipped.")
-        return 0
+        return _not_measured("no-token", "NOTION_TOKEN is not set.")
 
     root = Path(args.root).resolve()
     allowlist = load_allowlist(root / "scripts" / "deliverable_integrity_allowlist.txt")
     tracked = tracked_files(root)
 
-    try:
-        tasks = fetch_done_tasks(token, args.database_id)
-    except (urllib.error.URLError, urllib.error.HTTPError) as exc:
-        print(f"[WARN] Notion query failed ({exc}); skipping (exit 0).")
-        return 0
+    # A shallow clone has no history, so `git log --all` returns almost nothing and
+    # every deliverable would look like it never existed. Refuse rather than emit a
+    # verdict we cannot support: `actions/checkout` must set `fetch-depth: 0`.
+    if is_shallow(root):
+        return _not_measured(
+            "shallow-clone",
+            "the clone is shallow, so git history is unavailable and every claimed "
+            "deliverable would be reported as never-existing. Set `fetch-depth: 0` on "
+            "actions/checkout for this job.",
+        )
+    ever_added = paths_ever_added(root)
+    if not history_is_complete(ever_added, tracked):
+        unseen = len(tracked - ever_added)
+        return _not_measured(
+            "history-incomplete",
+            f"{unseen} of {len(tracked)} tracked file(s) do not appear as added anywhere in the "
+            f"scanned history, so the ever-existed check cannot run and every stale path would "
+            f"be reported as a phantom. Ensure the job checks out with `fetch-depth: 0` and that "
+            f"a ref (not only a detached HEAD) is present.",
+        )
 
-    missing = check_tasks(tasks, tracked, allowlist)
+    try:
+        tasks, done_seen, fp_seen, with_notes = fetch_done_tasks(token, args.database_id)
+        assert_non_degenerate(tasks, done_seen, fp_seen, with_notes)
+    except QueueUnavailable as exc:
+        return _not_measured(exc.kind, exc.detail)
+    except urllib.error.HTTPError as exc:
+        kind = "no-access" if exc.code in (401, 403, 404) else "unreachable"
+        return _not_measured(kind, f"HTTP {exc.code} querying database {args.database_id}.")
+    except urllib.error.URLError as exc:
+        return _not_measured("unreachable", str(exc))
+
+    missing, moved, mangled = check_tasks(tasks, tracked, allowlist, ever_added)
 
     print(f"Scanned {len(tasks)} Done file-producing task(s).")
+
+    # Neither of these fails the build. They are reported because silently absorbing
+    # them is how a guard stops telling you anything.
+    if mangled:
+        print(f"\n[WARN] {len(mangled)} claimed path(s) resolve only once Notion's eaten "
+              f"underscores are restored. The file EXISTS; the card's path is mis-stored "
+              f"because it was written without backticks (see CLAUDE.md):\n")
+        for m in mangled:
+            print(f"  {m['aiq'] or '(no id)'}  {m['path']}")
+            print(f"      -> {m['resolved_to']}")
+            print(f"      task: {m['title']}")
+    if moved:
+        print(f"\n[INFO] {len(moved)} claimed deliverable(s) are not present today but WERE "
+              f"added at some point — the work shipped and the path later moved or was "
+              f"removed. Not a failure:\n")
+        for m in moved:
+            print(f"  {m['aiq'] or '(no id)'}  {m['path']}")
+            if m.get("resolved_to"):
+                print(f"      -> {m['resolved_to']}   ({m['why']})")
+
     if not missing:
-        print(f"[PASS] every claimed deliverable is a tracked file "
+        print(f"\n[PASS] every claimed deliverable either exists today or existed once "
               f"({len(allowlist)} allowlisted).")
         return 0
 
-    print(f"\n[{'FAIL' if args.strict else 'WARN'}] {len(missing)} claimed "
-          f"deliverable(s) marked Done but NOT in the repo "
+    def _is_pre_convention(row: Dict[str, str]) -> bool:
+        aiq = str(row.get("aiq") or "")
+        return aiq.isdigit() and int(aiq) <= _PRE_CONVENTION_MAX_ID
+
+    legacy = [m for m in missing if _is_pre_convention(m)]
+    current = [m for m in missing if not _is_pre_convention(m)]
+
+    if legacy:
+        tasks = len({m["aiq"] for m in legacy})
+        print(f"\n[BACKLOG] {len(legacy)} claimed deliverable(s) across {tasks} task(s) at or "
+              f"below AIQ-{_PRE_CONVENTION_MAX_ID} never existed in any commit. Reported, NOT "
+              f"failed on: these predate the commit-subject convention, so nothing here can be "
+              f"confirmed or refuted from the repo alone. Not allowlisted — an allowlist entry "
+              f"would claim someone checked them.\n")
+        for m in legacy:
+            print(f"  {m['aiq'] or '(no id)'}  {m['path']}")
+
+    if not current:
+        print(f"\n[PASS] no claimed deliverable after AIQ-{_PRE_CONVENTION_MAX_ID} is unaccounted "
+              f"for ({len(allowlist)} allowlisted, {len(legacy)} in the pre-convention backlog).")
+        return 0
+
+    print(f"\n[{'FAIL' if args.strict else 'WARN'}] {len(current)} claimed "
+          f"deliverable(s) marked Done that NEVER existed in any commit on any branch "
           f"(allowlist in scripts/deliverable_integrity_allowlist.txt):\n")
-    for m in missing:
+    for m in current:
         print(f"  {m['aiq'] or '(no id)'}  {m['path']}")
         print(f"      task: {m['title']}")
         print(f"      {m['url']}")

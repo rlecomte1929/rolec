@@ -441,7 +441,7 @@ function DetailPanelContent({ task, caseId, role, idPrefix, onSaved }: DetailPan
           </p>
         )}
         {done && (
-          <p className="text-xs text-slate-400 mt-0.5">Completed</p>
+          <p className="text-xs text-slate-500 mt-0.5">Completed</p>
         )}
       </div>
 
@@ -461,7 +461,7 @@ function DetailPanelContent({ task, caseId, role, idPrefix, onSaved }: DetailPan
           <div>
             <label
               htmlFor={`${idPrefix}-status`}
-              className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1"
+              className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1"
             >
               Status
             </label>
@@ -483,7 +483,7 @@ function DetailPanelContent({ task, caseId, role, idPrefix, onSaved }: DetailPan
           <div>
             <label
               htmlFor={`${idPrefix}-date`}
-              className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1"
+              className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1"
             >
               Due date
             </label>
@@ -501,7 +501,7 @@ function DetailPanelContent({ task, caseId, role, idPrefix, onSaved }: DetailPan
           <div>
             <label
               htmlFor={`${idPrefix}-notes`}
-              className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1"
+              className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1"
             >
               Notes{statusDraft === 'blocked' ? ' / Block reason' : ''}
             </label>
@@ -516,7 +516,7 @@ function DetailPanelContent({ task, caseId, role, idPrefix, onSaved }: DetailPan
                   ? "What's blocking this? Add context for your HR team"
                   : 'Optional note…'
               }
-              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-[#334155] placeholder:text-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43] focus-visible:ring-offset-2 resize-none"
+              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-[#334155] placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43] focus-visible:ring-offset-2 resize-none"
             />
           </div>
         )}
@@ -579,7 +579,7 @@ function DetailPanel({ task, caseId, role, onSaved }: DetailPanelProps) {
   if (!task) {
     return (
       <div className="hidden lg:flex h-full min-h-[200px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-6">
-        <p className="text-sm text-slate-400 text-center">Select a task to view and edit details</p>
+        <p className="text-sm text-slate-500 text-center">Select a task to view and edit details</p>
       </div>
     );
   }
@@ -708,7 +708,7 @@ function BottomSheet({ open, task, caseId, role, onClose, onSaved }: BottomSheet
               onSaved={() => { onSaved(); onClose(); }}
             />
           ) : (
-            <p className="text-sm text-slate-400 text-center py-8">
+            <p className="text-sm text-slate-500 text-center py-8">
               Select a task to view details
             </p>
           )}
@@ -761,7 +761,7 @@ function TaskRow({
         } ${v.accentClass}`}
       >
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-          <span className={`text-sm font-medium leading-snug truncate ${done ? 'line-through text-slate-400' : v.textClass}`}>
+          <span className={`text-sm font-medium leading-snug truncate ${done ? 'line-through text-slate-500' : v.textClass}`}>
             {task.title}
           </span>
           <OwnerChip owner={task.owner} />

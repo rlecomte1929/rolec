@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import type { PolicyDocument, PolicyDocumentClause } from '../features/policy/types';
 import { Checkbox } from '../components/antigravity/Checkbox';
+import { LoadErrorBanner, loadErrorMessage } from '../components/LoadErrorBanner';
 import { FileInput } from '../components/antigravity/FileInput';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
@@ -478,11 +479,11 @@ function DetectedMetadataDisplay({ metadata }: { metadata: PolicyDocumentMetadat
         ))}
       </span>
     ) : (
-      <span className="text-[#9ca3af]"> - </span>
+      <span className="text-gray-500"> - </span>
     );
 
   const BoolBadge = ({ v }: { v: boolean }) => (
-    <span className={v ? 'text-[#059669] font-medium' : 'text-[#9ca3af]'}>
+    <span className={v ? 'text-[#059669] font-medium' : 'text-gray-500'}>
       {v ? 'Yes' : 'No'}
     </span>
   );
@@ -534,6 +535,7 @@ function NormalizedHintsDisplay({ hints }: { hints: Record<string, unknown> }) {
 
 function DocumentStructureTab({ docId }: { docId: string }) {
   const [clauses, setClauses] = useState<PolicyDocumentClause[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [clauseTypeFilter, setClauseTypeFilter] = useState<string>('');
   const [patchingId, setPatchingId] = useState<string | null>(null);
@@ -541,10 +543,15 @@ function DocumentStructureTab({ docId }: { docId: string }) {
 
   const loadClauses = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = (await policyDocumentsAPI.listClauses(docId, clauseTypeFilter || undefined)) as { clauses?: PolicyDocumentClause[] };
       setClauses(res.clauses || []);
-    } catch {
+    } catch (e) {
+      // Was silent: a failed read rendered "No clauses yet. Click Reprocess…", telling HR
+      // the document had no clauses when the endpoint was simply down. The sibling loader
+      // in this same file (loadDocuments) already surfaced its failure.
+      setLoadError(loadErrorMessage(e, "Couldn't load clauses."));
       setClauses([]);
     } finally {
       setLoading(false);
@@ -575,6 +582,14 @@ function DocumentStructureTab({ docId }: { docId: string }) {
 
   if (loading && clauses.length === 0) {
     return <div className="text-sm text-[#6b7280] py-4">Loading clauses…</div>;
+  }
+
+  if (loadError) {
+    return (
+      <div className="py-4">
+        <LoadErrorBanner message={loadError} onRetry={() => void loadClauses()} />
+      </div>
+    );
   }
 
   if (clauses.length === 0) {
@@ -1103,7 +1118,7 @@ export function PolicyDocumentIntakeSection({
             {message}
           </Alert>
           {uploadRequestId && (
-            <div className="text-xs text-[#9ca3af] mt-1 font-mono">Request ID: {uploadRequestId}</div>
+            <div className="text-xs text-gray-500 mt-1 font-mono">Request ID: {uploadRequestId}</div>
           )}
         </div>
       )}

@@ -109,7 +109,7 @@ export const VisaChecklistCard: React.FC<{ caseId: string | null | undefined }> 
             <div className="min-w-0">
               <div
                 className={`text-sm font-medium ${
-                  item.completed ? 'text-slate-400 line-through' : 'text-navy-800'
+                  item.completed ? 'text-slate-500 line-through' : 'text-navy-800'
                 }`}
               >
                 {item.title}

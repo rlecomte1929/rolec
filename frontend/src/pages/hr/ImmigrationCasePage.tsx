@@ -96,7 +96,7 @@ export const ImmigrationCasePage: React.FC = () => {
   if (loading) {
     return (
       <AppShell title="Immigration case">
-        <p className="text-[#94a3b8] p-8">Loading…</p>
+        <p className="text-slate-500 p-8">Loading…</p>
       </AppShell>
     );
   }
@@ -105,7 +105,7 @@ export const ImmigrationCasePage: React.FC = () => {
     return (
       <AppShell title="Immigration case">
         <div className="p-8">
-          <p className="text-[#fca5a5]">{error ?? 'Case not found.'}</p>
+          <p className="text-[#b91c1c]">{error ?? 'Case not found.'}</p>
           <Button className="mt-4" variant="ghost" onClick={() => navigate(-1)}>
             Go back
           </Button>
@@ -137,10 +137,10 @@ export const ImmigrationCasePage: React.FC = () => {
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-[#f1f5f9]">
+            <h1 className="text-2xl font-semibold text-[#0b2b43]">
               Immigration case
             </h1>
-            <p className="text-[#94a3b8] text-sm mt-1">
+            <p className="text-slate-500 text-sm mt-1">
               {immCase.corridor_from} → {immCase.corridor_to} ·{' '}
               {PERMIT_LABELS[immCase.permit_type] ?? immCase.permit_type}
             </p>
@@ -171,7 +171,7 @@ export const ImmigrationCasePage: React.FC = () => {
 
         {/* Timeline */}
         <Card className="p-6 mb-6">
-          <h2 className="text-sm font-semibold text-[#94a3b8] uppercase tracking-wider mb-6">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-6">
             Permit pipeline
           </h2>
           <ol className="relative border-l border-[#334155] space-y-0">
@@ -199,9 +199,9 @@ export const ImmigrationCasePage: React.FC = () => {
                       className={[
                         'text-sm font-medium',
                         isCurrent
-                          ? 'text-[#f1f5f9]'
+                          ? 'text-[#0b2b43]'
                           : isCompleted
-                          ? 'text-[#86efac]'
+                          ? 'text-[#15803d]'
                           : 'text-[#475569]',
                       ].join(' ')}
                     >
@@ -213,7 +213,7 @@ export const ImmigrationCasePage: React.FC = () => {
                       </Badge>
                     )}
                     {isCompleted && (
-                      <span className="text-xs text-[#4ade80]">✓</span>
+                      <span className="text-xs text-[#15803d]">✓</span>
                     )}
                     {isFuture && (
                       <span className="text-xs text-[#334155]">Pending</span>
@@ -227,33 +227,33 @@ export const ImmigrationCasePage: React.FC = () => {
 
         {/* Key dates */}
         <Card className="p-6 mb-6">
-          <h2 className="text-sm font-semibold text-[#94a3b8] uppercase tracking-wider mb-4">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">
             Key dates
           </h2>
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <dt className="text-[#64748b]">Expected submission</dt>
-              <dd className="text-[#f1f5f9] font-medium mt-0.5">
+              <dd className="text-[#0b2b43] font-medium mt-0.5">
                 {formatDate(immCase.expected_submission_date)}
               </dd>
             </div>
             <div>
               <dt className="text-[#64748b]">Expected grant</dt>
-              <dd className="text-[#f1f5f9] font-medium mt-0.5">
+              <dd className="text-[#0b2b43] font-medium mt-0.5">
                 {formatDate(immCase.expected_grant_date)}
               </dd>
             </div>
             {immCase.permit_expiry_date && (
               <div>
                 <dt className="text-[#64748b]">Permit expiry</dt>
-                <dd className="text-[#f1f5f9] font-medium mt-0.5">
+                <dd className="text-[#0b2b43] font-medium mt-0.5">
                   {formatDate(immCase.permit_expiry_date)}
                 </dd>
               </div>
             )}
             <div>
               <dt className="text-[#64748b]">Immigration partner</dt>
-              <dd className="text-[#f1f5f9] font-medium mt-0.5">
+              <dd className="text-[#0b2b43] font-medium mt-0.5">
                 {immCase.partner_name ?? '—'}
               </dd>
             </div>
@@ -262,7 +262,7 @@ export const ImmigrationCasePage: React.FC = () => {
 
         {/* BL-OCR.4 / AIQ-750 — uploaded documents + AI extraction status */}
         <Card className="p-6 mb-6">
-          <h2 className="text-sm font-semibold text-[#94a3b8] uppercase tracking-wider mb-4">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">
             Documents
           </h2>
           <CaseDocumentsPanel caseId={immCase.case_id} />
@@ -272,7 +272,7 @@ export const ImmigrationCasePage: React.FC = () => {
             Separate card from Documents above because it reads a different
             backend (rce) with its own document-id space; see the panel header. */}
         <Card className="p-6 mb-6">
-          <h2 className="text-sm font-semibold text-[#94a3b8] uppercase tracking-wider mb-4">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">
             Extracted data
           </h2>
           <CaseExtractedDataPanel caseId={immCase.case_id} />

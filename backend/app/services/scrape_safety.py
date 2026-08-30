@@ -18,11 +18,13 @@ import logging
 import re
 import uuid
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, FrozenSet, List, Optional, Set
 
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from ...database import db
+from . import destination_key
 from .audit_log_service import (
     ACTION_INSERT,
     ACTION_UPDATE,
@@ -61,19 +63,56 @@ def _clean_seed_note(note: Optional[str]) -> Optional[str]:
     return _SEED_NOTE_LABEL if _SEED_NOTE_RE.match(note.strip()) else note
 
 
-def is_destination_allowlisted(city: str, country: Optional[str]) -> bool:
-    city_n, country_n = _norm(city), _norm(country)
-    if not city_n or not country_n:
+def allowlist_index() -> FrozenSet[destination_key.DestinationKey]:
+    """One query -> every canonical key the allowlist currently answers to.
+
+    Batch callers (list_demand_gaps, list_intake_corridors) build this ONCE and pass it
+    to is_destination_allowlisted, instead of one full-table read per row.
+
+    Deliberately NOT a memoised/TTL cache. Under multiple workers a cache in worker A
+    would not see an add_allowlist_entry in worker B, so an admin who had just approved
+    a destination would see it intermittently refused. A parameter removes the N+1 with
+    no staleness at all.
+    """
+    with db.engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT city, country FROM catalog_destination_allowlist")
+        ).all()
+    keys: Set[destination_key.DestinationKey] = set()
+    for city, country in rows:
+        keys |= destination_key.destination_keys(city, country)
+    return frozenset(keys)
+
+
+def is_destination_allowlisted(
+    city: str,
+    country: Optional[str],
+    *,
+    index: Optional[FrozenSet[destination_key.DestinationKey]] = None,
+) -> bool:
+    """L4 gate: may we spend money scraping this destination?
+
+    Canonical comparison — case, whitespace, diacritics, and ISO-2-vs-full-name all
+    describe the SAME destination. Before this, a raw `=` meant the allowlist's
+    'France' could never answer a demand row's 'FR', so every gap row read
+    "not allowlisted" while the writer happily minted a duplicate.
+
+    FAILS CLOSED. An unusable city or country — empty, whitespace-only, or a string
+    that is not a country at all — yields no keys and therefore matches nothing. There
+    is no wildcard: `None` does not match `None`.
+
+    `index` is an optimisation for callers gating many rows in one request. `None` means
+    "read the table now"; an explicitly-passed EMPTY index means "the allowlist is
+    empty" and correctly returns False rather than silently re-querying.
+
+    A database error PROPAGATES. Do not catch it into a `return True` — an unreadable
+    allowlist must never open the gate.
+    """
+    probe = destination_key.destination_keys(city, country)
+    if not probe:
         return False
-    with db.engine.begin() as conn:
-        row = conn.execute(
-            text(
-                "SELECT 1 FROM catalog_destination_allowlist "
-                "WHERE city = :city AND country = :country LIMIT 1"
-            ),
-            {"city": city_n, "country": country_n},
-        ).first()
-    return row is not None
+    idx = allowlist_index() if index is None else index
+    return not probe.isdisjoint(idx)
 
 
 def list_allowlist() -> List[Dict[str, Any]]:
@@ -95,6 +134,43 @@ def list_allowlist() -> List[Dict[str, Any]]:
     return out
 
 
+def _house_country_spelling(
+    rows: List[Any], iso: Optional[str]
+) -> Optional[str]:
+    """The spelling this table already uses for `iso`, or None if it holds none.
+
+    Deliberately self-referential: NO new country map. The allowlist already knows how
+    it spells every country it holds, and the only ISO-2 writer is fill_demand_gap,
+    whose eight countries all already have a full-name row. So ('Berlin','DE') adopts
+    'Germany' from the existing ('Munich','Germany') instead of minting a 'DE' variant.
+
+    Preference mirrors dedupe_destination_allowlist's scoring so the writer and the
+    cleanup script agree on which spelling wins:
+      1. not a bare 2-letter code   ('France' over 'FR')
+      2. initial uppercase          ('France' over 'france')
+      3. most frequent in the table
+      4. lexicographic              (determinism across processes)
+    """
+    if not iso:
+        return None
+    counts: Dict[str, int] = {}
+    for _city, country in rows:
+        if destination_key.canon_country(country) == iso:
+            counts[country] = counts.get(country, 0) + 1
+    if not counts:
+        return None
+
+    def score(name: str) -> tuple:
+        return (
+            0 if len(name.strip()) != 2 else 1,   # full name beats a bare code
+            0 if name[:1].isupper() else 1,        # 'France' beats 'france'
+            -counts[name],                          # most frequent
+            name,                                   # deterministic tiebreak
+        )
+
+    return sorted(counts, key=score)[0]
+
+
 def add_allowlist_entry(
     *,
     city: str,
@@ -102,42 +178,92 @@ def add_allowlist_entry(
     approved_by_user_id: str,
     notes: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Admin-only. Idempotent."""
+    """Admin/HR-only. CANONICALLY idempotent.
+
+    A destination already allowlisted under ANY equivalent spelling is not inserted a
+    second time. This is the fix for the regenerating ('Paris','FR') / ('Paris','France')
+    pair that PR #2020 deleted from the data and that this writer immediately recreated
+    on the next click.
+
+    Returns the row that is IN FORCE — the existing spelling on a canonical match, the
+    newly-stored spelling otherwise — plus `created`. It still never raises for an
+    existing entry: `fill_demand_gap` and `resolve_destination_request` catch ValueError
+    and pass, and ValueError stays reserved for EMPTY input.
+    """
     city_n, country_n = _norm(city), _norm(country)
     if not city_n or not country_n:
         raise ValueError("city and country are both required")
+
+    probe = destination_key.destination_keys(city_n, country_n)
     now = datetime.utcnow().isoformat()
+    created = False
+    stored_city, stored_country = city_n, country_n
+
     with db.engine.begin() as conn:
-        existing = conn.execute(
-            text(
-                "SELECT city, country FROM catalog_destination_allowlist "
-                "WHERE city = :city AND country = :country"
-            ),
-            {"city": city_n, "country": country_n},
-        ).first()
-        if not existing:
-            conn.execute(
-                text(
-                    "INSERT INTO catalog_destination_allowlist "
-                    "(city, country, approved_by, approved_at, notes) "
-                    "VALUES (:city, :country, :actor, :now, :notes)"
-                ),
-                {
-                    "city": city_n,
-                    "country": country_n,
-                    "actor": approved_by_user_id,
-                    "now": now,
-                    "notes": notes,
-                },
-            )
-    _audit(
-        entity_type="catalog_destination_allowlist",
-        entity_id=f"{city_n}|{country_n}",
-        action=ACTION_INSERT,
-        actor_id=approved_by_user_id,
-        new_value={"city": city_n, "country": country_n, "notes": notes},
-    )
-    return {"city": city_n, "country": country_n, "notes": notes}
+        rows = conn.execute(
+            text("SELECT city, country FROM catalog_destination_allowlist")
+        ).all()
+
+        twin = None
+        if probe:
+            for row_city, row_country in rows:
+                if not probe.isdisjoint(
+                    destination_key.destination_keys(row_city, row_country)
+                ):
+                    twin = (row_city, row_country)
+                    break
+
+        if twin:
+            stored_city, stored_country = twin
+        else:
+            # City verbatim — never title-cased. `.title()` mangles 'The Hague',
+            # "'s-Hertogenbosch" and 'Sant Cugat del Vallès', and since #2023 the input
+            # comes from a picker rather than a free-text box.
+            house = _house_country_spelling(rows, destination_key.canon_country(country_n))
+            if house:
+                stored_country = house
+            # else: keep the caller's spelling. For a country the table has never held
+            # this is the normal path (the picker supplies a full name); a bare ISO-2
+            # would be the only row for that country, so no duplicate is possible and
+            # the canonical reader still matches a later 'Japan' against a stored 'JP'.
+            try:
+                conn.execute(
+                    text(
+                        "INSERT INTO catalog_destination_allowlist "
+                        "(city, country, approved_by, approved_at, notes) "
+                        "VALUES (:city, :country, :actor, :now, :notes)"
+                    ),
+                    {
+                        "city": stored_city,
+                        "country": stored_country,
+                        "actor": approved_by_user_id,
+                        "now": now,
+                        "notes": notes,
+                    },
+                )
+                created = True
+            except IntegrityError:
+                # Two concurrent fills of a brand-new destination derive the same
+                # spelling from the same deterministic rule, so the PK collides. The
+                # other writer won; treat it as the idempotent case.
+                created = False
+
+    # Audit only a REAL insert. This used to fire on every call, so the log claimed
+    # inserts that never happened.
+    if created:
+        _audit(
+            entity_type="catalog_destination_allowlist",
+            entity_id=f"{stored_city}|{stored_country}",
+            action=ACTION_INSERT,
+            actor_id=approved_by_user_id,
+            new_value={"city": stored_city, "country": stored_country, "notes": notes},
+        )
+    return {
+        "city": stored_city,
+        "country": stored_country,
+        "notes": notes,
+        "created": created,
+    }
 
 
 # ---------------------------------------------------------------------------

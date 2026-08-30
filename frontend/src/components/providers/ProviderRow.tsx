@@ -48,7 +48,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, onUpdated }) => {
           <span className="text-sm font-medium text-[#0b2b43]">{task.title}</span>
           <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${s.cls}`}>{s.label}</span>
           {task.due_date && (
-            <span className="text-xs text-[#94a3b8]">Due {task.due_date}</span>
+            <span className="text-xs text-slate-500">Due {task.due_date}</span>
           )}
         </div>
         {task.description && (
@@ -136,7 +136,7 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
           >
             Invite
           </Button>
-          <span className="text-[#94a3b8] text-sm select-none">{expanded ? '▲' : '▼'}</span>
+          <span className="text-slate-500 text-sm select-none">{expanded ? '▲' : '▼'}</span>
         </div>
       </Button>
 
@@ -144,7 +144,7 @@ export const ProviderRow: React.FC<ProviderRowProps> = ({
       {expanded && (
         <div className="px-4 pb-3">
           {tasks.length === 0 ? (
-            <p className="text-xs text-[#94a3b8] py-2">No tasks assigned yet.</p>
+            <p className="text-xs text-slate-500 py-2">No tasks assigned yet.</p>
           ) : (
             <ul>
               {tasks.map((t) => (

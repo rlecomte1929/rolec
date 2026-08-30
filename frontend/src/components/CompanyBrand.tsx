@@ -16,7 +16,12 @@ function getInitials(name: string): string {
   return (first.charAt(0) + last.charAt(0)).toUpperCase();
 }
 
-export const CompanyBrand: React.FC = () => {
+export interface CompanyBrandProps {
+  /** Logo/initials only, no company name — for the collapsed (64px) sidebar rail. */
+  compact?: boolean;
+}
+
+export const CompanyBrand: React.FC<CompanyBrandProps> = ({ compact = false }) => {
   const location = useLocation();
   const role = getAuthItem('relopass_role');
   const isOnHrRoute = location.pathname.startsWith('/hr');
@@ -50,7 +55,11 @@ export const CompanyBrand: React.FC = () => {
           : companyAPI.loading;
 
   if (loading || !company) {
-    return null;
+    // Hold the row's height instead of collapsing it. PlatformShellSidebar always renders
+    // the wrapper (px-3 py-2 + border), so returning null made it 17px tall and it jumped
+    // to 45px once the avatar (h-7 = 28px) mounted — pushing all 15 nav links down by
+    // exactly 28px after the company-profile response landed.
+    return <div className="h-7" aria-hidden />;
   }
 
   const nameRaw = (company as Record<string, unknown>).name;
@@ -62,22 +71,36 @@ export const CompanyBrand: React.FC = () => {
   const initials = getInitials(name);
   const logoUrl = (company as Record<string, unknown>).logo_url as string | undefined;
 
+  const mark = logoUrl ? (
+    <img
+      src={logoUrl}
+      alt=""
+      className="h-7 w-7 rounded-full object-cover border border-[#e2e8f0]"
+    />
+  ) : (
+    <div
+      className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-semibold bg-[#eef4f8] text-[#0b2b43] border border-[#e2e8f0]"
+      aria-hidden
+    >
+      {initials}
+    </div>
+  );
+
+  // Collapsed sidebar: the mark alone. Previously the whole slot was hidden when
+  // collapsed, so the company disappeared entirely — the page said the logo "appears in
+  // the header on every page" and then it did not. The name would not fit in 64px; the
+  // mark does, and `title` keeps it discoverable on hover.
+  if (compact) {
+    return (
+      <div className="flex items-center justify-center shrink-0" title={name}>
+        {mark}
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2 shrink-0" title={name}>
-      {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt=""
-          className="h-7 w-7 rounded-full object-cover border border-[#e2e8f0]"
-        />
-      ) : (
-        <div
-          className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-semibold bg-[#eef4f8] text-[#0b2b43] border border-[#e2e8f0]"
-          aria-hidden
-        >
-          {initials}
-        </div>
-      )}
+      {mark}
       <span className="text-sm font-medium text-[#0f172a] truncate max-w-[140px]">
         {displayName}
       </span>

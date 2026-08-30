@@ -44,8 +44,10 @@ jobs:
     name: Corridor deadline sweep
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # No-op unless explicitly enabled via repo vars.
-    if: ${{ vars.CORRIDOR_DEADLINE_SWEEP_ENABLED == 'true' }}
+    # The gate deliberately sits on the STEP, not the job. With `if:` on the job the
+    # whole run is skipped, and a skipped run renders as "completed" in the Actions
+    # UI — indistinguishable from a successful one. Same pattern as
+    # crawl-scheduler.yml; see docs/findings/AIQ-2012-cron-gates-never-set.md.
     env:
       # Quoted env (not inlined into run:) per workflow-injection guidance.
       API_BASE: ${{ vars.CORRIDOR_DEADLINE_SWEEP_API_BASE }}
@@ -53,7 +55,24 @@ jobs:
       # Scheduled runs are live; manual runs honour the input and default to dry.
       DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
     steps:
+      - name: Report gate state
+        env:
+          ENABLED: ${{ vars.CORRIDOR_DEADLINE_SWEEP_ENABLED }}
+        run: |
+          set -euo pipefail
+          if [ "${ENABLED:-}" != "true" ]; then
+            {
+              echo "## Corridor deadline sweep: DISABLED"
+              echo ''
+              echo "\`vars.CORRIDOR_DEADLINE_SWEEP_ENABLED\` is \`${ENABLED:-<unset>}\` — nothing ran."
+              echo "Corridor deadlines are not being swept, so no reminders are queued."
+              echo "Set the repo variable to \`true\` to enable."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Corridor deadline sweep disabled::CORRIDOR_DEADLINE_SWEEP_ENABLED is '${ENABLED:-<unset>}'; nothing ran."
+          fi
+
       - name: POST /api/crons/corridor-deadline-sweep
+        if: ${{ vars.CORRIDOR_DEADLINE_SWEEP_ENABLED == 'true' }}
         run: |
           set -euo pipefail
           if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then

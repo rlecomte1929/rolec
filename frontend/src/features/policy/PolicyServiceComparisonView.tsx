@@ -12,7 +12,7 @@ const STATUS_LABELS: Record<PolicyStatus, string> = {
 };
 
 const STATUS_STYLES: Record<PolicyStatus, string> = {
-  included: 'bg-[#eaf5f4] text-[#1f8e8b]',
+  included: 'bg-[#eaf5f4] text-[#105d5b]',
   capped: 'bg-[#fff7ed] text-[#9a3412]',
   approval_required: 'bg-[#fef3c7] text-[#92400e]',
   partial: 'bg-[#fef3c7] text-[#92400e]',

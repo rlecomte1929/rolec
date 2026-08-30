@@ -210,7 +210,7 @@ export function DataTable<T>({
   if (rows.length === 0 && emptyState) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="p-8 text-center text-sm text-slate-400">{emptyState}</div>
+        <div className="p-8 text-center text-sm text-slate-500">{emptyState}</div>
         {footerSlot}
       </div>
     );
@@ -317,7 +317,7 @@ function DraggableHeaderCell<T>({ header, unmovable }: DraggableHeaderCellProps<
             className={`shrink-0 transition-opacity ${
               isDragging
                 ? 'text-accent-500 opacity-100'
-                : 'text-slate-300 opacity-0 group-hover:opacity-100'
+                : 'text-slate-500 opacity-0 group-hover:opacity-100'
             }`}
           />
         )}
@@ -336,7 +336,7 @@ function DraggableHeaderCell<T>({ header, unmovable }: DraggableHeaderCellProps<
           {flexRender(header.column.columnDef.header, header.getContext())}
         </span>
         {canSort && (
-          <span aria-hidden className="text-[10px] text-slate-400">
+          <span aria-hidden className="text-[10px] text-slate-500">
             {sortDir === 'asc' ? '↑' : sortDir === 'desc' ? '↓' : '⇅'}
           </span>
         )}

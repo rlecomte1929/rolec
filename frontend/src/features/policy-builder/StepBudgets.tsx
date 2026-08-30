@@ -144,7 +144,7 @@ export const StepBudgets: React.FC<Props> = ({
                 <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">
                   {corridor.label}
                   {corridor.key === '*' && (
-                    <span className="ml-1 text-xs text-slate-400">(default)</span>
+                    <span className="ml-1 text-xs text-slate-500">(default)</span>
                   )}
                 </td>
                 {tiers.map((tier) => {
@@ -231,7 +231,7 @@ export const StepBudgets: React.FC<Props> = ({
         <Button variant="outline" size="sm" onClick={addCorridor} type="button">
           Add destination
         </Button>
-        <span className="text-xs text-slate-400 hidden sm:block">
+        <span className="text-xs text-slate-500 hidden sm:block">
           Use <code>*</code> as a wildcard for any origin or destination.
         </span>
       </div>

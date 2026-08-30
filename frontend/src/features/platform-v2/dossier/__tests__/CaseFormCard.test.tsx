@@ -138,3 +138,38 @@ describe('CaseFormCard — [WS1] content-honesty notice', () => {
     expect(screen.queryByText(/Indicative guidance/i)).toBeNull();
   });
 });
+
+/**
+ * [BUG-260706-ECA9] "when clicking on 'view original pdf', nothing gets loaded".
+ * The button used to render unconditionally, but GET .../original-pdf 404s when the
+ * template has no original attached — true for 85 of the 86 production templates.
+ * The card now only offers it when the server says one exists.
+ */
+describe('View original PDF — only offered when there is one', () => {
+  /** The card starts collapsed, so every assertion must expand it first —
+   *  otherwise "not in the document" passes for the wrong reason. */
+  function renderExpanded(hasOriginal: boolean | undefined) {
+    const form = makeForm();
+    if (hasOriginal === undefined) {
+      delete (form.template as { has_original_pdf?: boolean }).has_original_pdf;
+    } else {
+      (form.template as { has_original_pdf?: boolean }).has_original_pdf = hasOriginal;
+    }
+    render(<MemoryRouter><CaseFormCard form={form} initialExpanded /></MemoryRouter>);
+  }
+
+  it('offers it when an original really is attached', () => {
+    renderExpanded(true);
+    expect(screen.getByRole('button', { name: /view original pdf/i })).toBeInTheDocument();
+  });
+
+  it('hides the action when the template has no original attached', () => {
+    renderExpanded(false);
+    expect(screen.queryByRole('button', { name: /view original pdf/i })).not.toBeInTheDocument();
+  });
+
+  it('hides it when the flag is absent entirely (older payload)', () => {
+    renderExpanded(undefined);
+    expect(screen.queryByRole('button', { name: /view original pdf/i })).not.toBeInTheDocument();
+  });
+});

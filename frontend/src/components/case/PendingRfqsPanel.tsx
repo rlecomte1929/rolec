@@ -35,7 +35,7 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
   // so say so rather than showing a confident — and possibly false — empty state.
   if (!caseId) {
     return (
-      <p className="text-sm text-[#94a3b8]">
+      <p className="text-sm text-slate-500">
         Quote requests can&apos;t be loaded for this case yet.
       </p>
     );
@@ -43,7 +43,7 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-[#94a3b8] py-4">
+      <div className="flex items-center gap-2 text-sm text-slate-500 py-4">
         <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#0b2b43] border-t-transparent" />
         Loading quote requests…
       </div>
@@ -52,7 +52,7 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
 
   if (rfqs.length === 0) {
     return (
-      <p className="text-sm text-[#94a3b8]">
+      <p className="text-sm text-slate-500">
         No quote requests yet. The employee requests quotes from their Services flow; they&apos;ll
         appear here once submitted.
       </p>
@@ -86,7 +86,7 @@ export const PendingRfqsPanel: React.FC<Props> = ({ caseId }) => {
                       className="text-xs text-[#374151] flex items-center justify-between gap-2"
                     >
                       <span className="truncate">{r.supplier_name ?? r.supplier_id ?? 'Provider'}</span>
-                      <span className="text-[#94a3b8] shrink-0">{r.status ?? '—'}</span>
+                      <span className="text-slate-500 shrink-0">{r.status ?? '—'}</span>
                     </li>
                   ))}
                 </ul>

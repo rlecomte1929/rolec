@@ -43,7 +43,7 @@ export function EmployeeScopedAssignmentPicker({
               <span className="block text-sm text-[#64748b] font-normal">
                 {row.company?.name || 'Company'}
                 {formatCaseReference(row) ? (
-                  <span className="text-[#94a3b8]"> · Ref {formatCaseReference(row)}</span>
+                  <span className="text-slate-500"> · Ref {formatCaseReference(row)}</span>
                 ) : null}
               </span>
             </Button>

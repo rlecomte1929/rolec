@@ -229,7 +229,7 @@ function ConfidenceDot({ score }: { score: number | undefined }) {
   return (
     <span className="inline-flex items-center gap-1 ml-1.5">
       <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
-      <span className="text-[10px] text-[#94a3b8]">{pct}%</span>
+      <span className="text-[10px] text-slate-500">{pct}%</span>
     </span>
   );
 }
@@ -335,7 +335,7 @@ const UploadStep: React.FC<UploadStepProps> = ({ caseId, onUploaded, onSkip }) =
               className="max-h-40 rounded-lg border border-[#e2e8f0] object-contain shadow-sm"
             />
             <p className="text-sm text-[#475569]">{file?.name}</p>
-            <p className="text-xs text-[#94a3b8]">Click or drag to replace</p>
+            <p className="text-xs text-slate-500">Click or drag to replace</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -348,7 +348,7 @@ const UploadStep: React.FC<UploadStepProps> = ({ caseId, onUploaded, onSkip }) =
             <p className="text-sm font-medium text-[#374151]">
               Drop your passport photo page here, or click to browse
             </p>
-            <p className="text-xs text-[#94a3b8]">JPEG, PNG, or WebP · max 10 MB</p>
+            <p className="text-xs text-slate-500">JPEG, PNG, or WebP · max 10 MB</p>
           </div>
         )}
       </div>
@@ -384,7 +384,7 @@ const ProcessingStep: React.FC = () => (
   <div className="py-12 text-center space-y-4">
     <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#e2e8f0] border-t-[#0b2b43]" />
     <p className="text-sm font-medium text-[#0b2b43]">Scanning passport…</p>
-    <p className="text-xs text-[#94a3b8]">
+    <p className="text-xs text-slate-500">
       Extracting and verifying fields · validating MRZ checksums · checking for conflicts
     </p>
   </div>
@@ -522,7 +522,7 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({ caseId, result, onSave
             );
           })}
         </div>
-        <p className="text-xs text-[#94a3b8] mt-1.5">
+        <p className="text-xs text-slate-500 mt-1.5">
           Nothing is saved yet — check each value, correct anything the scan got wrong,
           then confirm.
         </p>

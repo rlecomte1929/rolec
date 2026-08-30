@@ -45,25 +45,25 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
     >
       <Link
         to={homeHref}
-        className="text-slate-400 hover:text-slate-700 transition-colors"
+        className="text-slate-500 hover:text-slate-700 transition-colors"
       >
         ReloPass
       </Link>
       {section && (
         <>
-          <span className="text-slate-300" aria-hidden="true">/</span>
+          <span className="text-slate-500" aria-hidden="true">/</span>
           <span className="text-slate-500 truncate">{section}</span>
         </>
       )}
       {parent && (
         <>
-          <span className="text-slate-300" aria-hidden="true">/</span>
+          <span className="text-slate-500" aria-hidden="true">/</span>
           <Link to={parent.href} className="text-slate-500 hover:text-slate-700 transition-colors truncate">
             {parent.label}
           </Link>
         </>
       )}
-      <span className="text-slate-300" aria-hidden="true">/</span>
+      <span className="text-slate-500" aria-hidden="true">/</span>
       <span className="text-slate-700 font-medium truncate" aria-current="page">
         {title}
       </span>

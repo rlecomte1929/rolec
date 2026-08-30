@@ -14,6 +14,7 @@ import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { usePageMeta } from '../../hooks/usePageMeta';
 import { useAdEngagementTracking } from '../../hooks/useAdEngagementTracking';
 import { mobilityTeamsContent as c } from './adLandingContent';
+import { imgDimensions } from '../../lib/publicImageDimensions';
 
 /**
  * [AIQ-1783] `/mobility-teams` — segment A, the HR / mobility buyer.
@@ -57,6 +58,7 @@ export const MobilityTeamsPage: React.FC = () => {
                   <div className={imageRight ? '' : 'lg:order-1'}>
                     <img
                       src={anchor.image}
+                      {...imgDimensions(anchor.image)}
                       alt={anchor.imageAlt}
                       loading="lazy"
                       decoding="async"

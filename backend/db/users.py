@@ -34,6 +34,43 @@ _is_sqlite = _raw_url.startswith("sqlite")
 from ..database import _profiles_has_status_column
 
 
+def _profile_matches(
+    row: Any,
+    role_norm: str,
+    email_norm: Optional[str],
+    full_name_norm: str,
+    company_id: Optional[str],
+) -> bool:
+    """Is the stored profile row already what ensure_profile_record would write?
+
+    `row` is (role, email, full_name, company_id). Returning True lets the caller skip
+    an UPDATE that would change nothing — the point of the whole exercise, since this
+    runs on every authenticated request.
+
+    Comparisons are EXACT, not semantic, and deliberately so:
+
+    * email — a differently-cased stored value counts as a difference, so the row is
+      normalised once and then matches forever after. Comparing case-insensitively
+      would leave it un-normalised permanently.
+    * full_name — NULL and '' are treated as equal. The writer coerces None to '',
+      so treating them as different would write '' over NULL on every single request
+      for every user who has no name: exactly the storm this is removing.
+    * company_id — `None` means "caller isn't managing company_id" (the writer has a
+      separate no-company_id branch), so it is not a difference. Compared as text
+      because the column is uuid while callers pass str.
+    """
+    cur_role, cur_email, cur_name, cur_company = row[0], row[1], row[2], row[3]
+    if (cur_role or "") != role_norm:
+        return False
+    if (cur_email or None) != (email_norm or None):
+        return False
+    if (cur_name or "") != (full_name_norm or ""):
+        return False
+    if company_id is not None and str(cur_company or "") != str(company_id):
+        return False
+    return True
+
+
 class UsersMixin:
     """Users/profile-domain methods mixed into :class:`backend.database.Database`."""
 
@@ -570,8 +607,15 @@ class UsersMixin:
         with self.engine.begin() as conn:
             existing = None
             if user_id_is_uuid:
+                # Read the CURRENT values, not just existence. This runs on every
+                # authenticated request (app/auth_deps.py get_current_user), and it used
+                # to UPDATE unconditionally: 154k UPDATEs + 160k SELECTs on profiles in
+                # 79 days, all on the critical path, most of them writing the values that
+                # were already there. A write also takes a row lock and generates WAL, so
+                # on a single-worker instance it is paid twice.
                 existing = conn.execute(
-                    text("SELECT 1 FROM profiles WHERE id = :id"), {"id": id_param}
+                    text("SELECT role, email, full_name, company_id FROM profiles WHERE id = :id"),
+                    {"id": id_param},
                 ).fetchone()
 
             # --- Email fallback ---------------------------------------------------
@@ -583,10 +627,14 @@ class UsersMixin:
             # profiles_id_fkey FK constraint pointing at auth.users).
             if not existing and email_norm:
                 existing_by_email = conn.execute(
-                    text("SELECT 1 FROM profiles WHERE LOWER(TRIM(email)) = :email"),
+                    text("SELECT role, email, full_name, company_id FROM profiles "
+                         "WHERE LOWER(TRIM(email)) = :email"),
                     {"email": email_norm},
                 ).fetchone()
                 if existing_by_email:
+                    if _profile_matches(existing_by_email, role_norm, email_norm,
+                                        full_name_norm, company_id):
+                        return
                     try:
                         if company_id is None:
                             conn.execute(text(
@@ -608,6 +656,8 @@ class UsersMixin:
             # ----------------------------------------------------------------------
 
             if existing:
+                if _profile_matches(existing, role_norm, email_norm, full_name_norm, company_id):
+                    return  # already correct — do not write
                 if company_id is None:
                     conn.execute(text(
                         "UPDATE profiles SET role = :role, email = :email, full_name = :full_name "

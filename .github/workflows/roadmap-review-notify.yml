@@ -16,10 +16,24 @@ name: Roadmap review notify sweep
 #
 # Test first with workflow_dispatch (dry_run=true) before relying on the schedule.
 
+# SCHEDULE REMOVED 2026-08-28. This fired hourly and was SKIPPED every time —
+# 26 skipped runs and zero real ones in the sampled window, because
+# ROADMAP_REVIEW_NOTIFY_CRON_ENABLED has never been set. Removing the schedule changes
+# no behaviour whatsoever: it was already doing nothing. What it stops is ~731 runs a
+# month, each billed as a full minute, against an Actions allowance whose exhaustion on
+# 2026-08-26 collapsed the scheduler and took prod-smoke down to 1 run/day.
+#
+# The other disabled crons in this PR keep their (daily/weekly) schedules and now warn
+# visibly instead. Hourly is different: a nag that fires 731 times is not a nag, it is
+# the bill.
+#
+# TO RE-ENABLE: restore the `schedule:` block below and set the vars listed above.
+# Note this path sends HR email — #2062 had to suppress it emailing test fixtures, so
+# turn it on deliberately, not by accident.
+#
+#  schedule:
+#    - cron: "17 * * * *"
 on:
-  schedule:
-    # 17 minutes past every hour, off the top of the hour to avoid the cron pileup.
-    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -39,15 +53,34 @@ jobs:
     name: Roadmap review notify sweep
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # No-op unless explicitly enabled via repo vars.
-    if: ${{ vars.ROADMAP_REVIEW_NOTIFY_CRON_ENABLED == 'true' }}
+    # The gate deliberately sits on the STEP, not the job. With `if:` on the job the
+    # whole run is skipped, and a skipped run renders as "completed" in the Actions
+    # UI — indistinguishable from a successful one. Same pattern as
+    # crawl-scheduler.yml; see docs/findings/AIQ-2012-cron-gates-never-set.md.
     env:
       # Quoted env (not inlined into run:) per workflow-injection guidance.
       API_BASE: ${{ vars.ROADMAP_REVIEW_NOTIFY_API_BASE }}   # e.g. https://api.relopass.com
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
       DRY_RUN: ${{ inputs.dry_run }}
     steps:
+      - name: Report gate state
+        env:
+          ENABLED: ${{ vars.ROADMAP_REVIEW_NOTIFY_CRON_ENABLED }}
+        run: |
+          set -euo pipefail
+          if [ "${ENABLED:-}" != "true" ]; then
+            {
+              echo "## Roadmap review notify sweep: DISABLED"
+              echo ''
+              echo "\`vars.ROADMAP_REVIEW_NOTIFY_CRON_ENABLED\` is \`${ENABLED:-<unset>}\` — nothing ran."
+              echo "HR is not being told that roadmaps are awaiting review."
+              echo "Set the repo variable to \`true\` to enable."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Roadmap review notify sweep disabled::ROADMAP_REVIEW_NOTIFY_CRON_ENABLED is '${ENABLED:-<unset>}'; nothing ran."
+          fi
+
       - name: POST /api/crons/roadmap-review-notify
+        if: ${{ vars.ROADMAP_REVIEW_NOTIFY_CRON_ENABLED == 'true' }}
         run: |
           set -euo pipefail
           if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then

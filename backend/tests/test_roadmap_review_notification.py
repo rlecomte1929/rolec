@@ -28,10 +28,13 @@ def _no_real_engine(monkeypatch):
     monkeypatch.setattr(svc, "_engine", lambda: pytest.fail("test touched the real engine"))
 
 
-def _stub_db(monkeypatch, *, recipient, already=False, corridor="FR → DE"):
+def _stub_db(monkeypatch, *, recipient, already=False, corridor="FR → DE", is_test=False):
     monkeypatch.setattr(svc, "resolve_hr_recipient", lambda _cid: recipient)
     monkeypatch.setattr(svc, "_already_notified", lambda _cid: already)
     monkeypatch.setattr(svc, "_corridor", lambda _cid: corridor)
+    # Fixture suppression reads the DB too; default it to "a real case" so every existing
+    # test keeps exercising the send path it was written for.
+    monkeypatch.setattr(svc, "_is_test_case", lambda _cid: is_test)
     recorded = {}
     monkeypatch.setattr(
         svc, "_record", lambda cid, status, to: recorded.update(case_id=cid, status=status, to=to)
@@ -321,3 +324,100 @@ class TestFallbackToAdminWhenNoHr:
         assert out["would_send_to"] == ["ops@relopass.com"]
         assert out.get("fallback") is True
         assert sent == []
+
+
+class TestFixtureCasesNeverReachResend:
+    """Cost containment, measured 2026-08-26: 627 roadmap-review emails went out in August
+    (187 in July, 3.4x growth) and EVERY recipient was an E2E fixture — `Test Drive R4xmove`,
+    `E2E Sentinel A ... (Seed)`. 806 of the 814 delivered rows resolve to a reserved synthetic
+    domain, the other 43 to an is_test company.
+
+    The provisioner creates the cases; this cron turns each one into a real, billed Resend
+    send. Both signals are checked because neither alone covers the data.
+
+    The demo tenants (@testcompany.com, @*-demo.com) are REAL and must keep receiving mail —
+    that is the over-blocking failure this guards against, and why the match is a suffix.
+    """
+
+    def test_probe_test_recipient_is_not_emailed(self, monkeypatch):
+        recorded = _stub_db(
+            monkeypatch,
+            recipient={"email": "hr@probe.test", "hr_name": "P", "employee_name": "E"},
+        )
+        monkeypatch.setattr(svc, "_is_test_case", lambda _cid: False)
+        out = svc.notify_hr_roadmap_pending("c1")
+        assert out["status"] == "skipped_test_fixture"
+        assert recorded["status"] == "skipped_test_fixture", "the skip must be RECORDED, not silent"
+
+    def test_testco_recipient_is_not_emailed(self, monkeypatch):
+        _stub_db(monkeypatch,
+                 recipient={"email": "hr@testco.com", "hr_name": "T", "employee_name": "E"})
+        monkeypatch.setattr(svc, "_is_test_case", lambda _cid: False)
+        assert svc.notify_hr_roadmap_pending("c1")["status"] == "skipped_test_fixture"
+
+    def test_is_test_company_is_not_emailed_even_with_a_real_looking_address(self, monkeypatch):
+        recorded = _stub_db(monkeypatch, recipient=_HR)
+        monkeypatch.setattr(svc, "_is_test_case", lambda _cid: True)
+        out = svc.notify_hr_roadmap_pending("c1")
+        assert out["status"] == "skipped_test_fixture"
+        assert recorded["status"] == "skipped_test_fixture"
+
+    def test_skip_never_marks_the_case_notified(self):
+        """`_record` sets notified_at only for delivered statuses — a skip must not be one,
+        so a fixture case stays visibly un-notified rather than looking successfully mailed."""
+        assert "skipped_test_fixture" not in (
+            svc._STATUS_SENT, svc._STATUS_NO_KEY, svc._STATUS_FALLBACK)
+
+    # ── over-blocking guards: these addresses are REAL ──────────────────────────────
+
+    def test_demo_tenant_still_receives_mail(self, monkeypatch):
+        _stub_db(monkeypatch,
+                 recipient={"email": "hr@testcompany.com", "hr_name": "D", "employee_name": "E"})
+        monkeypatch.setattr(svc, "_is_test_case", lambda _cid: False)
+        monkeypatch.setattr(svc, "_corridor", lambda _cid: "FR → DE")
+        sent = {}
+        import backend.app.services.assignment_invite_email as inv
+        monkeypatch.setattr(inv, "_resend_send",
+                            lambda **kw: sent.update(kw) or {"status": "sent"})
+        assert svc.notify_hr_roadmap_pending("c1")["status"] == "sent"
+        assert sent["to_email"] == "hr@testcompany.com"
+
+    def test_ordinary_customer_still_receives_mail(self, monkeypatch):
+        _stub_db(monkeypatch, recipient=_HR)
+        monkeypatch.setattr(svc, "_is_test_case", lambda _cid: False)
+        sent = {}
+        import backend.app.services.assignment_invite_email as inv
+        monkeypatch.setattr(inv, "_resend_send",
+                            lambda **kw: sent.update(kw) or {"status": "sent"})
+        assert svc.notify_hr_roadmap_pending("c1")["status"] == "sent"
+        assert sent["to_email"] == "hr@acme.com"
+
+    def test_explicit_override_can_still_force_a_send_to_a_fixture(self, monkeypatch):
+        """An operator asking for a specific address is a deliberate act, not the cron."""
+        _stub_db(monkeypatch,
+                 recipient={"email": "hr@probe.test", "hr_name": "P", "employee_name": "E"})
+        monkeypatch.setattr(svc, "_is_test_case", lambda _cid: False)
+        import backend.app.services.assignment_invite_email as inv
+        monkeypatch.setattr(inv, "_resend_send", lambda **kw: {"status": "sent"})
+        out = svc.notify_hr_roadmap_pending("c1", to_override="hr@probe.test")
+        assert out["status"] == "sent"
+
+    def test_unknown_test_state_fails_open(self, monkeypatch):
+        """If the is_test lookup breaks, answer False so the mail still goes out: a missing
+        real notification is worse than one extra fixture email. Mirrors _already_notified."""
+
+        def _boom():
+            raise RuntimeError("db down")
+
+        monkeypatch.setattr(svc, "_engine", _boom)
+        assert svc._is_test_case("c1") is False
+
+    def test_recipient_domain_match_is_a_suffix_not_a_substring(self):
+        """@testco.com must not swallow @testcompany.com — the demo tenants are real."""
+        assert svc._is_test_recipient("hr@probe.test") is True
+        assert svc._is_test_recipient("hr@testco.com") is True
+        assert svc._is_test_recipient("HR@TestCo.com ") is True
+        assert svc._is_test_recipient("hr@testcompany.com") is False
+        assert svc._is_test_recipient("hr@acme-demo.com") is False
+        assert svc._is_test_recipient("hr@probe.testing.com") is False
+        assert svc._is_test_recipient(None) is False

@@ -240,7 +240,7 @@ function FieldWrap({
     <div className={`flex flex-col gap-1 ${className}`}>
       <label className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
         {label}
-        {optional && <span className="text-gray-400 font-normal">(optional)</span>}
+        {optional && <span className="text-gray-500 font-normal">(optional)</span>}
         {why && (
           <Button unstyled
             type="button"
@@ -255,7 +255,7 @@ function FieldWrap({
       {whyOpen && why && (
         <div className="text-xs text-gray-500 bg-accent-50 border border-accent-100 rounded-lg px-3 py-2">{why}</div>
       )}
-      {hint && <div className="text-xs text-gray-400">{hint}</div>}
+      {hint && <div className="text-xs text-gray-500">{hint}</div>}
     </div>
   );
 }
@@ -315,8 +315,8 @@ const STATE_LABEL: Record<SectionState, string> = {
 const STATE_CLS: Record<SectionState, string> = {
   complete: 'text-green-600 bg-green-50',
   partial: 'text-amber-600 bg-amber-50',
-  empty: 'text-gray-400 bg-gray-50',
-  na: 'text-gray-300 bg-gray-50',
+  empty: 'text-gray-500 bg-gray-50',
+  na: 'text-gray-500 bg-gray-50',
 };
 
 function SectionCard({
@@ -390,11 +390,11 @@ function SectionCard({
           )}
         </div>
         <div className="flex-shrink-0 flex items-center gap-2 mt-0.5">
-          {est && <span className="text-[10px] text-gray-400">~{est} min</span>}
+          {est && <span className="text-[10px] text-gray-500">~{est} min</span>}
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATE_CLS[state]}`}>
             {STATE_LABEL[state]}
           </span>
-          <span className={`text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>▾</span>
+          <span className={`text-gray-500 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>▾</span>
         </div>
       </Button>
 
@@ -583,7 +583,7 @@ export function EmployeeRichProfilePage() {
                 </span>
               </div>
               <div className="text-xs font-semibold text-gray-700 text-center">Profile completion</div>
-              <div className="text-[11px] text-gray-400 text-center">
+              <div className="text-[11px] text-gray-500 text-center">
                 {completeCount} of {SECTIONS.length} sections complete
               </div>
             </div>
@@ -607,7 +607,7 @@ export function EmployeeRichProfilePage() {
                       }`}
                     />
                     <span className="font-medium truncate">{s.title}</span>
-                    <span className="ml-auto text-gray-300 text-[10px]">{s.marker}</span>
+                    <span className="ml-auto text-gray-500 text-[10px]">{s.marker}</span>
                   </Button>
                 );
               })}
@@ -707,7 +707,7 @@ export function EmployeeRichProfilePage() {
                       <Input unstyled type="number" placeholder="min" value={profile.monthly_budget_min}
                         onChange={(v) => set('monthly_budget_min', v === '' ? '' : Number(v))}
                         className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
-                      <span className="text-gray-400 text-sm">—</span>
+                      <span className="text-gray-500 text-sm">—</span>
                       <Input unstyled type="number" placeholder="max" value={profile.monthly_budget_max}
                         onChange={(v) => set('monthly_budget_max', v === '' ? '' : Number(v))}
                         className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300" />
@@ -835,7 +835,7 @@ export function EmployeeRichProfilePage() {
                         <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-700">
                           <span className="text-base">🧒</span>
                           Child {i + 1} · {child.name ?? `Child ${i + 1}`}
-                          {age != null && <span className="text-xs font-normal text-gray-400">({age}y)</span>}
+                          {age != null && <span className="text-xs font-normal text-gray-500">({age}y)</span>}
                         </div>
                         <Grid>
                           <FieldWrap label="School type">

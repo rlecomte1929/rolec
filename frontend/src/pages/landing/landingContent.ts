@@ -21,7 +21,13 @@ export const landingContent = {
       'One system for cases, documents, providers, and deadlines — so HR runs relocation on less budget, without dropping a move.',
     brandPromise:
       'The coordination layer across HR, employees, and providers.',
-    primaryCta: 'Structure how you run relocation. Start with one case.',
+    // 'Get started', matching the header and footer links to the same destination.
+    // WCAG 3.2.4: this CTA, the nav link and the footer link all go to /access; this one
+    // read 'Structure how you run relocation. Start with one case.' while the other two
+    // read 'Get started', so a screen-reader user listing links saw three destinations
+    // where there is one. The sentence was CTA copy, not body copy — it is dropped rather
+    // than relocated; re-add it as hero paragraph text if the marketing line is wanted.
+    primaryCta: 'Get started',
     secondaryCta: 'Book a demo',
     trustMicrocopy: '30-minute walkthrough. No commitment.',
   },
@@ -134,7 +140,8 @@ export const landingContent = {
     microCopy: 'Tell us how your relocations run today. We\'ll show you what changes.',
     options: {
       demo: 'Book a demo',
-      platform: 'See the platform walkthrough',
+      // Same destination as the nav's 'Platform' link, so same name (WCAG 3.2.4).
+      platform: 'Platform',
       signIn: 'Sign in',
     },
   },

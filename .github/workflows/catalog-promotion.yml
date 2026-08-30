@@ -29,15 +29,34 @@ jobs:
     name: Promote popular HR vendors
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # No-op unless explicitly enabled via repo vars.
-    if: ${{ vars.CATALOG_PROMOTION_CRON_ENABLED == 'true' }}
+    # The gate deliberately sits on the STEP, not the job. With `if:` on the job the
+    # whole run is skipped, and a skipped run renders as "completed" in the Actions
+    # UI — indistinguishable from a successful one. Same pattern as
+    # crawl-scheduler.yml; see docs/findings/AIQ-2012-cron-gates-never-set.md.
     env:
       # Quoted env (not inlined into run:) per workflow-injection guidance.
       API_BASE: ${{ vars.CATALOG_PROMOTION_API_BASE }}    # e.g. https://api.relopass.com
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
       DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
     steps:
+      - name: Report gate state
+        env:
+          ENABLED: ${{ vars.CATALOG_PROMOTION_CRON_ENABLED }}
+        run: |
+          set -euo pipefail
+          if [ "${ENABLED:-}" != "true" ]; then
+            {
+              echo "## Catalog HR-vendor promotion: DISABLED"
+              echo ''
+              echo "\`vars.CATALOG_PROMOTION_CRON_ENABLED\` is \`${ENABLED:-<unset>}\` — nothing ran."
+              echo "Popular HR vendors are not being promoted into the catalog."
+              echo "Set the repo variable to \`true\` to enable."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Catalog HR-vendor promotion disabled::CATALOG_PROMOTION_CRON_ENABLED is '${ENABLED:-<unset>}'; nothing ran."
+          fi
+
       - name: POST /api/crons/promote-hr-vendors
+        if: ${{ vars.CATALOG_PROMOTION_CRON_ENABLED == 'true' }}
         run: |
           set -euo pipefail
           if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then

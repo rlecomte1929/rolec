@@ -425,7 +425,7 @@ export const ProvidersPage: React.FC = () => {
     <AppShell section="Employee" title="Services">
       <div className="mb-6">
         <p className="text-[#6b7280]">Select what you need. We save it for the next steps.</p>
-        <p className="text-sm text-[#94a3b8] mt-1">~3 min to complete</p>
+        <p className="text-sm text-slate-500 mt-1">~3 min to complete</p>
         <div className="mt-4 rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-4 py-3">
           <label className="block">
             <span className="text-sm font-medium text-[#0b2b43]">Estimate currency</span>

@@ -1,11 +1,24 @@
 name: E2E Sentinel Campaign
 
-# Runs on every deploy to main (post-deploy smoke, gated on a /health check) and
-# on manual dispatch. The whole job no-ops unless the repo variable
-# E2E_CAMPAIGN_ENABLED == 'true', so merging this file changes nothing until you opt in.
+# Runs twice daily against prod (gated on a /health check) and on manual dispatch.
+# The whole job no-ops unless the repo variable E2E_CAMPAIGN_ENABLED == 'true', so
+# merging this file changes nothing until you opt in.
+#
+# WAS `push: branches: [main]` until 2026-08-26 — one full campaign per merge. At ~10
+# billed minutes a run (3 of them the Render deploy-grace sleep below), the 178 pushes
+# in the five active days 19-23 Aug cost ~1,780 billed minutes on their own. Combined
+# with CI that overran the account's Actions allowance and every workflow in the repo
+# started failing instantly on a billing block.
+#
+# The trade is real and deliberate: a regression can now sit up to ~12h before the
+# campaign catches it, where per-push caught it in ~13 min. That is acceptable only
+# while the platform is pre-launch. RECONSIDER BEFORE REAL USERS ARRIVE — either put
+# the push trigger back (and budget for it) or move to an external post-deploy hook.
+# Merges that need immediate coverage can always `workflow_dispatch` on demand.
 on:
-  push:
-    branches: [main]
+  schedule:
+    # 06:40 and 18:40 UTC — offset off the hour to dodge the cron pileup.
+    - cron: "40 6,18 * * *"
   workflow_dispatch:
     inputs:
       projects:
@@ -13,9 +26,13 @@ on:
         type: string
         default: "--project=public --project=provision --project=readiness --project=core --project=write-flow --project=deep --project=r4x-provision --project=run004x"
 
+# One campaign at a time, and only the newest deploy is worth smoke-testing: merges land
+# in batches, so 86% of runs were superseded within the hour (measured over 90d) while
+# still burning a full ~6.5 billable minutes each. Cancelling the in-flight run keeps the
+# post-deploy signal (the last merge's run always completes) and drops the redundant ones.
 concurrency:
   group: e2e-sentinel-campaign
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -42,9 +59,14 @@ jobs:
 
       # On a deploy, Render takes a few minutes to roll. Wait for the API to be
       # healthy (and, if the API exposes its commit, for the new SHA) before testing.
+      #
+      # The grace used to key off event_name == 'push'; that trigger is gone, so it now
+      # keys off "not a scheduled run" — i.e. a human dispatching straight after a merge
+      # still gets the deploy wait, while the twice-daily runs skip it. Prod has been up
+      # for hours by then, and skipping saves 3 of the run's ~10 billed minutes.
       - name: Wait for deploy / health
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event_name }}" != "schedule" ]; then
             echo "deploy grace: sleeping ${E2E_DEPLOY_GRACE:-180}s for Render to roll"
             sleep "${E2E_DEPLOY_GRACE:-180}"
           fi
@@ -285,7 +307,13 @@ jobs:
       # is never wiped mid-run by an unrelated merge. Default 24h; override with the
       # E2E_PURGE_MIN_AGE_HOURS repo var. The manual full teardown (e2e-purge.yml) keeps
       # the un-guarded purge (no --min-age-hours) for a complete wipe.
+      # continue-on-error: the purge is now strict (it fails on residual), but this step
+      # is deliberately ordered BEFORE the gate below so a red campaign is fully reported
+      # first. A purge shortfall must surface as an annotation without hijacking the
+      # campaign's own pass/fail semantics — the manual e2e-purge.yml run is where a
+      # shortfall is meant to fail loudly.
       - name: Auto-delete is_test data
+        continue-on-error: true
         if: ${{ always() && vars.E2E_AUTODELETE_ENABLED == 'true' && env.DATABASE_URL != '' }}
         env:
           # repo var (admin-controlled), default 24h — passed via env, not inline in run:

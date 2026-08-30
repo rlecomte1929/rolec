@@ -44,6 +44,15 @@ _STATUS_UNREACHABLE = "unreachable"
 # [AIQ-1609] No HR resolved, but an admin-allowlist recipient was emailed instead — so the
 # notification reached someone actionable rather than being silently dropped.
 _STATUS_FALLBACK = "fallback"
+# [cost] A fixture case is not a send. Recorded, never delivered — so notified_at stays NULL
+# and the row reads as "deliberately not mailed" rather than "successfully mailed".
+_STATUS_SKIPPED_TEST = "skipped_test_fixture"
+
+# The reserved synthetic domains the E2E provisioner mints. Kept in lockstep with
+# scripts/e2e_purge.py TEST_EMAIL_DOMAINS. SUFFIX-matched, never substring: the
+# @testcompany.com and @*-demo.com demo tenants are REAL accounts that must keep
+# receiving mail, and "@testco.com" is a substring of neither.
+_TEST_EMAIL_DOMAINS = ("@testco.com", "@probe.test")
 
 
 def _engine():
@@ -237,6 +246,48 @@ def _already_notified(case_id: str) -> bool:
         return False  # can't tell -> allow the send; a missing notification is worse than a repeat
 
 
+# ── Fixture suppression ──────────────────────────────────────────────────────────────
+
+
+def _is_test_recipient(email: Optional[str]) -> bool:
+    """True for the provisioner's reserved domains. Suffix match, so the demo tenants pass."""
+    if not email:
+        return False
+    addr = email.strip().lower()
+    return any(addr.endswith(domain) for domain in _TEST_EMAIL_DOMAINS)
+
+
+_TEST_CASE_SQL = _sql_text(
+    """
+    SELECT 1
+    FROM public.companies co
+    WHERE COALESCE(co.is_test, false)
+      AND (co.id::text IN (SELECT company_id::text FROM public.cases
+                            WHERE id::text = :cid)
+        OR co.id::text IN (SELECT company_id::text FROM public.relocation_cases
+                            WHERE id::text = :cid)
+        OR co.id::text IN (SELECT company_id::text FROM public.case_assignments
+                            WHERE case_id::text = :cid OR canonical_case_id::text = :cid))
+    LIMIT 1
+    """
+)
+
+
+def _is_test_case(case_id: str) -> bool:
+    """Does this case belong to an E2E-provisioned (is_test) company?
+
+    FAILS OPEN. If the lookup breaks we answer False and the mail goes out — mirroring
+    ``_already_notified``'s stance that a missing real notification costs more than a
+    duplicate. Over-blocking here would silently strand a live customer.
+    """
+    try:
+        with _engine().connect() as conn:
+            return conn.execute(_TEST_CASE_SQL, {"cid": str(case_id)}).fetchone() is not None
+    except Exception as exc:  # noqa: BLE001
+        log.warning("roadmap notify: is_test lookup failed for %s: %s", case_id, exc)
+        return False
+
+
 # ── Entry point ──────────────────────────────────────────────────────────────────────
 
 
@@ -256,6 +307,14 @@ def notify_hr_roadmap_pending(
     problem must not cost the employee their plan.
     """
     try:
+        # An is_test company's roadmap is a fixture, not a customer waiting on HR. Checked
+        # before _already_notified so the admin-allowlist fallback below (which also mails)
+        # can never fire for one.
+        if _is_test_case(case_id):
+            _record(case_id, _STATUS_SKIPPED_TEST, None)
+            log.info("roadmap notify: case %s is an is_test fixture — no email sent", case_id)
+            return {"status": _STATUS_SKIPPED_TEST, "case_id": case_id}
+
         if _already_notified(case_id):
             return {"status": "already_notified", "case_id": case_id}
 
@@ -317,6 +376,15 @@ def notify_hr_roadmap_pending(
             return {"status": _STATUS_UNREACHABLE, "case_id": case_id}
 
         to_email = to_override or recipient["email"]
+
+        # The stronger of the two signals in practice: 806 of 814 delivered rows resolved to
+        # one of these domains, including cases whose company carried no is_test flag. An
+        # explicit to_override is an operator acting deliberately, so it is honoured.
+        if not to_override and _is_test_recipient(to_email):
+            _record(case_id, _STATUS_SKIPPED_TEST, to_email)
+            log.info("roadmap notify: %s is a fixture address — no email sent", to_email)
+            return {"status": _STATUS_SKIPPED_TEST, "case_id": case_id, "to": to_email}
+
         email = render_email(
             case_id=case_id,
             employee_name=recipient["employee_name"],

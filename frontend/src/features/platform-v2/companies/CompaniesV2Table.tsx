@@ -166,7 +166,7 @@ export function CompaniesV2Table({
         cellClassName: 'text-right',
         cell: (c) =>
           busyId === c.id ? (
-            <span className="text-[11px] text-slate-400">…</span>
+            <span className="text-[11px] text-slate-500">…</span>
           ) : (
             <RowActionMenu
               onEdit={() => onEdit(c)}

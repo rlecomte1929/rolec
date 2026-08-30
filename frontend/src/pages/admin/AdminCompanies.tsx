@@ -11,9 +11,9 @@ import type { AdminCompany, CompanyPlanTier } from '../../types';
 import { AdminLayout } from './AdminLayout';
 
 const PLAN_OPTIONS: { value: CompanyPlanTier; label: string }[] = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'premium', label: 'Premium' },
+  { value: 'starter', label: 'Starter' },
+  { value: 'growth', label: 'Growth' },
+  { value: 'enterprise', label: 'Enterprise' },
 ];
 
 type SortKey =
@@ -70,7 +70,7 @@ export const AdminCompanies: React.FC = () => {
   };
 
   const canEdit = (c: AdminCompany) => !c.missing_from_companies_table;
-  const planTier = (c: AdminCompany) => (c.plan_tier as CompanyPlanTier) || 'low';
+  const planTier = (c: AdminCompany) => (c.plan_tier as CompanyPlanTier) || 'starter';
   const statusLabel = (c: AdminCompany) => (c.status || 'active').toLowerCase();
 
   const hasColumnFilters =
@@ -734,7 +734,7 @@ interface AddCompanyModalProps {
 const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated }) => {
   const [name, setName] = useState('');
   const [country, setCountry] = useState('');
-  const [plan_tier, setPlanTier] = useState<CompanyPlanTier>('low');
+  const [plan_tier, setPlanTier] = useState<CompanyPlanTier>('starter');
   const [status, setStatus] = useState<string>('active');
   const [hr_seat_limit, setHrSeatLimit] = useState<number | ''>('');
   const [employee_seat_limit, setEmployeeSeatLimit] = useState<number | ''>('');

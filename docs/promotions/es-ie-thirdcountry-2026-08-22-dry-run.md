@@ -80,3 +80,44 @@ overwrite a reviewer's decision. This is a property of the plan, not a promise t
 2. **The 6 `needs_lawyer_review` rows** named in the launch pack's gate list.
 3. **Approval is a second, separate step.** Inserting at `pending` serves nobody; a human flip
    to `approved` is what puts these in front of Andrea.
+
+---
+
+## 2026-08-23 — generator built, and what production actually enforced
+
+`scripts/promote_requirement_facts.py` emits the SQL. It **does not connect to a database**: the
+output is reviewed and applied by an operator, because a script holding production credentials
+makes "dry run by default" a promise rather than a property.
+
+It refuses to emit anything unless the batch's `sources/` directory holds real extracted text for
+every cited URL **and** every quote still appears in that text. So the promotion cannot outrun the
+verification.
+
+### What the rollback probe caught that review had not
+
+Running the emitted shape inside `BEGIN … ROLLBACK` against production surfaced three constraints
+no amount of reading had shown:
+
+- **`requirement_entities.status` is CHECK-constrained to `pending | approved | rejected`.** The
+  first draft wrote `'active'` — the `knowledge_packs` vocabulary — and was rejected outright. An
+  entity now arrives `pending`, unreviewed like its facts.
+- **`knowledge_packs.domain` allows `payroll`**, which no IE pack uses yet. PPSN documents file
+  there rather than under `other`.
+- `requirement_facts.fact_type` and `confidence` are both CHECK-constrained; the batch's 7 types
+  and 2 confidence values all satisfy them.
+
+### Emitted for this batch
+
+| table | rows |
+|---|---:|
+| `knowledge_packs` | 5 (IE × immigration, registration, tax, payroll, other) |
+| `knowledge_docs` | 10 |
+| `requirement_entities` | 6 |
+| `requirement_facts` | 38, all `status='pending'`, all `evidence_verified=NULL` |
+
+0 `UPDATE` statements. 0 `ON CONFLICT`. Every insert is guarded by `WHERE NOT EXISTS` on a
+deterministic `uuid5`, so re-running is a no-op rather than a duplicate.
+
+**The probe asserted the gate rather than trusting it:** after inserting, it counts rows that
+would satisfy `list_approved_requirement_facts` (`status='approved' AND COALESCE(evidence_verified,
+TRUE)`) and requires **0**. Promotion puts nothing in front of a mover.

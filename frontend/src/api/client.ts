@@ -949,8 +949,13 @@ export const hrAPI = {
   deleteEmployee: async (employeeId: string): Promise<void> => {
     await api.delete(`/api/hr/employees/${employeeId}`);
   },
-  saveCompanyProfile: async (payload: CompanyProfilePayload): Promise<unknown> => {
-    const response = await api.post<unknown>('/api/hr/company-profile', payload);
+  saveCompanyProfile: async (
+    payload: CompanyProfilePayload,
+  ): Promise<{ ok?: boolean; company_id?: string; company?: Record<string, unknown> | null }> => {
+    const response = await api.post<{ ok?: boolean; company_id?: string; company?: Record<string, unknown> | null }>(
+      '/api/hr/company-profile',
+      payload,
+    );
     invalidateApiCache('hr:company-profile');
     invalidateApiCache('company:get');
     return response.data;

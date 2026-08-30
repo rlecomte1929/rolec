@@ -9,6 +9,7 @@ import { adminResourcesAPI, adminStagingAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
+import { LoadErrorBanner, loadErrorMessage } from '../../components/LoadErrorBanner';
 
 type ResourceItem = {
   id: string;
@@ -31,6 +32,7 @@ export const AdminResources: React.FC = () => {
   // Distinguish "counts fetch failed" from "genuinely zero" so we don't render
   // fabricated-looking 0/0/0/0 stat cards when the backend is actually down.
   const [countsError, setCountsError] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [stagingCounts, setStagingCounts] = useState<{ resource_candidates_new?: number; event_candidates_new?: number } | null>(null);
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [categories, setCategories] = useState<{ id: string; key: string; label: string }[]>([]);
@@ -65,6 +67,7 @@ export const AdminResources: React.FC = () => {
 
   const loadResources = useCallback(async () => {
     setListLoading(true);
+    setListError(null);
     try {
       const res = await adminResourcesAPI.listResources({
         country_code: filters.country_code || undefined,
@@ -75,7 +78,8 @@ export const AdminResources: React.FC = () => {
       });
       setResources((res.items || []) as ResourceItem[]);
       setListTotal(res.total ?? 0);
-    } catch {
+    } catch (e) {
+      setListError(loadErrorMessage(e, "Couldn't load resources."));
       setResources([]);
       setListTotal(0);
     } finally {
@@ -199,7 +203,7 @@ export const AdminResources: React.FC = () => {
               </tbody>
             </table>
           </div>
-          {resources.length === 0 && !listLoading && <div className="py-8 text-center text-slate-500">No resources found.</div>}
+          {resources.length === 0 && !listLoading && !listError && <div className="py-8 text-center text-slate-500">No resources found.</div>}
         </Card>
       </AdminLayout>
     );
@@ -208,6 +212,7 @@ export const AdminResources: React.FC = () => {
   return (
     <AdminLayout title="Resources" subtitle="Country content: housing, schools, movers, events">
       <div className="space-y-6">
+        <LoadErrorBanner message={listError} onRetry={() => void loadResources()} />
         {countsError && (
           <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             <span>Couldn&apos;t load resource counts — the figures below may be stale or unavailable.</span>

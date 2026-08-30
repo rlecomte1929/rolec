@@ -27,6 +27,21 @@ VALID_SERVICE_CATEGORIES = frozenset({
 })
 
 
+def _is_iso2(value: str) -> bool:
+    """True when `value` is exactly two ASCII letters (ISO-3166-1 alpha-2 shape)."""
+    return len(value) == 2 and value.isascii() and value.isalpha()
+
+
+def normalize_country_code(value: Optional[str]) -> Optional[str]:
+    """Trim + upper-case a country code, or None when blank.
+
+    Does not truncate — `validate_capability` has already rejected anything that is
+    not alpha-2, and silently trimming a country name would store the wrong country.
+    """
+    cc = (value or "").strip().upper()
+    return cc or None
+
+
 def validate_supplier_create(data: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
     """Validate create supplier payload."""
     if not isinstance(data, dict):
@@ -73,13 +88,22 @@ def validate_capability(
     scope = (data.get("coverage_scope_type") or "country").lower()
     if scope not in VALID_COVERAGE_SCOPE_TYPES:
         return False, f"coverage_scope_type must be one of {VALID_COVERAGE_SCOPE_TYPES}"
-    if scope == "country":
-        cc = (data.get("country_code") or "").strip().upper()
-        if not cc or len(cc) < 2:
-            return False, "country_code (2-letter) required when coverage_scope_type is country"
+    # country_code must be ISO-3166-1 alpha-2, exactly. `supplier_cluster_cache.
+    # country_iso2` is character(2) and the nightly tiering refresh groups by DISTINCT
+    # country_code, so a country *name* here (three reached prod: 'Spain', 'Norway',
+    # 'Ireland') creates a phantom cell that cannot be written and kills the whole run.
+    # Reject rather than truncate: 'Norway'[:2] == 'NO' is right by luck, 'Spain'[:2]
+    # == 'SP' is not Spain.
+    if scope in ("country", "city"):
+        cc = (data.get("country_code") or "").strip()
+        if not cc:
+            return False, f"country_code required when coverage_scope_type is {scope}"
+        if not _is_iso2(cc):
+            return False, (
+                f"country_code must be a 2-letter ISO-3166-1 alpha-2 code "
+                f"(e.g. NO, ES, IE) — got {cc!r}"
+            )
     if scope == "city":
-        if not (data.get("country_code") or "").strip():
-            return False, "country_code required when coverage_scope_type is city"
         if not (data.get("city_name") or "").strip():
             return False, "city_name required when coverage_scope_type is city"
     if data.get("min_budget") is not None:

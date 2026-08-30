@@ -797,7 +797,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       {!AIQ1107_HIDE_SECTIONS && policyTldr && (
         <Card padding="lg" id="hr-policy-tldr">
           <div className="text-sm font-semibold text-[#0b2b43] mb-1">TL;DR</div>
-          <div className="text-[11px] uppercase tracking-wide text-[#9ca3af] mb-2">
+          <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-2">
             Extractive summary of the source document
           </div>
           <p className="text-sm leading-relaxed text-[#374151]">{policyTldr}</p>
@@ -879,7 +879,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                         ) : (
                           <span className={r.auto_generated ? 'text-[#0b2b43]' : 'text-[#059669] font-medium'}>
                             {formatBenefitLabel(r)}
-                            {r.auto_generated && <span className="text-[#9ca3af] ml-1">(auto)</span>}
+                            {r.auto_generated && <span className="text-gray-500 ml-1">(auto)</span>}
                           </span>
                         )}
                       </td>
@@ -964,7 +964,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                               p.{link.source_page_start ?? '?'}
                             </Button>
                           ) : (
-                            <span className="text-xs text-[#9ca3af]">-</span>
+                            <span className="text-xs text-gray-500">-</span>
                           )}
                           {sourceCitation ? (
                             <span className="text-xs text-[#6b7280]">{sourceCitation}</span>

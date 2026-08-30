@@ -116,6 +116,16 @@ def normalise(text: str) -> str:
     quotes and dashes (publishers and models disagree), and NBSP — Norwegian and French
     government pages are full of U+00A0 and U+202F, which would otherwise fail every match.
 
+    THIS IS THE ONLY QUOTE NORMALISER. There were three: this one, a more aggressive copy in
+    `scripts/verify_batch_quotes.py`, and a hand-rolled SQL version rewritten slightly
+    differently each time it was needed. The SQL copy under-verified 9 Irish facts and then 3
+    French ones on consecutive runs, purely by lagging behind this one. `verify_batch_quotes`
+    delegates here now, and evidence is stamped through Python rather than re-implemented in SQL.
+
+    Two folds from that copy are deliberately NOT adopted: it turned every dash into a space
+    (merging "e-mail" into "e mail") and every "/" into a space (destroying "and/or"). Those
+    change words, not markup, which is the line this function draws.
+
     NOT case-folded here: callers lower() at comparison time. Keeping case in the returned text
     means the context we show a reviewer is the real sentence, not a flattened one.
     """
@@ -127,7 +137,33 @@ def normalise(text: str) -> str:
     out = out.replace("“", '"').replace("”", '"')
     out = out.replace("–", "-").replace("—", "-")
     out = out.replace(" ", " ").replace(" ", " ").replace(" ", " ")
-    return re.sub(r"\s+", " ", out).strip()
+
+    # Markup the page renders and the sentence does not. Each cost a real false negative before
+    # it was folded, and none of them touches a WORD:
+    #   * list bullets — the page bullets a list the quote runs together;
+    #   * `titleContent` — a literal template token service-public.fr prints inside its own
+    #     sentences as a tooltip anchor;
+    #   * a space before `,.;:!?)` — what is left when an <a> or <li> around the mark is
+    #     stripped, so the page reads "note :" where the sentence reads "note:";
+    #   * a space after an apostrophe — French elision split across a tag boundary, so CLEISS
+    #     renders "L' article" for "l'article". That one alone had a genuine, verbatim CLEISS
+    #     sentence recorded as fabricated.
+    # Order matters: bullets before the whitespace collapse, or removing a bullet leaves a
+    # double space and a true quote reads as missing.
+    #
+    # A whitespace-delimited DASH is deliberately NOT folded, though it is markup by the same
+    # argument — BOFiP bullets its CGI art. 4B criteria as ": - les personnes qui …" while the
+    # quote runs them together. Folding it here removes the separator `_SEGMENT_SPLIT` keys on,
+    # and the recomposed-quote rule stops discriminating: `test_the_recomposed_rule_still_
+    # discriminates` fails, which is the planted-error suite catching a real weakening. A quote
+    # that flattens a bulleted list is a RECOMPOSED quotation (AIQ-2126), not a normalisation
+    # gap, and belongs to that decision rather than to this function.
+    out = re.sub(r"[\u2022\u00b7\u25aa\u25e6]", " ", out)
+    out = re.sub(r"\btitle\s?content\b", " ", out, flags=re.IGNORECASE)
+    out = re.sub(r"\s+", " ", out)
+    out = re.sub(r"\s+([,.;:!?)])", r"\1", out)
+    out = re.sub(r"(')\s+", r"\1", out)
+    return out.strip()
 
 
 # [AIQ-2126] A recomposed quotation: segments joined by an ellipsis, or a lead-in flattened onto
@@ -189,6 +225,34 @@ def _context_around(n_source: str, idx: int, span: int) -> str:
     start = max(0, idx - CONTEXT_WINDOW_CHARS)
     end = min(len(n_source), idx + span + CONTEXT_WINDOW_CHARS)
     return ("…" if start > 0 else "") + n_source[start:end] + ("…" if end < len(n_source) else "")
+
+
+def best_source_text(content_excerpt: Optional[str], text_content: Optional[str]) -> str:
+    """The archived text most likely to actually contain the quote.
+
+    `knowledge_docs` carries two source-text columns written by different code paths, and
+    NEITHER is reliably the better one:
+
+      * `content_excerpt` is what `backfill_fact_evidence.py` writes and what `content_sha256`
+        hashes. Across the corpus it is the fuller column — 257 of 758 documents are usable
+        there against 120 for `text_content`.
+      * `text_content` came from the original ingest. For the `enterprise.gov.ie` permit pages
+        it holds 17,333 / 19,568 / 9,909 / 5,242 characters of real content while the excerpt
+        holds **308 characters of cookie banner** — the capture landed the consent notice and
+        stopped.
+
+    Preferring either column outright loses evidence. Measured on production 2026-08-23 over the
+    196 served facts: excerpt-first evidences 129, longest-wins evidences **142**, and the 13
+    recovered are in IE, SG and US — the Irish ones being Critical Skills Employment Permit facts
+    on the first real customer's corridor.
+
+    So: take the longer. Length is a crude proxy for substance, but the failure it guards against
+    is a boilerplate stub, and a stub is always the short one. This resolves the read; it does not
+    write, so no capture is discarded and a later re-fetch of either column still wins on merit.
+    """
+    excerpt = content_excerpt or ""
+    body = text_content or ""
+    return body if len(body) > len(excerpt) else excerpt
 
 
 def check_evidence(quote: Optional[str], source_text: Optional[str]) -> EvidenceCheck:

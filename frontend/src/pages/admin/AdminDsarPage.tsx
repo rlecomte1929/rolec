@@ -94,12 +94,12 @@ export const AdminDsarPage: React.FC = () => {
           <option value="rejected">rejected</option>
           <option value="completed">completed</option>
         </select>
-        <span className="ml-auto text-sm text-slate-400">{items.length} requests</span>
+        <span className="ml-auto text-sm text-slate-500">{items.length} requests</span>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-widest text-slate-400">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-widest text-slate-500">
             <tr>
               <th className="px-4 py-2">Subject</th>
               <th className="px-4 py-2">Status</th>
@@ -110,16 +110,16 @@ export const AdminDsarPage: React.FC = () => {
           </thead>
           <tbody data-testid="dsar-rows">
             {loading ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">Loading…</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No erasure requests.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">No erasure requests.</td></tr>
             ) : (
               items.map((r) => (
                 <tr key={r.id} className="border-t border-slate-100">
                   <td className="px-4 py-2 font-mono text-xs text-slate-700">{r.employee_id || '—'}</td>
                   <td className="px-4 py-2"><Badge variant={statusTone(r.status)} size="sm">{r.status}</Badge></td>
-                  <td className="px-4 py-2 text-slate-400">{r.requested_at ? r.requested_at.slice(0, 10) : '—'}</td>
-                  <td className="px-4 py-2 text-slate-400">{r.statutory_due_at ? r.statutory_due_at.slice(0, 10) : '—'}</td>
+                  <td className="px-4 py-2 text-slate-500">{r.requested_at ? r.requested_at.slice(0, 10) : '—'}</td>
+                  <td className="px-4 py-2 text-slate-500">{r.statutory_due_at ? r.statutory_due_at.slice(0, 10) : '—'}</td>
                   <td className="px-4 py-2 text-right whitespace-nowrap">
                     {r.status === 'pending' && (
                       <>

@@ -49,6 +49,7 @@ from . import rag_pipeline
 from .country_resources import _country_code_from_name
 from .immigration_regime import ImmigrationRegimeRouter, _is_eu_national
 from .immigration_retriever import PathClassification, UserProfile, corridor_key
+from .wizard_draft_mapper import employee_nationality
 
 log = logging.getLogger(__name__)
 
@@ -80,11 +81,25 @@ def build_case_profile(
     if not origin or not dest:
         return None
 
-    nationality = (
-        basics.get("nationality")
-        or (draft.get("personalInfo") or {}).get("nationality")
-        or origin_raw  # an EEA-corridor mover is typically a national of the origin
-    )
+    # Read nationality from wherever the draft records it — `employee_nationality`
+    # is the single source for that, shared with wizard_draft_mapper.
+    #
+    # An unknown nationality stays unknown. This used to fall back to `origin_raw`
+    # ("an EEA-corridor mover is typically a national of the origin"), which
+    # answered a missing fact with a guess and read 410 prod cases as EU free
+    # movers on the strength of their origin country alone. The two errors are not
+    # symmetric: wrongly granting free movement DROPS required steps and the mover
+    # finds out when they cannot legally start work, while wrongly denying it adds
+    # steps that prove unnecessary. Only one of those is recoverable by the person
+    # reading the roadmap.
+    #
+    # This also matches what the rest of the stack already does with an unknown
+    # nationality — `nationality_class.classify` returns None and keeps the FULL
+    # requirement list rather than fabricating "nothing required", and
+    # `detect_regime` documents that an incomplete profile returns "unknown"
+    # rather than raising. `origin_country` is still passed below: that one is
+    # genuinely known.
+    nationality = employee_nationality(draft)
     regime = _router.detect_regime(
         nationality=nationality,
         destination_country=dest_raw,

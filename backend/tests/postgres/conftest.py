@@ -63,6 +63,10 @@ _AUTHORITATIVE_DDL: List[Tuple[str, Tuple[str, ...]]] = [
     # if a future create_all ever renders them.
     ("20261120000000_attestation_promotion_policy.sql", ()),
     ("20261121000000_attestation_case_scope.sql", ()),
+    # Creates case_entitlement_grants and ALTERs relocation_cases. It owns the grants table;
+    # relocation_cases belongs to an older migration, so the ADD COLUMN IF NOT EXISTS clauses
+    # replay harmlessly on whatever create_all rendered.
+    ("20261122000000_case_funding_source_and_grants.sql", ("case_entitlement_grants",)),
 ]
 
 #: Supabase ships these; a bare postgres:16 container does not. The migration GRANTs to them
@@ -104,6 +108,27 @@ def pg_schema():
                 f"DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='{role}') "
                 f"THEN CREATE ROLE {role} NOLOGIN; END IF; END $$;"
             )
+
+        # Supabase's `auth` schema, for the same reason as the roles above: a migration that
+        # writes `USING (auth.role() = 'service_role')` fails at CREATE POLICY on a bare
+        # postgres:16, because the policy expression is parsed and its functions resolved at
+        # creation time. Without this the replay aborts with InvalidSchemaName and takes the
+        # whole lane down — the same failure shape an unregistered table produces, and just
+        # as misleading.
+        #
+        # A stub, deliberately: tests connect as the superuser and bypass RLS, so this lane
+        # checks type parity and DDL validity, never policy behaviour. `auth.uid()` is here
+        # too because tenant-scoped policies reach for it and the next migration to arrive
+        # should not rediscover this.
+        cur.execute("CREATE SCHEMA IF NOT EXISTS auth;")
+        cur.execute(
+            "CREATE OR REPLACE FUNCTION auth.role() RETURNS text "
+            "LANGUAGE sql STABLE AS $fn$ SELECT current_setting('request.jwt.claim.role', true) $fn$;"
+        )
+        cur.execute(
+            "CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid "
+            "LANGUAGE sql STABLE AS $fn$ SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $fn$;"
+        )
         raw.commit()
     finally:
         raw.close()

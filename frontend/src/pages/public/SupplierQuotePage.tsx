@@ -139,7 +139,7 @@ export const SupplierQuotePage: React.FC = () => {
                   <td className="w-40 py-1 pr-3 text-slate-500">{row.label}</td>
                   <td
                     className={`py-1 font-medium ${
-                      row.value === 'Not specified' ? 'text-slate-400 italic' : 'text-[#0b2b43]'
+                      row.value === 'Not specified' ? 'text-slate-500 italic' : 'text-[#0b2b43]'
                     }`}
                   >
                     {row.value}
@@ -246,7 +246,7 @@ export const SupplierQuotePage: React.FC = () => {
         >
           {submitting ? 'Sending…' : 'Send my quote'}
         </button>
-        <p className="text-center text-xs text-slate-400">
+        <p className="text-center text-xs text-slate-500">
           No account needed. This link is unique to you.
         </p>
       </div>

@@ -87,7 +87,7 @@ export const CaseVendorsPanel: React.FC<CaseVendorsPanelProps> = ({ caseId }) =>
       <div className="px-4 py-3 border-b border-[#f1f5f9] flex items-center gap-2">
         <span className="text-base">🏢</span>
         <h3 className="text-sm font-semibold text-[#0b2b43]">Assigned suppliers</h3>
-        <span className="ml-auto text-xs text-[#94a3b8]">{vendors.length} vendor{vendors.length !== 1 ? 's' : ''}</span>
+        <span className="ml-auto text-xs text-slate-500">{vendors.length} vendor{vendors.length !== 1 ? 's' : ''}</span>
       </div>
 
       <div className="overflow-x-auto">
@@ -162,7 +162,7 @@ export const CaseVendorsPanel: React.FC<CaseVendorsPanelProps> = ({ caseId }) =>
                       )}
                     </div>
                   ) : (
-                    <span className="text-[#94a3b8] text-xs italic">Not assigned</span>
+                    <span className="text-slate-500 text-xs italic">Not assigned</span>
                   )}
                 </td>
               </tr>

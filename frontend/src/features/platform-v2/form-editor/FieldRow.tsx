@@ -142,10 +142,10 @@ function AiBadge({
         <div className="absolute z-10 bottom-full mb-1.5 left-1/2 -translate-x-1/2 rounded bg-slate-800 text-white text-xs px-2.5 py-1.5 shadow-lg pointer-events-none min-w-max max-w-[220px]">
           <div className="font-medium">Pre-filled by AI</div>
           {sourceLabel && (
-            <div className="text-slate-300 mt-0.5">Source: {sourceLabel}</div>
+            <div className="text-slate-500 mt-0.5">Source: {sourceLabel}</div>
           )}
           {pct !== null && (
-            <div className="text-slate-400 mt-0.5">Confidence: {pct}%</div>
+            <div className="text-slate-500 mt-0.5">Confidence: {pct}%</div>
           )}
           <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
         </div>

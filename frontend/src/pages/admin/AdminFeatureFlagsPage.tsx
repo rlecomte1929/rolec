@@ -102,7 +102,7 @@ export const AdminFeatureFlagsPage: React.FC = () => {
 
       <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-widest text-slate-400">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-widest text-slate-500">
             <tr>
               <th className="px-4 py-2">Flag</th>
               <th className="px-4 py-2">State</th>
@@ -112,15 +112,15 @@ export const AdminFeatureFlagsPage: React.FC = () => {
           </thead>
           <tbody data-testid="flag-rows">
             {loading ? (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-500">Loading…</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No feature flags.</td></tr>
+              <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-500">No feature flags.</td></tr>
             ) : (
               items.map((row) => (
                 <tr key={row.key} className="border-t border-slate-100">
                   <td className="px-4 py-2">
                     <div className="font-mono text-xs font-medium text-slate-800">{row.key}</div>
-                    {row.description && <div className="text-xs text-slate-400">{row.description}</div>}
+                    {row.description && <div className="text-xs text-slate-500">{row.description}</div>}
                   </td>
                   <td className="px-4 py-2">
                     {row.enabled
@@ -128,7 +128,7 @@ export const AdminFeatureFlagsPage: React.FC = () => {
                       : <Badge variant="neutral" size="sm">off</Badge>}
                   </td>
                   <td className="px-4 py-2 text-slate-500">
-                    {row.account_count === 0 ? <span className="text-slate-400">global</span> : `${row.account_count} scoped`}
+                    {row.account_count === 0 ? <span className="text-slate-500">global</span> : `${row.account_count} scoped`}
                   </td>
                   <td className="px-4 py-2 text-right">
                     <button className="mr-3 text-xs font-medium text-accent-700 hover:text-accent-800" onClick={() => void onToggle(row)}>

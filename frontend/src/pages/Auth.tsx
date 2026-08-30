@@ -324,7 +324,7 @@ export const Auth: React.FC = () => {
   // ── Invite flow ──────────────────────────────────────────────────────────────
   if (inviteMode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <main className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
         <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8">
           {inviteDone ? (
             <div className="text-center space-y-3">
@@ -359,7 +359,7 @@ export const Auth: React.FC = () => {
                   autoComplete="new-password" fullWidth />
                 <Button type="button" variant="ghost" onClick={() => setShowInvitePassword((p) => !p)}
                   aria-label={showInvitePassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-8 !p-0 !text-slate-400 hover:!text-slate-600 hover:!bg-transparent transition-colors">
+                  className="absolute right-3 top-8 !p-0 !text-slate-500 hover:!text-slate-600 hover:!bg-transparent transition-colors">
                   <EyeIcon open={showInvitePassword} />
                 </Button>
               </div>
@@ -378,22 +378,23 @@ export const Auth: React.FC = () => {
             </form>
           )}
         </div>
-      </div>
+      </main>
     );
   }
 
   // ── Main layout ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex overflow-hidden">
+    <main className="min-h-screen flex overflow-hidden">
 
       {/* ── Left: dark globe panel ── */}
       <div className="hidden lg:flex lg:flex-col lg:w-[58%] relative bg-[#061424] overflow-hidden select-none">
 
         {/* Header */}
         <div className="relative z-10 flex items-center gap-2.5 px-8 pt-7">
-          <img src="/relopass-logo.png" alt="ReloPass" className="h-7 w-auto"
+          <img src="/relopass-logo.png" width={122} height={128} alt="ReloPass" className="h-7 w-auto"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           <span className="text-white font-semibold text-base tracking-tight">ReloPass</span>
+          {/* eslint-disable-next-line local/no-low-contrast-text -- light-on-dark: inside the bg-[#061424] hero panel. slate-400 is ~5.6:1 here; slate-500 measures 3.5-3.9:1 (axe). Darkening this REDUCES contrast. */}
           <span className="text-slate-400 text-base">· Platform</span>
         </div>
 
@@ -410,17 +411,19 @@ export const Auth: React.FC = () => {
             him LIVE. Do not reintroduce counts without a real data source. */}
         <div className="relative z-10 px-6 pb-7">
           <div className="rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm px-5 py-4">
+            {/* eslint-disable-next-line local/no-low-contrast-text -- light-on-dark: inside the bg-[#061424] hero panel. slate-400 is ~5.6:1 here; slate-500 measures 3.5-3.9:1 (axe). Darkening this REDUCES contrast. */}
             <p className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase mb-2">
               Built for cross-border moves
             </p>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-                <Globe className="w-4 h-4 text-slate-300" aria-hidden="true" />
+                <Globe className="w-4 h-4 text-slate-500" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm text-white font-medium">
                   One record per relocation
                 </p>
+                {/* eslint-disable-next-line local/no-low-contrast-text -- light-on-dark: inside the bg-[#061424] hero panel. slate-400 is ~5.6:1 here; slate-500 measures 3.5-3.9:1 (axe). Darkening this REDUCES contrast. */}
                 <p className="text-xs text-slate-400">
                   Guided intake, your policy applied automatically, and suppliers in one place.
                 </p>
@@ -436,7 +439,7 @@ export const Auth: React.FC = () => {
 
           {/* Mobile logo */}
           <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <img src="/relopass-logo.png" alt="ReloPass" className="h-6 w-auto"
+            <img src="/relopass-logo.png" width={122} height={128} alt="ReloPass" className="h-6 w-auto"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             <span className="font-semibold text-[#0b2b43]">ReloPass</span>
           </div>
@@ -446,7 +449,10 @@ export const Auth: React.FC = () => {
             {(['login', 'register'] as const).map((m) => (
               <Button key={m} type="button" variant="ghost" onClick={() => { setMode(m); setError(''); }}
                 className={`flex-1 !py-1.5 text-sm !rounded-md transition-all ${
-                  mode === m ? '!bg-white shadow-sm !text-slate-900' : '!text-slate-500 hover:!text-slate-700 hover:!bg-transparent'
+                  // slate-500 on the bg-slate-100 track is 4.34:1 — under AA. slate-600 is
+                  // 6.92:1 there. (Reported separately as the "Create account tab toggle"
+                  // contrast bug.) The selected tab sits on white and is unaffected.
+                  mode === m ? '!bg-white shadow-sm !text-slate-900' : '!text-slate-600 hover:!text-slate-800 hover:!bg-transparent'
                 }`}>
                 {m === 'login' ? 'Sign in' : 'Create account'}
               </Button>
@@ -488,7 +494,14 @@ export const Auth: React.FC = () => {
             )}
           </div>
 
-          {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+          {/* Reserved slot. The panel above is `flex flex-col justify-center`, so inserting
+              an Alert re-centres the whole column: the heading rises and the form drops,
+              measured at 34px on the password field — the user's cursor moves out from
+              under them mid-typing. Holding the space means the error appears in place and
+              nothing else moves. min-h matches the rendered Alert + mb-4. */}
+          <div className="min-h-[3.75rem]">
+            {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+          </div>
 
           {/* ── Login form ── */}
           {mode === 'login' && (
@@ -502,14 +515,14 @@ export const Auth: React.FC = () => {
                   type="text" value={identifier}
                   onChange={(v) => setIdentifier(v)}
                   placeholder="you@company.com" autoComplete="username"
-                  className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/25 focus:border-[#0b2b43] transition-colors"
+                  className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/25 focus:border-[#0b2b43] transition-colors"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label htmlFor="auth-login-password" className="block text-sm font-medium text-slate-700">Password</label>
-                  <Button type="button" variant="ghost" className="text-xs !p-0 !font-normal !text-slate-400 hover:!text-slate-600 hover:!bg-transparent transition-colors">
+                  <Button type="button" variant="ghost" className="text-xs !p-0 !font-normal !text-slate-500 hover:!text-slate-600 hover:!bg-transparent transition-colors">
                     Forgot?
                   </Button>
                 </div>
@@ -526,14 +539,14 @@ export const Auth: React.FC = () => {
                     // onChange, so this leaves it untouched.
                     onFocus={(e) => clearAutofillResidueIfStale(password, e.currentTarget)}
                     placeholder="••••••••" autoComplete="current-password"
-                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/25 focus:border-[#0b2b43] transition-colors"
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 pr-10 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/25 focus:border-[#0b2b43] transition-colors"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     onClick={() => setShowPassword((p) => !p)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center !p-0 !text-slate-400 hover:!text-slate-600 hover:!bg-transparent transition-colors">
+                    className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center !p-0 !text-slate-500 hover:!text-slate-600 hover:!bg-transparent transition-colors">
                     <EyeIcon open={showPassword} />
                   </Button>
                 </div>
@@ -567,7 +580,7 @@ export const Auth: React.FC = () => {
                     onChange={setPassword} label="Password"
                     placeholder="Create a password" autoComplete="new-password" fullWidth />
                   <Button type="button" variant="ghost" onClick={() => setShowPassword((p) => !p)}
-                    className="absolute right-3 top-8 !p-0 !text-slate-400 hover:!text-slate-600 hover:!bg-transparent transition-colors">
+                    className="absolute right-3 top-8 !p-0 !text-slate-500 hover:!text-slate-600 hover:!bg-transparent transition-colors">
                     <EyeIcon open={showPassword} />
                   </Button>
                 </div>
@@ -621,7 +634,7 @@ export const Auth: React.FC = () => {
             <>
               <div className="flex items-center gap-3 my-5">
                 <div className="flex-1 h-px bg-slate-200" />
-                <span className="text-xs text-slate-400">or</span>
+                <span className="text-xs text-slate-500">or</span>
                 <div className="flex-1 h-px bg-slate-200" />
               </div>
 
@@ -667,7 +680,7 @@ export const Auth: React.FC = () => {
           {import.meta.env.DEV && (
           <div className="mt-7 pt-6 border-t border-slate-100">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">One-click demo</span>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">One-click demo</span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
                 DEV ONLY
               </span>
@@ -685,6 +698,6 @@ export const Auth: React.FC = () => {
 
         </div>
       </div>
-    </div>
+    </main>
   );
 };

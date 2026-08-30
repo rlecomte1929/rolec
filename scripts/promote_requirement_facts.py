@@ -1,0 +1,369 @@
+#!/usr/bin/env python3
+"""Emit the SQL that promotes a committed corridor batch into `public.requirement_facts`.
+
+GENERATES SQL. DOES NOT CONNECT TO A DATABASE. The output is reviewed, then applied by an
+operator. That is deliberate: promotion is a human-gated step, and a script holding production
+credentials makes "dry run by default" a promise rather than a property.
+
+WHY THIS EXISTS AT ALL. Two requirement pipelines exist and they do not meet.
+`backend/imports/otto/executor.promote()` writes `public.requirement_items`, which feeds the
+public corridor endpoint and the rules engine. The employee dossier reads a *different* table —
+`requirement_facts JOIN requirement_entities`, via `backend/db/policies.py`
+`list_approved_requirement_facts`. So the existing `--promote` tooling cannot land a batch where
+a mover would see it, and until now nothing could.
+
+IDEMPOTENCY, and a correction. An earlier revision claimed none of these tables had a unique key
+beyond the PK. That is true only of `requirement_facts` and `knowledge_packs`. Checking
+`pg_constraint` alone missed two UNIQUE INDEXES that are not constraint-backed:
+
+    knowledge_docs        UNIQUE (source_url)
+    requirement_entities  UNIQUE (destination_country, topic_key)
+
+which matters for more than tidiness. Two of this batch's ten source URLs already have a
+document, so guarding on a DERIVED id inserts a second row for a URL that already exists — and
+every fact citing one of those documents would point at an id that is not there.
+
+So the guard is on the NATURAL key wherever one exists, and foreign keys are resolved by natural
+key at apply time via a subquery rather than by the derived id. A pre-existing document or entity
+is therefore reused, not duplicated, and the generator still needs no database connection.
+`requirement_facts` has only its PK, so there the derived uuid5 and a `NOT EXISTS` on
+`(entity_id, fact_key)` do the work.
+
+THREE INVARIANTS, each enforced by construction rather than by care:
+  * INSERT only. No UPDATE is emitted anywhere, so the 25 IE rows that already carry a
+    `reviewed_by` cannot be touched.
+  * `status = 'pending'`, written explicitly. `list_approved_requirement_facts` serves only
+    `'approved'`, so pending IS the gate — nothing here reaches a mover until a human flips it.
+  * `evidence_verified` left NULL. NULL means "never checked", which the dossier renders as
+    "Source — not independently verified". Writing TRUE would claim a check nobody ran, and that
+    is how 705 live facts came to cite text that is not in their document.
+
+SOURCE TEXT. `knowledge_docs.text_content` is NOT NULL and a placeholder there is worse than a
+missing row: production holds 222 documents whose entire text is "Otto bridge capture,
+unverified — see source_url", carrying 705 unverifiable quotes. This emitter refuses to run
+unless the batch's `sources/` directory holds real extracted text for every cited URL, and it
+re-checks each quote against that text before emitting a single line.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import importlib.util
+import json
+import re
+import uuid
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+NS = uuid.uuid5(uuid.NAMESPACE_URL, "https://relopass.com/ns/requirement_facts")
+
+#: `knowledge_packs.domain` is CHECK-constrained to
+#: immigration | registration | payroll | housing | tax | other.
+#: Only `immigration`, `registration`, `tax` and `other` are in use today, but `payroll` exists
+#: and is the honest home for a PPSN document. `healthcare` has no pack domain at all, so it
+#: files under `other`. The alternative — putting every document in the one existing IE
+#: immigration pack — would mislabel tax and health sources as immigration.
+PACK_DOMAIN = {
+    "immigration": "immigration",
+    "registration": "registration",
+    "tax": "tax",
+    "social_security": "payroll",
+    "healthcare": "other",
+}
+
+
+def _norm_module():
+    spec = importlib.util.spec_from_file_location("v", REPO / "scripts/verify_batch_quotes.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _readable(text: str) -> str:
+    """Collapse the whitespace an HTML-to-text pass leaves behind.
+
+    Stripping tags turns a page's markup into long runs of spaces and blank lines: the smallest
+    of these documents is 7 KB of which most is nothing. Storing that verbatim makes a document
+    a human cannot read and a payload several times larger than the content.
+
+    Only whitespace is touched — never a word, never punctuation — so this cannot turn an
+    unsupported quote into a supported one. `verify_batch_quotes.norm()` already collapses
+    whitespace on both sides before comparing, so every quote that verified against the raw
+    capture verifies against this, and the caller re-checks all of them anyway. The raw capture
+    stays in the batch's `sources/` directory; this is what goes in the database.
+    """
+    text = re.sub(r"[^\S\n]+", " ", text)
+    text = re.sub(r" ?\n ?", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+#: `requirement_entities.domain_area` is NOT NULL and CHECK-constrained. The ES→IE batch carries
+#: it per record; the NO→FR batch does not carry it at all. Rather than default everything to
+#: `other`, derive it from the topic key WHERE THE KEY ITSELF STATES IT — `french_tax_domicile_eea`
+#: says tax, `a1_posted_worker_eea` says social security. That is derivation from a delivered
+#: field, which is allowed and recorded; inventing a classification the batch never expressed is
+#: not. A key that states nothing lands in `other`, which means "this batch did not classify it",
+#: not "we decided it is miscellaneous".
+_DOMAIN_KEYWORDS = (
+    ("social_security", "social_security"),
+    ("a1_posted_worker", "social_security"),
+    ("tax", "tax"),
+    ("residence_card", "immigration"),
+    ("work_authorization", "immigration"),
+    ("visa", "immigration"),
+    ("registration", "registration"),
+    ("health", "healthcare"),
+)
+
+
+def derive_domain_area(topic_key: str, explicit: Optional[str] = None) -> str:
+    """The record's own `domain_area` when it has one, else what the topic key states."""
+    if explicit:
+        return explicit
+    key = topic_key.lower()
+    for needle, domain in _DOMAIN_KEYWORDS:
+        if needle in key:
+            return domain
+    return "other"
+
+
+def read_entity(rec: dict) -> dict:
+    """Both batch vocabularies, because two exist and neither is going away.
+
+    ES→IE nests the entity (`entity.topic_key`); NO→FR is flat (`entity_topic_key`), which is
+    what `backend/imports/otto/parsers.read_jsonl` requires and what the ES→IE file had to be
+    converted into. A promoter that understands only one of them makes the other unpromotable
+    for a reason that has nothing to do with the facts.
+    """
+    nested = rec.get("entity")
+    if isinstance(nested, dict):
+        return {
+            "destination_country": rec.get("destination_country") or nested.get("destination_country"),
+            "topic_key": nested.get("topic_key"),
+            "title": nested.get("title") or nested.get("topic_key"),
+            "domain_area": derive_domain_area(nested.get("topic_key") or "", nested.get("domain_area")),
+        }
+    topic = rec.get("entity_topic_key")
+    if not topic:
+        raise SystemExit("record has neither a nested `entity` nor `entity_topic_key`")
+    return {
+        "destination_country": rec.get("destination_country"),
+        "topic_key": topic,
+        "title": rec.get("entity_title") or topic,
+        "domain_area": derive_domain_area(topic, rec.get("domain_area")),
+    }
+
+
+def _pdf_title(text: str) -> str | None:
+    first = next((l.strip() for l in text.splitlines() if l.strip()), "")
+    first = re.sub(r"^DOC TITLE:\s*", "", first, flags=re.I).strip()
+    return first[:120] or None
+
+
+def _title_from_url(url: str) -> str:
+    """Title from the URL path, not from the page text.
+
+    The extracted text of several of these pages opens with a cookie banner, so the first N
+    characters make a title like "Critical Skills Employment Permit - DETE Our website uses
+    cookies to enhance your browsing…". The last meaningful path segment is both cleaner and
+    deterministic, which matters because the id is derived and the row is written once.
+    """
+    generic = {"index", "files", "home", "default", "en", "ie"}
+    parts = [p for p in url.rstrip("/").split("/")[3:] if p and not p.isdigit()]
+    parts = [re.sub(r"\.(aspx|html?|php)$", "", p) for p in parts]
+    meaningful = [p for p in parts if p.lower() not in generic]
+    slug = meaningful[-1] if meaningful else (parts[-1] if parts else url.split("/")[2])
+    return re.sub(r"[-_]+", " ", slug).strip().title()[:120] or url[:120]
+
+
+def q(value) -> str:
+    """SQL literal. None -> NULL; everything else single-quoted with doubled quotes."""
+    if value is None:
+        return "NULL"
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, (dict, list)):
+        return "'" + json.dumps(value, ensure_ascii=False).replace("'", "''") + "'::jsonb"
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("batch_dir", type=Path)
+    ap.add_argument("--out", type=Path, help="write SQL here instead of stdout")
+    ap.add_argument("--skip-unverified", action="store_true",
+                    help="promote only the facts whose quote verifies against the captured "
+                         "source, and report the rest instead of refusing the whole batch")
+    ap.add_argument("--split-dir", type=Path,
+                    help="also write one file per statement group, for applying in chunks")
+    args = ap.parse_args()
+
+    v = _norm_module()
+    batch = args.batch_dir if args.batch_dir.is_absolute() else REPO / args.batch_dir
+    stream = next(p for p in sorted(batch.glob("*.ndjson")) if ".flat." not in p.name)
+    rows = [json.loads(l) for l in stream.read_text().splitlines() if l.strip()]
+
+    index_path = batch / "sources" / "index.json"
+    if not index_path.exists():
+        raise SystemExit(f"no captured source text at {index_path} — run verify_batch_quotes.py first")
+    index = json.loads(index_path.read_text())
+    texts = {u: (batch / "sources" / m["file"]).read_text() for u, m in index.items()}
+    pages = {u: v.norm(t) for u, t in texts.items()}
+
+    # Refuse rather than promote an unverifiable quote.
+    missing_src = sorted({r["source_url"] for r in rows} - set(texts))
+    if missing_src:
+        raise SystemExit("no captured text for: " + ", ".join(missing_src))
+    unverified = [r["fact_key"] for r in rows
+                  if v.norm(r["evidence_quote"] or "") not in pages[r["source_url"]]]
+    if unverified and not args.skip_unverified:
+        raise SystemExit(f"{len(unverified)} quote(s) do not appear on their cited page: {unverified}")
+    if unverified:
+        # Held back, not silently dropped: a fact whose quote is not on the page it cites has no
+        # business reaching a mover, and the batch's other facts should not be hostage to it.
+        print(f"-- HELD BACK ({len(unverified)}): quote not found on the cited page")
+        for k in unverified:
+            print(f"--   {k}")
+        rows = [r for r in rows if r["fact_key"] not in set(unverified)]
+
+    dest = rows[0]["destination_country"]
+    packs, docs, entities, facts = {}, {}, {}, []
+
+    for r in rows:
+        ent = read_entity(r)
+        domain = PACK_DOMAIN.get(ent["domain_area"], "other")
+        pack_id = str(uuid.uuid5(NS, f"pack:{dest}:{domain}"))
+        packs[(dest, domain)] = pack_id
+
+        url = r["source_url"]
+        if url not in docs:
+            text = _readable(texts[url])
+            docs[url] = {
+                "id": str(uuid.uuid5(NS, f"doc:{url}")),
+                "pack_id": pack_id,
+                # A PDF names itself on its first line; a web page's extracted text opens
+                # with navigation, so only the PDF branch trusts the document.
+                "title": (_pdf_title(text) if index[url].get("is_pdf") else None)
+                         or _title_from_url(url),
+                "publisher": re.sub(r"^www\d*\.", "", url.split("/")[2]),
+                "source_url": url,
+                "text_content": text,
+                "content_sha256": hashlib.sha256(text.encode()).hexdigest(),
+                "is_pdf": index[url].get("is_pdf", False),
+            }
+
+        ent_id = str(uuid.uuid5(NS, f"entity:{dest}:{ent['topic_key']}"))
+        entities[ent["topic_key"]] = {
+            "id": ent_id, "destination_country": dest,
+            "domain_area": ent["domain_area"], "topic_key": ent["topic_key"],
+            # CHECK-constrained to pending | approved | rejected. An entity arrives unreviewed
+            # like its facts; 'active' is the knowledge_packs vocabulary, not this one.
+            "title": ent.get("title") or ent["topic_key"], "status": "pending",
+        }
+        facts.append({
+            "id": str(uuid.uuid5(NS, f"fact:{dest}:{ent['topic_key']}:{r['fact_key']}")),
+            "dest": dest, "topic_key": ent["topic_key"],
+            "fact_type": r["fact_type"], "fact_key": r["fact_key"],
+            "fact_text": r["fact_text"], "applies_to": r.get("applies_to") or {},
+            "required_fields": r.get("required_fields") or [],
+            "source_url": url, "evidence_quote": r["evidence_quote"],
+            "confidence": r.get("confidence") or "medium",
+        })
+
+    out = [
+        "-- Generated by scripts/promote_requirement_facts.py — DO NOT hand-edit.",
+        f"-- batch: {stream.name}   records: {len(rows)}",
+        f"-- packs: {len(packs)}  knowledge_docs: {len(docs)}  entities: {len(entities)}  facts: {len(facts)}",
+        "-- Every quote was re-checked against the captured source text before emitting.",
+        "-- INSERT-only, guarded by NOT EXISTS on a deterministic uuid5 id: re-running is a no-op.",
+        "BEGIN;",
+        "",
+    ]
+
+    pack_stmts, doc_stmts, entity_stmts, fact_stmts = [], [], [], []
+
+    for (d, domain), pid in sorted(packs.items(), key=lambda kv: kv[0][1]):
+        pack_stmts.append(
+            f"INSERT INTO public.knowledge_packs (id, destination_country, domain, version, status)\n"
+            f"SELECT {q(pid)}::uuid, {q(d)}, {q(domain)}, 1, 'active'\n"
+            f"WHERE NOT EXISTS (SELECT 1 FROM public.knowledge_packs WHERE id = {q(pid)}::uuid);")
+    out.append("")
+
+    for doc in docs.values():
+        note = "  -- PDF, extracted with pypdf" if doc["is_pdf"] else ""
+        doc_stmts.append(
+            f"INSERT INTO public.knowledge_docs (id, pack_id, title, publisher, source_url,\n"
+            f"                                   text_content, content_sha256, fetch_status, fetched_at)\n"
+            f"SELECT {q(doc['id'])}::uuid, {q(doc['pack_id'])}::uuid, {q(doc['title'])},\n"
+            f"       {q(doc['publisher'])}, {q(doc['source_url'])},\n"
+            f"       {q(doc['text_content'])}, {q(doc['content_sha256'])}, 'fetched', now()\n"
+            f"WHERE NOT EXISTS (SELECT 1 FROM public.knowledge_docs\n"
+            f"                   WHERE source_url = {q(doc['source_url'])});{note}")
+    out.append("")
+
+    for ent in entities.values():
+        entity_stmts.append(
+            f"INSERT INTO public.requirement_entities (id, destination_country, domain_area, topic_key, title, status)\n"
+            f"SELECT {q(ent['id'])}::uuid, {q(ent['destination_country'])}, {q(ent['domain_area'])},\n"
+            f"       {q(ent['topic_key'])}, {q(ent['title'])}, {q(ent['status'])}\n"
+            f"WHERE NOT EXISTS (SELECT 1 FROM public.requirement_entities\n"
+            f"                   WHERE destination_country = {q(ent['destination_country'])}\n"
+            f"                     AND topic_key = {q(ent['topic_key'])});")
+    out.append("")
+
+    for f in facts:
+        fact_stmts.append(
+            f"INSERT INTO public.requirement_facts (id, entity_id, source_doc_id, fact_type, fact_key,\n"
+            f"                                      fact_text, applies_to, required_fields, source_url,\n"
+            f"                                      evidence_quote, confidence, status, evidence_verified)\n"
+            f"SELECT {q(f['id'])}::uuid,\n"
+            f"       (SELECT id FROM public.requirement_entities\n"
+            f"         WHERE destination_country = {q(f['dest'])} AND topic_key = {q(f['topic_key'])}),\n"
+            f"       (SELECT id FROM public.knowledge_docs WHERE source_url = {q(f['source_url'])}),\n"
+            f"       {q(f['fact_type'])}, {q(f['fact_key'])}, {q(f['fact_text'])},\n"
+            f"       {q(f['applies_to'])}, {q(f['required_fields'])}, {q(f['source_url'])},\n"
+            f"       {q(f['evidence_quote'])}, {q(f['confidence'])}, 'pending', NULL\n"
+            f"WHERE NOT EXISTS (\n"
+            f"    SELECT 1 FROM public.requirement_facts rf\n"
+            f"     WHERE rf.fact_key = {q(f['fact_key'])}\n"
+            f"       AND rf.entity_id = (SELECT id FROM public.requirement_entities\n"
+            f"                            WHERE destination_country = {q(f['dest'])}\n"
+            f"                              AND topic_key = {q(f['topic_key'])}));")
+
+    out += pack_stmts + [""] + doc_stmts + [""] + entity_stmts + [""] + fact_stmts
+    out += ["", "COMMIT;"]
+    sql = "\n".join(out) + "\n"
+
+    if args.split_dir:
+        # Written from the structured statements, never by re-splitting the emitted SQL. A
+        # naive split on ";\n" loses a statement here: one page's text_content contains that
+        # exact sequence, so the boundary is not a boundary. Chunks are FK-ordered, and every
+        # statement is NOT EXISTS-guarded, so applying them as separate transactions is safe
+        # and re-running any chunk is a no-op.
+        d = args.split_dir if args.split_dir.is_absolute() else REPO / args.split_dir
+        d.mkdir(parents=True, exist_ok=True)
+        for stale in d.glob("*.sql"):
+            stale.unlink()
+        (d / "01_packs_entities.sql").write_text(
+            "\n".join(pack_stmts + entity_stmts) + "\n")
+        for i, stmt in enumerate(doc_stmts, 1):
+            (d / f"02_doc_{i:02d}.sql").write_text(stmt + "\n")
+        for i in range(0, len(fact_stmts), 8):
+            (d / f"03_facts_{i // 8 + 1:02d}.sql").write_text(
+                "\n".join(fact_stmts[i:i + 8]) + "\n")
+        n = len(list(d.glob("*.sql")))
+        total = len(pack_stmts) + len(entity_stmts) + len(doc_stmts) + len(fact_stmts)
+        print(f"split into {n} chunk file(s) under {args.split_dir} covering {total} statements")
+    if args.out:
+        (args.out if args.out.is_absolute() else REPO / args.out).write_text(sql)
+        print(f"wrote {args.out}  ({len(packs)} packs, {len(docs)} docs, {len(entities)} entities, {len(facts)} facts)")
+    else:
+        print(sql)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

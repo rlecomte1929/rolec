@@ -5,7 +5,9 @@ import { Container } from '../antigravity';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 
-const logoUrl = '/relopass-logo.png?v=3';
+// v=4: the source was 122x128 for a 40px box. Re-cut to 80x84 (2x of h-10/w-10);
+// the version bump is what makes returning visitors pick up the smaller file.
+const logoUrl = '/relopass-logo.png?v=4';
 
 const PUBLIC_NAV = [
   { key: 'platform', label: 'Platform', path: ROUTE_DEFS.platform.path },
@@ -35,6 +37,8 @@ export const PublicHeader: React.FC = () => {
           >
             <img
               src={logoUrl}
+          width={80}
+          height={84}
               alt="ReloPass"
               className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl object-contain"
             />

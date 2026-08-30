@@ -6,6 +6,7 @@ import { adminResourcesAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
+import { LoadErrorBanner, loadErrorMessage } from '../../components/LoadErrorBanner';
 
 type Category = { id: string; key: string; label: string; description?: string; icon_name?: string; sort_order?: number; is_active?: boolean };
 
@@ -13,6 +14,7 @@ export const AdminCategories: React.FC = () => {
   const [items, setItems] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [newKey, setNewKey] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [newIcon, setNewIcon] = useState('');
@@ -20,10 +22,12 @@ export const AdminCategories: React.FC = () => {
 
   const load = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await adminResourcesAPI.listCategories();
       setItems((res.categories || []) as Category[]);
-    } catch {
+    } catch (e) {
+      setLoadError(loadErrorMessage(e, "Couldn't load categories."));
       setItems([]);
     } finally {
       setLoading(false);
@@ -84,6 +88,7 @@ export const AdminCategories: React.FC = () => {
 
   return (
     <AdminLayout title="Categories" subtitle="Manage resource categories">
+      <LoadErrorBanner message={loadError} onRetry={() => void load()} />
       <Link to={buildRoute('adminResources')} className="inline-block mb-4">
         <Button variant="secondary">← Back to Resources CMS</Button>
       </Link>
@@ -205,7 +210,7 @@ export const AdminCategories: React.FC = () => {
             </tbody>
           </table>
         </div>
-        {items.length === 0 && !loading && (
+        {items.length === 0 && !loading && !loadError && (
           <div className="py-6 text-center text-slate-500">No categories yet.</div>
         )}
       </Card>

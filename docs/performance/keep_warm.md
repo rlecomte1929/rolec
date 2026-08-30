@@ -7,10 +7,10 @@ steady-state is sub-3s; see `authed_audit_2026-06.md`). Keeping the instance war
 eliminates that cold-start **without a billing change** (the user's chosen lever
 over a plan upgrade).
 
-## Why the existing GitHub Actions pinger is not enough
+## Why the GitHub Actions pinger did not work — and was deleted (2026-08-28)
 
-`.github/workflows/keepalive.yml` pings `/health` on a `*/12` schedule. Two gaps
-made it ineffective in practice:
+`.github/workflows/keepalive.yml` pinged `/health` on a `*/12` schedule. **It has been
+removed.** Two gaps made it ineffective, and a third made it actively misleading:
 
 1. **GitHub throttles high-frequency scheduled workflows — hard.** The cron asks
    for a run every 12 min, but the actual run history fires only **a handful of
@@ -53,10 +53,23 @@ pinger is needed and there is no cold-start ever. This is the cleanest fix but i
 (Note: a prior queue task claimed to have done this "plan upgrade", but the service
 is still on `free` — verify before assuming it's handled.)
 
+3. **It reported green through a real outage.** `prod-smoke.yml`'s header records
+   **32 green keepalive runs during the 7h29m production outage on 2026-08-22** — `/health`
+   does not touch the database, so the check passed while the product was down. A monitor
+   that is green when the thing it watches is broken is worse than no monitor: it is a
+   reason not to look.
+
+Measured on 2026-08-28, the cost of keeping it: ~2,131 runs/month, each a ~7-second curl
+billed as a **full minute** (GitHub bills per job, rounded up). That quota is shared with
+CI, and when the account's Actions allowance was overrun on 2026-08-26 the *scheduler
+itself* collapsed — repo-wide scheduled runs fell from 89/day to 7/day, taking `prod-smoke`
+(the check that actually detects outages) down to **1 run/day against ~32 expected**. The
+keep-warm pinger was crowding out the outage detector.
+
 ## Recommendation
 
 - **Now (free):** set up the cron-job.org / UptimeRobot monitor above. Reliable,
-  24/7, no cost. Treat `keepalive.yml` as a redundant best-effort backup.
+  24/7, no cost. This is now the *only* keep-warm mechanism — `keepalive.yml` is gone.
 - **Later (when revenue/launch justifies it):** upgrade the Render plan and retire
   both pingers.
 

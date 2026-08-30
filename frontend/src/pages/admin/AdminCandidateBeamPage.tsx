@@ -716,7 +716,7 @@ export function AdminCandidateBeamPage(): React.ReactElement {
                     pass {variant.pass}
                     {variant.arrival_ordinal ? `.${variant.arrival_ordinal}` : ''}
                   </span>{' '}
-                  <span className="text-slate-400">{variant.framing}</span>
+                  <span className="text-slate-500">{variant.framing}</span>
                   <div className="text-slate-700">{variant.title}</div>
                 </li>
               ))}

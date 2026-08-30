@@ -13,6 +13,7 @@ from __future__ import annotations
 import pytest
 
 from backend.app.services.fact_evidence import (
+    best_source_text,
     NO_SOURCE,
     TRANSLATED,
     UNVERIFIED,
@@ -269,3 +270,110 @@ class TestNormalise:
 
     def test_empty_input_is_safe(self):
         assert normalise("") == "" and normalise(None) == ""
+
+
+# ---------------------------------------------------------------------------
+# best_source_text — `knowledge_docs` has two source-text columns and neither
+# is reliably the fuller one.
+# ---------------------------------------------------------------------------
+
+
+def test_best_source_text_takes_the_longer_column():
+    assert best_source_text("short", "a much longer body of text") == "a much longer body of text"
+    assert best_source_text("a much longer excerpt of text", "tiny") == "a much longer excerpt of text"
+
+
+def test_best_source_text_handles_the_enterprise_gov_ie_shape():
+    """The case that motivated it: the excerpt captured the consent notice and stopped, while
+    text_content holds the permit page. Preferring the excerpt loses 9 served Irish facts."""
+    cookie_banner = "Our website uses cookies to enhance your browsing experience " * 5
+    real_page = "Because the skills are identified as being in short supply, " * 60
+    assert best_source_text(cookie_banner, real_page) == real_page
+
+
+def test_best_source_text_missing_columns_do_not_raise():
+    assert best_source_text(None, None) == ""
+    assert best_source_text(None, "body") == "body"
+    assert best_source_text("excerpt", None) == "excerpt"
+
+
+def test_best_source_text_a_tie_keeps_the_excerpt():
+    """Equal length is no reason to switch column; the excerpt is the maintained one."""
+    assert best_source_text("abcd", "wxyz") == "abcd"
+
+
+def test_a_quote_only_in_text_content_still_verifies_through_the_resolver():
+    """End to end: the resolver is what makes check_evidence see the Irish CSEP quotes."""
+    quote = "a Labour Market Needs Test is not required"
+    excerpt = "Our website uses cookies to enhance your browsing experience."
+    body = ("The Critical Skills Employment Permit is designed to attract highly skilled people. "
+            "Because the skills are identified as being in short supply, "
+            + quote + ". Eligible occupations are listed separately. ") * 3
+    assert check_evidence(quote, excerpt).status != VERIFIED
+    assert check_evidence(quote, best_source_text(excerpt, body)).status == VERIFIED
+
+
+# ---------------------------------------------------------------------------
+# normalise() is the ONLY quote normaliser. Each fold below cost a real false
+# negative before it existed; each non-fold protects a word or a guard.
+# ---------------------------------------------------------------------------
+
+
+def test_normalise_folds_a_list_bullet():
+    assert normalise("prove: • you are resident or • your visa permits") == \
+           "prove: you are resident or your visa permits"
+
+
+def test_normalise_folds_the_service_public_template_token():
+    """service-public.fr prints a literal `titleContent` inside its own sentences."""
+    assert normalise("un salarié étranger (UE + EEE + Suisse) : titleContent en France") == \
+           "un salarié étranger (UE + EEE + Suisse): en France"
+
+
+def test_normalise_closes_a_space_before_punctuation():
+    """What stripping an <a> or <li> around the mark leaves behind."""
+    assert normalise("note : if you are") == "note: if you are"
+    assert normalise("the Department (DSP) .") == "the Department (DSP)."
+
+
+def test_normalise_closes_french_elision_split_across_a_tag():
+    """CLEISS renders "L' article" for "l'article"; this alone had a genuine, verbatim CLEISS
+    sentence recorded as fabricated."""
+    assert normalise("L' article 11 du règlement") == "L'article 11 du règlement"
+
+
+def test_normalise_does_not_touch_a_hyphen_inside_a_word():
+    """Folding every dash would merge "e-mail" into "e mail" — a word, not markup."""
+    assert "e-mail" in normalise("send an e-mail today")
+
+
+def test_normalise_keeps_a_whitespace_delimited_dash():
+    """Deliberate. It is markup by the same argument, but `_SEGMENT_SPLIT` keys on it, and
+    folding it stops the recomposed-quote rule discriminating (see the planted-error suite)."""
+    assert " - " in normalise("if you: - attend an ID check")
+
+
+def test_normalise_keeps_a_slash():
+    """The batch copy folded "/" to a space, which destroys "and/or"."""
+    assert "and/or" in normalise("the spouse and/or partner")
+
+
+def test_normalise_bullet_fold_runs_before_the_whitespace_collapse():
+    """Order matters: collapse first and removing a bullet leaves a double space, so a true
+    quote reads as missing."""
+    assert "  " not in normalise("prove: • you and • your dependants")
+
+
+def test_the_batch_checker_delegates_to_this_normaliser():
+    """There is one definition. `verify_batch_quotes.norm` may only add the case-fold."""
+    import importlib.util
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    spec = importlib.util.spec_from_file_location("vbq", root / "scripts" / "verify_batch_quotes.py")
+    vbq = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vbq)
+    for sample in ("L' article 11 (CE) n° 883/2004",
+                   "prove: • you and • your dependants",
+                   "note : if you are",
+                   "send an e-mail today"):
+        assert vbq.norm(sample) == normalise(sample).lower(), sample

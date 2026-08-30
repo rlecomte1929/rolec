@@ -14,6 +14,7 @@ import { Badge } from '../antigravity/Badge';
 import {
   listFeedback,
   triageFeedback,
+  bulkTriageFeedback,
   getFeedbackScreenshot,
   saveDispatchContext,
   dispatchPreview,
@@ -34,6 +35,9 @@ import { getApiErrorMessage } from '../../utils/apiDetail';
 import { isTriggerFixEnabled } from '../../featureFlags';
 import type { ClientContext } from '../../lib/diagnostics';
 import { posthogPersonUrl } from '../../lib/posthogLinks';
+import { Checkbox } from '../antigravity';
+import { BulkActionBar, type BulkActionResult } from '../antigravity/BulkActionBar';
+import { useRowSelection } from '../../hooks/useRowSelection';
 import { ProgressStrip } from './ProgressStrip';
 import { NewFeedbackModal } from './NewFeedbackModal';
 
@@ -153,21 +157,21 @@ function DiagnosticsPanel({ ctx }: { ctx: ClientContext }) {
       <p className="text-[10.5px] font-semibold text-gray-500">Diagnostics</p>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-600">
         {ctx.route && (
-          <span><span className="text-gray-400">Page</span> <span className="font-mono">{ctx.route}</span></span>
+          <span><span className="text-gray-500">Page</span> <span className="font-mono">{ctx.route}</span></span>
         )}
         {ctx.appVersion && (
-          <span><span className="text-gray-400">App</span> <span className="font-mono">{ctx.appVersion}</span></span>
+          <span><span className="text-gray-500">App</span> <span className="font-mono">{ctx.appVersion}</span></span>
         )}
         {ctx.viewport && (
-          <span><span className="text-gray-400">Viewport</span> {ctx.viewport}</span>
+          <span><span className="text-gray-500">Viewport</span> {ctx.viewport}</span>
         )}
         {ctx.interactionId && (
-          <span><span className="text-gray-400">Interaction</span> <span className="font-mono">{ctx.interactionId}</span></span>
+          <span><span className="text-gray-500">Interaction</span> <span className="font-mono">{ctx.interactionId}</span></span>
         )}
       </div>
       {(ctx.posthog_replay_url || ctx.posthog_id) && (
         <div className="text-[11px]">
-          <span className="text-gray-400">PostHog</span>{' '}
+          <span className="text-gray-500">PostHog</span>{' '}
           {ctx.posthog_replay_url ? (
             <a
               href={ctx.posthog_replay_url}
@@ -191,7 +195,7 @@ function DiagnosticsPanel({ ctx }: { ctx: ClientContext }) {
       )}
       {ctx.recentFailedRequests?.length > 0 && (
         <div className="text-[11px]">
-          <p className="text-gray-400 mb-0.5">Failed requests</p>
+          <p className="text-gray-500 mb-0.5">Failed requests</p>
           <ul className="space-y-0.5">
             {ctx.recentFailedRequests.map((r, i) => (
               <li key={i} className="font-mono text-gray-700">
@@ -199,7 +203,7 @@ function DiagnosticsPanel({ ctx }: { ctx: ClientContext }) {
                 <span className={r.status >= 500 || r.status === 0 ? 'text-red-600' : 'text-amber-600'}>
                   {r.status || 'network error'}
                 </span>
-                {r.requestId && <span className="text-gray-400"> · req {r.requestId}</span>}
+                {r.requestId && <span className="text-gray-500"> · req {r.requestId}</span>}
               </li>
             ))}
           </ul>
@@ -207,7 +211,7 @@ function DiagnosticsPanel({ ctx }: { ctx: ClientContext }) {
       )}
       {ctx.recentErrors?.length > 0 && (
         <div className="text-[11px]">
-          <p className="text-gray-400 mb-0.5">Errors — function that failed</p>
+          <p className="text-gray-500 mb-0.5">Errors — function that failed</p>
           <ul className="space-y-1">
             {ctx.recentErrors.map((e, i) => (
               <li key={i} className="text-gray-700">
@@ -222,7 +226,7 @@ function DiagnosticsPanel({ ctx }: { ctx: ClientContext }) {
       )}
       {ctx.breadcrumbs?.length > 0 && (
         <details className="text-[11px]">
-          <summary className="text-gray-400 cursor-pointer">Recent activity ({ctx.breadcrumbs.length})</summary>
+          <summary className="text-gray-500 cursor-pointer">Recent activity ({ctx.breadcrumbs.length})</summary>
           <ol className="mt-0.5 space-y-0.5 text-gray-500">
             {ctx.breadcrumbs.map((b, i) => (
               <li key={i} className="font-mono text-[10px]">{b.type}: {b.message}</li>
@@ -514,6 +518,53 @@ export function FeedbackTab() {
     return true;
   });
 
+  // ── Bulk triage ───────────────────────────────────────────────────────────
+  // Selection is scoped to `displayed` (the client-filtered list), NOT `rows`.
+  // Every filter on this page is client-side, so selecting over `rows` would let a
+  // "select all" act on items the admin cannot see. The filter signature is passed as
+  // `syncTo`, so changing any filter clears the selection rather than carrying hidden
+  // rows into the next action.
+  const filterSignature = `${activeStream}|${filterStatus}|${reporterFilter}|${messageFilter}|${showDismissed}`;
+  const { selectedRows, allVisibleSelected, isSelected, toggle, toggleAll, clear } =
+    useRowSelection(displayed, (r) => r.id, filterSignature);
+  const [bulkResult, setBulkResult] = useState<BulkActionResult>('idle');
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [bulkDone, setBulkDone] = useState<string>('');
+  const bulkBusy = bulkResult === 'busy';
+
+  const applyBulkStatus = async (status: TriageStatus) => {
+    const targets = selectedRows.map((r) => ({ stream: r.stream, source_id: r.id }));
+    if (targets.length === 0) return;
+    setBulkResult('busy');
+    setBulkError(null);
+    try {
+      const res = await bulkTriageFeedback(targets, status);
+      const ok = new Set(
+        targets
+          .filter((t) => !res.rejected.some((x) => x.stream === t.stream && x.source_id === t.source_id))
+          .map((t) => t.source_id),
+      );
+      // Patch locally — every mutation on this page does, and a bulk refetch would
+      // re-pull the whole list to learn what we already know.
+      setRows((prev) => prev.map((r) => (ok.has(r.id) ? { ...r, status } : r)));
+      if (res.rejected.length > 0) {
+        // Deliberately do NOT clear on failure. The bar only renders while something is
+        // selected, so clearing here would unmount the very message explaining what went
+        // wrong — and it would throw away the selection the admin needs in order to
+        // retry. Clear only when everything landed.
+        setBulkResult('error');
+        setBulkError(`${res.rejected.length} of ${targets.length} could not be updated.`);
+      } else {
+        clear();
+        setBulkResult('done');
+        setBulkDone(`${res.updated} updated.`);
+      }
+    } catch {
+      setBulkResult('error');
+      setBulkError('Could not apply the change — nothing was updated.');
+    }
+  };
+
   const counts = {
     all:      rows.length,
     new:      rows.filter((r) => r.status === 'new' || r.status === null).length,
@@ -525,7 +576,7 @@ export function FeedbackTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <p className="text-sm text-gray-400">Loading…</p>
+        <p className="text-sm text-gray-500">Loading…</p>
       </div>
     );
   }
@@ -575,7 +626,7 @@ export function FeedbackTab() {
       {activeStream === 'dispatched' && (
         <>
           <div className="flex justify-end">
-            <Button unstyled onClick={load} className="text-xs text-gray-400 hover:text-gray-600 underline">
+            <Button unstyled onClick={load} className="text-xs text-gray-500 hover:text-gray-600 underline">
               Refresh
             </Button>
           </div>
@@ -583,13 +634,13 @@ export function FeedbackTab() {
           {displayed.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center rounded-lg border border-gray-200 bg-white">
               <p className="text-sm font-medium text-gray-600">No dispatched tickets</p>
-              <p className="text-xs text-gray-400 mt-1">Dispatched tickets will appear here once tickets are routed to engineering.</p>
+              <p className="text-xs text-gray-500 mt-1">Dispatched tickets will appear here once tickets are routed to engineering.</p>
             </div>
           )}
 
           {displayed.length > 0 && (
             <div className="rounded-lg border border-gray-200 overflow-hidden">
-              <div className="grid grid-cols-[110px_140px_140px_110px_100px_100px_120px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+              <div className="grid grid-cols-[110px_140px_140px_110px_100px_100px_120px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
                 <div className="px-3 py-2.5">Source ref</div>
                 <div className="px-3 py-2.5">Stream</div>
                 <div className="px-3 py-2.5">Dispatch ref</div>
@@ -623,7 +674,7 @@ export function FeedbackTab() {
                           {row.dispatch_ref}
                         </span>
                       ) : (
-                        <span className="text-[11px] text-gray-400">—</span>
+                        <span className="text-[11px] text-gray-500">—</span>
                       )}
                     </div>
                     <div className="px-3">
@@ -640,7 +691,7 @@ export function FeedbackTab() {
                           {row.severity}
                         </Badge>
                       ) : (
-                        <span className="text-[11px] text-gray-400">—</span>
+                        <span className="text-[11px] text-gray-500">—</span>
                       )}
                     </div>
                     <div className="px-3">
@@ -652,11 +703,11 @@ export function FeedbackTab() {
                           {row.area}
                         </Badge>
                       ) : (
-                        <span className="text-[11px] text-gray-400">—</span>
+                        <span className="text-[11px] text-gray-500">—</span>
                       )}
                     </div>
                     <div className="px-3">
-                      <span className="text-[11px] text-gray-400" title={fmtDate(row.created_at)}>
+                      <span className="text-[11px] text-gray-500" title={fmtDate(row.created_at)}>
                         {fmtRelative(row.created_at)}
                       </span>
                     </div>
@@ -681,7 +732,7 @@ export function FeedbackTab() {
         ] as const).map(({ label, value, color }) => (
           <div key={label} className="rounded-lg border border-gray-200 px-4 py-3 bg-white">
             <p className={`text-xl font-bold ${color}`}>{value}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{label}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{label}</p>
           </div>
         ))}
       </div>
@@ -714,7 +765,7 @@ export function FeedbackTab() {
           onChange={(e) => setReporterFilter(e.target.value)}
           placeholder="Filter by reporter…"
           aria-label="Filter by reporter name or email"
-          className="text-xs px-2.5 py-1.5 rounded-md border border-gray-200 bg-white text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] w-48"
+          className="text-xs px-2.5 py-1.5 rounded-md border border-gray-200 bg-white text-gray-700 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] w-48"
         />
         <input
           type="search"
@@ -722,10 +773,10 @@ export function FeedbackTab() {
           onChange={(e) => setMessageFilter(e.target.value)}
           placeholder="Search message or page…"
           aria-label="Search feedback message or page route"
-          className="text-xs px-2.5 py-1.5 rounded-md border border-gray-200 bg-white text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] w-52"
+          className="text-xs px-2.5 py-1.5 rounded-md border border-gray-200 bg-white text-gray-700 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b] w-52"
         />
         {(reporterQuery || messageQuery) && (
-          <span className="text-[11px] text-gray-400">
+          <span className="text-[11px] text-gray-500">
             {displayed.length} match{displayed.length === 1 ? '' : 'es'}
           </span>
         )}
@@ -739,7 +790,7 @@ export function FeedbackTab() {
           />
           Show dismissed
         </label>
-        <Button unstyled onClick={load} className="text-xs text-gray-400 hover:text-gray-600 underline">
+        <Button unstyled onClick={load} className="text-xs text-gray-500 hover:text-gray-600 underline">
           Refresh
         </Button>
       </div>
@@ -748,16 +799,50 @@ export function FeedbackTab() {
       {displayed.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center rounded-lg border border-gray-200 bg-white">
           <p className="text-sm font-medium text-gray-600">No items match the current filter.</p>
-          <p className="text-xs text-gray-400 mt-1">Try a different stream or status filter.</p>
+          <p className="text-xs text-gray-500 mt-1">Try a different stream or status filter.</p>
         </div>
       )}
         </>
       )}
 
+      {activeStream !== 'dispatched' && (
+        <BulkActionBar
+          count={selectedRows.length}
+          busy={bulkBusy}
+          result={bulkResult}
+          successMessage={bulkDone}
+          errorMessage={bulkError}
+          onClear={clear}
+        >
+          {(['new', 'reviewed', 'acted_on', 'closed'] as TriageStatus[]).map((st) => (
+            <button
+              key={st}
+              type="button"
+              disabled={bulkBusy}
+              onClick={() => void applyBulkStatus(st)}
+              className="rounded-md border border-[#d1d5db] bg-white px-2.5 py-1 text-sm text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white disabled:opacity-50"
+            >
+              {/* The count is in the label on purpose: it is what makes a count
+                  regression impossible to miss, and it is what the vetting-queue
+                  tests assert on. */}
+              {bulkBusy ? 'Applying…' : `Mark ${STATUS_LABEL[st]} (${selectedRows.length})`}
+            </button>
+          ))}
+        </BulkActionBar>
+      )}
+
       {/* Table — normal (non-dispatched) mode */}
       {activeStream !== 'dispatched' && displayed.length > 0 && (
         <div className="rounded-lg border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-[100px_110px_minmax(0,1fr)_140px_120px_120px_140px_110px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+          <div className="grid grid-cols-[36px_100px_110px_minmax(0,1fr)_140px_120px_120px_140px_110px] bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+            <div className="px-2 py-2.5 flex items-center">
+              <Checkbox
+                aria-label="Select all"
+                checked={allVisibleSelected}
+                disabled={bulkBusy}
+                onChange={(e) => toggleAll(e.target.checked)}
+              />
+            </div>
             <div className="px-3 py-2.5">ID</div>
             <div className="px-3 py-2.5">Stream</div>
             <div className="px-3 py-2.5">Text</div>
@@ -777,7 +862,7 @@ export function FeedbackTab() {
               return (
                 <div key={row.id}>
                   <div
-                    className="grid grid-cols-[100px_110px_minmax(0,1fr)_140px_120px_120px_140px_110px] items-center hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="grid grid-cols-[36px_100px_110px_minmax(0,1fr)_140px_120px_120px_140px_110px] items-center hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => setExpanded(isExpanded ? null : row.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -789,6 +874,20 @@ export function FeedbackTab() {
                     tabIndex={0}
                     aria-expanded={isExpanded}
                   >
+                    <div className="px-2 py-2.5 flex items-center">
+                      <Checkbox
+                        aria-label={`Select ${row.source_ref ?? row.id}`}
+                        checked={isSelected(row.id)}
+                        disabled={bulkBusy}
+                        onChange={() => toggle(row.id)}
+                        // The row itself is the expand/collapse control, so the click
+                        // must stop here — otherwise ticking a box also opens the row.
+                        // On the input, not a wrapper div: the checkbox is the
+                        // interactive element and already handles its own keyboard.
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      />
+                    </div>
                     <div className="px-3 py-2.5 flex items-center gap-1">
                       <span className="font-mono text-[10.5px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                         {/* TD-FIX-5 (AIQ-1506): full report_id — see note above. */}
@@ -829,7 +928,7 @@ export function FeedbackTab() {
                       <span className="text-[11px] text-gray-500">{row.verdict ?? '—'}</span>
                     </div>
                     <div className="px-3 py-2.5">
-                      <span className="text-[11px] text-gray-400" title={fmtDate(row.created_at)}>
+                      <span className="text-[11px] text-gray-500" title={fmtDate(row.created_at)}>
                         {fmtRelative(row.created_at)}
                       </span>
                     </div>
@@ -862,7 +961,7 @@ export function FeedbackTab() {
                       ) : alreadyDispatched ? (
                         <Badge variant="success" size="sm">dispatched</Badge>
                       ) : (
-                        <span className="text-[11px] text-gray-300">—</span>
+                        <span className="text-[11px] text-gray-500">—</span>
                       )}
                     </div>
                   </div>
@@ -871,14 +970,14 @@ export function FeedbackTab() {
                     <div className="bg-gray-50 border-t border-gray-100 px-4 py-4 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap text-[10.5px]">
                         <span className="font-semibold text-gray-600">{STREAM_LABEL[row.stream]}</span>
-                        <span className="font-mono text-gray-400">{row.source_ref}</span>
+                        <span className="font-mono text-gray-500">{row.source_ref}</span>
                         {row.company_id && (
-                          <span className="font-mono text-gray-400">co: {row.company_id}</span>
+                          <span className="font-mono text-gray-500">co: {row.company_id}</span>
                         )}
                       </div>
                       {/* Reporter attribution — who reported this, and exactly when */}
                       <div className="flex items-center gap-2 flex-wrap text-[11px]">
-                        <span className="text-gray-400">Reported by</span>
+                        <span className="text-gray-500">Reported by</span>
                         {(row.reporter_name || row.reporter_email) ? (
                           <>
                             {row.reporter_name && (
@@ -900,9 +999,9 @@ export function FeedbackTab() {
                             )}
                           </>
                         ) : (
-                          <span className="italic text-gray-400">Unknown reporter</span>
+                          <span className="italic text-gray-500">Unknown reporter</span>
                         )}
-                        <span className="text-gray-300">·</span>
+                        <span className="text-gray-500">·</span>
                         <span className="text-gray-500" title={new Date(row.created_at).toLocaleString()}>
                           {fmtDate(row.created_at)}
                         </span>
@@ -941,7 +1040,7 @@ export function FeedbackTab() {
                           <div>
                             <p className="text-[10.5px] font-semibold text-gray-500 mb-1">Screenshot</p>
                             {!row.has_screenshot ? (
-                              <p className="text-[11px] text-gray-400">No screenshot attached.</p>
+                              <p className="text-[11px] text-gray-500">No screenshot attached.</p>
                             ) : shots[row.id] ? (
                               <button
                                 type="button"
@@ -956,11 +1055,11 @@ export function FeedbackTab() {
                                 />
                               </button>
                             ) : shotLoadingId === row.id ? (
-                              <p className="text-[11px] text-gray-400">Loading screenshot…</p>
+                              <p className="text-[11px] text-gray-500">Loading screenshot…</p>
                             ) : row.id in shots ? (
-                              <p className="text-[11px] text-gray-400">Screenshot unavailable.</p>
+                              <p className="text-[11px] text-gray-500">Screenshot unavailable.</p>
                             ) : (
-                              <p className="text-[11px] text-gray-400">Loading screenshot…</p>
+                              <p className="text-[11px] text-gray-500">Loading screenshot…</p>
                             )}
                             {/* AIQ-1480: click a thumbnail to view it full-size. */}
                             {lightboxSrc && (
@@ -988,16 +1087,16 @@ export function FeedbackTab() {
                             {parseCtx(row.client_context) ? (
                               <DiagnosticsPanel ctx={parseCtx(row.client_context)!} />
                             ) : (
-                              <p className="text-[11px] text-gray-400">No diagnostics captured for this report.</p>
+                              <p className="text-[11px] text-gray-500">No diagnostics captured for this report.</p>
                             )}
                           </div>
                         </div>
                       )}
                       {row.owner && (
-                        <p className="text-[10.5px] text-gray-400">Owner: {row.owner}</p>
+                        <p className="text-[10.5px] text-gray-500">Owner: {row.owner}</p>
                       )}
                       {row.resolution && (
-                        <p className="text-[10.5px] text-gray-400">Resolution: {row.resolution}</p>
+                        <p className="text-[10.5px] text-gray-500">Resolution: {row.resolution}</p>
                       )}
 
                       {/* Dispatch → AI Work Queue */}
@@ -1046,7 +1145,7 @@ export function FeedbackTab() {
                           <div className="space-y-2">
                             <p className="text-[10.5px] font-semibold text-gray-500">Dispatch to AI Work Queue</p>
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-[10.5px] text-gray-400">
+                              <span className="text-[10.5px] text-gray-500">
                                 Context (required — repro steps, expected behaviour, constraints)
                               </span>
                               <Button
@@ -1067,7 +1166,7 @@ export function FeedbackTab() {
                               rows={3}
                               className="w-full text-[12px] rounded border border-gray-200 px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#1f8e8b]"
                             />
-                            {savingContextId === row.id && <p className="text-[10px] text-gray-400">Saving…</p>}
+                            {savingContextId === row.id && <p className="text-[10px] text-gray-500">Saving…</p>}
 
                             {previewFor === row.id && previewTask ? (
                               <div className="rounded border border-gray-200 bg-white p-3 space-y-2">
@@ -1081,7 +1180,7 @@ export function FeedbackTab() {
                                   ['Verify (test command)', 'test_command'],
                                 ] as const).map(([label, key]) => (
                                   <div key={key}>
-                                    <span className="block text-[10px] uppercase tracking-wide text-gray-400">{label}</span>
+                                    <span className="block text-[10px] uppercase tracking-wide text-gray-500">{label}</span>
                                     <textarea
                                       value={(previewTask[key]) ?? ''}
                                       onChange={(e) => setPreviewTask((t) => (t ? { ...t, [key]: e.target.value } : t))}
@@ -1094,7 +1193,7 @@ export function FeedbackTab() {
                                     for the eval gate (D4: question→impl task check). */}
                                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                                   <div>
-                                    <span className="block text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Task type</span>
+                                    <span className="block text-[10px] uppercase tracking-wide text-gray-500 mb-0.5">Task type</span>
                                     <select
                                       value={previewTask.task_type}
                                       onChange={(e) => setPreviewTask((t) => t ? { ...t, task_type: e.target.value } : t)}
@@ -1106,7 +1205,7 @@ export function FeedbackTab() {
                                     </select>
                                   </div>
                                   <div>
-                                    <span className="block text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Status</span>
+                                    <span className="block text-[10px] uppercase tracking-wide text-gray-500 mb-0.5">Status</span>
                                     <select
                                       value={previewTask.status}
                                       onChange={(e) => setPreviewTask((t) => t ? { ...t, status: e.target.value } : t)}
@@ -1230,7 +1329,7 @@ export function FeedbackTab() {
                             </Button>
                           )
                         )}
-                        {managingId === row.id && <span className="text-gray-400">…</span>}
+                        {managingId === row.id && <span className="text-gray-500">…</span>}
                       </div>
                     </div>
                   )}

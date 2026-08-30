@@ -123,7 +123,7 @@ export function CaseExtractedDataPanel({ caseId }: CaseExtractedDataPanelProps) 
   );
 
   if (loading) {
-    return <p className="py-8 text-center text-sm text-slate-400">Loading extracted data…</p>;
+    return <p className="py-8 text-center text-sm text-slate-500">Loading extracted data…</p>;
   }
 
   if (error) {
@@ -139,7 +139,7 @@ export function CaseExtractedDataPanel({ caseId }: CaseExtractedDataPanelProps) 
 
   if (documents.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-slate-400">
+      <p className="py-8 text-center text-sm text-slate-500">
         No documents have been processed for this case yet.
       </p>
     );
@@ -162,7 +162,7 @@ export function CaseExtractedDataPanel({ caseId }: CaseExtractedDataPanelProps) 
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-slate-900">{doc.filename}</p>
-                <p className="mt-0.5 text-xs text-slate-400">
+                <p className="mt-0.5 text-xs text-slate-500">
                   {doc.document_type_label ?? doc.document_type_code}
                   {doc.uploaded_at && ` · ${formatDate(doc.uploaded_at)}`}
                 </p>
@@ -205,9 +205,9 @@ export function CaseExtractedDataPanel({ caseId }: CaseExtractedDataPanelProps) 
             {isOpen && (
               <div className="mt-3 border-t border-slate-100 pt-3">
                 {fieldsLoading && !docFields ? (
-                  <p className="text-xs text-slate-400">Loading…</p>
+                  <p className="text-xs text-slate-500">Loading…</p>
                 ) : !docFields || docFields.length === 0 ? (
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     Nothing was extracted from this document yet.
                   </p>
                 ) : (
@@ -228,7 +228,7 @@ export function CaseExtractedDataPanel({ caseId }: CaseExtractedDataPanelProps) 
                           <tr key={f.field_key} className="border-t border-slate-50">
                             <td className="py-1 pr-3 text-slate-500">{labelFor(f.field_key)}</td>
                             <td className="py-1 pr-3 text-slate-900">
-                              {f.value ?? <span className="text-slate-300">—</span>}
+                              {f.value ?? <span className="text-slate-500">—</span>}
                             </td>
                             <td className="py-1">
                               <ConfidenceBadge level={levelFor(f.confidence)} score={f.confidence} />
@@ -237,7 +237,7 @@ export function CaseExtractedDataPanel({ caseId }: CaseExtractedDataPanelProps) 
                         ))}
                       </tbody>
                     </table>
-                    <p className="mt-2 text-[11px] text-slate-400">
+                    <p className="mt-2 text-[11px] text-slate-500">
                       {fieldCounts[doc.document_id] ?? docFields.length} field
                       {(fieldCounts[doc.document_id] ?? docFields.length) === 1 ? '' : 's'} read
                       from this document.

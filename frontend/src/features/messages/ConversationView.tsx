@@ -52,7 +52,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
         aria-live="polite"
       >
         <p className="text-sm text-center">Select a conversation to read it.</p>
-        <p className="text-xs text-[#94a3b8] mt-1 text-center max-w-xs">HR opens the first thread once your case is linked. You&apos;ll reply from here.</p>
+        <p className="text-xs text-slate-500 mt-1 text-center max-w-xs">HR opens the first thread once your case is linked. You&apos;ll reply from here.</p>
       </div>
     );
   }

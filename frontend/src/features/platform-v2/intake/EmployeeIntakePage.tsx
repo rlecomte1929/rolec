@@ -270,12 +270,15 @@ function FieldWrap({
       <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 flex-wrap">
         {label}
         {required && <span className="text-red-500" title="Required">*</span>}
-        {optional && <span className="text-gray-400 font-normal">(optional)</span>}
+        {optional && <span className="text-gray-500 font-normal">(optional)</span>}
         {prefill && (
           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent-100 text-accent-700 text-[10px] font-medium">
             🔒 HR pre-filled
+            {/* accent-500 (#1f8e8b) is 3.19:1 on this chip's accent-100 tint; accent-700 is
+                6.18:1. Note accent-500 as TEXT is only 3.96:1 even on white, so the other
+                `text-accent-500` sites are suspect too — this is the one axe measures. */}
             {onUnlock && (
-              <Button unstyled type="button" onClick={onUnlock} className="underline text-accent-500 hover:text-accent-700 ml-0.5">
+              <Button unstyled type="button" onClick={onUnlock} className="underline text-accent-700 hover:text-accent-800 ml-0.5">
                 Edit
               </Button>
             )}
@@ -291,19 +294,19 @@ function FieldWrap({
       {whyOpen && why && (
         <div className="text-xs text-gray-500 bg-accent-50 border border-accent-100 rounded-lg px-3 py-2">{why}</div>
       )}
-      {hint && <div className="text-sm text-gray-400">{hint}</div>}
+      {hint && <div className="text-sm text-gray-500">{hint}</div>}
     </div>
   );
 }
 
 const inputCls = (locked?: boolean) =>
   `w-full px-3 py-2 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300 ${
-    locked ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
+    locked ? 'bg-gray-50 text-gray-500 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
   }`;
 
 const selectCls = (locked?: boolean) =>
   `w-full px-3 py-2 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-300 ${
-    locked ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
+    locked ? 'bg-gray-50 text-gray-500 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
   }`;
 
 // AIQ-1603: single-select commute preference. The persisted enum differs from the tokens
@@ -419,15 +422,15 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
           autoCorrect="off"
           autoCapitalize="off"
         />
-        <span className="px-2 text-gray-400 text-xs">▾</span>
+        <span className="px-2 text-gray-500 text-xs">▾</span>
       </div>
       {open && !disabled && (
         <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
           {query && filtered.length > 0 && (
-            <div className="px-4 pt-2 pb-1 text-[11px] text-gray-400">Select your country from the list</div>
+            <div className="px-4 pt-2 pb-1 text-[11px] text-gray-500">Select your country from the list</div>
           )}
           {filtered.length === 0
-            ? <div className="px-4 py-3 text-xs text-gray-400">No match</div>
+            ? <div className="px-4 py-3 text-xs text-gray-500">No match</div>
             : filtered.map((c) => (
               <div key={c.code} onClick={() => { onChange(c.code); setOpen(false); setQuery(''); }}
                 onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(c.code); setOpen(false); setQuery(''); } }}
@@ -437,7 +440,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
                 className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50 ${value === c.code ? 'bg-accent-50 text-accent-700' : ''}`}>
                 <span className="text-base">{c.flag ?? flagEmoji(c.code)}</span>
                 <span className="flex-1">{c.name}</span>
-                <span className="text-xs text-gray-400">{c.code}</span>
+                <span className="text-xs text-gray-500">{c.code}</span>
               </div>
             ))}
         </div>
@@ -463,13 +466,13 @@ function CityCombo({ country, value, onChange, testId, disabled, catalogueCities
   return (
     <div ref={ref} className="relative">
       <div className={`flex items-center border rounded-lg overflow-hidden ${disabled ? 'bg-gray-50 border-gray-100' : 'border-gray-200 bg-white'}`}>
-        <span className="px-3 text-gray-400 text-sm">📍</span>
+        <span className="px-3 text-gray-500 text-sm">📍</span>
         <Input unstyled type="text" data-testid={testId} value={value} placeholder="Select or type a city" autoComplete="off"
           disabled={disabled}
-          className={`flex-1 py-2 pr-3 text-sm focus:outline-none bg-transparent ${disabled ? 'text-gray-400 cursor-not-allowed' : ''}`}
+          className={`flex-1 py-2 pr-3 text-sm focus:outline-none bg-transparent ${disabled ? 'text-gray-500 cursor-not-allowed' : ''}`}
           onChange={(v) => onChange(v)}
           onFocus={() => { if (!disabled) setOpen(true); }} />
-        <span className="px-2 text-gray-400 text-xs">▾</span>
+        <span className="px-2 text-gray-500 text-xs">▾</span>
       </div>
       {open && !disabled && opts.length > 0 && (
         <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
@@ -499,7 +502,7 @@ function CardShell({ ico, title, sub, status, expanded, onToggle, onRemove, urge
   expanded: boolean; onToggle: () => void; onRemove?: () => void;
   urgent?: boolean; children: React.ReactNode;
 }) {
-  const statusCls = { complete: 'text-green-600 bg-green-50', partial: 'text-amber-600 bg-amber-50', empty: 'text-gray-400 bg-gray-50' };
+  const statusCls = { complete: 'text-green-600 bg-green-50', partial: 'text-amber-600 bg-amber-50', empty: 'text-gray-500 bg-gray-50' };
   const statusLbl = { complete: '✓ Complete', partial: 'In progress', empty: 'Not started' };
   return (
     <div className={`border rounded-xl overflow-hidden ${urgent ? 'border-amber-200' : 'border-gray-100'} bg-white`}>
@@ -507,13 +510,13 @@ function CardShell({ ico, title, sub, status, expanded, onToggle, onRemove, urge
         <span className="text-xl flex-shrink-0">{ico}</span>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>
-          <div className="text-xs text-gray-400 truncate">{sub}</div>
+          <div className="text-xs text-gray-500 truncate">{sub}</div>
         </div>
         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusCls[status]}`}>{statusLbl[status]}</span>
-        <span className={`text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>▾</span>
+        <span className={`text-gray-500 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>▾</span>
         {onRemove && (
           <Button unstyled type="button" onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            className="ml-1 text-gray-300 hover:text-red-400 transition-colors text-sm font-bold">✕</Button>
+            className="ml-1 text-gray-500 hover:text-red-400 transition-colors text-sm font-bold">✕</Button>
         )}
       </Button>
       {expanded && <div className="px-4 pb-4 border-t border-gray-100">{children}</div>}
@@ -600,7 +603,7 @@ function StepHd({ title, sub, required }: { title: string; sub: string; required
     <div className="mb-5">
       <div className="text-base font-bold text-gray-900">{title}</div>
       <div className="text-sm text-gray-500 mt-0.5">{sub}</div>
-      {required && <div className="text-xs text-gray-400 mt-1"><span className="text-red-400">*</span> required field</div>}
+      {required && <div className="text-xs text-gray-500 mt-1"><span className="text-red-400">*</span> required field</div>}
     </div>
   );
 }
@@ -639,7 +642,7 @@ function ReviewSummary({ data, goTo, loading = false }: { data: IntakeData; goTo
       <div className="flex flex-col gap-1.5">
         {rows.map(([k, v]) => (
           <div key={k} className="flex gap-3 text-xs">
-            <span className="text-gray-400 w-24 flex-shrink-0">{k}</span>
+            <span className="text-gray-500 w-24 flex-shrink-0">{k}</span>
             <span className="text-gray-700 font-medium">{v}</span>
           </div>
         ))}
@@ -1160,10 +1163,10 @@ export function EmployeeIntakePage() {
 
           {/* Progress stepper */}
           <div className="border-b border-gray-100 px-5 pt-4 pb-3">
-            <div className="flex items-center justify-between mb-2 text-xs text-gray-400">
+            <div className="flex items-center justify-between mb-2 text-xs text-gray-500">
               <span className="font-semibold text-gray-600">Detailed Intake</span>
               {saveStatus === 'saving' ? (
-                <span className="text-gray-400">Saving…</span>
+                <span className="text-gray-500">Saving…</span>
               ) : saveStatus === 'error' ? (
                 <button
                   type="button"
@@ -1193,14 +1196,14 @@ export function EmployeeIntakePage() {
                     disabled={n > step}
                     title={onHold ? 'On hold — coming soon' : undefined}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-semibold flex-shrink-0 transition-colors ${
-                      onHold && !isActive ? 'text-gray-400 opacity-60' :
+                      onHold && !isActive ? 'text-gray-500 opacity-60' :
                       isActive ? 'bg-accent-100 text-accent-700' :
                       isDone ? 'text-green-600 cursor-pointer hover:bg-green-50' :
-                      'text-gray-300'
+                      'text-gray-500'
                     }`}>
                     <span className={`w-4 h-4 rounded-full text-[9px] flex items-center justify-center flex-shrink-0 ${
-                      onHold && !isActive ? 'bg-gray-100 text-gray-400' :
-                      isActive ? 'bg-accent-600 text-white' : isDone ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
+                      onHold && !isActive ? 'bg-gray-100 text-gray-500' :
+                      isActive ? 'bg-accent-600 text-white' : isDone ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
                     }`}>{isDone ? '✓' : n}</span>
                     <span className="hidden sm:inline">{lbl}</span>
                     {onHold && (
@@ -1296,7 +1299,7 @@ export function EmployeeIntakePage() {
                       onChange={(v) => setField('passport_expiry', v)} />
                   </FieldWrap>
                   <FieldWrap label="Passport upload" optional hint="Drop a PDF or photo — we'll OCR name, country, and expiry." className="sm:col-span-2">
-                    <div className="flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl p-5 text-sm text-gray-400 cursor-pointer hover:border-accent-300 hover:text-accent-500 transition-colors">
+                    <div className="flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl p-5 text-sm text-gray-500 cursor-pointer hover:border-accent-300 hover:text-accent-500 transition-colors">
                       ↑ Drop your passport or click to browse
                     </div>
                   </FieldWrap>
@@ -1314,7 +1317,7 @@ export function EmployeeIntakePage() {
                     <span className="text-xl">🙋</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold text-gray-900">{data.full_name || 'You'}</div>
-                      <div className="text-xs text-gray-400">Primary relocator</div>
+                      <div className="text-xs text-gray-500">Primary relocator</div>
                     </div>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold text-green-600 bg-green-100">✓ From Step 2</span>
                   </div>
@@ -1377,7 +1380,7 @@ export function EmployeeIntakePage() {
                         officeGeo.status === 'notfound' ? 'bg-amber-50 text-amber-700' : 'bg-gray-50 text-gray-500'
                       }`}>
                         📍 <span className="flex-1">{data.office_address}</span>
-                        {officeGeo.status === 'loading' && <span className="text-gray-400">Locating…</span>}
+                        {officeGeo.status === 'loading' && <span className="text-gray-500">Locating…</span>}
                         {officeGeo.status === 'ok' && (
                           <span className="text-green-600 font-medium">Verified</span>
                         )}
@@ -1422,7 +1425,7 @@ export function EmployeeIntakePage() {
                             className="flex-1 accent-accent-600" />
                           <span className="text-sm font-bold text-accent-700 w-12 text-right">{data.commute_mins}min</span>
                         </div>
-                        <div className="text-xs text-gray-400">Shorter = fewer neighborhoods but better matches.</div>
+                        <div className="text-xs text-gray-500">Shorter = fewer neighborhoods but better matches.</div>
                       </FieldWrap>
                       <FieldWrap label="Preferred way to commute">
                         {/* AIQ-1657: single-select MultiChip (like Work pattern / Assignment
@@ -1438,7 +1441,7 @@ export function EmployeeIntakePage() {
                     <div>
                       <div className="text-xs font-semibold text-gray-700 mb-1.5">Commute map · live preview</div>
                       {officeGeo.status === 'ok' ? (
-                        <Suspense fallback={<div className="rounded-xl border border-gray-100 bg-gray-50 h-48 flex items-center justify-center text-xs text-gray-400">Loading commute map…</div>}>
+                        <Suspense fallback={<div className="rounded-xl border border-gray-100 bg-gray-50 h-48 flex items-center justify-center text-xs text-gray-500">Loading commute map…</div>}>
                           <RichCommuteMap
                             officeAddress={data.office_address}
                             commuteMins={data.commute_mins}
@@ -1447,7 +1450,7 @@ export function EmployeeIntakePage() {
                           />
                         </Suspense>
                       ) : (
-                        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 h-48 flex items-center justify-center px-4 text-center text-xs text-gray-400">
+                        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 h-48 flex items-center justify-center px-4 text-center text-xs text-gray-500">
                           {officeGeo.status === 'notfound'
                             ? 'We couldn’t locate that office address — fix it above to preview your commute area.'
                             : 'Enter your office address above to preview your commute area.'}
@@ -1500,14 +1503,14 @@ export function EmployeeIntakePage() {
                 ← Back
               </Button>
             ) : <div />}
-            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
               🔒 Encrypted · only you and your HR team see this
             </div>
             {step < TOTAL_STEPS ? (
               <Button unstyled type="button" data-testid="intake-continue" onClick={() => void goTo(step + 1)} disabled={!stepValid(step)}
                 aria-describedby={!stepValid(step) ? 'intake-step-hint' : undefined}
                 className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  stepValid(step) ? 'bg-navy-800 text-white hover:bg-navy-900' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                  stepValid(step) ? 'bg-navy-800 text-white hover:bg-navy-900' : 'bg-gray-100 text-gray-500 cursor-not-allowed'
                 }`}>
                 Continue →
               </Button>
@@ -1581,7 +1584,7 @@ export function EmployeeIntakePage() {
                     }
                   }}
                   className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                    data.consent && !submitting ? 'bg-navy-800 text-white hover:bg-navy-900' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                    data.consent && !submitting ? 'bg-navy-800 text-white hover:bg-navy-900' : 'bg-gray-100 text-gray-500 cursor-not-allowed'
                   }`}>
                   {submitting ? 'Submitting…' : '✦ Generate my roadmap'}
                 </Button>

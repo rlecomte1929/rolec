@@ -25,10 +25,13 @@ export const PublicFooter: React.FC = () => {
     <footer className="border-t border-marketing-border bg-marketing-surface-muted">
       <Container maxWidth="xl" className="py-8 sm:py-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 lg:gap-12">
+          {/* h2, not h4. These render on EVERY public page, so on a page whose body is
+              just an h1 (privacy, security) the outline jumped h1 -> h4. Visual size is
+              set by the classes, not the tag. */}
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-black mb-4">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-black mb-4">
               Product
-            </h4>
+            </h2>
             <ul className="space-y-3">
               {PRODUCT_LINKS.map((link) => (
                 <li key={link.path}>
@@ -44,9 +47,9 @@ export const PublicFooter: React.FC = () => {
           </div>
 
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-black mb-4">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-black mb-4">
               Company
-            </h4>
+            </h2>
             <ul className="space-y-3">
               <li>
                 <Link
@@ -77,9 +80,9 @@ export const PublicFooter: React.FC = () => {
           </div>
 
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-black mb-4">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-black mb-4">
               Legal
-            </h4>
+            </h2>
             <ul className="space-y-3">
               {LEGAL_LINKS.map((link) => (
                 <li key={link.path}>
@@ -104,7 +107,9 @@ export const PublicFooter: React.FC = () => {
               © {new Date().getFullYear()} ReloPass. All rights reserved.
             </p>
             <img
-              src="/relopass-full-logo.png?v=2"
+              src="/relopass-full-logo.png?v=3"
+              width={128}
+              height={192}
               alt="ReloPass"
               className="h-20 w-auto sm:h-24"
             />

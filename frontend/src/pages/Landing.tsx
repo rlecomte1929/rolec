@@ -17,6 +17,9 @@ import { useDemoBooking } from '../hooks/useDemoBooking';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { emitMarketingEvent, readUtm } from '../analytics';
 import { landingContent } from './landing/landingContent';
+import { imgDimensions } from '../lib/publicImageDimensions';
+
+let landingViewEmitted = false;
 
 export const Landing: React.FC = () => {
   useRegisterNav('Landing', [
@@ -91,6 +94,11 @@ export const Landing: React.FC = () => {
   const c = landingContent;
 
   useEffect(() => {
+    // Module-scoped, not a ref: Landing remounts on a NotFoundRedirect bounce and under
+    // StrictMode's dev double-invoke, and each emit costs two POSTs (PostHog + our own
+    // /api/public/track). One view per page load is what the metric means.
+    if (landingViewEmitted) return;
+    landingViewEmitted = true;
     emitMarketingEvent('landing_page_view', readUtm());
   }, []);
 
@@ -195,6 +203,8 @@ export const Landing: React.FC = () => {
           <FadeIn>
             <img
               src="/screenshot-hr-assignments.png"
+              {...imgDimensions("/screenshot-hr-assignments.png")}
+              decoding="async"
               alt="ReloPass — every relocation case, its tasks, providers and status on one record"
               className="w-full rounded-xl border border-marketing-border shadow-sm"
               loading="lazy"

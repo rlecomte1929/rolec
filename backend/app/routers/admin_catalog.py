@@ -209,6 +209,9 @@ def list_demand_gaps(
         except (TypeError, ValueError):
             return 0
 
+    # One allowlist read for the whole page instead of one per row — the gate is
+    # canonical now, so it must load the table to compare (see scrape_safety).
+    _allow_idx = scrape_safety.allowlist_index()
     gaps: List[Dict[str, Any]] = []
     for d in demand:
         if _have(d["city"], d["category"]) > 0:
@@ -222,7 +225,9 @@ def list_demand_gaps(
                 "demand": int(d["demand"] or 0),
                 "companies": int(d["companies"] or 0),
                 "last_seen_at": last_seen.isoformat() if hasattr(last_seen, "isoformat") else last_seen,
-                "allowlisted": scrape_safety.is_destination_allowlisted(d["city"], d["country"]),
+                "allowlisted": scrape_safety.is_destination_allowlisted(
+                    d["city"], d["country"], index=_allow_idx
+                ),
             }
         )
     return gaps[:limit]
@@ -333,6 +338,9 @@ def list_intake_corridors(
                 out.append(category)
         return sorted(out)
 
+    # One allowlist read for the whole page instead of one per row — the gate is
+    # canonical now, so it must load the table to compare (see scrape_safety).
+    _allow_idx = scrape_safety.allowlist_index()
     results: List[Dict[str, Any]] = []
     # Bound the per-city coverage work to the highest-volume corridors.
     for c in corridors[: int(limit)]:
@@ -350,7 +358,9 @@ def list_intake_corridors(
                 "intake_count": int(c["intake_count"] or 0),
                 "last_intake_at": last_seen.isoformat() if hasattr(last_seen, "isoformat") else last_seen,
                 "uncovered_categories": uncovered,
-                "allowlisted": scrape_safety.is_destination_allowlisted(city, country),
+                "allowlisted": scrape_safety.is_destination_allowlisted(
+                    city, country, index=_allow_idx
+                ),
             }
         )
     return results

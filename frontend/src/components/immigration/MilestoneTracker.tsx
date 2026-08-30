@@ -129,7 +129,7 @@ export const MilestoneTracker: React.FC<MilestoneTrackerProps> = ({
         {bookEarlyMessage && <BookEarlyAlert message={bookEarlyMessage} />}
         <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-6 text-center">
           <p className="text-sm font-medium text-[#64748b]">Set a move date to see your timeline</p>
-          <p className="mt-1 text-xs text-[#94a3b8]">
+          <p className="mt-1 text-xs text-slate-500">
             Milestone deadlines are calculated from the case&apos;s expected move date.
           </p>
         </div>
@@ -145,7 +145,7 @@ export const MilestoneTracker: React.FC<MilestoneTrackerProps> = ({
       {bookEarlyMessage && <BookEarlyAlert message={bookEarlyMessage} />}
 
       {loading && (
-        <div className="py-4 text-center text-sm text-[#94a3b8]">Loading milestones…</div>
+        <div className="py-4 text-center text-sm text-slate-500">Loading milestones…</div>
       )}
       {displayedError && (
         <div className="mb-3 rounded-lg border border-[#fecaca] bg-[#fff5f5] px-3 py-2 text-xs text-[#b91c1c]">
@@ -203,7 +203,7 @@ export const MilestoneTracker: React.FC<MilestoneTrackerProps> = ({
                         Target: {formatISODate(targetISO)}
                       </p>
                       {def.note && (
-                        <p className="mt-0.5 text-xs text-[#94a3b8]">{def.note}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{def.note}</p>
                       )}
                     </div>
 
@@ -245,7 +245,7 @@ export const MilestoneTracker: React.FC<MilestoneTrackerProps> = ({
 };
 
 const SectionHeading: React.FC = () => (
-  <div className="text-xs font-semibold uppercase tracking-wide text-[#94a3b8] mb-3">
+  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">
     Application timeline
   </div>
 );

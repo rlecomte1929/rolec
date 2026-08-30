@@ -194,7 +194,7 @@ export function CompanyProfileForm({
       )}
       <div className="mb-5">
         {eyebrow && (
-          <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">{eyebrow}</div>
+          <div className="text-[11px] font-medium uppercase tracking-widest text-slate-500">{eyebrow}</div>
         )}
         <div className="mt-1.5 flex items-baseline gap-3">
           <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">{title}</h1>
@@ -286,7 +286,7 @@ export function CompanyProfileForm({
             </Field>
             <Field label="Website" full>
               <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[12.5px] text-slate-400">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[12.5px] text-slate-500">
                   https://
                 </span>
                 <Controller
@@ -472,7 +472,7 @@ export function CompanyProfileForm({
               {logoUrl ? (
                 <img src={logoUrl} alt="Company logo" className="h-full w-full object-contain" />
               ) : (
-                <span className="text-[11px] text-slate-400">No logo</span>
+                <span className="text-[11px] text-slate-500">No logo</span>
               )}
             </div>
             <div className="flex-1 space-y-3">
@@ -504,7 +504,7 @@ export function CompanyProfileForm({
                     {logoUploading ? 'Uploading…' : logoUrl ? 'Replace' : 'Upload logo'}
                   </Button>
                 ) : (
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-slate-500">
                     Logo upload is only available to HR for their own company.
                   </span>
                 )}
@@ -564,7 +564,10 @@ export function CompanyProfileForm({
             <Button unstyled
               type="button"
               onClick={() => void saveNow()}
-              disabled={saving || !watchedName.trim()}
+              /* isDirty is already used at the status pill above; the button was the one
+                 place that ignored it, so 'Save profile' stayed clickable with nothing
+                 to save. */
+              disabled={saving || !isDirty || !watchedName.trim()}
               className="inline-flex items-center gap-1.5 rounded-lg bg-[#0b2b43] px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-[#123651] focus:outline-none focus:ring-2 focus:ring-[#0b2b43] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckIcon className="h-3.5 w-3.5" /> Save profile
@@ -579,7 +582,7 @@ export function CompanyProfileForm({
 // ── Visual primitives ──────────────────────────────────────────────────────
 
 const inputCx =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-100';
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13.5px] text-slate-900 placeholder:text-slate-500 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-100';
 
 const selectCx =
   'w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13.5px] text-slate-900 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-100';

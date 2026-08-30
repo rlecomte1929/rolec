@@ -30,7 +30,7 @@ export function EmployeeWelcomePage() {
 
   return (
     <WelcomeShell onSkip={handleSkip}>
-      <p className="text-sm font-medium text-accent-500 uppercase tracking-wide mb-2">Welcome to ReloPass</p>
+      <p className="text-sm font-medium text-accent-600 uppercase tracking-wide mb-2">Welcome to ReloPass</p>
       <h1 className="text-2xl font-semibold text-navy-800 mb-3">Your relocation starts here</h1>
       <p className="text-sm text-slate-600 mb-10 max-w-lg">
         Three steps stand between you and a clear, personalised relocation plan. Follow them in order — each one

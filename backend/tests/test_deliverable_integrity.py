@@ -159,6 +159,11 @@ class CheckTasksTests(unittest.TestCase):
     def setUp(self):
         self.tracked = {"backend/app/services/landed.py", "prompts/ok.txt"}
 
+    # These four pass `ever_added=None` (the default), i.e. no git history. That is
+    # deliberate: with no history the guard keeps its original present-tense semantics
+    # and an absent path is still `missing`, so these fixtures keep asserting exactly
+    # what they always did. The history-aware behaviour is covered separately in
+    # backend/tests/test_notion_guards_measure_something.py.
     def test_present_path_passes_missing_path_is_flagged(self):
         tasks = [
             {"aiq": "AIQ-1", "title": "Landed task", "url": "u1",
@@ -166,7 +171,7 @@ class CheckTasksTests(unittest.TestCase):
             {"aiq": "AIQ-2", "title": "Leaked task", "url": "u2",
              "paths": ["backend/scripts/never_landed.py"]},
         ]
-        missing = cdi.check_tasks(tasks, self.tracked, allowlist=set())
+        missing, _moved, _mangled = cdi.check_tasks(tasks, self.tracked, allowlist=set())
         self.assertEqual(len(missing), 1)
         self.assertEqual(missing[0]["aiq"], "AIQ-2")
         self.assertEqual(missing[0]["path"], "backend/scripts/never_landed.py")
@@ -179,13 +184,14 @@ class CheckTasksTests(unittest.TestCase):
             {"aiq": "AIQ-709", "title": "P3-01c factual evaluator", "url": "u",
              "paths": ["backend/scripts/eval_factual_consistency.py"]},
         ]
-        missing = cdi.check_tasks(tasks, tracked_files=set(), allowlist=set())
+        missing, _moved, _mangled = cdi.check_tasks(
+            tasks, tracked_files=set(), allowlist=set())
         self.assertEqual({m["aiq"] for m in missing}, {"AIQ-490", "AIQ-709"})
 
     def test_allowlist_suppresses_bare_path(self):
         tasks = [{"aiq": "AIQ-2", "title": "x", "url": "u",
                   "paths": ["backend/scripts/never_landed.py"]}]
-        missing = cdi.check_tasks(
+        missing, _moved, _mangled = cdi.check_tasks(
             tasks, self.tracked, allowlist={"backend/scripts/never_landed.py"}
         )
         self.assertEqual(missing, [])
@@ -193,7 +199,7 @@ class CheckTasksTests(unittest.TestCase):
     def test_allowlist_suppresses_aiq_scoped_key(self):
         tasks = [{"aiq": "AIQ-2", "title": "x", "url": "u",
                   "paths": ["backend/scripts/never_landed.py"]}]
-        missing = cdi.check_tasks(
+        missing, _moved, _mangled = cdi.check_tasks(
             tasks, self.tracked, allowlist={"AIQ-2:backend/scripts/never_landed.py"}
         )
         self.assertEqual(missing, [])
@@ -235,3 +241,112 @@ class UniqueIdTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HistoryScanTests(unittest.TestCase):
+    """The ever-existed check is the difference between a stale path and a phantom.
+
+    Measured 2026-08-23: the guard reported 110 missing deliverables, of which 71 had been added
+    on a branch in this repo's own history — `backend/app/routers/hr_rfq.py` among them, added
+    2026-05-18 and deleted 2026-07-22. `is_shallow()` saw nothing wrong because the clone was not
+    shallow; `git log --all` simply matched no refs on a detached-HEAD CI checkout and returned
+    the empty set.
+    """
+
+    def test_history_is_complete_rejects_an_empty_scan(self):
+        self.assertFalse(cdi.history_is_complete(set(), {"backend/app/main.py"}))
+
+    def test_history_is_complete_rejects_a_partial_scan(self):
+        """The exact invariant: a file in the working tree was added by some commit."""
+        self.assertFalse(
+            cdi.history_is_complete({"a.py"}, {"a.py", "b.py"}))
+
+    def test_history_is_complete_accepts_a_superset(self):
+        """Deleted paths legitimately appear in history and not in the tree."""
+        self.assertTrue(
+            cdi.history_is_complete({"a.py", "b.py", "gone.py"}, {"a.py", "b.py"}))
+
+
+class RestampedMigrationTests(unittest.TestCase):
+    """A migration re-stamped to clear a timestamp collision is the same migration."""
+
+    TRACKED = {
+        "supabase/migrations/20261013000000_test_drive_tester_contact.sql",
+        "supabase/migrations/20260521070001_completion_pct_trigger.sql",
+    }
+
+    def test_resolves_the_same_migration_under_a_later_timestamp(self):
+        self.assertEqual(
+            cdi.resolve_restamped_migration(
+                "supabase/migrations/20260927000000_test_drive_tester_contact.sql", self.TRACKED),
+            "supabase/migrations/20261013000000_test_drive_tester_contact.sql")
+
+    def test_refuses_when_two_migrations_share_a_name(self):
+        """Ambiguity gets no resolution rather than an arbitrary one."""
+        tracked = self.TRACKED | {
+            "supabase/migrations/20261099000000_test_drive_tester_contact.sql"}
+        self.assertIsNone(cdi.resolve_restamped_migration(
+            "supabase/migrations/20260927000000_test_drive_tester_contact.sql", tracked))
+
+    def test_a_migration_that_never_existed_is_not_resolved(self):
+        self.assertIsNone(cdi.resolve_restamped_migration(
+            "supabase/migrations/20260101000000_never_written.sql", self.TRACKED))
+
+    def test_only_applies_to_migrations(self):
+        self.assertIsNone(cdi.resolve_restamped_migration(
+            "backend/app/routers/hr_rfq.py", {"backend/app/routers/hr_rfq.py"}))
+
+
+class PathSuffixResolutionTests(unittest.TestCase):
+    """A note written one directory out names a file that is really here."""
+
+    TRACKED = {
+        "backend/app/services/ai_trace_logger.py",
+        "backend/scripts/rag_eval_harness.py",
+        "README.md",
+        "backend/README.md",
+        "frontend/README.md",
+    }
+
+    def test_resolves_a_wrong_prefix(self):
+        self.assertEqual(
+            cdi.resolve_by_path_suffix("backend/services/ai_trace_logger.py", self.TRACKED),
+            "backend/app/services/ai_trace_logger.py")
+        self.assertEqual(
+            cdi.resolve_by_path_suffix("scripts/rag_eval_harness.py", self.TRACKED),
+            "backend/scripts/rag_eval_harness.py")
+
+    def test_a_bare_filename_never_resolves(self):
+        """`README.md` exists in dozens of directories; one segment is not evidence."""
+        self.assertIsNone(cdi.resolve_by_path_suffix("docs/README.md", self.TRACKED))
+
+    def test_an_ambiguous_tail_is_refused(self):
+        tracked = {"a/x/thing.py", "b/x/thing.py"}
+        self.assertIsNone(cdi.resolve_by_path_suffix("c/x/thing.py", tracked))
+
+    def test_a_path_that_is_nowhere_is_not_resolved(self):
+        self.assertIsNone(cdi.resolve_by_path_suffix(
+            "apps/hr-dashboard/src/features/resolution/CandidateCard.tsx", self.TRACKED))
+
+
+class ResolversFeedTheMovedBucketTests(unittest.TestCase):
+    """Resolved claims must not fail the build, and must say where the file went."""
+
+    def test_a_restamped_migration_is_moved_not_missing(self):
+        tracked = {"supabase/migrations/20261013000000_test_drive_tester_contact.sql"}
+        tasks = [{"aiq": "1629", "title": "t", "url": "u", "paths": [
+            "supabase/migrations/20260927000000_test_drive_tester_contact.sql"]}]
+        missing, moved, _ = cdi.check_tasks(tasks, tracked, allowlist=set(), ever_added=set())
+        self.assertEqual(missing, [])
+        self.assertEqual(len(moved), 1)
+        self.assertEqual(moved[0]["resolved_to"], sorted(tracked)[0])
+        self.assertIn("re-stamped", moved[0]["why"])
+
+    def test_a_genuinely_absent_path_still_fails(self):
+        """The guard must remain able to fail — the lesson of #2035."""
+        tasks = [{"aiq": "9999", "title": "t", "url": "u",
+                  "paths": ["backend/app/nowhere_at_all.py"]}]
+        missing, moved, _ = cdi.check_tasks(
+            tasks, {"backend/app/main.py"}, allowlist=set(), ever_added=set())
+        self.assertEqual(len(missing), 1)
+        self.assertEqual(moved, [])

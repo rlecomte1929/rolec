@@ -126,7 +126,7 @@ export const AdminAbTestsPage: React.FC = () => {
     return (
       <AdminLayout title="A/B Tests" subtitle="Experiment health dashboard">
         <div className="flex items-center justify-center py-24">
-          <div className="text-sm text-slate-400">Loading experiment data…</div>
+          <div className="text-sm text-slate-500">Loading experiment data…</div>
         </div>
       </AdminLayout>
     );
@@ -155,10 +155,10 @@ export const AdminAbTestsPage: React.FC = () => {
       subtitle="Experiment health dashboard"
       headerRight={
         lastUpdated ? (
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-slate-500">
             Last analysis: <span className="font-medium text-slate-600">{lastUpdated}</span>
             {' · '}
-            <span className="text-slate-400">runs daily at 04:00 UTC</span>
+            <span className="text-slate-500">runs daily at 04:00 UTC</span>
           </span>
         ) : null
       }
@@ -169,15 +169,15 @@ export const AdminAbTestsPage: React.FC = () => {
         {analysis && (
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-white rounded-xl border border-slate-200 px-5 py-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Total Users (7d)</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Total Users (7d)</p>
               <p className="text-2xl font-semibold text-slate-900">{analysis.funnel.total_users.toLocaleString()}</p>
             </div>
             <div className="bg-white rounded-xl border border-slate-200 px-5 py-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Active Experiments</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Active Experiments</p>
               <p className="text-2xl font-semibold text-slate-900">{analysis.experiments.length}</p>
             </div>
             <div className="bg-white rounded-xl border border-slate-200 px-5 py-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Top Friction Point</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Top Friction Point</p>
               <p className="text-sm font-semibold text-slate-900 leading-snug">
                 {analysis.top_friction_points[0]
                   ? analysis.top_friction_points[0].step.replace(/_/g, ' ')
@@ -196,7 +196,7 @@ export const AdminAbTestsPage: React.FC = () => {
         {flagEntries.length === 0 ? (
           <div className="bg-white rounded-xl border border-slate-200 px-6 py-10 text-center">
             <p className="text-sm text-slate-500">No feature flags found in Edge Config.</p>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Add flags to the <code className="font-mono bg-slate-100 px-1 rounded">relopass-flags</code> Edge Config store.
             </p>
           </div>

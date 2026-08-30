@@ -151,7 +151,7 @@ export const HrBenefitMixOptimizerPage: React.FC<Props> = () => {
             <Badge variant="success">Utility {result.achieved_utility.toFixed(1)}</Badge>
             <Badge variant="info">+€1000 budget → +{result.shadow_prices.budget_per_1000.toFixed(1)} utility</Badge>
           </div>
-          <p className="text-xs text-[#94a3b8]">
+          <p className="text-xs text-slate-500">
             The shadow price is the marginal satisfaction each extra €1000 of budget would unlock — use it to justify a budget increase.
           </p>
         </Card>
@@ -218,7 +218,7 @@ export const HrBenefitMixOptimizerPage: React.FC<Props> = () => {
                       <button
                         type="button"
                         onClick={() => removeRow(r.id)}
-                        className="text-xs text-slate-400 hover:text-red-500"
+                        className="text-xs text-slate-500 hover:text-red-500"
                       >
                         Remove
                       </button>

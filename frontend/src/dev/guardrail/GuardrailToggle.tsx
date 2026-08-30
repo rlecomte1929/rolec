@@ -15,7 +15,7 @@ export function GuardrailToggle() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-slate-400">
+      <div className="flex items-center gap-2 text-sm text-slate-500">
         <span className="inline-block w-4 h-4 rounded-full border-2 border-slate-200 border-t-accent-500 animate-spin" />
         Loading guardrail status…
       </div>
@@ -59,11 +59,11 @@ export function GuardrailToggle() {
         <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-amber-50 text-amber-600 border border-amber-200 uppercase">
           Dev mode
         </span>
-        <span className="text-xs text-slate-400">Remove this toggle before demo / launch.</span>
+        <span className="text-xs text-slate-500">Remove this toggle before demo / launch.</span>
       </div>
 
       {saving && (
-        <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+        <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
           <span className="inline-block w-3 h-3 rounded-full border border-slate-300 border-t-accent-400 animate-spin" />
           Saving…
         </p>

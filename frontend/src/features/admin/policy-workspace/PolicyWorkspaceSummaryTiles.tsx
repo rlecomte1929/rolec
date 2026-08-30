@@ -13,7 +13,7 @@ function Tile({ label, value, sub }: { label: string; value: string | number; su
     <Card padding="md" className="border-[#e2e8f0] bg-[#fafbfc]">
       <div className="text-xs font-medium uppercase tracking-wide text-[#64748b]">{label}</div>
       <div className="text-2xl font-semibold text-[#0b2b43] mt-1">{value}</div>
-      {sub ? <div className="text-xs text-[#94a3b8] mt-0.5">{sub}</div> : null}
+      {sub ? <div className="text-xs text-slate-500 mt-0.5">{sub}</div> : null}
     </Card>
   );
 }

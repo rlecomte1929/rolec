@@ -1,4 +1,25 @@
 {
+  "https://bofip.impots.gouv.fr/bofip/1911-PGP.html/identifiant=BOI-IR-CHAMP-10-20160728": {
+    "bytes_fetched": 93153,
+    "file": "ef7b6cb8fea48244.txt",
+    "is_pdf": false,
+    "sha256_of_text": "ebc58b730fcaa5277e5c5246be508abbef685a83ac0b1ee3bbe0554e36131941",
+    "text_chars": 37642
+  },
+  "https://www.cleiss.fr/faq/immatriculation_numero_de_securite_sociale.html": {
+    "bytes_fetched": 12655,
+    "file": "57d7d63e6f28360f.txt",
+    "is_pdf": false,
+    "sha256_of_text": "ca1909883b10adb0d202edcf440fe9b0fafe354b30436b7bdb0511bf87251c09",
+    "text_chars": 7108
+  },
+  "https://www.cleiss.fr/reglements/883_legislation_applicable.html": {
+    "bytes_fetched": 27384,
+    "file": "7d46809e1e23b3bb.txt",
+    "is_pdf": false,
+    "sha256_of_text": "4874b757f57c983228968996329972e0de8d5aa9308678ffee4b86e3de52e2d2",
+    "text_chars": 18871
+  },
   "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000006302521": {
     "bytes_fetched": 5695,
     "file": "5d40b6bde3871821.txt",
@@ -7,17 +28,31 @@
     "text_chars": 38
   },
   "https://www.service-public.fr/particuliers/vosdroits/F16003": {
-    "bytes_fetched": 143900,
+    "bytes_fetched": 143908,
     "file": "88768866c8a9345a.txt",
     "is_pdf": false,
     "sha256_of_text": "b88e1e9fd19d3428f3e9ba189ea442966988ff2d5a520cb7285a26d1e74971b5",
     "text_chars": 27617
   },
   "https://www.service-public.fr/particuliers/vosdroits/F2728": {
-    "bytes_fetched": 383363,
+    "bytes_fetched": 383391,
     "file": "25b7e5b125f8f188.txt",
     "is_pdf": false,
     "sha256_of_text": "617fa2a1f9abd7d92fdca0040d11a9802d3d2915f410744a074deaded5ff4b8a",
     "text_chars": 105040
+  },
+  "https://www.service-public.gouv.fr/particuliers/vosdroits/F16003": {
+    "bytes_fetched": 143924,
+    "file": "bc23b0fd79e4f0bc.txt",
+    "is_pdf": false,
+    "sha256_of_text": "b88e1e9fd19d3428f3e9ba189ea442966988ff2d5a520cb7285a26d1e74971b5",
+    "text_chars": 27617
+  },
+  "https://www.service-public.gouv.fr/particuliers/vosdroits/F35600/0": {
+    "bytes_fetched": 94878,
+    "file": "9aa6f84db45d4c97.txt",
+    "is_pdf": false,
+    "sha256_of_text": "00aa3888055babeb259cb30f9c23585b11c1e43099923e1638291b5bf2092cc1",
+    "text_chars": 14153
   }
 }

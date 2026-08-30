@@ -265,3 +265,217 @@ class CleanSeedNoteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Canonical destination identity — the ISO-2 vs full-name bug
+#
+# Production, 2026-08-23: catalog_destination_allowlist held 70 FULL country names
+# and ZERO ISO-2 codes; catalog_employee_demand held eight ISO-2 codes and ZERO
+# names. Disjoint vocabularies, so the raw `=` failed for EVERY demand row, and the
+# writer (which never checked) minted a duplicate on every "Allowlist & scrape".
+# ---------------------------------------------------------------------------
+
+
+class CanonicalAllowlistTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
+        with self.engine.begin() as conn:
+            for stmt in SCHEMA.split(";"):
+                if stmt.strip():
+                    conn.execute(text(stmt))
+        patcher = mock.patch.object(scrape_safety.db, "engine", self.engine)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.actor = str(uuid.uuid4())
+
+    def _add(self, city: str, country: str):
+        return scrape_safety.add_allowlist_entry(
+            city=city, country=country, approved_by_user_id=self.actor
+        )
+
+    def _raw_insert(self, city: str, country: str) -> None:
+        """Bypass the writer, to simulate rows the seeds put there."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO catalog_destination_allowlist (city, country) "
+                    "VALUES (:c, :co)"
+                ),
+                {"c": city, "co": country},
+            )
+
+    def _count(self) -> int:
+        with self.engine.connect() as conn:
+            return conn.execute(
+                text("SELECT COUNT(*) FROM catalog_destination_allowlist")
+            ).scalar_one()
+
+    # ── reader ────────────────────────────────────────────────────────────────
+
+    def test_iso_and_full_name_are_the_same_destination(self) -> None:
+        """THE bug. Fails on origin/main: stored 'France' vs probed 'FR'."""
+        self._raw_insert("Paris", "France")
+        self.assertTrue(scrape_safety.is_destination_allowlisted("Paris", "FR"))
+
+    def test_case_insensitive_city_and_country(self) -> None:
+        self._raw_insert("Paris", "France")
+        self.assertTrue(scrape_safety.is_destination_allowlisted("paris", "france"))
+
+    def test_alpha3_and_localisation_match(self) -> None:
+        self._raw_insert("Paris", "France")
+        self.assertTrue(scrape_safety.is_destination_allowlisted("Paris", "FRA"))
+        self.assertTrue(scrape_safety.is_destination_allowlisted("Paris", "Frankreich"))
+
+    def test_the_dubai_alias_that_cost_eight_tickets(self) -> None:
+        """Prod: allowlist holds 'United Arab Emirates'; HR sent 'UAE'. Eight
+        destination_requests tickets were opened for a destination already approved."""
+        self._raw_insert("Dubai", "United Arab Emirates")
+        self.assertTrue(scrape_safety.is_destination_allowlisted("Dubai", "UAE"))
+
+    def test_diacritics_folded(self) -> None:
+        self._raw_insert("Zürich", "Switzerland")
+        self.assertTrue(scrape_safety.is_destination_allowlisted("Zurich", "CH"))
+
+    def test_whitespace_collapsed(self) -> None:
+        self._raw_insert("The Hague", "Netherlands")
+        self.assertTrue(
+            scrape_safety.is_destination_allowlisted("  The   Hague ", " netherlands ")
+        )
+
+    def test_unresolvable_country_still_matches_its_own_literal(self) -> None:
+        """The load-bearing ("raw", ...) key. The name map does not cover every country
+        in the allowlist; under an ISO-only index these rows would silently drop out and
+        a destination an admin approved would stop scraping."""
+        self._raw_insert("Almaty", "Kazakhstan")
+        self.assertTrue(scrape_safety.is_destination_allowlisted("almaty", "KAZAKHSTAN"))
+
+    def test_unresolvable_country_does_not_match_a_different_country(self) -> None:
+        self._raw_insert("Almaty", "Kazakhstan")
+        self.assertFalse(scrape_safety.is_destination_allowlisted("Almaty", "Ruritania"))
+
+    def test_empty_and_whitespace_fail_closed(self) -> None:
+        self._raw_insert("Paris", "France")
+        for city, country in [
+            ("", "France"), ("   ", "France"),
+            ("Paris", ""), ("Paris", "   "), ("Paris", None),
+        ]:
+            with self.subTest(city=city, country=country):
+                self.assertFalse(scrape_safety.is_destination_allowlisted(city, country))
+
+    def test_junk_row_cannot_allowlist_anything(self) -> None:
+        self._raw_insert("", "")
+        self.assertFalse(scrape_safety.is_destination_allowlisted("", ""))
+        self.assertFalse(scrape_safety.is_destination_allowlisted("Paris", "France"))
+
+    def test_a_different_city_is_still_rejected(self) -> None:
+        """The canary: canonicalising must not open the gate generally."""
+        self._raw_insert("Paris", "France")
+        self.assertFalse(scrape_safety.is_destination_allowlisted("Tokyo", "Japan"))
+
+    def test_index_is_equivalent_to_no_index(self) -> None:
+        self._raw_insert("Paris", "France")
+        idx = scrape_safety.allowlist_index()
+        for city, country in [("Paris", "FR"), ("paris", "france"), ("Tokyo", "JP")]:
+            with self.subTest(city=city, country=country):
+                self.assertEqual(
+                    scrape_safety.is_destination_allowlisted(city, country),
+                    scrape_safety.is_destination_allowlisted(city, country, index=idx),
+                )
+
+    def test_empty_index_returns_false_without_requerying(self) -> None:
+        self._raw_insert("Paris", "France")
+        self.assertFalse(
+            scrape_safety.is_destination_allowlisted("Paris", "FR", index=frozenset())
+        )
+
+    def test_a_database_error_does_not_open_the_gate(self) -> None:
+        with mock.patch.object(
+            scrape_safety, "allowlist_index", side_effect=RuntimeError("db down")
+        ):
+            with self.assertRaises(RuntimeError):
+                scrape_safety.is_destination_allowlisted("Paris", "FR")
+
+    # ── writer ────────────────────────────────────────────────────────────────
+
+    def test_iso_spelling_does_not_create_a_duplicate_row(self) -> None:
+        """The PR #2020 regression. Fails on origin/main, which inserts a second row."""
+        self._add("Paris", "France")
+        result = self._add("Paris", "FR")
+        self.assertEqual(self._count(), 1)
+        self.assertEqual(result["country"], "France")
+        self.assertFalse(result["created"])
+
+    def test_case_variant_does_not_create_a_duplicate_row(self) -> None:
+        self._add("Dublin", "Ireland")
+        self._add("dublin", "ireland")
+        self.assertEqual(self._count(), 1)
+
+    def test_new_destination_adopts_the_house_country_spelling(self) -> None:
+        """('Berlin','DE') must adopt 'Germany' from the existing ('Munich','Germany')
+        rather than minting a second vocabulary in the same table."""
+        self._add("Munich", "Germany")
+        result = self._add("Berlin", "DE")
+        self.assertTrue(result["created"])
+        self.assertEqual(result["country"], "Germany")
+
+    def test_new_country_stores_the_callers_full_name(self) -> None:
+        result = self._add("Lisbon", "Portugal")
+        self.assertEqual(result["country"], "Portugal")
+
+    def test_city_spelling_is_preserved_not_titlecased(self) -> None:
+        result = self._add("'s-Hertogenbosch", "Netherlands")
+        self.assertEqual(result["city"], "'s-Hertogenbosch")
+
+    def test_empty_input_still_raises_valueerror(self) -> None:
+        """fill_demand_gap catches ValueError and passes; it must stay reserved for
+        empty input, never for an already-present destination."""
+        with self.assertRaises(ValueError):
+            self._add("", "France")
+
+    def test_no_audit_row_on_the_idempotent_noop(self) -> None:
+        self._add("Paris", "France")
+        self._add("Paris", "FR")
+        with self.engine.connect() as conn:
+            n = conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM audit_logs "
+                    "WHERE entity_type = 'catalog_destination_allowlist'"
+                )
+            ).scalar_one()
+        self.assertEqual(n, 1, "the no-op must not claim an insert in the audit log")
+
+
+class DestinationKeyTests(unittest.TestCase):
+    """No DB — the pure key helpers."""
+
+    def test_canon_city_matches_the_frontend_canonplace(self) -> None:
+        from backend.app.services import destination_key as dk
+        self.assertEqual(dk.canon_city("Zürich"), "zurich")
+        self.assertEqual(dk.canon_city("  The   Hague "), "the hague")
+        self.assertEqual(dk.canon_city("PARIS"), "paris")
+        self.assertEqual(dk.canon_city(""), "")
+        self.assertEqual(dk.canon_city(None), "")
+
+    def test_lower_not_casefold(self) -> None:
+        """casefold() maps 'ß'->'ss' and would merge two different German towns."""
+        from backend.app.services import destination_key as dk
+        self.assertNotEqual(dk.canon_city("Weißenburg"), dk.canon_city("Weissenburg"))
+
+    def test_a_known_diacritic_collision_is_accepted_on_purpose(self) -> None:
+        """Munster (Hesse) and Münster (NRW) are two real municipalities that fold to
+        one key. Accepted deliberately: the identical fold already ships on the read
+        path in vendor_curation._canon_city, the blast radius is one extra quota-bounded
+        and audited scrape, and exact matching is what made 29 approved Dublin vendors
+        unreachable. Documented here so it is a decision, not a surprise."""
+        from backend.app.services import destination_key as dk
+        self.assertEqual(dk.canon_city("Münster"), dk.canon_city("Munster"))
+
+    def test_empty_inputs_yield_no_keys(self) -> None:
+        from backend.app.services import destination_key as dk
+        self.assertEqual(dk.destination_keys("", "France"), set())
+        self.assertEqual(dk.destination_keys("Paris", ""), set())
+        self.assertEqual(dk.destination_keys("Paris", None), set())
+

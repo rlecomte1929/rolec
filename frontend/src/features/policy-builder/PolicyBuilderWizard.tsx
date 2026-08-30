@@ -34,7 +34,7 @@ const PlaceholderStep: React.FC<{ title: string; onBack: () => void }> = ({
         This step will be available soon (AIQ-37-C).
       </p>
     </div>
-    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-400 text-sm">
+    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-500 text-sm">
       Coming in the next release
     </div>
     <div className="flex justify-between pt-2">
@@ -105,7 +105,7 @@ export const PolicyBuilderWizard: React.FC = () => {
           className="flex-1 max-w-xs border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43] focus:ring-offset-1"
         />
         {draft.draftId && (
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-slate-500">
             Draft saved · version will be assigned on activation
           </span>
         )}
@@ -152,7 +152,7 @@ export const PolicyBuilderWizard: React.FC = () => {
       </Card>
 
       {/* Bottom save hint */}
-      <p className="text-xs text-slate-400 text-center">
+      <p className="text-xs text-slate-500 text-center">
         Your progress is saved as a draft — it won&apos;t go live until you activate it in Step 5.
       </p>
     </div>

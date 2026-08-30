@@ -100,14 +100,14 @@ function SortableFormRow({ form, index }: SortableFormRowProps) {
         type="button"
         {...attributes}
         {...listeners}
-        className="touch-none text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing flex-none"
+        className="touch-none text-slate-500 hover:text-slate-500 cursor-grab active:cursor-grabbing flex-none"
         aria-label="Drag to reorder"
       >
         <GripVertical className="h-4 w-4" />
       </Button>
 
       {/* Position index */}
-      <span className="flex-none w-5 text-center text-xs font-semibold text-slate-400">{index + 1}</span>
+      <span className="flex-none w-5 text-center text-xs font-semibold text-slate-500">{index + 1}</span>
 
       {/* Form info */}
       <div className="flex-1 min-w-0">
@@ -243,10 +243,10 @@ function Step1({ forms, selectedIds, onToggle }: Step1Props) {
                 {selected ? (
                   <CheckSquare className="h-4 w-4 text-[#0b2b43] flex-none" />
                 ) : (
-                  <Square className="h-4 w-4 text-slate-300 flex-none" />
+                  <Square className="h-4 w-4 text-slate-500 flex-none" />
                 )}
 
-                <FileText className="h-4 w-4 text-slate-400 flex-none" />
+                <FileText className="h-4 w-4 text-slate-500 flex-none" />
 
                 {/* Form code badge — "Custom" for ad-hoc forms */}
                 {form.is_adhoc ? (
@@ -268,7 +268,7 @@ function Step1({ forms, selectedIds, onToggle }: Step1Props) {
                 </div>
 
                 {/* Completion pct */}
-                <span className="text-[11px] text-slate-400 flex-none">{form.completion_pct}%</span>
+                <span className="text-[11px] text-slate-500 flex-none">{form.completion_pct}%</span>
 
                 <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border flex-none ${statusColor(form.status)}`}>
                   {statusLabel(form.status)}
@@ -346,7 +346,7 @@ function Step2({ orderedForms, onReorder, coverPage, onCoverPageChange }: Step2P
               {coverPage ? (
                 <CheckSquare className="h-5 w-5 text-[#0b2b43]" />
               ) : (
-                <Square className="h-5 w-5 text-slate-300" />
+                <Square className="h-5 w-5 text-slate-500" />
               )}
             </Button>
             <div>
@@ -361,9 +361,9 @@ function Step2({ orderedForms, onReorder, coverPage, onCoverPageChange }: Step2P
 
       {/* Right: preview placeholder */}
       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-        <FileText className="h-8 w-8 text-slate-300 mb-3" />
+        <FileText className="h-8 w-8 text-slate-500 mb-3" />
         <p className="text-sm font-medium text-slate-500">Preview</p>
-        <p className="text-xs text-slate-400 mt-1">Preview will be available after building</p>
+        <p className="text-xs text-slate-500 mt-1">Preview will be available after building</p>
       </div>
     </div>
   );
@@ -444,7 +444,7 @@ function Step3({ caseId, orderedForms, coverPage, onDone }: Step3Props) {
         <ul className="space-y-1">
           {orderedForms.map((form, i) => (
             <li key={form.id} className="flex items-center gap-2 text-sm text-slate-700">
-              <span className="text-slate-400 font-medium w-5 text-right">{i + 1}.</span>
+              <span className="text-slate-500 font-medium w-5 text-right">{i + 1}.</span>
               <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 flex-none">{form.template.code}</span>
               <span className="truncate">{form.template.name}</span>
             </li>
@@ -634,7 +634,7 @@ export const DossierBuilderPage: React.FC = () => {
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
-            <p className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase mb-1">
+            <p className="text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-1">
               ReloPass · Dossier Builder
             </p>
             <h1 className="text-2xl font-semibold text-slate-900">Build dossier package</h1>
@@ -646,7 +646,7 @@ export const DossierBuilderPage: React.FC = () => {
             type="button"
             onClick={handleDone}
             aria-label="Close builder"
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-600 transition-colors"
           >
             <X className="h-5 w-5" />
           </Button>
@@ -657,7 +657,7 @@ export const DossierBuilderPage: React.FC = () => {
           {stepList.map((s, i) => (
             <React.Fragment key={s}>
               <div
-                className={`flex items-center gap-2 ${step >= s ? 'text-[#0b2b43]' : 'text-slate-400'}`}
+                className={`flex items-center gap-2 ${step >= s ? 'text-[#0b2b43]' : 'text-slate-500'}`}
               >
                 <div
                   className={`w-6 h-6 rounded-full text-[11px] font-semibold flex items-center justify-center border-2 ${
@@ -665,7 +665,7 @@ export const DossierBuilderPage: React.FC = () => {
                       ? 'bg-[#0b2b43] border-[#0b2b43] text-white'
                       : step === s
                         ? 'border-[#0b2b43] text-[#0b2b43] bg-white'
-                        : 'border-slate-300 text-slate-400 bg-white'
+                        : 'border-slate-300 text-slate-500 bg-white'
                   }`}
                 >
                   {step > s ? '✓' : s}

@@ -417,8 +417,14 @@ def triage_feedback(
             VALUES (:stream, :source_id, :status, :owner, :resolution, :updated_at)
             ON CONFLICT (stream, source_id) DO UPDATE SET
                 status     = excluded.status,
-                owner      = excluded.owner,
-                resolution = excluded.resolution,
+                -- COALESCE, not a bare overwrite. `owner` and `resolution` default to
+                -- None on TriageUpdate, and the console's ONLY caller sends {status}
+                -- alone — so every dropdown change silently erased the resolution
+                -- somebody had written. Bulk triage would have erased N of them at
+                -- once. Omitting a field now means "leave it alone"; clearing one is
+                -- still possible by sending an explicit empty string.
+                owner      = COALESCE(excluded.owner, feedback_status.owner),
+                resolution = COALESCE(excluded.resolution, feedback_status.resolution),
                 updated_at = excluded.updated_at
             """
         ),
@@ -442,6 +448,103 @@ def triage_feedback(
         detail={"stream": stream, "id": item_id, "status": body.status},
     )
     return {"stream": stream, "id": item_id, "status": body.status}
+
+
+class BulkTriageItem(BaseModel):
+    stream: str
+    source_id: str
+
+
+class BulkTriageBody(BaseModel):
+    items: List[BulkTriageItem]
+    status: str
+
+
+@router.post("/feedback/bulk-triage")
+def bulk_triage_feedback(
+    body: BulkTriageBody,
+    db: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Apply one status to many feedback items.
+
+    Keyed on (stream, source_id) PAIRS, not bare ids, because that is the composite key
+    of feedback_status — an id alone is ambiguous across the five streams the console
+    unions together.
+
+    BEST-EFFORT, and it says what it dropped. Modelled on hr_catalog.bulk_select, which
+    returns a `rejected[]` with reasons — NOT on admin_review_queue's bulk-status, whose
+    {updated_count} silently discards failures so a caller cannot tell a partial
+    application from a complete one. Status changes here are independent of one another,
+    so partial success is genuinely useful: closing 40 items and having 2 fail should
+    still close the 38.
+
+    Like the single-item PATCH, an omitted owner/resolution LEAVES THE EXISTING VALUE —
+    a bulk close must not wipe 40 resolutions.
+    """
+    if body.status not in _VALID_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"status must be one of {sorted(_VALID_STATUSES)}",
+        )
+    if not body.items:
+        return {"updated": 0, "rejected": []}
+
+    now = datetime.utcnow().isoformat()
+    actor_id = str(user.get("id") or user.get("user_id") or "unknown")
+    updated = 0
+    rejected: List[Dict[str, str]] = []
+
+    for item in body.items:
+        stream = (item.stream or "").strip()
+        source_id = (item.source_id or "").strip()
+        if not stream or not source_id:
+            rejected.append(
+                {"stream": stream, "source_id": source_id, "reason": "missing stream or id"}
+            )
+            continue
+        try:
+            db.execute(
+                text(
+                    """
+                    INSERT INTO feedback_status (stream, source_id, status, updated_at)
+                    VALUES (:stream, :source_id, :status, :updated_at)
+                    ON CONFLICT (stream, source_id) DO UPDATE SET
+                        status     = excluded.status,
+                        updated_at = excluded.updated_at
+                    """
+                ),
+                {
+                    "stream": stream,
+                    "source_id": source_id,
+                    "status": body.status,
+                    "updated_at": now,
+                },
+            )
+            updated += 1
+        except Exception as exc:  # noqa: BLE001 - one bad row must not lose the rest
+            log.warning(
+                "bulk_triage: failed stream=%s id=%s: %s", stream, source_id, exc
+            )
+            rejected.append(
+                {"stream": stream, "source_id": source_id, "reason": "write failed"}
+            )
+
+    # Audit per item, and non-fatal: losing an audit row must never lose the verdicts.
+    for item in body.items:
+        try:
+            record_admin_event(
+                db,
+                actor_id=actor_id,
+                event="feedback_triaged",
+                entity="feedback_status",
+                entity_id=item.source_id,
+                detail={"stream": item.stream, "id": item.source_id, "status": body.status, "bulk": True},
+            )
+        except Exception:  # noqa: BLE001
+            log.warning("bulk_triage: audit write failed for %s", item.source_id)
+
+    return {"updated": updated, "rejected": rejected}
 
 
 class StateBody(BaseModel):

@@ -315,7 +315,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form, initialExpande
           )}
           <Badge variant={badge.variant}>{badge.label}</Badge>
           <svg
-            className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -354,7 +354,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form, initialExpande
             <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs">
               {form.roadmap_step_title && (
                 <span className="inline-flex items-center gap-1 text-slate-500">
-                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                  <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
                   Roadmap step:{' '}
@@ -380,7 +380,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form, initialExpande
               {form.template.source_url &&
                 form.template.source_last_verified &&
                 !isSourceStale(form.template.source_last_verified) && (
-                  <span className="text-slate-400" title="When we last checked the official source page">
+                  <span className="text-slate-500" title="When we last checked the official source page">
                     Last verified · {new Date(form.template.source_last_verified).toLocaleDateString()}
                   </span>
                 )}
@@ -442,20 +442,26 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form, initialExpande
                   )}
                 </Button>
                 {form.draft_pdf_url && !isDownloadingPdf && (
-                  <span className="text-[10px] text-slate-400 mt-0.5">
+                  <span className="text-[10px] text-slate-500 mt-0.5">
                     Last generated: {new Date(form.updated_at).toLocaleString()}
                   </span>
                 )}
               </div>
             ) : null}
-            {/* [P2-4] "View original" — opens OriginalPdfDrawer with signed URL */}
-            <Button unstyled
-              type="button"
-              onClick={() => setShowOriginal(true)}
-              className="text-sm text-[#0b2b43] hover:underline"
-            >
-              View original PDF
-            </Button>
+            {/* [P2-4] "View original" — opens OriginalPdfDrawer with signed URL.
+                [BUG-260706-ECA9] Only when one is actually attached. This was rendered
+                unconditionally, but the endpoint 404s when form_templates.original_pdf_url
+                is null — true for 85 of 86 production templates — so the overwhelming
+                majority of users clicked a button that could only fail. */}
+            {form.template.has_original_pdf ? (
+              <Button unstyled
+                type="button"
+                onClick={() => setShowOriginal(true)}
+                className="text-sm text-[#0b2b43] hover:underline"
+              >
+                View original PDF
+              </Button>
+            ) : null}
             {/* AIQ-1274: form version metadata hidden from employees. */}
           </div>
 

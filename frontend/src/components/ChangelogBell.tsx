@@ -55,6 +55,45 @@ function formatDate(iso: string): string {
   }
 }
 
+/**
+ * Session-scoped memo for the changelog payload.
+ *
+ * This used to be a bare `fetch('/changelog.json', { cache: 'no-store' })` in a mount
+ * effect. Two things made that expensive: `no-store` explicitly opts out of the HTTP
+ * cache, and AppShell — which renders this bell — is NOT a router layout. It is rendered
+ * inside 77 individual page components, so React Router unmounts and remounts it on every
+ * navigation. The result was one uncacheable round trip for a static file per route change.
+ *
+ * Caching the PROMISE (not just the result) also collapses concurrent mounts into one
+ * request. The file is a build artefact, so a session is the right lifetime — a reload
+ * picks up a new one.
+ */
+let changelogPromise: Promise<ChangelogEntry[]> | null = null;
+
+/**
+ * Test-only. The memo is module-scoped by design, which means it also outlives a single
+ * test — without this, the first spec's payload leaks into every later one and they stop
+ * testing what they claim to. Not exported from any barrel; nothing in src/ calls it.
+ */
+export function __resetChangelogCacheForTests(): void {
+  changelogPromise = null;
+}
+
+function loadChangelog(): Promise<ChangelogEntry[]> {
+  if (!changelogPromise) {
+    changelogPromise = fetch('/changelog.json')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: unknown) => (Array.isArray(data) ? (data as ChangelogEntry[]) : []))
+      .catch((err) => {
+        // Do not cache a failure — a transient network blip should not disable the bell
+        // for the rest of the session.
+        changelogPromise = null;
+        throw err;
+      });
+  }
+  return changelogPromise;
+}
+
 export const ChangelogBell: React.FC = () => {
   const [entries, setEntries] = useState<ChangelogEntry[] | null>(null);
   const [open, setOpen] = useState(false);
@@ -62,16 +101,13 @@ export const ChangelogBell: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  // Fetch the static changelog once on mount. Silent failure — if the file
+  // Fetch the static changelog once PER SESSION. Silent failure — if the file
   // is missing in some environment, the bell just shows zero entries.
   useEffect(() => {
     let cancelled = false;
-    fetch('/changelog.json', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data: ChangelogEntry[]) => {
-        if (cancelled) return;
-        if (Array.isArray(data)) setEntries(data);
-        else setEntries([]);
+    loadChangelog()
+      .then((data) => {
+        if (!cancelled) setEntries(data);
       })
       .catch(() => {
         if (!cancelled) setEntries([]);
@@ -143,7 +179,7 @@ export const ChangelogBell: React.FC = () => {
         }
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="relative grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+        className="relative grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
       >
         {/* Sparkles-free megaphone-ish icon — clean lucide-style stroke */}
         <svg
@@ -180,7 +216,7 @@ export const ChangelogBell: React.FC = () => {
             <Button unstyled
               type="button"
               onClick={() => setOpen(false)}
-              className="text-xs text-slate-400 hover:text-slate-600"
+              className="text-xs text-slate-500 hover:text-slate-600"
               aria-label="Close"
             >
               Close
@@ -203,7 +239,7 @@ export const ChangelogBell: React.FC = () => {
                 <li key={entry.id} className="px-4 py-3">
                   <div className="flex items-baseline justify-between gap-2">
                     <h3 className="text-sm font-medium text-slate-900">{entry.title}</h3>
-                    <span className="text-[11px] text-slate-400 shrink-0">
+                    <span className="text-[11px] text-slate-500 shrink-0">
                       {formatDate(entry.date)}
                     </span>
                   </div>

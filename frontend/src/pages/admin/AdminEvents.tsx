@@ -8,6 +8,7 @@ import { adminResourcesAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
+import { LoadErrorBanner, loadErrorMessage } from '../../components/LoadErrorBanner';
 
 const EVENT_TYPES = ['cinema', 'concert', 'family_activity', 'festival', 'museum', 'networking', 'sports', 'theater'];
 
@@ -27,6 +28,7 @@ type EventItem = {
 export const AdminEvents: React.FC = () => {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     country_code: '',
@@ -38,6 +40,7 @@ export const AdminEvents: React.FC = () => {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await adminResourcesAPI.listEvents({
         country_code: filters.country_code || undefined,
@@ -49,7 +52,8 @@ export const AdminEvents: React.FC = () => {
       });
       setEvents((res.items || []) as EventItem[]);
       setTotal(res.total ?? 0);
-    } catch {
+    } catch (e) {
+      setLoadError(loadErrorMessage(e, "Couldn't load events."));
       setEvents([]);
       setTotal(0);
     } finally {
@@ -103,6 +107,7 @@ export const AdminEvents: React.FC = () => {
 
   return (
     <AdminLayout title="Events" subtitle="Manage country events">
+      <LoadErrorBanner message={loadError} onRetry={() => void load()} />
       <div className="flex flex-wrap gap-2 mb-4">
         {/* Filters key on ISO country_code — valueMode="code" so the dropdown stores
             what the query expects. A picker that stores a NAME here would silently match
@@ -189,7 +194,7 @@ export const AdminEvents: React.FC = () => {
             </tbody>
           </table>
         </div>
-        {events.length === 0 && !loading && (
+        {events.length === 0 && !loading && !loadError && (
           <div className="py-8 text-center text-slate-500">No events found.</div>
         )}
       </Card>

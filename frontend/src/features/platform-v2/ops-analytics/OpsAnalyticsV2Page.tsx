@@ -352,9 +352,9 @@ export function OpsAnalyticsV2Page() {
                     <td className="px-3 py-2 text-right tabular-nums text-rose-600">{fmtNum(r.blocked)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-amber-600">{fmtNum(r.overdue)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-rose-600">{fmtNum(r.critical)}</td>
-                    <td className="px-3 py-2 text-right text-slate-300">—</td>
-                    <td className="px-3 py-2 text-right text-slate-300">—</td>
-                    <td className="px-3 py-2 text-right text-slate-300">—</td>
+                    <td className="px-3 py-2 text-right text-slate-500">—</td>
+                    <td className="px-3 py-2 text-right text-slate-500">—</td>
+                    <td className="px-3 py-2 text-right text-slate-500">—</td>
                   </tr>
                 ))}
               </tbody>

@@ -50,7 +50,7 @@ interface PetWithRule {
 function RequirementFlag({ label, required }: { label: string; required: boolean }) {
   return (
     <span className="inline-flex items-center gap-1 text-xs text-[#4b5563]">
-      <span className={required ? 'text-[#22c55e]' : 'text-[#94a3b8]'}>
+      <span className={required ? 'text-[#22c55e]' : 'text-slate-500'}>
         {required ? '✓' : '–'}
       </span>
       {label}
@@ -83,7 +83,7 @@ function PetRuleCard({ petWithRule }: { petWithRule: PetWithRule }) {
 
       {/* No data fallback */}
       {!rule && (
-        <p className="text-sm text-[#94a3b8] italic">
+        <p className="text-sm text-slate-500 italic">
           No import data available for this country / species combination.
           Check official government sources before travel.
         </p>
@@ -104,7 +104,7 @@ function PetRuleCard({ petWithRule }: { petWithRule: PetWithRule }) {
             <ul className="space-y-1">
               {rule.requirements.map((req, i) => (
                 <li key={i} className="flex gap-2 text-sm text-[#374151]">
-                  <span className="text-[#94a3b8] shrink-0 mt-0.5">•</span>
+                  <span className="text-slate-500 shrink-0 mt-0.5">•</span>
                   <span>{req}</span>
                 </li>
               ))}
@@ -130,10 +130,10 @@ function PetRuleCard({ petWithRule }: { petWithRule: PetWithRule }) {
                 Verify requirements ↗
               </a>
             ) : (
-              <span className="text-xs text-[#94a3b8]">No source link available</span>
+              <span className="text-xs text-slate-500">No source link available</span>
             )}
             {rule.last_verified_at && (
-              <span className="text-xs text-[#94a3b8]">
+              <span className="text-xs text-slate-500">
                 Last verified: {new Date(rule.last_verified_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
               </span>
             )}
@@ -215,7 +215,7 @@ export const PetRequirementsSection: React.FC<Props> = ({ caseId, destCountry })
       <div className="flex items-center justify-between mb-4">
         <div>
           <div className="text-sm font-semibold text-[#0b2b43]">Pet import requirements</div>
-          <p className="text-xs text-[#94a3b8] mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Import rules for {destCountry || 'the destination country'} — verify with source links before travel
           </p>
         </div>
@@ -225,7 +225,7 @@ export const PetRequirementsSection: React.FC<Props> = ({ caseId, destCountry })
       </div>
 
       {loading && (
-        <div className="text-sm text-[#94a3b8] py-4">Loading pet requirements…</div>
+        <div className="text-sm text-slate-500 py-4">Loading pet requirements…</div>
       )}
 
       {failed && (

@@ -36,6 +36,7 @@ Dual-registered in backend/main.py AND backend/app/main.py (CLAUDE.md 405 rule).
 # annotations as real objects.
 import json
 import logging
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -211,6 +212,30 @@ def _latest_signature(db: Session, request_id: str) -> Optional[CorridorAttestat
     )
 
 
+def _reviewer_link_base() -> str:
+    """Base URL for the reviewer's link — the PUBLIC WEB APP, never this API.
+
+    `/attest/:token` is a client-side SPA route. It was previously built from
+    `request.base_url`, which is whatever host served the API call — in production
+    `https://api.relopass.com`, which does not serve the SPA at all:
+
+        https://relopass.com/attest/<token>      -> 200, renders
+        https://api.relopass.com/attest/<token>  -> 405
+        https://app.relopass.com/attest/<token>  -> 403   (HR host, not this one)
+
+    Measured 2026-08-23 during the ATT-1 activation dry run, on a real request. The
+    admin page shows this link once, above the warning "This link is shown once and
+    cannot be recovered" — so a reviewer received a dead link and the token could not
+    be reissued without creating a whole new request. It is the only link the system
+    hands out.
+
+    `APP_WEB_BASE_URL` is the repo's existing name for the public web app base (see
+    services/assignment_invite_email.py), and is deliberately NOT `APP_BASE_URL`,
+    which is the HR-facing app host and 403s on this route.
+    """
+    return os.getenv("APP_WEB_BASE_URL", "https://relopass.com").rstrip("/")
+
+
 def _admin_dto(db: Session, req: CorridorAttestationRequest, *, with_items: bool = True) -> AttestationAdminDTO:
     items = _load_items(db, req.id) if with_items else []
     return AttestationAdminDTO(
@@ -340,7 +365,7 @@ def create_attestation(
         db.commit()
         db.refresh(req)
 
-        base = str(request.base_url).rstrip("/")
+        base = _reviewer_link_base()
         return AttestationCreatedDTO(
             request=_admin_dto(db, req),
             review_token=raw_token,
@@ -497,7 +522,7 @@ def create_case_attestation(
         db.commit()
         db.refresh(req)
 
-        base = str(request.base_url).rstrip("/")
+        base = _reviewer_link_base()
         return AttestationCreatedDTO(
             request=_admin_dto(db, req),
             review_token=raw_token,

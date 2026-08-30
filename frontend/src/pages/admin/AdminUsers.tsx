@@ -236,7 +236,7 @@ export const AdminUsers: React.FC = () => {
                   ) : p.company_id ? (
                     <span className="text-xs text-amber-600">Company {p.company_id}</span>
                   ) : (
-                    <span className="text-xs text-[#94a3b8]">Unassigned</span>
+                    <span className="text-xs text-slate-500">Unassigned</span>
                   )}
                   {(p.status || 'active').toLowerCase() === 'inactive' && (
                     <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">Inactive</span>

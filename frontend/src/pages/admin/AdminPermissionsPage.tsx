@@ -4,7 +4,7 @@ import { Alert } from '../../components/antigravity';
 import { buildPermissionsMatrix, MATRIX_ROLES, type MatrixRole } from '../../lib/permissionsMatrix';
 
 const cell = (on: boolean) =>
-  on ? <span className="text-accent-700" aria-label="yes">✓</span> : <span className="text-slate-300" aria-label="no">—</span>;
+  on ? <span className="text-accent-700" aria-label="yes">✓</span> : <span className="text-slate-500" aria-label="no">—</span>;
 
 export const AdminPermissionsPage: React.FC = () => {
   const [filter, setFilter] = useState('');
@@ -30,12 +30,12 @@ export const AdminPermissionsPage: React.FC = () => {
           aria-label="Filter routes"
           className="min-w-[18rem] rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
-        <span className="text-sm text-slate-400">{shown.length} of {rows.length} routes</span>
+        <span className="text-sm text-slate-500">{shown.length} of {rows.length} routes</span>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-widest text-slate-400">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-widest text-slate-500">
             <tr>
               <th className="px-4 py-2">Route</th>
               <th className="px-4 py-2">Path</th>

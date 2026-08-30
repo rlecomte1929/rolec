@@ -84,7 +84,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, token, onUpdate }) => {
       )}
 
       {task.due_date && (
-        <p className="text-xs text-slate-400 mb-3">
+        <p className="text-xs text-slate-500 mb-3">
           Due: {new Date(task.due_date).toLocaleDateString()}
         </p>
       )}
@@ -230,7 +230,7 @@ export const ProviderPortal: React.FC = () => {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
-        <img src="/relopass-logo.png" alt="ReloPass" className="h-7 w-auto" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        <img src="/relopass-logo.png" width={122} height={128} alt="ReloPass" className="h-7 w-auto" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
         <span className="font-semibold text-slate-900">ReloPass · Provider Portal</span>
         {providerName && (
           <span className="ml-auto text-sm text-slate-500">{providerName}</span>
@@ -255,9 +255,9 @@ export const ProviderPortal: React.FC = () => {
         )}
 
         {loadingTasks ? (
-          <div className="text-center py-16 text-sm text-slate-400">Loading your tasks…</div>
+          <div className="text-center py-16 text-sm text-slate-500">Loading your tasks…</div>
         ) : tasks.length === 0 ? (
-          <div className="text-center py-16 text-sm text-slate-400">No tasks assigned yet.</div>
+          <div className="text-center py-16 text-sm text-slate-500">No tasks assigned yet.</div>
         ) : (
           <>
             {active.length > 0 && (
