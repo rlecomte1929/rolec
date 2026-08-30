@@ -39,6 +39,11 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from ..db import SessionLocal
+from .paywall_policy import (
+    ROADMAP_GATING_STAGES,
+    PaywallContext,
+    resolve_paywall_policy,
+)
 from .pii_masker import safe_log_text
 
 logger = logging.getLogger(__name__)
@@ -83,9 +88,11 @@ def lookup_entitlement(case_id: str) -> EntitlementLookup:
         with SessionLocal() as db:
             row = db.execute(
                 text(
-                    "SELECT access_tier, payment_status FROM relocation_cases WHERE id::text = :cid\n"
+                    "SELECT access_tier, payment_status, funding_source, sponsor_id\n"
+                    "  FROM relocation_cases WHERE id::text = :cid\n"
                     "UNION ALL\n"
-                    "SELECT rc.access_tier, rc.payment_status FROM case_assignments ca\n"
+                    "SELECT rc.access_tier, rc.payment_status, rc.funding_source, rc.sponsor_id\n"
+                    "  FROM case_assignments ca\n"
                     "  JOIN relocation_cases rc ON rc.id::text = ca.canonical_case_id::text\n"
                     " WHERE (ca.id::text = :cid OR ca.canonical_case_id::text = :cid OR ca.case_id::text = :cid)\n"
                     "LIMIT 1"
@@ -113,13 +120,47 @@ def resolve_entitlement(case_id: str) -> Optional[Dict[str, Any]]:
 
 def unlocked_from_lookup(found: EntitlementLookup) -> bool:
     """The single roadmap-access decision, shared by the enforcement gate and the
-    status endpoint so the two can never disagree about the same case."""
+    status endpoint so the two can never disagree about the same case.
+
+    Since the paywall became segment-aware there are THREE questions here, in order, and
+    only the last one is about payment:
+
+      1. Is the mechanism on at all?              `roadmap_paywall_enabled()`
+      2. Does THIS case's funder gate the roadmap? `resolve_paywall_policy(...)`
+      3. Has it been paid for?                     `access_tier in PAID_TIERS`
+
+    Question 2 is what makes a sponsored mover — a refugee programme, an NGO or university
+    scheme — never see a wall, and what lets an SME sit on the execution gate (option D)
+    while still reading their own plan for free. A case whose gate falls elsewhere in the
+    journey, or nowhere, is unlocked HERE regardless of tier.
+
+    Note the consequence, which is deliberate: flipping RELOPASS_ROADMAP_PAYWALL_ENABLED back
+    on no longer paywalls anybody by itself, because every policy that would gate the roadmap
+    ships disabled. Walling a segment now takes two decisions — the switch AND the policy —
+    and that is the point. On 2026-08-23 a single flag flip denied 1,845 cases their own
+    roadmap; one switch should not be able to do that again.
+    """
     if not roadmap_paywall_enabled():
         return True
     if not found.available:
         return True  # store unreachable — never lock a user out over an outage
     if found.row is None:
         return False  # resolved: no such case → not entitled
+
+    decision = resolve_paywall_policy(
+        PaywallContext(
+            funding_source=found.row.get("funding_source"),
+            sponsor_id=found.row.get("sponsor_id"),
+            current_tier=found.row.get("access_tier"),
+        )
+    )
+    if decision.applies and decision.gate_stage not in ROADMAP_GATING_STAGES:
+        # A policy positively says this funder's gate falls elsewhere in the journey, or
+        # nowhere. Only an ENABLED policy earns that: `applies=False` is silence — an unknown
+        # funder, or one whose policy is defined but switched off — and silence must not be
+        # read as permission. Absent a policy we do exactly what we did before.
+        return True
+
     return (found.row.get("access_tier") or "free") in PAID_TIERS
 
 
