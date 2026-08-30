@@ -1,0 +1,54 @@
+{
+  "batch_id": "fr-sg-facts-2026-08-30",
+  "corridor": "FR-SG",
+  "destination": "SG (Singapore)",
+  "persona": "Adrien Hardy (Paris->Singapore, French professional, work-pass/third-country)",
+  "source": "Otto (Audos) — France Singapore Relocation Facts thread, 2026-08-30",
+  "audience": {
+    "nationality": "non-EEA",
+    "status": "professional",
+    "note": "Singapore has no free-movement scheme; every foreigner is the work-pass track."
+  },
+  "gcs": {
+    "facts_ndjson": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788095616815_dgh7n3yf.ndjson",
+    "rejects_ndjson": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788095617840_cxt4adge.ndjson",
+    "manifest": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788095639409_uefj4x64.json"
+  },
+  "files": {
+    "facts.ndjson": {
+      "records": 30,
+      "sha256": "b405fc6235894a105ba0279619b2968f7f54f104c2b99847c6391e402582c52f",
+      "note": "Otto delivery as received (30)"
+    },
+    "clean.ndjson": {
+      "records": 17,
+      "sha256": "3eb0e21fd5032ead1db11c5869b2c39a9d78319889de1ae07a1a996e92b118c9",
+      "note": "verify_ledger V3 quote-confirmed (imported)"
+    },
+    "worklist.ndjson": {
+      "records": 13,
+      "sha256": "246b926fb2970867e3288dce36f7bd8166802806890e923713bc636d1890bc2a",
+      "note": "quote_not_on_page — re-source (may be JS-rendered gov.sg)"
+    },
+    "rejects.ndjson": {
+      "records": 10,
+      "sha256": "604961e53aa139093c88a2779141114cb1cd82ede474527570fadc476847f92e",
+      "note": "Otto's own rejects"
+    }
+  },
+  "verification": "verify_ledger.py fetched all pages: 17 of 30 quotes confirmed, 13 not on the cited page (Otto self-reported all 30 verbatim — the referee disagreed).",
+  "landed": {
+    "promoted": 7,
+    "table": "public.requirement_items (review_status='pending', all corpus_grounded)",
+    "scope": "scoped promote(country='SG'); 8 pre-existing SG-immig-2026-08-12 ready rows parked+restored, 11 approved untouched"
+  },
+  "code_dependency": "backend/imports/otto/parsers.py — added 'gov.sg' to _OFFICIAL_SUFFIXES (mom/ica/iras/cpf.gov.sg); without it all 30 scored UNOFFICIAL.",
+  "known_gaps": [
+    "tax_residence (IRAS JS-rendered, 0 facts)",
+    "fin_number (0)",
+    "housing_rental (0)",
+    "healthcare_ep (policy ambiguity, 0)",
+    "COMPASS C4-C6 not individually extracted",
+    "13 quotes failed ground-truth re-fetch"
+  ]
+}
