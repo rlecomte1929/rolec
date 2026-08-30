@@ -443,6 +443,88 @@ SOURCES: Tuple[RegistrySource, ...] = (
               "PSRA licence. Search form, no per-entity URL; the licence number is the vetter's "
               "check against the register.",
     ),
+    # ── France / Paris (NO-FR / Denis, Norway→Paris) ─────────────────────────
+    #
+    # Otto's Paris preflight (2026-08-30) found most French registers DO expose per-entity URLs,
+    # so these carry a real entry_url_pattern (stronger provenance than the Irish set) — only the
+    # Barreau is search-only and takes PUBLIC_REGISTER. Scoped to NO-FR; the older UNAVAILABLE
+    # "FNAIM (FR)" entry above stays as the FR-DE recon record (that corridor's housing is still
+    # unharvestable), and a test pins its emptiness — this NO-FR FNAIM is a separate source so it
+    # does not reopen it.
+    RegistrySource(
+        name="REGAFI — registre des agents financiers (ACPR / Banque de France)",
+        base_url="https://www.regafi.fr/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LOOKUP,
+        corridors=("NO-FR",),
+        categories=("banks",),
+        # fiche-banque?refine.id_referentiel=20556 — the bare /pages/fiche-banque form matches none.
+        entry_url_pattern=r"id_referentiel=\d+",
+        notes="Statutory register of authorised credit institutions (ACPR). Banks cap at tier 2 by "
+              "effective_tier regardless — entity/licence confirmation only.",
+    ),
+    RegistrySource(
+        name="Annuaire de l'Éducation nationale (annuaire-education.fr)",
+        base_url="https://annuaire-education.fr/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("NO-FR",),
+        categories=("schools",),
+        # /etablissement/paris/lycee-... — one page per establishment, sourced from MEN open data.
+        entry_url_pattern=r"/etablissement/",
+        notes="Aggregator of official Ministère de l'Éducation nationale establishment data, with a "
+              "stable per-school page. Tier 2: it confirms the school exists and is MEN-listed, not "
+              "an accreditation.",
+    ),
+    RegistrySource(
+        name="Ordre des Experts-Comptables — annuaire",
+        base_url="https://annuaire.experts-comptables.org/",
+        tier=1,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("NO-FR",),
+        categories=("tax_finance",),
+        # /expert-comptable/36523-sclover — one page per inscrit on the Ordre's tableau.
+        entry_url_pattern=r"/expert-comptable/\d+",
+        notes="The statutory professional order — inscription au tableau is mandatory to practise, "
+              "so this is a genuine accreditation register with per-entity pages (tier 1).",
+    ),
+    RegistrySource(
+        name="FNAIM — annuaire des adhérents (Paris)",
+        base_url="https://www.fnaim.fr/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("NO-FR",),
+        categories=("housing_agencies",),
+        # /agence-immobiliere/21241/43-paris-17-... — one page per member agency. The
+        # /agences-immobilieres/43-paris-75.htm LISTING page matches none, by design.
+        entry_url_pattern=r"/agence-immobiliere/\d+",
+        notes="Professional federation with per-agency member pages (re-verified 2026-08-30 — the "
+              "2026-08-10 recon that marked FNAIM UNAVAILABLE for FR-DE predates this listing). "
+              "Tier 2: membership + carte-T holder, entity-level.",
+    ),
+    RegistrySource(
+        name="Chambre Syndicale du Déménagement (CSD) — annuaire adhérents",
+        base_url="https://www.csdemenagement.fr/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("NO-FR",),
+        categories=("movers",),
+        # /annuaire-adherents/annuaire-demenageurs/3617-... — one page per member firm.
+        entry_url_pattern=r"/annuaire-demenageurs/\d+",
+        notes="French removals trade chamber. Membership directory with per-firm pages; tier 2 "
+              "(association member list, not a FAIM-style audited accreditation).",
+    ),
+    RegistrySource(
+        name="Barreau de Paris — annuaire des avocats",
+        base_url="https://www.avocatparis.org/annuaire",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("NO-FR",),
+        categories=("legal_admin",),
+        notes="The Paris bar — inscription is mandatory to practise there. The annuaire is a search "
+              "form with no per-entity URL, so it takes PUBLIC_REGISTER (tier 2, claimed): the "
+              "vetter confirms the avocat on the roll by name.",
+    ),
 )
 
 

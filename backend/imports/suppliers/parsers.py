@@ -68,6 +68,13 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("centralbank.ie",        "Central Bank of Ireland — Register of Authorised Firms"),
     ("tusla.ie",              "Tusla — Register of Independent Schools"),
     ("psr.ie",                "PSRA — Register of Licensed Property Services Providers"),
+    # France / Paris (NO-FR) — most expose per-entity pages; Barreau is PUBLIC_REGISTER.
+    ("regafi.fr",                     "REGAFI — registre des agents financiers (ACPR / Banque de France)"),
+    ("annuaire-education.fr",         "Annuaire de l'Éducation nationale (annuaire-education.fr)"),
+    ("annuaire.experts-comptables.org", "Ordre des Experts-Comptables — annuaire"),
+    ("fnaim.fr",                      "FNAIM — annuaire des adhérents (Paris)"),
+    ("csdemenagement.fr",             "Chambre Syndicale du Déménagement (CSD) — annuaire adhérents"),
+    ("avocatparis.org",               "Barreau de Paris — annuaire des avocats"),
 )
 
 
