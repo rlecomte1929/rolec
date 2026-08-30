@@ -67,6 +67,13 @@ GATE_EXECUTION = "execution"            # option D — free to know, pay to do
 
 GATE_STAGES = frozenset({GATE_NONE, GATE_INTAKE, GATE_ROADMAP_REVEAL, GATE_EXECUTION})
 
+#: The stages that put a wall in front of the ROADMAP. `execution` deliberately does not:
+#: under option D the plan is free and the charge lands on the work done afterwards, so a
+#: case on the execution gate must still be able to read its own roadmap. `none` gates
+#: nothing anywhere. Naming the set here keeps that judgement in one place rather than
+#: leaving each surface to re-derive which stages concern it.
+ROADMAP_GATING_STAGES = frozenset({GATE_INTAKE, GATE_ROADMAP_REVEAL})
+
 #: Mirrors ROADMAP_AMOUNT_CENTS in backend/app/routers/payment.py. Kept here rather than
 #: imported so this module stays free of FastAPI and stays a pure function; a test asserts the
 #: two agree, so they cannot drift apart silently.
@@ -110,6 +117,15 @@ class PaywallDecision:
     price_cents: int
     policy_key: str
     reason: str
+    #: True only when an ENABLED policy produced this decision — i.e. we positively know this
+    #: funder's arrangement. False means "no policy spoke": unknown funder, or one whose
+    #: policy is defined but switched off.
+    #:
+    #: Callers gating access must not read a False decision as "grant". It is silence, and a
+    #: caller should fall back to whatever it did before rather than treat absence of a policy
+    #: as permission — the same distinction `EntitlementLookup.available` draws between "the
+    #: store said no" and "the store did not answer".
+    applies: bool = False
 
     @property
     def gated(self) -> bool:
@@ -207,6 +223,7 @@ def resolve_paywall_policy(context: PaywallContext) -> PaywallDecision:
             price_cents=policy.price_cents,
             policy_key=policy.key,
             reason=policy.rationale,
+            applies=True,
         )
     except Exception:  # noqa: BLE001 — a paywall must never lock someone out over a bug
         logger.exception("paywall_policy: resolution failed; granting access")

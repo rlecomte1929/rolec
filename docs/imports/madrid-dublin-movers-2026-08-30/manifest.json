@@ -1,0 +1,12 @@
+{
+  "batch_id": "madrid-dublin-movers-2026-08-30",
+  "corridor": "ES-IE",
+  "service_category": "movers",
+  "origin_city": "Madrid",
+  "destination_city": "Dublin",
+  "record_count": 10,
+  "contactable_count": 6,
+  "passes_strict_email_gate": 1,
+  "source_task": "otto-ping-madrid-dublin-movers-2026-08-30",
+  "notes": "Otto produced the candidate list (10 real FIDI/IAM movers, denominator ~25 considered, 6 competitors + ~9 verification-failures dropped, no fabrication). Claude grounded contact_email by fetching each live site. source_url intentionally blank — needs the fidi.org/iamovers.org member-directory entry. status=candidate; NOTHING promoted."
+}
