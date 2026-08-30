@@ -8,7 +8,7 @@ Adapter layer uses ``milestone_type`` to hydrate rows from the DB without migrat
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Final, List, Mapping, Optional, Sequence, Tuple
+from typing import Dict, Final, FrozenSet, List, Mapping, Optional, Sequence, Tuple
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,18 @@ class TaskLibraryEntry:
     instructions: Tuple[str, ...] = ()
     required_inputs: Tuple[RequiredInputDef, ...] = ()
     sequence_in_phase: int = 0
+
+
+#: Milestones only a THIRD-COUNTRY national needs. A free mover (EU_EEA / OWN_NATIONAL) into an
+#: EEA destination needs no entry visa and no work permit, so these steps must not appear on their
+#: roadmap — the same nationality gate the requirements engine applies (requirements_builder).
+#: Scoped to the three generic visa/permit tasks: the corridor-specific visa tasks (uk_/japan_/
+#: l1b_) are only ever generated on third-country routes, so a free mover never has them.
+FREE_MOVER_WAIVED_MILESTONE_TYPES: Final[FrozenSet[str]] = frozenset({
+    "task_visa_docs_prep",   # Prepare visa / work permit application pack
+    "task_visa_submit",      # Submit visa / work permit application
+    "task_biometrics",       # Book biometrics / visa appointment
+})
 
 
 # Global phase ordering (first → last in the journey).
