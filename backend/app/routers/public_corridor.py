@@ -255,6 +255,10 @@ def corridor_requirements(
             # false ("modeled, and it is obvious"). Do not collapse them.
             "timing": item.get("timing"),
             "non_obvious": item.get("non_obvious"),
+            # Served with a caveat: flagged needs_lawyer_review AND not attested. `_base_items`
+            # computes it; apply_rules carries it through opaquely; it must be re-projected here
+            # or the public corridor page can never badge it. See lawyer_review_gate.
+            "legalReviewPending": bool(item.get("legalReviewPending")),
             "category": item.get("pillar"),
             "source": _public_sources(item.get("citations")),
         }
