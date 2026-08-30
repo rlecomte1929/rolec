@@ -357,3 +357,135 @@ def admin_reject_company_invite(
     )
     log.info("company_invite rejected id=%s by=%s", invite_id, admin_id)
     return {"id": invite_id, "status": "rejected", "rejected_reason": reason}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [AIQ-2094 ST4] The colleague accepts an admin-approved invite.
+#
+# This is the ONLY code path in the product that attaches an HR profile to an
+# EXISTING company. AIQ-2090 (PR #1989) removed the previous one because a typed
+# company name on a public form joined a stranger into a customer's tenant.
+#
+# DESIGN DEVIATION FROM THE CARD, decided 2026-08-30. The card specified an
+# unauthenticated public route. This requires an authenticated caller instead:
+# the colleague registers normally (AIQ-2090 gives them their own throwaway
+# company), then accepts while logged in and is re-pointed at the invite's
+# company. That removes a public write path into the identity system and the
+# whole account-creation surface, and needs no route_auth_allowlist entry. The
+# orphan company left behind is exactly what ST6 merges.
+#
+# THE TOKEN IS A POINTER, NOT AUTHORISATION. It selects which invite is being
+# answered; the caller's own authenticated email is what proves they are the
+# person invited. Without that second check, anyone holding a leaked token could
+# join a tenant they were never invited to.
+#
+# ORDERING IS DELIBERATE. The invite is CLAIMED first, in a single status-guarded
+# UPDATE, and only then is the hr_users link written. db.ensure_hr_user_for_profile
+# opens its own engine connection and commits independently of this request's
+# session, so the two cannot share a transaction. Claim-then-link fails CLOSED: a
+# failure between them leaves an invite consumed and no access granted. Link-then-
+# claim would fail OPEN — access granted against an unconsumed invite.
+# ─────────────────────────────────────────────────────────────────────────────
+from ..auth_deps import get_current_user  # noqa: E402
+
+
+
+def _is_expired(expires_at: Any) -> bool:
+    """True when `expires_at` is in the past. Unparseable or absent -> NOT expired.
+
+    Postgres returns a datetime here; the SQLite test fixture returns an ISO string.
+    A value we cannot read must not silently expire a valid invite, so this fails
+    OPEN on the expiry check specifically — the status guard is what protects access.
+    """
+    if expires_at is None:
+        return False
+    if isinstance(expires_at, datetime):
+        exp = expires_at
+    else:
+        try:
+            exp = datetime.fromisoformat(str(expires_at))
+        except ValueError:
+            return False
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    return exp < datetime.now(timezone.utc)
+
+
+def _emails_match(a: Optional[str], b: Optional[str]) -> bool:
+    return (a or "").strip().lower() == (b or "").strip().lower() and bool((a or "").strip())
+
+
+@router.post("/api/company-invites/{token}/accept")
+def accept_company_invite(
+    token: str,
+    session: Session = Depends(_get_db),
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Consume an approved invite and join the caller to the invite's company.
+
+    Refuses on any of: unknown token, wrong status, expired, or an authenticated
+    caller whose email is not the invited one.
+    """
+    token_hash = hashlib.sha256((token or "").encode("utf-8")).hexdigest()
+
+    # Lookup is by hash ONLY. The raw token is never a key, so a column holding a
+    # raw token by mistake is not addressable by it either.
+    row = session.execute(
+        text("SELECT id, company_id, invited_email, status, expires_at "
+             "FROM hr_company_invites WHERE token_hash = :h"),
+        {"h": token_hash},
+    ).fetchone()
+    if row is None:
+        # Deliberately says nothing about whether an invite exists.
+        raise HTTPException(status_code=404, detail="This invite link is not valid.")
+
+    m = row._mapping
+    invite_id = m["id"]
+
+    # The caller must be the person invited. The token alone is not enough.
+    if not _emails_match(user.get("email"), m["invited_email"]):
+        log.warning("company_invite accept email mismatch invite=%s", invite_id)
+        raise HTTPException(
+            status_code=403,
+            detail="This invite was issued to a different email address.",
+        )
+
+    if m["status"] != "approved":
+        raise HTTPException(
+            status_code=409,
+            detail=f"This invite is '{m['status']}' and cannot be accepted.",
+        )
+
+    if _is_expired(m["expires_at"]):
+        session.execute(
+            text("UPDATE hr_company_invites SET status = 'expired', updated_at = :now "
+                 "WHERE id = :id AND status = 'approved'"),
+            {"now": datetime.now(timezone.utc).isoformat(), "id": invite_id},
+        )
+        raise HTTPException(status_code=410, detail="This invite has expired.")
+
+    profile_id = str(user.get("id") or "")
+    company_id = str(m["company_id"])
+
+    # CLAIM FIRST — guard in the WHERE clause so check-and-write is atomic and a
+    # concurrent second accept loses the race rather than double-linking.
+    claimed = session.execute(
+        text("UPDATE hr_company_invites "
+             "SET status = 'accepted', accepted_at = :now, accepted_profile_id = :pid, "
+             "    updated_at = :now "
+             "WHERE id = :id AND status = 'approved'"),
+        {"now": datetime.now(timezone.utc).isoformat(), "pid": profile_id, "id": invite_id},
+    )
+    if claimed.rowcount == 0:
+        raise HTTPException(status_code=409, detail="This invite has already been used.")
+    session.flush()
+
+    # THEN link. company_id comes from the invite row and from nowhere else.
+    # hr_users is text-keyed on all three of id/company_id/profile_id while this
+    # table's company_id is uuid, hence the str() — pre-existing drift, handled at
+    # the boundary rather than "fixed" here.
+    db.ensure_hr_user_for_profile(profile_id, company_id)
+
+    log.info("company_invite accepted id=%s profile=%s company=%s",
+             invite_id, profile_id, company_id)
+    return {"id": invite_id, "status": "accepted", "company_id": company_id}
