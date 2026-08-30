@@ -588,6 +588,56 @@ def add_capability(
     return get_supplier(session, supplier_id)
 
 
+def _ensure_catalog_master_for_capability(cap: Any, supplier_name: Optional[str]) -> None:
+    """AIQ-2095: forge the ``service_catalog_items`` master that makes an approved
+    supplier reachable by an employee.
+
+    A supplier reaches an employee ONLY through a catalog master — the HR curation
+    view, the vendor-proposal seed and the employee recommendations filter all read
+    ``service_catalog_items`` (by ``supplier_id`` / ``external_id``), never the
+    registry directly. Approving a capability is the moment the supplier becomes
+    offerable, so the master is created here rather than at raw promotion (a pending
+    supplier must not appear in HR curation, and ``list_items`` does not gate on
+    vetting status).
+
+    Country comes from the CAPABILITY's ``country_code``, never
+    ``suppliers.based_in_country``: an AGS-France-style supplier based in FR but
+    serving DE and NO must get a DE master and a NO master — one per capability —
+    not an FR one. Idempotent via a deterministic ``external_id``. Best-effort: a
+    catalog failure must never roll back a completed approval (the coverage guard /
+    backfill catches any straggler)."""
+    from . import service_catalog
+
+    category = (getattr(cap, "service_category", None) or "").strip().lower()
+    if not category:
+        return
+    country = (getattr(cap, "country_code", None) or "").strip().upper()[:2] or None
+    city = getattr(cap, "city_name", None) or None
+    supplier_id = str(getattr(cap, "supplier_id", "") or "")
+    if not supplier_id:
+        return
+    # Dedupe is on (category, external_id); key by supplier+capability country so
+    # re-approving the same capability updates one row instead of duplicating.
+    external_id = f"registry:{supplier_id}:{category}:{country or ''}"
+    try:
+        service_catalog.upsert_item(
+            category=category,
+            name=(supplier_name or supplier_id),
+            attributes={},
+            source="registry_promoted",
+            city=city,
+            country=country,
+            external_id=external_id,
+            supplier_id=supplier_id,
+        )
+    except Exception:
+        log.exception(
+            "AIQ-2095: failed to create catalog master for approved capability "
+            "supplier_id=%s category=%s country=%s",
+            supplier_id, category, country,
+        )
+
+
 def approve_capability(
     session: Session,
     capability_id: str,
@@ -609,7 +659,12 @@ def approve_capability(
     cap.vetted_at = datetime.now(timezone.utc)
     cap.vetting_notes = (notes or "").strip() or None
     session.commit()
-    return get_supplier(session, cap.supplier_id)
+    supplier = get_supplier(session, cap.supplier_id)
+    # AIQ-2095: an approved capability is only reachable by an employee once a
+    # linked catalog master exists — create it now (best-effort, never fails the
+    # approval). Country is taken from the capability, not suppliers.based_in_country.
+    _ensure_catalog_master_for_capability(cap, (supplier or {}).get("name"))
+    return supplier
 
 
 def reject_capability(
