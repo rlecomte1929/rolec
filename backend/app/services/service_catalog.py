@@ -27,7 +27,7 @@ from ...database import db
 
 log = logging.getLogger(__name__)
 
-VALID_SOURCES = ("scraper", "manual", "seed", "hr_promoted")
+VALID_SOURCES = ("scraper", "manual", "seed", "hr_promoted", "registry_promoted")
 
 
 def _row_to_item(row: Any) -> Dict[str, Any]:
@@ -107,11 +107,18 @@ def upsert_item(
     country: Optional[str] = None,
     external_id: Optional[str] = None,
     created_by_user_id: Optional[str] = None,
+    supplier_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Insert a row, or update in place when (category, external_id) already
     exists. Used by the JSON→DB backfill (idempotent re-runs) and later
     by per-category scrapers (re-scraping shouldn't duplicate).
+
+    AIQ-2095: pass ``supplier_id`` to LINK the master to a suppliers-registry
+    row — the join the employee recommendation/curation paths use to reach a
+    promoted supplier. When ``supplier_id`` is None the emitted SQL is
+    byte-identical to before (the column is not referenced), so existing callers
+    and their SQLite fixtures are unaffected.
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"source must be one of {VALID_SOURCES}")
@@ -128,48 +135,59 @@ def upsert_item(
                 {"cat": category, "eid": external_id},
             ).mappings().first()
         if existing:
+            set_supplier = ", supplier_id = :supplier_id" if supplier_id is not None else ""
+            params = {
+                "city": city,
+                "country": country,
+                "name": name,
+                "attr": attr_json,
+                "source": source,
+                "now": now,
+                "id": existing["id"],
+            }
+            if supplier_id is not None:
+                params["supplier_id"] = supplier_id
             conn.execute(
                 text(
                     "UPDATE service_catalog_items SET "
                     "city = :city, country = :country, name = :name, "
                     "attributes_json = :attr, source = :source, "
-                    "active = true, updated_at = :now "
+                    "active = true, updated_at = :now" + set_supplier + " "
                     "WHERE id = :id"
                 ),
-                {
-                    "city": city,
-                    "country": country,
-                    "name": name,
-                    "attr": attr_json,
-                    "source": source,
-                    "now": now,
-                    "id": existing["id"],
-                },
+                params,
             )
             row_id = existing["id"]
         else:
             row_id = str(uuid.uuid4())
+            cols = (
+                "id, category, city, country, name, attributes_json, "
+                "source, active, external_id, created_at, updated_at, "
+                "created_by_user_id"
+            )
+            vals = (
+                ":id, :category, :city, :country, :name, :attr, "
+                ":source, 1, :eid, :now, :now, :actor"
+            )
+            params = {
+                "id": row_id,
+                "category": category,
+                "city": city,
+                "country": country,
+                "name": name,
+                "attr": attr_json,
+                "source": source,
+                "eid": external_id,
+                "now": now,
+                "actor": created_by_user_id,
+            }
+            if supplier_id is not None:
+                cols += ", supplier_id"
+                vals += ", :supplier_id"
+                params["supplier_id"] = supplier_id
             conn.execute(
-                text(
-                    "INSERT INTO service_catalog_items ("
-                    "id, category, city, country, name, attributes_json, "
-                    "source, active, external_id, created_at, updated_at, "
-                    "created_by_user_id) VALUES ("
-                    ":id, :category, :city, :country, :name, :attr, "
-                    ":source, 1, :eid, :now, :now, :actor)"
-                ),
-                {
-                    "id": row_id,
-                    "category": category,
-                    "city": city,
-                    "country": country,
-                    "name": name,
-                    "attr": attr_json,
-                    "source": source,
-                    "eid": external_id,
-                    "now": now,
-                    "actor": created_by_user_id,
-                },
+                text(f"INSERT INTO service_catalog_items ({cols}) VALUES ({vals})"),
+                params,
             )
         row = conn.execute(
             text("SELECT * FROM service_catalog_items WHERE id = :id"),
