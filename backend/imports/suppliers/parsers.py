@@ -60,6 +60,14 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("rechtsanwaltsregister.org", "Rechtsanwaltskammer (RAK) + Partnerschaftsregister (DE)"),
     ("bstbk.de",              "Bundessteuerberaterkammer / regional StBK (DE)"),
     ("hamburg.de",            "Official public business register (DE)"),
+    # Ireland (ES-IE / Dublin) — statutory registers with no per-entity URL, admitted as
+    # PUBLIC_REGISTER (tier 2, staged `claimed`). `centralbank.ie` suffix also catches
+    # `registers.centralbank.ie`, which is where the bank rows actually cite.
+    ("lawsociety.ie",         "Law Society of Ireland — Find a Solicitor"),
+    ("cpaireland.ie",         "CPA Ireland — firm directory"),
+    ("centralbank.ie",        "Central Bank of Ireland — Register of Authorised Firms"),
+    ("tusla.ie",              "Tusla — Register of Independent Schools"),
+    ("psr.ie",                "PSRA — Register of Licensed Property Services Providers"),
 )
 
 

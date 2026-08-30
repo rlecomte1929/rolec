@@ -291,8 +291,13 @@ def test_missing_expiry_lowers_confidence():
 
 # ── source catalogue policy ──────────────────────────────────────────────────
 
-def test_all_ten_pairs_are_in_scope():
-    assert len(pairs_in_scope()) == 10
+def test_pairs_in_scope_is_corridors_x_categories():
+    # 4 corridors (FR-DE, FR-NO, ES-IE, NO-FR) x 6 categories (movers, housing_agencies,
+    # legal_admin, tax_finance, banks, schools). ES-IE/NO-FR + schools were added 2026-08-30
+    # for the Otto Dublin/Paris provider batches; not every pair has a source yet, which is
+    # what unavailable_reasons() and empty ingestable_sources() are for.
+    from backend.app.services.registry_sources import CORRIDORS, CATEGORIES
+    assert len(pairs_in_scope()) == len(CORRIDORS) * len(CATEGORIES) == 24
 
 
 def test_unavailable_sources_are_declared_not_hidden():
@@ -305,6 +310,21 @@ def test_unavailable_sources_are_declared_not_hidden():
         "substituting a weaker source, which the brief forbids"
     )
     assert sources_for("FR-DE", "housing_agencies"), "but the sources are still listed"
+
+
+def test_public_register_is_admitted_only_at_tier_2():
+    """A permalink-less statutory register (Option C, 2026-08-30) is the one source allowed to
+    skip entry_url_pattern — but only at tier 2, so its rows stage 'claimed' at reduced
+    confidence for the vetting-queue human to confirm."""
+    from backend.app.services.registry_sources import Acquisition, RegistrySource
+    with pytest.raises(ValueError, match="tier 2"):
+        RegistrySource(name="bad", base_url="https://x.ie/", tier=1,
+                       acquisition=Acquisition.PUBLIC_REGISTER,
+                       corridors=("ES-IE",), categories=("banks",))
+    ok = RegistrySource(name="ok", base_url="https://x.ie/", tier=2,
+                        acquisition=Acquisition.PUBLIC_REGISTER,
+                        corridors=("ES-IE",), categories=("banks",))
+    assert ok.entry_url_pattern is None  # the whole point: no per-entity URL, yet ingestable
 
 
 def test_unavailable_source_must_state_a_reason():

@@ -302,3 +302,45 @@ def test_dest_country_is_derived_from_the_corridor(corridor, expected):
 def test_dest_country_is_none_rather_than_junk(junk):
     """A corridor with no resolvable destination yields None — never a stored bad code."""
     assert _dest_iso_from_corridor(junk) is None
+
+
+# ── Irish statutory registers — PUBLIC_REGISTER (Option C, 2026-08-30) ─────────────────
+
+@pytest.mark.parametrize("url,expected_source", [
+    ("https://www.lawsociety.ie/Find-a-Solicitor/", "Law Society of Ireland — Find a Solicitor"),
+    ("https://www.cpaireland.ie/find-a-cpa/", "CPA Ireland — firm directory"),
+    # subdomain: the bank rows cite registers.centralbank.ie, caught by the centralbank.ie suffix
+    ("https://registers.centralbank.ie/", "Central Bank of Ireland — Register of Authorised Firms"),
+    ("https://www.tusla.ie/services/preschool-services/independent-schools/",
+     "Tusla — Register of Independent Schools"),
+    ("https://www.psr.ie/en/psra/register/",
+     "PSRA — Register of Licensed Property Services Providers"),
+])
+def test_irish_register_urls_map_to_their_register_not_self_declared(url, expected_source):
+    src = source_for_url(url)
+    assert src.name == expected_source
+    assert src.name != SELF_DECLARED
+
+
+def test_a_statutory_register_page_lands_despite_no_per_entity_url():
+    """Option C: PSRA/Tusla/Central Bank/Law Society expose no per-entity URL, so a row cites the
+    register page. It must LAND at tier 2 (claimed) rather than reject as "a search page evidences
+    nobody" — the /admin/vetting-queue human confirms it against the register."""
+    import os
+    import tempfile
+    csv_text = (
+        "corridor,service_category,company_name,website_url,source_name,source_url,"
+        "accreditation_body,accreditation_number,accreditation_expiry\n"
+        "ES-IE,housing_agencies,Savills Ireland,https://www.savills.ie,PSRA,"
+        "https://www.psr.ie/en/psra/register/,PSRA,001234,\n"
+    )
+    with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as fh:
+        fh.write(csv_text)
+        path = fh.name
+    try:
+        cand = list(read_csv(Path(path)))[0]
+        validate(cand)  # must NOT raise
+        assert effective_tier(cand.service_category, cand.source.tier) == 2
+        assert cand.country_code == "IE"
+    finally:
+        os.unlink(path)
