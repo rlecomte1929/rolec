@@ -1,0 +1,77 @@
+# Verifier source-authority configuration (V2).
+#
+# `rank` is the authority tier of the PUBLISHER, keyed by host:
+#   1  statutory body / government register — the thing itself
+#   2  public agency or institution that is not the statute's owner but publishes on its behalf
+#   3  practitioner or commercial explainer — never sufficient on its own
+#
+# WHY THIS IS SEPARATE FROM `parsers.classify_source`. That function answers a different,
+# coarser question — "is this publisher admissible at all" (official / semi_official /
+# unofficial), and it is the gate the importer already enforces. This file answers "how much
+# weight does it carry", which is what tiering (V8, a later phase) needs and which a
+# three-valued class cannot express. The verifier consults BOTH: `classify_source` decides
+# admission, this file decides rank. A host may be admissible and still rank 2.
+#
+# A host that is absent is not an error and not a rejection — it is `rank: null`, reported so
+# the gap is visible. Silently defaulting an unknown publisher to a rank would be inventing an
+# authority claim, which is the one thing this service exists to prevent.
+#
+# Keys are matched on the registrable host and on any subdomain of it, longest match winning,
+# so `www.skatteetaten.no` resolves from `skatteetaten.no`.
+
+settings:
+  # V2 liveness. A fetch failure is a WARNING, never a rejection: on 2026-08-22 a transient
+  # outage made a live HSE URL look dead and nearly retired a fact that was newer than its
+  # proposed replacements. Dead-looking sources go to a human, not to the bin.
+  fetch_timeout_s: 20.0
+  require_https: true
+
+hosts:
+  # ---- Norway (rank 1) ----
+  skatteetaten.no: 1        # Norwegian Tax Administration
+  udi.no: 1                 # Directorate of Immigration
+  lovdata.no: 1             # statute text
+  brreg.no: 1               # Brønnøysund register
+  politiet.no: 1
+  nav.no: 2                 # labour & welfare agency — administers, does not legislate
+  finanstilsynet.no: 1
+  altinn.no: 2
+
+  # ---- France (rank 1) ----
+  service-public.fr: 1
+  legifrance.gouv.fr: 1
+  urssaf.fr: 1
+  ameli.fr: 2
+  cleiss.fr: 2
+  caf.fr: 2
+
+  # ---- Ireland ----
+  irishimmigration.ie: 1     # ISD / immigration permissions
+  revenue.ie: 1              # tax
+  enterprise.gov.ie: 1       # DETE — employment permits (CSEP); the ES->IE batch's largest source
+  gov.ie: 1                  # the wider .gov.ie estate (dfa.ie, etc. publish here)
+  welfare.ie: 1
+  mywelfare.ie: 1            # PPSN allocation service (services.mywelfare.ie)
+  citizensinformation.ie: 2  # public info service, not the statute owner
+  hse.ie: 2                  # health service — administers, not statute owner
+  rtb.ie: 1
+
+  # ---- Spain ----
+  boe.es: 1                  # Boletín Oficial del Estado
+  seg-social.es: 1
+  agenciatributaria.es: 1
+  policia.es: 1
+  sepe.es: 1
+
+  # ---- Germany / Denmark ----
+  bamf.de: 1
+  bzst.de: 1
+  service.berlin.de: 2
+  skat.dk: 1
+  borger.dk: 2
+
+  # ---- Supranational ----
+  eur-lex.europa.eu: 1
+  ec.europa.eu: 1
+  europa.eu: 2
+  efta.int: 1
