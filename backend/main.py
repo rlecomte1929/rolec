@@ -210,6 +210,7 @@ from .app.routers import exception_requests as exception_requests_router
 from .app.routers import services_state as services_state_router
 from .app.routers import admin_catalog as admin_catalog_router
 from .app.routers import hr_catalog as hr_catalog_router
+from .app.routers import hr_company_invites as hr_company_invites_router
 from .app.routers import research_requests as research_requests_router  # [AIQ-1349 P2]
 from .app.routers import hr_vendor_widgets as hr_vendor_widgets_router
 from .app.routers import hr_case_detail as hr_case_detail_router
@@ -877,6 +878,7 @@ app.include_router(crons_router.router)  # [P4-4] cron endpoints
 app.include_router(exception_requests_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
+app.include_router(hr_company_invites_router.router)  # [AIQ-2094] HR raises a colleague invite
 app.include_router(hr_catalog_router.router)  # [AUDIT-C2.3] re-added — vendor curation, notification-counts (B16)
 app.include_router(research_requests_router.router)  # [AIQ-1349 P2] research-request intake
 app.include_router(hr_vendor_widgets_router.router)  # [B16/AIQ-422] bare-path vendor widget aliases

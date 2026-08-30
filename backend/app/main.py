@@ -71,6 +71,7 @@ from .routers import (
     hr_case_escalation,
     setup_assistant,
     hr_catalog,
+    hr_company_invites,
     hr_vendor_widgets,
     research_requests,
     hr_coordination,
@@ -178,6 +179,7 @@ def create_app() -> FastAPI:
 
     # ── Month-1 migration: HR cluster ─────────────────────────────────────────
     app.include_router(hr_catalog.router)
+    app.include_router(hr_company_invites.router)
     app.include_router(hr_vendor_widgets.router)  # [B16/AIQ-422] bare-path vendor widget aliases
     app.include_router(research_requests.router)  # [AIQ-1349 P2] research-request intake
     app.include_router(hr_coordination.router)
