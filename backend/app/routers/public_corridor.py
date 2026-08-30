@@ -58,6 +58,7 @@ from ...rate_limit import limiter
 from .. import crud
 from ..db import SessionLocal
 from ..services.disclaimers import IMMIGRATION_DISCLAIMER
+from ..services import lawyer_review_gate
 from ..services.nationality_class import classify_best
 from ..services.rules_engine import apply_rules
 # AIQ-1473b: single source of truth for ISO → catalog-name mapping. Imported
@@ -150,6 +151,17 @@ def _base_items(requirements: List[Any]) -> List[Dict[str, Any]]:
                 else None
             ),
             "verificationStatus": getattr(item, "verification_status", None),
+            # Served-with-a-caveat: flagged needs_lawyer_review AND not attested. getattr-safe
+            # so the SimpleNamespace test rows (which carry no JSON columns) degrade to False.
+            "legalReviewPending": lawyer_review_gate.legal_review_pending(
+                attestation_status=getattr(item, "attestation_status", None),
+                blobs=(
+                    getattr(item, "required_fields_json", None),
+                    getattr(item, "citations_json", None),
+                    getattr(item, "applies_to_assignment_types_json", None),
+                    getattr(item, "applies_to_nationality_classes_json", None),
+                ),
+            ),
             "attestationStatus": getattr(item, "attestation_status", None),
             "attestedBy": getattr(item, "attested_by", None),
             "attestedAt": getattr(item, "attested_at", None),

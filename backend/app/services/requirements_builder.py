@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 from .. import crud
 from ..db import SessionLocal
 from ..schemas import CaseRequirementsDTO, RequirementItemDTO, SourceRecordDTO
+from . import lawyer_review_gate
 from .disclaimers import DEFAULT_VERIFICATION_STATUS, IMMIGRATION_DISCLAIMER
 from .requirements_country_key import resolve_catalog_country, to_iso
 from .requirements_purpose_key import (
@@ -318,6 +319,16 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     else None
                 ),
                 "verificationStatus": getattr(item, "verification_status", None),
+                # Served-with-a-caveat: flagged needs_lawyer_review AND not attested.
+                "legalReviewPending": lawyer_review_gate.legal_review_pending(
+                    attestation_status=getattr(item, "attestation_status", None),
+                    blobs=(
+                        getattr(item, "required_fields_json", None),
+                        getattr(item, "citations_json", None),
+                        getattr(item, "applies_to_assignment_types_json", None),
+                        getattr(item, "applies_to_nationality_classes_json", None),
+                    ),
+                ),
                 # getattr-defaulted like its neighbours: test_public_corridor.py feeds
                 # SimpleNamespace rows that carry none of these columns.
                 "attestationStatus": getattr(item, "attestation_status", None),
@@ -356,6 +367,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     statusForCase=status,
                     citations=citations,
                     verificationStatus=item.get("verificationStatus"),
+                    legalReviewPending=item.get("legalReviewPending"),
         attestationStatus=item.get("attestationStatus"),
         attestedBy=item.get("attestedBy"),
         attestedAt=item.get("attestedAt"),

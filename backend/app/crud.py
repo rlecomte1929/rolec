@@ -401,40 +401,26 @@ def list_requirements(
     `include_unapproved=True` is for the admin review surface, which must obviously see the
     rows it is being asked to approve.
 
-    Second withhold, same gate: a row carrying an unresolved `needs_lawyer_review` flag is held
-    back until it is `attestation_status='attested'` — the identical `blocks_approval` rule the
-    approve endpoint enforces (`admin.py`), applied here so a row approved *before* that gate
-    existed cannot keep serving unattested. Applied only on the serving path; the admin review
-    surface (`include_unapproved=True`) still sees it so counsel can be requested and it can be
-    attested. It is a JSON-blob walk, not SQL, so it filters in Python after the query — safe
-    because a country's requirement set is small and the list is effectively unpaginated
-    (limit 500). See `services/lawyer_review_gate.py` and
-    `docs/compliance/counsel-attestation-lane-2026-08-30.md`.
+    A `needs_lawyer_review`-flagged, un-attested row is NOT withheld here — it is served with a
+    caveat instead. #2131 withheld it; that removed real, grounded content from users. The
+    serving layer now sets `legalReviewPending=True` on such a row (see
+    `services/lawyer_review_gate.legal_review_pending`, computed in `public_corridor._base_items`
+    and `requirements_builder`), and the UI badges it "Legal review pending — not independently
+    legal-reviewed." Honest (the flag means exactly that) and higher coverage than a blank.
+    Approval still blocks on the same flag at `admin.py`; only the *serving* treatment changed
+    from withhold to badge. See `docs/compliance/counsel-attestation-lane-2026-08-30.md`.
     """
-    from .services import lawyer_review_gate
-
     query = db.query(models.RequirementItem).filter(models.RequirementItem.country_code == country_code)
     if purpose:
         query = query.filter(models.RequirementItem.purpose == purpose)
     if not include_unapproved:
         query = query.filter(models.RequirementItem.review_status == "approved")
-    rows = query.order_by(models.RequirementItem.id.desc()).all()
-    if not include_unapproved:
-        rows = [
-            r
-            for r in rows
-            if not lawyer_review_gate.blocks_approval(
-                attestation_status=r.attestation_status,
-                blobs=(
-                    r.required_fields_json,
-                    r.citations_json,
-                    r.applies_to_assignment_types_json,
-                    r.applies_to_nationality_classes_json,
-                ),
-            )
-        ]
-    start = max(0, offset)
-    return rows[start : start + max(1, min(limit, 1000))]
+    return (
+        query.order_by(models.RequirementItem.id.desc())
+        .offset(max(0, offset))
+        .limit(max(1, min(limit, 1000)))
+        .all()
+    )
 
 
 def create_snapshot(db: Session, payload: Dict[str, Any]) -> models.CaseRequirementsSnapshot:

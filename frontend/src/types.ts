@@ -499,6 +499,10 @@ export interface RequirementItemDTO {
   // what the backend constants and every doc comment say. Both are accepted until the two
   // are normalised — see the PROVENANCE map in RequirementList.tsx.
   verificationStatus?: 'representative' | 'corpus_grounded' | 'expert_verified' | 'verified' | null;
+  // Served-with-a-caveat: the claim was flagged `needs_lawyer_review` and has no counsel
+  // attestation yet, so it renders with a "Legal review pending" badge. true only when the
+  // caveat applies; false/null when it was never flagged (or has since been attested).
+  legalReviewPending?: boolean | null;
   // Counsel attestation. A SEPARATE axis from verificationStatus, not a further rung on it:
   // ours is provenance, this is external legal sign-off. null = no counsel has looked.
   attestationStatus?: 'requested' | 'attested' | 'stale' | null;

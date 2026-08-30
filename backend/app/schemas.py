@@ -128,6 +128,11 @@ class RequirementItemDTO(BaseModel):
     citations: List[SourceRecordDTO]
     # AIQ-1349: provenance level for this requirement.
     verificationStatus: Optional[str] = None
+    # True when the row carries an unresolved `needs_lawyer_review` flag and no counsel
+    # attestation yet: it is SERVED, but the UI badges it "Legal review pending — not
+    # independently legal-reviewed." Honest caveat, not a claim anyone reviewed it. Drops to
+    # False/None once `attestation_status='attested'`. See services/lawyer_review_gate.py.
+    legalReviewPending: Optional[bool] = None
     # A real obligation the person would not anticipate. Optional, not `bool = False`:
     # an engine-synthesised item has no such data, and null ("not modeled") must stay
     # distinguishable from false ("modeled, and it is obvious").

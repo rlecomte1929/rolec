@@ -104,3 +104,14 @@ def is_attested(attestation_status: Optional[str]) -> bool:
 def blocks_approval(*, attestation_status: Optional[str], blobs: tuple) -> bool:
     """The gate: flagged AND not attested."""
     return carries_lawyer_review_flag(*blobs) and not is_attested(attestation_status)
+
+
+def legal_review_pending(*, attestation_status: Optional[str], blobs: tuple) -> bool:
+    """Serving-side twin of `blocks_approval` — same predicate (flagged AND not attested),
+    named for what the serving layer does with it: instead of WITHHOLDING the row, it serves
+    it and the response carries `legalReviewPending=True` so the UI badges it "Legal review
+    pending — not independently legal-reviewed." A true, honest caveat (the flag literally
+    means a lawyer should confirm this), not a claim that anyone reviewed it. Once
+    `attestation_status='attested'` this returns False and the caveat drops.
+    """
+    return blocks_approval(attestation_status=attestation_status, blobs=blobs)

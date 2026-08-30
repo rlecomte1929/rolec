@@ -99,6 +99,22 @@ const attestationBadge = (
 const nonObviousBadge = (nonObvious: RequirementItemDTO['nonObvious']) =>
   nonObvious ? <Badge variant="warning" size="sm">Easy to miss</Badge> : null;
 
+/**
+ * The honest inverse of the attestation badge. The row IS served, but its underlying claim was
+ * flagged `needs_lawyer_review` and no counsel attestation exists yet — so we say so plainly
+ * rather than either hide the (real, cited) content or imply a review that did not happen.
+ * `attested` earns "Counsel-attested"; flagged-and-un-attested earns this caution. Only `true`
+ * renders; null/false means the claim was never flagged for legal review.
+ */
+const legalReviewPendingBadge = (pending: RequirementItemDTO['legalReviewPending']) =>
+  pending ? (
+    <span title="Not independently legal-reviewed — confirm with a qualified legal adviser before relying on it.">
+      <Badge variant="warning" size="sm" data-testid="legal-review-pending-badge">
+        Legal review pending
+      </Badge>
+    </span>
+  ) : null;
+
 /** Free text, not a date — the source phrases deadlines against events we do not model. */
 const timingLine = (timing: RequirementItemDTO['timing']) =>
   timing ? (
@@ -164,6 +180,7 @@ export const RequirementList: React.FC<RequirementListProps> = ({ items, onActio
                   {nonObviousBadge(item.nonObvious)}
                   {provenanceBadge(item.verificationStatus)}
                   {attestationBadge(item.attestationStatus, item.attestedBy)}
+                  {legalReviewPendingBadge(item.legalReviewPending)}
                 </div>
               </div>
               {/* These four were rendered unconditionally, but no caller has ever

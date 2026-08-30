@@ -79,3 +79,30 @@ describe('RequirementList counsel-attestation badge', () => {
     expect(screen.getByText('Counsel-attested')).toBeTruthy();
   });
 });
+
+/**
+ * "Legal review pending" — a served row whose claim was flagged needs_lawyer_review with no
+ * attestation yet. The honest middle ground between hiding real content and implying a review
+ * that never happened. Only `true` renders; it must never claim more than "not yet reviewed".
+ */
+describe('RequirementList legal-review-pending badge', () => {
+  it('shows the caveat when the claim is flagged and un-attested', () => {
+    render(<RequirementList items={[item({ legalReviewPending: true })]} />);
+    expect(screen.getByText('Legal review pending')).toBeTruthy();
+  });
+
+  it('renders NOTHING when the claim was never flagged for legal review', () => {
+    render(<RequirementList items={[item({ legalReviewPending: false })]} />);
+    expect(screen.queryByTestId('legal-review-pending-badge')).toBeNull();
+  });
+
+  it('renders NOTHING when the field is absent', () => {
+    render(<RequirementList items={[item({})]} />);
+    expect(screen.queryByTestId('legal-review-pending-badge')).toBeNull();
+  });
+
+  it('does not imply counsel: the caveat is not the attestation badge', () => {
+    render(<RequirementList items={[item({ legalReviewPending: true })]} />);
+    expect(screen.queryByText('Counsel-attested')).toBeNull();
+  });
+});
