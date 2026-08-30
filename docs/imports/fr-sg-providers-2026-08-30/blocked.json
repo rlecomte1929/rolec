@@ -1,0 +1,42 @@
+[
+  {
+    "register_name": "MAS Financial Institutions Directory – JSON API",
+    "url": "https://eservices.mas.gov.sg/fid/institution/getList",
+    "reason": "Endpoint returns 404 / page not found. Individual institution detail pages are accessible but the aggregate JSON list endpoint is not."
+  },
+  {
+    "register_name": "CEA Public Register (ACEAS) – Agency Search (old URL)",
+    "url": "https://eservices.cea.gov.sg/prs/internet/agencySearch/showSearchForAgency.action",
+    "reason": "Returns HTTP 404 (DOSarrest). Legacy PRS URL no longer valid; new ACEAS portal at eservices.cea.gov.sg/aceas/ returns empty on fetch (JS-rendered SPA). Licence numbers confirmed via search-result snippets; no per-agency record URL could be scraped."
+  },
+  {
+    "register_name": "ISCA Find a Member",
+    "url": "https://isca.org.sg/membership/find-a-member/",
+    "reason": "Page loads navigation/shell only. Member search is a JS-rendered form; scraper returned an error page with no results. KPMG and EY included in providers.csv via ACRA company register confirmation and confirmed public accounting status, not via ISCA search."
+  },
+  {
+    "register_name": "ACRA List of Public Accounting Firms",
+    "url": "https://www.acra.gov.sg/public-accounting-firms/list-of-public-accounting-firms",
+    "reason": "Returns 404. Page has been removed or moved. ACRA company register (main site) is live but the public accounting firm list sub-page is not accessible."
+  },
+  {
+    "register_name": "MOE International Schools List",
+    "url": "https://www.moe.gov.sg/international-schools",
+    "reason": "Fetch returned no text (JS-rendered page). Schools included in providers.csv (IFS, UWCSEA) confirmed via direct school websites and independent sources citing MOE/CPE registration."
+  },
+  {
+    "register_name": "CPE Listing of Registered Private Education Institutions",
+    "url": "https://www.cpe.gov.sg/programmes-and-institutions/listing-of-registered-private-education-institutions",
+    "reason": "Not fetched -- CPE site known to be JS-rendered. Schools confirmed via official school websites and MOE references instead."
+  },
+  {
+    "register_name": "FIDI Affiliate Search (country-filtered)",
+    "url": "https://www.fidi.org/fidi-members?country=Singapore",
+    "reason": "URL returns 404 (page not found). Alternative URL https://www.fidi.org/find-fidi-affiliate?country=113 loads the full global list but country filter is applied client-side in JS -- Singapore results not extractable via scraper. Per-affiliate record pages (e.g. /find-fidi-affiliate/asian-tigers-singapore) render correctly and were used instead."
+  },
+  {
+    "register_name": "IAM Singapore Member Search",
+    "url": "https://www.iamovers.org/SingaporeMemberSearch",
+    "reason": "URL not attempted after FIDI per-affiliate pages confirmed 5 Singapore FAIM-accredited movers with direct register URLs. IAM search added to blocked log as a precaution."
+  }
+]

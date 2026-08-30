@@ -44,7 +44,7 @@ from typing import Dict, List, Optional, Tuple
 # batches for the two demo corridors came in. Note `validate()` does NOT gate on corridor — this
 # tuple only bounds which (corridor, category) pairs the run report and source metadata cover, so
 # adding a corridor never loosens validation; it just lets a source declare it honestly.
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -524,6 +524,67 @@ SOURCES: Tuple[RegistrySource, ...] = (
         notes="The Paris bar — inscription is mandatory to practise there. The annuaire is a search "
               "form with no per-entity URL, so it takes PUBLIC_REGISTER (tier 2, claimed): the "
               "vetter confirms the avocat on the roll by name.",
+    ),
+    # ── Singapore (FR-SG / Adrien) ────────────────────────────────────────────
+    # Otto's FR-SG sourcing (2026-08-30) reached MAS FID and FIDI per-entity pages directly; the
+    # rest (CEA/ACEAS, Law Society, ACRA, MOE/CPE) are JS-rendered SPAs that only answer a search
+    # form, so they take PUBLIC_REGISTER (tier 2, staged `claimed`) exactly like the Dublin set.
+    # MAS is the exception — its /fid/institution/detail/<id> pages ARE per-entity, so it is a
+    # normal HTTP_LISTING with a real entry_url_pattern.
+    RegistrySource(
+        name="MAS Financial Institutions Directory",
+        base_url="https://eservices.mas.gov.sg/fid",
+        tier=1,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("FR-SG",),
+        categories=("banks",),
+        # /fid/institution/detail/3064-BNP-PARIBAS — one page per authorised institution.
+        entry_url_pattern=r"/fid/institution/detail/",
+        notes="Monetary Authority of Singapore — the statutory register of licensed financial "
+              "institutions. Per-entity detail pages render server-side. Banks are capped at tier 2 "
+              "by effective_tier regardless — identity/licence confirmation, not banking fitness.",
+    ),
+    RegistrySource(
+        name="CEA Public Register (ACEAS)",
+        base_url="https://eservices.cea.gov.sg/aceas/public-register/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("FR-SG",),
+        categories=("housing_agencies",),
+        notes="Council for Estate Agencies — the mandatory register of licensed estate agencies "
+              "(every agency carries a CEA licence no., e.g. L3008022J). JS SPA with no reliable "
+              "per-entity URL; vetter confirms the agency by licence number.",
+    ),
+    RegistrySource(
+        name="Law Society of Singapore — Find a Lawyer",
+        base_url="https://www.lawsociety.org.sg/for-public/find-a-lawyer/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("FR-SG",),
+        categories=("legal_admin",),
+        notes="The Singapore bar — membership is mandatory to practise. Search form / featured "
+              "directory, no per-entity URL; vetter confirms the firm on the roll by name.",
+    ),
+    RegistrySource(
+        name="ACRA Company Register",
+        base_url="https://www.acra.gov.sg/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("FR-SG",),
+        categories=("tax_finance",),
+        notes="Accounting & Corporate Regulatory Authority — the statutory company register (and "
+              "public-accounting-firm registrar). Per-entity records are behind the BizFile+ portal, "
+              "so this takes PUBLIC_REGISTER; vetter confirms the firm/UEN in BizFile+.",
+    ),
+    RegistrySource(
+        name="MOE International Schools List",
+        base_url="https://www.moe.gov.sg/international-schools",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("FR-SG",),
+        categories=("schools",),
+        notes="Ministry of Education list of international schools (CPE-registered private education "
+              "institutions). JS-rendered index, no per-school URL; vetter confirms the school by name.",
     ),
 )
 

@@ -1,0 +1,21 @@
+corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry
+FR-SG,banks,BNP Paribas,https://www.bnpparibas.com.sg,MAS Financial Institutions Directory,https://eservices.mas.gov.sg/fid/institution/detail/3064-BNP-PARIBAS,MAS,,
+FR-SG,banks,Société Générale,https://www.sgcib.com,MAS Financial Institutions Directory,https://eservices.mas.gov.sg/fid/institution/detail/3103-SOCIETE-GENERALE,MAS,,
+FR-SG,banks,Crédit Agricole Corporate and Investment Bank,https://www.ca-cib.com,MAS Financial Institutions Directory,https://eservices.mas.gov.sg/fid/institution/detail/3082-CREDIT-AGRICOLE-CORPORATE-AND-INVESTMENT-BANK,MAS,,
+FR-SG,banks,HSBC Bank (Singapore) Limited,https://www.hsbc.com.sg,MAS Financial Institutions Directory,https://eservices.mas.gov.sg/fid/institution/detail/200568-HSBC-BANK-SINGAPORE-LIMITED,MAS,,
+FR-SG,movers,Asian Tigers Singapore,https://www.asiantigersgroup.com,FIDI Affiliate Directory,https://www.fidi.org/find-fidi-affiliate/asian-tigers-singapore,FIDI,FAIM,2029
+FR-SG,movers,Santa Fe Relocation Services (S) Pte Ltd,https://www.santaferelo.com,FIDI Affiliate Directory,https://www.fidi.org/find-fidi-affiliate/santa-fe-relocation-singapore,FIDI,FAIM,2029
+FR-SG,movers,AGS Four Winds International Relocations Pte Ltd,https://www.agsmovers.com,FIDI Affiliate Directory,https://www.fidi.org/find-fidi-affiliate/ags-four-winds-singapore,FIDI,FAIM,2028
+FR-SG,movers,Allied Moving Services (S) Pte Ltd,https://www.allied.com/sg/,FIDI Affiliate Directory,https://www.fidi.org/find-fidi-affiliate/allied-moving-services-singapore,FIDI,FAIM,2027
+FR-SG,movers,Classic Moving & Storage Pte Ltd,https://classicmoving.asia,FIDI Affiliate Directory,https://www.fidi.org/find-fidi-affiliate/classic-moving-storage,FIDI,FAIM,2028
+FR-SG,legal_admin,WongPartnership LLP,https://www.wongpartnership.com,Law Society of Singapore – Find a Featured Lawyer/Law Firm,https://www.lawsociety.org.sg/for-public/find-a-lawyer/,Law Society of Singapore,,
+FR-SG,legal_admin,Rajah & Tann Singapore LLP,https://www.rajahtannasia.com,Law Society of Singapore – Find a Featured Lawyer/Law Firm,https://www.lawsociety.org.sg/for-public/find-a-lawyer/,Law Society of Singapore,,
+FR-SG,legal_admin,Drew & Napier LLC,https://www.drewnapier.com,Law Society of Singapore – Find a Featured Lawyer/Law Firm,https://www.lawsociety.org.sg/for-public/find-a-lawyer/,Law Society of Singapore,,
+FR-SG,tax_finance,KPMG Services Pte Ltd,https://kpmg.com/sg/en/home.html,ACRA Company Register (Registration No: 200003956G),https://www.acra.gov.sg/,,
+FR-SG,tax_finance,Ernst & Young Solutions LLP,https://www.ey.com/en_sg,ACRA Company Register (public accounting firm),https://www.acra.gov.sg/,,
+FR-SG,housing_agencies,PropNex Realty Pte Ltd,https://www.propnex.com,CEA Public Register (ACEAS),https://eservices.cea.gov.sg/aceas/public-register/,CEA,L3008022J,
+FR-SG,housing_agencies,ERA Realty Network Pte Ltd,https://www.era.com.sg,CEA Public Register (ACEAS),https://eservices.cea.gov.sg/aceas/public-register/sales/1/496f4788-8d2f-4e55-8b5e-4774b3456af9/sales,CEA,L3002382K,
+FR-SG,housing_agencies,OrangeTee & Tie Pte Ltd,https://www.orangetee.com,CEA Public Register (ACEAS),https://eservices.cea.gov.sg/aceas/public-register/,CEA,L3009250K,
+FR-SG,housing_agencies,Vesper Homes Pte Ltd,https://vesperhomes.com,CEA Public Register (ACEAS),https://eservices.cea.gov.sg/aceas/public-register/,CEA,L3010860D,
+FR-SG,schools,International French School (Singapore),https://www.ifs.edu.sg,MOE International Schools List / CPE,https://www.moe.gov.sg/international-schools,CPE / French Ministry of Education,,
+FR-SG,schools,United World College of South East Asia (UWCSEA),https://www.uwcsea.edu.sg,MOE International Schools List,https://www.moe.gov.sg/international-schools,CPE,,
