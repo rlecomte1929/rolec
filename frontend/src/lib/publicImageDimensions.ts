@@ -15,14 +15,14 @@
  * (e2e/cls.spec.ts) is what catches a mismatch.
  */
 export const PUBLIC_IMAGE_DIMENSIONS: Record<string, { width: number; height: number }> = {
-  '/screenshot-hero-case-card.png': { width: 1400, height: 840 },
+  '/screenshot-hero-case-card.png': { width: 1200, height: 720 },
   '/screenshot-hr-assignments.png': { width: 1024, height: 444 },
   '/screenshot-employee-plan.png': { width: 992, height: 847 },
   '/screenshot-destination-intelligence.png': { width: 1040, height: 669 },
   '/screenshot-provider-recommendations.png': { width: 1040, height: 701 },
   '/screenshot-service-package.png': { width: 660, height: 314 },
-  '/relopass-logo.png': { width: 122, height: 128 },
-  '/relopass-full-logo.png': { width: 200, height: 300 },
+  '/relopass-logo.png': { width: 80, height: 84 },
+  '/relopass-full-logo.png': { width: 128, height: 192 },
 };
 
 /**
