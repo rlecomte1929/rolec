@@ -58,7 +58,7 @@ from ...rate_limit import limiter
 from .. import crud
 from ..db import SessionLocal
 from ..services.disclaimers import IMMIGRATION_DISCLAIMER
-from ..services.nationality_class import classify
+from ..services.nationality_class import classify_best
 from ..services.rules_engine import apply_rules
 # AIQ-1473b: single source of truth for ISO → catalog-name mapping. Imported
 # (not duplicated) so this endpoint stays in sync if the catalog naming changes.
@@ -181,6 +181,13 @@ def corridor_requirements(
                     "Omit it and the response is filtered as THIRD_COUNTRY, the most demanding "
                     "track, which can only ever over-show.",
     ),
+    second_nationality: Optional[str] = Query(
+        None, max_length=40,
+        description="A second nationality, if the traveller holds one. Rights are cumulative: "
+                    "a Venezuelan/Italian citizen moving to Ireland exercises Italian free "
+                    "movement, so the response is filtered on whichever passport gives the "
+                    "most favourable class. Omit it for a single-national traveller.",
+    ),
 ) -> JSONResponse:
     """Generic, non-PII requirement set for (destination, employee_type). No auth."""
     etype = (employee_type or "").strip().upper()
@@ -191,16 +198,34 @@ def corridor_requirements(
         raise HTTPException(status_code=422, detail=f"purpose must be one of {sorted(_VALID_PURPOSES)}")
 
     dest_catalog = resolve_catalog_country(to)
-    # Minimal, PII-free draft. `destCountry` and `nationality` are here so the engine's
-    # nationality gate can run: without them `classify()` returns None and every response
+    # Minimal, PII-free draft. `destCountry` and the nationalities are here so the engine's
+    # nationality gate can run: without them `classify_best()` returns None and every response
     # falls back to THIRD_COUNTRY. A nationality alone is not personal data — no name, no
     # document, no case is involved.
+    #
+    # `second_nationality` is passed under the same key the case-scoped path uses, because
+    # `apply_rules` already reads BOTH (rules_engine.py → classify_best). Before this, a dual
+    # national could not be represented here at all: the parameter did not exist, so a
+    # Venezuelan/Italian was filtered as a third-country national and shown a permit track
+    # they must not apply for. The engine was always right; it was never given the second value.
+    profile: dict = {}
+    if nationality:
+        profile["nationality"] = nationality
+    if second_nationality:
+        profile["second_nationality"] = second_nationality
     draft = {
         "relocationBasics": {"purpose": purp, "destCountry": to},
         "assignmentContext": {"assignmentType": etype},
-        "employeeProfile": ({"nationality": nationality} if nationality else {}),
+        "employeeProfile": profile,
     }
-    applied_class = classify(nationality, to) if nationality else None
+    # Echo the class the engine will actually apply. `classify_best` mirrors apply_rules
+    # exactly; using `classify(nationality)` here would report a different class from the one
+    # that filtered the payload whenever a second nationality is the more favourable one.
+    applied_class = (
+        classify_best((nationality, second_nationality), to)
+        if (nationality or second_nationality)
+        else None
+    )
 
     with SessionLocal() as db:
         base_items = _base_items(crud.list_requirements(db, dest_catalog, purp))
