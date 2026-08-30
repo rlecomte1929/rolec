@@ -45,6 +45,7 @@ if str(_REPO_ROOT) not in sys.path:
 from backend.imports.otto.verifier import (  # noqa: E402
     REJECT,
     Verdict,
+    check_evidence_grounding,
     load_config,
     summarise,
     verify_lines,
@@ -60,17 +61,28 @@ OK = "fetched"
 SKIPPED = "not_fetched"
 
 
-def _fetch_liveness(verdicts: List[Verdict], timeout_s: float) -> Dict[str, str]:
-    """V2 liveness for the distinct URLs still in play. Never rejects — see the note below.
+def _fetch_liveness(verdicts: List[Verdict], timeout_s: float) -> Dict[str, Dict[str, Any]]:
+    """Fetch the distinct URLs still in play, once, and KEEP the parsed text.
 
     Reuses `backfill_fact_evidence.fetch_and_parse`, which already honours robots.txt, rotates
     user agents, rate-limits per host, and distinguishes "every identity was refused" from "there
     is nothing there". Writing a second fetcher here would get that distinction wrong, and the
     distinction is the whole reason a dead-looking source is a warning rather than a rejection.
+
+    Returns `{url: {"status", "text", "ok", "reason"}}`. It used to return just the status string
+    and throw the page away, which meant V3 quote grounding would have had to fetch every source a
+    second time. Keeping the text makes V3 free.
+
+    ROBOTS. This passed `limiter=` but not `robots=`, so `fetch_and_parse`'s robots check —
+    guarded by `robots is not None` — never ran, and the docstring above claimed otherwise.
+    Observed fetching `lovdata.no`, which disallows crawlers. Now passes a policy. The effect is
+    MORE `source_unreadable` warnings, which is correct: a source we are not allowed to read is a
+    source we cannot verify a quote against, and saying so is the honest outcome.
     """
     try:
         from backend.scripts.backfill_fact_evidence import (  # noqa: WPS433
             HostRateLimiter,
+            RobotsPolicy,
             fetch_and_parse,
             fetch_status_for,
         )
@@ -85,14 +97,42 @@ def _fetch_liveness(verdicts: List[Verdict], timeout_s: float) -> Dict[str, str]
     if not urls:
         return {}
 
-    limiter = HostRateLimiter()
-    out: Dict[str, str] = {}
+    limiter, robots = HostRateLimiter(), RobotsPolicy()
+    out: Dict[str, Dict[str, Any]] = {}
     for url in urls:
         try:
-            out[url] = fetch_status_for(fetch_and_parse(url, limiter=limiter))
+            res = fetch_and_parse(url, robots=robots, limiter=limiter)
+            out[url] = {
+                "status": fetch_status_for(res),
+                "text": res.get("text") or "",
+                "ok": bool(res.get("ok")),
+                "reason": str(res.get("reason") or ""),
+            }
         except Exception as exc:  # noqa: BLE001 - a fetch failure is data, not a crash
-            out[url] = f"error_{type(exc).__name__}"
+            out[url] = {"status": f"error_{type(exc).__name__}", "text": "", "ok": False,
+                        "reason": f"error_{type(exc).__name__}"}
     return out
+
+
+def _apply_grounding(verdicts: List[Verdict], pages: Dict[str, Dict[str, Any]]) -> None:
+    """V3: append quote-grounding findings, in place, using the pages already fetched.
+
+    Skips rows already rejected by V0-V2 — a line that will not be imported does not need a
+    fourth reason, and folding one in inflates every count in the report.
+    """
+    for v in verdicts:
+        if v.record is None or v.rejected:
+            continue
+        url = str(v.record.get("source_url") or "")
+        page = pages.get(url)
+        if page is None:
+            continue  # no fetch was attempted (no url, or liveness was skipped)
+        findings, verified, offset = check_evidence_grounding(
+            v.record, page["text"], fetch_ok=page["ok"], fetch_reason=page["reason"],
+        )
+        v.findings.extend(findings)
+        v.evidence_verified = verified
+        v.evidence_offset = offset
 
 
 def _write(path: Path, lines: List[str]) -> None:
@@ -131,20 +171,25 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"::error::{ledger} contains no records. An empty batch is not a clean batch.")
         return 1
 
-    liveness: Dict[str, str] = {}
+    liveness: Dict[str, Dict[str, Any]] = {}
     if not args.no_fetch:
         print(f"V2 liveness: fetching distinct sources (timeout "
               f"{cfg['settings'].get('fetch_timeout_s', 20.0)}s) ...")
         liveness = _fetch_liveness(verdicts, cfg["settings"].get("fetch_timeout_s", 20.0))
+        # V3 runs on the text that fetch just produced — no second request. It must happen
+        # BEFORE summarise(), or its findings are not counted in the report they justify.
+        _apply_grounding(verdicts, liveness)
 
     summary = summarise(verdicts)
     summary["liveness_checked"] = bool(liveness)
     if liveness:
-        summary["sources_checked"] = len(liveness)
-        summary["sources_fetched"] = sum(1 for s in liveness.values() if s == OK)
-        summary["sources_skipped"] = sum(1 for s in liveness.values() if s == SKIPPED)
-        summary["sources_failed"] = sum(
-            1 for s in liveness.values() if s not in (OK, SKIPPED))
+        statuses = [p["status"] for p in liveness.values()]
+        summary["sources_checked"] = len(statuses)
+        summary["sources_fetched"] = sum(1 for s in statuses if s == OK)
+        summary["sources_skipped"] = sum(1 for s in statuses if s == SKIPPED)
+        summary["sources_failed"] = sum(1 for s in statuses if s not in (OK, SKIPPED))
+        summary["quotes_verified"] = sum(1 for v in verdicts if v.evidence_verified is True)
+        summary["quotes_not_on_page"] = sum(1 for v in verdicts if v.evidence_verified is False)
 
     # ---------------- report ----------------
     print(f"\nledger: {ledger}")
@@ -169,16 +214,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"\nV2 liveness: {summary['sources_fetched']} fetched, "
               f"{summary['sources_skipped']} skipped by robots.txt, "
               f"{summary['sources_failed']} failed (of {summary['sources_checked']} distinct).")
+        print(f"V3 evidence: {summary.get('quotes_verified', 0)} quote(s) confirmed on the cited "
+              f"page, {summary.get('quotes_not_on_page', 0)} rejected as not on it.")
         if summary["sources_skipped"]:
             # `not_fetched` means we chose not to ask. Folding it in with real failures would
             # report a healthy source as dead, which is the mistake this line exists to avoid.
-            for url in sorted(u for u, st in liveness.items() if st == SKIPPED)[:_SAMPLE]:
+            for url in sorted(u for u, p in liveness.items() if p["status"] == SKIPPED)[:_SAMPLE]:
                 print(f"      robots-skipped   {url[:96]}")
         if summary["sources_failed"]:
             print("  ! failures are reported, NOT rejected — a transient outage has faked a "
                   "dead source before (2026-08-22, a live HSE URL).")
-            for url in sorted(u for u, st in liveness.items() if st not in (OK, SKIPPED))[:_SAMPLE]:
-                print(f"      {liveness[url]:16} {url[:96]}")
+            for url in sorted(u for u, p in liveness.items()
+                              if p["status"] not in (OK, SKIPPED))[:_SAMPLE]:
+                print(f"      {liveness[url]['status']:16} {url[:96]}")
 
     rejects = [v for v in verdicts if v.rejected]
     if rejects:
