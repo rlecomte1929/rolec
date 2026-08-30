@@ -280,11 +280,60 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> str:
                 logger.exception("dossier: HR profile lookup failed id=%s", user_id)
         return False
 
+    # AIQ-2031: an HR-created case lives in public.relocation_cases (hr_user_id +
+    # company_id) from the moment it is created — BEFORE any employee is assigned,
+    # so there is no case_assignments row and no public.cases row yet. Without this
+    # branch GET /api/cases/{id} 404s for the very HR user who created the case,
+    # while PATCH (create-on-missing) and GET /api/hr/cases/{id} both succeed.
+    # Grants the creator (hr_user_id), a directly-linked employee, same-company HR,
+    # and admin; anyone else 403; unknown id 404. relocation_cases.id IS the
+    # canonical case id, so resolving to it keeps case-scoped SQL keyed correctly.
+    def _relocation_case_access() -> Optional[bool]:
+        nonlocal resolved_id
+        try:
+            with main_db.engine.connect() as conn:
+                rc = conn.execute(
+                    _sql_text(
+                        f"SELECT id, hr_user_id, employee_id, company_id "
+                        f"FROM {_pg_table('relocation_cases')} WHERE CAST(id AS TEXT) = :id"
+                    ),
+                    {"id": case_id},
+                ).mappings().first()
+        except Exception:
+            logger.exception("dossier: failed to query relocation_cases for access check id=%s", case_id)
+            return None
+        if rc is None:
+            return None
+        resolved_id = str(rc.get("id") or case_id)
+        if _owns(rc.get("hr_user_id")) or _owns(rc.get("employee_id")) or is_admin:
+            return True
+        if role == "HR":
+            try:
+                with main_db.engine.connect() as conn:
+                    prof = conn.execute(
+                        _sql_text(
+                            f"SELECT company_id FROM {_pg_table('profiles')} WHERE CAST(id AS TEXT) = :id"
+                        ),
+                        {"id": str(auth_uuid or user_id or "")},
+                    ).mappings().first()
+                if prof and str(prof.get("company_id") or "") == str(rc.get("company_id") or ""):
+                    return True
+            except Exception:
+                logger.exception("dossier: HR profile lookup (relocation_cases) failed id=%s", user_id)
+        return False
+
     if not row:
         granted = _assignment_access()
         if granted:
             return _resolved()
         if granted is False:
+            raise HTTPException(status_code=403, detail="Not authorised for this case")
+        # AIQ-2031: no public.cases row and no assignment yet — fall back to the
+        # relocation_cases row (HR-created case, pre-assignment).
+        rc_access = _relocation_case_access()
+        if rc_access:
+            return _resolved()
+        if rc_access is False:
             raise HTTPException(status_code=403, detail="Not authorised for this case")
         raise HTTPException(status_code=404, detail="Case not found")
 
