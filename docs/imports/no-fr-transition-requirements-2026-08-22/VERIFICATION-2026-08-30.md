@@ -37,6 +37,23 @@ not an official *rule*.
 | `no_fr_ss_a1_issued_by_france` | `https://www.urssaf.fr` |
 | `no_fr_treaty_art15_allocation_counsel` | `https://www.impots.gouv.fr` |
 
+**Resolved 2026-08-30 (this PR).** All 6 bare-domain URLs re-sourced to the deep link that
+states the rule, per recommendation 1 below — each page fetched and confirmed on-topic before use:
+
+| fact_key | new source_url |
+|---|---|
+| `no_fr_fodselsnummer_not_dnumber` | `https://www.skatteetaten.no/en/person/national-registry/identitetsnummer-og-elektronisk-id/fodselsnummer/` |
+| `no_fr_norway_source_tax_counsel` | `https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/abroad/tax-residence-in-norway-when-moving-to-or-from-norway/` |
+| `no_fr_health_day_one_route_counsel` | `https://www.ameli.fr/assure/droits-demarches/principes/protection-universelle-maladie` |
+| `no_fr_health_two_cpam_routes_exist` | `https://www.ameli.fr/assure/droits-demarches/principes/protection-universelle-maladie` |
+| `no_fr_ss_a1_issued_by_france` | `https://www.urssaf.fr/accueil/services/services-employeurs/service-firmes-etrangeres.html` |
+| `no_fr_treaty_art15_allocation_counsel` | `https://www.impots.gouv.fr/les-conventions-internationales` |
+
+This clears the citations-specificity ratchet (`scripts/tests/test_check_otto_batches_citations.py`),
+which #2100 had left red on `main` — blocking every PR. The **DO NOT PROMOTE** verdict still
+stands: it turns on the separate quote-grounding gate below (3/15 quotes verified), which this
+URL fix does not by itself discharge.
+
 ### Why all 15 still read `auto_accepted`
 
 They predate the gate by a day. The rows were staged **2026-08-22 20:30 UTC**;
