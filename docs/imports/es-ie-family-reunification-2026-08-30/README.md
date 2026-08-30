@@ -26,7 +26,18 @@ Every fact: `applies_to.nationality="non-EEA"`, `applies_to.status="professional
 Hosts: enterprise.gov.ie, irishimmigration.ie (official), citizensinformation.ie (semi-official → 4
 facts land `needs_review`). Verifier: 20 importable / 0 rejected.
 
-## Landing
+## Landing — LANDED 2026-08-30
 Staged in `otto_staging` then promoted to `public.requirement_items` at `review_status='pending'` —
-never served until a human approves at `/admin/countries`. Import:
-`scripts/import_otto_facts.py <batch> --apply --promote --expected 20`.
+never served until a human approves at `/admin/countries`.
+
+Two steps, not one — `--promote` alone promotes **0** on a fresh batch (stage writes
+`status='new'`; `promote()` reads `status='ready'`; the `new→ready` flip is a separate curation
+gate — see memory `reference_otto_promote_needs_new_to_ready_flip`):
+1. `scripts/import_otto_facts.py <batch> --apply --expected 20` → 20 facts staged at `status='new'`.
+2. Flip this batch's 6 topic keys `new→ready` (scoped `UPDATE`), then `promote(country='IE')`.
+
+**Result:** 6 `requirement_items` at `review_status='pending'` — 3 `corpus_grounded`
+(family_join_eligibility, family_financial_requirements, family_registration_irp) + 3
+`representative` (spouse_work_permission, dependant_children_permission, join_family_d_visa — each
+carries a citizensinformation.ie semi-official fact, honestly badged). Awaiting `/admin/countries`
+approval before any employee sees them.
