@@ -38,9 +38,13 @@ from ...relocation_plan_service import (
     map_milestone_status_to_plan_status,
 )
 from ...relocation_plan_draft_normalize import profile_for_plan_derivation
-from ...relocation_plan_task_library import estimated_effort_for
+from ...relocation_plan_task_library import (
+    FREE_MOVER_WAIVED_MILESTONE_TYPES,
+    estimated_effort_for,
+)
 from .roadmap_lead_times import lead_time_days_for_phase  # [AIQ-1340]
 from .roadmap_requirement_copy import enrich_milestones_with_requirements
+from .nationality_class import EU_EEA, OWN_NATIONAL, classify
 from ...relocation_plan_status_derivation import (
     DerivationThresholds,
     RelocationPlanDerivationContext,
@@ -493,6 +497,36 @@ def _resolve_roadmap_validation(db, case_id, summary):
     return False, None, None
 
 
+def _filter_milestones_for_nationality(
+    milestones: List[Dict[str, Any]], profile_draft: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """Drop the visa/permit steps a free mover does not need.
+
+    A free mover (EU_EEA / OWN_NATIONAL into an EEA state) has no entry-visa or work-permit
+    track, so a roadmap that tells them to "Submit visa application" or "Book biometrics" is
+    actively wrong — the exact inaccuracy this removes. Mirrors the nationality gate the
+    requirements engine already applies (requirements_builder), so the two surfaces agree.
+
+    Fail-open: when nationality or destination is unknown we classify to None and filter
+    NOTHING — an uncertain roadmap keeps every step rather than hide one it should not.
+    """
+    try:
+        ep = (profile_draft or {}).get("employeeProfile") or {}
+        pa = (profile_draft or {}).get("primaryApplicant") or {}
+        rb = (profile_draft or {}).get("relocationBasics") or {}
+        nationality = ep.get("nationality") or pa.get("nationality")
+        dest_country = rb.get("destCountry")
+        klass = classify(nationality, dest_country)
+    except Exception:  # never let tailoring break the plan view
+        return milestones
+    if klass not in (EU_EEA, OWN_NATIONAL):
+        return milestones
+    return [
+        m for m in milestones
+        if str(m.get("milestone_type") or "") not in FREE_MOVER_WAIVED_MILESTONE_TYPES
+    ]
+
+
 def build_relocation_plan_view_response(
     *,
     case_id: str,
@@ -533,6 +567,8 @@ def build_relocation_plan_view_response(
         destination_requires_biometrics=None,
     )
 
+    # Nationality-tailor the roadmap before assembly (fail-open when class unknown).
+    milestones = _filter_milestones_for_nationality(milestones, profile_draft)
     blocks = build_phased_plan_from_milestones(milestones)
     flat: List[EnrichedPlanTask] = [t for b in blocks for t in b.tasks]
     apply_derived_statuses_to_enriched_tasks(flat, ctx, include_debug=debug)
