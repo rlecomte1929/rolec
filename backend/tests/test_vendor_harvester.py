@@ -292,12 +292,13 @@ def test_missing_expiry_lowers_confidence():
 # ── source catalogue policy ──────────────────────────────────────────────────
 
 def test_pairs_in_scope_is_corridors_x_categories():
-    # 4 corridors (FR-DE, FR-NO, ES-IE, NO-FR) x 6 categories (movers, housing_agencies,
-    # legal_admin, tax_finance, banks, schools). ES-IE/NO-FR + schools were added 2026-08-30
-    # for the Otto Dublin/Paris provider batches; not every pair has a source yet, which is
-    # what unavailable_reasons() and empty ingestable_sources() are for.
+    # 6 corridors (FR-DE, FR-NO, ES-IE, NO-FR, FR-SG, US-EC) x 6 categories (movers,
+    # housing_agencies, legal_admin, tax_finance, banks, schools). ES-IE/NO-FR + schools were
+    # added 2026-08-30 for the Dublin/Paris batches; FR-SG/US-EC for the Singapore/Quito batches.
+    # Not every pair has a source yet, which is what unavailable_reasons() and empty
+    # ingestable_sources() are for.
     from backend.app.services.registry_sources import CORRIDORS, CATEGORIES
-    assert len(pairs_in_scope()) == len(CORRIDORS) * len(CATEGORIES) == 24
+    assert len(pairs_in_scope()) == len(CORRIDORS) * len(CATEGORIES) == 36
 
 
 def test_unavailable_sources_are_declared_not_hidden():
