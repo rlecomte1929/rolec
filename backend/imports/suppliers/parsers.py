@@ -81,6 +81,8 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("lawsociety.org.sg",             "Law Society of Singapore — Find a Lawyer"),
     ("acra.gov.sg",                   "ACRA Company Register"),
     ("moe.gov.sg",                    "MOE International Schools List"),
+    # Ecuador (US-EC) — CAINEC exposes per-entity ficha.php records; other EC registers are blocked.
+    ("cainec.com",                    "CAINEC — Great Place Inmobiliario"),
 )
 
 
