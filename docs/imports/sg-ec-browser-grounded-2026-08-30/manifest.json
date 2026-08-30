@@ -1,0 +1,46 @@
+{
+  "batch_id": "sg-ec-browser-grounded-2026-08-30",
+  "corridors": [
+    "FR-SG",
+    "US-EC"
+  ],
+  "personas": [
+    "Adrien (Paris->Singapore)",
+    "Abraham (Seattle->Quito)"
+  ],
+  "method": "Browser-grounded by Claude Code — the JS-rendered gov pages Otto's scraper could not read, opened in a real browser, verbatim quotes extracted, then re-confirmed by verify_ledger (10/10 quotes confirmed on live re-fetch, 0 rejected).",
+  "sources": {
+    "SG tax": "https://www.iras.gov.sg/taxes/individual-income-tax/basics-of-individual-income-tax/tax-residency-and-tax-rates/working-out-my-tax-residency",
+    "EC professional residence visa": "https://www.gob.ec/mremh/tramites/concesion-visa-residencia-temporal-profesional-tecnico-tecnologo-artesano",
+    "EC tourist (no work)": "https://www.gob.ec/mremh/tramites/concesion-visa-visitante-temporal-turista-90-dias"
+  },
+  "files": {
+    "facts.ndjson": {
+      "records": 10,
+      "sha256": "34ab2ef48c373451b7bbdfff4b6b708cb0a597d3bba8190b2a960ed4427193cf"
+    },
+    "clean.ndjson": {
+      "records": 10,
+      "sha256": "34ab2ef48c373451b7bbdfff4b6b708cb0a597d3bba8190b2a960ed4427193cf"
+    }
+  },
+  "landed": {
+    "SINGAPORE": {
+      "promoted": 1,
+      "requirement": "Tax residence (IRAS) — corpus_grounded, pending",
+      "facts": 3
+    },
+    "ECUADOR": {
+      "promoted": 2,
+      "requirements": [
+        "Temporary residence visa — professional (corpus_grounded, pending, 6 facts)",
+        "Tourist status prohibits work (corpus_grounded, pending, 1 fact)"
+      ]
+    }
+  },
+  "significance": "Fills the two most-critical previously-empty pillars: the EC work residence visa (the corridor's spine) and the tourist-trap (90-day entry != work permit). All corpus_grounded — higher tier than the original representative Otto facts.",
+  "still_open": [
+    "SG: FIN number, EP healthcare cover, housing/rental",
+    "EC: work authorization (trabajo.gob.ec), tax/RUC 183-day rule at SRI, IESS pillar-split (5 facts staged, unmapped)"
+  ]
+}
