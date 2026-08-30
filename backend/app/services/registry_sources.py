@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -737,6 +737,66 @@ SOURCES: Tuple[RegistrySource, ...] = (
         notes="The Real Estate Council of Ontario — mandatory registrar for real-estate brokerages "
               "in Ontario. Registrant search form, no per-entity URL; vetter confirms the brokerage "
               "is RECO-registered.",
+    ),
+    # ── Australia (XX-AU destination-coverage / Sydney) ────────────────────────
+    # Movers on the global FIDI source. The other Australian registers are search-form/flat with no
+    # stable per-entity URL, so PUBLIC_REGISTER tier 2 (staged 'claimed', vetter confirms). Sourced
+    # 2026-08-31 (Sydney batch); CPA Australia / CA-ANZ / REINSW were Cloudflare/JS-blocked and
+    # substituted with the statutory TPB and NSW Fair Trading registers.
+    RegistrySource(
+        name="OMARA — Register of Migration Agents",
+        base_url="https://portal.mara.gov.au/search-the-register-of-migration-agents/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-AU",),
+        categories=("legal_admin",),
+        notes="Office of the Migration Agents Registration Authority — the statutory register of "
+              "registered migration agents (mandatory to give immigration assistance for a fee). "
+              "Search form, no per-entity URL; vetter confirms the agent/firm on the register.",
+    ),
+    RegistrySource(
+        name="TPB — Tax Practitioners Board register",
+        base_url="https://myprofile.tpb.gov.au/public-register/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-AU",),
+        categories=("tax_finance",),
+        notes="Tax Practitioners Board — the statutory register of registered tax agents (mandatory "
+              "to prepare Australian tax returns for a fee). Public register search; the practitioner "
+              "detail page carries the registration number, but no stable per-entity URL — vetter confirms.",
+    ),
+    RegistrySource(
+        name="APRA — Register of authorised ADIs",
+        base_url="https://www.apra.gov.au/registers/list-registered-authorised-deposit-taking-institutions",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-AU",),
+        categories=("banks",),
+        notes="Australian Prudential Regulation Authority — the statutory list of authorised "
+              "deposit-taking institutions (banks). Flat list, no per-entity URL; vetter confirms "
+              "membership. (Banks are capped at tier 2 regardless.)",
+    ),
+    RegistrySource(
+        name="NESA — Approved NSW school providers (CRICOS)",
+        base_url="https://www.nsw.gov.au/education-and-training/nesa/overseas-students/approved-nsw-school-providers",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-AU",),
+        categories=("schools",),
+        notes="NSW Education Standards Authority list of NSW schools approved to enrol overseas "
+              "students (CRICOS). Table page with CRICOS code per school but no per-school URL; "
+              "vetter confirms the school by CRICOS code (carried in accreditation_number).",
+    ),
+    RegistrySource(
+        name="NSW Fair Trading — property agents register",
+        base_url="https://verify.licence.nsw.gov.au/home/Property",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-AU",),
+        categories=("housing_agencies",),
+        notes="NSW Fair Trading (Verify NSW) — the statutory licence register for property/real-estate "
+              "agents under the Property and Stock Agents Act. Search form, no per-entity URL; vetter "
+              "confirms the current licence number (carried in accreditation_number).",
     ),
 )
 

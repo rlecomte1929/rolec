@@ -98,6 +98,14 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("cdic.ca",                       "CDIC — member institutions list"),
     ("data.ontario.ca",              "Ontario Ministry of Education — Private School Location List"),
     ("reco.on.ca",                    "RECO — Real Estate Council of Ontario registrant search"),
+    # Australia (XX-AU / Sydney) — movers stay on fidi.org; the rest are search-form/flat registers.
+    # `verify.licence.nsw.gov.au` is listed BEFORE `nsw.gov.au` and wins by longest-suffix match, so
+    # NSW property-agent URLs resolve to Fair Trading and the NESA schools page to NESA.
+    ("mara.gov.au",                   "OMARA — Register of Migration Agents"),
+    ("tpb.gov.au",                    "TPB — Tax Practitioners Board register"),
+    ("apra.gov.au",                   "APRA — Register of authorised ADIs"),
+    ("verify.licence.nsw.gov.au",     "NSW Fair Trading — property agents register"),
+    ("nsw.gov.au",                    "NESA — Approved NSW school providers (CRICOS)"),
 )
 
 
