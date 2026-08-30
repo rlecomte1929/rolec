@@ -154,6 +154,15 @@ def test_canada_is_covered():
     assert resolve_catalog_country("Canada") == "CANADA"
 
 
+def test_australia_is_covered():
+    """AU resolves — Destination Coverage Master rank 6 (Sydney), destination-only."""
+    assert to_iso("AU") == "AU"
+    assert to_iso("Australia") == "AU"
+    assert iso_to_catalog_name("AU") == "AUSTRALIA"
+    assert resolve_catalog_country("AU") == "AUSTRALIA"
+    assert resolve_catalog_country("Australia") == "AUSTRALIA"
+
+
 def test_every_corridor_destination_resolves():
     """Every corridor profile's destination must resolve to a catalog name.
 
