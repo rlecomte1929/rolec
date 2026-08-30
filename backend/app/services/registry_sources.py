@@ -586,6 +586,25 @@ SOURCES: Tuple[RegistrySource, ...] = (
         notes="Ministry of Education list of international schools (CPE-registered private education "
               "institutions). JS-rendered index, no per-school URL; vetter confirms the school by name.",
     ),
+    # ── Ecuador (US-EC / Abraham) ─────────────────────────────────────────────
+    # EC registers are mostly JS/login/iframe-gated (superbancos, MinEduc AMIE, Colegio de Abogados
+    # iframe, CCPP login) — sourced by browser-grounding, not Otto's scraper. CAINEC is the one that
+    # exposes real per-entity records: ficha.php?codigo=INMO-GP-... pages rendered in a browser (Otto's
+    # scraper saw only JS shells). CAINEC is a national body (Cuenca-based) so its accredited firms are
+    # not city-scoped — the /admin/vetting-queue human confirms Quito service. Tier 2, HTTP_LISTING.
+    RegistrySource(
+        name="CAINEC — Great Place Inmobiliario",
+        base_url="https://www.cainec.com/greatplace.php",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("US-EC",),
+        categories=("housing_agencies",),
+        # /ficha.php?codigo=INMO-GP-2026-06-005 — one certificate record per accredited firm.
+        entry_url_pattern=r"/ficha\.php\?codigo=",
+        notes="Cámara Inmobiliaria Ecuatoriana accreditation directory — the only EC real-estate "
+              "register with public per-entity records. National (Cuenca-based); vetter confirms the "
+              "firm actually serves Quito, since CAINEC does not scope by city.",
+    ),
 )
 
 
