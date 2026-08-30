@@ -619,10 +619,33 @@ def _ensure_catalog_master_for_capability(cap: Any, supplier_name: Optional[str]
     # Dedupe is on (category, external_id); key by supplier+capability country so
     # re-approving the same capability updates one row instead of duplicating.
     external_id = f"registry:{supplier_id}:{category}:{country or ''}"
+    name = supplier_name or supplier_id
     try:
+        # Link-or-insert. The catalog enforces UNIQUE (category, lower(trim(name))), so a
+        # plain INSERT fails whenever a same-named row already exists — e.g. the
+        # crowdsourced, supplier_id-less rows that are the whole reason approved suppliers
+        # were invisible (AIQ-2095). Prefer LINKING that row over an INSERT the index would
+        # reject (and, being best-effort, silently swallow).
+        existing = service_catalog.find_master_by_category_name(category, name)
+        if existing is not None:
+            ex_supplier = str(existing.get("supplier_id") or "")
+            if not ex_supplier:
+                service_catalog.link_supplier_to_master(existing["id"], supplier_id, country=country)
+            elif ex_supplier != supplier_id:
+                # A different supplier already owns this (category, name). Don't relink —
+                # that would silently re-point another vendor's catalog row. Flag it.
+                log.info(
+                    "AIQ-2095: catalog row %s (category=%s name=%s) already linked to "
+                    "supplier %s; not relinking to %s",
+                    existing.get("id"), category, name, ex_supplier, supplier_id,
+                )
+            # ex_supplier == supplier_id → already linked; nothing to do. This also covers
+            # the multi-country case: a supplier serving two countries under one name keeps
+            # its single (category, name) master rather than erroring on a second insert.
+            return
         service_catalog.upsert_item(
             category=category,
-            name=(supplier_name or supplier_id),
+            name=name,
             attributes={},
             source="registry_promoted",
             city=city,

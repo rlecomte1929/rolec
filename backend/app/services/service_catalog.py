@@ -252,6 +252,50 @@ def find_master_by_external_id(category: str, external_id: str) -> Optional[Dict
     return _row_to_item(row) if row else None
 
 
+def find_master_by_category_name(category: str, name: str) -> Optional[Dict[str, Any]]:
+    """Resolve a master by (category, case-insensitive trimmed name) — the shape of the
+    ``uq_service_catalog_items_category_name_ci`` UNIQUE index on
+    ``(category, lower(trim(name)))``.
+
+    [AIQ-2095] The registry-promotion link-or-insert path uses this: an approved supplier
+    whose name already exists as a (usually crowdsourced, ``supplier_id``-less) catalog row
+    must LINK that row rather than INSERT a duplicate the unique index would reject. Not
+    filtered on ``active`` on purpose — the unique index covers inactive rows too, so an
+    inactive twin must still be found (and can be re-linked/reactivated) instead of causing
+    a silent insert failure."""
+    nm = (name or "").strip()
+    if not category or not nm:
+        return None
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT * FROM service_catalog_items "
+                "WHERE category = :cat AND lower(trim(name)) = lower(trim(:nm)) "
+                "LIMIT 1"
+            ),
+            {"cat": category, "nm": nm},
+        ).mappings().first()
+    return _row_to_item(row) if row else None
+
+
+def link_supplier_to_master(
+    item_id: str, supplier_id: str, country: Optional[str] = None
+) -> None:
+    """[AIQ-2095] Attach a suppliers-registry id to an existing master, making that catalog
+    row resolvable to the supplier by the recommendation/curation path. Reactivates the row
+    and fills ``country`` only when it has none; never overwrites an existing ``supplier_id``
+    (the caller checks that first)."""
+    now = datetime.utcnow().isoformat()
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE service_catalog_items SET supplier_id = :sid, active = true, "
+                "updated_at = :now, country = COALESCE(country, :country) WHERE id = :id"
+            ),
+            {"sid": supplier_id, "now": now, "country": country, "id": item_id},
+        )
+
+
 def find_master_by_supplier_or_external_id(
     category: str, item_id: str
 ) -> Optional[Dict[str, Any]]:
