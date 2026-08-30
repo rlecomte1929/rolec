@@ -68,6 +68,10 @@ _ISO_TO_CATALOG_NAME = {
     # with corridors/US_EC/corridor.yaml — `test_every_corridor_destination_resolves`
     # fails the moment the profile lands without this row.
     "EC": "ECUADOR",
+    # CA is a Destination Coverage Master destination (rank 5, Toronto hub). No corridor
+    # profile — authored as a destination like GB above. Without this entry Canada facts stage
+    # but `mappings.resolve()` refuses to promote them (no catalog coverage), reaching no case.
+    "CA": "CANADA",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.

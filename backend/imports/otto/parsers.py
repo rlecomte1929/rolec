@@ -94,6 +94,13 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # (social security), registrocivil.gob.ec (cédula). `gob.es` above is Spain only; the
     # bare `gov` does not match `.ec`. 5th too-narrow-allowlist instance.
     "gob.ec",
+    # Canada (destination rank 5, Toronto). Federal content lives on `canada.ca` (IRCC, CRA,
+    # Service Canada all publish there now), which the legacy `gc.ca` suffix above does NOT
+    # match — every canada.ca fact scored UNOFFICIAL until this was added. `ontario.ca` is the
+    # Government of Ontario's own domain (OHIP, ServiceOntario, driving, the private-school
+    # list on data.ontario.ca), a statutory provincial government publishing its own rules —
+    # same call as `madrid.es` / `service.berlin.de`. 6th too-narrow-allowlist instance.
+    "canada.ca", "ontario.ca",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the

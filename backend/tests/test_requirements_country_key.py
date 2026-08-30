@@ -141,6 +141,19 @@ def test_ecuador_is_covered():
     assert resolve_catalog_country("Ecuador") == "ECUADOR"
 
 
+def test_canada_is_covered():
+    """CA resolves — a Destination Coverage Master destination (rank 5, Toronto).
+
+    A destination-only entry like GB: no corridor profile, but Canada facts must resolve to a
+    catalog name or `mappings.resolve()` refuses to promote them and they reach no case.
+    """
+    assert to_iso("CA") == "CA"
+    assert to_iso("Canada") == "CA"
+    assert iso_to_catalog_name("CA") == "CANADA"
+    assert resolve_catalog_country("CA") == "CANADA"
+    assert resolve_catalog_country("Canada") == "CANADA"
+
+
 def test_every_corridor_destination_resolves():
     """Every corridor profile's destination must resolve to a catalog name.
 
