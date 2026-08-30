@@ -1,0 +1,28 @@
+{
+  "batch_id": "us-ec-providers-2026-08-30",
+  "corridor": "US-EC",
+  "destination": "EC (Quito)",
+  "persona": "Abraham",
+  "source": "Otto sourcing (0 rows — all 6 EC registers JS-blocked) + Claude browser-grounding of the one confirmed firm (INSA).",
+  "gcs": {
+    "otto_providers_csv_empty": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788110899208_nchzk5kh.csv",
+    "otto_blocked_ndjson": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788111015151_v5dnk55h.ndjson"
+  },
+  "files": {
+    "providers.csv": {
+      "records": 2,
+      "sha256": "b260665fda54f2413e761cbfa93e4ad201a5c49d9db51fc545895d4c501a8043"
+    },
+    "blocked.json": {
+      "records": 38,
+      "sha256": "ad8b4d759fdd65eeea169b6d01b7b740ed3b9bf7bd37e7c219a85a2a4d90c427",
+      "note": "Otto's 6 blocked EC categories with exact browser-grounding actions"
+    }
+  },
+  "landed": {
+    "promoted_pending": 1,
+    "table": "public.supplier_service_capabilities (platform_vetting_status='pending')",
+    "movers": "INSA International Shipping & Storage (FIDI FAIM to 2029, info@insa.com.ec, Quito) — browser-grounded per-entity FIDI URL"
+  },
+  "browser_grounding_worklist": "Otto blocked ALL 6 EC registers (JS/iframe/login). blocked.json carries the exact repo-agent actions. Confirmed-by-name but not yet grounded: housing = 7 CAINEC Great Place firms (FORXA, EDENCORP, Aquaterra, Ksa, Huasi360, etc. — need per-entity Ver-ficha URLs + emails). Still to source (0 firms): banks (superbancos Catastro), schools (MinEduc AMIE), legal (Colegio Abogados Pichincha iframe), tax (Colegio Contadores CCPP)."
+}

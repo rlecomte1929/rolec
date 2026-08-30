@@ -1,0 +1,35 @@
+{
+  "batch_id": "us-ec-providers-cainec-2026-08-30",
+  "corridor": "US-EC",
+  "destination": "EC (Quito)",
+  "persona": "Abraham",
+  "method": "Browser-grounding round for the EC providers Otto could not source. CAINEC's per-entity ficha.php pages render in a browser (Otto's scraper saw only JS shells); firm names + business emails extracted from the ficha records.",
+  "register": "CAINEC — Great Place Inmobiliario (cainec.com/ficha.php?codigo=INMO-GP-...) — per-entity records, HTTP_LISTING tier 2",
+  "files": {
+    "providers.csv": {
+      "records": 5,
+      "sha256": "192a635d6cdb18769105a516b68e1d30e561cd6a30d671c5387f18a4f62d2f4f"
+    }
+  },
+  "landed": {
+    "promoted_pending": 4,
+    "category": "housing_agencies",
+    "firms": [
+      "EDENCORP S.A. (PLATINUM, patricia.cabrera@inmobiliariaedencorp.com)",
+      "Ksa Inmobiliaria (GOLD, irojas@ksa.com.ec)",
+      "Huasi360 (GOLD, inmobiliaria@huasi360.com)",
+      "IMMOBILLIS (SILVER, informacion@immobillis.com)"
+    ]
+  },
+  "excluded": [
+    "FORXA INMOBILIARIA — ficha lists city CUENCA, not Quito (only firm with a city on record)",
+    "Aquaterra + Gerardo Tacuri — gmail-only contact, no business website"
+  ],
+  "city_caveat": "CAINEC is a national body (Cuenca-based); the ficha pages do not list a city for these 4. Landed 'claimed' for the /admin/vetting-queue human to confirm Quito service.",
+  "still_blocked": {
+    "banks": "superbancos.gob.ec — navigation denied/blocked (not renderable). Not sourced.",
+    "schools": "MinEduc AMIE (web.educacion.gob.ec/CNIE) — login/JS. Not sourced.",
+    "legal_admin": "Colegio de Abogados de Pichincha directorio — iframe. Not sourced.",
+    "tax_finance": "Colegio de Contadores CCPP (ccpp.org.ec) — login-gated. Not sourced."
+  }
+}

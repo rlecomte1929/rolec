@@ -338,3 +338,72 @@ def test_one_url_cited_by_several_facts_appears_once():
 def test_no_citations_is_an_empty_list():
     assert _public_sources(None) == []
     assert _public_sources([]) == []
+
+
+# ── dual nationality on the public surface ───────────────────────────────────────────
+# The engine has always handled this: `rules_engine.apply_rules` calls
+# `classify_best((nationality, second_nationality), dest)`, which returns the most
+# favourable class because rights are cumulative. But this endpoint never supplied the
+# second value, so a dual national could not be represented here at all — a
+# Venezuelan/Italian was filtered as THIRD_COUNTRY and shown a permit track they must
+# not apply for. That is Andrea's real case (Madrid -> Dublin, VE national, possibly
+# also IT), and it is exactly the failure `classify_best`'s docstring describes.
+
+def test_a_second_nationality_upgrades_the_track(monkeypatch):
+    """VE alone gets the permit track; VE+IT must get the EEA one instead."""
+    _patch_two_track(monkeypatch)
+
+    ve_only = client.get(
+        "/api/public/corridor-requirements?from=ES&to=NO&employee_type=LTA&nationality=VE"
+    )
+    assert ve_only.json()["nationality_class"] == "THIRD_COUNTRY"
+    assert "Valid passport (6+ months)" in _labels(ve_only)
+    assert "Valid identity card or passport (EU/EEA)" not in _labels(ve_only)
+
+    dual = client.get(
+        "/api/public/corridor-requirements?from=ES&to=NO&employee_type=LTA"
+        "&nationality=VE&second_nationality=IT"
+    )
+    assert dual.json()["nationality_class"] == "EU_EEA", \
+        "the Italian passport did not upgrade the track"
+    assert "Valid identity card or passport (EU/EEA)" in _labels(dual)
+    assert "Valid passport (6+ months)" not in _labels(dual), \
+        "a dual EU national was still shown the third-country track"
+
+
+def test_order_of_the_two_nationalities_does_not_matter(monkeypatch):
+    """Rights are cumulative, so whichever passport intake happened to record first
+    must not decide the journey."""
+    _patch_two_track(monkeypatch)
+    a = client.get("/api/public/corridor-requirements?from=ES&to=NO&employee_type=LTA"
+                   "&nationality=VE&second_nationality=IT")
+    b = client.get("/api/public/corridor-requirements?from=ES&to=NO&employee_type=LTA"
+                   "&nationality=IT&second_nationality=VE")
+    assert a.json()["nationality_class"] == b.json()["nationality_class"] == "EU_EEA"
+    assert _labels(a) == _labels(b)
+
+
+def test_an_unrecognised_second_nationality_does_not_discard_a_good_first(monkeypatch):
+    """classify_best skips what it cannot classify rather than letting it win."""
+    _patch_two_track(monkeypatch)
+    resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA"
+                      "&nationality=FR&second_nationality=ZZZZ")
+    assert resp.json()["nationality_class"] == "EU_EEA"
+    assert "Valid identity card or passport (EU/EEA)" in _labels(resp)
+
+
+def test_a_second_nationality_alone_still_classifies(monkeypatch):
+    """Defensive: the param must not be silently ignored when the first is absent."""
+    _patch_two_track(monkeypatch)
+    resp = client.get("/api/public/corridor-requirements?from=ES&to=NO&employee_type=LTA"
+                      "&second_nationality=IT")
+    assert resp.json()["nationality_class"] == "EU_EEA"
+
+
+def test_omitting_both_still_falls_back_to_third_country(monkeypatch):
+    """The pre-existing contract: no nationality means the most demanding track,
+    which can only ever over-show."""
+    _patch_two_track(monkeypatch)
+    resp = client.get("/api/public/corridor-requirements?from=ES&to=NO&employee_type=LTA")
+    assert resp.json()["nationality_class"] is None
+    assert "Valid passport (6+ months)" in _labels(resp)
