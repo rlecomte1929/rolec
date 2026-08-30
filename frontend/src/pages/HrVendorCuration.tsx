@@ -845,8 +845,25 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
                 Pick a category below to review and tick the ones to show your employees.
               </>
             ) : (
+              // AIQ-1873: 0 inserted does NOT mean "already has master vendors for
+              // every category" — it can also mean quota-blocked or nothing found.
+              // Claiming full coverage here contradicted section 2 showing 0 masters
+              // for the selected category. Report what actually happened instead.
               <>
-                {city} already has master vendors for every service category. Nothing was added — no AI tokens used.
+                No new vendors were added for {city}, {country}
+                {(populateResult.categories_skipped_existing || 0) > 0 && (
+                  <>
+                    {' '}— {populateResult.categories_skipped_existing} categor
+                    {populateResult.categories_skipped_existing === 1 ? 'y' : 'ies'} already had vendors
+                  </>
+                )}
+                {(populateResult.categories_quota_blocked || 0) > 0 && (
+                  <>
+                    {(populateResult.categories_skipped_existing || 0) > 0 ? ';' : ' —'}{' '}
+                    {populateResult.categories_quota_blocked} hit your daily quota (try again tomorrow, UTC)
+                  </>
+                )}
+                . Pick a category below to review the available vendors.
               </>
             )}
           </Alert>
