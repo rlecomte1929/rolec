@@ -33,7 +33,8 @@ def _cap(country_code, *, category="movers", city="Oslo", supplier_id="vc-ags"):
 class ApprovalCreatesMasterTests(unittest.TestCase):
     def test_master_country_comes_from_capability(self):
         cap = _cap("NO")  # supplier is based in FR, but the capability serves NO
-        with mock.patch.object(service_catalog, "upsert_item") as up:
+        with mock.patch.object(service_catalog, "find_master_by_category_name", return_value=None), \
+             mock.patch.object(service_catalog, "upsert_item") as up:
             supplier_registry._ensure_catalog_master_for_capability(cap, "AGS France")
         up.assert_called_once()
         kw = up.call_args.kwargs
@@ -45,7 +46,8 @@ class ApprovalCreatesMasterTests(unittest.TestCase):
 
     def test_ags_france_one_supplier_two_countries(self):
         """One FR-based supplier, two capabilities (DE, NO) → two masters, DE and NO."""
-        with mock.patch.object(service_catalog, "upsert_item") as up:
+        with mock.patch.object(service_catalog, "find_master_by_category_name", return_value=None), \
+             mock.patch.object(service_catalog, "upsert_item") as up:
             supplier_registry._ensure_catalog_master_for_capability(_cap("DE"), "AGS France")
             supplier_registry._ensure_catalog_master_for_capability(_cap("NO"), "AGS France")
         countries = [c.kwargs["country"] for c in up.call_args_list]
@@ -60,9 +62,10 @@ class ApprovalCreatesMasterTests(unittest.TestCase):
 
     def test_catalog_failure_never_raises(self):
         cap = _cap("NO")
-        with mock.patch.object(
-            service_catalog, "upsert_item", side_effect=RuntimeError("db down")
-        ):
+        with mock.patch.object(service_catalog, "find_master_by_category_name", return_value=None), \
+             mock.patch.object(
+                 service_catalog, "upsert_item", side_effect=RuntimeError("db down")
+             ):
             # Best-effort: an approval already committed must not be undone by a
             # catalog failure.
             supplier_registry._ensure_catalog_master_for_capability(cap, "AGS France")
