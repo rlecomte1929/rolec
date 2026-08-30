@@ -1,0 +1,14 @@
+category,company_name,reject_reason
+banks,HSBC France,REGAFI page JS-rendered and returned no content; CIB not confirmed from official register page — only found via third-party sources; excluded pending direct REGAFI confirmation
+banks,Banque Palatine,REGAFI page JS-rendered; CIB not found from any search result; insufficient register confirmation
+banks,Caisse d'Épargne Île-de-France,REGAFI page JS-rendered; CIB number not confirmed from official source; only generic group references found
+schools,Lycée Polyvalent Privé Sainte-Thérèse (UAI 0753217P),UAI 0753217P resolves to Sainte-Thérèse (vocational lycée) not ISP — preflight assumption was wrong; not an international school
+schools,Marymount International School Paris,Located in Neuilly-sur-Seine (92200) not Paris 75xxx; outside corridor scope
+schools,American School of Paris,Located in Saint-Cloud (92210) not Paris 75xxx; outside corridor scope
+schools,British School of Paris,Located in Croissy-sur-Seine (78290) not Paris 75xxx; outside corridor scope
+schools,École Bilingue de Londres,No Paris campus confirmed on annuaire-education.fr
+tax_finance,ASENDENS,OEC page fetched but no international/expat specialisation confirmed
+housing_agencies,1818 Immobilier,Only found in FNAIM listing page not individual agency page; no CPI card number confirmed; source_url is the search results listing not a per-firm page — retained at low confidence
+movers,Demeco,CSD membership confirmed via third-party source only; no per-firm CSD register page found; could not confirm via site:csdemenagement.fr
+movers,Gentlemen du Déménagement,CSD membership confirmed via third-party sources; no per-firm CSD page URL found to cite as source_url
+legal_admin,Haywood Wise Avocats,Barreau de Nanterre (Hauts-de-Seine) not Barreau de Paris; excluded

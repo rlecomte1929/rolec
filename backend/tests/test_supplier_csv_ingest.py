@@ -322,6 +322,50 @@ def test_irish_register_urls_map_to_their_register_not_self_declared(url, expect
     assert src.name != SELF_DECLARED
 
 
+@pytest.mark.parametrize("url,expected_source", [
+    ("https://www.regafi.fr/pages/fiche-banque?refine.id_referentiel=20556",
+     "REGAFI — registre des agents financiers (ACPR / Banque de France)"),
+    ("https://annuaire-education.fr/etablissement/paris/lycee-x",
+     "Annuaire de l'Éducation nationale (annuaire-education.fr)"),
+    ("https://annuaire.experts-comptables.org/expert-comptable/36523-sclover",
+     "Ordre des Experts-Comptables — annuaire"),
+    ("https://www.fnaim.fr/agence-immobiliere/21241/43-paris-17-x",
+     "FNAIM — annuaire des adhérents (Paris)"),
+    ("https://www.csdemenagement.fr/annuaire-adherents/annuaire-demenageurs/3617-x",
+     "Chambre Syndicale du Déménagement (CSD) — annuaire adhérents"),
+    ("https://www.avocatparis.org/annuaire", "Barreau de Paris — annuaire des avocats"),
+])
+def test_french_register_urls_map_to_their_register(url, expected_source):
+    src = source_for_url(url)
+    assert src.name == expected_source
+    assert src.name != SELF_DECLARED
+
+
+def test_fnaim_listing_page_rejects_while_a_per_agency_page_lands():
+    """The per-agency FNAIM page (…/agence-immobiliere/<id>/…) evidences one firm and lands; the
+    FNAIM listing page (…/agences-immobilieres/…) evidences nobody and must reject."""
+    import os
+    import tempfile
+
+    def _one(source_url):
+        csv_text = (
+            "corridor,service_category,company_name,website_url,source_name,source_url,"
+            "accreditation_body,accreditation_number,accreditation_expiry\n"
+            f"NO-FR,housing_agencies,Test Agence,https://test.fr,FNAIM,{source_url},FNAIM,,\n"
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as fh:
+            fh.write(csv_text)
+            path = fh.name
+        try:
+            return list(read_csv(Path(path)))[0]
+        finally:
+            os.unlink(path)
+
+    validate(_one("https://www.fnaim.fr/agence-immobiliere/21241/43-paris-17-x"))  # lands
+    with pytest.raises(HarvestRejected, match="entry for one entity"):
+        validate(_one("https://www.fnaim.fr/agences-immobilieres/43-paris-75.htm"))  # rejects
+
+
 def test_a_statutory_register_page_lands_despite_no_per_entity_url():
     """Option C: PSRA/Tusla/Central Bank/Law Society expose no per-entity URL, so a row cites the
     register page. It must LAND at tier 2 (claimed) rather than reject as "a search page evidences

@@ -1,0 +1,56 @@
+{
+  "batch_id": "no-fr-paris-providers-2026-08-30",
+  "corridor": "NO-FR",
+  "generated": "2026-08-30",
+  "source": "Otto Paris provider batch",
+  "otto_manifest": [
+    {
+      "category": "banks",
+      "sourced_count": 5,
+      "examined_count": 10,
+      "register_used": "REGAFI (ACPR/Banque de France) — https://www.regafi.fr",
+      "confidence": "medium",
+      "notes": "REGAFI is a JS-rendered SPA returning no parseable content on fetch. CIB codes confirmed via authoritative third-party sources (bankoscope.com citing ACPR, 01banque-en-ligne.fr CIB list, contractual documents referencing CIB). Per-firm REGAFI URLs are real and citable even though page content is JS-rendered. 5 major Paris retail banks sourced. HSBC France, Banque Palatine, Caisse d'Épargne IDF rejected for insufficient CIB confirmation from official source."
+    },
+    {
+      "category": "schools",
+      "sourced_count": 6,
+      "examined_count": 11,
+      "register_used": "Annuaire de l'Education nationale (MEN) — https://annuaire-education.fr",
+      "confidence": "high",
+      "notes": "All 6 UAI codes directly confirmed by fetching entity pages on annuaire-education.fr (official MEN open data). Each page shows UAI code, SIREN/SIRET, address, type, and contract status. UAI 0753217P was a preflight error resolving to Lycée Sainte-Thérèse not ISP. ISP secondary school correctly found at UAI 0752803P. EABJM counted twice as separate registered entities (lycée 0753874D + collège 0752935H). American/British/Marymount schools excluded: not in 75xxx postcodes."
+    },
+    {
+      "category": "tax_finance",
+      "sourced_count": 5,
+      "examined_count": 7,
+      "register_used": "Annuaire des Experts-Comptables (OEC) — https://annuaire.experts-comptables.org",
+      "confidence": "high",
+      "notes": "All 5 firms confirmed by fetching entity pages on annuaire.experts-comptables.org. Pages show firm name, address, named accountant members, and languages spoken. OEC does not publish a cabinet registration number on public annuaire pages — the listing is the accreditation confirmation. Priority given to firms with international/expat focus."
+    },
+    {
+      "category": "housing_agencies",
+      "sourced_count": 5,
+      "examined_count": 8,
+      "register_used": "FNAIM annuaire — https://www.fnaim.fr",
+      "confidence": "medium",
+      "notes": "4 agencies confirmed via individual FNAIM entity pages (Batignolles id 21241, Ave Hoche id 914502 with CPI card CPI 7501 2020 000 045 316, WMCP id 20288 with CPI card CPI 7501 2016 000 014 869, Cabinet Moulin des Prés id 3610). 1818 Immobilier confirmed in FNAIM Paris listing only, not a dedicated per-firm page."
+    },
+    {
+      "category": "movers",
+      "sourced_count": 5,
+      "examined_count": 10,
+      "register_used": "CSD (csdemenagement.fr) for domestic movers; FIDI France (fidi-france.com) for international specialists",
+      "confidence": "medium",
+      "notes": "2 firms confirmed via per-firm CSD register pages (France Inter Déménagements Paris 10, Crown Worldwide SAS Poissy/Paris region). 3 FIDI France members (AGS France, Santa Fe Relocation, Gosselin) sourced from FIDI France members list — no per-firm sub-pages on fidi-france.com. Demeco and Gentlemen du Déménagement confirmed as CSD members via third-party only — no per-firm CSD page URL found, so rejected per source_url rule."
+    },
+    {
+      "category": "legal_admin",
+      "sourced_count": 3,
+      "examined_count": 7,
+      "register_used": "Barreau de Paris annuaire — https://www.avocatparis.org/annuaire",
+      "confidence": "medium",
+      "notes": "Barreau de Paris annuaire is a JS SPA with no stable per-lawyer URLs. All 3 firms confirmed as Barreau de Paris members via multiple corroborating sources. Karl Waheed Avocats: Barreau de Paris since 1993, specialist in corporate immigration/mobilité internationale. Exilae Avocats: Barreau de Paris and Nice, specialist in migration and labour law. Laure Navarro: Barreau de Paris since Nov 2007, specialist in immigration/droit des étrangers. Source_url points to the annuaire directory page. Haywood Wise excluded (Barreau de Nanterre not Paris)."
+    }
+  ]
+}
