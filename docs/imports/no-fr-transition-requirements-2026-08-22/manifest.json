@@ -1,0 +1,12 @@
+{
+  "batch_id": "no-fr-transition-requirements-2026-08-22",
+  "corridor": "NO-FR",
+  "generated": "2026-08-30",
+  "note": "Denis NO->FR transition batch, exported from otto_staging for repo record. Citations re-sourced (#2107) and evidence-repaired 2026-08-30: 13/15 quote_verbatim_confirmed, 2 needs-counsel. See VERIFICATION-2026-08-30.md.",
+  "files": [
+    {
+      "name": "facts.ndjson",
+      "record_count": 15
+    }
+  ]
+}
