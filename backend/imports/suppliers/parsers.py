@@ -83,6 +83,14 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("moe.gov.sg",                    "MOE International Schools List"),
     # Ecuador (US-EC) — CAINEC exposes per-entity ficha.php records; other EC registers are blocked.
     ("cainec.com",                    "CAINEC — Great Place Inmobiliario"),
+    # United Kingdom (XX-GB / London) — statutory/professional registers with per-entity URLs.
+    # movers stay on fidi.org above. `find.icaew.com`, `register.fca.org.uk` and
+    # `get-information-schools.service.gov.uk` are matched by suffix.
+    ("sra.org.uk",                    "SRA — Solicitors Regulation Authority register"),
+    ("icaew.com",                     "ICAEW — Find a Chartered Accountant"),
+    ("fca.org.uk",                    "FCA Financial Services Register"),
+    ("get-information-schools.service.gov.uk", "GIAS — Get Information About Schools (DfE)"),
+    ("propertymark.co.uk",            "ARLA Propertymark — member directory"),
 )
 
 

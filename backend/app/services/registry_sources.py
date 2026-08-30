@@ -44,7 +44,12 @@ from typing import Dict, List, Optional, Tuple
 # batches for the two demo corridors came in. Note `validate()` does NOT gate on corridor — this
 # tuple only bounds which (corridor, category) pairs the run report and source metadata cover, so
 # adding a corridor never loosens validation; it just lets a source declare it honestly.
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC")
+# `XX-GB` is a DESTINATION-COVERAGE pseudo-corridor: the UK is authored as a destination
+# (coverage-master rank 3), not a persona origin→dest pair, so the origin token is the `XX`
+# wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
+# second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
+# will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -604,6 +609,74 @@ SOURCES: Tuple[RegistrySource, ...] = (
         notes="Cámara Inmobiliaria Ecuatoriana accreditation directory — the only EC real-estate "
               "register with public per-entity records. National (Cuenca-based); vetter confirms the "
               "firm actually serves Quito, since CAINEC does not scope by city.",
+    ),
+    # ── United Kingdom (XX-GB destination-coverage / London) ───────────────────
+    # UK statutory/professional registers, all exposing stable per-entity URLs (unlike the
+    # Irish set, which had none and took PUBLIC_REGISTER). Movers are already covered by the
+    # global FIDI source above (corridors=CORRIDORS now includes XX-GB). Banks are capped at
+    # tier 2 by effective_tier regardless — the FCA record confirms identity/authorisation, not
+    # banking fitness. Sourced 2026-08-31 (London batch).
+    RegistrySource(
+        name="SRA — Solicitors Regulation Authority register",
+        base_url="https://www.sra.org.uk/consumers/register/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("XX-GB",),
+        categories=("legal_admin",),
+        # /consumers/register/organisation/?sraNumber=459836 — one page per SRA-regulated firm.
+        entry_url_pattern=r"sraNumber=\d+",
+        notes="The Solicitors Regulation Authority is the statutory regulator of solicitors' "
+              "firms in England & Wales; its consumer register exposes a per-firm page keyed on "
+              "SRA number. Immigration solicitors are the corporate-mobility legal category.",
+    ),
+    RegistrySource(
+        name="ICAEW — Find a Chartered Accountant",
+        base_url="https://find.icaew.com/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("XX-GB",),
+        categories=("tax_finance",),
+        # /firms/london/blick-rothenberg-limited/1CT85L — one page per member firm.
+        entry_url_pattern=r"/firms/",
+        notes="Institute of Chartered Accountants in England & Wales — statutory-recognised "
+              "supervisory body; its Find-a-Chartered-Accountant directory lists per-firm pages.",
+    ),
+    RegistrySource(
+        name="FCA Financial Services Register",
+        base_url="https://register.fca.org.uk/s/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("XX-GB",),
+        categories=("banks",),
+        # /s/firm?id=001b000003ZcFXFAA3 — one page per authorised firm (carries the FRN).
+        entry_url_pattern=r"/s/firm",
+        notes="Financial Conduct Authority — the statutory register of authorised firms; each "
+              "row carries a Firm Reference Number. Per-entity firm pages render server-side.",
+    ),
+    RegistrySource(
+        name="GIAS — Get Information About Schools (DfE)",
+        base_url="https://get-information-schools.service.gov.uk/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("XX-GB",),
+        categories=("schools",),
+        # /Establishments/Establishment/Details/101168 — one page per school, keyed on URN.
+        entry_url_pattern=r"/Establishment/Details/\d+",
+        notes="The Department for Education's official register of schools (GIAS); every "
+              "establishment has a per-entity page keyed on its URN, with open/closed status.",
+    ),
+    RegistrySource(
+        name="ARLA Propertymark — member directory",
+        base_url="https://www.propertymark.co.uk/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("XX-GB",),
+        categories=("housing_agencies",),
+        # /company/foxtons-wembley.html — one page per member branch.
+        entry_url_pattern=r"/company/",
+        notes="Propertymark (ARLA) is the professional body for UK letting agents; its member "
+              "directory exposes a per-branch company page. Membership is the letting-agent "
+              "quality mark short of the mandatory redress-scheme registration.",
     ),
 )
 
