@@ -231,8 +231,19 @@ def validate(cand: Candidate) -> None:
         )
     # GDPR: company-level contacts only. A named-individual address is a personal-data
     # collection we have no basis for at harvest time.
+    #
+    # The prefix set is role-based inboxes only — never a personal name. It was widened
+    # 2026-08-30 after a Madrid->Dublin mover batch: 6 of 10 firms published a real company
+    # inbox, but 5 used sales@/enquiries@/hq@ and the old list (info|contact|hello|office...)
+    # rejected them. Discarding valid B2B addresses is a measured root cause of the
+    # "115 of 122 suppliers uncontactable" problem — the moving and relocation trade lives on
+    # sales@ and enquiries@, not info@. Spanish/multilingual role inboxes are included because
+    # the corridors are cross-border (ventas@, comercial@, contacto@). Still no first names.
     if cand.email and not re.match(
-        r"^(info|contact|kontakt|post|hello|office|mail|firmapost|sekretariat)@",
+        r"^(info|contact|contacto|kontakt|post|hello|hola|office|mail|firmapost|sekretariat"
+        r"|sales|ventas|comercial|enquiries|enquiry|hq|moving|movers|move|removals"
+        r"|relocation|relocations|customerservice|customercare|support|help|helpdesk"
+        r"|bookings|booking|quote|quotes|admin|reception|atencion)@",
         cand.email.strip().lower(),
     ):
         raise HarvestRejected(
