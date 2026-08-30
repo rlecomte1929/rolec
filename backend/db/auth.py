@@ -286,10 +286,19 @@ class AuthMixin:
 
     def set_admin_session(self, token: str, actor_user_id: str, target_user_id: str, mode: str) -> None:
         now = datetime.utcnow().isoformat()
+        # AIQ-2091: portable upsert keyed on admin_sessions_pkey (token). The prior
+        # `INSERT OR REPLACE` is SQLite-only and 500s on Postgres (42601 syntax error),
+        # so `POST /api/admin/impersonate/start` failed in prod. `ON CONFLICT ... DO
+        # UPDATE` works on both dialects (SQLite >= 3.24, Postgres).
         with self.engine.begin() as conn:
             conn.execute(text(
-                "INSERT OR REPLACE INTO admin_sessions (token, actor_user_id, target_user_id, mode, created_at) "
-                "VALUES (:token, :actor, :target, :mode, :created_at)"
+                "INSERT INTO admin_sessions (token, actor_user_id, target_user_id, mode, created_at) "
+                "VALUES (:token, :actor, :target, :mode, :created_at) "
+                "ON CONFLICT (token) DO UPDATE SET "
+                "actor_user_id = excluded.actor_user_id, "
+                "target_user_id = excluded.target_user_id, "
+                "mode = excluded.mode, "
+                "created_at = excluded.created_at"
             ), {"token": token, "actor": actor_user_id, "target": target_user_id, "mode": mode, "created_at": now})
 
     def clear_admin_session(self, token: str) -> None:
