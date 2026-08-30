@@ -12,43 +12,43 @@
       "scores": [
         {
           "item_id": "la-1",
-          "score_raw": 94.05
+          "score_raw": 84.05
         },
         {
           "item_id": "la-2",
-          "score_raw": 91.5
+          "score_raw": 77.611111
         },
         {
           "item_id": "la-3",
-          "score_raw": 89.25
+          "score_raw": 80.916667
         },
         {
           "item_id": "la-4",
-          "score_raw": 92.7
+          "score_raw": 86.033333
         },
         {
           "item_id": "la-5",
-          "score_raw": 88.3
+          "score_raw": 76.077778
         },
         {
           "item_id": "la-6",
-          "score_raw": 95.0
+          "score_raw": 87.222222
         },
         {
           "item_id": "la-7",
-          "score_raw": 94.8
+          "score_raw": 79.244444
         },
         {
           "item_id": "la-8",
-          "score_raw": 87.45
+          "score_raw": 81.894444
         },
         {
           "item_id": "la-9",
-          "score_raw": 92.2
+          "score_raw": 79.977778
         },
         {
           "item_id": "la-10",
-          "score_raw": 95.5
+          "score_raw": 84.388889
         },
         {
           "item_id": "la-o1",
@@ -613,5 +613,8 @@
         }
       ]
     }
+  },
+  "notes": {
+    "living_areas": "living_areas score_raw re-frozen 2026-08-30 for AIQ-2119: the commute component became a gradient (100 at the office, tapering to 0 at max_minutes) instead of a flat 100 for every area inside the limit. This is an intended scoring change, not weights drift \u2014 the WS-D refactor this baseline was created to police is still byte-identical for all 5 other categories (126 entries checked, only these 10 moved)."
   }
 }

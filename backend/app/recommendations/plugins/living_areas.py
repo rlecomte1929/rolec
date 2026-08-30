@@ -192,7 +192,21 @@ class LivingAreasPlugin(BasePlugin):
         max_mins = 45
         if c.commute_work:
             max_mins = c.commute_work.get("max_minutes", 45)
-        commute_match = max(0, 100 - (commute_mins - max_mins) * 3) if commute_mins > max_mins else 100.0
+        # A GRADIENT, not a pass/fail. This was `100.0 if commute_mins <= max_mins else
+        # max(0, 100 - 3*overage)`, which gave every area inside the limit a flat 100 — so
+        # `commute`, on the joint-largest weight (0.25), contributed zero differentiation in
+        # the ordinary case and the ranking was decided by space/lifestyle/rating instead.
+        # Measured on the card's own scenario (Grand Canal Dock office, 40-min cap) the
+        # office's OWN neighbourhood ranked fourth, behind an area 30 minutes away, across a
+        # total spread of 1.35 points. See docs/plans/AIQ-2119_neighbourhood_advisor_plan.
+        #
+        # 100 at the door, tapering to 0 at the stated limit and staying 0 beyond it. That
+        # last part is a deliberate CHANGE: the old expression degraded linearly past the cap
+        # (an area 60 min from a 40-min limit still scored 40), so a commute the employee
+        # called too long kept real weight. It no longer does.
+        commute_match = (
+            max(0.0, 100.0 * (1.0 - commute_mins / max_mins)) if max_mins > 0 else 0.0
+        )
 
         sqm_range = item.get("typical_sqm_range", [60, 90])
         sqm_min_item = sqm_range[0] if isinstance(sqm_range, list) else 60
