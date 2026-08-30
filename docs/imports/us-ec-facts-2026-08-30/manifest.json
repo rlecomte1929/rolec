@@ -1,0 +1,55 @@
+{
+  "batch_id": "us-ec-facts-2026-08-30",
+  "corridor": "US-EC",
+  "destination": "EC (Quito)",
+  "persona": "Abraham Romo (Seattle->Quito, US professional, third-country/residence-visa)",
+  "source": "Otto (Audos) — Ecuador Corridor Requirement Facts thread, 2026-08-30",
+  "audience": {
+    "nationality": "non-EEA",
+    "status": "professional",
+    "note": "Ecuador has no free movement; a foreign worker needs a residence visa."
+  },
+  "gcs": {
+    "facts_ndjson": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788095752156_zvrwttrx.ndjson",
+    "rejects_ndjson": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788096011968_jxt2kzxo.ndjson",
+    "manifest": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788096182539_gqjjmu27.json"
+  },
+  "files": {
+    "facts.ndjson": {
+      "records": 14,
+      "sha256": "814c3b061313eb326e6f259dc961238d2315c2be109ef24dfb30e85fc196f011"
+    },
+    "clean.ndjson": {
+      "records": 14,
+      "sha256": "814c3b061313eb326e6f259dc961238d2315c2be109ef24dfb30e85fc196f011"
+    },
+    "rejects.ndjson": {
+      "records": 16,
+      "sha256": "796b347e55268323ddeab9b8abeb9cd34d424d164aba35e297ea5e608d11cd47"
+    }
+  },
+  "verification": "verify_ledger.py fetched all 7 distinct pages: 13 quote(s) confirmed, 0 rejected (verify_ledger reached the .gob.ec pages Otto's own scraper could not).",
+  "onboarding": {
+    "catalog_key": "EC->ECUADOR already in requirements_country_key (#2105)",
+    "allowlist_suffix": "added 'gob.ec' to _OFFICIAL_SUFFIXES (parsers.py) — 5th too-narrow-allowlist instance",
+    "catalog_destination_allowlist": "INSERT (city='Quito', country='Ecuador') applied to prod as a data backfill 2026-08-30",
+    "corridor_profile": "corridors/US_EC/corridor.yaml exists (#2105)"
+  },
+  "landed": {
+    "promoted": 2,
+    "table": "public.requirement_items (review_status='pending', representative)",
+    "requirements": [
+      "Cédula de identidad para extranjeros con residencia temporal (IDENTITY, 8 facts)",
+      "SRI — RUC mencionado como trámite (EMPLOYMENT, 1 fact)"
+    ]
+  },
+  "blocked": {
+    "iess_social_security": "5 facts staged 'ready' but UNMAPPED — Otto put mixed pillars (4 SOCIAL_SECURITY + 1 HEALTHCARE) on one topic; a topic maps to one pillar. Re-brief Otto to split IESS into pension (SOCIAL_SECURITY) vs health (HEALTHCARE) topics."
+  },
+  "known_gaps": [
+    "core visa/RESIDENCE (cancilleria.gob.ec JS-rendered, 0 facts)",
+    "work authorization (trabajo.gob.ec timeout, 0)",
+    "RUC/tax 183-day rule (sri deep paths 404)",
+    "the tourist-trap fact '90-day entry != work permit' is in rejects (fact_key EC-TOURIST-TRAP:eligibility:90day_no_work) — needs browser-grounding of cancilleria"
+  ]
+}

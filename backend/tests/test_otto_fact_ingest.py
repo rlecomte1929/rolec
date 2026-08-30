@@ -134,6 +134,10 @@ def test_the_france_batch_stays_partial_until_a_file_delivers_the_missing_85():
         # catch them (host ends in `.sg`). Regression guard for the FR->SG batch.
         ("https://www.mom.gov.sg/passes-and-permits/employment-pass/eligibility", OFFICIAL),
         ("https://www.ica.gov.sg/enter-transit-depart/entering-singapore", OFFICIAL),
+        # Ecuador statutory bodies publish under `.gob.ec`; `gob.es` (Spain) does not catch
+        # `.ec`, and the bare `gov` does not either. Regression guard for the US->EC batch.
+        ("https://www.registrocivil.gob.ec/cedulacion/", OFFICIAL),
+        ("https://www.iess.gob.ec/es/afiliados", OFFICIAL),
         ("https://www.campusfrance.org/en/tuition-fees", SEMI_OFFICIAL),
         ("https://some-relocation-blog.com/moving-to-france", UNOFFICIAL),
         ("https://bigmoverslaw.fr/blog/visas", UNOFFICIAL),
