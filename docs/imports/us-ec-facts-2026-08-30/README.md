@@ -4,15 +4,19 @@ First requirement-fact batch for the **greenfield US→EC** corridor (Abraham Ro
 moving to Quito). Ecuador has no free-movement scheme → **third-country / residence-visa** audience:
 `applies_to.nationality="non-EEA"`, `status="professional"`, `corridor="US->EC"`.
 
-## Landed (2 requirements at `review_status='pending'`, `representative`)
+## Landed (1 requirement at `review_status='pending'`, `representative`)
 Otto delivered **14** facts from `.gob.ec` hosts; `verify_ledger.py` reached all 7 pages and confirmed
 13 quotes, 0 rejected (the referee's fetcher read the `.gob.ec` pages Otto's own scraper timed out on).
-Promoted:
+
+**2 `fact_type='other'` facts were then dropped for citation quality** — a bare statistic
+(`stat_167000_cedulas`) and a "homepage lists RUC" note (`ruc_menu_sri`), both citing a `.gob.ec`
+*homepage*, which the `test_check_otto_batches_citations` gate refuses. The SRI RUC "requirement" they
+would have formed was deleted from prod; it rested entirely on that homepage citation. 12 facts remain,
+promoting **1** requirement:
 
 | requirement | pillar | facts |
 |---|---|---|
-| Cédula de identidad para extranjeros con residencia temporal | IDENTITY | 8 (registrocivil.gob.ec) |
-| SRI — RUC mencionado como trámite para personas naturales | EMPLOYMENT | 1 (sri.gob.ec) |
+| Cédula de identidad para extranjeros con residencia temporal | IDENTITY | 7 (registrocivil.gob.ec/cedulacion/) |
 
 Behind the `/admin/countries` gate. EC was greenfield — no pre-existing staged rows, no collisions.
 

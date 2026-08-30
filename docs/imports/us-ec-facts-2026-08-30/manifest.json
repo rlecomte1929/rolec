@@ -16,19 +16,19 @@
   },
   "files": {
     "facts.ndjson": {
-      "records": 14,
-      "sha256": "814c3b061313eb326e6f259dc961238d2315c2be109ef24dfb30e85fc196f011"
+      "records": 12,
+      "sha256": "de54715c193c68889c0e15217b71109b05ac0ed607cdfa9c16a3ed6674d9b147"
     },
     "clean.ndjson": {
-      "records": 14,
-      "sha256": "814c3b061313eb326e6f259dc961238d2315c2be109ef24dfb30e85fc196f011"
+      "records": 12,
+      "sha256": "de54715c193c68889c0e15217b71109b05ac0ed607cdfa9c16a3ed6674d9b147"
     },
     "rejects.ndjson": {
-      "records": 16,
-      "sha256": "796b347e55268323ddeab9b8abeb9cd34d424d164aba35e297ea5e608d11cd47"
+      "records": 14,
+      "sha256": "ea102100e7dad5a9c35b47c504f38bd7b25b9d98bab0cbf343e0ece35e14bf2f"
     }
   },
-  "verification": "verify_ledger.py fetched all 7 distinct pages: 13 quote(s) confirmed, 0 rejected (verify_ledger reached the .gob.ec pages Otto's own scraper could not).",
+  "verification": "verify_ledger confirmed 13/14; after dropping 2 homepage-cited facts_type='other' (a bare statistic + a 'homepage lists RUC' note) to satisfy the citation-quality gate, 12 facts remain.",
   "onboarding": {
     "catalog_key": "EC->ECUADOR already in requirements_country_key (#2105)",
     "allowlist_suffix": "added 'gob.ec' to _OFFICIAL_SUFFIXES (parsers.py) — 5th too-narrow-allowlist instance",
@@ -36,11 +36,10 @@
     "corridor_profile": "corridors/US_EC/corridor.yaml exists (#2105)"
   },
   "landed": {
-    "promoted": 2,
+    "promoted": 1,
     "table": "public.requirement_items (review_status='pending', representative)",
     "requirements": [
-      "Cédula de identidad para extranjeros con residencia temporal (IDENTITY, 8 facts)",
-      "SRI — RUC mencionado como trámite (EMPLOYMENT, 1 fact)"
+      "Cédula de identidad para extranjeros con residencia temporal (IDENTITY, 7 facts)"
     ]
   },
   "blocked": {
@@ -51,5 +50,10 @@
     "work authorization (trabajo.gob.ec timeout, 0)",
     "RUC/tax 183-day rule (sri deep paths 404)",
     "the tourist-trap fact '90-day entry != work permit' is in rejects (fact_key EC-TOURIST-TRAP:eligibility:90day_no_work) — needs browser-grounding of cancilleria"
+  ],
+  "dropped_for_citation_quality": [
+    "EC-CEDULA:other:stat_167000_cedulas (registrocivil.gob.ec homepage — a statistic, not a rule)",
+    "EC-SRI:other:ruc_menu_sri (sri.gob.ec homepage — 'RUC is a menu item', not a requirement) — its SRI RUC requirement was deleted from prod",
+    "2 homepage-citing rejects trimmed (EC-SRI 183-day, EC-TRABAJO homepage)"
   ]
 }
