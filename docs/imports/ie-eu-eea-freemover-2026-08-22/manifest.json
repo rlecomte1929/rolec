@@ -1,0 +1,11 @@
+{
+  "batch_id": "ie-eu-eea-freemover-2026-08-22",
+  "corridor": "EU_EEA_IE",
+  "employee_type": "EU_EEA_FREE_MOVER",
+  "run_date": "2026-08-30",
+  "source_task": "audos-relopass-ie-eu-eea-freemover-bridge-run-1",
+  "record_count": 11,
+  "schema_version": "1.0",
+  "target_directory": "docs/imports/ie-eu-eea-freemover-2026-08-22/",
+  "notes": "Flat schema, nationality=EEA/status=professional. Claude-grounded: 10/11 quotes verbatim-verified against live official pages; 1 (bank proof-of-address) flagged for re-source. review_status=pending."
+}
