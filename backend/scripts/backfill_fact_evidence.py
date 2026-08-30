@@ -69,7 +69,13 @@ log = logging.getLogger("backfill_fact_evidence")
 
 # Matches requirement_fact_extractor._MAX_CONTENT_CHARS. The old value was 5_000, which truncated
 # the article before the requirement in a long page.
+# What we STORE as knowledge_docs.content_excerpt — bounded, because a row is queried often.
 MAX_EXCERPT_CHARS = 24_000
+# What we FETCH and MATCH a quote against. Much larger: statutory sources (eur-lex Directive
+# 2004/38, Reg 883/2004) run to hundreds of KB and the cited article can sit well past 24k.
+# Truncating the MATCH text at 24k false-flagged five sound EU-law quotes as `unverified`
+# (measured 2026-08-30). So we match on the full page and store only the bounded head.
+MAX_MATCH_CHARS = 2_000_000
 FETCH_TIMEOUT_S = 30.0
 
 # Measured 2026-08-20 across the sources behind the approved facts. There is NO single
@@ -249,7 +255,7 @@ def fetch_and_parse(
             # no evidence, instead of leaving them to guess. Another UA will not render it.
             return {"ok": False, "reason": "js_shell_or_empty", "text": "", "blocked": False,
                     "ua": ua}
-        return {"ok": True, "reason": "fetched", "text": parsed[:MAX_EXCERPT_CHARS],
+        return {"ok": True, "reason": "fetched", "text": parsed[:MAX_MATCH_CHARS],
                 "blocked": False, "ua": ua}
 
     # Every identity refused. That is a block, whatever the last status line said.
@@ -332,7 +338,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                 f"{res['reason']:<22} {url}")
 
         source_text = res["text"]
-        sha = hashlib.sha256(source_text.encode("utf-8")).hexdigest() if source_text else None
+        # Match against the full fetched text (below); archive only a bounded head, and
+        # fingerprint what we actually store so change-detection stays consistent.
+        stored_excerpt = source_text[:MAX_EXCERPT_CHARS]
+        sha = hashlib.sha256(stored_excerpt.encode("utf-8")).hexdigest() if stored_excerpt else None
 
         if args.apply:
             # Record the failure too. Writing fetch_status only on success let the column drift
@@ -347,7 +356,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                                fetched_at = :now,
                                last_verified_at = :now
                          WHERE id = :id
-                    """), {"excerpt": source_text, "sha": sha, "now": _now(), "id": doc_id})
+                    """), {"excerpt": stored_excerpt, "sha": sha, "now": _now(), "id": doc_id})
             else:
                 # Leave content_excerpt alone: a previously archived excerpt is still the best
                 # evidence we hold, and a refusal today is no reason to discard it.

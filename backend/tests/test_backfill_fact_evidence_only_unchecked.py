@@ -203,3 +203,25 @@ def test_a_dry_run_writes_nothing_even_with_the_flag(engine):
     bf.main(["--dest", "IE", "--status", "approved", "--only-unchecked"])
     assert _checked_ids(engine) == set()
     assert _verified_of(engine, "unchecked_a") is None
+
+
+def test_match_window_exceeds_stored_excerpt_and_finds_a_quote_past_24k():
+    """[2026-08-30] Statutory pages (eur-lex Directive 2004/38, Reg 883/2004) run past 24k, and
+    the cited article can sit well beyond it. Before the fix, fetch_and_parse truncated the MATCH
+    text at 24k, false-flagging five sound EU-law quotes as `unverified`. We now match on the full
+    page and store only a bounded head.
+    """
+    import importlib
+    m = importlib.import_module("backend.scripts.backfill_fact_evidence")
+    # The match window must be much larger than the stored excerpt.
+    assert m.MAX_MATCH_CHARS > m.MAX_EXCERPT_CHARS
+    assert m.MAX_MATCH_CHARS >= 500_000
+
+    from backend.app.services.fact_evidence import check_evidence, VERIFIED
+    # A quote that only appears ~100k chars into the page — past the old 24k cap.
+    quote = "he is not sent to replace another person"
+    page = ("filler sentence about social security coordination. " * 3000) + \
+           " provided that the anticipated duration of such work does not exceed twenty-four " \
+           "months and that " + quote + ". " + ("more filler. " * 200)
+    assert len(page) > m.MAX_EXCERPT_CHARS  # the quote sits past the stored-excerpt cap
+    assert check_evidence(quote, page).status == VERIFIED
