@@ -137,9 +137,25 @@ def test_rejects_named_individual_email_gdpr():
         validate(make(email="anna.schmidt@acme-movers.de"))
 
 
-@pytest.mark.parametrize("addr", ["info@acme.de", "kontakt@acme.de", "post@acme.no"])
+@pytest.mark.parametrize("addr", [
+    "info@acme.de", "kontakt@acme.de", "post@acme.no",
+    # Widened 2026-08-30 for the moving/relocation trade, which lives on these role inboxes.
+    # A Madrid->Dublin batch published sales@/enquiries@/hq@ and the old list rejected them.
+    "sales@johnmason.com", "enquiries@bishopsmove.com", "hq@whiteandcompany.co.uk",
+    "ventas@mudanzas.es", "comercial@mudanzas.es", "contacto@mudanzas.es",
+    "removals@abels.co.uk", "bookings@mover.ie", "support@mover.ie",
+])
 def test_accepts_company_level_email(addr):
     validate(make(email=addr))  # must not raise
+
+
+@pytest.mark.parametrize("addr", [
+    "anna.schmidt@acme-movers.de", "john@acme.de", "maria.garcia@mudanzas.es",
+])
+def test_still_rejects_named_individual_email(addr):
+    # The widening added role inboxes only — first-name addresses stay rejected (GDPR).
+    with pytest.raises(HarvestRejected):
+        validate(make(email=addr))
 
 
 def test_no_website_falls_back_to_a_name_key_instead_of_rejecting():
