@@ -340,3 +340,75 @@ def test_an_entity_with_no_clean_fact_is_not_landed(tmp_path):
     s = _RecordingSession()
     n = land(s, entities, [f for f in facts if f.verdict == VERDICT_PASS], batch_id="t")
     assert n["entities"] == 1
+
+
+# ── V0: candidate staging (the audit trail) ──────────────────────────────────
+
+stage_candidates = _vl.stage_candidates
+FACT_TYPE_TO_REQUIREMENT_TYPE = _vl.FACT_TYPE_TO_REQUIREMENT_TYPE
+
+
+def _stage(tmp_path, facts, name="stage"):
+    d = _write_batch(tmp_path, [_entity()], facts, name=name)
+    _, all_facts, _ = run_gates(*load_batch(d)[:2], fetcher=_stub_fetcher())
+    s = _RecordingSession()
+    n = stage_candidates(s, all_facts, corridor="US-EC")
+    return s, n, all_facts
+
+
+def test_v0_stages_every_fact_including_the_rejects(tmp_path):
+    """The audit trail must show what was refused. A trail containing only the passes
+    agrees with the outcome by construction and is worth nothing to a re-sourcer."""
+    s, n, facts = _stage(tmp_path, [
+        _fact(),
+        _fact(fact_uid="f-bad", source_url="https://a-blog.example/x"),   # V2 reject
+    ])
+    assert n == 2
+    verdicts = sorted(p["verdict"] for _, p in s.calls)
+    assert verdicts == ["pass", "reject"]
+
+
+@pytest.mark.parametrize("fact_type,expected", [
+    ("document", "document"), ("fee", "fee"), ("eligibility", "eligibility"),
+    ("deadline", "timeline"),          # the rename
+    ("step", "other"),                 # would violate the CHECK unmapped
+    ("where_to_apply", "other"),
+    ("account", "other"),
+    ("other", "other"),
+])
+def test_v0_maps_fact_type_into_the_narrower_candidates_vocabulary(fact_type, expected):
+    """`requirement_fact_candidates.requirement_type` admits only
+    document|fee|timeline|eligibility|other. Four legal requirement_facts types are NOT
+    in it, so an unmapped insert raises 23514."""
+    assert FACT_TYPE_TO_REQUIREMENT_TYPE[fact_type] == expected
+
+
+def test_v0_never_emits_a_requirement_type_the_check_would_reject(tmp_path):
+    live_check = {"document", "fee", "timeline", "eligibility", "other"}
+    s, _, _ = _stage(tmp_path, [_fact(fact_type=t, fact_uid=f"f-{t}")
+                                for t in sorted(FACT_TYPE_TO_REQUIREMENT_TYPE)])
+    emitted = {p["rtype"] for _, p in s.calls}
+    assert emitted <= live_check, emitted - live_check
+
+
+def test_v0_confidence_score_stays_inside_the_check_range(tmp_path):
+    """The candidates CHECK is `> 0 AND <= 1` — a 0.0 would be rejected."""
+    s, _, _ = _stage(tmp_path, [_fact(confidence=c, fact_uid=f"f-{c}")
+                                for c in ("low", "medium", "high")])
+    scores = [p["score"] for _, p in s.calls]
+    assert scores and all(0 < v <= 1 for v in scores)
+
+
+def test_v0_upserts_on_fact_uid_and_preserves_reviewer_state(tmp_path):
+    s, _, _ = _stage(tmp_path, [_fact()])
+    sql = s.calls[0][0]
+    assert "ON CONFLICT (fact_uid)" in sql
+    update = sql.split("DO UPDATE SET", 1)[1]
+    assert "status" not in update
+    assert "reviewed_by" not in update and "reviewed_at" not in update
+
+
+def test_v0_records_the_checks_json_audit_trail(tmp_path):
+    s, _, _ = _stage(tmp_path, [_fact()])
+    checks = json.loads(s.calls[0][1]["checks"])
+    assert set(checks) == {"v1_schema", "v2_source", "v3_evidence"}

@@ -113,6 +113,31 @@ VERDICT_PASS = "pass"
 VERDICT_FLAG = "flag"
 VERDICT_REJECT = "reject"
 
+#: `requirement_facts.fact_type` -> `requirement_fact_candidates.requirement_type`.
+#:
+#: The two tables do not share a vocabulary, and the candidates CHECK is the narrower of
+#: the two: it admits document|fee|timeline|eligibility|other, so `deadline`, `step`,
+#: `where_to_apply` and `account` — all legal on requirement_facts — violate it outright.
+#: Staging without this map raises 23514 on any batch containing a step or a deadline.
+#:
+#: The mapping is LOSSY and deliberately one-way: `step`, `where_to_apply` and `account`
+#: all collapse to `other`, so the candidates row cannot be read back as the authority on
+#: what a fact is. requirement_facts keeps the real type; this is a staging shadow.
+FACT_TYPE_TO_REQUIREMENT_TYPE: Dict[str, str] = {
+    "document": "document",
+    "fee": "fee",
+    "eligibility": "eligibility",
+    "deadline": "timeline",
+    "step": "other",
+    "where_to_apply": "other",
+    "account": "other",
+    "other": "other",
+}
+
+#: `confidence` -> `confidence_score`. The candidates CHECK is `> 0 AND <= 1`, so there is
+#: no zero option: an unknown confidence is `low`, not absent.
+CONFIDENCE_TO_SCORE: Dict[str, float] = {"high": 0.9, "medium": 0.6, "low": 0.3}
+
 #: Stable ids. uuid5 over the batch's natural key means a re-run computes the same uuid
 #: and ON CONFLICT (id) updates in place — `requirement_facts` has no other unique
 #: constraint, so ON CONFLICT on anything else silently matches nothing.
@@ -488,14 +513,80 @@ def main(argv: Optional[List[str]] = None) -> int:
     from backend.app.db import SessionLocal  # noqa: E402
 
     with SessionLocal() as session:
+        # V0 first: the candidates row is the audit trail, and it is written for EVERY
+        # fact including the rejects, which by definition never reach requirement_facts.
+        staged = stage_candidates(session, facts, corridor=batch_id)
         written = land(session, entities, landed, batch_id=batch_id)
-    print(f"\nAPPLIED — {written['entities']} entit(ies), {written['facts']} fact(s) "
+    print(f"\nAPPLIED — {staged} candidate(s) staged, "
+          f"{written['entities']} entit(ies), {written['facts']} fact(s) "
           f"at status='{STATUS_PENDING}' (unserved).")
 
     if args.promote:
         print("\n--promote: hand off to scripts/import_otto_facts.py "
               "(run it directly; this script does not shell out).")
     return 0
+
+
+def stage_candidates(session: Any, facts: List[Fact], *, corridor: str) -> int:
+    """V0: upsert every fact — verdict and all — into `requirement_fact_candidates`.
+
+    EVERY fact, not just the clean ones. This table is the verifier's audit trail: a row
+    rejected at V1 is exactly what someone re-sourcing the batch needs to see, and it
+    never reaches requirement_facts. Writing only the passes would make the trail agree
+    with the outcome by construction.
+
+    Idempotent on `fact_uid`, which the accompanying migration adds together with a
+    partial unique index. Without that column there is no natural key here at all — `id`
+    is a table-generated uuid — so this cannot run until the migration is applied.
+
+    NOTE the type narrowing: `requirement_type` admits fewer values than
+    `requirement_facts.fact_type`, so FACT_TYPE_TO_REQUIREMENT_TYPE collapses four of
+    them onto `other`. See that map for why that is lossy on purpose.
+    """
+    from sqlalchemy import text  # noqa: E402
+
+    sql = text("""
+        INSERT INTO public.requirement_fact_candidates
+            (source_url, corridor, requirement_type, fact_text, confidence_score,
+             source_quote, extraction_method, status, fact_uid, verdict,
+             source_authority_rank, contradiction, checks_json, fetched_at, dimension)
+        VALUES
+            (:url, :corridor, :rtype, :ftext, :score,
+             :quote, :method, :status, :fact_uid, :verdict,
+             :rank, false, cast(:checks as jsonb), :fetched, :dimension)
+        ON CONFLICT (fact_uid) WHERE fact_uid IS NOT NULL DO UPDATE SET
+            source_url            = EXCLUDED.source_url,
+            fact_text             = EXCLUDED.fact_text,
+            source_quote          = EXCLUDED.source_quote,
+            verdict               = EXCLUDED.verdict,
+            source_authority_rank = EXCLUDED.source_authority_rank,
+            checks_json           = EXCLUDED.checks_json,
+            fetched_at            = EXCLUDED.fetched_at
+    """)
+    # `status` and `reviewed_by`/`reviewed_at` are omitted from the UPDATE for the same
+    # reason as in land(): a re-run must not walk back a reviewer's decision.
+
+    n = 0
+    for f in facts:
+        session.execute(sql, {
+            "url": f.source_url or "",
+            "corridor": corridor,
+            "rtype": FACT_TYPE_TO_REQUIREMENT_TYPE.get(f.fact_type, "other"),
+            "ftext": f.fact_text or "",
+            "score": CONFIDENCE_TO_SCORE.get(f.confidence, 0.3),
+            "quote": f.evidence_quote,
+            "method": "verifier_v1",
+            "status": STATUS_PENDING,
+            "fact_uid": f.fact_uid,
+            "verdict": f.verdict,
+            "rank": f.authority_rank,
+            "checks": json.dumps(f.checks),
+            "fetched": f.fetched_at,
+            "dimension": f.fact_type,
+        })
+        n += 1
+    session.commit()
+    return n
 
 
 def land(session: Any, entities: List[Entity], facts: List[Fact], *, batch_id: str) -> Dict[str, int]:
