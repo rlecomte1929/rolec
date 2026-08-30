@@ -1,0 +1,43 @@
+{
+  "batch_id": "fr-sg-providers-2026-08-30",
+  "corridor": "FR-SG",
+  "destination": "SG (Singapore)",
+  "persona": "Adrien",
+  "source": "Otto (Audos) — Singapore Provider Sourcing FR-SG thread, 2026-08-30",
+  "gcs": {
+    "providers_csv": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788110691589_4fidl88r.csv",
+    "blocked_ndjson": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788110764142_sbarzqmp.ndjson"
+  },
+  "files": {
+    "providers.csv": {
+      "records": 21,
+      "sha256": "84d25a201fa4a3915d2b314872f1c9a0f9c409f3e4e860825f43359315f12a0a"
+    },
+    "blocked.json": {
+      "records": 8,
+      "sha256": "3c4a91a2c199983d14af398d5371c077928906fbc742f0757f30970760008659",
+      "note": "JSON array (not .ndjson — provider batches carry no fact stream); JS-blocked registers for browser-grounding"
+    }
+  },
+  "code_dependency": "registry_sources.py — added FR-SG/US-EC to CORRIDORS + 5 SG registers (MAS HTTP_LISTING per-entity; CEA/LawSociety/ACRA/MOE as PUBLIC_REGISTER tier2). parsers.py — 5 SG domains in _DOMAIN_TO_SOURCE.",
+  "landed": {
+    "promoted_pending": 20,
+    "staged": 12,
+    "duplicate": 8,
+    "rejected": 0,
+    "table": "public.supplier_service_capabilities (platform_vetting_status='pending')",
+    "by_category": {
+      "banks": 4,
+      "movers": 5,
+      "housing_agencies": 4,
+      "legal_admin": 3,
+      "schools": 2,
+      "tax_finance": 2
+    }
+  },
+  "evidence_quality": {
+    "strong_per_entity": "banks (MAS /fid/institution/detail/ per-entity pages) + movers (FIDI FAIM per-entity pages)",
+    "claimed_public_register": "legal_admin (Law Society search page), tax_finance (ACRA root — Otto flagged Low confidence, KPMG/EY via BizFile snippets), housing_agencies (CEA ACEAS SPA — but rows carry real CEA licence nos e.g. L3008022J), schools (MOE index) — all staged 'claimed' for the /admin/vetting-queue human to confirm."
+  },
+  "browser_grounding_worklist": "blocked.ndjson lists the JS-blocked per-entity registers to upgrade later: CEA ACEAS (per-agency URLs), Law Society mandatory register, ACRA BizFile+ (per-firm), MOE/CPE (per-school)."
+}

@@ -75,6 +75,12 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("fnaim.fr",                      "FNAIM — annuaire des adhérents (Paris)"),
     ("csdemenagement.fr",             "Chambre Syndicale du Déménagement (CSD) — annuaire adhérents"),
     ("avocatparis.org",               "Barreau de Paris — annuaire des avocats"),
+    # Singapore (FR-SG) — MAS exposes per-entity pages; the rest are PUBLIC_REGISTER SPAs.
+    ("mas.gov.sg",                    "MAS Financial Institutions Directory"),
+    ("cea.gov.sg",                    "CEA Public Register (ACEAS)"),
+    ("lawsociety.org.sg",             "Law Society of Singapore — Find a Lawyer"),
+    ("acra.gov.sg",                   "ACRA Company Register"),
+    ("moe.gov.sg",                    "MOE International Schools List"),
 )
 
 
