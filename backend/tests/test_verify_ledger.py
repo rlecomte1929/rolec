@@ -288,3 +288,112 @@ def test_a_host_unranked_row_still_counts_as_promotable(cfg):
     [v] = verify_lines([_json.dumps(rec)], cfg)
     assert not v.rejected
     assert not v.promote_blocked, [f.code for f in v.findings if f.blocks_promote]
+
+
+# ── V3: is the quote actually on the page? ───────────────────────────────────
+#
+# Everything above is offline. V3 needs a page, so these drive
+# `check_evidence_grounding` directly with the text a fetch would have produced — no
+# network, and no second matcher: the verdict comes from `fact_evidence.check_evidence`,
+# the same function that produced the 357 verified rows in `requirement_facts`.
+#
+# The case that matters is the LAST one. Until this gate existed, nothing between Otto
+# and `requirement_items` compared a quote to its source, and a paraphrase of the right
+# page scored exactly like a quotation from it.
+
+from backend.imports.otto.verifier import check_evidence_grounding  # noqa: E402
+
+# Long enough to clear MIN_USABLE_SOURCE_CHARS (200) in fact_evidence.
+_PAGE = (
+    "Votre domicile fiscal est en France si la residence habituelle de votre foyer est "
+    "France. Votre foyer est constitue de votre famille et de vous. Vous etes egalement "
+    "domicilie fiscalement en France si vous y exercez une activite professionnelle, "
+    "salariee ou non, a moins que celle-ci ne soit exercee a titre accessoire, ou si vous "
+    "y avez le centre de vos interets economiques."
+)
+
+
+def _ground(quote, page=_PAGE, ok=True, reason=""):
+    return check_evidence_grounding(
+        {"evidence_quote": quote}, page, fetch_ok=ok, fetch_reason=reason)
+
+
+def test_v3_passes_a_quote_that_is_on_the_page():
+    findings, verified, offset = _ground("Votre foyer est constitue de votre famille et de vous")
+    assert findings == []
+    assert verified is True
+    assert offset is not None
+
+
+def test_v3_rejects_a_quote_the_page_does_not_contain():
+    """THE gate. A page we read successfully that does not contain the quote is the
+    damning case, and the only one that rejects."""
+    findings, verified, offset = _ground("The registration fee is EUR 9999")
+    assert [f.code for f in findings] == ["quote_not_on_page"]
+    assert findings[0].severity == "reject"
+    assert findings[0].blocks_promote is True
+    assert verified is False
+    assert offset is None
+
+
+def test_v3_warns_but_does_not_reject_an_unreadable_source():
+    """robots.txt / 403 / JS shell says nothing about the quote. A transient outage has
+    already faked a dead source once (a live HSE URL, 2026-08-22), which is why V2
+    liveness warns rather than rejects — V3 must not be stricter about the same fact."""
+    findings, verified, offset = _ground("anything", ok=False, reason="robots_disallowed")
+    assert [f.code for f in findings] == ["source_unreadable"]
+    assert findings[0].severity == "warn"
+    assert verified is None          # NOT False — the check did not apply
+    assert offset is None
+
+
+def test_v3_does_not_reject_a_page_too_thin_to_judge():
+    findings, verified, _ = _ground("anything at all", page="short")
+    assert [f.code for f in findings] == ["source_unreadable"]
+    assert findings[0].severity == "warn"
+    assert verified is None
+
+
+def test_v3_warns_on_a_missing_quote_rather_than_rejecting():
+    findings, verified, _ = _ground("")
+    assert [f.code for f in findings] == ["no_quote"]
+    assert findings[0].severity == "warn"
+    assert verified is None
+
+
+def test_v3_verified_is_tristate_not_boolean():
+    """None and False mean different things, and the tier downgrade tests `is False`.
+    Collapsing them would drop the tier of every row whose source merely blocks crawlers."""
+    assert _ground("Votre foyer est constitue de votre famille et de vous")[1] is True
+    # Must be FRENCH. An English sentence against a French page is TRANSLATED — "a verbatim
+    # match is impossible by construction" — which returns None, not False. That distinction
+    # is the whole reason the 97 French facts are not in the suspect pile.
+    assert _ground("Vous devez declarer vos revenus avant le trente et un mai chaque annee")[1] is False
+    assert _ground("x", ok=False, reason="http_403")[1] is None
+
+
+def test_v3_does_not_condemn_an_english_quote_on_a_french_page():
+    """The TRANSLATED escape hatch, exercised end-to-end through the gate: a language
+    mismatch is a WARN with a None verdict, never a rejection."""
+    findings, verified, _ = _ground("You must file your income tax return before 31 May each year")
+    assert [f.code for f in findings] == ["quote_language_mismatch"]
+    assert findings[0].severity == "warn"
+    assert verified is None
+
+
+def test_v3_catches_a_paraphrase_of_the_right_page():
+    """The real defect, from the NO→FR transition batch (docs/imports/
+    no-fr-transition-requirements-2026-08-22/VERIFICATION-2026-08-30.md).
+
+    The cited page was the RIGHT page and fetched cleanly. It says "la residence
+    habituelle de votre foyer est France". The batch stored, as a verbatim quote, "le lieu
+    ou vous habitez normalement avec votre conjoint ou partenaire de pacs et vos enfants"
+    — substantively consistent, and not the page's words. Every gate that shipped before
+    V3 passed it: official publisher, non-empty quote, plausible prose.
+    """
+    paraphrase = ("Votre domicile fiscal est en France si votre foyer y est situe, "
+                  "c'est-a-dire le lieu ou vous habitez normalement avec votre conjoint "
+                  "ou partenaire de pacs et vos enfants.")
+    findings, verified, _ = _ground(paraphrase)
+    assert [f.code for f in findings] == ["quote_not_on_page"]
+    assert verified is False

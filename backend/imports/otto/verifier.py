@@ -134,6 +134,11 @@ class Verdict:
     findings: List[Finding] = field(default_factory=list)
     source_rank: Optional[int] = None
     source_class: Optional[str] = None
+    #: V3 outcome, mirroring `public.requirement_facts`. Tri-state: True = the quote is on the
+    #: cited page, False = the page was read and it is not, None = the check did not run or could
+    #: not apply. Populated by the second pass in `verify_ledger`, which owns the fetch.
+    evidence_verified: Optional[bool] = None
+    evidence_offset: Optional[int] = None
 
     @property
     def rejected(self) -> bool:
@@ -332,6 +337,96 @@ def check_record(rec: Dict[str, Any], cfg: Dict[str, Any]) -> Tuple[List[Finding
                 f"host {_host(url)!r} is not in the authority allowlist — no rank assigned"))
 
     return findings, rank, source_class
+
+
+# --------------------------------------------------------------------------- V3
+
+
+def check_evidence_grounding(
+    rec: Dict[str, Any],
+    page_text: Optional[str],
+    *,
+    fetch_ok: bool,
+    fetch_reason: str = "",
+) -> Tuple[List[Finding], Optional[bool], Optional[int]]:
+    """V3: is the `evidence_quote` actually on the page it cites?
+
+    Returns (findings, evidence_verified, evidence_offset). The two extra values mirror
+    `public.requirement_facts` and are persisted onto the staging row, so the answer survives
+    the run instead of living only in a report nobody re-reads.
+
+    Runs SEPARATELY from `check_record` because it needs the network, and the fetch has already
+    happened for V2 liveness — `verify_ledger._fetch_liveness` keeps the parsed text rather than
+    discarding it, so V3 costs no extra request.
+
+    WHY THIS GATE EXISTS. Until it did, nothing between Otto and `requirement_items` ever
+    compared a quote to its source. Measured on the NO→FR transition batch (15 facts, every one
+    `auto_accepted`): 3 quotes were on the page they cited. One was a paraphrase of the right
+    page — "la résidence habituelle de votre foyer est France" stored as "le lieu où vous habitez
+    normalement avec votre conjoint ou partenaire de pacs". `evidence_quote` is what a reviewer
+    trusts to re-check a claim without leaving the queue, so a reconstructed sentence there is
+    worse than an empty one: it reads as proof.
+
+    ONLY ONE OUTCOME REJECTS, and the distinction is the whole design:
+
+        page read + quote absent   REJECT  the damning case. We have the source, it is the same
+                                           language, and the quote is not in it.
+        source unreadable          WARN    robots.txt, 403, a JS shell. Says nothing about the
+                                           quote. A transient outage has already faked a dead
+                                           source once (a live HSE URL, 2026-08-22), and V2
+                                           liveness warns rather than rejects for exactly this
+                                           reason — V3 must not be stricter about the same fact.
+        language mismatch          WARN    TRANSLATED: a verbatim match is impossible by
+                                           construction. Folding these into a rejection would
+                                           condemn 97 sound French facts.
+        no quote at all            WARN    already a `grade()` downgrade; flagged, not rejected.
+
+    The matcher is `fact_evidence.check_evidence` and must stay that way. It is pure, tested
+    against planted errors, and carries the TRANSLATED verdict this gate depends on. A second
+    matcher here would drift from the one that produced the 357 verified rows in
+    `requirement_facts`.
+    """
+    from backend.app.services.fact_evidence import (  # noqa: WPS433 - keeps the import graph flat
+        TRANSLATED,
+        UNVERIFIED,
+        VERIFIED,
+        check_evidence,
+    )
+
+    quote = str(rec.get("evidence_quote") or "").strip()
+    if not quote:
+        return ([Finding(WARN, "V3", "no_quote",
+                         "no evidence_quote — the claim cannot be re-checked from the row")],
+                None, None)
+
+    if not fetch_ok:
+        return ([Finding(WARN, "V3", "source_unreadable",
+                         f"could not read the source to check the quote ({fetch_reason or 'unknown'}) "
+                         "— this says nothing about the quote itself")],
+                None, None)
+
+    result = check_evidence(quote, page_text or "")
+
+    if result.status == VERIFIED:
+        return [], True, result.offset
+
+    if result.status == TRANSLATED:
+        return ([Finding(WARN, "V3", "quote_language_mismatch",
+                         "the source is in a different language from the quote, so a verbatim "
+                         "match is impossible by construction — the check does not apply")],
+                None, None)
+
+    if result.status == UNVERIFIED:
+        return ([Finding(REJECT, "V3", "quote_not_on_page",
+                         "the cited page was read and does not contain this quote — re-quote it "
+                         "verbatim from the source, or cite the page that actually says it")],
+                False, None)
+
+    # NO_SOURCE: fetched, but too little usable text to judge against (a nav stub, a JS shell).
+    return ([Finding(WARN, "V3", "source_unreadable",
+                     "the cited page yielded too little text to check a quote against — usually a "
+                     "bare domain or a JavaScript-rendered page")],
+            None, None)
 
 
 # --------------------------------------------------------------------------- driver
