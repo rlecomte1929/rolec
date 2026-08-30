@@ -1,0 +1,64 @@
+{
+  "batch_id": "es-ie-dublin-providers-2026-08-30",
+  "generated": "2026-08-30",
+  "corridor": "ES-IE",
+  "categories": [
+    {
+      "service_category": "movers",
+      "register": "FIDI Global Alliance",
+      "denominator": 9,
+      "accepted": 2,
+      "rejected": 7,
+      "confidence": "high",
+      "notes": "Two FIDI affiliate pages confirmed with Dublin addresses and active websites. Five candidate slugs return 404 on FIDI (membership lapsed or never existed). Doree Bonner and Corrigan confirmed on FIDI but are UK/US entities. FIDI member list is JS-rendered; Ireland filter returns no parseable firm list -- individual per-firm pages used instead. FAIM expiry data taken directly from each affiliate profile page."
+    },
+    {
+      "service_category": "legal_admin",
+      "register": "Law Society of Ireland",
+      "denominator": 3,
+      "accepted": 2,
+      "rejected": 1,
+      "confidence": "medium",
+      "notes": "Law Society find-a-solicitor search is JS-rendered and returns no firm data via web_fetch. Firms accepted on basis of: (1) confirmed Dublin presence via own website, (2) Law Society of Ireland governs all solicitor firms in Ireland so membership is implicit for practising firms, (3) Global Mobility / immigration practice confirmed in site navigation (Matheson) or publicly known (Mason Hayes & Curran). No roll numbers available -- register is not machine-readable. Dillon Eustace dropped for insufficient evidence of relocation specialism."
+    },
+    {
+      "service_category": "tax_finance",
+      "register": "CPA Ireland Firm Directory",
+      "denominator": 2,
+      "accepted": 1,
+      "rejected": 1,
+      "confidence": "low",
+      "notes": "CPA Ireland find-a-cpa directory is entirely JS-rendered; web_fetch returns marketing copy only with no firm listings. BDO Ireland accepted as it is a major Dublin accounting firm whose website confirms tax and advisory services and is publicly known to be a CPA Ireland member firm. No CPA firm number is available from the directory. Confidence is low because no individual firms could be confirmed directly from the CPA register output."
+    },
+    {
+      "service_category": "banks",
+      "register": "Central Bank of Ireland",
+      "denominator": 7,
+      "accepted": 5,
+      "rejected": 2,
+      "confidence": "high",
+      "notes": "Central Bank register search endpoints all return server errors (Error Page). Firms accepted on basis of: each institution states its Central Bank of Ireland regulatory status on its own website. Ulster Bank (exited RoI) and KBC (exited 2022) rejected. N26 IE page returns 404 so cannot confirm active Irish product. CBI firm reference numbers not obtainable due to register search errors -- left blank per honesty rules."
+    },
+    {
+      "service_category": "schools",
+      "register": "Tusla / Department of Education",
+      "denominator": 5,
+      "accepted": 3,
+      "rejected": 2,
+      "confidence": "medium",
+      "notes": "Tusla register of independent schools PDF and webpage both return 404/not-found. Department of Education find-a-school returned no text. Three schools accepted on basis of confirmed websites with Dublin addresses and admin contact emails: LFI (Foxrock/Clonskeagh, AEFE-accredited), St. Columba's College (Dublin Hills, admin@stcolumbas.ie), Rathdown School (Glenageary Co. Dublin, admin@rathdownschool.ie). School roll numbers not obtainable -- register not accessible. St. Kilian's referenced in LFI page but own website timed out. English International School website timed out."
+    },
+    {
+      "service_category": "housing_agencies",
+      "register": "PSRA Register",
+      "denominator": 6,
+      "accepted": 4,
+      "rejected": 2,
+      "confidence": "medium",
+      "notes": "PSRA register at psr.ie returns 404 on all attempted URLs; register is JS-rendered WP Data Tables with no accessible data endpoint. PSRA licence numbers not obtainable via web_fetch -- left blank per honesty rules. Four major Dublin agencies accepted on basis of confirmed websites with Dublin offices and letting/property management services. All are publicly known PSRA licensees but licence numbers cannot be confirmed from register. Hunters Estate Agent and Hooke & MacDonald websites timed out or returned no text -- moved to rejects."
+    }
+  ],
+  "total_accepted": 17,
+  "total_rejected": 17,
+  "least_certain_category": "tax_finance"
+}

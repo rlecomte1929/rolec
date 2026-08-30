@@ -39,19 +39,24 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-# The two corridors in scope. Must match corridor_coverage_targets.corridor EXACTLY —
-# verified 2026-08-10: 20 rows, 0 unmapped against supplier_service_categories.
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO")
+# Corridors in scope. The original FR-DE / FR-NO pair was the AIQ-1788 harvest; ES-IE (Andrea,
+# Madrid→Dublin) and NO-FR (Denis, Norway→Paris) were added 2026-08-30 as the Otto provider
+# batches for the two demo corridors came in. Note `validate()` does NOT gate on corridor — this
+# tuple only bounds which (corridor, category) pairs the run report and source metadata cover, so
+# adding a corridor never loosens validation; it just lets a source declare it honestly.
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR")
 
-# The five categories with live suppliers today. rmc / dsp / healthcare_ipmi /
-# language_cultural are deliberately OUT of scope for this run: zero suppliers and weaker
-# public registries. They need their own task, not a weaker source here.
+# Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
+# Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
+# language_cultural stay OUT of scope: zero suppliers and weaker public registries — their own
+# task, not a weaker source here.
 CATEGORIES: Tuple[str, ...] = (
     "movers",
     "housing_agencies",
     "legal_admin",
     "tax_finance",
     "banks",
+    "schools",
 )
 
 
@@ -70,6 +75,16 @@ class Acquisition(str, Enum):
     #: Confirmed NOT publicly usable. Kept so the run report can say why, and so nobody
     #: silently substitutes a weaker source for this pair.
     UNAVAILABLE = "unavailable"
+    #: A public/statutory register that is authoritative for membership but exposes NO stable
+    #: per-entity URL — the register answers only a search form or a flat page (Ireland's Law
+    #: Society, PSRA, Tusla and the Central Bank register are all this shape). The row cites the
+    #: register page rather than a per-entity record, so it CANNOT self-evidence one company the
+    #: way an entry_url_pattern demands. It is admitted at TIER 2 only, staged `claimed`, and the
+    #: human at /admin/vetting-queue confirms the firm against the register — which is what that
+    #: gate exists for. This is a deliberate, founder-approved exception to the "a search page
+    #: evidences nobody" rule, scoped to genuinely permalink-less STATUTORY registers; it must
+    #: never be used to launder a provider's own site (that is still SELF_DECLARED / tier 3).
+    PUBLIC_REGISTER = "public_register"
 
 
 @dataclass(frozen=True)
@@ -107,12 +122,22 @@ class RegistrySource:
         for c in self.categories:
             if c not in CATEGORIES:
                 raise ValueError(f"{self.name}: unknown category {c!r}")
+        # A permalink-less statutory register (PUBLIC_REGISTER) is the ONE case allowed to skip
+        # entry_url_pattern — and only at tier 2, so its rows stage at reduced confidence and are
+        # human-confirmed. Anything higher would let a register root pose as verified provenance.
+        if self.acquisition is Acquisition.PUBLIC_REGISTER and self.tier != 2:
+            raise ValueError(
+                f"{self.name}: PUBLIC_REGISTER is tier 2 only — no per-entity URL means reduced "
+                "confidence, staged 'claimed' for the vetting-queue human to confirm"
+            )
         # Last, so a source with several problems still reports the more basic one first.
         # Mandatory rather than opt-in: an unguarded ingestable source is exactly how the
         # search-page hole appeared, and the next domain someone adds would reopen it.
+        # UNAVAILABLE has nothing to read; PUBLIC_REGISTER has no per-entity URL by nature and
+        # carries its reduced-confidence tier-2 rule above instead.
         if (
             self.tier < 3
-            and self.acquisition is not Acquisition.UNAVAILABLE
+            and self.acquisition not in (Acquisition.UNAVAILABLE, Acquisition.PUBLIC_REGISTER)
             and not self.entry_url_pattern
         ):
             raise ValueError(
@@ -356,6 +381,67 @@ SOURCES: Tuple[RegistrySource, ...] = (
             "BRAIN-3C sense, so entity confirmation is all this proves — see "
             "confidence_for()."
         ),
+    ),
+    # ── Ireland (ES-IE / Andrea, Madrid→Dublin) ──────────────────────────────
+    #
+    # Otto's Dublin register preflight (2026-08-30) confirmed all five below are the
+    # authoritative registers for their category, but NONE exposes a stable per-entity URL —
+    # each answers only a search form (Law Society, CPA, Central Bank) or a flat register page
+    # (Tusla, PSRA). So a harvested row cites the register page, not a record. Founder decision
+    # 2026-08-30: admit them as PUBLIC_REGISTER (tier 2, staged `claimed`) rather than lose 15 of
+    # 17 real Dublin providers to the permalink rule; the /admin/vetting-queue human confirms each
+    # firm against the register. See the PUBLIC_REGISTER docstring for the rationale and its limits.
+    RegistrySource(
+        name="Law Society of Ireland — Find a Solicitor",
+        base_url="https://www.lawsociety.ie/Find-a-Solicitor/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE",),
+        categories=("legal_admin",),
+        notes="Mandatory register — every practising solicitor in Ireland is on it. Search form, "
+              "no per-entity URL; vetter confirms the firm's roll entry by name.",
+    ),
+    RegistrySource(
+        name="CPA Ireland — firm directory",
+        base_url="https://www.cpaireland.ie/find-a-cpa/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE",),
+        categories=("tax_finance",),
+        notes="No mandatory public register for Irish tax advisors; CPA Ireland's directory is the "
+              "strongest available. Professional body, not statutory — tier 2 is the ceiling anyway.",
+    ),
+    RegistrySource(
+        name="Central Bank of Ireland — Register of Authorised Firms",
+        base_url="https://registers.centralbank.ie/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE",),
+        categories=("banks",),
+        notes="Statutory register of authorised credit institutions. Search form, no per-entity "
+              "URL. Banks are capped at tier 2 by effective_tier regardless — entity/licence "
+              "confirmation only, nothing about relocation-banking fitness.",
+    ),
+    RegistrySource(
+        name="Tusla — Register of Independent Schools",
+        base_url="https://www.tusla.ie/services/preschool-services/independent-schools/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE",),
+        categories=("schools",),
+        notes="Statutory register of private independent schools. Published as a single flat HTML "
+              "page — no per-school URL; vetter confirms the school by name on that page.",
+    ),
+    RegistrySource(
+        name="PSRA — Register of Licensed Property Services Providers",
+        base_url="https://www.psr.ie/en/psra/register/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE",),
+        categories=("housing_agencies",),
+        notes="Statutory mandatory register — every letting/estate agent in Ireland must hold a "
+              "PSRA licence. Search form, no per-entity URL; the licence number is the vetter's "
+              "check against the register.",
     ),
 )
 
