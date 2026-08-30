@@ -7,6 +7,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CityPicker, CountryPicker } from '../../components/location';
 import { Input } from '../../components/antigravity/Input';
 import { Alert, Button, Card } from '../../components/antigravity';
+import { Checkbox } from '../../components/antigravity/Checkbox';
+import { BulkActionBar, type BulkActionResult } from '../../components/antigravity/BulkActionBar';
+import { useRowSelection } from '../../hooks/useRowSelection';
 import {
   addAllowlistEntry,
   fillDemandGap,
@@ -59,6 +62,20 @@ export const AdminCatalogQueuePage: React.FC = () => {
   const [newNotes, setNewNotes] = useState('');
   const [adding, setAdding] = useState(false);
 
+  // AIQ-1894: bulk approve/reject for pending scrape requests. Reuses the shared
+  // useRowSelection (select-all is over VISIBLE pending rows; selection clears when
+  // the tab changes) and the BulkActionBar toolbar.
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkResult, setBulkResult] = useState<BulkActionResult>('idle');
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const getTicketId = useCallback((t: DestinationRequest) => t.id, []);
+  const pendingTickets = useMemo(
+    () => tickets.filter((t) => t.status === 'pending'),
+    [tickets],
+  );
+  const selection = useRowSelection(pendingTickets, getTicketId, tab);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -103,6 +120,37 @@ export const AdminCatalogQueuePage: React.FC = () => {
     } finally {
       setResolvingId(null);
     }
+  };
+
+  // AIQ-1894: apply one action to every selected pending request. allSettled so one
+  // failure doesn't hide the rest — the bar reports how many succeeded vs failed.
+  const bulkResolve = async (status: 'approved' | 'rejected') => {
+    const ids = selection.selectedRows.map((t) => t.id);
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    setBulkResult('busy');
+    setBulkMessage(null);
+    setBulkError(null);
+    setError(null);
+    setInfo(null);
+    const outcomes = await Promise.allSettled(
+      ids.map((id) => resolveDestinationRequest(id, status)),
+    );
+    const failed = outcomes.filter((o) => o.status === 'rejected').length;
+    const ok = outcomes.length - failed;
+    const verb = status === 'approved' ? 'Approved' : 'Rejected';
+    setBulkBusy(false);
+    if (failed === 0) {
+      setBulkResult('done');
+      setBulkMessage(`${verb} ${ok} request${ok === 1 ? '' : 's'}.`);
+    } else {
+      setBulkResult('error');
+      setBulkError(
+        `${ok} ${verb.toLowerCase()}, ${failed} failed — retry the failed rows individually.`,
+      );
+    }
+    selection.clear();
+    await loadAll();
   };
 
   const addEntry = async () => {
@@ -306,6 +354,43 @@ export const AdminCatalogQueuePage: React.FC = () => {
             ))}
           </div>
         </div>
+        {tab === 'pending' && pendingTickets.length > 0 && (
+          <div className="mb-3">
+            <label className="mb-2 flex w-fit cursor-pointer items-center gap-2 text-sm text-[#374151]">
+              <Checkbox
+                className="h-4 w-4 rounded border-[#cbd5e1]"
+                checked={selection.allVisibleSelected}
+                onChange={(e) => selection.toggleAll(e.target.checked)}
+                disabled={bulkBusy}
+              />
+              Select all pending ({pendingTickets.length})
+            </label>
+            <BulkActionBar
+              count={selection.selectedRows.length}
+              busy={bulkBusy}
+              result={bulkResult}
+              successMessage={bulkMessage ?? undefined}
+              errorMessage={bulkError}
+              onClear={() => selection.clear()}
+            >
+              <Button
+                size="sm"
+                onClick={() => void bulkResolve('approved')}
+                disabled={bulkBusy}
+              >
+                {bulkBusy ? 'Working…' : `Approve & allowlist (${selection.selectedRows.length})`}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void bulkResolve('rejected')}
+                disabled={bulkBusy}
+              >
+                Reject ({selection.selectedRows.length})
+              </Button>
+            </BulkActionBar>
+          </div>
+        )}
         {loading && tickets.length === 0 ? (
           <div className="space-y-2 py-3">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -324,7 +409,17 @@ export const AdminCatalogQueuePage: React.FC = () => {
               return (
                 <li key={t.id} className="p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 items-start gap-3">
+                      {t.status === 'pending' && (
+                        <Checkbox
+                          className="mt-1 h-4 w-4 shrink-0 rounded border-[#cbd5e1]"
+                          checked={selection.isSelected(t.id)}
+                          onChange={() => selection.toggle(t.id)}
+                          disabled={bulkBusy}
+                          aria-label={`Select ${t.city}, ${t.country}`}
+                        />
+                      )}
+                      <div className="min-w-0">
                       <div className="font-medium text-[#0b2b43]">
                         {t.city}, {t.country}
                         <span className="ml-2 text-xs font-normal text-slate-500">
@@ -351,18 +446,19 @@ export const AdminCatalogQueuePage: React.FC = () => {
                         </p>
                       )}
                     </div>
+                    </div>
                     {t.status === 'pending' && (
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
                           onClick={() => void resolve(t.id, 'rejected')}
-                          disabled={saving}
+                          disabled={saving || bulkBusy}
                         >
                           Reject
                         </Button>
                         <Button
                           onClick={() => void resolve(t.id, 'approved')}
-                          disabled={saving}
+                          disabled={saving || bulkBusy}
                         >
                           {saving ? 'Saving…' : 'Approve & allowlist'}
                         </Button>
