@@ -1,0 +1,38 @@
+[
+  {
+    "register_name": "FIDI affiliate finder",
+    "category": "movers",
+    "url": "https://fidi.org/find-fidi-affiliate",
+    "reason": "Per-entity affiliate profile pages are JavaScript-rendered and return 404 at all tested static URL slug patterns (/find-fidi-affiliate/{slug}, /affiliate/{slug}, /member/{slug}, /find-fidi-affiliate/insa/, /affiliate/insa/). The finder page static HTML does list all affiliate names alphabetically but contains no per-entity hrefs — filtering and detail cards are loaded by JS from an internal API. INSA International Shipping & Storage is confirmed as the sole Ecuador FIDI-FAIM certified mover (insa.com.ec, info@insa.com.ec, Quito office: Av. Galo Plaza Lasso N50-193 y Rafael Bustamante, Quito 170512) — excluded from CSV because no valid per-entity source_url could be retrieved. Repo agent action: use browser automation on https://fidi.org/find-fidi-affiliate, select Ecuador from the country dropdown, click the INSA card, and capture the resulting per-entity URL."
+  },
+  {
+    "register_name": "CAINEC Great Place Inmobiliario",
+    "category": "housing_agencies",
+    "url": "https://www.cainec.com/greatplace.php",
+    "reason": "Per-entity 'Ver ficha' links are JavaScript-driven; all guessed static URL patterns (/greatplace-ficha/{slug}, /greatplace-ficha/?empresa={slug}) return the CAINEC homepage. 7 firms confirmed in register static HTML (city not filterable statically, Quito status unverified): FORXA INMOBILIARIA (PLATINUM, Activa), EDENCORP S.A. (PLATINUM, Activa), Aquaterra (GOLD, Activa), Ksa Inmobiliaria (GOLD, Activa), Huasi360 (GOLD, Activa), Gerardo Patricio Tacuri Guerrero (SILVER, Activa), IMMOBILLIS (SILVER, Activa). Firm own domains attempted (forxainmobiliaria.com, forxa.ec, edencorp.com.ec, huasi360.com, aquaterra.com.ec, ksainmobiliaria.com.ec) — all returned no text. Repo agent action: use browser automation on https://www.cainec.com/greatplace.php, click each 'Ver ficha' button, capture per-entity URL and contact email."
+  },
+  {
+    "register_name": "Superintendencia de Bancos — Catastro Público",
+    "category": "banks",
+    "url": "https://superbancos.gob.ec/bancos/catastro-publico/",
+    "reason": "Static scraper received empty response (no text). Register is JavaScript-rendered. 0 firms examined. Repo agent action: use browser automation to render the catastro público page and extract bank entities with Quito branches."
+  },
+  {
+    "register_name": "MinEduc AMIE — Censo Nacional de Instituciones Educativas",
+    "category": "schools",
+    "url": "http://web.educacion.gob.ec/CNIE",
+    "reason": "Scrape timed out after 2 minutes. Page did not respond to static scraper. 0 firms examined. Repo agent action: use browser automation; filter for international/bilingual private schools in Quito (province: Pichincha). Sostenimiento = Particular (private)."
+  },
+  {
+    "register_name": "Colegio de Abogados de Pichincha — Directorio Profesional",
+    "category": "legal_admin",
+    "url": "https://www.abogadospichincha.com/directorio-profesional/",
+    "reason": "Directory is served inside an iframe at https://www.abogadospichincha.com/profesionales/ (confirmed from page source tag: [iframe src='https://www.abogadospichincha.com/profesionales/' height='1500px']). Both the outer page and the iframe URL timed out under static scraping. 0 firms examined. Repo agent action: use browser automation on directorio-profesional, wait for iframe to fully render, then search or browse for lawyers specialising in immigration / derecho migratorio in Quito."
+  },
+  {
+    "register_name": "Colegio de Contadores Públicos del Ecuador — Firmas Auditoras Afiliadas 2026",
+    "category": "tax_finance",
+    "url": "https://ccpp.org.ec",
+    "reason": "Homepage confirms a 'FIRMAS AUDITORAS AFILIADAS 2026' section exists, but its URL is unknown — the homepage navigation lists it as a menu item with no visible href in the static HTML. All path guesses return 404: /socios, /directorio, /afiliados, /firmas-auditoras, /firmas-auditoras-afiliadas, /campus-virtual. Member registry likely login-gated (Login/Registro menu visible). 0 firms examined. Repo agent action: load https://ccpp.org.ec with browser automation, inspect nav for the 'FIRMAS AUDITORAS AFILIADAS 2026' link href, then fetch that page."
+  }
+]
