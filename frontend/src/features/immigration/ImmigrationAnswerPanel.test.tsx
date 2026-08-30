@@ -78,4 +78,38 @@ describe('ImmigrationAnswerPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /ask/i }));
     await waitFor(() => expect(screen.getByText(/enough official, corridor-specific/i)).toBeInTheDocument());
   });
+
+  it('renders the answer as markdown — headings, bold, GFM tables — not raw source (AIQ-1869)', async () => {
+    mockAsk.mockResolvedValue({
+      answer_text: [
+        '## Work Permit Requirements',
+        '',
+        'You need a **Blue Card**.',
+        '',
+        '| Step | Action |',
+        '| --- | --- |',
+        '| 1 | Apply online |',
+      ].join('\n'),
+      answer_kind: 'answer',
+      cited_sources: [],
+      confidence: 'high',
+      trace_id: 'tr-md',
+    });
+    render(<ImmigrationAnswerPanel caseContext={{ ...CASE_CTX }} />);
+    fillQuestion();
+    fireEvent.click(screen.getByRole('button', { name: /ask/i }));
+
+    // Heading is a real element, not a literal "##".
+    const heading = await screen.findByText('Work Permit Requirements');
+    expect(heading.tagName).toMatch(/^H[1-6]$/);
+    expect(screen.queryByText(/## Work Permit/)).toBeNull();
+
+    // Bold renders as <strong>, not literal "**".
+    expect(screen.getByText('Blue Card').tagName).toBe('STRONG');
+
+    // GFM table renders, not literal pipes.
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.getByText('Apply online')).toBeInTheDocument();
+    expect(screen.queryByText(/\| Step \|/)).toBeNull();
+  });
 });
