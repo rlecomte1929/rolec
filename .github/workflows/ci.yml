@@ -28,18 +28,25 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      frontend: ${{ steps.filter.outputs.frontend }}
-      backend: ${{ steps.filter.outputs.backend }}
+      # AIQ-2092: `steps.bigpr.outputs.over_filter_cap` is OR'd into EVERY filter below.
+      # dorny/paths-filter resolves changed files via the PR Files API, which returns at
+      # most 3000 files; past that the list is truncated, every unmatched filter reads
+      # `false`, and the jobs they gate skip — green, nothing checked (PR #1974: 16,101
+      # files, all guards skipped). When the PR is at/over the cap we force ALL filters ON
+      # and let each job/guard decide. Same shape and rationale as the `stacked` step's
+      # `untrusted_base`: a filter TRIGGER we cannot trust must fail closed, never open.
+      frontend: ${{ steps.filter.outputs.frontend == 'true' || steps.bigpr.outputs.over_filter_cap == 'true' }}
+      backend: ${{ steps.filter.outputs.backend == 'true' || steps.bigpr.outputs.over_filter_cap == 'true' }}
       # A stacked PR's diff base is its PARENT branch, which already contains the
       # parent's migrations — so paths-filter reports `false` and every migration
       # guard skips. See the `stacked` step below. OR'd, never replaced: on a normal
       # PR this is byte-identical to what it was.
-      migrations: ${{ steps.filter.outputs.migrations == 'true' || steps.stacked.outputs.untrusted_base == 'true' }}
-      workflows: ${{ steps.filter.outputs.workflows }}
-      edge_functions: ${{ steps.filter.outputs.edge_functions }}
-      case_id_writers: ${{ steps.filter.outputs.case_id_writers == 'true' || steps.stacked.outputs.untrusted_base == 'true' }}
-      orm_models: ${{ steps.filter.outputs.orm_models == 'true' || steps.stacked.outputs.untrusted_base == 'true' }}
-      corridor_facts: ${{ steps.filter.outputs.corridor_facts }}
+      migrations: ${{ steps.filter.outputs.migrations == 'true' || steps.stacked.outputs.untrusted_base == 'true' || steps.bigpr.outputs.over_filter_cap == 'true' }}
+      workflows: ${{ steps.filter.outputs.workflows == 'true' || steps.bigpr.outputs.over_filter_cap == 'true' }}
+      edge_functions: ${{ steps.filter.outputs.edge_functions == 'true' || steps.bigpr.outputs.over_filter_cap == 'true' }}
+      case_id_writers: ${{ steps.filter.outputs.case_id_writers == 'true' || steps.stacked.outputs.untrusted_base == 'true' || steps.bigpr.outputs.over_filter_cap == 'true' }}
+      orm_models: ${{ steps.filter.outputs.orm_models == 'true' || steps.stacked.outputs.untrusted_base == 'true' || steps.bigpr.outputs.over_filter_cap == 'true' }}
+      corridor_facts: ${{ steps.filter.outputs.corridor_facts == 'true' || steps.bigpr.outputs.over_filter_cap == 'true' }}
     steps:
       - uses: actions/checkout@v4
       # On `pull_request`, paths-filter diffs against the PR's BASE BRANCH. For a stacked
@@ -72,6 +79,24 @@ jobs:
             echo "untrusted_base=true" >> "$GITHUB_OUTPUT"
           else
             echo "untrusted_base=false" >> "$GITHUB_OUTPUT"
+          fi
+      # AIQ-2092: dorny/paths-filter lists changed files via the PR Files API, which
+      # returns AT MOST 3000 files. A PR over that cap hands every filter a truncated
+      # list, so unmatched filters read `false` and the guards they gate skip — green,
+      # with nothing checked (PR #1974: 16,101 files bypassed the RLS, migration,
+      # serving/LLM-isolation, route-auth and provenance guards). `changed_files` is the
+      # PR's TRUE count from the event payload, not subject to the Files API page cap, so
+      # it sees the case the filter itself cannot. At/over the cap → force every filter ON.
+      - name: Does this PR exceed the paths-filter file cap?
+        id: bigpr
+        env:
+          CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
+        run: |
+          if [ "${CHANGED_FILES:-0}" -ge 3000 ]; then
+            echo "::warning::PR changes ${CHANGED_FILES} files, at/over the dorny/paths-filter 3000-file cap; forcing all path filters ON so no guard is silently skipped (AIQ-2092)."
+            echo "over_filter_cap=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "over_filter_cap=false" >> "$GITHUB_OUTPUT"
           fi
       - uses: dorny/paths-filter@v3
         id: filter
