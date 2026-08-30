@@ -83,6 +83,12 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     "gouv.fr", "gov.uk", "gov.pt", "gov.pl", "gov.ie", "gov.it", "gov.gr",
     "gob.es", "governo.it", "admin.ch", "overheid.nl", "public.lu",
     "europa.eu", "bund.de", "gc.ca", "govt.nz", "gov.au", "gov",
+    # Singapore (FR->SG / Adrien): the statutory bodies all publish under `.gov.sg` —
+    # mom.gov.sg (Ministry of Manpower / work passes), ica.gov.sg (Immigration & Checkpoints),
+    # iras.gov.sg (tax), cpf.gov.sg (Central Provident Fund). The bare `gov` above does NOT
+    # catch these — `mom.gov.sg` ends in `.sg`, not `.gov` — so the whole 30-fact FR->SG batch
+    # scored UNOFFICIAL until this was added (the 4th too-narrow-allowlist instance).
+    "gov.sg",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the

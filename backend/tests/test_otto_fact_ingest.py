@@ -130,6 +130,10 @@ def test_the_france_batch_stays_partial_until_a_file_delivers_the_missing_85():
         ("https://www.udi.no/en/want-to-apply/", OFFICIAL),
         ("https://www.gov.uk/skilled-worker-visa", OFFICIAL),
         ("https://eur-lex.europa.eu/legal-content/EN/TXT/", OFFICIAL),
+        # Singapore statutory bodies publish under `.gov.sg`; the bare `gov` suffix does not
+        # catch them (host ends in `.sg`). Regression guard for the FR->SG batch.
+        ("https://www.mom.gov.sg/passes-and-permits/employment-pass/eligibility", OFFICIAL),
+        ("https://www.ica.gov.sg/enter-transit-depart/entering-singapore", OFFICIAL),
         ("https://www.campusfrance.org/en/tuition-fees", SEMI_OFFICIAL),
         ("https://some-relocation-blog.com/moving-to-france", UNOFFICIAL),
         ("https://bigmoverslaw.fr/blog/visas", UNOFFICIAL),
