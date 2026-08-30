@@ -163,6 +163,14 @@ def test_australia_is_covered():
     assert resolve_catalog_country("Australia") == "AUSTRALIA"
 
 
+def test_uae_is_covered():
+    """AE resolves — Destination Coverage Master rank 8 (Dubai), destination-only, non-EEA."""
+    assert to_iso("AE") == "AE"
+    assert iso_to_catalog_name("AE") == "UNITED ARAB EMIRATES"
+    assert resolve_catalog_country("AE") == "UNITED ARAB EMIRATES"
+    assert resolve_catalog_country("United Arab Emirates") == "UNITED ARAB EMIRATES"
+
+
 def test_every_corridor_destination_resolves():
     """Every corridor profile's destination must resolve to a catalog name.
 

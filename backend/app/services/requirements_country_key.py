@@ -74,6 +74,8 @@ _ISO_TO_CATALOG_NAME = {
     "CA": "CANADA",
     # AU — Destination Coverage Master rank 6 (Sydney hub). Destination-only, like GB/CA.
     "AU": "AUSTRALIA",
+    # AE — Destination Coverage Master rank 8 (Dubai hub). Destination-only; non-EEA.
+    "AE": "UNITED ARAB EMIRATES",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.

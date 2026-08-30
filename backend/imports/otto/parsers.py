@@ -101,6 +101,11 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # list on data.ontario.ca), a statutory provincial government publishing its own rules —
     # same call as `madrid.es` / `service.berlin.de`. 6th too-narrow-allowlist instance.
     "canada.ca", "ontario.ca",
+    # United Arab Emirates (destination rank 8, Dubai). Federal bodies publish under `.gov.ae`
+    # (tax.gov.ae = Federal Tax Authority, icp.gov.ae = ICP/residency, gdrfad.gov.ae = GDRFA Dubai,
+    # mohre.gov.ae = labour) and the official one-stop portal is `u.ae` — neither matched the bare
+    # `gov` suffix (`.gov.ae` ≠ `.gov`). 7th too-narrow-allowlist instance.
+    "gov.ae", "u.ae",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
