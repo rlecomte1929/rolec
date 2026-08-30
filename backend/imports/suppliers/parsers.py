@@ -91,6 +91,13 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("fca.org.uk",                    "FCA Financial Services Register"),
     ("get-information-schools.service.gov.uk", "GIAS — Get Information About Schools (DfE)"),
     ("propertymark.co.uk",            "ARLA Propertymark — member directory"),
+    # Canada (XX-CA / Toronto) — movers stay on fidi.org; the rest are search-form/flat registers
+    # (PUBLIC_REGISTER). `data.ontario.ca` and `reco.on.ca` are matched by suffix.
+    ("lso.ca",                        "LSO — Law Society of Ontario directory"),
+    ("cpaontario.ca",                 "CPA Ontario — firm directory"),
+    ("cdic.ca",                       "CDIC — member institutions list"),
+    ("data.ontario.ca",              "Ontario Ministry of Education — Private School Location List"),
+    ("reco.on.ca",                    "RECO — Real Estate Council of Ontario registrant search"),
 )
 
 

@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -677,6 +677,66 @@ SOURCES: Tuple[RegistrySource, ...] = (
         notes="Propertymark (ARLA) is the professional body for UK letting agents; its member "
               "directory exposes a per-branch company page. Membership is the letting-agent "
               "quality mark short of the mandatory redress-scheme registration.",
+    ),
+    # ── Canada (XX-CA destination-coverage / Toronto) ──────────────────────────
+    # Movers are covered by the global FIDI source above. The other Ontario/Canada registers are
+    # search-form or flat-list with no stable per-entity URL (like the Dublin set), so they take
+    # PUBLIC_REGISTER tier 2, staged 'claimed', and the /admin/vetting-queue human confirms each
+    # firm against the register. Sourced 2026-08-31 (Toronto batch).
+    RegistrySource(
+        name="LSO — Law Society of Ontario directory",
+        base_url="https://lso.ca/public-resources/finding-a-lawyer-or-paralegal/lawyer-and-paralegal-directory",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-CA",),
+        categories=("legal_admin",),
+        notes="The Law Society of Ontario — mandatory regulator to practise law in Ontario. Its "
+              "Lawyer & Paralegal Directory is a search form with no per-entity URL; vetter "
+              "confirms the immigration firm/lawyer on the roll by name.",
+    ),
+    RegistrySource(
+        name="CPA Ontario — firm directory",
+        base_url="https://www.cpaontario.ca/protecting-the-public/directories/firm",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-CA",),
+        categories=("tax_finance",),
+        notes="Chartered Professional Accountants of Ontario — the statutory accounting regulator. "
+              "Firm directory is a flat/search page (403 to automated fetch), no per-entity URL; "
+              "vetter confirms the firm's CPA Ontario registration.",
+    ),
+    RegistrySource(
+        name="CDIC — member institutions list",
+        base_url="https://www.cdic.ca/depositors/list-of-members/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-CA",),
+        categories=("banks",),
+        notes="Canada Deposit Insurance Corporation — the federal deposit insurer; its member list "
+              "is the authoritative confirmation that a firm is a real Canadian bank. Flat list, no "
+              "per-entity URL; vetter confirms membership. (Banks are capped at tier 2 regardless.)",
+    ),
+    RegistrySource(
+        name="Ontario Ministry of Education — Private School Location List",
+        base_url="https://data.ontario.ca/dataset/private-school-location-list",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-CA",),
+        categories=("schools",),
+        notes="The Government of Ontario's official private-school list (open-data dataset, BSID per "
+              "school). Published as an XLSX with no per-school URL; vetter confirms the school by "
+              "its BSID (carried in accreditation_number).",
+    ),
+    RegistrySource(
+        name="RECO — Real Estate Council of Ontario registrant search",
+        base_url="https://registrantsearch.reco.on.ca/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-CA",),
+        categories=("housing_agencies",),
+        notes="The Real Estate Council of Ontario — mandatory registrar for real-estate brokerages "
+              "in Ontario. Registrant search form, no per-entity URL; vetter confirms the brokerage "
+              "is RECO-registered.",
     ),
 )
 
