@@ -4,6 +4,22 @@
 cites. The batch is staged `status='new'`, all 15 at `accuracy_tier='auto_accepted'`, and it
 must not reach `requirement_items` in that state.
 
+> **Update 2026-08-30 — evidence-repair pass: now 13 of 15 grounded.** Otto re-sourced 6 to a
+> verbatim quote (skatteetaten ×2, service-public.fr F62 for CGI 4B, F34308 for PUMa ×2). The
+> remaining 9 were all sources Otto's scraper cannot read (EUR-Lex regs past the recital window,
+> Lovdata JS SPA, URSSAF JS, the treaty-as-PDF); **7 of those were then fetched in the browser**
+> and carry a verbatim quote now — facts 1–7: URSSAF firmes-étrangères, EUR-Lex **consolidated**
+> 883/2004 Art 11(1) & Art 13(1)(a), Lovdata §2-14, EUR-Lex **consolidated** 987/2009 Art 21(1)&(2).
+> `quote_verbatim_confirmed=true` is set on those 13 in `facts.ndjson`.
+>
+> **2 remain needs-counsel** (flagged `needs_lawyer_review=true`, no quote forced):
+> - `no_fr_treaty_art15_allocation_counsel` — the FR–NO convention is a PDF on impots.gouv.fr;
+>   Art 15 text is not in HTML. A counsel fact anyway.
+> - `no_fr_nationality_resolution_fr_governs` — **legal correction:** Dir 2004/38 is mis-cited.
+>   Art 3(1) limits the directive to a national moving to a Member State *other than* their own
+>   (ECJ C-434/09 *McCarthy*), so it does not govern Denis returning to France. Re-cite to TFEU
+>   Art 21 / national law before this fact is used, and have counsel confirm.
+
 This is Denis's corridor (NO→FR, French national returning home, `nationality=EEA`,
 `status=professional`), so every row here would land on a real demo mover's roadmap.
 
