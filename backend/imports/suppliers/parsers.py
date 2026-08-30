@@ -27,6 +27,7 @@ from typing import Dict, Iterator, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 from backend.app.services.registry_sources import SOURCES, RegistrySource
+from backend.app.services.requirements_country_key import to_iso_alpha2
 from backend.app.services.vendor_harvester import Candidate
 
 #: The nine columns Card C's harvest actually produced.
@@ -157,6 +158,25 @@ def read_csv(path: Path) -> Iterator[Candidate]:
                 raise RowError(f"line {lineno}: {exc}") from exc
 
 
+def _dest_iso_from_corridor(corridor: str) -> Optional[str]:
+    """Destination ISO alpha-2 for a corridor code like 'FR-DE' / 'ES-IE' / 'US-EC'.
+
+    A vendor's supplier capability is scoped to the DESTINATION country, and the batch's
+    `corridor` column is ORIGIN-DEST in ISO alpha-2, so the destination is the second token.
+    This was a two-entry dict (``{"FR-DE": "DE", "FR-NO": "NO"}``) that returned ``None`` for
+    every other corridor — so ES-IE, NO-FR, FR-SG and US-EC promoted supplier capabilities
+    with no ``country_code`` at all. Deriving it covers every corridor, and ``to_iso_alpha2``
+    rejects a malformed token (returns ``None``) rather than storing junk.
+    """
+    if not corridor:
+        return None
+    for sep in ("->", "→", "-", "_"):  # check "->" / "→" before bare "-"
+        if sep in corridor:
+            _, _, tail = corridor.partition(sep)
+            return to_iso_alpha2(tail.strip())
+    return None
+
+
 def _to_candidate(row: Dict[str, str]) -> Candidate:
     def get(k: str) -> str:
         return (row.get(k) or "").strip()
@@ -175,6 +195,6 @@ def _to_candidate(row: Dict[str, str]) -> Candidate:
         accreditation_body=get("accreditation_body") or None,
         accreditation_number=get("accreditation_number") or None,
         accreditation_expiry=coerce_expiry(expiry_raw),
-        country_code={"FR-DE": "DE", "FR-NO": "NO"}.get(get("corridor")),
+        country_code=_dest_iso_from_corridor(get("corridor")),
         notes=_note_for(row, expiry_raw, source),
     )

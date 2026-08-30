@@ -1,0 +1,37 @@
+# Corridor registry profile — United States → Ecuador.
+#
+# Abraham Romo's corridor (Seattle → Quito). Ecuador is a brand-new destination.
+# This profile ships together with the EC→ECUADOR entry in
+# backend/app/services/requirements_country_key.py: test_every_corridor_destination_resolves
+# fails the moment a corridor.yaml declares a destination_iso the catalog map cannot
+# resolve — which is exactly the guard that stops US→EC requirement records from
+# landing unservable (as IE→ES and IE did before it).
+#
+# The eligibility pathway step-graph (the temporary-residence / professional-visa
+# route) is authoring TODO: corridor_registry is fallback-safe, so the corridor loads
+# without a `pathways:` section.
+#
+# STATUS: authoring. Nothing here is counsel-verified; nothing may render as legal
+# advice in ReloPass's own voice. Ecuador (Cancillería / Ministerio del Trabajo / SRI)
+# is the binding jurisdiction.
+
+corridor:
+  id: "US_EC"
+  origin_iso: "US"
+  destination_iso: "EC"
+  display_name: "United States → Ecuador"
+  aliases: ["US→EC", "US-EC"]
+
+  # Not counsel-verified. Drives the "informational, not verified counsel" banner.
+  status: authoring
+
+  retrieval:
+    trust_tiers: [1, 2, 3]
+    min_similarity: 0.25
+
+  prompt:
+    task_key: "immigration_answer"
+
+  sla:
+    at_risk_window_days: 30
+    at_risk_pct: 80

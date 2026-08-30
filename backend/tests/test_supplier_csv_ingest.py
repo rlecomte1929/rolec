@@ -18,6 +18,7 @@ from backend.app.services.vendor_harvester import Candidate, HarvestRejected, va
 from backend.imports.suppliers.parsers import (
     RowError,
     SELF_DECLARED,
+    _dest_iso_from_corridor,
     coerce_expiry,
     read_csv,
     source_for_url,
@@ -269,3 +270,35 @@ def test_the_three_banks_now_carry_bafin_institute_records():
         assert f"institutId={institut_id}" in cand.source_url, name
         assert cand.source.name == "BaFin institute register (DE)", name
         validate(cand)  # must not raise
+
+
+# ── corridor → destination country_code ──────────────────────────────────────────────
+
+@pytest.mark.parametrize(
+    "corridor,expected",
+    [
+        # Regression: the two the old hardcoded dict covered.
+        ("FR-DE", "DE"),
+        ("FR-NO", "NO"),
+        # The corridors the old dict returned None for — a supplier capability with no
+        # country_code. These are the priority corridors this fix exists to unblock.
+        ("ES-IE", "IE"),
+        ("NO-FR", "FR"),
+        ("FR-SG", "SG"),
+        ("US-EC", "EC"),
+        # Separator variants the corridor field is written with in different batches.
+        ("FR->SG", "SG"),
+        ("FR→SG", "SG"),
+        ("US_EC", "EC"),
+        # A full destination name still resolves via to_iso_alpha2.
+        ("FR-Singapore", "SG"),
+    ],
+)
+def test_dest_country_is_derived_from_the_corridor(corridor, expected):
+    assert _dest_iso_from_corridor(corridor) == expected
+
+
+@pytest.mark.parametrize("junk", ["", None, "FR", "FR-", "FR-ZZZZ", "garbage"])
+def test_dest_country_is_none_rather_than_junk(junk):
+    """A corridor with no resolvable destination yields None — never a stored bad code."""
+    assert _dest_iso_from_corridor(junk) is None

@@ -62,6 +62,12 @@ _ISO_TO_CATALOG_NAME = {
     # DK is not a corridor profile yet, but the B3 batch stages six Denmark-destination
     # facts and `mappings.resolve()` refuses an entity whose destination has no coverage.
     "DK": "DENMARK",
+    # EC is the destination of US_EC (Seattle→Quito, Abraham). Ecuador is a brand-new
+    # destination: without this entry US→EC facts stage but `mappings.resolve()` refuses
+    # to promote them (no catalog coverage), so they would reach no case. Ships together
+    # with corridors/US_EC/corridor.yaml — `test_every_corridor_destination_resolves`
+    # fails the moment the profile lands without this row.
+    "EC": "ECUADOR",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.
@@ -172,7 +178,7 @@ _NAME_TO_ISO2: Dict[str, str] = {
     "u.s.": "US", "u.s.a.": "US", "america": "US", "états-unis": "US",
     "canada": "CA", "mexico": "MX", "brazil": "BR", "brésil": "BR",
     "argentina": "AR", "chile": "CL", "colombia": "CO", "peru": "PE",
-    "uruguay": "UY", "costa rica": "CR", "panama": "PA",
+    "uruguay": "UY", "costa rica": "CR", "panama": "PA", "ecuador": "EC",
     # Asia / Pacific
     "japan": "JP", "china": "CN", "south korea": "KR", "korea": "KR",
     "republic of korea": "KR", "north korea": "KP", "india": "IN", "inde": "IN",
@@ -192,7 +198,7 @@ _NAME_TO_ISO2: Dict[str, str] = {
 # Alpha-3 → alpha-2 for the codes we actually see. Not the full ISO table.
 _ALPHA3_TO_ISO2: Dict[str, str] = {
     "deu": "DE", "fra": "FR", "esp": "ES", "ita": "IT", "gbr": "GB",
-    "usa": "US", "can": "CA", "mex": "MX", "bra": "BR", "nor": "NO",
+    "usa": "US", "can": "CA", "mex": "MX", "bra": "BR", "ecu": "EC", "nor": "NO",
     "swe": "SE", "fin": "FI", "dnk": "DK", "nld": "NL", "che": "CH",
     "aut": "AT", "bel": "BE", "irl": "IE", "prt": "PT", "pol": "PL",
     "jpn": "JP", "chn": "CN", "kor": "KR", "ind": "IN", "sgp": "SG",
