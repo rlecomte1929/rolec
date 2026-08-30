@@ -1,0 +1,33 @@
+{
+  "batch_id": "es-ie-family-reunification-2026-08-30",
+  "corridor": "ES-IE",
+  "generated": "2026-08-30",
+  "files": [
+    {
+      "name": "facts.ndjson",
+      "record_count": 20
+    }
+  ],
+  "otto_manifest": {
+    "files": {
+      "facts.ndjson": {
+        "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788104233169_06v7tjj9.ndjson",
+        "record_count": 20,
+        "topics": {
+          "family_join_eligibility": 2,
+          "spouse_work_permission": 4,
+          "dependant_children_permission": 4,
+          "join_family_d_visa": 3,
+          "family_registration_irp": 3,
+          "family_financial_requirements": 4
+        }
+      }
+    },
+    "corridor": "ES->IE",
+    "applies_to": {
+      "nationality": "non-EEA",
+      "status": "professional"
+    },
+    "note": "entity_topic_key regrouped from single join_family_csep key; no fact content changed"
+  }
+}
