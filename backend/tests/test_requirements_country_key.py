@@ -127,6 +127,20 @@ def test_switzerland_is_covered():
     assert resolve_catalog_country("CH") == "SWITZERLAND"
 
 
+def test_ecuador_is_covered():
+    """EC resolves — the US_EC corridor profile (Seattle→Quito, Abraham) targets it.
+
+    Ecuador is a brand-new destination. Without this, US→EC facts stage but
+    `mappings.resolve()` refuses to promote them (no catalog coverage), so they reach no
+    case. `to_iso` must also resolve the full name, since destinations are stored either way.
+    """
+    assert to_iso("EC") == "EC"
+    assert to_iso("Ecuador") == "EC"
+    assert iso_to_catalog_name("EC") == "ECUADOR"
+    assert resolve_catalog_country("EC") == "ECUADOR"
+    assert resolve_catalog_country("Ecuador") == "ECUADOR"
+
+
 def test_every_corridor_destination_resolves():
     """Every corridor profile's destination must resolve to a catalog name.
 

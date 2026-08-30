@@ -1,0 +1,34 @@
+# Corridor registry profile — France → Singapore.
+#
+# Adrien Hardy's corridor. Singapore's requirement-catalog key already exists
+# (SG→SINGAPORE in requirements_country_key._ISO_TO_CATALOG_NAME), so this profile
+# registers the corridor identity — a FR→SG case now resolves a profile instead of
+# falling through to global defaults.
+#
+# The eligibility pathway step-graph (the Employment Pass route) is authoring TODO:
+# corridor_registry is fallback-safe, so the corridor loads without a `pathways:`
+# section (get_pathways returns ()).
+#
+# STATUS: authoring. Nothing here is counsel-verified; nothing may render as legal
+# advice in ReloPass's own voice. Singapore (MOM/ICA/IRAS) is the binding jurisdiction.
+
+corridor:
+  id: "FR_SG"
+  origin_iso: "FR"
+  destination_iso: "SG"
+  display_name: "France → Singapore"
+  aliases: ["FR→SG", "FR-SG"]
+
+  # Not counsel-verified. Drives the "informational, not verified counsel" banner.
+  status: authoring
+
+  retrieval:
+    trust_tiers: [1, 2, 3]
+    min_similarity: 0.25
+
+  prompt:
+    task_key: "immigration_answer"
+
+  sla:
+    at_risk_window_days: 30
+    at_risk_pct: 80
