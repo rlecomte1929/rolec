@@ -79,14 +79,46 @@ DEFAULT_CONFIG = Path(__file__).with_name("verifier_config.yaml")
 PROMOTABLE_DOMAIN_AREA = "immigration"
 
 
+#: WARN codes that mirror a `mappings.resolve()` refusal — a row carrying one stages and then
+#: never promotes. Everything NOT here (host_unranked, fact_type_unknown, confidence_unknown,
+#: not_https, unspecific_citation) is informational: it does not stop a row becoming a requirement,
+#: so it must not be counted against the promotable total.
+_PROMOTE_BLOCKING_CODES = frozenset({
+    "country_not_in_catalog",
+    "domain_area_not_promotable",
+    "no_nationality",
+    "nationality_unknown",
+    "no_status",
+    "status_unknown",
+    "pillar_unknown",
+})
+
+
 @dataclass
 class Finding:
-    """One thing wrong with one record."""
+    """One thing wrong with one record.
+
+    `blocks_promote` is the distinction real data forced: a WARN that mirrors a
+    `mappings.resolve()` refusal (absent nationality/status, a non-immigration domain, an unknown
+    pillar) means the row stages and never becomes a requirement -- that is the expensive silent
+    failure. A WARN that is merely informational (an unranked host, a fact_type that normalises to
+    'other', a non-https quality flag) does NOT stop promotion, and counting it against the
+    promotable total makes the verdict lie pessimistic. Measured on the real ES->IE third-country
+    batch: 13 host_unranked + 2 fact_type warnings dragged a genuinely 38/38-promotable batch down
+    to a reported 24. REJECT findings always block; that is what REJECT means.
+    """
 
     severity: str      # REJECT | WARN
     check: str         # V0 | V1 | V2
     code: str          # short machine-readable slug
     detail: str
+    blocks_promote: bool = field(default=False)
+
+    def __post_init__(self) -> None:
+        # A REJECT never reaches the clean file, so it blocks by definition. A WARN blocks only
+        # when its code is in the resolve() refusal set below; every other WARN is informational.
+        if self.severity == REJECT or self.code in _PROMOTE_BLOCKING_CODES:
+            self.blocks_promote = True
 
     def __str__(self) -> str:  # pragma: no cover - display only
         return f"[{self.severity.upper()}] {self.check}/{self.code}: {self.detail}"
@@ -110,6 +142,11 @@ class Verdict:
     @property
     def warned(self) -> bool:
         return any(f.severity == WARN for f in self.findings)
+
+    @property
+    def promote_blocked(self) -> bool:
+        """Will stage but never become a requirement — the silent failure."""
+        return any(f.blocks_promote for f in self.findings) and not self.rejected
 
     @property
     def clean(self) -> bool:
@@ -371,7 +408,10 @@ def summarise(verdicts: List[Verdict]) -> Dict[str, Any]:
         "clean": sum(1 for v in verdicts if v.clean),
         "warned": sum(1 for v in kept if v.warned),
         "rejected": sum(1 for v in verdicts if v.rejected),
-        "promotable": sum(1 for v in kept if not v.warned),
+        # Promotable = importable AND carrying no resolve()-refusal finding. An informational
+        # warning (an unranked host, a normalised fact_type) does not stop promotion.
+        "promotable": sum(1 for v in kept if not v.promote_blocked),
+        "promote_blocked": sum(1 for v in kept if v.promote_blocked),
         "findings_by_code": dict(sorted(by_code.items())),
         "source_rank_mix": dict(sorted(ranks.items())),
     }

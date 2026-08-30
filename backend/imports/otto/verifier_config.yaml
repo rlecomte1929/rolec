@@ -46,11 +46,14 @@ hosts:
   caf.fr: 2
 
   # ---- Ireland ----
-  irishimmigration.ie: 1
-  revenue.ie: 1
+  irishimmigration.ie: 1     # ISD / immigration permissions
+  revenue.ie: 1              # tax
+  enterprise.gov.ie: 1       # DETE — employment permits (CSEP); the ES->IE batch's largest source
+  gov.ie: 1                  # the wider .gov.ie estate (dfa.ie, etc. publish here)
   welfare.ie: 1
+  mywelfare.ie: 1            # PPSN allocation service (services.mywelfare.ie)
   citizensinformation.ie: 2  # public info service, not the statute owner
-  hse.ie: 2
+  hse.ie: 2                  # health service — administers, not statute owner
   rtb.ie: 1
 
   # ---- Spain ----

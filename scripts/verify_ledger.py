@@ -151,7 +151,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"lines {summary['lines']}   clean {summary['clean']}   "
           f"warned {summary['warned']}   rejected {summary['rejected']}")
     print(f"importable: {summary['lines'] - summary['rejected']}   "
-          f"of which promotable: {summary['promotable']}")
+          f"promotable: {summary['promotable']}   "
+          f"stage-but-never-promote: {summary.get('promote_blocked', 0)}")
 
     if summary["findings_by_code"]:
         print("\nfindings:")
@@ -190,18 +191,21 @@ def main(argv: Optional[List[str]] = None) -> int:
         if len(rejects) > _SAMPLE:
             print(f"  … and {len(rejects) - _SAMPLE} more")
 
-    warned = [v for v in verdicts if not v.rejected and v.warned]
-    if warned:
-        print(f"\nwill import but NOT promote ({len(warned)}) — silent unless read here:")
-        shown = 0
-        for v in warned:
-            if shown >= _SAMPLE:
-                break
-            codes = ", ".join(f.code for f in v.findings if f.severity != REJECT)
+    blocked = [v for v in verdicts if v.promote_blocked]
+    if blocked:
+        print(f"\nwill import but NOT promote ({len(blocked)}) — resolve() refuses these; "
+              "silent unless read here:")
+        for v in blocked[:_SAMPLE]:
+            codes = ", ".join(f.code for f in v.findings if f.blocks_promote)
             print(f"  line {v.lineno:4}  {v.dedupe_key}  [{codes}]")
-            shown += 1
-        if len(warned) > _SAMPLE:
-            print(f"  … and {len(warned) - _SAMPLE} more")
+        if len(blocked) > _SAMPLE:
+            print(f"  … and {len(blocked) - _SAMPLE} more")
+
+    # Informational warnings are worth a count, but they do not gate the verdict.
+    info = [v for v in verdicts if not v.rejected and v.warned and not v.promote_blocked]
+    if info:
+        print(f"\ninformational only ({len(info)} row(s)) — imports and promotes; a quality/"
+              "tiering note, not a blocker. See findings above for the breakdown.")
 
     # ---------------- outputs ----------------
     out_dir = Path(args.out) if args.out else ledger.parent

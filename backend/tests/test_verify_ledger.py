@@ -220,10 +220,12 @@ def test_v3_reuses_the_existing_matcher_and_translated_still_fires():
 def test_no_rapidfuzz_anywhere():
     """An explicit acceptance criterion: the existing matcher must not be weakened by a
     similarity threshold. Asserted over the tree so a future import trips this test."""
+    # Exclude this test file, which necessarily names the library it forbids.
     hits = subprocess.run(
-        ["git", "grep", "-l", "rapidfuzz", "--", "*.py", "*.txt", "*.toml", "*.cfg"],
+        ["git", "grep", "-l", "rapidfuzz", "--",
+         "*.py", "*.txt", "*.toml", "*.cfg", ":!backend/tests/test_verify_ledger.py"],
         capture_output=True, text=True, cwd=REPO)
-    assert hits.stdout.strip() == "", f"rapidfuzz appeared in: {hits.stdout}"
+    assert hits.stdout.strip() == "", f"rapidfuzz appeared in production code: {hits.stdout}"
 
 
 def test_liveness_vocabulary_matches_the_fetcher_it_reuses():
@@ -249,3 +251,40 @@ def test_liveness_vocabulary_matches_the_fetcher_it_reuses():
     assert fetch_status_for({"ok": True}) == vl.OK
     assert fetch_status_for({"ok": False, "reason": "robots_disallowed"}) == vl.SKIPPED
     assert fetch_status_for({"ok": False, "reason": "error_ConnectError"}) not in (vl.OK, vl.SKIPPED)
+
+
+def test_informational_warnings_do_not_reduce_promotable():
+    """The bug the real ES->IE third-country batch exposed.
+
+    13 host_unranked + 2 fact_type warnings reported a genuinely 38/38-promotable batch as 24.
+    An informational WARN (unranked host, a fact_type that normalises to 'other') must NOT count
+    against promotable; only a WARN mirroring a resolve() refusal does.
+    """
+    from backend.imports.otto.verifier import Finding
+
+    assert Finding("warn", "V2", "host_unranked", "x").blocks_promote is False
+    assert Finding("warn", "V1", "fact_type_unknown", "x").blocks_promote is False
+    assert Finding("warn", "V1", "confidence_unknown", "x").blocks_promote is False
+    assert Finding("warn", "V1", "no_nationality", "x").blocks_promote is True
+    assert Finding("warn", "V1", "no_status", "x").blocks_promote is True
+    assert Finding("warn", "V1", "domain_area_not_promotable", "x").blocks_promote is True
+    # A REJECT blocks by definition — it never reaches the clean file.
+    assert Finding("reject", "V1", "missing_required", "x").blocks_promote is True
+
+
+def test_a_host_unranked_row_still_counts_as_promotable(cfg):
+    """A fact from an official host we simply have not ranked promotes fine; it is a tiering gap,
+    not a serving gap. Uses an official IE host (classify_source passes) absent from the config."""
+    rec = {
+        "destination_country": "IE",
+        "entity_topic_key": "ie.work",
+        "fact_key": "k1",
+        "fact_text": "x",
+        "source_url": "https://www.somewhere.gov.ie/page",  # gov.ie: official, and now ranked
+        "applies_to": {"nationality": "non-EEA", "status": "professional"},
+    }
+    from backend.imports.otto.verifier import verify_lines
+    import json as _json
+    [v] = verify_lines([_json.dumps(rec)], cfg)
+    assert not v.rejected
+    assert not v.promote_blocked, [f.code for f in v.findings if f.blocks_promote]
