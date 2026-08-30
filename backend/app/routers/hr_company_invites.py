@@ -138,10 +138,14 @@ def issue_invite(
                     "  (id, company_id, invited_email, invited_by_profile_id, status) "
                     "VALUES (:id, :company_id, :email, :inviter, 'pending_admin')"
                 ),
-                # company_id is bound as a plain str: psycopg2 sends it as an untyped literal
-                # which Postgres coerces into the uuid column, and SQLite stores it as
-                # text. Do NOT write `:company_id::uuid` — that bind-adjacent cast breaks
-                # the driver.
+                # company_id is bound as a plain str: psycopg2 sends it as an untyped
+                # literal which Postgres coerces into the uuid column, and SQLite stores
+                # it as text. Verified through SQLAlchemy against prod — both str and
+                # uuid.UUID round-trip correctly, so no cast is needed here at all.
+                # If one ever is, use the CAST(:param AS type) form: the double-colon
+                # suffix form binds a truncated name and leaves a literal placeholder in
+                # the SQL, which Postgres rejects and SQLite silently masks. See
+                # backend/tests/test_jsonb_bind_cast.py.
                 {"id": invite_id, "company_id": company_id, "email": body.email,
                  "inviter": inviter},
             )
