@@ -1,0 +1,43 @@
+{
+  "batch_id": "sg-ec-browser-grounded-2-2026-08-30",
+  "corridors": [
+    "FR-SG",
+    "US-EC"
+  ],
+  "personas": [
+    "Adrien",
+    "Abraham"
+  ],
+  "method": "Browser-grounding round 2 — remaining SG/EC cores from JS-rendered gov pages, verbatim-extracted and re-confirmed by verify_ledger (4/4 confirmed, 0 rejected).",
+  "sources": {
+    "EC tax (SRI)": "https://www.gob.ec/sri/tramites/certificado-residencia-fiscal-persona-natural",
+    "EC work (SUT)": "https://www.gob.ec/mt/tramites/registro-datos-trabajadores-vinculacion-laboral-parte-empleador-sistema-unico-trabajo-sut",
+    "SG healthcare (MOM)": "https://www.mom.gov.sg/faq/employment-pass/are-employers-required-to-buy-medical-insurance-for-employment-pass-holders",
+    "SG FIN (ICA)": "https://www.ica.gov.sg/news-and-publications/newsroom/media-release/new-m-fin-series-to-be-introduced-from-1-january-2022"
+  },
+  "files": {
+    "facts.ndjson": {
+      "records": 4,
+      "sha256": "a025f3bd044d9983f3d557be2dd34c50d35ba964398cc91e3e795d9339c95a57"
+    },
+    "clean.ndjson": {
+      "records": 4,
+      "sha256": "a025f3bd044d9983f3d557be2dd34c50d35ba964398cc91e3e795d9339c95a57"
+    }
+  },
+  "landed": {
+    "SINGAPORE": [
+      "Healthcare — EP holders (corpus_grounded): EP holders need no employer medical insurance",
+      "Foreign Identification Number (FIN) (corpus_grounded)"
+    ],
+    "ECUADOR": [
+      "Tax residence (SRI) — foreign fiscal residency under LORTI Art 4.1 (corpus_grounded)",
+      "Work registration (Ministerio del Trabajo — SUT) (corpus_grounded)",
+      "IESS — Seguro General Obligatorio (corpus_grounded)"
+    ]
+  },
+  "iess_normalization": "The us-ec-facts-2026-08-30 IESS topic was UNMAPPED because Otto put two pillars on it (4 SOCIAL_SECURITY + 1 HEALTHCARE). At promote time the single HEALTHCARE fact's staged pillar was normalized to SOCIAL_SECURITY — IESS *is* Ecuador's social-security institute and the 5 facts are one requirement (enrol in IESS). This is a staging-only normalization; the original batch's raw ndjson is unchanged. All 5 IESS facts now promoted as 1 requirement.",
+  "still_open": [
+    "SG housing/rental — EP holders have no address-registration step (a 'what you don't need' determination, not a positive fact); left unsourced rather than assert a negative."
+  ]
+}

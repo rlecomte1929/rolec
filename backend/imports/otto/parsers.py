@@ -89,6 +89,11 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # catch these — `mom.gov.sg` ends in `.sg`, not `.gov` — so the whole 30-fact FR->SG batch
     # scored UNOFFICIAL until this was added (the 4th too-narrow-allowlist instance).
     "gov.sg",
+    # Ecuador (US->EC / Abraham): every statutory body publishes under `.gob.ec` —
+    # cancilleria.gob.ec (visas), trabajo.gob.ec (labour), sri.gob.ec (tax), iess.gob.ec
+    # (social security), registrocivil.gob.ec (cédula). `gob.es` above is Spain only; the
+    # bare `gov` does not match `.ec`. 5th too-narrow-allowlist instance.
+    "gob.ec",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
