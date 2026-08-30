@@ -77,7 +77,10 @@ def test_fr_no_lta_returns_generic_requirements_no_auth(monkeypatch):
     reqs = body["requirements"]
     assert isinstance(reqs, list) and len(reqs) >= 1
     for r in reqs:  # exact response shape per requirement
-        assert set(r.keys()) == {"key", "label", "description", "timing", "non_obvious", "category", "source"}
+        assert set(r.keys()) == {
+            "key", "label", "description", "timing", "non_obvious",
+            "legalReviewPending", "category", "source",
+        }
     # the D-number / folkeregister residence item the engine DOES carry for NO/LTA
     blob = json.dumps(reqs).lower()
     assert "d-number" in blob or "folkeregister" in blob
