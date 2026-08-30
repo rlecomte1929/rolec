@@ -1,0 +1,15 @@
+{
+  "batch_id": "es-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code research subagent (verify_ledger referee)",
+  "destination_country_code": "ES",
+  "target_table": "public.requirement_items",
+  "target_country_code": "SPAIN",
+  "record_count": 16,
+  "artifact": "facts.ndjson",
+  "sha256": "7a32d3b5bf41a62470d338d2e55f340657c8f4245bf1a2bfcc6553175ea30d99",
+  "status": "HELD_FOR_RECONCILIATION",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "scope": "HELD: SPAIN already has 25 pending requirement_items (IE->ES batch). Not promoted; reconcile before adding. 4 net-new facts identified in README."
+}

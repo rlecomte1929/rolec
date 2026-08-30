@@ -1,0 +1,15 @@
+{
+  "batch_id": "nl-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code research subagent (verify_ledger referee)",
+  "destination_country_code": "NL",
+  "target_table": "public.requirement_items",
+  "target_country_code": "NETHERLANDS",
+  "record_count": 18,
+  "artifact": "facts.ndjson",
+  "sha256": "3fd2cbccbc0e84acc4fca9b972f33cfdee6d8a96a07a5e498d4efa313c31da80",
+  "status": "HELD_FOR_RECONCILIATION",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "scope": "HELD: NETHERLANDS already has 10 APPROVED requirement_items. Not promoted; reconcile before adding. Net-new facts (MVV, TB test, GVVA, DigiD, EU free-mover) in README. NL source hosts need allowlisting."
+}
