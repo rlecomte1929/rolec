@@ -128,6 +128,15 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("de.dk",                         "MDE — Dansk Ejendomsmæglerforening members"),
     ("advokatnoeglen.dk",            "Advokatsamfundet — Advokatnøglen (Danish bar)"),
     ("fsr.dk",                        "FSR — danske revisorer member directory"),
+    # Tier-3 hub cities: Riyadh (XX-SA) + Helsinki (XX-FI) + Lisbon (XX-PT), subagent batch 2026-08-31.
+    ("sama.gov.sa",                  "SAMA — Saudi Central Bank licensed local banks"),
+    ("sba.gov.sa",                   "Saudi Bar Association — legal firms directory"),
+    ("bankingsupervision.europa.eu", "ECB Banking Supervision — supervised entities (Finland)"),
+    ("prh.fi",                        "PRH — Finnish auditor register (Tilintarkastajahaku)"),
+    ("findanattorney.fi",            "Finnish Bar Association — Find an Attorney"),
+    ("eba.europa.eu",                "EBA Credit Institutions Register (Portugal)"),
+    ("impic.pt",                      "IMPIC — Portuguese estate-agent (AMI) register"),
+    ("oroc.pt",                       "OROC — Portuguese statutory auditors (SROC) register"),
 )
 
 

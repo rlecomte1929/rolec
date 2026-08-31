@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -930,6 +930,70 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-DK",), categories=("tax_finance",),
         notes="FSR – danske revisorer — the Danish auditors' & accountants' professional body member "
               "directory. Search directory; vetter confirms membership.",
+    ),
+    # ── Tier-3 hub cities: Riyadh (XX-SA) + Helsinki (XX-FI) + Lisbon (XX-PT), subagent batch 2026-08-31 ──
+    # Movers reuse the FIDI FAIM directory (corridors=CORRIDORS covers them); schools reuse IBO above.
+    # Riyadh legal is the Saudi Bar Association public firms directory; SA housing/tax registers are
+    # verify-by-number-only / geoblocked (skipped, re-source worklist). Lisbon legal (Ordem dos
+    # Advogados) is individual-only, no firm listing (skipped). FI/PT banks cite the EU-level
+    # ECB/EBA registers (the national SPAs are Cloudflare/JS-gated) — same authorisation data.
+    RegistrySource(
+        name="SAMA — Saudi Central Bank licensed local banks",
+        base_url="https://www.sama.gov.sa/en-US/Licensing/Pages/LicensedBanks.aspx",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-SA",), categories=("banks",),
+        notes="Saudi Central Bank (SAMA) — statutory list of licensed local banks. Flat list; vetter "
+              "confirms. (Banks capped at tier 2 regardless.)",
+    ),
+    RegistrySource(
+        name="Saudi Bar Association — legal firms directory",
+        base_url="https://eservice.sba.gov.sa/directory",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-SA",), categories=("legal_admin",),
+        notes="Saudi Bar Association — public register of licensed legal firms (each firm has an "
+              "eservice.sba.gov.sa/directory/<id> page). Vetter confirms the firm on the roll.",
+    ),
+    RegistrySource(
+        name="ECB Banking Supervision — supervised entities (Finland)",
+        base_url="https://www.bankingsupervision.europa.eu/banking/list/who/html/index.en.html",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-FI",), categories=("banks",),
+        notes="ECB/SSM list of supervised entities, Finland section — the FIN-FSA-authorised Finnish "
+              "credit institutions, each with an LEI. Used because the FIN-FSA register is a JS SPA; "
+              "the ECB list carries the same authorisation status. (Banks capped at tier 2.)",
+    ),
+    RegistrySource(
+        name="PRH — Finnish auditor register (Tilintarkastajahaku)",
+        base_url="https://tietopalvelut.prh.fi/tilintarkastajahaku/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-FI",), categories=("tax_finance",),
+        notes="Finnish Patent and Registration Office (PRH) auditor oversight — statutory register of "
+              "authorised audit firms (Tilintarkastusyhteisö). Search register; vetter confirms.",
+    ),
+    RegistrySource(
+        name="Finnish Bar Association — Find an Attorney",
+        base_url="https://www.findanattorney.fi/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-FI",), categories=("legal_admin",),
+        notes="Suomen Asianajajaliitto — the Finnish Bar Association member directory (membership is "
+              "mandatory to use the asianajaja title). Search directory; vetter confirms membership.",
+    ),
+    RegistrySource(
+        name="EBA Credit Institutions Register (Portugal)",
+        base_url="https://euclid.eba.europa.eu/register/cir/search",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-PT",), categories=("banks",),
+        notes="European Banking Authority Credit Institutions Register — data owned by Banco de Portugal; "
+              "each entry carries the BdP institution code + LEI. Used because bportugal.pt is "
+              "Cloudflare-gated. (Banks capped at tier 2.)",
+    ),
+    RegistrySource(
+        name="IMPIC — Portuguese estate-agent (AMI) register",
+        base_url="https://www.impic.pt/impic/pt-pt/atividades/mediacao-imobiliaria",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-PT",), categories=("housing_agencies",),
+        notes="Instituto dos Mercados Públicos, do Imobiliário e da Construção — statutory register of "
+              "licensed estate agents (AMI licence number). Vetter confirms the AMI number.",
+    ),
+    RegistrySource(
+        name="OROC — Portuguese statutory auditors (SROC) register",
+        base_url="https://www.oroc.pt/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-PT",), categories=("tax_finance",),
+        notes="Ordem dos Revisores Oficiais de Contas — the official list of registered audit firms "
+              "(SROC number). Vetter confirms the SROC number.",
     ),
 )
 
