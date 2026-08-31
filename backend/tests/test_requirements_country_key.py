@@ -177,6 +177,8 @@ def test_italy_and_sweden_are_covered():
     assert resolve_catalog_country("Italy") == "ITALY"
     assert resolve_catalog_country("SE") == "SWEDEN"
     assert resolve_catalog_country("Sweden") == "SWEDEN"
+    assert resolve_catalog_country("BE") == "BELGIUM"
+    assert resolve_catalog_country("AT") == "AUSTRIA"
 
 
 def test_every_corridor_destination_resolves():

@@ -106,6 +106,10 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # mohre.gov.ae = labour) and the official one-stop portal is `u.ae` — neither matched the bare
     # `gov` suffix (`.gov.ae` ≠ `.gov`). 7th too-narrow-allowlist instance.
     "gov.ae", "u.ae",
+    # Belgium (rank 15, Brussels) — federal bodies publish under `.fgov.be` (inami.fgov.be, rsz.fgov.be).
+    # Austria (rank 16, Vienna) — the whole public sector sits under `.gv.at` (oesterreich.gv.at,
+    # migration.gv.at, wien.gv.at, help.gv.at). Neither matched the bare `gov`.
+    "fgov.be", "gv.at",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -190,6 +194,9 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # own `.se` domain: Migrationsverket (migration), Skatteverket (tax + population register),
     # Försäkringskassan (social insurance). Each publishes its own rule. 8th too-narrow-allowlist instance.
     "migrationsverket.se", "skatteverket.se", "forsakringskassan.se",
+    # Belgium — statutory bodies not under `.fgov.be`: the Immigration Office (ibz.be), the City of
+    # Brussels (brussels.be) and the federal single-permit One-Stop Counter.
+    "ibz.be", "brussels.be", "onestopcounter.workinginbelgium.be",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )

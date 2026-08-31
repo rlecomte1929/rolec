@@ -80,6 +80,9 @@ _ISO_TO_CATALOG_NAME = {
     "IT": "ITALY",
     # SE — Destination Coverage Master rank 14 (Stockholm hub). EEA destination.
     "SE": "SWEDEN",
+    # BE — rank 15 (Brussels hub). EEA destination. AT — rank 16 (Vienna hub). EEA destination.
+    "BE": "BELGIUM",
+    "AT": "AUSTRIA",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.
