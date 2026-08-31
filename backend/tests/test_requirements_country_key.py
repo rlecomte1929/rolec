@@ -33,7 +33,7 @@ def test_to_iso_aliases():
 def test_to_iso_unknown_or_empty_is_none():
     # None signals "unrecognised" so callers fail closed (1473c) instead of
     # querying with a bad key.
-    assert to_iso("IT") is None          # no catalog data yet
+    assert to_iso("ZZ") is None          # genuinely unmapped code (IT/SE are now catalog-mapped)
     assert to_iso("Japan") is None
     assert to_iso("") is None
     assert to_iso("   ") is None
@@ -75,7 +75,7 @@ def test_resolve_catalog_country_preserves_legacy_behaviour():
     assert resolve_catalog_country("UK") == "UNITED KINGDOM"
     assert resolve_catalog_country("usa") == "UNITED STATES"
     assert resolve_catalog_country("UNITED KINGDOM") == "UNITED KINGDOM"
-    assert resolve_catalog_country("IT") == "IT"       # unknown → raw upper
+    assert resolve_catalog_country("ZZ") == "ZZ"       # unknown → raw upper
     assert resolve_catalog_country("Japan") == "JAPAN"
     assert resolve_catalog_country("") == "UNKNOWN"
     assert resolve_catalog_country("  ") == "UNKNOWN"
