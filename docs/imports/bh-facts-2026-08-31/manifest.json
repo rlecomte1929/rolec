@@ -1,0 +1,18 @@
+{
+  "batch_id": "bh-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "BH",
+  "origin_country_code": null,
+  "destination_country_code": "BH",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "BAHRAIN",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "570d52d8254f488ade0dcebc2f368833244a4386800436ee6ba7a7e24a3b4cd3",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources: lmra.gov.bh (LMRA \u2014 rendered page + Contractual-Obligations & Flexi PDFs), bahrain.bh, sio.gov.bh. lmra.gov.bh blocks the applier's curl entirely (returns a 118-byte stub for pages AND PDFs), so imported --no-fetch. Independently validated: bahrain.bh 2/2 via curl; the applier browser-verified 3 lmra page/show/106 quotes (new-work-permit, Wafid medical, failed-medical deportation) \u2014 all exact. Remaining lmra-PDF + sio facts are subagent-confirmed on the same validated lmra.gov.bh domain; re-confirm before approve. No income-tax fact (no verbatim gov statement; no TAX pillar)."
+}
