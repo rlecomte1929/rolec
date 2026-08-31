@@ -153,6 +153,8 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("rea.govt.nz",                   "REA — New Zealand real-estate licensee public register"),
     # Doha (XX-QA) — subagent batch 2026-08-31.
     ("qfc.qa",                        "QFC — Qatar Financial Centre public register"),
+    # Kuwait City (XX-KW) — subagent batch 2026-08-31.
+    ("cbk.gov.kw",                    "CBK — Central Bank of Kuwait regulated banks"),
 )
 
 
