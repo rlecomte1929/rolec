@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1261,6 +1261,29 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-BH",), categories=("banks",),
         notes="Central Bank of Bahrain — the licensing directory of licensed institutions (queryable via the "
               "CBB's own /cbbapi/ endpoints). Vetter confirms. (Banks capped at tier 2.)",
+    ),
+    # ── Johannesburg (XX-ZA) — subagent batch 2026-08-31. Movers FIDI, schools IBO. Legal (LPC is
+    # per-practitioner, no firm search) skipped. South Africa has strong statutory registers.
+    RegistrySource(
+        name="SARB — South African Reserve Bank registered banks",
+        base_url="https://www.resbank.co.za/en/home/what-we-do/prudential-regulation",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ZA",), categories=("banks",),
+        notes="South African Reserve Bank Prudential Authority — the list of registered banks. Flat list; "
+              "vetter confirms. (Banks capped at tier 2.)",
+    ),
+    RegistrySource(
+        name="IRBA — SA registered audit firms",
+        base_url="https://www.irba.co.za/find-a-ra/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ZA",), categories=("tax_finance",),
+        notes="Independent Regulatory Board for Auditors — the statutory 'Find a Firm' register of registered "
+              "audit firms, each with a Practice Number. Vetter confirms.",
+    ),
+    RegistrySource(
+        name="PPRA — SA property practitioners register",
+        base_url="https://www.theppra.org.za/practitioner-search/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ZA",), categories=("housing_agencies",),
+        notes="Property Practitioners Regulatory Authority — the mandatory register; each practitioner holds a "
+              "Fidelity Fund Certificate (FFC number). Vetter confirms the FFC is valid.",
     ),
 )
 
