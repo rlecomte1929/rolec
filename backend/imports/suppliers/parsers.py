@@ -189,6 +189,8 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("resbank.co.za",                 "SARB — South African Reserve Bank registered banks"),
     ("irba.co.za",                    "IRBA — SA registered audit firms"),
     ("theppra.org.za",               "PPRA — SA property practitioners register"),
+    # Bucharest (XX-RO) — subagent batch 2026-08-31.
+    ("bnr.ro",                        "BNR — National Bank of Romania credit-institutions register"),
 )
 
 
