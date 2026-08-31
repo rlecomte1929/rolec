@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1208,6 +1208,23 @@ SOURCES: Tuple[RegistrySource, ...] = (
         notes="People's Bank of China & NFRA — the published list of systemically important banks. Used "
               "because the NFRA per-firm licence register is a CAPTCHA-gated Ext-JS app with no stable URL. "
               "Flat list; vetter confirms. (Banks capped at tier 2.)",
+    ),
+    # ── Bengaluru (XX-IN) + Istanbul (XX-TR) — subagent batch 2026-08-31. Movers FIDI, schools IBO.
+    # (IN RERA housing / ICAI tax and TR bar/tax/housing registers deferred — batch-limited or JS/CAPTCHA;
+    # re-source worklists in the batch READMEs.)
+    RegistrySource(
+        name="RBI — Reserve Bank of India scheduled banks",
+        base_url="https://www.rbi.org.in/scripts/banklinks.aspx",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-IN",), categories=("banks",),
+        notes="Reserve Bank of India — the list of scheduled commercial banks. Flat list; vetter confirms. "
+              "(Banks capped at tier 2.)",
+    ),
+    RegistrySource(
+        name="BDDK — Turkish banking regulator licensed banks",
+        base_url="https://www.bddk.org.tr/Kurulus/Liste/77",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-TR",), categories=("banks",),
+        notes="Banking Regulation and Supervision Agency (BDDK) — the official register of licensed banks; "
+              "each active entry carries an EFT code. Vetter confirms. (Banks capped at tier 2.)",
     ),
 )
 
