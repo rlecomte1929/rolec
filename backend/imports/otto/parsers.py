@@ -322,8 +322,12 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     "serviciomigraciones.cl", "sii.cl",
     # Estonia (rank 47) — no governmental suffix; each body owns its own `.ee`: politsei.ee (Police
     # & Border Guard Board / residence permits), emta.ee (Tax & Customs Board), eesti.ee (state
-    # portal), sotsiaalkindlustusamet.ee (Social Insurance Board).
-    "politsei.ee", "emta.ee", "eesti.ee", "sotsiaalkindlustusamet.ee",
+    # portal), sotsiaalkindlustusamet.ee (Social Insurance Board). riigiteataja.ee is the Riigi
+    # Teataja (State Gazette) — the official consolidated-law database that publishes the Aliens Act
+    # itself, exactly like boe.es / lovdata.no / normattiva.it above. It was missing here, so the two
+    # Estonian immigration-quota facts (Aliens Act §113/§115) scored UNOFFICIAL and were rejected —
+    # the same too-narrow-allowlist failure whose rejects always cluster by source.
+    "politsei.ee", "emta.ee", "eesti.ee", "sotsiaalkindlustusamet.ee", "riigiteataja.ee",
     # Iceland (rank 49) — no governmental suffix; utl.is (Directorate of Immigration /
     # Útlendingastofnun), skatturinn.is (tax), island.is (state portal).
     "utl.is", "skatturinn.is", "island.is",
