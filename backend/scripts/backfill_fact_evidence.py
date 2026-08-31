@@ -41,12 +41,15 @@ Usage:
     python backend/scripts/backfill_fact_evidence.py --apply          # write
     python backend/scripts/backfill_fact_evidence.py \\
         --dest IE --status approved --only-unchecked                  # re-check the served gap
+    python backend/scripts/backfill_fact_evidence.py \\
+        --dest SG --status approved --only-unchecked --headless       # render the mom.gov.sg shell
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import logging
+import os
 import sys
 import time
 import urllib.robotparser
@@ -211,10 +214,56 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def render_headless(url: str, timeout_s: float = FETCH_TIMEOUT_S) -> Optional[str]:
+    """Return a page's fully rendered HTML via headless Chromium, or None if it cannot.
+
+    The fallback for a client-rendered publisher (mom.gov.sg is an Angular shell that returns
+    200 with no server-rendered article text, so httpx + the parser see nothing — every one of
+    Singapore's work-pass facts is uncheckable without this). A headless browser runs the page's
+    JS and yields the same DOM a reviewer would see.
+
+    Playwright is NOT a hard dependency. It is imported lazily and only reached when --headless
+    is passed, so the httpx path, the rest of the backfill, and the test suite are unaffected
+    when it is absent (`pip install playwright`; the Chromium binary comes from the environment
+    via PLAYWRIGHT_BROWSERS_PATH, or from `playwright install chromium`). Every failure — package
+    missing, no browser binary, a navigation error — returns None rather than raising, so the
+    caller degrades to exactly the js_shell_or_empty result it would have produced anyway. A live
+    page that renders client-side becomes checkable; nothing that already worked changes.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception:
+        log.warning("--headless requested but Playwright is not installed "
+                    "(`pip install playwright`) — leaving %s unrendered", url)
+        return None
+
+    # Some environments ship a Chromium whose build revision differs from the pip package's
+    # expected one; point launch at it explicitly rather than downloading a matching browser.
+    exe = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE")
+    if not exe and Path("/opt/pw-browsers/chromium").exists():
+        exe = "/opt/pw-browsers/chromium"
+    launch_kwargs: Dict[str, Any] = {"headless": True, "args": ["--no-sandbox"]}
+    if exe:
+        launch_kwargs["executable_path"] = exe
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(**launch_kwargs)
+            try:
+                page = browser.new_page(user_agent=UA_BROWSER)
+                page.goto(url, wait_until="networkidle", timeout=int(timeout_s * 1000))
+                return page.content()
+            finally:
+                browser.close()
+    except Exception as exc:
+        log.warning("headless render failed for %s: %s", url, type(exc).__name__)
+        return None
+
+
 def fetch_and_parse(
     url: str,
     robots: Optional[Any] = None,
     limiter: Optional[HostRateLimiter] = None,
+    headless: bool = False,
 ) -> Dict[str, Any]:
     """Fetch one source and return its readable article text. Never raises.
 
@@ -257,7 +306,18 @@ def fetch_and_parse(
 
         parsed = (immigration_page_parser.parse(resp.text).get("text") or "").strip()
         if not parsed:
-            # A JS-only shell. Recording this is the point — it tells a reviewer why there is
+            # A client-rendered shell: 200, but no server-rendered article text. httpx cannot
+            # see past it; a headless browser runs the page's JS and can. Only attempt it when
+            # asked (--headless), and only here — a 404 or a real block is not a rendering
+            # problem and a browser would not change the answer.
+            if headless:
+                rendered = render_headless(url)
+                if rendered:
+                    rtext = (immigration_page_parser.parse(rendered).get("text") or "").strip()
+                    if rtext:
+                        return {"ok": True, "reason": "fetched_headless",
+                                "text": rtext[:MAX_MATCH_CHARS], "blocked": False, "ua": ua}
+            # Still nothing. Recording this is the point — it tells a reviewer why there is
             # no evidence, instead of leaving them to guess. Another UA will not render it.
             return {"ok": False, "reason": "js_shell_or_empty", "text": "", "blocked": False,
                     "ua": ua}
@@ -283,6 +343,11 @@ def main(argv: Optional[List[str]] = None) -> int:
                         "(--status approved): without it, a re-check rewrites the verdict of every "
                         "fact in scope, so an already-verified fact can flip to FALSE and silently "
                         "leave the served surface.")
+    p.add_argument("--headless", action="store_true",
+                   help="Fall back to a headless-Chromium render when a page returns 200 but no "
+                        "server-rendered text (a client-rendered shell, e.g. mom.gov.sg). Requires "
+                        "Playwright (`pip install playwright`); degrades to the normal result when "
+                        "it is absent. Only affects the shell case — not blocks or 404s.")
     args = p.parse_args(argv)
 
     from backend.database import db
@@ -338,7 +403,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     for i, doc_id in enumerate(doc_ids, 1):
         url = doc_urls[doc_id]
         rows = by_doc[doc_id]
-        res = fetch_and_parse(url, robots=robots, limiter=limiter)
+        res = fetch_and_parse(url, robots=robots, limiter=limiter, headless=args.headless)
         fetch_reasons[res["reason"]] += 1
         if not res["ok"]:
             (blocked_sources if res.get("blocked") else dead_sources).append(

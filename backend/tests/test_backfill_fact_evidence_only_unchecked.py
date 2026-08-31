@@ -123,7 +123,7 @@ def engine(monkeypatch):
     monkeypatch.setitem(sys.modules, "backend.database", stub_module)
     monkeypatch.setattr(
         bf, "fetch_and_parse",
-        lambda url, robots=None, limiter=None: {
+        lambda url, robots=None, limiter=None, headless=False: {
             "ok": True, "reason": "fetched", "text": SOURCE_TEXT, "blocked": False,
             "ua": "ReloPassBot/1.0",
         },
