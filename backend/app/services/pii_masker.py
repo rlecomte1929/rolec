@@ -101,15 +101,38 @@ _PASSPORT: Pattern[str] = re.compile(
     r"\b[A-Z]{1,2}\d{5,9}\b",
 )
 
-# Phone — international (+CC) or national; 8+ digits with optional
-# separators. Runs AFTER the SSN/INSEE/fnr/passport rules so a 9-digit
-# string lands on those more specific labels first. The negative
-# lookbehind keeps us from grabbing the trailing chars of an email or
-# already-masked token; the explicit `\+?` is captured inside the
-# match so the leading `+` doesn't leak.
+# Phone — international (+CC) or national. Runs AFTER the SSN/INSEE/fnr/passport
+# rules so a 9-digit string lands on those more specific labels first. The
+# negative lookbehind keeps us from grabbing the trailing chars of an email or
+# already-masked token; the explicit `\+?` is captured inside the match so the
+# leading `+` doesn't leak. This regex only finds CANDIDATES — a candidate is
+# redacted only when `_redact_phone_if_plausible` confirms a phone-plausible
+# digit count, so hyphenated legal identifiers (e.g. the EU directive number
+# "2003-109") and years are left intact. See AIQ-1869.
 _PHONE: Pattern[str] = re.compile(
     r"(?<![\w@.])\+?\d(?:[\d\s().-]{6,})\d(?![\w@.])",
 )
+
+# E.164 caps a phone number at 15 digits; national numbers run ~8+. A candidate
+# with fewer than 8 digits is far more likely a hyphenated identifier or a date
+# span than a phone number — AIQ-1869: the directive number "2003-109" (7 digits)
+# inside a citation URL was masked to [REDACTED_PHONE], dropping the emn.ie source
+# from the Immigration Q&A footer. Gate the loose regex on this range.
+_PHONE_MIN_DIGITS = 8
+_PHONE_MAX_DIGITS = 15
+
+
+def _redact_phone_if_plausible(match: "re.Match[str]") -> str:
+    """Redact a `_PHONE` candidate only when its digit count is phone-plausible.
+
+    Keeps hyphenated legal identifiers and years (too few digits) intact while
+    still masking real national/international numbers. See AIQ-1869.
+    """
+    span = match.group(0)
+    n_digits = sum(ch.isdigit() for ch in span)
+    if _PHONE_MIN_DIGITS <= n_digits <= _PHONE_MAX_DIGITS:
+        return "[REDACTED_PHONE]"
+    return span
 
 # Generic alphanumeric ID — last-line-of-defense for things that look
 # like an internal reference but didn't fit a more specific shape.
@@ -231,7 +254,7 @@ def mask_pii(text: str) -> str:
         # phone/generic rules claim them with a wrong label. Additive: it only
         # touches spans the earlier passes left untouched.
         out = _mask_with_recognizers(out)
-        out = _PHONE.sub("[REDACTED_PHONE]", out)
+        out = _PHONE.sub(_redact_phone_if_plausible, out)
         out = _GENERIC_ID.sub("[REDACTED_ID]", out)
         return out
     except Exception:
