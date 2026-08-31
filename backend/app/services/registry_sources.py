@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -797,6 +797,61 @@ SOURCES: Tuple[RegistrySource, ...] = (
         notes="NSW Fair Trading (Verify NSW) — the statutory licence register for property/real-estate "
               "agents under the Property and Stock Agents Act. Search form, no per-entity URL; vetter "
               "confirms the current licence number (carried in accreditation_number).",
+    ),
+    # ── Amsterdam (XX-NL) + Madrid (XX-ES) + Dubai (XX-AE) — Otto batch 2026-08-31 ──────────────
+    # Movers reuse the global FIDI source. Only bona-fide statutory/professional registers are wired;
+    # Otto's law-firm-website and mis-cited rows (Spanish tax agency for banks, Dubai Land Dept for
+    # tax, aggregator sites) stay unmapped → SELF_DECLARED → rejected by validate(), honestly.
+    RegistrySource(
+        name="DNB — De Nederlandsche Bank register",
+        base_url="https://www.dnb.nl/en/public-register/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-NL",), categories=("banks",),
+        notes="De Nederlandsche Bank — the Dutch central-bank register of licensed banks. Search "
+              "register, no stable per-entity URL; vetter confirms. (Banks capped at tier 2 regardless.)",
+    ),
+    RegistrySource(
+        name="NOvA — Dutch Bar find-a-lawyer register",
+        base_url="https://zoekeenadvocaat.advocatenorde.nl/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-NL",), categories=("legal_admin",),
+        notes="Nederlandse orde van advocaten — the statutory Dutch bar register (mandatory to practise). "
+              "Search form, no per-entity URL; vetter confirms the immigration lawyer on the roll.",
+    ),
+    RegistrySource(
+        name="AFM — Autoriteit Financiële Markten register",
+        base_url="https://www.afm.nl/en/sector/registers",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-NL",), categories=("tax_finance",),
+        notes="Dutch Authority for the Financial Markets — statutory register of financial-service firms. "
+              "Search register, no per-entity URL; vetter confirms the firm's AFM registration.",
+    ),
+    RegistrySource(
+        name="MVA — Makelaarsvereniging Amsterdam members",
+        base_url="https://www.mva.nl/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-NL",), categories=("housing_agencies",),
+        notes="Makelaarsvereniging Amsterdam — the Amsterdam real-estate brokers' association. Member "
+              "directory without a stable per-entity URL; vetter confirms membership.",
+    ),
+    RegistrySource(
+        name="CBUAE — Central Bank of the UAE register",
+        base_url="https://www.centralbank.ae/en/our-operations/licensing-and-authorisation/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-AE",), categories=("banks",),
+        notes="Central Bank of the UAE — the statutory register of licensed banks. No stable per-entity "
+              "URL; vetter confirms. (Banks capped at tier 2 regardless.)",
+    ),
+    RegistrySource(
+        name="KHDA — Dubai schools directory",
+        base_url="https://web.khda.gov.ae/en/education-directory",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-AE",), categories=("schools",),
+        notes="Knowledge and Human Development Authority — the Dubai education regulator's directory of "
+              "licensed private schools. JS-rendered directory, no stable per-entity URL; vetter confirms.",
+    ),
+    RegistrySource(
+        name="IBO — IB World Schools directory",
+        base_url="https://www.ibo.org/programmes/find-an-ib-school/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE"), categories=("schools",),
+        notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
+              "World Schools. Search directory; a school's IB authorisation is the accreditation the "
+              "vetter confirms. Used for international schools where a national per-entity register is "
+              "login/JS-gated.",
     ),
 )
 

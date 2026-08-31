@@ -106,6 +106,16 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("apra.gov.au",                   "APRA — Register of authorised ADIs"),
     ("verify.licence.nsw.gov.au",     "NSW Fair Trading — property agents register"),
     ("nsw.gov.au",                    "NESA — Approved NSW school providers (CRICOS)"),
+    # Amsterdam (XX-NL) + Dubai (XX-AE) + shared IB schools — Otto batch 2026-08-31. Only the real
+    # statutory/professional registers are mapped; law-firm sites, the Spanish tax agency (mis-cited
+    # for banks), Dubai Land Dept (mis-cited for tax) and aggregator sites stay unmapped -> rejected.
+    ("dnb.nl",                        "DNB — De Nederlandsche Bank register"),
+    ("advocatenorde.nl",              "NOvA — Dutch Bar find-a-lawyer register"),
+    ("afm.nl",                        "AFM — Autoriteit Financiële Markten register"),
+    ("mva.nl",                        "MVA — Makelaarsvereniging Amsterdam members"),
+    ("centralbank.ae",               "CBUAE — Central Bank of the UAE register"),
+    ("khda.gov.ae",                   "KHDA — Dubai schools directory"),
+    ("ibo.org",                       "IBO — IB World Schools directory"),
 )
 
 

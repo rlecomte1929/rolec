@@ -1,0 +1,90 @@
+{
+  "batch_id": "es-nl-ae-providers-2026-08-31",
+  "generated_by": "otto (Audos) \u2014 pulled from GCS by claude-code",
+  "target_table": "public.suppliers + public.supplier_service_capabilities",
+  "platform_vetting_status_all": "pending",
+  "landed": 35,
+  "rejected_tier3": 17,
+  "delivered": 53,
+  "generated": "2026-08-30",
+  "files": [
+    {
+      "city": "Madrid",
+      "corridor": "XX-ES",
+      "filename": "madrid_providers.csv",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788134073683_kiz29gsi.csv",
+      "row_count": 17,
+      "categories": {
+        "movers": 5,
+        "legal_admin": 2,
+        "tax_finance": 2,
+        "banks": 5,
+        "schools": 3,
+        "housing_agencies": 0
+      }
+    },
+    {
+      "city": "Amsterdam",
+      "corridor": "XX-NL",
+      "filename": "amsterdam_providers.csv",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788134208497_2vuea8k6.csv",
+      "row_count": 17,
+      "categories": {
+        "movers": 2,
+        "legal_admin": 3,
+        "tax_finance": 4,
+        "banks": 3,
+        "schools": 2,
+        "housing_agencies": 3
+      }
+    },
+    {
+      "city": "Dubai",
+      "corridor": "XX-AE",
+      "filename": "dubai_providers.csv",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788134347256_jjg1n4h8.csv",
+      "row_count": 19,
+      "categories": {
+        "movers": 3,
+        "legal_admin": 1,
+        "tax_finance": 4,
+        "banks": 5,
+        "schools": 3,
+        "housing_agencies": 3
+      }
+    }
+  ],
+  "blocked": [
+    {
+      "city": "Madrid",
+      "corridor": "XX-ES",
+      "category": "housing_agencies",
+      "reason": "COAPI Madrid member directory is behind an intranet login at coapimadrid.es/privado.php; individual API colegiado numbers are not publicly enumerable. Could not confirm any specific agency with a verified API registration number from a public register page."
+    },
+    {
+      "city": "Madrid",
+      "corridor": "XX-ES",
+      "category": "tax_finance",
+      "reason": "REAF directorio at reaf.economistas.es/directorio-de-miembros/ returned HTTP 403. Consejo General de Economistas register requires login. Included ECOVIS Fiscalges and VIA Consultores as real firms sourced from public websites, but no verified member registration number was retrievable from an official public register page."
+    },
+    {
+      "city": "Amsterdam",
+      "corridor": "XX-NL",
+      "category": "movers",
+      "reason": "Only two FIDI FAIM-certified movers confirmed with Amsterdam city addresses (Atlas, Santa Fe). Third NL FIDI affiliate found (De Haan) was Rotterdam-based. Including a Rotterdam firm would misrepresent city scope."
+    },
+    {
+      "city": "Amsterdam",
+      "corridor": "XX-NL",
+      "category": "schools",
+      "reason": "DUO school register at duo.nl is an interactive JS map not readable by fetch. Only two international schools confirmed via IBO public register (ISA school 000136, AICS school 002871 with DUO BRIN 17YS18). Third school could not be independently verified against a readable official register."
+    },
+    {
+      "city": "Dubai",
+      "corridor": "XX-AE",
+      "category": "legal_admin",
+      "reason": "Dubai Legal Affairs Department does not publish a publicly queryable searchable register of licensed law firms with license numbers. Only 1 firm (LYLAW) confirmed with explicit LAD licensing statement on firm website. UAE MOJ mainland lawyer register not publicly accessible via web fetch. Category blocked at 3-5 providers; only 1 included."
+    }
+  ],
+  "total_providers": 53
+}
