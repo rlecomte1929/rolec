@@ -175,6 +175,15 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # Turkey (destination rank 42, Istanbul) — the government publishes under `.gov.tr`
     # (goc.gov.tr Migration Management, gib.gov.tr tax, turkiye.gov.tr e-portal). `.gov.tr` ≠ `.gov`.
     "gov.tr",
+    # Hungary (rank 43) — `.gov.hu` (oif.gov.hu / enterhungary.gov.hu residence, nav.gov.hu tax).
+    "gov.hu",
+    # Romania (rank 44) — `.gov.ro` (igi.mai.gov.ro immigration). ANAF tax = anaf.ro (host below).
+    "gov.ro",
+    # Argentina (rank 45) — `.gob.ar` (migraciones.gob.ar, argentina.gob.ar, arca.gob.ar tax).
+    "gob.ar",
+    # Chile (rank 46) — `.gob.cl` (chileatiende.gob.cl, extranjeria.gob.cl). serviciomigraciones.cl /
+    # sii.cl are not gob.cl — hosts below.
+    "gob.cl",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -299,6 +308,12 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Bahrain — the national e-government portal is `bahrain.bh` (the eGovernment Authority's own
     # domain), which is not a `gov.bh` host.
     "bahrain.bh",
+    # Romania — ANAF (Agenția Națională de Administrare Fiscală, the tax authority) publishes under
+    # `anaf.ro`, not a `gov.ro` host.
+    "anaf.ro",
+    # Chile — the National Migration Service (`serviciomigraciones.cl`) and the tax authority SII
+    # (`sii.cl`) publish on their own `.cl`, not under `gob.cl`.
+    "serviciomigraciones.cl", "sii.cl",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )

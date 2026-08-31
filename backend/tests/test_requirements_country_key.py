@@ -262,6 +262,22 @@ def test_tier3_wave5_destinations_are_covered():
     assert resolve_catalog_country("Malaysia") == "MALAYSIA"
 
 
+def test_tier3_wave7_destinations_are_covered():
+    """HU/RO/AR/CL resolve — Tier-3 wave 7 coverage-master destinations, destination-only.
+
+    Hungary (rank 43, Budapest), Romania (rank 44, Bucharest), Argentina (rank 45, Buenos Aires),
+    Chile (rank 46, Santiago). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("HU") == "HUNGARY"
+    assert resolve_catalog_country("Hungary") == "HUNGARY"
+    assert resolve_catalog_country("RO") == "ROMANIA"
+    assert resolve_catalog_country("Romania") == "ROMANIA"
+    assert resolve_catalog_country("AR") == "ARGENTINA"
+    assert resolve_catalog_country("Argentina") == "ARGENTINA"
+    assert resolve_catalog_country("CL") == "CHILE"
+    assert resolve_catalog_country("Chile") == "CHILE"
+
+
 def test_tier3_wave6_destinations_are_covered():
     """TH/CN/IN/TR resolve — Tier-3 wave 6 coverage-master destinations, destination-only.
 

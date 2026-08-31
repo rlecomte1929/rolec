@@ -121,6 +121,12 @@ _ISO_TO_CATALOG_NAME = {
     "CN": "CHINA",
     "IN": "INDIA",
     "TR": "TURKEY",
+    # Tier-3 wave 7 — HU rank 43 (Budapest), RO rank 44 (Bucharest), AR rank 45 (Buenos Aires),
+    # CL rank 46 (Santiago). Destination-only, third-country-national pathway.
+    "HU": "HUNGARY",
+    "RO": "ROMANIA",
+    "AR": "ARGENTINA",
+    "CL": "CHILE",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.
