@@ -1,0 +1,18 @@
+{
+  "batch_id": "ee-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "EE",
+  "origin_country_code": null,
+  "destination_country_code": "EE",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "ESTONIA",
+  "record_count": 13,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "d287249c8cce4163fb559322b32cd929c9a48a9e8909326544dfd67cf7d50516",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "confirm_quotes.py: 10 CONFIRMED (politsei.ee + emta.ee, curl-reproducible), 3 REVIEW_BROWSER (eesti.ee Cloudflare + riigiteataja JS-gated \u2014 the referee's WAF/JS detection correctly flagged these, not a false hold). Applier browser-verified: riigiteataja Aliens Act quota-definition quote EXACT; both source pages render legitimately in-browser; the specialist-exemption (same Act \u00a7115) and isikukood (eesti.ee collapsed subsection) quotes sit deeper on those confirmed pages and were subagent-browser-confirmed. Imported --no-fetch. Third-country-only."
+}
