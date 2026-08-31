@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1057,6 +1057,32 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-PL",), categories=("legal_admin",),
         notes="Krajowy Rejestr Adwokatów i Aplikantów Adwokackich — the Polish Bar's statutory register "
               "(each advocate has a WAW/Adw/<no> profile). Vetter confirms the advocate/firm on the roll.",
+    ),
+    # ── Auckland (XX-NZ) — subagent batch 2026-08-31. Movers FIDI, schools IBO. Legal (NZLS per-lawyer
+    # only) + tax (CA ANZ Cloudflare-gated) skipped — worklist in batch README.
+    RegistrySource(
+        name="RBNZ — Registered banks in New Zealand",
+        base_url="https://www.rbnz.govt.nz/regulation-and-supervision/cross-industry-regulation/register-of-registered-banks-in-new-zealand",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-NZ",), categories=("banks",),
+        notes="Reserve Bank of New Zealand — the statutory register of registered banks. Flat list; vetter "
+              "confirms. (Banks capped at tier 2.)",
+    ),
+    RegistrySource(
+        name="REA — New Zealand real-estate licensee public register",
+        base_url="https://publicregister.rea.govt.nz/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-NZ",), categories=("housing_agencies",),
+        notes="Real Estate Authority — the public register of licensed real-estate companies/agents; each "
+              "has a per-licence detail page with its licence number. Vetter confirms the number.",
+    ),
+    # ── Doha (XX-QA) — subagent batch 2026-08-31. Movers FIDI, schools IBO. Banks (QCB register JS/
+    # geo-gated) + housing (broker register geo-fenced) skipped — worklist in batch README.
+    RegistrySource(
+        name="QFC — Qatar Financial Centre public register",
+        base_url="https://eservices.qfc.qa/qfcpublicregister/publicregister.aspx",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-QA",), categories=("legal_admin", "tax_finance"),
+        notes="Qatar Financial Centre Authority public register — lists QFCA-licensed approved service "
+              "providers (law firms) and approved auditors (audit firms). Vetter confirms the firm on the "
+              "register (tables ApprovedServiceProvider / ApprovedAuditors).",
     ),
 )
 

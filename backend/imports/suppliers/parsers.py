@@ -148,6 +148,11 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("knf.gov.pl",                    "KNF — Polish Financial Supervision Authority entity register"),
     ("pana.gov.pl",                   "PANA — Polish audit-firm register (Lista firm audytorskich)"),
     ("rejestradwokatow.pl",          "Krajowy Rejestr Adwokatów — Polish Bar register"),
+    # Auckland (XX-NZ) — subagent batch 2026-08-31.
+    ("rbnz.govt.nz",                  "RBNZ — Registered banks in New Zealand"),
+    ("rea.govt.nz",                   "REA — New Zealand real-estate licensee public register"),
+    # Doha (XX-QA) — subagent batch 2026-08-31.
+    ("qfc.qa",                        "QFC — Qatar Financial Centre public register"),
 )
 
 
