@@ -1,0 +1,19 @@
+{
+  "batch_id": "za-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "ZA",
+  "origin_country_code": null,
+  "destination_country_code": "ZA",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "SOUTH AFRICA",
+  "record_count": 3,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "f2938a2f89320e4a917121a90a548528c4eeaca8cfb0a7361df43292df193a81",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "held_count": 10,
+  "referee_note": "Of 13 researched facts, only the 3 SARS tax-residency facts were promoted (sars.gov.za \u2014 applier-confirmed on the live page, 40-char-window match through HTML markup). The 10 DHA visa facts are HELD (worklist): every DHA source PDF (dha.gov.za work-visa/critical-skills/ICT/points-notice) yields ZERO extractable text (image/scanned or intermittently fetch-blocked \u2014 curl returns %PDF-with-0-chars or a non-PDF stub), so the subagent's pypdf-verbatim claim could not be reproduced by the applier with pypdf OR pdfplumber. Re-source the DHA facts via OCR or the rendered DHA site before promoting. NOTE the subagent flagged the General Work Visa is now points-based (18 Oct 2024), superseding the labour-certificate premise."
+}
