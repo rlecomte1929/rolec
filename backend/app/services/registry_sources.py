@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1033,6 +1033,30 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-HK",), categories=("legal_admin",),
         notes="The Law Society of Hong Kong — statutory roll of solicitors' firms (each firm has a "
               "Firm-Detail?FirmId=<id> page). Vetter confirms the firm on the roll.",
+    ),
+    # ── Warsaw (XX-PL) — subagent batch 2026-08-31. Movers FIDI, schools IBO. Housing skipped:
+    # Poland abolished mandatory estate-agent licensing on 2014-01-01, so no statutory register exists.
+    RegistrySource(
+        name="KNF — Polish Financial Supervision Authority entity register",
+        base_url="https://www.knf.gov.pl/podmioty/wyszukiwarka_podmiotow",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-PL",), categories=("banks",),
+        notes="Komisja Nadzoru Finansowego — the register of supervised entities (Poland is outside the "
+              "euro area/SSM, so KNF, not the ECB, is the supervisor). Per-bank searchPhrase URLs. Vetter "
+              "confirms. (Banks capped at tier 2.)",
+    ),
+    RegistrySource(
+        name="PANA — Polish audit-firm register (Lista firm audytorskich)",
+        base_url="https://strefa.pana.gov.pl/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-PL",), categories=("tax_finance",),
+        notes="Polska Agencja Nadzoru Audytowego — the statutory register of audit firms, each with a "
+              "register number. Vetter confirms the number.",
+    ),
+    RegistrySource(
+        name="Krajowy Rejestr Adwokatów — Polish Bar register",
+        base_url="https://rejestradwokatow.pl/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-PL",), categories=("legal_admin",),
+        notes="Krajowy Rejestr Adwokatów i Aplikantów Adwokackich — the Polish Bar's statutory register "
+              "(each advocate has a WAW/Adw/<no> profile). Vetter confirms the advocate/firm on the roll.",
     ),
 )
 
