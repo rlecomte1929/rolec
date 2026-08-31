@@ -182,6 +182,14 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # padrón vanished from any ES-side deliverable. Named hosts only — a third city is a
     # decision, not a silent addition.
     "madrid.es", "barcelona.cat",
+    # Italy (destination rank 11, Milan). `gov.it` above catches interno.gov.it / agenziaentrate.gov.it,
+    # but `normattiva.it` — the official consolidated-law database (Istituto Poligrafico e Zecca dello
+    # Stato) where the D.Lgs / TUIR articles are published — has no gov TLD, like boe.es / lovdata.no.
+    "normattiva.it",
+    # Sweden (destination rank 14, Stockholm). Sweden uses no governmental suffix; each agency has its
+    # own `.se` domain: Migrationsverket (migration), Skatteverket (tax + population register),
+    # Försäkringskassan (social insurance). Each publishes its own rule. 8th too-narrow-allowlist instance.
+    "migrationsverket.se", "skatteverket.se", "forsakringskassan.se",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )

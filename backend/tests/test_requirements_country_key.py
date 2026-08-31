@@ -171,6 +171,14 @@ def test_uae_is_covered():
     assert resolve_catalog_country("United Arab Emirates") == "UNITED ARAB EMIRATES"
 
 
+def test_italy_and_sweden_are_covered():
+    """IT + SE resolve — coverage-master destinations (Milan rank 11, Stockholm rank 14)."""
+    assert resolve_catalog_country("IT") == "ITALY"
+    assert resolve_catalog_country("Italy") == "ITALY"
+    assert resolve_catalog_country("SE") == "SWEDEN"
+    assert resolve_catalog_country("Sweden") == "SWEDEN"
+
+
 def test_every_corridor_destination_resolves():
     """Every corridor profile's destination must resolve to a catalog name.
 
