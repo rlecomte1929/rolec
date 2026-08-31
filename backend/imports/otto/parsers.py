@@ -361,6 +361,14 @@ _SEMI_OFFICIAL_HOSTS: Tuple[str, ...] = (
     # as citizensinformation.ie: it is a portal that restates what SKAT, the CPR office and
     # the regions publish elsewhere, so a fact from here belongs in the review queue.
     "borger.dk",
+    # Vietnam. baochinhphu.vn (Báo Chính phủ / the Online Newspaper of the Government of Viet
+    # Nam) is run by the Government Office (Văn phòng Chính phủ) — a state organ, so it belongs
+    # in, not out. Semi-official for the same reason as citizensinformation.ie / borger.dk: it
+    # reports and restates the decrees (219/2025, 152/2020, 143/2018 …) rather than promulgating
+    # them, and the primary texts (vbpl.vn) sit behind a WAF while the decree PDFs are scanned —
+    # so a fact from here is worth keeping and belongs in the review queue for a check against
+    # the statute. The `.vn` government suffix is `gov.vn`; baochinhphu.vn does not carry it.
+    "baochinhphu.vn",
 )
 
 
