@@ -1,0 +1,18 @@
+{
+  "batch_id": "mx-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "MX",
+  "origin_country_code": null,
+  "destination_country_code": "MX",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "MEXICO",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "070c34a6815d4ae11feb6ea1b563b6ed66ab9027c39753d48a39086261d1d442",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources all official gob.mx (SRE visa page + INM tramite PDFs), sat.gob.mx, inm.gob.mx. Applier independently reconfirmed 9/12: the 4 INM tramite PDFs (curl+pypdf, verbatim incl. Spanish accents), the 4 gob.mx/SRE visa-page facts (browser get_page_text, all exact), and rfc_registration (curl). The 3 not personally reproduced \u2014 curp_assignment (gob.mx tramites JS), tax_residency (sat CFF Art.9, subagent verified vs the official CFF PDF), imss_enrolment (gob.mx/imss, WebFetch) \u2014 are official-source and subagent-confirmed; re-confirm before approve. Imported --no-fetch (sat/imss WAF-gate curl+verify_ledger)."
+}
