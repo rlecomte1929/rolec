@@ -1182,6 +1182,23 @@ SOURCES: Tuple[RegistrySource, ...] = (
               "Act, agents hold a bound trade (vázaná živnost 'Realitní zprostředkování'); the ARES record "
               "for the firm's IČO shows it. Vetter confirms.",
     ),
+    # ── São Paulo (XX-BR) — subagent batch 2026-08-31. Movers FIDI, schools IBO. Housing (CRECI-SP
+    # reCAPTCHA-gated) + tax (CRC/CFC register unreachable) skipped — worklist in batch README.
+    RegistrySource(
+        name="BCB — Banco Central do Brasil financial-institution register",
+        base_url="https://dadosabertos.bcb.gov.br/dataset/instituicoes-financeiras",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-BR",), categories=("banks",),
+        notes="Banco Central do Brasil — the register of authorised financial institutions (SFN), each with "
+              "a per-institution page keyed by CNPJ on the BCB open-data portal. Vetter confirms. "
+              "(Banks capped at tier 2.)",
+    ),
+    RegistrySource(
+        name="OAB-SP — São Paulo Bar law-firm register",
+        base_url="https://www2.oabsp.org.br/asp/consultas/consultaSociedades.asp",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-BR",), categories=("legal_admin",),
+        notes="Ordem dos Advogados do Brasil, Seção São Paulo — the statutory register of law firms "
+              "(Sociedades de Advocacia), each with an OAB número. Vetter confirms the firm on the roll.",
+    ),
 )
 
 

@@ -169,6 +169,9 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("cak.cz",                        "ČAK — Czech Bar Association advocate register"),
     ("kacr.cz",                       "KAČR — Czech Chamber of Auditors register"),
     ("ares.gov.cz",                   "ARES/RŽP — Czech Trade Register (real-estate brokerage)"),
+    # São Paulo (XX-BR) — subagent batch 2026-08-31.
+    ("bcb.gov.br",                    "BCB — Banco Central do Brasil financial-institution register"),
+    ("oabsp.org.br",                 "OAB-SP — São Paulo Bar law-firm register"),
 )
 
 
