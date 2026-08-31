@@ -1,0 +1,18 @@
+{
+  "batch_id": "qa-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "QA",
+  "origin_country_code": null,
+  "destination_country_code": "QA",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "QATAR",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "cd3aa640ce863d32bebd0092d4977142d03c184a140b02f141cb2ff4755f15d3",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources are official hukoomi.gov.qa + portal.moi.gov.qa \u2014 official-tier. Both WAF/JS-gate verify_ledger's fetcher AND curl (403 maintenance/JS shell), so imported with --no-fetch. Research subagent browser-confirmed 12/12 verbatim (Playwright); applier independently browser-verified 4 quotes across 2 hukoomi URLs (change_of_employer, exit_permit, workers_fund on labor-law; driving_licence NOC) \u2014 all exact. 'no personal income tax' deliberately omitted (no reachable official page stated it verbatim). adlsa.gov.qa/mol.gov.qa unreachable from this environment."
+}
