@@ -1151,6 +1151,37 @@ SOURCES: Tuple[RegistrySource, ...] = (
               "banks), each with a Clave de Registro and per-entity home_publico.jsp page. Vetter confirms. "
               "(Banks capped at tier 2.)",
     ),
+    # ── Prague (XX-CZ) — subagent batch 2026-08-31. Movers FIDI, schools IBO. All 6 categories filled.
+    RegistrySource(
+        name="ČNB — Czech National Bank JERRS register",
+        base_url="https://www.cnb.cz/en/supervision-financial-market/lists-and-registers/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CZ",), categories=("banks",),
+        notes="Czech National Bank JERRS — the register of licensed banks (Czechia is outside the SSM). "
+              "Per-entity deep links are CAPTCHA-gated so the register page is cited. Vetter confirms. "
+              "(Banks capped at tier 2.)",
+    ),
+    RegistrySource(
+        name="ČAK — Czech Bar Association advocate register",
+        base_url="https://www.cak.cz/scripts/detail.php?pgid=64",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CZ",), categories=("legal_admin",),
+        notes="Česká advokátní komora — the statutory register of advocates; each has an advokat-detail "
+              "page with an evidenční číslo. Vetter confirms the advocate/firm on the roll.",
+    ),
+    RegistrySource(
+        name="KAČR — Czech Chamber of Auditors register",
+        base_url="https://www.kacr.cz/rejstrik-auditoru",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CZ",), categories=("tax_finance",),
+        notes="Komora auditorů ČR — the statutory register of audit firms; each has a detail-auditora page "
+              "with an evidence number. Vetter confirms.",
+    ),
+    RegistrySource(
+        name="ARES/RŽP — Czech Trade Register (real-estate brokerage)",
+        base_url="https://ares.gov.cz/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CZ",), categories=("housing_agencies",),
+        notes="Živnostenský rejstřík via the official ARES REST API — since the 2020 Real Estate Brokerage "
+              "Act, agents hold a bound trade (vázaná živnost 'Realitní zprostředkování'); the ARES record "
+              "for the firm's IČO shows it. Vetter confirms.",
+    ),
 )
 
 

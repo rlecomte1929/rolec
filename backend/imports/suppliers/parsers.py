@@ -164,6 +164,11 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     # Athens (XX-GR) + Mexico City (XX-MX) — subagent batch 2026-08-31.
     ("elte.org.gr",                   "ELTE/HAASOB — Greek public register of audit firms"),
     ("condusef.gob.mx",              "CONDUSEF SIPRES — Mexican supervised financial entities"),
+    # Prague (XX-CZ) — subagent batch 2026-08-31.
+    ("cnb.cz",                        "ČNB — Czech National Bank JERRS register"),
+    ("cak.cz",                        "ČAK — Czech Bar Association advocate register"),
+    ("kacr.cz",                       "KAČR — Czech Chamber of Auditors register"),
+    ("ares.gov.cz",                   "ARES/RŽP — Czech Trade Register (real-estate brokerage)"),
 )
 
 
