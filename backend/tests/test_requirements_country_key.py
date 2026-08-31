@@ -214,6 +214,22 @@ def test_tier3_wave2_destinations_are_covered():
     assert resolve_catalog_country("Poland") == "POLAND"
 
 
+def test_tier3_wave3_destinations_are_covered():
+    """KR/IL/KW/LU resolve — Tier-3 wave 3 coverage-master destinations, destination-only.
+
+    South Korea (rank 27, Seoul), Israel (rank 28, Tel Aviv), Kuwait (rank 29, Kuwait City),
+    Luxembourg (rank 30, Luxembourg City). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("KR") == "SOUTH KOREA"
+    assert resolve_catalog_country("South Korea") == "SOUTH KOREA"
+    assert resolve_catalog_country("IL") == "ISRAEL"
+    assert resolve_catalog_country("Israel") == "ISRAEL"
+    assert resolve_catalog_country("KW") == "KUWAIT"
+    assert resolve_catalog_country("Kuwait") == "KUWAIT"
+    assert resolve_catalog_country("LU") == "LUXEMBOURG"
+    assert resolve_catalog_country("Luxembourg") == "LUXEMBOURG"
+
+
 def test_every_corridor_destination_resolves():
     """Every corridor profile's destination must resolve to a catalog name.
 

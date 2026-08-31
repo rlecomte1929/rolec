@@ -128,6 +128,17 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     "gov.qa",
     # (New Zealand rank 22 uses `govt.nz`, already listed above; Poland rank 25 uses `gov.pl`,
     # already listed above — udsc.gov.pl, podatki.gov.pl, nfz.gov.pl all match it.)
+    # South Korea (destination rank 27, Seoul) — government publishes under `.go.kr`
+    # (hikorea.go.kr immigration, immigration.go.kr, nts.go.kr tax, moel.go.kr labour). `.go.kr` ≠ `.gov`.
+    "go.kr",
+    # Israel (destination rank 28, Tel Aviv) — government bodies publish under `.gov.il`
+    # (piba.gov.il Population & Immigration Authority, taxes.gov.il, gov.il). `.gov.il` ≠ `.gov`.
+    "gov.il",
+    # Kuwait (destination rank 29, Kuwait City) — government publishes under `.gov.kw`
+    # (moi.gov.kw Interior, paci.gov.kw Civil Information / Civil ID, e.gov.kw portal). `.gov.kw` ≠ `.gov`.
+    "gov.kw",
+    # (Luxembourg rank 30 uses `public.lu`, already listed above — guichet.public.lu matches it;
+    # the bare guichet.lu host is added below.)
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -236,6 +247,12 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Poland — ZUS (Zakład Ubezpieczeń Społecznych, the social-insurance institution) publishes its
     # own contribution/coverage rules under `zus.pl`, which is not a `gov.pl` host.
     "zus.pl",
+    # South Korea — the national health-insurance service publishes coverage rules under `nhis.or.kr`
+    # (an or.kr TLD, not go.kr).
+    "nhis.or.kr",
+    # Luxembourg — the state's one-stop portal is `guichet.lu` (the content also mirrors under
+    # guichet.public.lu, which the `public.lu` suffix catches; the bare host is added for safety).
+    "guichet.lu",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )

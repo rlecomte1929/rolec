@@ -97,6 +97,12 @@ _ISO_TO_CATALOG_NAME = {
     "NZ": "NEW ZEALAND",
     "QA": "QATAR",
     "PL": "POLAND",
+    # Tier-3 wave 3 — KR rank 27 (Seoul), IL rank 28 (Tel Aviv), KW rank 29 (Kuwait City),
+    # LU rank 30 (Luxembourg City). Destination-only, third-country-national pathway.
+    "KR": "SOUTH KOREA",
+    "IL": "ISRAEL",
+    "KW": "KUWAIT",
+    "LU": "LUXEMBOURG",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.
