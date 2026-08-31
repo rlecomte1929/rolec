@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -870,6 +870,66 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CH",), categories=("schools",),
         notes="Swiss Group of International Schools — the membership body for accredited international "
               "schools in Switzerland. Member directory; vetter confirms membership.",
+    ),
+    # ── Brussels (XX-BE) + Vienna (XX-AT) + Copenhagen (XX-DK) — Otto/subagent batch 2026-08-31 ──
+    # Movers reuse FIDI; schools reuse IBO. BE/AT legal + tax registers are anti-bot/JS-gated (blocked,
+    # re-source worklist), so only the reachable statutory registers are wired.
+    RegistrySource(
+        name="NBB — National Bank of Belgium credit-institutions list",
+        base_url="https://www.nbb.be/en/financial-oversight/prudential-supervision/areas-responsibility/credit-institutions/lists",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-BE",), categories=("banks",),
+        notes="National Bank of Belgium — statutory list of authorised credit institutions. Flat list, "
+              "no per-entity URL; vetter confirms. (Banks capped at tier 2 regardless.)",
+    ),
+    RegistrySource(
+        name="FMA — Austrian Financial Market Authority company database",
+        base_url="https://www.fma.gv.at/en/search-company-database/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-AT",), categories=("banks",),
+        notes="Finanzmarktaufsicht — the Austrian financial regulator's company database of licensed "
+              "banks. Search form; vetter confirms. (Banks capped at tier 2 regardless.)",
+    ),
+    RegistrySource(
+        name="Finanstilsynet — Danish FSA company register",
+        base_url="https://virksomhedsregister.finanstilsynet.dk/index-en.html",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-DK",), categories=("banks",),
+        notes="Danish Financial Supervisory Authority — statutory register of licensed banks (FTID). "
+              "Search register; vetter confirms. (Banks capped at tier 2 regardless.)",
+    ),
+    RegistrySource(
+        name="BIV/IPI — Belgian real-estate agents register",
+        base_url="https://www.biv.be/vastgoedmakelaars",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-BE",), categories=("housing_agencies",),
+        notes="Beroepsinstituut van Vastgoedmakelaars / Institut professionnel des agents immobiliers — "
+              "the statutory register of recognised Belgian estate agents (IPI/BIV number). Search form; "
+              "vetter confirms the recognition number.",
+    ),
+    RegistrySource(
+        name="WKO — Austrian real-estate agents register",
+        base_url="https://firmen.wko.at/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-AT",), categories=("housing_agencies",),
+        notes="Wirtschaftskammer Österreich Firmen A-Z — the register of licensed Immobilienmakler "
+              "(membership is mandatory to trade). Search form; vetter confirms.",
+    ),
+    RegistrySource(
+        name="MDE — Dansk Ejendomsmæglerforening members",
+        base_url="https://www.de.dk/boligkob-salg/find-medlem",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-DK",), categories=("housing_agencies",),
+        notes="Dansk Ejendomsmæglerforening — the Danish estate-agents' association member directory. "
+              "Search form; vetter confirms membership.",
+    ),
+    RegistrySource(
+        name="Advokatsamfundet — Advokatnøglen (Danish bar)",
+        base_url="https://www.advokatnoeglen.dk/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-DK",), categories=("legal_admin",),
+        notes="The Danish Bar and Law Society register (mandatory to practise). Search directory; vetter "
+              "confirms the firm/lawyer on the roll.",
+    ),
+    RegistrySource(
+        name="FSR — danske revisorer member directory",
+        base_url="https://www.fsr.dk/vaerktoejer/find-revisor",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-DK",), categories=("tax_finance",),
+        notes="FSR – danske revisorer — the Danish auditors' & accountants' professional body member "
+              "directory. Search directory; vetter confirms membership.",
     ),
 )
 

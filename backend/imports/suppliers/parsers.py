@@ -119,6 +119,15 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     # Zurich (XX-CH) — Otto batch 2026-08-31 (movers reuse fidi.org; SE schools reuse ibo.org).
     ("finma.ch",                      "FINMA — Swiss financial-market authority register"),
     ("sgischools.com",               "SGIS — Swiss Group of International Schools members"),
+    # Brussels (XX-BE) + Vienna (XX-AT) + Copenhagen (XX-DK) — Otto/subagent batch 2026-08-31.
+    ("nbb.be",                        "NBB — National Bank of Belgium credit-institutions list"),
+    ("biv.be",                        "BIV/IPI — Belgian real-estate agents register"),
+    ("fma.gv.at",                     "FMA — Austrian Financial Market Authority company database"),
+    ("wko.at",                        "WKO — Austrian real-estate agents register"),
+    ("finanstilsynet.dk",            "Finanstilsynet — Danish FSA company register"),
+    ("de.dk",                         "MDE — Dansk Ejendomsmæglerforening members"),
+    ("advokatnoeglen.dk",            "Advokatsamfundet — Advokatnøglen (Danish bar)"),
+    ("fsr.dk",                        "FSR — danske revisorer member directory"),
 )
 
 
