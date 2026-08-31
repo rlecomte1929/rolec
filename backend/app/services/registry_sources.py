@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -954,7 +954,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="ECB Banking Supervision — supervised entities (SSM)",
         base_url="https://www.bankingsupervision.europa.eu/banking/list/who/html/index.en.html",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-FI", "XX-GR"), categories=("banks",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-FI", "XX-GR", "XX-EE"), categories=("banks",),
         notes="ECB/SSM list of supervised entities — the euro-area credit institutions authorised in each "
               "country, each with an LEI. Used where the national regulator's register is a JS SPA "
               "(FIN-FSA / Bank of Greece); the ECB list carries the same authorisation status. Filter by "
@@ -1335,6 +1335,47 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-HU",), categories=("tax_finance",),
         notes="Magyar Könyvvizsgálói Kamara — the statutory register of audit firms, each with a per-firm "
               "public-data page + chamber registration number. Vetter confirms.",
+    ),
+    # ── Tallinn (XX-EE) — subagent batch 2026-08-31. Movers FIDI, schools IBO, banks ECB SSM (above).
+    # Housing skipped (no statutory per-firm register in Estonia).
+    RegistrySource(
+        name="Eesti Advokatuur — Estonian Bar law-offices register",
+        base_url="https://www.advokatuur.ee/en/find-advocates/law-offices/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-EE",), categories=("legal_admin",),
+        notes="Eesti Advokatuur (Estonian Bar Association) — the statutory register of law offices, each "
+              "with a per-firm page. Vetter confirms the firm on the register.",
+    ),
+    RegistrySource(
+        name="Audiitorkogu — Estonian audit-firms register",
+        base_url="https://www.audiitorkogu.ee/est/audiitorettevotjad/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-EE",), categories=("tax_finance",),
+        notes="Audiitorkogu (Estonian Auditors' Association) — the statutory register of audit firms, each "
+              "with an activity-licence number. Vetter confirms.",
+    ),
+    # ── Reykjavik (XX-IS) — subagent batch 2026-08-31. Schools IBO. No FIDI affiliate in Iceland
+    # (movers skipped, not a gap). Legal skipped (lmfi.is JS-rendered, cross-contaminated this run).
+    RegistrySource(
+        name="Central Bank of Iceland — supervised commercial banks",
+        base_url="https://www.cb.is/financial-supervision/supervised-entities/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-IS",), categories=("banks",),
+        notes="Central Bank of Iceland (Seðlabanki, incorporating the former FME) — the register of "
+              "supervised entities; the commercial banks (viðskiptabankar) carry a kennitala. Vetter "
+              "confirms. (Banks capped at tier 2.)",
+    ),
+    RegistrySource(
+        name="Endurskoðendaráð — Iceland audit-firms register",
+        base_url="https://www.endurskodendarad.is/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-IS",), categories=("tax_finance",),
+        notes="Endurskoðendaráð (Iceland's audit oversight board, Act 94/2019) — the statutory register of "
+              "audit firms, each with an EF firm number. Vetter confirms.",
+    ),
+    RegistrySource(
+        name="Ísland.is — Iceland licensed real-estate agents register",
+        base_url="https://island.is/en/o/district-commissioner/real-estate-agents",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-IS",), categories=("housing_agencies",),
+        notes="The official Ísland.is register of licensed real-estate agents (löggiltir fasteignasalar, "
+              "held by the District Commissioners); each agency is evidenced by a named licensed broker. "
+              "Vetter confirms the licence.",
     ),
 )
 

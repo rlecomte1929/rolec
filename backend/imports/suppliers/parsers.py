@@ -199,6 +199,12 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     # Budapest (XX-HU) — subagent batch 2026-08-31.
     ("mnb.hu",                        "MNB — Magyar Nemzeti Bank institution register"),
     ("mkvk.hu",                       "MKVK — Hungarian Chamber of Auditors register"),
+    # Tallinn (XX-EE) + Reykjavik (XX-IS) — subagent batch 2026-08-31.
+    ("advokatuur.ee",                 "Eesti Advokatuur — Estonian Bar law-offices register"),
+    ("audiitorkogu.ee",              "Audiitorkogu — Estonian audit-firms register"),
+    ("cb.is",                         "Central Bank of Iceland — supervised commercial banks"),
+    ("endurskodendarad.is",          "Endurskoðendaráð — Iceland audit-firms register"),
+    ("island.is",                     "Ísland.is — Iceland licensed real-estate agents register"),
 )
 
 
