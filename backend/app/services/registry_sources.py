@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT", "XX-TW", "XX-VN", "XX-ID", "XX-PH")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT", "XX-TW", "XX-VN", "XX-ID", "XX-PH"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1422,6 +1422,34 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-MT",), categories=("legal_admin",),
         notes="Malta Chamber of Advocates — the official directory of warranted advocates; each firm is "
               "evidenced by a named warranted advocate's profile. Vetter confirms.",
+    ),
+    # ── Wave 9: Asia-Pacific tail (XX-TW/VN/ID/PH) — subagent batches 2026-08-31. Movers reuse the
+    # global FIDI/IAM directories; schools reuse IBO (corridors added above). Only each country's
+    # central-bank register is net-new; legal/tax/housing statutory registers are individual-
+    # practitioner rolls or verify-by-name portals (not browsable firm directories) → skipped.
+    RegistrySource(
+        name="CBC — Central Bank of the Republic of China (Taiwan) domestic-bank list",
+        base_url="https://www.cbc.gov.tw/en/lp-495-2.html",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-TW",), categories=("banks",),
+        notes="Central Bank of the ROC (Taiwan) — the statutory list of domestic banks (incl. the "
+              "expat-relevant foreign subsidiaries). No stable per-entity URL or licence number is "
+              "published; the vetter confirms. (Banks capped at tier 2 regardless.)",
+    ),
+    RegistrySource(
+        name="SBV — State Bank of Vietnam foreign-bank-branch register",
+        base_url="https://www.sbv.gov.vn/en/foreign-bank-branches",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-VN",), categories=("banks",),
+        notes="State Bank of Vietnam — the statutory register of licensed banks and foreign-bank "
+              "branches. The register table carries no per-bank website, so those rows land with "
+              "website_url blank rather than a fabricated URL; the vetter confirms by name.",
+    ),
+    RegistrySource(
+        name="BSP — Bangko Sentral ng Pilipinas directory of banks",
+        base_url="https://www.bsp.gov.ph/SitePages/FinancialStability/DirBanksFIList.aspx",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-PH",), categories=("banks",),
+        notes="Bangko Sentral ng Pilipinas — the statutory directory of BSP-supervised universal / "
+              "commercial banks (the FCDU-authority list is the concrete register document, the JS "
+              "directory hub being unfetchable). No per-entity website; the vetter confirms by name.",
     ),
 )
 

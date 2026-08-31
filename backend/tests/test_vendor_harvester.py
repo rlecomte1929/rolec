@@ -299,7 +299,8 @@ def test_pairs_in_scope_is_corridors_x_categories():
     # ingestable_sources() are for.
     from backend.app.services.registry_sources import CORRIDORS, CATEGORIES
     # + XX-ZA (Johannesburg Tier-3 wave-5) added 2026-08-31 → 50 corridors.
-    assert len(pairs_in_scope()) == len(CORRIDORS) * len(CATEGORIES) == 300
+    # + XX-TW/VN/ID/PH (wave-9 Asia-Pacific tail) 2026-08-31 → 54 corridors.
+    assert len(pairs_in_scope()) == len(CORRIDORS) * len(CATEGORIES) == 324
 
 
 def test_unavailable_sources_are_declared_not_hidden():

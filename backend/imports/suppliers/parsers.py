@@ -212,6 +212,10 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("ktimatomesites.com",           "Cyprus Real Estate Agents Registration Council register"),
     ("mfsa.mt",                       "MFSA Financial Services Register (Malta)"),
     ("avukati.org",                  "Malta Chamber of Advocates — Find a Lawyer directory"),
+    # Wave 9 (XX-TW/VN/ID/PH) — central-bank registers; movers/schools reuse fidi/iam/ibo above.
+    ("cbc.gov.tw",                    "CBC — Central Bank of the Republic of China (Taiwan) domestic-bank list"),
+    ("sbv.gov.vn",                    "SBV — State Bank of Vietnam foreign-bank-branch register"),
+    ("bsp.gov.ph",                    "BSP — Bangko Sentral ng Pilipinas directory of banks"),
 )
 
 
