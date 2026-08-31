@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1376,6 +1376,52 @@ SOURCES: Tuple[RegistrySource, ...] = (
         notes="The official Ísland.is register of licensed real-estate agents (löggiltir fasteignasalar, "
               "held by the District Commissioners); each agency is evidenced by a named licensed broker. "
               "Vetter confirms the licence.",
+    ),
+    # ── Nicosia (XX-CY) — subagent batch 2026-08-31. Movers FIDI, schools IBO. All 6 categories filled.
+    RegistrySource(
+        name="Central Bank of Cyprus — register of credit institutions",
+        base_url="https://www.centralbank.cy/en/licensing-supervision/banks/register-of-credit-institutions",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CY",), categories=("banks",),
+        notes="Central Bank of Cyprus — the Register of Credit Institutions operating in Cyprus. Flat list; "
+              "vetter confirms. (Banks capped at tier 2.)",
+    ),
+    RegistrySource(
+        name="Cyprus Bar Association — lawyers' companies registry",
+        base_url="https://www.cyprusbar.org/AssociationPage.aspx",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CY",), categories=("legal_admin",),
+        notes="Παγκύπριος Δικηγορικός Σύλλογος (Cyprus Bar Association) — the register of lawyers' companies, "
+              "each with a CBA registration number. Vetter confirms.",
+    ),
+    RegistrySource(
+        name="ICPAC — Cyprus statutory audit-firms register",
+        base_url="https://www.icpac.org.cy/en/audit-firms",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CY",), categories=("tax_finance",),
+        notes="Institute of Certified Public Accountants of Cyprus — the Register of Statutory Audit Firms, "
+              "each with a practising-certificate number. Vetter confirms.",
+    ),
+    RegistrySource(
+        name="Cyprus Real Estate Agents Registration Council register",
+        base_url="https://ktimatomesites.com/agents/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CY",), categories=("housing_agencies",),
+        notes="Council for the Registration of Estate Agents (Cyprus) — the statutory register of licensed "
+              "estate agents, each with a registration number. Vetter confirms.",
+    ),
+    # ── Valletta / Malta (XX-MT) — subagent batch 2026-08-31. Schools IBO. Movers skipped (no FIDI
+    # affiliate in Malta); housing skipped (PMA register is verify-by-number only).
+    RegistrySource(
+        name="MFSA Financial Services Register (Malta)",
+        base_url="https://fsr.mfsa.mt/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-MT",), categories=("banks", "tax_finance"),
+        notes="Malta Financial Services Authority Financial Services Register — licensed credit institutions "
+              "(banks) and approved auditors / company service providers (tax_finance), each with an MFSA "
+              "C-number. The app has no stable per-firm deep link; the C-number is the reproduction key.",
+    ),
+    RegistrySource(
+        name="Malta Chamber of Advocates — Find a Lawyer directory",
+        base_url="https://www.avukati.org/find-a-lawyer/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-MT",), categories=("legal_admin",),
+        notes="Malta Chamber of Advocates — the official directory of warranted advocates; each firm is "
+              "evidenced by a named warranted advocate's profile. Vetter confirms.",
     ),
 )
 

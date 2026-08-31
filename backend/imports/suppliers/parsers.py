@@ -205,6 +205,13 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("cb.is",                         "Central Bank of Iceland — supervised commercial banks"),
     ("endurskodendarad.is",          "Endurskoðendaráð — Iceland audit-firms register"),
     ("island.is",                     "Ísland.is — Iceland licensed real-estate agents register"),
+    # Nicosia (XX-CY) + Valletta (XX-MT) — subagent batch 2026-08-31.
+    ("centralbank.cy",               "Central Bank of Cyprus — register of credit institutions"),
+    ("cyprusbar.org",                "Cyprus Bar Association — lawyers' companies registry"),
+    ("icpac.org.cy",                 "ICPAC — Cyprus statutory audit-firms register"),
+    ("ktimatomesites.com",           "Cyprus Real Estate Agents Registration Council register"),
+    ("mfsa.mt",                       "MFSA Financial Services Register (Malta)"),
+    ("avukati.org",                  "Malta Chamber of Advocates — Find a Lawyer directory"),
 )
 
 
