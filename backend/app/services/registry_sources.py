@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1243,6 +1243,15 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-OM",), categories=("banks",),
         notes="Central Bank of Oman — the register of licensed banks. Flat list; vetter confirms. "
               "(Banks capped at tier 2.)",
+    ),
+    # ── Kuala Lumpur (XX-MY) — subagent batch 2026-08-31. Movers FIDI, schools IBO. Housing (BOVAEP/LPPEH),
+    # legal (Malaysian Bar) and tax (MIA) are dynamic search-only portals — skipped, worklist in README.
+    RegistrySource(
+        name="BNM — Bank Negara Malaysia licensed banks",
+        base_url="https://www.bnm.gov.my/regulations/fi-directory",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-MY",), categories=("banks",),
+        notes="Bank Negara Malaysia — the List of Licensed Financial Institutions (commercial banks). Flat "
+              "list; vetter confirms the exact legal name. (Banks capped at tier 2.)",
     ),
 )
 
