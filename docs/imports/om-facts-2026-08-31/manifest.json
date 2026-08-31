@@ -1,0 +1,17 @@
+{
+  "batch_id": "om-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "OM",
+  "origin_country_code": null,
+  "destination_country_code": "OM",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "OMAN",
+  "record_count": 10,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "9549f1064d5340edc42d637ecbf6be2e1699151265935dcb952d57d67d644e24",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded"
+}
