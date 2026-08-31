@@ -1,0 +1,19 @@
+{
+  "batch_id": "cl-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "CL",
+  "origin_country_code": null,
+  "destination_country_code": "CL",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "CHILE",
+  "record_count": 9,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "54ec6be5a5b80dc69cb6507914a085617eca593dc0c1918ce33403048782b555",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "held_count": 2,
+  "referee_note": "11 researched; 9 promoted (serviciomigraciones.cl 6/6, chileatiende cedula, sii tax_first_three_years, sii rut_inscription \u2014 the last confirmed under latin-1 decoding, the SII page's real encoding). 2 HELD: cedula_deadline (79% bigram, below the 0.85 bar) and tax_residency_183 (sii Circular 63/2021 PDF, 0% extract \u2014 image/scan or wrong section). Re-confirm both before promoting."
+}
