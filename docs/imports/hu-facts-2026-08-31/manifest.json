@@ -1,0 +1,17 @@
+{
+  "batch_id": "hu-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "HU",
+  "origin_country_code": null,
+  "destination_country_code": "HU",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "HUNGARY",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "59b7bfebd407065262f901d2969960ab57b7002a8fdb00c3f08d8d979e80b1f1",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded"
+}
