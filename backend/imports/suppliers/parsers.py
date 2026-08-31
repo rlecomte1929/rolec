@@ -183,6 +183,8 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("cbo.gov.om",                    "CBO — Central Bank of Oman licensed banks"),
     # Kuala Lumpur (XX-MY) — subagent batch 2026-08-31.
     ("bnm.gov.my",                    "BNM — Bank Negara Malaysia licensed banks"),
+    # Manama (XX-BH) — subagent batch 2026-08-31.
+    ("cbb.gov.bh",                    "CBB — Central Bank of Bahrain licensing register"),
 )
 
 
