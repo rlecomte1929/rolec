@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1225,6 +1225,15 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-TR",), categories=("banks",),
         notes="Banking Regulation and Supervision Agency (BDDK) — the official register of licensed banks; "
               "each active entry carries an EFT code. Vetter confirms. (Banks capped at tier 2.)",
+    ),
+    # ── Bangkok (XX-TH) — subagent batch 2026-08-31. Movers FIDI, schools IBO. Tax (TFAC verify-by-number),
+    # legal (individual-lawyer licensing) and housing (no realtor register) skipped — worklist in README.
+    RegistrySource(
+        name="BoT — Bank of Thailand financial-institutions list",
+        base_url="https://www.bot.or.th/en/financial-institutions/institutes-under-bot-supervision.html",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-TH",), categories=("banks",),
+        notes="Bank of Thailand — the list of financial institutions under BoT supervision; each Thai "
+              "commercial bank carries a BoT bankCode. Vetter confirms. (Banks capped at tier 2.)",
     ),
 )
 
