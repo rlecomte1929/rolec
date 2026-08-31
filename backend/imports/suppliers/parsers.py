@@ -137,6 +137,10 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("eba.europa.eu",                "EBA Credit Institutions Register (Portugal)"),
     ("impic.pt",                      "IMPIC — Portuguese estate-agent (AMI) register"),
     ("oroc.pt",                       "OROC — Portuguese statutory auditors (SROC) register"),
+    # Tokyo (XX-JP) — subagent batch 2026-08-31.
+    ("fsa.go.jp",                     "FSA — Japan licensed financial institutions list"),
+    ("mlit.go.jp",                    "MLIT — Japan real-estate broker (Takken) licence search"),
+    ("zeirishikensaku.jp",           "Nichizeiren — Japan certified tax accountant (zeirishi) register"),
 )
 
 
