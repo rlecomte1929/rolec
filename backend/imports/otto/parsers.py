@@ -119,6 +119,15 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # (mol.gov.sa / hrsd.gov.sa labour, moi.gov.sa Interior/Absher, mofa.gov.sa visas,
     # zatca.gov.sa tax, sama.gov.sa central bank, premiumresidency.gov.sa). `.gov.sa` ≠ `.gov`.
     "gov.sa",
+    # Hong Kong (destination rank 21) — the whole government publishes under `.gov.hk`
+    # (immd.gov.hk Immigration, ird.gov.hk Inland Revenue, td.gov.hk Transport, gov.hk portal,
+    # mpfa.org.hk is the MPF authority — added as a host below). `.gov.hk` ≠ `.gov`.
+    "gov.hk",
+    # Qatar (destination rank 23, Doha) — government bodies publish under `.gov.qa`
+    # (moi.gov.qa Interior, hukoomi.gov.qa the e-gov portal, mol.gov.qa labour). `.gov.qa` ≠ `.gov`.
+    "gov.qa",
+    # (New Zealand rank 22 uses `govt.nz`, already listed above; Poland rank 25 uses `gov.pl`,
+    # already listed above — udsc.gov.pl, podatki.gov.pl, nfz.gov.pl all match it.)
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -221,6 +230,12 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # database, like normattiva.it / boe.es / lovdata.no). Each publishes its own rule.
     "migri.fi", "enterfinland.fi", "um.fi", "vero.fi", "kela.fi", "dvv.fi",
     "suomi.fi", "traficom.fi", "tyosuojelu.fi", "finlex.fi",
+    # Hong Kong — the MPF (Mandatory Provident Fund) Schemes Authority publishes retirement-savings
+    # rules under `mpfa.org.hk`, an org TLD, so `gov.hk` does not catch it.
+    "mpfa.org.hk",
+    # Poland — ZUS (Zakład Ubezpieczeń Społecznych, the social-insurance institution) publishes its
+    # own contribution/coverage rules under `zus.pl`, which is not a `gov.pl` host.
+    "zus.pl",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )

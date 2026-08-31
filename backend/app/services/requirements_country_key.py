@@ -91,6 +91,12 @@ _ISO_TO_CATALOG_NAME = {
     "JP": "JAPAN",
     "PT": "PORTUGAL",
     "FI": "FINLAND",
+    # Tier-3 wave 2 — HK rank 21 (Hong Kong), NZ rank 22 (Auckland), QA rank 23 (Doha),
+    # PL rank 25 (Warsaw). Destination-only, third-country-national pathway.
+    "HK": "HONG KONG",
+    "NZ": "NEW ZEALAND",
+    "QA": "QATAR",
+    "PL": "POLAND",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.

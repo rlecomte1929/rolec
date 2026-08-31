@@ -198,6 +198,22 @@ def test_tier3_destinations_are_covered():
     assert resolve_catalog_country("Finland") == "FINLAND"
 
 
+def test_tier3_wave2_destinations_are_covered():
+    """HK/NZ/QA/PL resolve — Tier-3 wave 2 coverage-master destinations, destination-only.
+
+    Hong Kong (rank 21), New Zealand (rank 22, Auckland), Qatar (rank 23, Doha), Poland
+    (rank 25, Warsaw). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("HK") == "HONG KONG"
+    assert resolve_catalog_country("Hong Kong") == "HONG KONG"
+    assert resolve_catalog_country("NZ") == "NEW ZEALAND"
+    assert resolve_catalog_country("New Zealand") == "NEW ZEALAND"
+    assert resolve_catalog_country("QA") == "QATAR"
+    assert resolve_catalog_country("Qatar") == "QATAR"
+    assert resolve_catalog_country("PL") == "POLAND"
+    assert resolve_catalog_country("Poland") == "POLAND"
+
+
 def test_every_corridor_destination_resolves():
     """Every corridor profile's destination must resolve to a catalog name.
 
