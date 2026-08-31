@@ -163,6 +163,18 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # Malaysia (destination rank 38, Kuala Lumpur) — the whole government publishes under `.gov.my`
     # (imi.gov.my Immigration / Expatriate Services Division, hasil.gov.my Inland Revenue). `.gov.my` ≠ `.gov`.
     "gov.my",
+    # Thailand (destination rank 39, Bangkok) — the whole government publishes under `.go.th`
+    # (immigration.go.th, rd.go.th tax, mfa.go.th visa, sso.go.th social security). `.go.th` ≠ `.gov`.
+    "go.th",
+    # China (destination rank 40, Shanghai) — the government publishes under `.gov.cn`
+    # (nia.gov.cn National Immigration Administration, chinatax.gov.cn, mfa.gov.cn visa). `.gov.cn` ≠ `.gov`.
+    "gov.cn",
+    # India (destination rank 41, Bengaluru) — the government publishes under `.gov.in`
+    # (mha.gov.in Home Affairs, indianfrro.gov.in / boi.gov.in immigration, incometax.gov.in, mea.gov.in visa).
+    "gov.in",
+    # Turkey (destination rank 42, Istanbul) — the government publishes under `.gov.tr`
+    # (goc.gov.tr Migration Management, gib.gov.tr tax, turkiye.gov.tr e-portal). `.gov.tr` ≠ `.gov`.
+    "gov.tr",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the

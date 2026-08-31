@@ -115,6 +115,12 @@ _ISO_TO_CATALOG_NAME = {
     "OM": "OMAN",
     "ZA": "SOUTH AFRICA",
     "MY": "MALAYSIA",
+    # Tier-3 wave 6 — TH rank 39 (Bangkok), CN rank 40 (Shanghai), IN rank 41 (Bengaluru),
+    # TR rank 42 (Istanbul). Destination-only, third-country-national pathway.
+    "TH": "THAILAND",
+    "CN": "CHINA",
+    "IN": "INDIA",
+    "TR": "TURKEY",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.

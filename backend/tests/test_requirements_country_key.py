@@ -262,6 +262,22 @@ def test_tier3_wave5_destinations_are_covered():
     assert resolve_catalog_country("Malaysia") == "MALAYSIA"
 
 
+def test_tier3_wave6_destinations_are_covered():
+    """TH/CN/IN/TR resolve — Tier-3 wave 6 coverage-master destinations, destination-only.
+
+    Thailand (rank 39, Bangkok), China (rank 40, Shanghai), India (rank 41, Bengaluru),
+    Turkey (rank 42, Istanbul). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("TH") == "THAILAND"
+    assert resolve_catalog_country("Thailand") == "THAILAND"
+    assert resolve_catalog_country("CN") == "CHINA"
+    assert resolve_catalog_country("China") == "CHINA"
+    assert resolve_catalog_country("IN") == "INDIA"
+    assert resolve_catalog_country("India") == "INDIA"
+    assert resolve_catalog_country("TR") == "TURKEY"
+    assert resolve_catalog_country("Turkey") == "TURKEY"
+
+
 def test_every_corridor_destination_resolves():
     """Every corridor profile's destination must resolve to a catalog name.
 
