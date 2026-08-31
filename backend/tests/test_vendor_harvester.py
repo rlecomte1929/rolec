@@ -298,8 +298,8 @@ def test_pairs_in_scope_is_corridors_x_categories():
     # Not every pair has a source yet, which is what unavailable_reasons() and empty
     # ingestable_sources() are for.
     from backend.app.services.registry_sources import CORRIDORS, CATEGORIES
-    # + XX-IL/XX-LU (Tel Aviv/Luxembourg Tier-3 wave-3 destination-coverage) added 2026-08-31 → 30 corridors.
-    assert len(pairs_in_scope()) == len(CORRIDORS) * len(CATEGORIES) == 180
+    # + XX-CZ/GR/MX/BR (Prague/Athens/Mexico City/São Paulo Tier-3 wave-4) added 2026-08-31 → 34 corridors.
+    assert len(pairs_in_scope()) == len(CORRIDORS) * len(CATEGORIES) == 204
 
 
 def test_unavailable_sources_are_declared_not_hidden():

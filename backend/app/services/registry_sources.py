@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -952,12 +952,13 @@ SOURCES: Tuple[RegistrySource, ...] = (
               "eservice.sba.gov.sa/directory/<id> page). Vetter confirms the firm on the roll.",
     ),
     RegistrySource(
-        name="ECB Banking Supervision — supervised entities (Finland)",
+        name="ECB Banking Supervision — supervised entities (SSM)",
         base_url="https://www.bankingsupervision.europa.eu/banking/list/who/html/index.en.html",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-FI",), categories=("banks",),
-        notes="ECB/SSM list of supervised entities, Finland section — the FIN-FSA-authorised Finnish "
-              "credit institutions, each with an LEI. Used because the FIN-FSA register is a JS SPA; "
-              "the ECB list carries the same authorisation status. (Banks capped at tier 2.)",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-FI", "XX-GR"), categories=("banks",),
+        notes="ECB/SSM list of supervised entities — the euro-area credit institutions authorised in each "
+              "country, each with an LEI. Used where the national regulator's register is a JS SPA "
+              "(FIN-FSA / Bank of Greece); the ECB list carries the same authorisation status. Filter by "
+              "the country section. (Banks capped at tier 2.)",
     ),
     RegistrySource(
         name="PRH — Finnish auditor register (Tilintarkastajahaku)",
@@ -1130,6 +1131,25 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-LU",), categories=("housing_agencies",),
         notes="Chambre Immobilière du Grand-Duché de Luxembourg — the recognized real-estate professional "
               "body's member directory (agence-immobiliere category). Vetter confirms membership.",
+    ),
+    # ── Athens (XX-GR) — subagent batch 2026-08-31. Movers FIDI, schools IBO, banks ECB SSM (above).
+    # Legal (Athens Bar contact-lookup, no permalink) + housing (no per-firm realtor register) skipped.
+    RegistrySource(
+        name="ELTE/HAASOB — Greek public register of audit firms",
+        base_url="https://dbapplication.elte.org.gr/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-GR",), categories=("tax_finance",),
+        notes="Hellenic Accounting and Auditing Standards Oversight Board (ELTE) — the statutory Public "
+              "Register of Audit Firms; each firm has a companyDetails page with its ELTE ID. Vetter confirms.",
+    ),
+    # ── Mexico City (XX-MX) — subagent batch 2026-08-31. Movers FIDI, schools IBO. Tax (IMCP individual-
+    # only), legal (no unified bar), housing (AMPI voluntary) skipped — worklist in batch README.
+    RegistrySource(
+        name="CONDUSEF SIPRES — Mexican supervised financial entities",
+        base_url="https://webapps.condusef.gob.mx/SIPRES/jsp/pub/index.jsp",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-MX",), categories=("banks",),
+        notes="CONDUSEF SIPRES — the official register of supervised financial entities (CNBV-supervised "
+              "banks), each with a Clave de Registro and per-entity home_publico.jsp page. Vetter confirms. "
+              "(Banks capped at tier 2.)",
     ),
 )
 

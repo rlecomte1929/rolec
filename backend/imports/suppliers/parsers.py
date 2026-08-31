@@ -131,7 +131,7 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     # Tier-3 hub cities: Riyadh (XX-SA) + Helsinki (XX-FI) + Lisbon (XX-PT), subagent batch 2026-08-31.
     ("sama.gov.sa",                  "SAMA — Saudi Central Bank licensed local banks"),
     ("sba.gov.sa",                   "Saudi Bar Association — legal firms directory"),
-    ("bankingsupervision.europa.eu", "ECB Banking Supervision — supervised entities (Finland)"),
+    ("bankingsupervision.europa.eu", "ECB Banking Supervision — supervised entities (SSM)"),
     ("prh.fi",                        "PRH — Finnish auditor register (Tilintarkastajahaku)"),
     ("findanattorney.fi",            "Finnish Bar Association — Find an Attorney"),
     ("eba.europa.eu",                "EBA Credit Institutions Register (Portugal)"),
@@ -161,6 +161,9 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("boi.org.il",                    "Bank of Israel — supervised banking corporations"),
     ("cssf.lu",                       "CSSF — Luxembourg supervised entities & audit register"),
     ("chambre-immobiliere.lu",       "CIGDL — Chambre Immobilière du Grand-Duché member directory"),
+    # Athens (XX-GR) + Mexico City (XX-MX) — subagent batch 2026-08-31.
+    ("elte.org.gr",                   "ELTE/HAASOB — Greek public register of audit firms"),
+    ("condusef.gob.mx",              "CONDUSEF SIPRES — Mexican supervised financial entities"),
 )
 
 
