@@ -116,6 +116,9 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("centralbank.ae",               "CBUAE — Central Bank of the UAE register"),
     ("khda.gov.ae",                   "KHDA — Dubai schools directory"),
     ("ibo.org",                       "IBO — IB World Schools directory"),
+    # Zurich (XX-CH) — Otto batch 2026-08-31 (movers reuse fidi.org; SE schools reuse ibo.org).
+    ("finma.ch",                      "FINMA — Swiss financial-market authority register"),
+    ("sgischools.com",               "SGIS — Swiss Group of International Schools members"),
 )
 
 

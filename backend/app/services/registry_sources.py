@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,11 +847,29 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
               "login/JS-gated.",
+    ),
+    # ── Zurich (XX-CH) + Milan (XX-IT) + Stockholm (XX-SE) — Otto batch 2026-08-31 ──────────────
+    # Thin batch (national legal/tax/housing registers are JS-only): movers reuse FIDI, SE schools
+    # reuse IBO. Only two new registers needed.
+    RegistrySource(
+        name="FINMA — Swiss financial-market authority register",
+        base_url="https://www.finma.ch/en/finma-public/authorised-institutions-individuals-and-products/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CH",), categories=("banks",),
+        notes="Swiss Financial Market Supervisory Authority — the statutory register of authorised "
+              "banks. JS/PDF register, no stable per-entity URL; vetter confirms against FINMA's list. "
+              "(Banks capped at tier 2 regardless.)",
+    ),
+    RegistrySource(
+        name="SGIS — Swiss Group of International Schools members",
+        base_url="https://www.sgischools.com/schools/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CH",), categories=("schools",),
+        notes="Swiss Group of International Schools — the membership body for accredited international "
+              "schools in Switzerland. Member directory; vetter confirms membership.",
     ),
 )
 
