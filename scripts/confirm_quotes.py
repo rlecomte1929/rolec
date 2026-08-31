@@ -55,6 +55,17 @@ BIGRAM_MID = 0.5        # [MID, OK): quote is probably present but markup-split 
 BIGRAM_WRONG = 0.15     # text-rich source but < this overlap => the cited URL is wrong
 MIN_TEXT_RICH = 500     # chars of extracted text below which we don't call a source "text-rich"
 MIN_BODY_BYTES = 800    # response smaller than this is a stub/block, not a page
+# A genuinely-wrong large source (scanned/scrambled PDF, misattributed URL) extracts a LOT of
+# text at ~0 overlap. A WAF/JS challenge page also extracts "text" at 0 overlap but is small and
+# carries challenge markers — that is a BLOCK to route to the browser, not a wrong source. This
+# floor + the markers below were added after gov.cy (an 8 KB WAF interstitial) was false-held as
+# HOLD_WRONG_SRC — the ledger doing its job.
+WRONG_SRC_MINCHARS = 25000
+WAF_MARKERS = (
+    "just a moment", "enable javascript", "captcha", "cloudflare", "attention required",
+    "access denied", "incapsula", "cf-browser-verification", "challenge-platform",
+    "请开启", "verifying you are human", "ddos-guard",
+)
 FETCH_TIMEOUT = 40
 
 
@@ -178,14 +189,17 @@ def classify(rec: dict, cache: dict):
         # verify_ledger's own fetch resolved several of these; a browser check settles it.
         return _row(rec, host, ctype, "REVIEW_BROWSER", frac, method,
                     f"{frac:.0%} overlap — likely present but markup-split; confirm in a browser")
-    if max_chars >= MIN_TEXT_RICH and frac < BIGRAM_WRONG:
+    # frac < BIGRAM_MID: near-zero overlap. Separate a real wrong-source from a block/challenge.
+    blob = " ".join(t for t in texts.values() if isinstance(t, str))
+    if any(m in blob for m in WAF_MARKERS) or max_chars < WRONG_SRC_MINCHARS:
+        return _row(rec, host, ctype, "REVIEW_BROWSER", frac, method,
+                    f"{max_chars} chars, {frac:.0%} overlap — looks like a WAF/JS challenge or thin "
+                    "page, not the real content; confirm in a browser")
+    if frac < BIGRAM_WRONG:
         return _row(rec, host, ctype, "HOLD_WRONG_SRC", frac, method,
                     f"text-rich source ({max_chars} chars) but {frac:.0%} overlap — cited URL likely wrong")
-    if max_chars >= MIN_TEXT_RICH:
-        return _row(rec, host, ctype, "HOLD_ABSENT", frac, method,
-                    f"page extracted ({max_chars} chars) but quote not present ({frac:.0%})")
-    return _row(rec, host, ctype, "REVIEW_BROWSER", frac, method,
-                "thin/blocked extraction — confirm in a browser")
+    return _row(rec, host, ctype, "HOLD_ABSENT", frac, method,
+                f"page extracted ({max_chars} chars) but quote not present ({frac:.0%})")
 
 
 def _row(rec, host, ctype, verdict, frac, method, reason):
