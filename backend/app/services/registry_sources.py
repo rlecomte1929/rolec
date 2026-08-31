@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1103,6 +1103,33 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-KR",), categories=("banks",),
         notes="Korea Federation of Banks — the member list of FSS-supervised banks. Flat list; vetter "
               "confirms. (Banks capped at tier 2.)",
+    ),
+    # ── Tel Aviv (XX-IL) — subagent batch 2026-08-31. Movers FIDI, schools IBO. Legal (Israel Bar
+    # geo-blocked + individual-only), tax (ICPAS voluntary, no per-firm), housing (MoJ broker register
+    # individual-only) skipped — worklist in batch README.
+    RegistrySource(
+        name="Bank of Israel — supervised banking corporations",
+        base_url="https://www.boi.org.il/en/banking-supervision/supervised-banking-corporations/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-IL",), categories=("banks",),
+        notes="Bank of Israel Banking Supervision — the register of supervised banking corporations; each "
+              "carries its official BoI reporting symbol. Vetter confirms. (Banks capped at tier 2.)",
+    ),
+    # ── Luxembourg City (XX-LU) — subagent batch 2026-08-31. Movers FIDI (the 1 LU affiliate),
+    # schools IBO. Legal (Barreau tableau is a client-side DataTable, no per-firm permalink) skipped.
+    RegistrySource(
+        name="CSSF — Luxembourg supervised entities & audit register",
+        base_url="https://www.cssf.lu/en/regulated-entities/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-LU",), categories=("banks", "tax_finance"),
+        notes="Commission de Surveillance du Secteur Financier — the register of supervised credit "
+              "institutions (edesk.apps.cssf.lu, type-B banks) and the Public Register of the Audit "
+              "Profession (audit.apps.cssf.lu, approved audit firms, status AGR). Vetter confirms.",
+    ),
+    RegistrySource(
+        name="CIGDL — Chambre Immobilière du Grand-Duché member directory",
+        base_url="https://www.chambre-immobiliere.lu/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-LU",), categories=("housing_agencies",),
+        notes="Chambre Immobilière du Grand-Duché de Luxembourg — the recognized real-estate professional "
+              "body's member directory (agence-immobiliere category). Vetter confirms membership.",
     ),
 )
 

@@ -157,6 +157,10 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("cbk.gov.kw",                    "CBK — Central Bank of Kuwait regulated banks"),
     # Seoul (XX-KR) — subagent batch 2026-08-31.
     ("kfb.or.kr",                     "KFB — Korea Federation of Banks member list"),
+    # Tel Aviv (XX-IL) + Luxembourg City (XX-LU) — subagent batch 2026-08-31.
+    ("boi.org.il",                    "Bank of Israel — supervised banking corporations"),
+    ("cssf.lu",                       "CSSF — Luxembourg supervised entities & audit register"),
+    ("chambre-immobiliere.lu",       "CIGDL — Chambre Immobilière du Grand-Duché member directory"),
 )
 
 
