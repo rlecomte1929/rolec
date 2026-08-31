@@ -1,0 +1,19 @@
+{
+  "batch_id": "my-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "MY",
+  "origin_country_code": null,
+  "destination_country_code": "MY",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "MALAYSIA",
+  "record_count": 5,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "e640c18e2db1abfac977cde15d702fee9eb3d65ef1d4d7a849ebb7ba87f315fb",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "held_count": 7,
+  "referee_note": "12 researched; 5 promoted (esd.imi.gov.my web pages: ESD company registration + EP salary policy \u2014 applier curl-confirmed 5/5). 7 HELD (worklist): 3 ESD-FAQ-PDF facts (EP categories, replacement plan, dependant pass) + 4 LHDN-PDF tax facts \u2014 those PDFs extract full text but 0% bigram overlap with the cited quotes (likely misattributed URLs after the hasil portal upgrade / a different ESD FAQ PDF). Re-source the EP-category, dependant-pass and tax facts before promoting. RM5,000 Cat-III threshold was already dropped by the research (unconfirmable post the 1-Jun-2026 revision)."
+}
