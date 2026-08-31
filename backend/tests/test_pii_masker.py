@@ -56,6 +56,21 @@ class PiiMaskerTests(unittest.TestCase):
             "My number is [REDACTED_PHONE]",
         )
 
+    def test_hyphenated_legal_id_in_url_survives_phone_rule(self):
+        # AIQ-1869: the EU directive number 2003-109 (7 digits) was matched by
+        # the phone rule inside a citation URL and redacted to [REDACTED_PHONE],
+        # which dropped the emn.ie source from the Immigration Q&A footer. A
+        # phone-plausible digit-count gate (E.164: 8–15 digits) lets it survive.
+        url = (
+            "https://emn.ie/legislation/council-directive-2003-109-ec-"
+            "of-25-november-2003"
+        )
+        self.assertEqual(mask_pii(url), url)
+
+    def test_short_hyphenated_number_is_not_a_phone(self):
+        # A 7-digit hyphenated run is below the phone-plausible floor.
+        self.assertEqual(mask_pii("Directive 2003-109 applies"), "Directive 2003-109 applies")
+
     # ── pattern 2: IBAN ──────────────────────────────────────────────────────
 
     def test_masks_french_iban(self):
