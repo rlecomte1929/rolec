@@ -52,6 +52,18 @@ pdfplumber layout).
   Immigration facts use the parent-agency Act PDF on `royalthaipolice.go.th` instead.*
 - **Latin-1 pages:** Chile `sii.cl`. The referee already re-decodes; no brief change needed.
 
+### 3a. Empirical hold-hosts (from `_verification_ledger.ndjson`, 120 labelled facts)
+The ledger's confirmed rate rose from the pre-priors batches (ZA 23%, KR 30%, MY 42%) to the
+priors-briefed wave-8 batches (MT 100%, IS 92%, EE 77%, CY 100% via the browser path) — better
+briefs measurably raise first-pass confirmation. The chronically-unconfirmable hosts, ranked by
+hold count, are the standing re-source worklist — **do not cite a verbatim quote to these from a
+headless fetch:**
+`dha.gov.za` (image PDFs), `hasil.gov.my` + `esd.imi.gov.my` (portal-upgraded / misattributed
+paths), `immigration.go.kr` + `nts.go.kr` (column-scrambled PDFs — pdfplumber layout sometimes
+recovers), `static.anaf.ro` (image PDF), `sii.cl` (latin-1 — the referee handles it). WAF/JS hosts
+that need the browser (not "holds", but `REVIEW_BROWSER`): `gov.cy`, `riigiteataja.ee`, `eesti.ee`,
+`gov.il`, `hukoomi.gov.qa`, `lmra.gov.bh`, `cfr.gov.mt`, `ibo.org`.
+
 ## 4. Provider register-availability priors (by category)
 Every hub city so far: **banks** always have a register (the central-bank / prudential list —
 SAMA, FSA, RBI, BNM, SARB, BCRA, CMF, MNB, BNR, CBB, CBO, CBK, PBOC…); **movers** always via
