@@ -109,6 +109,12 @@ _ISO_TO_CATALOG_NAME = {
     "GR": "GREECE",
     "MX": "MEXICO",
     "BR": "BRAZIL",
+    # Tier-3 wave 5 — BH rank 35 (Manama), OM rank 36 (Muscat), ZA rank 37 (Johannesburg),
+    # MY rank 38 (Kuala Lumpur). Destination-only, third-country-national pathway.
+    "BH": "BAHRAIN",
+    "OM": "OMAN",
+    "ZA": "SOUTH AFRICA",
+    "MY": "MALAYSIA",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.

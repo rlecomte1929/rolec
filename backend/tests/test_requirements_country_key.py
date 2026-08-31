@@ -246,6 +246,22 @@ def test_tier3_wave4_destinations_are_covered():
     assert resolve_catalog_country("Brazil") == "BRAZIL"
 
 
+def test_tier3_wave5_destinations_are_covered():
+    """BH/OM/ZA/MY resolve — Tier-3 wave 5 coverage-master destinations, destination-only.
+
+    Bahrain (rank 35, Manama), Oman (rank 36, Muscat), South Africa (rank 37, Johannesburg),
+    Malaysia (rank 38, Kuala Lumpur). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("BH") == "BAHRAIN"
+    assert resolve_catalog_country("Bahrain") == "BAHRAIN"
+    assert resolve_catalog_country("OM") == "OMAN"
+    assert resolve_catalog_country("Oman") == "OMAN"
+    assert resolve_catalog_country("ZA") == "SOUTH AFRICA"
+    assert resolve_catalog_country("South Africa") == "SOUTH AFRICA"
+    assert resolve_catalog_country("MY") == "MALAYSIA"
+    assert resolve_catalog_country("Malaysia") == "MALAYSIA"
+
+
 def test_every_corridor_destination_resolves():
     """Every corridor profile's destination must resolve to a catalog name.
 

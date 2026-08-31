@@ -151,6 +151,18 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # Brazil (destination rank 34, São Paulo) — the whole federal government publishes under `.gov.br`
     # (gov.br/mj + gov.br/pf residence, gov.br/receitafederal tax, gov.br/inss social security).
     "gov.br",
+    # Bahrain (destination rank 35, Manama) — government bodies publish under `.gov.bh`
+    # (lmra.gov.bh Labour Market Regulatory Authority, moi.gov.bh, nbr.gov.bh VAT). `.gov.bh` ≠ `.gov`.
+    "gov.bh",
+    # Oman (destination rank 36, Muscat) — government bodies publish under `.gov.om`
+    # (rop.gov.om Royal Oman Police / residence, manpower/labour, tax authority). `.gov.om` ≠ `.gov`.
+    "gov.om",
+    # South Africa (destination rank 37, Johannesburg) — the whole government publishes under `.gov.za`
+    # (dha.gov.za Home Affairs / visas & permits, sars.gov.za tax, labour.gov.za). `.gov.za` ≠ `.gov`.
+    "gov.za",
+    # Malaysia (destination rank 38, Kuala Lumpur) — the whole government publishes under `.gov.my`
+    # (imi.gov.my Immigration / Expatriate Services Division, hasil.gov.my Inland Revenue). `.gov.my` ≠ `.gov`.
+    "gov.my",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -272,6 +284,9 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Greece — statutory bodies not under gov.gr: aade.gr (Independent Authority for Public Revenue /
     # tax), mfa.gr (Ministry of Foreign Affairs / visas).
     "aade.gr", "mfa.gr",
+    # Bahrain — the national e-government portal is `bahrain.bh` (the eGovernment Authority's own
+    # domain), which is not a `gov.bh` host.
+    "bahrain.bh",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )
