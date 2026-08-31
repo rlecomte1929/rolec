@@ -1,0 +1,13 @@
+{
+  "batch_id": "ch-it-se-providers-2026-08-31",
+  "generated_by": "otto (Audos) \u2014 3 per-city GCS tasks, pulled by claude-code",
+  "target_table": "public.suppliers + public.supplier_service_capabilities",
+  "platform_vetting_status_all": "pending",
+  "landed": 19,
+  "cities": {
+    "Zurich XX-CH": "10 (movers 4 FIDI, banks 3 FINMA, schools 3 SGIS)",
+    "Milan XX-IT": "3 (movers 3 FIDI; rest blocked JS-only)",
+    "Stockholm XX-SE": "6 (movers 2 FIDI, schools 4 IBO; rest blocked JS-only)"
+  },
+  "scope": "Otto providers for Zurich/Milan/Stockholm. 19 register-evidenced rows, 0 rejects. XX-CH/XX-IT/XX-SE corridors + FINMA/SGIS registers (movers reuse FIDI, SE schools reuse IBO). Milan/Stockholm thin: IT/SE legal/tax/housing registers JS-only (re-source worklist in README). Scoped promote append-only (suppliers 312->331, +19 pending, approved unchanged 130)."
+}
