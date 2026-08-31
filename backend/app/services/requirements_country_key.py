@@ -103,6 +103,12 @@ _ISO_TO_CATALOG_NAME = {
     "IL": "ISRAEL",
     "KW": "KUWAIT",
     "LU": "LUXEMBOURG",
+    # Tier-3 wave 4 — CZ rank 31 (Prague), GR rank 32 (Athens), MX rank 33 (Mexico City),
+    # BR rank 34 (São Paulo). Destination-only, third-country-national pathway.
+    "CZ": "CZECH REPUBLIC",
+    "GR": "GREECE",
+    "MX": "MEXICO",
+    "BR": "BRAZIL",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.

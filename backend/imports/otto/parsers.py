@@ -139,6 +139,18 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     "gov.kw",
     # (Luxembourg rank 30 uses `public.lu`, already listed above — guichet.public.lu matches it;
     # the bare guichet.lu host is added below.)
+    # Czech Republic (destination rank 31, Prague) — the new unified portal is `gov.cz`; the
+    # statutory bodies also publish on their own `.cz` (mvcr.cz, mzv.cz — added as hosts below).
+    "gov.cz",
+    # Greece (destination rank 32, Athens) — the unified portal + ministries publish under `.gov.gr`
+    # (migration.gov.gr, efka.gov.gr). `.gov.gr` ≠ `.gov`.
+    "gov.gr",
+    # Mexico (destination rank 33, Mexico City) — the whole federal government publishes under `.gob.mx`
+    # (inm.gob.mx immigration, sat.gob.mx tax, imss.gob.mx social security, sre.gob.mx foreign affairs).
+    "gob.mx",
+    # Brazil (destination rank 34, São Paulo) — the whole federal government publishes under `.gov.br`
+    # (gov.br/mj + gov.br/pf residence, gov.br/receitafederal tax, gov.br/inss social security).
+    "gov.br",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -253,6 +265,13 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Luxembourg — the state's one-stop portal is `guichet.lu` (the content also mirrors under
     # guichet.public.lu, which the `public.lu` suffix catches; the bare host is added for safety).
     "guichet.lu",
+    # Czech Republic — statutory bodies on their own `.cz` (not gov.cz): mvcr.cz (Ministry of Interior /
+    # immigration), mzv.cz (MFA / visas), mpsv.cz (labour), financnisprava.cz (tax), cssz.cz (social
+    # security), vzp.cz (public health insurer).
+    "mvcr.cz", "mzv.cz", "mpsv.cz", "financnisprava.cz", "cssz.cz", "vzp.cz",
+    # Greece — statutory bodies not under gov.gr: aade.gr (Independent Authority for Public Revenue /
+    # tax), mfa.gr (Ministry of Foreign Affairs / visas).
+    "aade.gr", "mfa.gr",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )

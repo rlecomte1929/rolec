@@ -230,6 +230,22 @@ def test_tier3_wave3_destinations_are_covered():
     assert resolve_catalog_country("Luxembourg") == "LUXEMBOURG"
 
 
+def test_tier3_wave4_destinations_are_covered():
+    """CZ/GR/MX/BR resolve — Tier-3 wave 4 coverage-master destinations, destination-only.
+
+    Czech Republic (rank 31, Prague), Greece (rank 32, Athens), Mexico (rank 33, Mexico City),
+    Brazil (rank 34, São Paulo). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("CZ") == "CZECH REPUBLIC"
+    assert resolve_catalog_country("Czech Republic") == "CZECH REPUBLIC"
+    assert resolve_catalog_country("GR") == "GREECE"
+    assert resolve_catalog_country("Greece") == "GREECE"
+    assert resolve_catalog_country("MX") == "MEXICO"
+    assert resolve_catalog_country("Mexico") == "MEXICO"
+    assert resolve_catalog_country("BR") == "BRAZIL"
+    assert resolve_catalog_country("Brazil") == "BRAZIL"
+
+
 def test_every_corridor_destination_resolves():
     """Every corridor profile's destination must resolve to a catalog name.
 
