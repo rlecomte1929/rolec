@@ -1,0 +1,19 @@
+{
+  "batch_id": "kr-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "KR",
+  "origin_country_code": null,
+  "destination_country_code": "KR",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "SOUTH KOREA",
+  "record_count": 3,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "066a56e2601eadcb0bb2c841799d95663cf2c3a0d097d1e5bb557c74c4d4ce56",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "held_count": 7,
+  "referee_note": "Of 12 researched facts (README), 3 (nhis.or.kr health-insurance) were verify_ledger-confirmed live AND applier-reconfirmed, and were promoted. The 7 PDF-sourced facts (immigration.go.kr VISA NAVIGATOR + nts.go.kr tax guide) are HELD in worklist.ndjson: the subagent confirmed them via its own pdfplumber extraction (saved as visa_nav.txt/nts_guide.txt, quotes present) but the applier could not independently reproduce a clean verbatim match against a fresh fetch (pdfplumber default+layout both column-interleave the tables). Re-confirm from the saved extraction before promoting. Sources are the correct official English PDFs (verified: 59-page KIS VISA NAVIGATOR)."
+}
