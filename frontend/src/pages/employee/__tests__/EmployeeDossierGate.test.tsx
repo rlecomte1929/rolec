@@ -23,6 +23,11 @@ const mockPlanView = vi.fn();
 
 vi.mock('../../../api/dossier', () => ({
   dossierAPI: { list: (...a: unknown[]) => mockList(...a) },
+  // [AIQ-1855] the page now mounts ImmigrationFormFill; stub it to "no fillable forms".
+  immigrationFormsAPI: {
+    available: () => Promise.resolve({ corridor_to: '', visa_type: null, forms: [] }),
+    generate: () => Promise.resolve({ download_url: null, fill_report: { form_id: '', filled_count: 0, blank_count: 0, warning_count: 0, not_in_pdf_count: 0, fields: [] } }),
+  },
 }));
 vi.mock('../../../api/relocationPlanView', () => ({
   fetchRelocationPlanView: (...a: unknown[]) => mockPlanView(...a),

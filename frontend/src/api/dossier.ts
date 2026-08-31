@@ -313,3 +313,69 @@ export const flagAPI = {
       .patch(`/api/cases/${caseId}/forms/${formId}/flag`, { flag_note: flagNote })
       .then((r: { data: FormFlagResponse }) => r.data),
 };
+
+// ── [AIQ-1855] Immigration form pre-fill (IMM-11) ──────────────────────────────
+// Wires the shipped-but-unreachable pre-fill backend for BOTH personas. `role`
+// selects the endpoint tree: HR (`require_admin_or_hr`, org-scoped) or employee
+// (`require_hr_or_employee` + case ownership + consent). The frontend passes no
+// corridor — both routes resolve it from the case.
+export type DossierRole = 'hr' | 'employee';
+
+/** Backend field-fill status. `blank_missing_data` = no source value; `warning` =
+ *  filled but low-confidence/exact-match caution; `not_in_pdf` = the vault had a
+ *  value but the template has no matching field. The UI collapses these to three
+ *  states: filled / missing / needs-review. */
+export type FormFillStatus = 'filled' | 'blank_missing_data' | 'warning' | 'not_in_pdf';
+
+export interface AvailableForm {
+  form_id: string;
+  form_name: string;
+  corridor_to: string;
+  visa_type: string;
+  field_count: number;
+  form_url: string | null;
+}
+
+export interface AvailableFormsResponse {
+  corridor_to: string;
+  visa_type: string | null;
+  forms: AvailableForm[];
+}
+
+export interface FormFillField {
+  form_field_id: string;
+  vault_field_path: string;
+  label: string | null;
+  status: FormFillStatus;
+  value: string | null;
+  warning: string | null;
+}
+
+export interface FormFillReport {
+  form_id: string;
+  filled_count: number;
+  blank_count: number;
+  warning_count: number;
+  not_in_pdf_count: number;
+  fields: FormFillField[];
+}
+
+export interface GenerateFormResponse {
+  /** Time-limited signed URL — never a raw bucket path. */
+  download_url: string | null;
+  fill_report: FormFillReport;
+}
+
+const immigrationFormsBase = (caseId: string, role: DossierRole): string =>
+  `/api/${role}/cases/${caseId}/immigration`;
+
+export const immigrationFormsAPI = {
+  available: (caseId: string, role: DossierRole): Promise<AvailableFormsResponse> =>
+    api
+      .get(`${immigrationFormsBase(caseId, role)}/available-forms`)
+      .then((r: { data: AvailableFormsResponse }) => r.data),
+  generate: (caseId: string, role: DossierRole, formId: string): Promise<GenerateFormResponse> =>
+    api
+      .post(`${immigrationFormsBase(caseId, role)}/generate-form`, { form_id: formId })
+      .then((r: { data: GenerateFormResponse }) => r.data),
+};

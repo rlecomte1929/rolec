@@ -27,7 +27,9 @@ from backend.app.auth_deps import (
     get_current_user,
     get_org_id_for_hr_user,
     require_admin_or_hr,
+    require_hr_or_employee,
 )
+from fastapi import HTTPException
 
 _HR_USER: Dict[str, Any] = {
     "id": "user-hr-a", "role": UserRole.HR.value,
@@ -136,6 +138,121 @@ class EmployeeInterviewStatusTest(unittest.TestCase):
         self.assertFalse(body["has_session"])
         self.assertEqual(body["completion_pct"], 0)
         self.assertFalse(body["is_complete"])
+
+
+class _PrefillResult:
+    """Stand-in for PrefilledPdfResult with the two fields the route reads."""
+    download_url = "https://signed.example/prefilled.pdf"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "filled_count": 2, "blank_count": 1, "warning_count": 0,
+            "not_in_pdf_count": 0, "fields": [],
+        }
+
+
+class EmployeeFormPrefillTest(unittest.TestCase):
+    """[AIQ-1855] The employee-facing pre-fill routes. The load-bearing test is
+    cross-case access: a caller may only reach a case their assignment owns."""
+
+    def setUp(self) -> None:
+        app.dependency_overrides[require_hr_or_employee] = lambda: _EMP_USER
+        self.client = TestClient(app, raise_server_exceptions=False)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+
+    def test_available_forms_own_case_returns_forms(self) -> None:
+        with patch(f"{_FORMS_MOD}.require_case_access", return_value={}), \
+                patch(f"{_FORMS_MOD}.get_available_forms",
+                      return_value=[_Form("blue_card_fill", "Blue Card")]) as mock_forms:
+            resp = self.client.get(
+                "/api/employee/cases/case-a/immigration/available-forms",
+                params={"corridor_to": "DE", "visa_type": "blue_card"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["forms"], [{"form_id": "blue_card_fill", "name": "Blue Card"}])
+        mock_forms.assert_called_once_with("DE", "blue_card")
+
+    def test_available_forms_cross_case_is_forbidden(self) -> None:
+        # require_case_access raises for a case the caller does not own → the route
+        # must surface that BEFORE resolving or returning any form.
+        with patch(f"{_FORMS_MOD}.require_case_access",
+                   side_effect=HTTPException(status_code=403, detail="Not authorised for this case")), \
+                patch(f"{_FORMS_MOD}.get_available_forms") as mock_forms:
+            resp = self.client.get(
+                "/api/employee/cases/someone-elses-case/immigration/available-forms",
+                params={"corridor_to": "DE", "visa_type": "blue_card"},
+            )
+        self.assertEqual(resp.status_code, 403)
+        mock_forms.assert_not_called()
+
+    def test_available_forms_resolves_corridor_from_case_when_omitted(self) -> None:
+        # No corridor_to passed → resolved from the case (ownership already checked).
+        with patch(f"{_FORMS_MOD}.require_case_access", return_value={}), \
+                patch(f"{_FORMS_MOD}._get_case_details",
+                      return_value={"dest_country": "DE"}) as mock_case, \
+                patch(f"{_FORMS_MOD}.visa_types_for_corridor", return_value=["blue_card"]), \
+                patch(f"{_FORMS_MOD}.get_available_forms",
+                      return_value=[_Form("blue_card_fill", "Blue Card")]):
+            resp = self.client.get("/api/employee/cases/case-a/immigration/available-forms")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["corridor_to"], "DE")
+        mock_case.assert_called_once()
+
+    def test_generate_cross_case_is_forbidden_before_vault_read(self) -> None:
+        with patch(f"{_FORMS_MOD}.require_case_access",
+                   side_effect=HTTPException(status_code=403, detail="Not authorised for this case")), \
+                patch(f"{_FORMS_MOD}._load_profile_for_case_employee") as mock_profile, \
+                patch(f"{_FORMS_MOD}.generate_prefilled_pdf") as mock_gen:
+            resp = self.client.post(
+                "/api/employee/cases/someone-elses-case/immigration/generate-form",
+                json={"form_id": "blue_card_fill"},
+            )
+        self.assertEqual(resp.status_code, 403)
+        mock_profile.assert_not_called()  # no vault read on a case we don't own
+        mock_gen.assert_not_called()
+
+    def test_generate_requires_consent(self) -> None:
+        with patch(f"{_FORMS_MOD}.require_case_access", return_value={}), \
+                patch(f"{_FORMS_MOD}._check_consent", return_value=False), \
+                patch(f"{_FORMS_MOD}._load_profile_for_case_employee") as mock_profile:
+            resp = self.client.post(
+                "/api/employee/cases/case-a/immigration/generate-form",
+                json={"form_id": "blue_card_fill"},
+            )
+        self.assertEqual(resp.status_code, 403)
+        self.assertIn("consent", resp.json()["detail"].lower())
+        mock_profile.assert_not_called()  # consent gate is before the vault read
+
+    def test_generate_missing_profile_returns_404(self) -> None:
+        with patch(f"{_FORMS_MOD}.require_case_access", return_value={}), \
+                patch(f"{_FORMS_MOD}._check_consent", return_value=True), \
+                patch(f"{_FORMS_MOD}._load_profile_for_case_employee", return_value=None):
+            resp = self.client.post(
+                "/api/employee/cases/case-a/immigration/generate-form",
+                json={"form_id": "blue_card_fill"},
+            )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_generate_own_case_returns_download_and_report(self) -> None:
+        with patch(f"{_FORMS_MOD}.require_case_access", return_value={}), \
+                patch(f"{_FORMS_MOD}._check_consent", return_value=True), \
+                patch(f"{_FORMS_MOD}._load_profile_for_case_employee",
+                      return_value={"id": "prof-1"}) as mock_profile, \
+                patch(f"{_FORMS_MOD}._decrypt_passport", side_effect=lambda p: p), \
+                patch(f"{_FORMS_MOD}.generate_prefilled_pdf", return_value=_PrefillResult()), \
+                patch(f"{_FORMS_MOD}._log_access"):
+            resp = self.client.post(
+                "/api/employee/cases/case-a/immigration/generate-form",
+                json={"form_id": "blue_card_fill"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["download_url"], "https://signed.example/prefilled.pdf")
+        self.assertEqual(body["fill_report"]["filled_count"], 2)
+        # The vault is loaded scoped to the CALLER's own id, never the path.
+        mock_profile.assert_called_once_with("case-a", "user-emp")
 
 
 if __name__ == "__main__":

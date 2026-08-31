@@ -48,6 +48,13 @@ const RequirementsSufficiencyPanel = lazy(() =>
   })),
 );
 
+// [AIQ-1855] Lazy like its dossier siblings so it stays out of the static graph.
+const ImmigrationFormFill = lazy(() =>
+  import('../../features/immigration/ImmigrationFormFill').then((m) => ({
+    default: m.ImmigrationFormFill,
+  })),
+);
+
 type FilterTabKey = 'all' | 'action_needed' | 'blocked' | 'ready' | 'submitted';
 
 const FILTER_TABS: Array<{ key: FilterTabKey; label: string }> = [
@@ -323,6 +330,14 @@ export const EmployeeDossierPage: React.FC = () => {
         {caseId && (
           <Suspense fallback={<div className="mb-6 text-sm text-[#6b7280]">Loading requirements…</div>}>
             <DestinationRequirements caseId={caseId} />
+          </Suspense>
+        )}
+
+        {/* [AIQ-1855] Pre-fill official immigration forms from the case vault. Renders
+            only when the corridor has a fillable form; fallback null so nothing flashes. */}
+        {caseId && (
+          <Suspense fallback={null}>
+            <ImmigrationFormFill caseId={caseId} audience="employee" />
           </Suspense>
         )}
 

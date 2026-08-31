@@ -33,6 +33,7 @@ import { AppShell } from '../../components/AppShell';
 import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
 import { HrCaseFormRow } from '../../features/platform-v2/hr-dossier/HrCaseFormRow';
 import { DestinationRequirements } from '../../features/platform-v2/dossier/DestinationRequirements';
+import { ImmigrationFormFill } from '../../features/immigration/ImmigrationFormFill';
 import {
   AddDocumentModal,
   type AddDocumentPersonOption,
@@ -177,6 +178,10 @@ export const HrCaseDossierPage: React.FC = () => {
             discharges it second — the same order the employee dossier uses. Fetches
             independently, so a requirements outage never blocks the forms below. */}
         {caseId && <DestinationRequirements caseId={caseId} audience="hr" />}
+
+        {/* [AIQ-1855] Pre-fill official immigration forms from the case vault. Renders
+            only when the corridor actually has a fillable form. */}
+        {caseId && <ImmigrationFormFill caseId={caseId} audience="hr" />}
 
         {/* ── Filter tabs ───────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center gap-1 mb-4 border-b border-slate-200">
