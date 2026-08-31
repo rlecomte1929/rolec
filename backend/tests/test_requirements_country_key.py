@@ -278,6 +278,22 @@ def test_tier3_wave7_destinations_are_covered():
     assert resolve_catalog_country("Chile") == "CHILE"
 
 
+def test_tier3_wave8_destinations_are_covered():
+    """EE/CY/IS/MT resolve — Tier-3 wave 8 coverage-master destinations, destination-only.
+
+    Estonia (rank 47, Tallinn), Cyprus (rank 48, Nicosia), Iceland (rank 49, Reykjavik),
+    Malta (rank 50, Valletta). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("EE") == "ESTONIA"
+    assert resolve_catalog_country("Estonia") == "ESTONIA"
+    assert resolve_catalog_country("CY") == "CYPRUS"
+    assert resolve_catalog_country("Cyprus") == "CYPRUS"
+    assert resolve_catalog_country("IS") == "ICELAND"
+    assert resolve_catalog_country("Iceland") == "ICELAND"
+    assert resolve_catalog_country("MT") == "MALTA"
+    assert resolve_catalog_country("Malta") == "MALTA"
+
+
 def test_tier3_wave6_destinations_are_covered():
     """TH/CN/IN/TR resolve — Tier-3 wave 6 coverage-master destinations, destination-only.
 

@@ -184,6 +184,12 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # Chile (rank 46) — `.gob.cl` (chileatiende.gob.cl, extranjeria.gob.cl). serviciomigraciones.cl /
     # sii.cl are not gob.cl — hosts below.
     "gob.cl",
+    # Cyprus (rank 48) — `.gov.cy` (moi.gov.cy Civil Registry & Migration, mof.gov.cy tax).
+    "gov.cy",
+    # Malta (rank 50) — `.gov.mt` (identita.gov.mt residence, cfr.gov.mt tax, homeaffairs.gov.mt).
+    "gov.mt",
+    # (Estonia rank 47 and Iceland rank 49 use no governmental suffix — their statutory bodies are
+    # added as hosts below.)
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -314,6 +320,13 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Chile — the National Migration Service (`serviciomigraciones.cl`) and the tax authority SII
     # (`sii.cl`) publish on their own `.cl`, not under `gob.cl`.
     "serviciomigraciones.cl", "sii.cl",
+    # Estonia (rank 47) — no governmental suffix; each body owns its own `.ee`: politsei.ee (Police
+    # & Border Guard Board / residence permits), emta.ee (Tax & Customs Board), eesti.ee (state
+    # portal), sotsiaalkindlustusamet.ee (Social Insurance Board).
+    "politsei.ee", "emta.ee", "eesti.ee", "sotsiaalkindlustusamet.ee",
+    # Iceland (rank 49) — no governmental suffix; utl.is (Directorate of Immigration /
+    # Útlendingastofnun), skatturinn.is (tax), island.is (state portal).
+    "utl.is", "skatturinn.is", "island.is",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )

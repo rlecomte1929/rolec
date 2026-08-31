@@ -127,6 +127,12 @@ _ISO_TO_CATALOG_NAME = {
     "RO": "ROMANIA",
     "AR": "ARGENTINA",
     "CL": "CHILE",
+    # Tier-3 wave 8 — EE rank 47 (Tallinn), CY rank 48 (Nicosia), IS rank 49 (Reykjavik),
+    # MT rank 50 (Valletta). Destination-only, third-country-national pathway.
+    "EE": "ESTONIA",
+    "CY": "CYPRUS",
+    "IS": "ICELAND",
+    "MT": "MALTA",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.
