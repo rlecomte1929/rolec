@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1017,6 +1017,22 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-JP",), categories=("tax_finance",),
         notes="Japan Federation of Certified Public Tax Accountants' Associations (Nichizeiren) — the "
               "statutory zeirishi search site; a firm's registered zeirishi confirm membership. Vetter confirms.",
+    ),
+    # ── Hong Kong (XX-HK) — subagent batch 2026-08-31. Movers FIDI, schools IBO. Housing (EAA,
+    # CAPTCHA-gated) + tax (HKICPA 404 / AFRC postback, no stable per-firm URL) skipped — worklist.
+    RegistrySource(
+        name="HKMA — register of authorized institutions (Hong Kong)",
+        base_url="https://www.hkma.gov.hk/eng/smart-consumers/register-of-authorized-institutions/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-HK",), categories=("banks",),
+        notes="Hong Kong Monetary Authority — statutory register of authorized institutions; each licensed "
+              "bank has a vpr.hkma.gov.hk detail page with its AI code. Vetter confirms. (Banks capped tier 2.)",
+    ),
+    RegistrySource(
+        name="Law Society of Hong Kong — The Law List",
+        base_url="https://www.hklawsoc.org.hk/en/Serve-the-Public/The-Law-List",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-HK",), categories=("legal_admin",),
+        notes="The Law Society of Hong Kong — statutory roll of solicitors' firms (each firm has a "
+              "Firm-Detail?FirmId=<id> page). Vetter confirms the firm on the roll.",
     ),
 )
 

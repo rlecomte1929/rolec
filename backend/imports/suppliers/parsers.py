@@ -141,6 +141,9 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("fsa.go.jp",                     "FSA — Japan licensed financial institutions list"),
     ("mlit.go.jp",                    "MLIT — Japan real-estate broker (Takken) licence search"),
     ("zeirishikensaku.jp",           "Nichizeiren — Japan certified tax accountant (zeirishi) register"),
+    # Hong Kong (XX-HK) — subagent batch 2026-08-31.
+    ("hkma.gov.hk",                   "HKMA — register of authorized institutions (Hong Kong)"),
+    ("hklawsoc.org.hk",              "Law Society of Hong Kong — The Law List"),
 )
 
 
