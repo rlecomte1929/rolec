@@ -133,6 +133,13 @@ _ISO_TO_CATALOG_NAME = {
     "CY": "CYPRUS",
     "IS": "ICELAND",
     "MT": "MALTA",
+    # Tier-3 wave 9 — Asia-Pacific tail, coverage-master ranks 53-56 (Taipei, Ho Chi Minh
+    # City, Jakarta, Manila). Ranks 51-52 (Russia, Ukraine) deliberately skipped: sanctions /
+    # active conflict make corporate relocation there a non-starter for the customer base.
+    "TW": "TAIWAN",
+    "VN": "VIETNAM",
+    "ID": "INDONESIA",
+    "PH": "PHILIPPINES",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.

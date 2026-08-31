@@ -190,6 +190,13 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     "gov.mt",
     # (Estonia rank 47 and Iceland rank 49 use no governmental suffix — their statutory bodies are
     # added as hosts below.)
+    # Wave 9 — Asia-Pacific tail, ranks 53-56. Each is a registry-reserved government namespace:
+    # Taiwan `.gov.tw` (immigration.gov.tw NIA, mol.gov.tw labour, nhi.gov.tw health, ntbt.gov.tw tax);
+    # Vietnam `.gov.vn` (xuatnhapcanh.gov.vn immigration, molisa.gov.vn labour, gdt.gov.vn tax,
+    # baohiemxahoi.gov.vn social insurance); Indonesia `.go.id` (imigrasi.go.id, kemnaker.go.id labour,
+    # pajak.go.id tax, bpjsketenagakerjaan.go.id); Philippines `.gov.ph` (immigration.gov.ph BI,
+    # dole.gov.ph labour, bir.gov.ph tax, philhealth.gov.ph, sss.gov.ph).
+    "gov.tw", "gov.vn", "go.id", "gov.ph",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
