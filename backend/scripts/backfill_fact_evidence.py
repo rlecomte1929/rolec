@@ -12,6 +12,12 @@ WHAT IT DOES
   2. Updates knowledge_docs: content_excerpt, content_sha256, fetch_status, last_verified_at.
   3. Per fact, runs the evidence check and stores evidence_verified / evidence_offset /
      evidence_checked_at.
+  4. [AIQ-1887 VC1] On --apply, demotes a fact whose verdict is a definitive FALSE from
+     approved to pending, so a re-check can never leave a disproved fact wearing an approved
+     badge. A NULL verdict (source unreachable, or a translated quote) is left approved and
+     served, deliberately — only a real disproof demotes. Without this, every re-check reopens
+     the gap this ticket exists to close: the reader guard hides an approved+FALSE fact, but it
+     is still approved.
 
 --dry-run (THE DEFAULT) writes nothing and prints exactly what would change. A dead source is
 signal, not failure: a fact whose page has vanished is precisely a fact to re-check.
@@ -324,6 +330,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     per_dest: Dict[str, Counter] = {}
     dead_sources: List[str] = []
     blocked_sources: List[str] = []
+    demoted_facts: List[Tuple[str, str]] = []
 
     robots = RobotsPolicy()
     limiter = HostRateLimiter()
@@ -371,6 +378,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             check = check_evidence(quote, source_text)
             verdicts[check.status] += 1
             per_dest.setdefault(dest, Counter())[check.status] += 1
+            # [AIQ-1887 VC1] A DEFINITIVE disproof — check.verified is False, never a NULL
+            # "couldn't check" — must not keep an approved badge. `is False` on purpose: None
+            # (NO_SOURCE / TRANSLATED) stays approved and served, as the reader guard intends.
+            # Only meaningful when the cohort being processed is the approved one.
+            demoted = args.status == "approved" and check.verified is False
+            if demoted:
+                demoted_facts.append((dest, str(fid)))
             if args.apply:
                 with db.engine.begin() as conn:
                     conn.execute(text("""
@@ -381,6 +395,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                          WHERE id = :id
                     """), {"ver": check.verified, "off": check.offset,
                            "now": _now(), "id": str(fid)})
+                    if demoted:
+                        # Guarded on status='approved' so it is a strict no-op for a fact that
+                        # is already pending or was demoted on an earlier pass — idempotent.
+                        conn.execute(text("""
+                            UPDATE requirement_facts SET status = 'pending'
+                             WHERE id = :id AND status = 'approved'
+                        """), {"id": str(fid)})
 
         if i % 25 == 0:
             print(f"  … {i}/{len(doc_ids)} sources")
@@ -418,6 +439,15 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"   {line}")
         if len(dead_sources) > 25:
             print(f"   … and {len(dead_sources)-25} more")
+
+    if demoted_facts:
+        verb = "DEMOTED" if args.apply else "WOULD DEMOTE"
+        print(f"\n{verb} approved -> pending ({len(demoted_facts)}) — quote disproved against the"
+              f"\ncited page, so the fact no longer wears an approved badge (AIQ-1887 VC1):")
+        for dest, fid in demoted_facts[:25]:
+            print(f"   {dest}  {fid}")
+        if len(demoted_facts) > 25:
+            print(f"   … and {len(demoted_facts)-25} more")
 
     if not args.apply:
         print("\nDry run — nothing written. Re-run with --apply to persist.")
