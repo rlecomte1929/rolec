@@ -98,7 +98,7 @@ def _seed_engine():
     return engine
 
 
-def _fake_fetch(url, robots=None, limiter=None):
+def _fake_fetch(url, robots=None, limiter=None, headless=False):
     """Live URL returns archived text; the 'empty' URL renders to nothing (NO_SOURCE)."""
     if "empty" in url:
         return {"ok": False, "reason": "js_shell_or_empty", "text": "", "blocked": False,
