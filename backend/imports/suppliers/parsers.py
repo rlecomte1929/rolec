@@ -172,6 +172,8 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     # São Paulo (XX-BR) — subagent batch 2026-08-31.
     ("bcb.gov.br",                    "BCB — Banco Central do Brasil financial-institution register"),
     ("oabsp.org.br",                 "OAB-SP — São Paulo Bar law-firm register"),
+    # Shanghai (XX-CN) — subagent batch 2026-08-31.
+    ("pbc.gov.cn",                    "PBOC/NFRA — systemically important banks list (China)"),
 )
 
 
