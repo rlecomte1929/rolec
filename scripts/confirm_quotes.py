@@ -165,7 +165,7 @@ def classify(rec: dict, cache: dict):
     if url not in cache:
         cache[url] = _curl(url)
     raw = cache[url]
-    is_pdf = raw[:5] == b"%PDF"
+    is_pdf = raw.startswith(b"%PDF")  # NB: `raw[:5] == b"%PDF"` is always False (5-byte slice vs 4-byte literal)
     ctype = "pdf" if is_pdf else "html"
 
     if len(raw) < MIN_BODY_BYTES and not is_pdf:
