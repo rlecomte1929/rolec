@@ -83,6 +83,14 @@ _ISO_TO_CATALOG_NAME = {
     # BE — rank 15 (Brussels hub). EEA destination. AT — rank 16 (Vienna hub). EEA destination.
     "BE": "BELGIUM",
     "AT": "AUSTRIA",
+    # Tier-3 Destination Coverage Master destinations (no prior corridor data). Destination-only,
+    # authored like GB/CA above; all served on the third-country-national (non-EEA) professional
+    # relocation pathway. SA rank 12 (Riyadh), JP rank 18 (Tokyo), PT rank 24 (Lisbon; EEA dest,
+    # non-EEA audience), FI rank 26 (Helsinki; EEA dest, non-EEA audience).
+    "SA": "SAUDI ARABIA",
+    "JP": "JAPAN",
+    "PT": "PORTUGAL",
+    "FI": "FINLAND",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.

@@ -34,7 +34,7 @@ def test_to_iso_unknown_or_empty_is_none():
     # None signals "unrecognised" so callers fail closed (1473c) instead of
     # querying with a bad key.
     assert to_iso("ZZ") is None          # genuinely unmapped code (IT/SE are now catalog-mapped)
-    assert to_iso("Japan") is None
+    assert to_iso("Narnia") is None      # fictional name — real ones keep getting catalog-mapped
     assert to_iso("") is None
     assert to_iso("   ") is None
     assert to_iso(None) is None
@@ -179,6 +179,23 @@ def test_italy_and_sweden_are_covered():
     assert resolve_catalog_country("Sweden") == "SWEDEN"
     assert resolve_catalog_country("BE") == "BELGIUM"
     assert resolve_catalog_country("AT") == "AUSTRIA"
+
+
+def test_tier3_destinations_are_covered():
+    """SA/JP/PT/FI resolve — Tier-3 coverage-master destinations, destination-only.
+
+    Saudi Arabia (rank 12, Riyadh), Japan (rank 18, Tokyo), Portugal (rank 24, Lisbon) and
+    Finland (rank 26, Helsinki). All served on the third-country-national pathway; each must
+    resolve to a catalog name or `mappings.resolve()` refuses to promote and they reach no case.
+    """
+    assert resolve_catalog_country("SA") == "SAUDI ARABIA"
+    assert resolve_catalog_country("Saudi Arabia") == "SAUDI ARABIA"
+    assert resolve_catalog_country("JP") == "JAPAN"
+    assert resolve_catalog_country("Japan") == "JAPAN"
+    assert resolve_catalog_country("PT") == "PORTUGAL"
+    assert resolve_catalog_country("Portugal") == "PORTUGAL"
+    assert resolve_catalog_country("FI") == "FINLAND"
+    assert resolve_catalog_country("Finland") == "FINLAND"
 
 
 def test_every_corridor_destination_resolves():

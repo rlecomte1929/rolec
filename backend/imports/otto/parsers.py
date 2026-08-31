@@ -110,6 +110,15 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # Austria (rank 16, Vienna) — the whole public sector sits under `.gv.at` (oesterreich.gv.at,
     # migration.gv.at, wien.gv.at, help.gv.at). Neither matched the bare `gov`.
     "fgov.be", "gv.at",
+    # Japan (destination rank 18, Tokyo) — the entire central government publishes under `.go.jp`
+    # (isa.go.jp = Immigration Services Agency, moj.go.jp, mofa.go.jp, mhlw.go.jp, nta.go.jp,
+    # digital.go.jp), and cities/prefectures under `.lg.jp` (residence registration, My Number).
+    # `.go.jp` ≠ `.gov`, so the bare `gov` matched none of them.
+    "go.jp", "lg.jp",
+    # Saudi Arabia (destination rank 12, Riyadh) — federal bodies publish under `.gov.sa`
+    # (mol.gov.sa / hrsd.gov.sa labour, moi.gov.sa Interior/Absher, mofa.gov.sa visas,
+    # zatca.gov.sa tax, sama.gov.sa central bank, premiumresidency.gov.sa). `.gov.sa` ≠ `.gov`.
+    "gov.sa",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -197,6 +206,21 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Belgium — statutory bodies not under `.fgov.be`: the Immigration Office (ibz.be), the City of
     # Brussels (brussels.be) and the federal single-permit One-Stop Counter.
     "ibz.be", "brussels.be", "onestopcounter.workinginbelgium.be",
+    # Saudi Arabia — statutory portals not under `.gov.sa`: Qiwa (labour/work-permit platform,
+    # MHRSD), Absher (MoI e-services) and Muqeem (residency). Each is the operator of the process
+    # it documents, like Absher/Muqeem being where the Iqama and exit/re-entry visa are actioned.
+    "qiwa.sa", "absher.sa", "muqeem.sa",
+    # Portugal — IMT (Instituto da Mobilidade e dos Transportes) runs and publishes driving-licence
+    # exchange; its `imt-ip.pt` domain has no `gov.pt` suffix. (aima.gov.pt / seg-social.pt /
+    # portaldasfinancas.gov.pt above cover immigration/social-security/tax; `gov.pt` covers sns.gov.pt.)
+    "imt-ip.pt",
+    # Finland (destination rank 26, Helsinki) — Finland uses no governmental suffix; each agency owns
+    # its own `.fi`: Migri (immigration), Enter Finland (permit portal), UM (MFA), Vero (tax),
+    # Kela (social insurance), DVV (population register / personal identity code), Suomi.fi (state
+    # portal), Traficom (driving), Tyosuojelu (occupational safety) and Finlex (the official law
+    # database, like normattiva.it / boe.es / lovdata.no). Each publishes its own rule.
+    "migri.fi", "enterfinland.fi", "um.fi", "vero.fi", "kela.fi", "dvv.fi",
+    "suomi.fi", "traficom.fi", "tyosuojelu.fi", "finlex.fi",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )
