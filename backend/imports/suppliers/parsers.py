@@ -196,6 +196,9 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("colegioinmobiliario.org.ar",   "CUCICBA — Buenos Aires real-estate brokers register"),
     # Santiago (XX-CL) — subagent batch 2026-08-31.
     ("cmfchile.cl",                   "CMF — Chile supervised-banks register"),
+    # Budapest (XX-HU) — subagent batch 2026-08-31.
+    ("mnb.hu",                        "MNB — Magyar Nemzeti Bank institution register"),
+    ("mkvk.hu",                       "MKVK — Hungarian Chamber of Auditors register"),
 )
 
 
