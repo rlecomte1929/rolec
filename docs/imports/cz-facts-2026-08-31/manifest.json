@@ -1,0 +1,17 @@
+{
+  "batch_id": "cz-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "CZ",
+  "origin_country_code": null,
+  "destination_country_code": "CZ",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "CZECH REPUBLIC",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "f5094a11b18bccfe464275fcd41027229b984a60132a6dfa0aa7076216b73075",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded"
+}
