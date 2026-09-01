@@ -1,0 +1,50 @@
+---
+description: ReloPass repo guardrails — authoritative rules live in CLAUDE.md. Always in context.
+alwaysApply: true
+---
+
+# ReloPass — read this first
+
+The authoritative agent instructions for this repo are in **`CLAUDE.md`** (also exposed as
+`AGENTS.md`, a symlink to it). **Open and follow `CLAUDE.md` before making changes** — it covers
+architecture, the dual-layer backend, migration workflow, and the CI gates. This file only
+restates the non-negotiable hard gates so they are always in context; `CLAUDE.md` is the source of
+truth and wins on any detail.
+
+## Hard gates — never violate these
+
+1. **Migrations.** NEVER run `supabase db push` against prod, and NEVER apply a migration via MCP
+   `apply_migration` or by inserting into `supabase_migrations.schema_migrations`. The only workflow:
+   commit `supabase/migrations/<ts>_<name>.sql` (idempotent DDL) → PR. Apply-to-prod is a manual,
+   out-of-band operator step. Stamp the timestamp above **both** the highest repo file version and
+   the prod ledger max.
+
+2. **New `public` table = RLS + policy + revoke anon.** Every migration creating a table in `public`
+   must `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`, add at least one tenant-scoped policy, and
+   `REVOKE ALL ... FROM anon`. Missing any → do not merge.
+
+3. **Register new routers in BOTH `backend/main.py` AND `backend/app/main.py`.** Prod boots
+   `uvicorn backend.main:app`; a router registered only in the modular app 405s in production.
+
+4. **Serving/LLM isolation.** The deterministic serving engines (`requirements_builder`,
+   `rules_engine`, `requirement_evaluation_service`, `immigration_requirement_service`,
+   `hr_policy_resolver`) must NEVER import an LLM gateway or SDK. Fix violations by breaking the
+   import, never by editing the guard.
+
+5. **Mask PII before any LLM call.** Any user-supplied text sent to OpenAI/Anthropic must pass
+   through `backend/app/services/pii_masker.py` `mask_pii()` first. Never log raw user input.
+
+6. **No compliance-status claims in shipped copy.** Never claim EU AI Act "Ready/Compliant/
+   Certified" or describe ReloPass as high-risk AI. Describe what controls *do*, claim no status.
+   Any new compliance claim needs legal sign-off before shipping.
+
+## Workflow hygiene
+
+- Work in a **git worktree**, not the shared checkout: `git worktree add -q -b <branch> /tmp/wt-<name> origin/main`.
+- Commit with **explicit paths** (`git commit -- <path>…`), never `git commit -a` — the shared index
+  may hold other agents' staged files.
+- Never bare `git stash` / `git stash pop` (shared stack). Use a WIP commit instead.
+- Before flagging any task done: `cd frontend && npx tsc --noEmit` (strict), and `npm run build`
+  must pass (Render auto-deploys `main`).
+- Frontend uses the in-house `frontend/src/components/antigravity/` design system and
+  `lucide-react` icons; read `DESIGN.md` before any UI change (navy + teal, no purple).
