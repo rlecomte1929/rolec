@@ -220,6 +220,11 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Germany
     "bamf.de", "auswaertiges-amt.de", "gesetze-im-internet.de", "bundesregierung.de",
     "make-it-in-germany.com", "arbeitsagentur.de",
+    # FR-DE wave (2026-09): the federal portal is make-it-in-germany.DE (the .com above is the
+    # legacy host); deutsche-rentenversicherung.de is the statutory pension body and
+    # gkv-spitzenverband.de the statutory-health-insurance umbrella — both public-law bodies that
+    # publish the rule, like bamf.de. Missing here = same too-narrow-allowlist reject as riigiteataja.
+    "make-it-in-germany.de", "deutsche-rentenversicherung.de", "gkv-spitzenverband.de",
     # Portugal
     "aima.gov.pt", "seg-social.pt", "portaldasfinancas.gov.pt",
     # Ireland. Immigration Service Delivery, the Department of Justice unit that operates
