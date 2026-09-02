@@ -216,6 +216,12 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("cbc.gov.tw",                    "CBC — Central Bank of the Republic of China (Taiwan) domestic-bank list"),
     ("sbv.gov.vn",                    "SBV — State Bank of Vietnam foreign-bank-branch register"),
     ("bsp.gov.ph",                    "BSP — Bangko Sentral ng Pilipinas directory of banks"),
+    # Wave 10 (XX-CO/PE/UY/CR/PA) — bank supervisor registers; movers/schools reuse fidi/iam/ibo.
+    ("superfinanciera.gov.co",        "Superintendencia Financiera de Colombia — bank register"),
+    ("sbs.gob.pe",                    "SBS — Superintendencia de Banca, Seguros y AFP (Peru) bank directory"),
+    ("bcu.gub.uy",                    "BCU — Banco Central del Uruguay authorised-bank register"),
+    ("sugef.fi.cr",                   "SUGEF — Superintendencia General de Entidades Financieras (Costa Rica) bank register"),
+    ("superbancos.gob.pa",           "Superintendencia de Bancos de Panamá — general-licence bank register"),
 )
 
 

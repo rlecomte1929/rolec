@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT", "XX-TW", "XX-VN", "XX-ID", "XX-PH")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT", "XX-TW", "XX-VN", "XX-ID", "XX-PH", "XX-CO", "XX-PE", "XX-UY", "XX-CR", "XX-PA")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT", "XX-TW", "XX-VN", "XX-ID", "XX-PH"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT", "XX-TW", "XX-VN", "XX-ID", "XX-PH", "XX-CO", "XX-PE", "XX-UY", "XX-CR", "XX-PA"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1450,6 +1450,46 @@ SOURCES: Tuple[RegistrySource, ...] = (
         notes="Bangko Sentral ng Pilipinas — the statutory directory of BSP-supervised universal / "
               "commercial banks (the FCDU-authority list is the concrete register document, the JS "
               "directory hub being unfetchable). No per-entity website; the vetter confirms by name.",
+    ),
+    # ── Wave 10: Latin America cluster (XX-CO/PE/UY/CR/PA) — subagent batches 2026-09-01. Movers
+    # reuse global FIDI/IAM; schools reuse IBO (corridors added above). Net-new = each country's
+    # bank supervisor register; legal/tax/housing are individual-practitioner rolls or voluntary
+    # associations (no browsable statutory firm register) → skipped everywhere.
+    RegistrySource(
+        name="Superintendencia Financiera de Colombia — bank register",
+        base_url="https://www.superfinanciera.gov.co/publicaciones/10114906/lista-de-entidades/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CO",), categories=("banks",),
+        notes="Superintendencia Financiera de Colombia — the statutory list of establecimientos "
+              "bancarios (each with a cod_entidad). No stable per-entity URL; the vetter confirms.",
+    ),
+    RegistrySource(
+        name="SBS — Superintendencia de Banca, Seguros y AFP (Peru) bank directory",
+        base_url="https://www.sbs.gob.pe/app/stats/EstadisticaBoletinEstadistico.asp",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-PE",), categories=("banks",),
+        notes="Superintendencia de Banca, Seguros y AFP — the statutory directory of empresas "
+              "bancarias. Live site is Imperva-bot-walled; the register roster is stable and "
+              "vetter-confirmable. No per-entity website published.",
+    ),
+    RegistrySource(
+        name="BCU — Banco Central del Uruguay authorised-bank register",
+        base_url="https://www.bcu.gub.uy/Servicios-Financieros-SSF/Paginas/bancos_Instituciones_Lst.aspx",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-UY",), categories=("banks",),
+        notes="Banco Central del Uruguay — the statutory register of authorised banks (each with a "
+              "BCU institution number). No per-entity public URL; the vetter confirms by name.",
+    ),
+    RegistrySource(
+        name="SUGEF — Superintendencia General de Entidades Financieras (Costa Rica) bank register",
+        base_url="https://www.sugef.fi.cr/entidades_supervisadas/lista_entidades_supervisadas_por_SUGEF.aspx",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-CR",), categories=("banks",),
+        notes="SUGEF — the statutory list of supervised banks (each with a cédula jurídica). No "
+              "per-entity public URL; the vetter confirms by name.",
+    ),
+    RegistrySource(
+        name="Superintendencia de Bancos de Panamá — general-licence bank register",
+        base_url="https://www.superbancos.gob.pa/en/gen-info-banks/general-license",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-PA",), categories=("banks",),
+        notes="Superintendencia de Bancos de Panamá — the statutory list of general-licence banks "
+              "(a banking hub, foreign banks included). No per-entity public number; vetter confirms.",
     ),
 )
 

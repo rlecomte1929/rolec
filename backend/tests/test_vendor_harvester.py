@@ -300,7 +300,8 @@ def test_pairs_in_scope_is_corridors_x_categories():
     from backend.app.services.registry_sources import CORRIDORS, CATEGORIES
     # + XX-ZA (Johannesburg Tier-3 wave-5) added 2026-08-31 → 50 corridors.
     # + XX-TW/VN/ID/PH (wave-9 Asia-Pacific tail) 2026-08-31 → 54 corridors.
-    assert len(pairs_in_scope()) == len(CORRIDORS) * len(CATEGORIES) == 324
+    # + XX-CO/PE/UY/CR/PA (wave-10 LatAm cluster) 2026-09-02 → 59 corridors.
+    assert len(pairs_in_scope()) == len(CORRIDORS) * len(CATEGORIES) == 354
 
 
 def test_unavailable_sources_are_declared_not_hidden():
