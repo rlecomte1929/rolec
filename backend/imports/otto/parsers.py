@@ -204,6 +204,13 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # (the Caja / social-security fund, a `.sa.cr` host, added below); Panama `.gob.pa`
     # (migracion.gob.pa, css.gob.pa social security).
     "gov.co", "gob.pe", "gub.uy", "go.cr", "gob.pa",
+    # Wave 11 — EU cluster, ranks 66-70. EU member states; each has a government suffix, though
+    # several statutory bodies sit on bare national domains (added as hosts below): Croatia
+    # `.gov.hr` (mup.gov.hr police/residence); Slovenia `.gov.si` (fu.gov.si tax, e-uprava.gov.si);
+    # Slovakia `.gov.sk` (many ministries use bare `.sk` — hosts below); Latvia `.gov.lv`
+    # (pmlp.gov.lv migration, vid.gov.lv tax, vsaa.gov.lv social insurance); Lithuania `.gov.lt`
+    # (plus migracija.lrv.lt / vmi.lt / sodra.lt on bare `.lt` — hosts below).
+    "gov.hr", "gov.si", "gov.sk", "gov.lv", "gov.lt",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -353,6 +360,20 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Costa Rica (wave 10) — the Caja Costarricense de Seguro Social publishes on ccss.sa.cr, a
     # `.sa.cr` host the `.go.cr` suffix does not cover (migracion.go.cr / hacienda.go.cr do).
     "ccss.sa.cr",
+    # EU cluster (wave 11) — statutory bodies that publish the rule on bare national domains, not
+    # under the government suffix. Croatia: porezna-uprava.hr (Tax Administration), hzzo.hr (health
+    # fund), mirovinsko.hr (pension). Slovenia: policija.si (police / residence registration),
+    # zzzs.si (health-insurance institute), zpiz.si (pension institute). Slovakia (ministries sit
+    # on bare `.sk`): minv.sk (Interior/police — residence), financnasprava.sk (Financial
+    # Administration/tax), socpoist.sk (Sociálna poisťovňa), slovensko.sk (state e-portal).
+    # Lithuania: migracija.lrv.lt (Migration Dept), vmi.lt (State Tax Inspectorate), sodra.lt
+    # (social insurance), vlk.lt (compulsory-health-insurance fund). Latvia: latvija.lv (state
+    # portal; pmlp/vid/vsaa are gov.lv, covered by the suffix above).
+    "porezna-uprava.hr", "hzzo.hr", "mirovinsko.hr",
+    "policija.si", "zzzs.si", "zpiz.si",
+    "minv.sk", "financnasprava.sk", "socpoist.sk", "slovensko.sk",
+    "migracija.lrv.lt", "vmi.lt", "sodra.lt", "vlk.lt",
+    "latvija.lv",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )

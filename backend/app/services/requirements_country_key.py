@@ -147,6 +147,13 @@ _ISO_TO_CATALOG_NAME = {
     "UY": "URUGUAY",
     "CR": "COSTA RICA",
     "PA": "PANAMA",
+    # Tier-3 wave 11 — EU cluster, coverage-master ranks 66-70 (Zagreb, Ljubljana, Bratislava,
+    # Vilnius, Riga). EEA corridors like FR->DE: the audience is an EU/EEA professional relocating in.
+    "HR": "CROATIA",
+    "SI": "SLOVENIA",
+    "SK": "SLOVAKIA",
+    "LT": "LITHUANIA",
+    "LV": "LATVIA",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.
