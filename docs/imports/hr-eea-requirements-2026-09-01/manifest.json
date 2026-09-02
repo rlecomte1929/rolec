@@ -1,0 +1,18 @@
+{
+  "batch_id": "hr-eea-requirements-2026-09-01",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "HR",
+  "origin_country_code": null,
+  "destination_country_code": "HR",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "CROATIA",
+  "record_count": 14,
+  "needs_lawyer_review_count": 1,
+  "artifact": "facts.ndjson",
+  "sha256": "27e0e42f48806f9ef96cb26079d6267840fbd60ed29e971a5a763ab30b55a5b2",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "EEA corridor (EU professional -> Croatia). confirm_quotes 14/14 CONFIRMED. Sources mup.gov.hr / porezna-uprava.gov.hr / hzzo.hr / mirovinsko.hr / ec.europa.eu. nationality=EEA -> EU free-mover categories; scope guard clean. Greenfield. A few Croatian-language quotes were confidence:medium (single-render) per the researcher — the human review gate should re-confirm before serve. Imported --no-fetch."
+}
