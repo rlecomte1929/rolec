@@ -1,0 +1,18 @@
+{
+  "batch_id": "pe-facts-2026-09-01",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "PE",
+  "origin_country_code": null,
+  "destination_country_code": "PE",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "PERU",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "4bddcc88cf003fed4e1807ce0a3c0c0ff3b7849148065d14b7d2edd3a4355552",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "confirm_quotes 12/12 CONFIRMED. Sources gob.pe (Migraciones/SUNAT/EsSalud/ONP) + congreso.gob.pe (D.L. 689 statute). nationality=non-EEA->THIRD_COUNTRY; scope guard clean. Greenfield. Imported --no-fetch."
+}
