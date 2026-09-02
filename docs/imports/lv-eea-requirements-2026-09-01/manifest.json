@@ -1,0 +1,18 @@
+{
+  "batch_id": "lv-eea-requirements-2026-09-01",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "LV",
+  "origin_country_code": null,
+  "destination_country_code": "LV",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "LATVIA",
+  "record_count": 13,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "b333b695387d665c34f03309889b1b88e5a0656a60921f0a2ff46dbf185fa778",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "EEA corridor (EU professional -> LATVIA). confirm_quotes CONFIRMED all. nationality=EEA -> EU categories; the EU-registration-certificate rows were re-scoped to [EU_EEA] only (a host national needs no certificate) so the nationality scope guard passes. Imported --no-fetch. Greenfield."
+}
