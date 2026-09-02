@@ -197,6 +197,13 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # pajak.go.id tax, bpjsketenagakerjaan.go.id); Philippines `.gov.ph` (immigration.gov.ph BI,
     # dole.gov.ph labour, bir.gov.ph tax, philhealth.gov.ph, sss.gov.ph).
     "gov.tw", "gov.vn", "go.id", "gov.ph",
+    # Wave 10 — Latin America cluster, ranks 57-61. Registry-reserved government namespaces:
+    # Colombia `.gov.co` (migracioncolombia.gov.co, dian.gov.co tax); Peru `.gob.pe`
+    # (migraciones.gob.pe, sunat.gob.pe tax); Uruguay `.gub.uy` (migracion.gub.uy, dgi.gub.uy tax,
+    # bps.gub.uy); Costa Rica `.go.cr` (migracion.go.cr, hacienda.go.cr tax) — plus ccss.sa.cr
+    # (the Caja / social-security fund, a `.sa.cr` host, added below); Panama `.gob.pa`
+    # (migracion.gob.pa, css.gob.pa social security).
+    "gov.co", "gob.pe", "gub.uy", "go.cr", "gob.pa",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -343,6 +350,9 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Iceland (rank 49) — no governmental suffix; utl.is (Directorate of Immigration /
     # Útlendingastofnun), skatturinn.is (tax), island.is (state portal).
     "utl.is", "skatturinn.is", "island.is",
+    # Costa Rica (wave 10) — the Caja Costarricense de Seguro Social publishes on ccss.sa.cr, a
+    # `.sa.cr` host the `.go.cr` suffix does not cover (migracion.go.cr / hacienda.go.cr do).
+    "ccss.sa.cr",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )

@@ -140,6 +140,13 @@ _ISO_TO_CATALOG_NAME = {
     "VN": "VIETNAM",
     "ID": "INDONESIA",
     "PH": "PHILIPPINES",
+    # Tier-3 wave 10 — Latin America cluster, coverage-master ranks 57-61 (Bogotá, Lima,
+    # Montevideo, San José, Panama City). Third-country-national pathway.
+    "CO": "COLOMBIA",
+    "PE": "PERU",
+    "UY": "URUGUAY",
+    "CR": "COSTA RICA",
+    "PA": "PANAMA",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.
