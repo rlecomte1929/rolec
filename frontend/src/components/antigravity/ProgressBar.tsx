@@ -1,25 +1,29 @@
 import React from 'react';
 
+/** `indigo` is a deprecated alias for `navy` (off-brand name kept so callers compile). */
+export type ProgressBarColor = 'navy' | 'indigo' | 'green' | 'yellow' | 'red';
+
 interface ProgressBarProps {
   value: number; // 0-100
   label?: string;
   showLabel?: boolean;
-  color?: 'indigo' | 'green' | 'yellow' | 'red';
+  color?: ProgressBarColor;
 }
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   value,
   label,
   showLabel = true,
-  color = 'indigo',
+  color = 'navy',
 }) => {
-  const colors = {
+  const colors: Record<ProgressBarColor, string> = {
+    navy: 'bg-[#0b2b43]',
     indigo: 'bg-[#0b2b43]',
-    green: 'bg-[#1f8e8b]',
-    yellow: 'bg-[#7a5e2a]',
-    red: 'bg-[#7a2a2a]',
+    green: 'bg-emerald-600',
+    yellow: 'bg-amber-600',
+    red: 'bg-rose-700',
   };
-  
+
   return (
     <div className="w-full">
       {label && <div className="text-sm font-medium text-[#374151] mb-1">{label}</div>}
@@ -30,7 +34,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
         ></div>
       </div>
       {showLabel && (
-        <div className="text-xs text-[#6b7280] mt-1 text-right">{Math.round(value)}%</div>
+        <div className="text-xs text-slate-500 mt-1 text-right">{Math.round(value)}%</div>
       )}
     </div>
   );

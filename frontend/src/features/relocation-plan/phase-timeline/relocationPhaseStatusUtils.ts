@@ -3,8 +3,8 @@ import type { RelocationPlanPhaseTaskCountsDTO } from '../../../types/relocation
 
 export type PhaseBadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
-/** Matches antigravity `ProgressBar` `color` prop */
-export type RelocationPhaseProgressColor = 'indigo' | 'green' | 'yellow' | 'red';
+/** Matches antigravity `ProgressBar` `color` prop (`indigo` is a deprecated alias for `navy`) */
+export type RelocationPhaseProgressColor = 'navy' | 'indigo' | 'green' | 'yellow' | 'red';
 
 export interface RelocationPhaseStatusMeta {
   /** Short label for badges and assistive context */
@@ -26,13 +26,13 @@ const STATUS_TABLE: Record<RelocationPlanPhaseStatusWire, RelocationPhaseStatusM
     label: 'Active',
     badgeVariant: 'info',
     markerClass: 'bg-[#0b2b43]',
-    progressColor: 'indigo',
+    progressColor: 'navy',
   },
   upcoming: {
     label: 'Upcoming',
     badgeVariant: 'neutral',
     markerClass: 'bg-[#cbd5e1]',
-    progressColor: 'indigo',
+    progressColor: 'navy',
   },
   blocked: {
     label: 'Blocked',

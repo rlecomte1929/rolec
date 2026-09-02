@@ -63,7 +63,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   }
 
   const widthClass = fullWidth ? 'w-full' : '';
-  const errorClass = error ? 'border-[#7a2a2a] focus:ring-[#7a2a2a]' : 'border-[#d1d5db] focus:ring-[#0b2b43]';
+  const errorClass = error ? 'border-rose-700 focus:ring-rose-700' : 'border-[#d1d5db] focus:ring-[#0b2b43]';
 
   return (
     <div className={widthClass}>
@@ -80,7 +80,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
         } ${className}`}
       />
       {error && (
-        <p id={errorId} className="text-sm text-[#7a2a2a] mt-1" role="alert">
+        <p id={errorId} className="text-sm text-rose-800 mt-1" role="alert">
           {error}
         </p>
       )}

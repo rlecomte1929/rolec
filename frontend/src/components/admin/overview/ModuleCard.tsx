@@ -34,7 +34,7 @@ export const ModuleCard: React.FC<ModuleCardProps> = ({ testId, to, icon, title,
         </div>
         <div>
           <p className="text-sm font-semibold text-slate-900">{title}</p>
-          <p className="text-xs text-slate-400">{subtitle}</p>
+          <p className="text-xs text-slate-500">{subtitle}</p>
         </div>
       </div>
       <span className="text-2xl font-semibold text-slate-900">

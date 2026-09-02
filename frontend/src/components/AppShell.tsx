@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { Clock } from 'lucide-react';
 import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { authAPI } from '../api/client';
 import { useBrandingConfig } from '../hooks/useBrandingConfig';
@@ -249,10 +250,12 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         <GlobalApiErrorBanner />
 
         {showEmployeeBanner && (
-          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-sm text-amber-900 shrink-0">
-            <span className="mr-2">⏳</span>
+          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-sm text-amber-900 shrink-0 flex items-start gap-2">
+            <Clock className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
+            <span>
             Your account isn&apos;t linked to a relocation case yet — most features are on hold.
             If HR set one up for your email, open the <strong>Dashboard</strong> to accept it (a case for your verified email links automatically).
+            </span>
           </div>
         )}
 

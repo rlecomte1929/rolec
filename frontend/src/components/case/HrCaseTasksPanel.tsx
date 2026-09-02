@@ -412,7 +412,7 @@ export const HrCaseTasksPanel: React.FC<HrCaseTasksPanelProps> = ({ caseId, coor
           <ProgressBar
             value={data.stats.pct}
             color={
-              data.stats.pct === 100 ? 'green' : data.stats.pct >= 60 ? 'indigo' : 'yellow'
+              data.stats.pct === 100 ? 'green' : data.stats.pct >= 60 ? 'navy' : 'yellow'
             }
           />
         </div>

@@ -16,7 +16,7 @@
 
 ## Aesthetic Direction
 - **Direction:** clean enterprise SaaS — restrained, information-dense, structure-first.
-- **Decoration level:** minimal — typography, whitespace, and a single accent carry the design. No gradients, blobs, or decorative texture.
+- **Decoration level:** minimal — typography, whitespace, and a single accent carry the design. No blobs or decorative texture. **No gradients except one named exception:** the employee roadmap hero in `RoadmapTemplate.tsx` (`from-[#0b2b43] via-[#103e54] to-[#176f6b]`). Do not copy that treatment to Admin or HR shells.
 - **Mood:** competent and calm. Navy conveys structure/trust; teal marks the few things that matter (links, primary actions, active state).
 - **Hard rule (from the Branding Blueprint):** there is **no purple/violet/indigo** in the brand. Teal is used **sparingly** as the accent, not as a fill.
 
@@ -28,7 +28,7 @@
 - > Note: Inter is a deliberate, shipped choice (documented in both the tokens file and tokens.css). It is the established brand font — do not swap it without an explicit rebrand decision.
 
 ## Color
-Two brand scales (50→900) + neutrals + semantic. **Light is default; dark via `[data-theme='dark']`.**
+Two brand scales (50→900) + neutrals + semantic. **Light is the only reachable theme in the product shells.** `[data-theme='dark']` tokens exist in `platform.css` and `ThemeProvider` can apply them, but `ThemeProvider` is not mounted from `main.tsx` and Admin/HR/Employee AppShell have no theme toggle. Treat dark mode as **token-ready, not user-reachable** until a toggle ships. Do not claim dark mode as a product feature in QA or copy.
 
 - **Primary — Navy** (`navy.*` in Tailwind; `--rp-color-primary-*`): structure, headings, primary buttons, dark inverted strips.
   - `800 = #0b2b43` (the canonical brand navy), 900 `#061a2a`, 700 `#133456`, 500 `#2d5f8e` … 50 `#f0f5fa`.
@@ -36,7 +36,7 @@ Two brand scales (50→900) + neutrals + semantic. **Light is default; dark via 
   - `500 = #1f8e8b` (the canonical accent), 600 `#167572` (link hover), 700 `#105d5b` … 50 `#ebf7f6`.
 - **Neutrals:** slate/gray. Body text `#1f2937` (`--rp-text-primary` / `neutral-800`); secondary `neutral-600`; tertiary/muted `neutral-500`; surfaces `neutral-0/50/100`.
 - **Semantic** (Tailwind palette, as used across the app): success **emerald**, warning **amber**, error **rose/red**, info **blue**.
-- **Surfaces:** page `--rp-surface` (white), subtle (`neutral-50`, alt rows), muted (`neutral-100`, disabled/raised), inverse (`navy-800`).
+- **Surfaces:** page `--rp-bg` / shell `bg-slate-50` (`#f8fafc`); cards `--rp-surface` (white); subtle (`neutral-50`, alt rows), muted (`neutral-100`, disabled/raised), inverse (`navy-800`).
 - **Muted-text contrast (WCAG AA) — A11Y-2 / AIQ-1211:** secondary/muted **text on light surfaces must be `text-slate-500` (≈4.6:1) or darker** — **never `text-slate-400` / `text-gray-400` / `*-300`** (≈2.6:1, fails AA's 4.5:1). On dark/navy/colored fills the lighter slate tokens are correct (light-on-dark). New code: `text-slate-500` for muted, `text-slate-600` for secondary body. (Migration of the ~490 existing light-surface usages is in progress, by feature area.)
 
 ## Spacing
@@ -74,3 +74,4 @@ None of these change the *intended* look — navy `#0b2b43` + teal `#1f8e8b` + I
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-06-14 | DESIGN.md created (infer + audit mode) | Documented the shipped system (navy `#0b2b43` + teal `#1f8e8b` + Inter + 8px grid + antigravity) as the formal source of truth; flagged 3 adoption drifts to fix forward. Created by `/design-consultation`. |
+| 2026-09-02 | Dark mode honesty; roadmap hero gradient exception; `--rp-bg` = slate-50 | Audit vs shipped UI: dark tokens unused in the SPA entry; employee roadmap hero is the only approved in-app gradient; body `--rp-bg` aligned with `bg-slate-50` (`#f8fafc`). |
