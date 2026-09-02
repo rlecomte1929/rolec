@@ -1,0 +1,18 @@
+{
+  "batch_id": "cr-facts-2026-09-01",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "CR",
+  "origin_country_code": null,
+  "destination_country_code": "CR",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "COSTA RICA",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "865804d7d119e8d68c5e3e4fae309d01f4238b686ef4f269f41ebd18e3becaab",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "All 12 from pgrweb.go.cr/SINALEVI (JS SPA — curl gets an 18KB shell, so confirm_quotes flagged all 12 REVIEW_BROWSER). Applier browser-verified all 12 against the SPA's _CargarTextoCompleto payload rendered into #contenedorTexto: Ley 8764 (Migración) ×10, Ley 17/CCSS ×1, Ley 7092 (Renta, territorial) ×1 — every quote present verbatim. nationality=non-EEA->THIRD_COUNTRY; scope clean. Greenfield. Imported --no-fetch."
+}
