@@ -57,6 +57,12 @@ function parseCtx(raw: ClientContext | string | null | undefined): ClientContext
   return raw;
 }
 
+/** Product ingest writes a feedback_status row; a left-join with no severity/dispatch
+ *  means that seed failed and dispatch/triage will not have a ticket. */
+function productTicketIncomplete(row: UnifiedFeedbackItem): boolean {
+  return row.stream === 'product' && !row.severity && !row.dispatch_status;
+}
+
 /** Highlighted callout naming the exact skill + command to run in Claude Code. */
 function FixSkillCallout({ result }: { result: FixTriggerResult }) {
   const [copied, setCopied] = useState(false);
@@ -907,6 +913,9 @@ export function FeedbackTab() {
                     </div>
                     {/* Tags: severity + area badges */}
                     <div className="px-3 py-2.5 flex flex-wrap gap-1">
+                      {productTicketIncomplete(row) && (
+                        <Badge variant="warning" size="sm">Ticket incomplete</Badge>
+                      )}
                       {row.severity && (
                         <Badge
                           variant={row.severity === 'critical' ? 'error' : 'neutral'}

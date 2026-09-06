@@ -83,6 +83,12 @@ describe('FeedbackTab', () => {
     expect(screen.getByText('Great answer')).toBeTruthy();
   });
 
+  it('shows Ticket incomplete when a product row has no status seed', async () => {
+    renderTab();
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    expect(screen.getByText('Ticket incomplete')).toBeTruthy();
+  });
+
   it('calls listFeedback with stream param when stream tab clicked', async () => {
     renderTab();
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
