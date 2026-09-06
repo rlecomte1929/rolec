@@ -15,14 +15,21 @@ vi.mock('../api/productFeedback', () => ({
   getMyReports: vi.fn(),
 }));
 
+vi.mock('../analytics', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../analytics')>();
+  return { ...actual, track: vi.fn() };
+});
+
 import { submitProductFeedback, getMyReports } from '../api/productFeedback';
+import { track } from '../analytics';
 import { FeedbackWidget } from './FeedbackWidget';
 
 const mockSubmit = submitProductFeedback as unknown as ReturnType<typeof vi.fn>;
 const mockGetReports = getMyReports as unknown as ReturnType<typeof vi.fn>;
+const mockTrack = track as unknown as ReturnType<typeof vi.fn>;
 
 afterEach(cleanup);
-beforeEach(() => { mockSubmit.mockReset(); mockGetReports.mockReset(); });
+beforeEach(() => { mockSubmit.mockReset(); mockGetReports.mockReset(); mockTrack.mockReset(); });
 
 function openAndType(text: string) {
   fireEvent.click(screen.getByLabelText('Give feedback'));
@@ -77,6 +84,33 @@ describe('FeedbackWidget', () => {
     expect(arg.campaign).toBe('insead-2026');
     expect(arg.corridor_id).toBe('GB_US');
     expect(arg.tester_segment).toBe('prospect');
+  });
+
+  it('tracks widget open and submit with report_id, not the message', async () => {
+    mockSubmit.mockResolvedValue({ ok: true, report_id: 'BUG-x' });
+    render(<FeedbackWidget userId="u1" />);
+    openAndType('secret passport details in the box');
+    await waitFor(() =>
+      expect(mockTrack).toHaveBeenCalledWith(
+        'feedback_widget_opened',
+        expect.objectContaining({ route: expect.any(String) }),
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /send/i }));
+    await waitFor(() => expect(mockSubmit).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(mockTrack).toHaveBeenCalledWith(
+        'feedback_submitted',
+        expect.objectContaining({
+          report_id: 'BUG-x',
+          category: 'bug',
+          route: expect.any(String),
+        }),
+      ),
+    );
+    for (const [, props] of mockTrack.mock.calls) {
+      expect(JSON.stringify(props ?? {})).not.toMatch(/secret passport/i);
+    }
   });
 
   it('does not submit an empty message', () => {

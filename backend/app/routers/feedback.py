@@ -228,6 +228,24 @@ def submit_feedback(
             report_id,
         )
 
+    try:
+        from ..posthog_client import get_posthog_client
+
+        ph = get_posthog_client()
+        if ph is not None:
+            ph.capture(
+                distinct_id=str(reporter_id or report_id),
+                event="feedback_submitted",
+                properties={
+                    "report_id": report_id,
+                    "category": category,
+                    "route": (body.page_url or "")[:200],
+                    "source": "api",
+                },
+            )
+    except Exception:  # noqa: BLE001
+        log.warning("posthog feedback_submitted failed report_id=%s", report_id)
+
     resp: Dict[str, Any] = {"ok": True, "report_id": report_id}
     # [AIQ-1480] When the screenshot landed in Storage, tell the reporter how much image
     # storage is left (best-effort; omitted if it can't be computed).
