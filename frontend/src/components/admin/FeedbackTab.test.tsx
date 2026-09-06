@@ -52,11 +52,27 @@ const MOCK_ITEMS: UnifiedFeedbackItem[] = [
     owner: null,
     resolution: null,
   },
+  {
+    id: 'cccc-3333',
+    stream: 'ai_answers',
+    source_ref: 'trace-002',
+    text: 'Policy assistant was wrong about visas',
+    verdict: 'thumbs_down',
+    user_id: 'u-3',
+    company_id: 'co-1',
+    created_at: new Date(Date.now() - 8_000_000).toISOString(),
+    status: null,
+    owner: null,
+    resolution: null,
+  },
 ];
 
 describe('FeedbackTab', () => {
   beforeEach(() => {
-    vi.mocked(feedbackApi.listFeedback).mockResolvedValue(MOCK_ITEMS);
+    vi.mocked(feedbackApi.listFeedback).mockImplementation(async (params) => {
+      if (!params?.stream) return MOCK_ITEMS;
+      return MOCK_ITEMS.filter((i) => i.stream === params.stream);
+    });
     vi.mocked(feedbackApi.triageFeedback).mockResolvedValue(undefined);
   });
 
@@ -68,19 +84,26 @@ describe('FeedbackTab', () => {
     );
   }
 
-  it('renders stream tabs including Product, AI Answers and Helpfulness', async () => {
+  it('renders grouped chips: Product, AI answers, HR, plus All and Dispatched', async () => {
     renderTab();
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
-    expect(screen.getAllByText('Product').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Helpfulness').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('AI Answers').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Product' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'AI answers' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'HR' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'All streams' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Dispatched' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Helpfulness' })).toBeNull();
   });
 
-  it('shows rows from both streams by default', async () => {
+  it('defaults to product tickets and hides AI answer rows', async () => {
     renderTab();
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
     expect(screen.getByText('Button is broken')).toBeTruthy();
-    expect(screen.getByText('Great answer')).toBeTruthy();
+    expect(screen.queryByText('Great answer')).toBeNull();
+    expect(screen.queryByText('Policy assistant was wrong about visas')).toBeNull();
+    expect(feedbackApi.listFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({ stream: 'product' }),
+    );
   });
 
   it('shows Ticket incomplete when a product row has no status seed', async () => {
@@ -89,14 +112,17 @@ describe('FeedbackTab', () => {
     expect(screen.getByText('Ticket incomplete')).toBeTruthy();
   });
 
-  it('calls listFeedback with stream param when stream tab clicked', async () => {
+  it('loads AI streams together and shows the eval-gold note', async () => {
     renderTab();
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
-    // Click the first occurrence (the tab button)
-    fireEvent.click(screen.getAllByText('Helpfulness')[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'AI answers' }));
     await waitFor(() =>
-      expect(feedbackApi.listFeedback).toHaveBeenCalledWith({ stream: 'helpfulness' })
+      expect(feedbackApi.listFeedback).toHaveBeenCalledWith({ stream: 'ai_answers' }),
     );
+    expect(feedbackApi.listFeedback).toHaveBeenCalledWith({ stream: 'helpfulness' });
+    expect(
+      screen.getByText('This stream feeds eval gold, not a code dispatch by default.'),
+    ).toBeTruthy();
   });
 
   it('calls triageFeedback on status change', async () => {
@@ -392,7 +418,7 @@ describe('FeedbackTab — bulk triage', () => {
   beforeEach(() => {
     (feedbackApi.listFeedback as ReturnType<typeof vi.fn>).mockResolvedValue(MOCK_ITEMS);
     (feedbackApi.bulkTriageFeedback as ReturnType<typeof vi.fn>).mockResolvedValue({
-      updated: 2,
+      updated: 3,
       rejected: [],
     });
   });
@@ -400,23 +426,28 @@ describe('FeedbackTab — bulk triage', () => {
   it('shows no bar until something is selected', async () => {
     render(<MemoryRouter><FeedbackTab /></MemoryRouter>);
     await screen.findByText('Button is broken');
+    fireEvent.click(screen.getByRole('button', { name: 'All streams' }));
+    await screen.findByText('Great answer');
     expect(screen.queryByTestId('bulk-action-bar')).not.toBeInTheDocument();
   });
 
   it('applies one status to every selected row, keyed by stream and id', async () => {
     render(<MemoryRouter><FeedbackTab /></MemoryRouter>);
     await screen.findByText('Button is broken');
+    fireEvent.click(screen.getByRole('button', { name: 'All streams' }));
+    await screen.findByText('Great answer');
 
     fireEvent.click(screen.getByLabelText('Select all'));
     expect(await screen.findByTestId('bulk-action-bar')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Mark Closed \(2\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Mark Closed \(3\)/ }));
 
     await waitFor(() =>
       expect(feedbackApi.bulkTriageFeedback).toHaveBeenCalledWith(
         [
           { stream: 'product', source_id: 'aaaa-1111' },
           { stream: 'helpfulness', source_id: 'bbbb-2222' },
+          { stream: 'ai_answers', source_id: 'cccc-3333' },
         ],
         'closed',
       ),
@@ -426,6 +457,8 @@ describe('FeedbackTab — bulk triage', () => {
   it('carries the count in the button label', async () => {
     render(<MemoryRouter><FeedbackTab /></MemoryRouter>);
     await screen.findByText('Button is broken');
+    fireEvent.click(screen.getByRole('button', { name: 'All streams' }));
+    await screen.findByText('Great answer');
     fireEvent.click(screen.getByLabelText('Select report-001'));
     expect(
       await screen.findByRole('button', { name: /Mark Reviewed \(1\)/ }),
@@ -439,9 +472,11 @@ describe('FeedbackTab — bulk triage', () => {
     });
     render(<MemoryRouter><FeedbackTab /></MemoryRouter>);
     await screen.findByText('Button is broken');
+    fireEvent.click(screen.getByRole('button', { name: 'All streams' }));
+    await screen.findByText('Great answer');
     fireEvent.click(screen.getByLabelText('Select all'));
-    fireEvent.click(screen.getByRole('button', { name: /Mark Closed \(2\)/ }));
-    expect(await screen.findByText(/1 of 2 could not be updated/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Mark Closed \(3\)/ }));
+    expect(await screen.findByText(/1 of 3 could not be updated/i)).toBeInTheDocument();
   });
 
   it('does not report success when the whole call fails', async () => {
@@ -450,8 +485,10 @@ describe('FeedbackTab — bulk triage', () => {
     );
     render(<MemoryRouter><FeedbackTab /></MemoryRouter>);
     await screen.findByText('Button is broken');
+    fireEvent.click(screen.getByRole('button', { name: 'All streams' }));
+    await screen.findByText('Great answer');
     fireEvent.click(screen.getByLabelText('Select all'));
-    fireEvent.click(screen.getByRole('button', { name: /Mark Closed \(2\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Mark Closed \(3\)/ }));
     expect(await screen.findByText(/nothing was updated/i)).toBeInTheDocument();
   });
 });

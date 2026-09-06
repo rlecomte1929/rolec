@@ -42,7 +42,26 @@ import { ProgressStrip } from './ProgressStrip';
 import { NewFeedbackModal } from './NewFeedbackModal';
 
 type FilterStatus = TriageStatus | 'all';
-type ActiveMode = FeedbackStream | 'all' | 'dispatched';
+type InboxChip = 'all' | 'product' | 'ai' | 'hr' | 'dispatched';
+
+const AI_STREAMS: FeedbackStream[] = ['ai_answers', 'helpfulness'];
+const HR_STREAMS: FeedbackStream[] = ['hr_assignment', 'hr_case'];
+const INBOX_CHIPS: InboxChip[] = ['all', 'product', 'ai', 'hr', 'dispatched'];
+
+function chipLabel(chip: InboxChip): string {
+  if (chip === 'all') return 'All streams';
+  if (chip === 'dispatched') return 'Dispatched';
+  if (chip === 'ai') return 'AI answers';
+  if (chip === 'hr') return 'HR';
+  return 'Product';
+}
+
+function rowInChip(chip: InboxChip, stream: FeedbackStream): boolean {
+  if (chip === 'all' || chip === 'dispatched') return true;
+  if (chip === 'product') return stream === 'product';
+  if (chip === 'ai') return AI_STREAMS.includes(stream);
+  return HR_STREAMS.includes(stream);
+}
 
 /** client_context normally arrives as an object (jsonb); tolerate a string just in case. */
 function parseCtx(raw: ClientContext | string | null | undefined): ClientContext | null {
@@ -284,13 +303,11 @@ function fmtDate(iso: string): string {
   );
 }
 
-const STREAMS: FeedbackStream[] = ['product', 'ai_answers', 'helpfulness', 'hr_assignment', 'hr_case'];
-
 export function FeedbackTab() {
   const [rows, setRows]                   = useState<UnifiedFeedbackItem[]>([]);
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState<string | null>(null);
-  const [activeStream, setActiveStream]   = useState<ActiveMode>('all');
+  const [activeStream, setActiveStream]   = useState<InboxChip>('product');
   const [filterStatus, setFilterStatus]   = useState<FilterStatus>('all');
   const [reporterFilter, setReporterFilter] = useState('');
   const [messageFilter, setMessageFilter] = useState('');
@@ -326,12 +343,21 @@ export function FeedbackTab() {
     setLoading(true);
     setError(null);
     try {
-      const items = await listFeedback({
-        ...(activeStream === 'dispatched'
-          ? { dispatched: true }
-          : activeStream !== 'all' ? { stream: activeStream } : {}),
-        ...(showDismissed ? { includeDismissed: true } : {}),
-      });
+      const extra = showDismissed ? { includeDismissed: true as const } : {};
+      let items: UnifiedFeedbackItem[];
+      if (activeStream === 'dispatched') {
+        items = await listFeedback({ dispatched: true, ...extra });
+      } else if (activeStream === 'all') {
+        items = await listFeedback({ ...extra });
+      } else if (activeStream === 'product') {
+        items = await listFeedback({ stream: 'product', ...extra });
+      } else {
+        const streams = activeStream === 'ai' ? AI_STREAMS : HR_STREAMS;
+        const batches = await Promise.all(
+          streams.map((stream) => listFeedback({ stream, ...extra })),
+        );
+        items = batches.flat();
+      }
       setRows(items);
     } catch {
       setError('Failed to load feedback.');
@@ -512,6 +538,7 @@ export function FeedbackTab() {
   const reporterQuery = reporterFilter.trim().toLowerCase();
   const messageQuery = messageFilter.trim().toLowerCase();
   const displayed = rows.filter((r) => {
+    if (!rowInChip(activeStream, r.stream)) return false;
     if (activeStream !== 'dispatched' && filterStatus !== 'all' && r.status !== filterStatus) return false;
     if (reporterQuery) {
       const hay = `${r.reporter_name ?? ''} ${r.reporter_email ?? ''}`.toLowerCase();
@@ -600,7 +627,7 @@ export function FeedbackTab() {
       {/* Stream tabs + New feedback */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex gap-1 rounded-lg border border-gray-200 p-0.5 bg-gray-50 w-fit">
-          {(['all', ...STREAMS, 'dispatched'] as ActiveMode[]).map((s) => (
+          {INBOX_CHIPS.map((s) => (
             <Button
               unstyled
               key={s}
@@ -611,7 +638,7 @@ export function FeedbackTab() {
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {s === 'all' ? 'All streams' : s === 'dispatched' ? 'Dispatched' : STREAM_LABEL[s]}
+              {chipLabel(s)}
             </Button>
           ))}
         </div>
@@ -619,6 +646,11 @@ export function FeedbackTab() {
           <Plus className="w-4 h-4" /> New feedback
         </Button>
       </div>
+      {activeStream === 'ai' && (
+        <p className="text-xs text-slate-500">
+          This stream feeds eval gold, not a code dispatch by default.
+        </p>
+      )}
 
       {showNew && (
         <NewFeedbackModal
