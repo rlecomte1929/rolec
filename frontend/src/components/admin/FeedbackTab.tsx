@@ -23,6 +23,7 @@ import {
   deleteFeedback,
   triggerFix,
   autoAttempt,
+  fetchAgentBrief,
   EvalGateError,
   type UnifiedFeedbackItem,
   type FeedbackStream,
@@ -331,6 +332,9 @@ export function FeedbackTab() {
   const [creatingId, setCreatingId]             = useState<string | null>(null);
   const [forceCreatingId, setForceCreatingId]   = useState<string | null>(null);
   const [dispatchErrors, setDispatchErrors]     = useState<Record<string, string>>({});
+  const [briefBusyId, setBriefBusyId]           = useState<string | null>(null);
+  const [briefCopiedId, setBriefCopiedId]       = useState<string | null>(null);
+  const [briefFallback, setBriefFallback]       = useState<Record<string, string>>({});
   /** Structured eval gate results per row — set when dispatch_create is blocked by the quality gate. */
   const [evalResults, setEvalResults]           = useState<Record<string, EvalGateResult>>({});
   // Trigger fix / Auto-attempt (on dispatched rows).
@@ -439,6 +443,38 @@ export function FeedbackTab() {
       setPreviewFor(null);
     } finally {
       setPreviewLoadingId(null);
+    }
+  }, []);
+
+  const copyCursorBrief = useCallback(async (row: UnifiedFeedbackItem) => {
+    setBriefBusyId(row.id);
+    setDispatchErrors((prev) => {
+      const n = { ...prev };
+      delete n[row.id];
+      return n;
+    });
+    try {
+      const res = await fetchAgentBrief(row.stream, row.id);
+      const payload = `${res.brief}\n\n${res.command}`;
+      try {
+        await navigator.clipboard.writeText(payload);
+        setBriefCopiedId(row.id);
+        setBriefFallback((prev) => {
+          const n = { ...prev };
+          delete n[row.id];
+          return n;
+        });
+        window.setTimeout(() => {
+          setBriefCopiedId((cur) => (cur === row.id ? null : cur));
+        }, 1500);
+      } catch {
+        setBriefFallback((prev) => ({ ...prev, [row.id]: payload }));
+      }
+    } catch (err) {
+      const msg = getApiErrorMessage(err, '') || (err instanceof Error ? err.message : '') || 'Could not build brief';
+      setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
+    } finally {
+      setBriefBusyId(null);
     }
   }, []);
 
@@ -1282,6 +1318,14 @@ export function FeedbackTab() {
                                 <div className="flex gap-2">
                                   <Button
                                     unstyled
+                                    disabled={briefBusyId === row.id}
+                                    onClick={() => void copyCursorBrief(row)}
+                                    className="text-[11px] font-medium px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                                  >
+                                    {briefBusyId === row.id ? 'Building brief…' : briefCopiedId === row.id ? 'Copied ✓' : 'Copy Cursor brief'}
+                                  </Button>
+                                  <Button
+                                    unstyled
                                     disabled={creatingId === row.id || forceCreatingId === row.id}
                                     onClick={() => void createTask(row)}
                                     className="text-[11px] font-medium px-3 py-1 rounded bg-[#0b2b43] text-white hover:bg-[#0b3b5c] disabled:opacity-50"
@@ -1314,6 +1358,7 @@ export function FeedbackTab() {
                                 })()}
                               </div>
                             ) : (
+                              <div className="flex flex-wrap gap-2">
                               <Button
                                 unstyled
                                 disabled={!ctxValue(row).trim() || previewLoadingId === row.id}
@@ -1322,6 +1367,20 @@ export function FeedbackTab() {
                               >
                                 {previewLoadingId === row.id ? 'Generating spec… (this takes ~30s)' : 'Draft task with AI'}
                               </Button>
+                              <Button
+                                unstyled
+                                disabled={briefBusyId === row.id}
+                                onClick={() => void copyCursorBrief(row)}
+                                className="text-[11px] font-medium px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                              >
+                                {briefBusyId === row.id ? 'Building brief…' : briefCopiedId === row.id ? 'Copied ✓' : 'Copy Cursor brief'}
+                              </Button>
+                              </div>
+                            )}
+                            {briefFallback[row.id] && (
+                              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded border border-gray-200 bg-white p-2 text-[11px] text-slate-500">
+                                {briefFallback[row.id]}
+                              </pre>
                             )}
                           </div>
                         )}

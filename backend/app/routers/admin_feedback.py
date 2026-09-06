@@ -42,6 +42,55 @@ from ..services import notion_work_queue
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin-feedback"])
 
+_AGENT_BRIEF_FENCE = (
+    "Do not merge to main. Open a feature branch and a PR. "
+    "Do not touch serving LLM isolation. Mask PII."
+)
+
+
+def build_agent_brief(
+    *,
+    report_id: Optional[str],
+    stream: str,
+    item_id: str,
+    reporter_text: str,
+    dispatch_context: str,
+    diagnostics: str,
+    notion_url: Optional[str],
+) -> Dict[str, Any]:
+    """Markdown clipboard payload. Read-only: does not touch Notion status."""
+    parts = [
+        "# ReloPass feedback brief",
+        f"stream: {stream}",
+        f"item_id: {item_id}",
+        f"report_id: {report_id or 'none'}",
+        "",
+        "## Reporter",
+        (reporter_text or "").strip() or "(empty)",
+        "",
+        "## Admin context",
+        (dispatch_context or "").strip() or "(none)",
+        "",
+        "## Diagnostics",
+        (diagnostics or "").strip() or "(none)",
+        "",
+        "## Constraints",
+        _AGENT_BRIEF_FENCE,
+    ]
+    if notion_url:
+        parts.extend(["", f"Notion: {notion_url}"])
+    blob = f"{notion_url or ''} {dispatch_context or ''}"
+    aiq = re.search(r"AIQ-\d+", blob)
+    command = f"/relopass-dev-queue {aiq.group(0)}" if aiq else "Work this ticket in Cursor"
+    return {
+        "report_id": report_id,
+        "stream": stream,
+        "item_id": item_id,
+        "notion_url": notion_url,
+        "command": command,
+        "brief": "\n".join(parts),
+    }
+
 
 def _get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
@@ -1132,6 +1181,43 @@ def _invoke_autofix_pipeline(notion_task_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=502, detail=f"Autofix pipeline returned {exc.code}: {detail}")
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"Autofix pipeline unreachable: {exc}") from exc
+
+
+@router.post("/feedback/{stream}/{item_id}/agent-brief")
+def agent_brief(
+    stream: str,
+    item_id: str,
+    db: Session = Depends(_get_db),
+    _user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Copyable Cursor brief. Does not set Notion to Ready for AI (that is /fix)."""
+    fs = db.execute(
+        text(
+            "SELECT dispatch_context, dispatch_ref FROM feedback_status "
+            "WHERE stream = :s AND source_id = :id"
+        ),
+        {"s": stream, "id": item_id},
+    ).fetchone()
+    pf = _load_product_fields(db, item_id) if stream == "product" else {}
+    if stream == "product" and not pf:
+        raise HTTPException(status_code=404, detail="Feedback item not found")
+    diagnostics = format_diagnostics(pf.get("client_context")) if pf else ""
+    notion_url = None
+    dispatch_context = ""
+    if fs:
+        dispatch_context = fs[0] or ""
+        ref = fs[1]
+        if ref and str(ref).startswith("http"):
+            notion_url = str(ref)
+    return build_agent_brief(
+        report_id=pf.get("report_id") if pf else None,
+        stream=stream,
+        item_id=item_id,
+        reporter_text=pf.get("message") if pf else "",
+        dispatch_context=dispatch_context,
+        diagnostics=diagnostics,
+        notion_url=notion_url,
+    )
 
 
 @router.post("/feedback/{stream}/{item_id}/fix", dependencies=[Depends(_require_fix_enabled)])

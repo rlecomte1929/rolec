@@ -321,6 +321,23 @@ export interface FixTriggerResult {
   url: string | null;
 }
 
+export interface AgentBrief {
+  report_id: string | null;
+  stream: string;
+  item_id: string;
+  notion_url: string | null;
+  command: string;
+  brief: string;
+}
+
+/** Read-only clipboard brief. Does not flip Notion to Ready for AI. */
+export async function fetchAgentBrief(
+  stream: FeedbackStream,
+  itemId: string,
+): Promise<AgentBrief> {
+  return apiPost<AgentBrief>(`/api/admin/feedback/${stream}/${itemId}/agent-brief`, {});
+}
+
 /**
  * Mark a dispatched task 'Ready for AI' and return the /relopass-dev-queue command.
  * The button hands off to the skill; it does not run any code itself.

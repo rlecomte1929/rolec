@@ -20,6 +20,7 @@ vi.mock('../../api/adminFeedback', () => ({
   bulkTriageFeedback: vi.fn(),
   triggerFix: vi.fn(),
   autoAttempt: vi.fn(),
+  fetchAgentBrief: vi.fn(),
   EvalGateError: class extends Error {},
 }));
 import * as feedbackApi from '../../api/adminFeedback';
@@ -251,6 +252,31 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     fireEvent.click(screen.getByText('Minor UI glitch'));
     expect(feedbackApi.dispatchPreview).not.toHaveBeenCalled();
     expect(await screen.findByPlaceholderText(/detail an engineer needs/i)).toBeTruthy();
+  });
+
+  it('copies a Cursor brief without calling triggerFix', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    vi.mocked(feedbackApi.fetchAgentBrief).mockResolvedValue({
+      report_id: 'BUG-x',
+      stream: 'product',
+      item_id: 'low-risk-1',
+      notion_url: null,
+      command: 'Work this ticket in Cursor',
+      brief: 'Do not merge to main\nreplay',
+    });
+    renderTab();
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    fireEvent.click(screen.getByText('Minor UI glitch'));
+    fireEvent.click(await screen.findByRole('button', { name: /copy cursor brief/i }));
+    await waitFor(() =>
+      expect(feedbackApi.fetchAgentBrief).toHaveBeenCalledWith('product', 'low-risk-1'),
+    );
+    expect(writeText).toHaveBeenCalled();
+    const payload = String(writeText.mock.calls[0][0]);
+    expect(payload).toContain('Do not merge to main');
+    expect(payload).toContain('Work this ticket in Cursor');
+    expect(feedbackApi.triggerFix).not.toHaveBeenCalled();
   });
 
   it('drafts a task from context, then creates the Notion task and shows the link', async () => {
