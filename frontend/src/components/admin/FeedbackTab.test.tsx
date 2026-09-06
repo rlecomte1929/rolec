@@ -21,7 +21,16 @@ vi.mock('../../api/adminFeedback', () => ({
   triggerFix: vi.fn(),
   autoAttempt: vi.fn(),
   fetchAgentBrief: vi.fn(),
-  EvalGateError: class extends Error {},
+  EvalGateError: class EvalGateError extends Error {
+    evalResult: { score: number; issues: string[]; warnings: string[]; passed: boolean };
+    constructor(
+      message: string,
+      evalResult: { score: number; issues: string[]; warnings: string[]; passed: boolean },
+    ) {
+      super(message);
+      this.evalResult = evalResult;
+    }
+  },
 }));
 import * as feedbackApi from '../../api/adminFeedback';
 import { FeedbackTab } from './FeedbackTab';
@@ -305,6 +314,53 @@ describe('FeedbackTab — dispatch + badges (BR-3)', () => {
     await waitFor(() => expect(feedbackApi.dispatchCreate).toHaveBeenCalled());
     const links = await screen.findAllByRole('link', { name: /notion/i });
     expect(links.length).toBeGreaterThan(0);
+  });
+
+  it('requires a written reason before force-dispatch', async () => {
+    const Gate = feedbackApi.EvalGateError as unknown as new (
+      m: string,
+      e: { score: number; issues: string[]; warnings: string[]; passed: boolean },
+    ) => Error;
+    vi.mocked(feedbackApi.dispatchPreview).mockResolvedValue({
+      task: {
+        title: 'Guess the file', strategic_objective: 'g', execution_prompt: 'p', expected_output: 'o',
+        validation_criteria: 'v', priority: 'P1', complexity: 'Low',
+        task_type: 'Backend Implementation', layer: 'API', product_area: 'Core Product', status: 'Ready for AI',
+      },
+      evalResult: { score: 40, issues: ['no failingFrame'], warnings: [], passed: false },
+    });
+    vi.mocked(feedbackApi.dispatchCreate)
+      .mockRejectedValueOnce(new Gate('blocked', {
+        score: 40, issues: ['no failingFrame'], warnings: [], passed: false,
+      }))
+      .mockResolvedValue({
+        dispatched: true, url: 'https://notion.so/forced', dispatch_ref: 'https://notion.so/forced',
+      });
+    renderTab();
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    fireEvent.click(screen.getByText('Minor UI glitch'));
+    const ctx = await screen.findByPlaceholderText(/detail an engineer needs/i);
+    fireEvent.change(ctx, { target: { value: 'repro: open /journey' } });
+    fireEvent.click(screen.getByRole('button', { name: /draft task with ai/i }));
+    await waitFor(() => expect(feedbackApi.dispatchPreview).toHaveBeenCalled());
+    const createBtn = await screen.findByRole('button', { name: /create notion task/i });
+    fireEvent.click(createBtn);
+    const forceBtn = await screen.findByRole('button', { name: /force dispatch/i });
+    expect(forceBtn).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText(/at least 12 characters/i), {
+      target: { value: 'Reproduced on staging after review.' },
+    });
+    expect(forceBtn).not.toBeDisabled();
+    fireEvent.click(forceBtn);
+    await waitFor(() =>
+      expect(feedbackApi.dispatchCreate).toHaveBeenLastCalledWith(
+        'product',
+        'low-risk-1',
+        expect.objectContaining({ title: 'Guess the file' }),
+        true,
+        'Reproduced on staging after review.',
+      ),
+    );
   });
 
   it('dismiss hides the row; delete asks to confirm then removes it', async () => {

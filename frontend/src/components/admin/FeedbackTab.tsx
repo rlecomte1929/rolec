@@ -124,9 +124,11 @@ function EvalGatePanel({
   forcing,
 }: {
   result: EvalGateResult;
-  onForce: () => void;
+  onForce: (reason: string) => void;
   forcing?: boolean;
 }) {
+  const [forceReason, setForceReason] = useState('');
+  const canForce = forceReason.trim().length >= 12;
   const scoreColor =
     result.score >= 70
       ? 'text-green-700 bg-green-50 border-green-200'
@@ -162,12 +164,23 @@ function EvalGatePanel({
         </ul>
       )}
       <p className="text-amber-700">
-        <strong>Fix:</strong> change <em>Task type</em> to &ldquo;Research&rdquo; (or <em>Status</em> to &ldquo;Needs Human Clarification&rdquo;) in the form above, then re-submit — or force dispatch to override.
+        <strong>Fix:</strong> change <em>Task type</em> to &ldquo;Research&rdquo; (or <em>Status</em> to &ldquo;Needs Human Clarification&rdquo;) in the form above, then re-submit — or force dispatch with a written reason.
       </p>
+      <label className="block space-y-1">
+        <span className="text-slate-500">Why override the quality gate?</span>
+        <textarea
+          value={forceReason}
+          onChange={(e) => setForceReason(e.target.value)}
+          disabled={forcing}
+          rows={2}
+          placeholder="At least 12 characters — what did you verify?"
+          className="w-full rounded border border-amber-300 bg-white px-2 py-1 text-[11px] text-[#0b2b43] disabled:opacity-50"
+        />
+      </label>
       <Button
         unstyled
-        disabled={forcing}
-        onClick={onForce}
+        disabled={forcing || !canForce}
+        onClick={() => onForce(forceReason.trim())}
         className="text-[11px] font-medium px-3 py-1 rounded border border-amber-400 text-amber-900 bg-white hover:bg-amber-100 disabled:opacity-50"
       >
         {forcing ? 'Dispatching…' : 'Force dispatch (override gate)'}
@@ -479,7 +492,7 @@ export function FeedbackTab() {
   }, []);
 
   /** Create the Notion Work Queue page from the reviewed task. */
-  const createTask = useCallback(async (row: UnifiedFeedbackItem, force = false) => {
+  const createTask = useCallback(async (row: UnifiedFeedbackItem, force = false, forceReason = '') => {
     if (!previewTask) return;
     if (force) setForceCreatingId(row.id);
     else setCreatingId(row.id);
@@ -487,7 +500,7 @@ export function FeedbackTab() {
     // Clear previous eval gate block so the panel shows fresh results.
     if (!force) setEvalResults((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
     try {
-      const res = await dispatchCreate(row.stream, row.id, previewTask, force);
+      const res = await dispatchCreate(row.stream, row.id, previewTask, force, forceReason);
       const notionUrl = res.notion_url ?? res.url;
       setRows((prev) => prev.map((r) => r.id === row.id
         ? { ...r, dispatch_status: 'dispatched', dispatch_ref: notionUrl } : r));
@@ -1101,7 +1114,7 @@ export function FeedbackTab() {
                               return (
                                 <EvalGatePanel
                                   result={parsed.eval}
-                                  onForce={() => void createTask(row, true)}
+                                  onForce={(reason) => void createTask(row, true, reason)}
                                   forcing={forceCreatingId === row.id}
                                 />
                               );
@@ -1351,7 +1364,7 @@ export function FeedbackTab() {
                                   return (
                                     <EvalGatePanel
                                       result={er}
-                                      onForce={() => void createTask(row, true)}
+                                      onForce={(reason) => void createTask(row, true, reason)}
                                       forcing={forceCreatingId === row.id}
                                     />
                                   );

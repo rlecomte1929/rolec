@@ -290,12 +290,14 @@ export async function dispatchCreate(
   itemId: string,
   task: EngineeredTask,
   forceDispatch?: boolean,
+  forceReason?: string,
 ): Promise<{ dispatched: boolean; url: string; dispatch_ref: string; notion_url?: string; already_exists?: boolean }> {
   try {
     return await apiPost(`/api/admin/feedback/${stream}/${itemId}/dispatch/create`, {
       task,
       confirm: true,
       force_dispatch: forceDispatch ?? false,
+      force_reason: forceReason ?? '',
     });
   } catch (err) {
     const evalResult = tryExtractEvalGate(err);

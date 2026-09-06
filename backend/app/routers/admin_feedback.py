@@ -943,6 +943,7 @@ class CreateTaskBody(BaseModel):
     task: Dict[str, Any]
     confirm: bool = True
     force_dispatch: bool = False  # set True to bypass the eval gate (admin override)
+    force_reason: Optional[str] = None  # required (min 12 chars) when force_dispatch is true
 
 
 @router.post("/feedback/{stream}/{item_id}/dispatch/create")
@@ -958,6 +959,13 @@ def dispatch_create(
     task = body.task or {}
     if not task.get("title"):
         raise HTTPException(status_code=400, detail="Task title is required.")
+
+    force_reason = (body.force_reason or "").strip()
+    if body.force_dispatch and len(force_reason) < 12:
+        raise HTTPException(
+            status_code=422,
+            detail="force_reason is required (min 12 characters) when force_dispatch is true.",
+        )
 
     # ── Idempotency + pre-flight sentinel ────────────────────────────────────────
     # Root cause of the duplicate-Notion-task bug (AIQ-1465/1466): if the client
@@ -1115,13 +1123,32 @@ def dispatch_create(
         ),
         {"s": stream, "id": item_id, "ref": url, "now": now, "ntid": notion_task_id, "tier": tier},
     )
+    if body.force_dispatch:
+        db.execute(
+            text(
+                "UPDATE feedback_status SET dispatch_context = "
+                "COALESCE(dispatch_context, '') || :note, updated_at = :now "
+                "WHERE stream = :s AND source_id = :id"
+            ),
+            {
+                "s": stream,
+                "id": item_id,
+                "now": now,
+                "note": f"\n\n[force_dispatch] {force_reason}",
+            },
+        )
     record_admin_event(
         db,
         actor_id=str(user.get("id") or user.get("user_id") or "unknown"),
         event="ticket_dispatched",
         entity="feedback_status",
         entity_id=item_id,
-        detail={"stream": stream, "notion_url": url, "title": task.get("title")},
+        detail={
+            "stream": stream,
+            "notion_url": url,
+            "title": task.get("title"),
+            **({"force_reason": force_reason} if body.force_dispatch else {}),
+        },
     )
     return {"dispatched": True, "already_exists": False, "notion_url": url, "url": url, "dispatch_ref": url}
 
