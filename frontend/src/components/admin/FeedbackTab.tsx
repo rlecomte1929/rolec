@@ -23,6 +23,7 @@ import {
   deleteFeedback,
   triggerFix,
   autoAttempt,
+  fetchAgentBrief,
   EvalGateError,
   type UnifiedFeedbackItem,
   type FeedbackStream,
@@ -42,7 +43,26 @@ import { ProgressStrip } from './ProgressStrip';
 import { NewFeedbackModal } from './NewFeedbackModal';
 
 type FilterStatus = TriageStatus | 'all';
-type ActiveMode = FeedbackStream | 'all' | 'dispatched';
+type InboxChip = 'all' | 'product' | 'ai' | 'hr' | 'dispatched';
+
+const AI_STREAMS: FeedbackStream[] = ['ai_answers', 'helpfulness'];
+const HR_STREAMS: FeedbackStream[] = ['hr_assignment', 'hr_case'];
+const INBOX_CHIPS: InboxChip[] = ['all', 'product', 'ai', 'hr', 'dispatched'];
+
+function chipLabel(chip: InboxChip): string {
+  if (chip === 'all') return 'All streams';
+  if (chip === 'dispatched') return 'Dispatched';
+  if (chip === 'ai') return 'AI answers';
+  if (chip === 'hr') return 'HR';
+  return 'Product';
+}
+
+function rowInChip(chip: InboxChip, stream: FeedbackStream): boolean {
+  if (chip === 'all' || chip === 'dispatched') return true;
+  if (chip === 'product') return stream === 'product';
+  if (chip === 'ai') return AI_STREAMS.includes(stream);
+  return HR_STREAMS.includes(stream);
+}
 
 /** client_context normally arrives as an object (jsonb); tolerate a string just in case. */
 function parseCtx(raw: ClientContext | string | null | undefined): ClientContext | null {
@@ -55,6 +75,12 @@ function parseCtx(raw: ClientContext | string | null | undefined): ClientContext
     }
   }
   return raw;
+}
+
+/** Product ingest writes a feedback_status row; a left-join with no severity/dispatch
+ *  means that seed failed and dispatch/triage will not have a ticket. */
+function productTicketIncomplete(row: UnifiedFeedbackItem): boolean {
+  return row.stream === 'product' && !row.severity && !row.dispatch_status;
 }
 
 /** Highlighted callout naming the exact skill + command to run in Claude Code. */
@@ -98,9 +124,11 @@ function EvalGatePanel({
   forcing,
 }: {
   result: EvalGateResult;
-  onForce: () => void;
+  onForce: (reason: string) => void;
   forcing?: boolean;
 }) {
+  const [forceReason, setForceReason] = useState('');
+  const canForce = forceReason.trim().length >= 12;
   const scoreColor =
     result.score >= 70
       ? 'text-green-700 bg-green-50 border-green-200'
@@ -136,12 +164,23 @@ function EvalGatePanel({
         </ul>
       )}
       <p className="text-amber-700">
-        <strong>Fix:</strong> change <em>Task type</em> to &ldquo;Research&rdquo; (or <em>Status</em> to &ldquo;Needs Human Clarification&rdquo;) in the form above, then re-submit — or force dispatch to override.
+        <strong>Fix:</strong> change <em>Task type</em> to &ldquo;Research&rdquo; (or <em>Status</em> to &ldquo;Needs Human Clarification&rdquo;) in the form above, then re-submit — or force dispatch with a written reason.
       </p>
+      <label className="block space-y-1">
+        <span className="text-slate-500">Why override the quality gate?</span>
+        <textarea
+          value={forceReason}
+          onChange={(e) => setForceReason(e.target.value)}
+          disabled={forcing}
+          rows={2}
+          placeholder="At least 12 characters — what did you verify?"
+          className="w-full rounded border border-amber-300 bg-white px-2 py-1 text-[11px] text-[#0b2b43] disabled:opacity-50"
+        />
+      </label>
       <Button
         unstyled
-        disabled={forcing}
-        onClick={onForce}
+        disabled={forcing || !canForce}
+        onClick={() => onForce(forceReason.trim())}
         className="text-[11px] font-medium px-3 py-1 rounded border border-amber-400 text-amber-900 bg-white hover:bg-amber-100 disabled:opacity-50"
       >
         {forcing ? 'Dispatching…' : 'Force dispatch (override gate)'}
@@ -278,13 +317,11 @@ function fmtDate(iso: string): string {
   );
 }
 
-const STREAMS: FeedbackStream[] = ['product', 'ai_answers', 'helpfulness', 'hr_assignment', 'hr_case'];
-
 export function FeedbackTab() {
   const [rows, setRows]                   = useState<UnifiedFeedbackItem[]>([]);
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState<string | null>(null);
-  const [activeStream, setActiveStream]   = useState<ActiveMode>('all');
+  const [activeStream, setActiveStream]   = useState<InboxChip>('product');
   const [filterStatus, setFilterStatus]   = useState<FilterStatus>('all');
   const [reporterFilter, setReporterFilter] = useState('');
   const [messageFilter, setMessageFilter] = useState('');
@@ -308,6 +345,9 @@ export function FeedbackTab() {
   const [creatingId, setCreatingId]             = useState<string | null>(null);
   const [forceCreatingId, setForceCreatingId]   = useState<string | null>(null);
   const [dispatchErrors, setDispatchErrors]     = useState<Record<string, string>>({});
+  const [briefBusyId, setBriefBusyId]           = useState<string | null>(null);
+  const [briefCopiedId, setBriefCopiedId]       = useState<string | null>(null);
+  const [briefFallback, setBriefFallback]       = useState<Record<string, string>>({});
   /** Structured eval gate results per row — set when dispatch_create is blocked by the quality gate. */
   const [evalResults, setEvalResults]           = useState<Record<string, EvalGateResult>>({});
   // Trigger fix / Auto-attempt (on dispatched rows).
@@ -320,12 +360,21 @@ export function FeedbackTab() {
     setLoading(true);
     setError(null);
     try {
-      const items = await listFeedback({
-        ...(activeStream === 'dispatched'
-          ? { dispatched: true }
-          : activeStream !== 'all' ? { stream: activeStream } : {}),
-        ...(showDismissed ? { includeDismissed: true } : {}),
-      });
+      const extra = showDismissed ? { includeDismissed: true as const } : {};
+      let items: UnifiedFeedbackItem[];
+      if (activeStream === 'dispatched') {
+        items = await listFeedback({ dispatched: true, ...extra });
+      } else if (activeStream === 'all') {
+        items = await listFeedback({ ...extra });
+      } else if (activeStream === 'product') {
+        items = await listFeedback({ stream: 'product', ...extra });
+      } else {
+        const streams = activeStream === 'ai' ? AI_STREAMS : HR_STREAMS;
+        const batches = await Promise.all(
+          streams.map((stream) => listFeedback({ stream, ...extra })),
+        );
+        items = batches.flat();
+      }
       setRows(items);
     } catch {
       setError('Failed to load feedback.');
@@ -410,8 +459,40 @@ export function FeedbackTab() {
     }
   }, []);
 
+  const copyCursorBrief = useCallback(async (row: UnifiedFeedbackItem) => {
+    setBriefBusyId(row.id);
+    setDispatchErrors((prev) => {
+      const n = { ...prev };
+      delete n[row.id];
+      return n;
+    });
+    try {
+      const res = await fetchAgentBrief(row.stream, row.id);
+      const payload = `${res.brief}\n\n${res.command}`;
+      try {
+        await navigator.clipboard.writeText(payload);
+        setBriefCopiedId(row.id);
+        setBriefFallback((prev) => {
+          const n = { ...prev };
+          delete n[row.id];
+          return n;
+        });
+        window.setTimeout(() => {
+          setBriefCopiedId((cur) => (cur === row.id ? null : cur));
+        }, 1500);
+      } catch {
+        setBriefFallback((prev) => ({ ...prev, [row.id]: payload }));
+      }
+    } catch (err) {
+      const msg = getApiErrorMessage(err, '') || (err instanceof Error ? err.message : '') || 'Could not build brief';
+      setDispatchErrors((prev) => ({ ...prev, [row.id]: msg }));
+    } finally {
+      setBriefBusyId(null);
+    }
+  }, []);
+
   /** Create the Notion Work Queue page from the reviewed task. */
-  const createTask = useCallback(async (row: UnifiedFeedbackItem, force = false) => {
+  const createTask = useCallback(async (row: UnifiedFeedbackItem, force = false, forceReason = '') => {
     if (!previewTask) return;
     if (force) setForceCreatingId(row.id);
     else setCreatingId(row.id);
@@ -419,7 +500,7 @@ export function FeedbackTab() {
     // Clear previous eval gate block so the panel shows fresh results.
     if (!force) setEvalResults((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
     try {
-      const res = await dispatchCreate(row.stream, row.id, previewTask, force);
+      const res = await dispatchCreate(row.stream, row.id, previewTask, force, forceReason);
       const notionUrl = res.notion_url ?? res.url;
       setRows((prev) => prev.map((r) => r.id === row.id
         ? { ...r, dispatch_status: 'dispatched', dispatch_ref: notionUrl } : r));
@@ -506,6 +587,7 @@ export function FeedbackTab() {
   const reporterQuery = reporterFilter.trim().toLowerCase();
   const messageQuery = messageFilter.trim().toLowerCase();
   const displayed = rows.filter((r) => {
+    if (!rowInChip(activeStream, r.stream)) return false;
     if (activeStream !== 'dispatched' && filterStatus !== 'all' && r.status !== filterStatus) return false;
     if (reporterQuery) {
       const hay = `${r.reporter_name ?? ''} ${r.reporter_email ?? ''}`.toLowerCase();
@@ -594,7 +676,7 @@ export function FeedbackTab() {
       {/* Stream tabs + New feedback */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex gap-1 rounded-lg border border-gray-200 p-0.5 bg-gray-50 w-fit">
-          {(['all', ...STREAMS, 'dispatched'] as ActiveMode[]).map((s) => (
+          {INBOX_CHIPS.map((s) => (
             <Button
               unstyled
               key={s}
@@ -605,7 +687,7 @@ export function FeedbackTab() {
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {s === 'all' ? 'All streams' : s === 'dispatched' ? 'Dispatched' : STREAM_LABEL[s]}
+              {chipLabel(s)}
             </Button>
           ))}
         </div>
@@ -613,6 +695,11 @@ export function FeedbackTab() {
           <Plus className="w-4 h-4" /> New feedback
         </Button>
       </div>
+      {activeStream === 'ai' && (
+        <p className="text-xs text-slate-500">
+          This stream feeds eval gold, not a code dispatch by default.
+        </p>
+      )}
 
       {showNew && (
         <NewFeedbackModal
@@ -907,6 +994,9 @@ export function FeedbackTab() {
                     </div>
                     {/* Tags: severity + area badges */}
                     <div className="px-3 py-2.5 flex flex-wrap gap-1">
+                      {productTicketIncomplete(row) && (
+                        <Badge variant="warning" size="sm">Ticket incomplete</Badge>
+                      )}
                       {row.severity && (
                         <Badge
                           variant={row.severity === 'critical' ? 'error' : 'neutral'}
@@ -1024,7 +1114,7 @@ export function FeedbackTab() {
                               return (
                                 <EvalGatePanel
                                   result={parsed.eval}
-                                  onForce={() => void createTask(row, true)}
+                                  onForce={(reason) => void createTask(row, true, reason)}
                                   forcing={forceCreatingId === row.id}
                                 />
                               );
@@ -1241,6 +1331,14 @@ export function FeedbackTab() {
                                 <div className="flex gap-2">
                                   <Button
                                     unstyled
+                                    disabled={briefBusyId === row.id}
+                                    onClick={() => void copyCursorBrief(row)}
+                                    className="text-[11px] font-medium px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                                  >
+                                    {briefBusyId === row.id ? 'Building brief…' : briefCopiedId === row.id ? 'Copied ✓' : 'Copy Cursor brief'}
+                                  </Button>
+                                  <Button
+                                    unstyled
                                     disabled={creatingId === row.id || forceCreatingId === row.id}
                                     onClick={() => void createTask(row)}
                                     className="text-[11px] font-medium px-3 py-1 rounded bg-[#0b2b43] text-white hover:bg-[#0b3b5c] disabled:opacity-50"
@@ -1266,13 +1364,14 @@ export function FeedbackTab() {
                                   return (
                                     <EvalGatePanel
                                       result={er}
-                                      onForce={() => void createTask(row, true)}
+                                      onForce={(reason) => void createTask(row, true, reason)}
                                       forcing={forceCreatingId === row.id}
                                     />
                                   );
                                 })()}
                               </div>
                             ) : (
+                              <div className="flex flex-wrap gap-2">
                               <Button
                                 unstyled
                                 disabled={!ctxValue(row).trim() || previewLoadingId === row.id}
@@ -1281,6 +1380,20 @@ export function FeedbackTab() {
                               >
                                 {previewLoadingId === row.id ? 'Generating spec… (this takes ~30s)' : 'Draft task with AI'}
                               </Button>
+                              <Button
+                                unstyled
+                                disabled={briefBusyId === row.id}
+                                onClick={() => void copyCursorBrief(row)}
+                                className="text-[11px] font-medium px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                              >
+                                {briefBusyId === row.id ? 'Building brief…' : briefCopiedId === row.id ? 'Copied ✓' : 'Copy Cursor brief'}
+                              </Button>
+                              </div>
+                            )}
+                            {briefFallback[row.id] && (
+                              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded border border-gray-200 bg-white p-2 text-[11px] text-slate-500">
+                                {briefFallback[row.id]}
+                              </pre>
                             )}
                           </div>
                         )}

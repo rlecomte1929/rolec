@@ -213,6 +213,17 @@ def format_diagnostics(client_context: Any) -> str:
     fn = ctx.get("failingFunction") or ctx.get("failing_function")
     if fn:
         lines.append(f"Failing function: {fn}")
+
+    ph_id = str(ctx.get("posthog_id") or "").strip()
+    ph_sess = str(ctx.get("posthog_session_id") or "").strip()
+    ph_replay = str(ctx.get("posthog_replay_url") or "").strip()
+    if ph_replay or ph_id or ph_sess:
+        lines.append(
+            "PostHog (LEAD, not proof of root cause): "
+            f"replay={ph_replay or 'none'} person_id={ph_id or 'none'} "
+            f"session_id={ph_sess or 'none'}. "
+            "Replay may start when the widget opened, after the failure."
+        )
     return "\n".join(lines)
 
 

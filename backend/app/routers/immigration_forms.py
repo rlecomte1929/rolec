@@ -19,7 +19,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from ..auth_deps import get_org_id_for_hr_user, require_admin_or_hr
+from ..auth_deps import (
+    get_org_id_for_hr_user,
+    require_admin_or_hr,
+    require_case_access,
+    require_hr_or_employee,
+)
 from ...database import db
 from ..services.form_prefill_service import (
     generate_prefilled_pdf,
@@ -27,8 +32,10 @@ from ..services.form_prefill_service import (
     visa_types_for_corridor,
 )
 from ..services.immigration_service import (
+    _check_consent,
     _get_case_details,
     _load_profile_for_case,
+    _load_profile_for_case_employee,
     _log_access,
     decrypt_passport_for_display,
 )
@@ -55,6 +62,73 @@ def _decrypt_passport(profile: Dict[str, Any]) -> Dict[str, Any]:
     if result.withheld:
         log.warning("passport decryption failed during form pre-fill; field left blank")
     return result.profile
+
+
+def _forms_payload(corridor_to: Optional[str], visa_type: Optional[str]) -> Dict[str, Any]:
+    """Resolve the fillable forms for a corridor/visa pair.
+
+    [AIQ-1855] Shared by the HR and employee available-forms routes so both fail the
+    same way. Fail-closed: no corridor -> 422 (never a DE default, per AIQ-1771); a
+    corridor with more than one form-bearing visa -> 422 asking the caller to choose;
+    a corridor with no fillable forms -> an empty list, which is the right answer for
+    portal/data-sheet corridors like Norway rather than an error.
+    """
+    if not corridor_to:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Cannot determine the destination corridor for this case. "
+                "Set the case's destination country, or pass ?corridor_to=XX."
+            ),
+        )
+    if not visa_type:
+        candidates = visa_types_for_corridor(corridor_to)
+        if len(candidates) == 1:
+            visa_type = candidates[0]
+        elif len(candidates) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Corridor {corridor_to} has more than one visa type with "
+                    f"mapped forms ({', '.join(candidates)}); pass ?visa_type= "
+                    "to choose."
+                ),
+            )
+        else:
+            return {"corridor_to": corridor_to, "visa_type": None, "forms": []}
+    forms = get_available_forms(corridor_to, visa_type)
+    return {
+        "corridor_to": corridor_to,
+        "visa_type": visa_type,
+        "forms": [f.to_dict() for f in forms],
+    }
+
+
+def _generate_and_report(
+    case_id: str,
+    profile: Dict[str, Any],
+    form_id: str,
+    user_id: str,
+    role: str,
+) -> Dict[str, Any]:
+    """Decrypt the passport, pre-fill the PDF, log the access, and return the signed
+    download URL + per-field fill report. [AIQ-1855] Shared by the HR and employee
+    generate-form routes; the caller is responsible for loading a profile the caller
+    is authorised to read (HR: org-scoped; employee: their own case + consent)."""
+    profile = _decrypt_passport(profile)
+    try:
+        result = generate_prefilled_pdf(form_id, case_id, profile)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    _log_access(
+        case_id=case_id,
+        profile_id=profile.get("id"),
+        user_id=user_id,
+        role=role,
+        action="form_prefill",
+        fields=[form_id],
+    )
+    return {"download_url": result.download_url, "fill_report": result.to_dict()}
 
 
 @router.get("/hr/cases/{case_id}/immigration/available-forms")
@@ -84,42 +158,7 @@ def list_available_forms(
     if not corridor_to:
         case = _get_case_details(case_id, org_id)
         corridor_to = (case.get("dest_country") if case else None) or None
-
-    if not corridor_to:
-        # Fail closed. Guessing here is what offered a German form to a case with
-        # no destination at all.
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                "Cannot determine the destination corridor for this case. "
-                "Set the case's destination country, or pass ?corridor_to=XX."
-            ),
-        )
-
-    if not visa_type:
-        candidates = visa_types_for_corridor(corridor_to)
-        if len(candidates) == 1:
-            visa_type = candidates[0]
-        elif len(candidates) > 1:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    f"Corridor {corridor_to} has more than one visa type with "
-                    f"mapped forms ({', '.join(candidates)}); pass ?visa_type= "
-                    "to choose."
-                ),
-            )
-        else:
-            # No fillable forms for this corridor — correct for data-sheet
-            # corridors. Echo the corridor so the caller can say so plainly.
-            return {"corridor_to": corridor_to, "visa_type": None, "forms": []}
-
-    forms = get_available_forms(corridor_to, visa_type)
-    return {
-        "corridor_to": corridor_to,
-        "visa_type": visa_type,
-        "forms": [f.to_dict() for f in forms],
-    }
+    return _forms_payload(corridor_to, visa_type)
 
 
 @router.post("/hr/cases/{case_id}/immigration/generate-form")
@@ -136,24 +175,65 @@ def generate_form(
             status_code=404,
             detail="No immigration profile found for this case.",
         )
+    return _generate_and_report(case_id, profile, body.form_id, hr_user["id"], "hr")
 
-    profile = _decrypt_passport(profile)
 
-    try:
-        result = generate_prefilled_pdf(body.form_id, case_id, profile)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+# ─────────────────────────────────────────────────────────────────────────────
+# [AIQ-1855] Employee-facing pre-fill — the relocating employee reaches the same
+# forms for their OWN case. The HR routes above are require_admin_or_hr; these are
+# require_hr_or_employee + require_case_access, so the path case_id is authorised
+# (employee owns the assignment, or HR has visibility) BEFORE anything is read —
+# fail-closed on cross-case access, mirroring employee_immigration_snapshot.
+#
+# available-forms reads no vault, so ownership is the only gate; generate-form
+# reads + decrypts the caller's OWN profile (scoped by (case_id, employee_id)) and
+# only behind the immigration consent gate, matching the employee profile-read
+# route. corridor_to is supplied by the employee dossier (which already holds the
+# case destination); absent, it fails closed with 422 rather than guessing.
+# ─────────────────────────────────────────────────────────────────────────────
+@router.get("/employee/cases/{case_id}/immigration/available-forms")
+def list_available_forms_employee(
+    case_id: str,
+    visa_type: Optional[str] = None,
+    corridor_to: Optional[str] = None,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+) -> Dict[str, Any]:
+    """Forms available for pre-fill for the caller's OWN case. Ownership-gated."""
+    require_case_access(case_id, user)  # 403/404 before anything is resolved
+    if not corridor_to:
+        # org_id is unused by _get_case_details' query; ownership is already enforced
+        # by require_case_access above (same pattern as immigration_snapshot_service).
+        case = _get_case_details(case_id, "")
+        corridor_to = (case.get("dest_country") if case else None) or None
+    return _forms_payload(corridor_to, visa_type)
 
-    _log_access(
-        case_id=case_id,
-        profile_id=profile.get("id"),
-        user_id=hr_user["id"],
-        role="hr",
-        action="form_prefill",
-        fields=[body.form_id],
-    )
 
-    return {
-        "download_url": result.download_url,
-        "fill_report": result.to_dict(),
-    }
+@router.post("/employee/cases/{case_id}/immigration/generate-form")
+def generate_form_employee(
+    case_id: str,
+    body: GenerateFormBody,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+) -> Dict[str, Any]:
+    """Generate a pre-filled PDF from the caller's OWN vault profile for their case.
+
+    Ownership-gated (require_case_access) and consent-gated. The profile is loaded
+    scoped to (case_id, employee_id=caller.id) so a caller can only ever pre-fill
+    from their own vault row.
+    """
+    require_case_access(case_id, user)
+    employee_id = str(user.get("id") or "")
+    if not _check_consent(case_id, employee_id):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "No valid immigration consent on record for this case. "
+                "Please complete the consent step first."
+            ),
+        )
+    profile = _load_profile_for_case_employee(case_id, employee_id)
+    if not profile:
+        raise HTTPException(
+            status_code=404,
+            detail="No immigration profile found for this case.",
+        )
+    return _generate_and_report(case_id, profile, body.form_id, employee_id, "employee")

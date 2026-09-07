@@ -15,7 +15,7 @@ import { useState, useRef, useEffect } from 'react';
 import { submitProductFeedback, getMyReports, type ScreenshotStorage } from '../api/productFeedback';
 import type { MyReport } from '../api/productFeedback';
 import { collectDiagnostics } from '../lib/diagnostics';
-import { startBugReportRecording, getAnalyticsConsent } from '../analytics';
+import { startBugReportRecording, getAnalyticsConsent, track } from '../analytics';
 import { ScreenshotCapture } from './feedback/ScreenshotCapture';
 import { AnnotationModal } from './feedback/AnnotationModal';
 import { Button } from './antigravity/Button';
@@ -88,6 +88,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
     if (state === 'open') {
       setTimeout(() => textareaRef.current?.focus(), 50);
       startBugReportRecording();
+      track('feedback_widget_opened', { route: window.location.pathname });
     }
   }, [state]);
 
@@ -173,6 +174,13 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
         ...readTestDriveSlice(),
       });
       setStorageNote(res.screenshot_storage ?? null);
+      if (res.report_id) {
+        track('feedback_submitted', {
+          report_id: res.report_id,
+          category,
+          route: window.location.pathname,
+        });
+      }
       setState('success');
       // Keep the success panel up a little longer when there's a storage note to read.
       setTimeout(() => close(), res.screenshot_storage ? 6000 : 3500);

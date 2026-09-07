@@ -44,10 +44,17 @@ def _seeded_titles():
     return out
 
 
-def _item(title, description, pillar="RESIDENCE", outcome="action"):
+def _item(title, description, pillar="RESIDENCE", outcome="action", citations=None):
     return SimpleNamespace(
-        title=title, description=description, pillar=pillar, outcomeType=outcome
+        title=title, description=description, pillar=pillar, outcomeType=outcome,
+        citations=citations or [],
     )
+
+
+def _cite(url):
+    """A resolved citation as requirements_builder yields it: a SourceRecordDTO-shaped
+    object whose only field this overlay reads is `url`."""
+    return SimpleNamespace(url=url)
 
 
 def _dto(country, items):
@@ -358,3 +365,83 @@ class TestNoContradictoryDeadlineSurvivesAnywhere:
         }
         task = adapt_milestone_row(row)
         assert task.instructions == TASK_BY_MILESTONE_TYPE["task_arrival_registration"].instructions
+
+
+class TestProvenanceReachesTheTimeline:
+    """AIQ-2023 — the requirement's source URL(s) ride onto the milestone so the
+    relocation-plan timeline can show the published rule a step traces to.
+
+    The overlay reads `RequirementItemDTO.citations`, already resolved across the three
+    `citations_json` shapes by requirements_builder — so this asserts the URLs it hands on,
+    not the raw column.
+    """
+
+    def _enrich_one(self, monkeypatch, item):
+        import backend.app.services.roadmap_requirement_copy as mod
+
+        monkeypatch.setattr(
+            "backend.app.services.requirements_builder.compute_case_requirements",
+            lambda cid: _dto("GERMANY", [item]),
+        )
+        before = [_milestone("task_arrival_registration", "Complete arrival registration", "generic")]
+        return before, mod.enrich_milestones_with_requirements("c1", before)[0]
+
+    def test_citations_become_sources(self, monkeypatch):
+        _, after = self._enrich_one(monkeypatch, _item(
+            "Residence registration (Anmeldung)", "Bürgeramt, 14 days.",
+            citations=[_cite("https://www.bamf.de/anmeldung"),
+                       _cite("https://service.berlin.de/anmeldung")],
+        ))
+        assert after["sources"] == [
+            "https://www.bamf.de/anmeldung", "https://service.berlin.de/anmeldung",
+        ]
+
+    def test_duplicate_urls_collapse_order_preserved(self, monkeypatch):
+        _, after = self._enrich_one(monkeypatch, _item(
+            "Residence registration (Anmeldung)", "x",
+            citations=[_cite("https://a.gov.de/x"), _cite("https://a.gov.de/x"),
+                       _cite("https://b.gov.de/y")],
+        ))
+        assert after["sources"] == ["https://a.gov.de/x", "https://b.gov.de/y"]
+
+    def test_an_uncited_requirement_yields_empty_sources_and_still_renders(self, monkeypatch):
+        _, after = self._enrich_one(monkeypatch, _item(
+            "Residence registration (Anmeldung)", "x", citations=[]))
+        assert after["sources"] == []
+        # Criterion 2: the copy still overlays; only the provenance is absent.
+        assert after["title"] == "Residence registration (Anmeldung)"
+
+    def test_overlay_touches_only_title_description_and_sources(self, monkeypatch):
+        before, after = self._enrich_one(monkeypatch, _item(
+            "Residence registration (Anmeldung)", "Bürgeramt, 14 days.",
+            citations=[_cite("https://www.bamf.de/anmeldung")],
+        ))
+        changed = {k for k in before[0] if after.get(k) != before[0].get(k)}
+        assert changed == {"title", "description"}, changed
+        added = set(after) - set(before[0])
+        assert added == {"sources", "requirement_copy"}, added
+
+    def test_sources_reach_the_enriched_plan_task(self):
+        from backend.relocation_plan_service import adapt_milestone_row
+
+        task = adapt_milestone_row({
+            "id": "m1",
+            "milestone_type": "task_arrival_registration",
+            "title": "Residence registration (Anmeldung)",
+            "description": "Bürgeramt, within 14 days.",
+            "status": "pending",
+            "requirement_copy": True,
+            "sources": ["https://www.bamf.de/anmeldung"],
+        })
+        assert task.sources == ("https://www.bamf.de/anmeldung",)
+
+    def test_a_row_without_sources_defaults_to_empty(self):
+        from backend.relocation_plan_service import adapt_milestone_row
+
+        task = adapt_milestone_row({
+            "id": "m2",
+            "milestone_type": "task_arrival_registration",
+            "title": "Complete arrival registration",
+            "status": "pending",
+        })
+        assert task.sources == ()

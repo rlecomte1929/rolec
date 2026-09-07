@@ -16,16 +16,24 @@ vi.mock('../../api/aiFeedback', () => ({ submitAiFeedback: vi.fn() }));
 // client, and route every question to the immigration engine.
 vi.mock('../../api/policyAssistantQuery', () => ({ getPolicyAnswer: vi.fn() }));
 vi.mock('../../api/assistantRoute', () => ({ routeAssistantDomain: vi.fn().mockResolvedValue('immigration') }));
+vi.mock('../../api/immigrationAuthority', () => ({ getDestinationImmigrationAuthority: vi.fn().mockResolvedValue(null) }));
 
 import { askImmigrationQuestion } from '../../api/immigrationAnswer';
 import { submitAiFeedback } from '../../api/aiFeedback';
+import { getDestinationImmigrationAuthority } from '../../api/immigrationAuthority';
 import { ImmigrationAnswerPanel } from './ImmigrationAnswerPanel';
 
 const mockAsk = askImmigrationQuestion as unknown as ReturnType<typeof vi.fn>;
 const mockFeedback = submitAiFeedback as unknown as ReturnType<typeof vi.fn>;
+const mockAuthority = getDestinationImmigrationAuthority as unknown as ReturnType<typeof vi.fn>;
 
 afterEach(cleanup);
-beforeEach(() => { mockAsk.mockReset(); mockFeedback.mockReset(); });
+beforeEach(() => {
+  mockAsk.mockReset();
+  mockFeedback.mockReset();
+  mockAuthority.mockReset();
+  mockAuthority.mockResolvedValue(null);
+});
 
 // AIQ-1476: corridor + nationality now pre-fill from the case (nationality is a
 // multi-value chip select, permit type is optional). Provide caseContext so the ask
@@ -77,5 +85,61 @@ describe('ImmigrationAnswerPanel', () => {
     fillQuestion();
     fireEvent.click(screen.getByRole('button', { name: /ask/i }));
     await waitFor(() => expect(screen.getByText(/enough official, corridor-specific/i)).toBeInTheDocument());
+  });
+
+  it('renders the answer as markdown — headings, bold, GFM tables — not raw source (AIQ-1869)', async () => {
+    mockAsk.mockResolvedValue({
+      answer_text: [
+        '## Work Permit Requirements',
+        '',
+        'You need a **Blue Card**.',
+        '',
+        '| Step | Action |',
+        '| --- | --- |',
+        '| 1 | Apply online |',
+      ].join('\n'),
+      answer_kind: 'answer',
+      cited_sources: [],
+      confidence: 'high',
+      trace_id: 'tr-md',
+    });
+    render(<ImmigrationAnswerPanel caseContext={{ ...CASE_CTX }} />);
+    fillQuestion();
+    fireEvent.click(screen.getByRole('button', { name: /ask/i }));
+
+    // Heading is a real element, not a literal "##".
+    const heading = await screen.findByText('Work Permit Requirements');
+    expect(heading.tagName).toMatch(/^H[1-6]$/);
+    expect(screen.queryByText(/## Work Permit/)).toBeNull();
+
+    // Bold renders as <strong>, not literal "**".
+    expect(screen.getByText('Blue Card').tagName).toBe('STRONG');
+
+    // GFM table renders, not literal pipes.
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.getByText('Apply online')).toBeInTheDocument();
+    expect(screen.queryByText(/\| Step \|/)).toBeNull();
+  });
+
+  it('shows a standing authority link before any question when curated data exists', async () => {
+    mockAuthority.mockResolvedValue({ name: 'Ausländerbehörde', url: 'https://www.bamf.de' });
+    render(<ImmigrationAnswerPanel caseContext={{ ...CASE_CTX }} />);
+    const link = await screen.findByTestId('destination-authority-link');
+    expect(link).toHaveAttribute('href', 'https://www.bamf.de');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(link).toHaveTextContent(/Official immigration site: Ausländerbehörde/);
+  });
+
+  it('looks up the standing authority when To is a country name, not ISO-2', async () => {
+    mockAuthority.mockResolvedValue({ name: 'Ausländerbehörde', url: 'https://www.bamf.de' });
+    render(
+      <ImmigrationAnswerPanel
+        caseContext={{ from: 'Spain', to: 'Germany', nationalities: ['FR'] }}
+      />,
+    );
+    await waitFor(() => expect(mockAuthority).toHaveBeenCalledWith('Germany'));
+    const link = await screen.findByTestId('destination-authority-link');
+    expect(link).toHaveAttribute('href', 'https://www.bamf.de');
   });
 });

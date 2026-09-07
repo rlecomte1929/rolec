@@ -134,6 +134,25 @@ class _FreeMovementStatement:
     )
 
 
+def _requirement_source_urls(item: Any) -> List[str]:
+    """The requirement's citation URLs, de-duplicated and order-preserving.
+
+    `RequirementItemDTO.citations` is already resolved across the three `citations_json`
+    shapes by `requirements_builder.citation_dtos`, so we read the resolved URLs rather
+    than re-parsing the raw column. Empty for a stated-answer overlay
+    (`_FreeMovementStatement`) or any requirement with no citation — that is the criterion
+    that an uncited task carries `sources: []` and still renders.
+    """
+    urls: List[str] = []
+    seen = set()
+    for citation in getattr(item, "citations", None) or []:
+        url = (getattr(citation, "url", None) or "").strip()
+        if url and url not in seen:
+            seen.add(url)
+            urls.append(url)
+    return urls
+
+
 def enrich_milestones_with_requirements(
     case_id: str,
     milestones: List[Dict[str, Any]],
@@ -142,8 +161,9 @@ def enrich_milestones_with_requirements(
 ) -> List[Dict[str, Any]]:
     """Overlay destination-specific copy from the requirements dossier.
 
-    Only `title` and `description` are ever touched. status / owner / target_date /
-    sort_order / criticality are the roadmap's, and stay the roadmap's.
+    Only `title`, `description` and `sources` (the requirement's citation URLs) are ever
+    touched. status / owner / target_date / sort_order / criticality are the roadmap's,
+    and stay the roadmap's.
 
     Fails OPEN: any error returns the milestones untouched. A generic roadmap is far
     better than a roadmap that 500s.
@@ -206,6 +226,10 @@ def enrich_milestones_with_requirements(
         enriched = dict(m)
         enriched["title"] = item.title
         enriched["description"] = item.description
+        # The requirement's provenance: the source URL(s) behind the copy just overlaid,
+        # so the timeline can show the employee the published rule this step traces to.
+        # Empty list for a stated answer or a requirement with no citation.
+        enriched["sources"] = _requirement_source_urls(item)
         # Marks this row as rewritten, so relocation_plan_service surfaces our
         # description as `why_this_matters` — the line the employee actually reads.
         # Without it the specific copy is written and then silently thrown away: the

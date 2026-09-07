@@ -156,6 +156,22 @@ def test_an_unofficial_publisher_is_rejected_not_downgraded(tmp_path):
     assert "not an official or public-agency publisher" in rejections[0]
 
 
+def test_truncated_evidence_quote_is_rejected_not_stored(tmp_path):
+    path = _write(tmp_path, [_record(evidence_quote="a" * 255)])
+    rows, rejections = read_jsonl(path, batch_id="b1")
+    assert rows == []
+    assert len(rejections) == 1
+    assert "column limit" in rejections[0]
+
+
+def test_utf8_evidence_quote_is_kept_verbatim(tmp_path):
+    quote = "La carte de séjour est délivrée gratuitement."
+    path = _write(tmp_path, [_record(evidence_quote=quote)])
+    rows, rejections = read_jsonl(path, batch_id="b1")
+    assert rejections == []
+    assert rows[0].evidence_quote == quote
+
+
 def test_a_public_agency_is_kept_but_never_auto_accepted(tmp_path):
     """Campus France is a French public establishment — worth keeping, not statutory.
 

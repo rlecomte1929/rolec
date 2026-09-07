@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CountryPicker } from '../../components/location';
 import { Alert, Badge, Button, Card, Input } from '../../components/antigravity';
 import { CountryMultiSelect } from '../policy-config/CountryMultiSelect';
@@ -15,6 +15,12 @@ import {
 } from '../policy/employeePolicyAssistantModel';
 import { submitAiFeedback, type FeedbackVerdict } from '../../api/aiFeedback';
 import { routeAssistantDomain, type AssistantDomain } from '../../api/assistantRoute';
+import {
+  getDestinationImmigrationAuthority,
+  type DestinationImmigrationAuthority,
+} from '../../api/immigrationAuthority';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 /**
  * Unified relocation assistant (Slice 5 — policy bridge). One question box that
@@ -44,6 +50,50 @@ function confidenceBadge(confidence?: string | null): ConfidenceBadge {
     default: return { label: 'Confidence: unknown', variant: 'neutral' };
   }
 }
+
+// AIQ-1869: the grounded immigration answer is markdown (headings, **bold**,
+// lists, GFM tables). Render it as such instead of dumping the raw source. Styled
+// explicitly with antigravity tones because the app does not ship
+// @tailwindcss/typography, so `prose` classes would be inert here. react-markdown
+// builds React elements (no dangerouslySetInnerHTML), so answer text cannot inject
+// markup.
+const answerMarkdownComponents: Components = {
+  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+  h1: ({ children }) => <h3 className="mb-1 mt-3 text-base font-semibold text-[#0b2b43]">{children}</h3>,
+  h2: ({ children }) => <h4 className="mb-1 mt-3 text-sm font-semibold text-[#0b2b43]">{children}</h4>,
+  h3: ({ children }) => <h5 className="mb-1 mt-2 text-sm font-semibold text-[#0b2b43]">{children}</h5>,
+  h4: ({ children }) => <h6 className="mb-1 mt-2 text-sm font-semibold text-[#0b2b43]">{children}</h6>,
+  ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-0.5">{children}</ul>,
+  ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-0.5">{children}</ol>,
+  li: ({ children }) => <li>{children}</li>,
+  strong: ({ children }) => <strong className="font-semibold text-slate-900">{children}</strong>,
+  em: ({ children }) => <em className="italic">{children}</em>,
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noreferrer" className="text-[#1f8e8b] underline">
+      {children}
+    </a>
+  ),
+  code: ({ children }) => (
+    <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">{children}</code>
+  ),
+  blockquote: ({ children }) => (
+    <blockquote className="my-2 border-l-2 border-gray-200 pl-3 text-slate-600">{children}</blockquote>
+  ),
+  hr: () => <hr className="my-3 border-gray-100" />,
+  table: ({ children }) => (
+    <div className="my-2 overflow-x-auto">
+      <table className="w-full border-collapse text-xs">{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th className="border border-gray-200 bg-gray-50 px-2 py-1 text-left font-semibold text-slate-700">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="border border-gray-200 px-2 py-1 align-top text-slate-800">{children}</td>
+  ),
+};
 
 /**
  * Corridor derived from the employee's own case (relocation-assistant MVP). When
@@ -91,6 +141,28 @@ export function ImmigrationAnswerPanel(
 
   const [verdict, setVerdict] = useState<FeedbackVerdict | null>(null);
   const [verdictError, setVerdictError] = useState(false);
+  // IDR-260820-28EC: standing link to the destination immigration authority.
+  // Null until loaded, or when nothing is curated — never invent a URL.
+  const [authority, setAuthority] = useState<DestinationImmigrationAuthority | null>(null);
+
+  useEffect(() => {
+    const dest = to.trim();
+    if (!dest) {
+      setAuthority(null);
+      return;
+    }
+    let active = true;
+    getDestinationImmigrationAuthority(dest)
+      .then((row) => {
+        if (active) setAuthority(row);
+      })
+      .catch(() => {
+        if (active) setAuthority(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [to]);
 
   const canAsk = !!query.trim();
   // AIQ-1476: permit type dropped from the gate (the assistant determines it). Nationality
@@ -282,11 +354,23 @@ export function ImmigrationAnswerPanel(
               ))}
             </div>
           )}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button variant="primary" onClick={() => void ask()} disabled={!canAsk || loading}>
               {loading ? 'Asking…' : 'Ask'}
             </Button>
             <span className="text-xs text-gray-500">Grounded + cited · always confirm with the cited source</span>
+            {/* IDR-260820-28EC — standing authority link, visible before any question. */}
+            {authority && (
+              <a
+                className="text-xs text-accent-700 underline"
+                href={authority.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="destination-authority-link"
+              >
+                Official immigration site: {authority.name}
+              </a>
+            )}
           </div>
         </div>
       </Card>
@@ -313,7 +397,23 @@ export function ImmigrationAnswerPanel(
             {isRefusal ? (
               <Alert variant="warning">
                 We don&apos;t have enough official, corridor-specific source material to answer
-                that confidently yet. Please confirm with the relevant authority.
+                that confidently yet. Please confirm with the relevant authority
+                {authority ? (
+                  <>
+                    {' '}
+                    (
+                    <a
+                      className="text-accent-700 underline"
+                      href={authority.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {authority.name}
+                    </a>
+                    )
+                  </>
+                ) : null}
+                .
               </Alert>
             ) : (
               <>
@@ -322,7 +422,11 @@ export function ImmigrationAnswerPanel(
                   <Badge variant={conf.variant}>{conf.label}</Badge>
                   {answer.all_stale_warning && <Badge variant="warning">Sources may be outdated</Badge>}
                 </div>
-                <div className="whitespace-pre-wrap text-sm text-slate-800">{answer.answer_text}</div>
+                <div className="text-sm text-slate-800">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={answerMarkdownComponents}>
+                    {answer.answer_text}
+                  </ReactMarkdown>
+                </div>
                 {answer.cited_sources?.length > 0 && (
                   <div className="border-t border-gray-100 pt-3">
                     <p className="mb-1 text-xs font-semibold text-slate-500">Sources</p>
