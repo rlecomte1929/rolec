@@ -14,11 +14,15 @@ fee under miscellany where no reviewer would ever find it again.
 from __future__ import annotations
 
 import json
-import re
-import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Sequence, Tuple
+
+from backend.app.services.evidence_quote_validator import (
+    CorruptedEvidenceError,
+    normalize_legal_text,
+    validate_ingest_text,
+)
 
 #: `public.knowledge_packs` / `requirement_entities` share this CHECK list. 'UK' is NOT in it.
 DESTINATION_COUNTRIES = {
@@ -77,21 +81,10 @@ class FactRow:
 def normalise_text(value: str) -> str:
     """Fold a string to the form both sides of the evidence check are compared in.
 
-    Publishers serve the same sentence with non-breaking spaces, typographic quotes and soft
-    hyphens; a vetted quote is typed with ASCII ones. Comparing raw would fail honest matches
-    and push real evidence onto the manual worklist, so both sides are folded identically.
-
-    This is a presentation fold, not a content edit: it never inserts, removes or reorders
-    words, so it cannot make a quote match a document that does not contain it.
+    Delegates to ``normalize_legal_text`` so ingest rejection and evidence matching
+    use one fold. Never compare legal quotes with raw ``==``.
     """
-    text = unicodedata.normalize("NFKC", value)
-    text = (
-        text.replace("‘", "'").replace("’", "'")
-        .replace("“", '"').replace("”", '"')
-        .replace("–", "-").replace("—", "-")
-        .replace("­", "")
-    )
-    return re.sub(r"\s+", " ", text).strip()
+    return normalize_legal_text(value)
 
 
 class RowError(ValueError):
@@ -153,7 +146,17 @@ def _clean_row(raw: Dict[str, Any], index: int) -> Tuple[FactRow | None, str | N
     if not isinstance(applies_to, dict):
         return None, f"{label}: applies_to must be an object, got {type(applies_to).__name__}"
 
-    quote = (raw.get("evidence_quote") or "").strip() or None
+    try:
+        fact_text = validate_ingest_text(fact_text, field="fact_text")
+        if not fact_text:
+            return None, f"{label}: fact_text is empty"
+        quote = validate_ingest_text(
+            raw.get("evidence_quote"),
+            field="evidence_quote",
+            checksum=raw.get("quote_sha256"),
+        )
+    except CorruptedEvidenceError as exc:
+        return None, f"{label}: {exc}"
 
     return FactRow(
         destination_country=country,
