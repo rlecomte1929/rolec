@@ -14,13 +14,33 @@ re-scope EU-registration-certificate rows to `["EU_EEA"]` before the scope guard
 
 ---
 
+## ✅ Cleared 2026-09-08 (quick wins)
+
+Five holds re-sourced and landed **pending** (append-only; approved count unchanged at 325,
+expert_verified 0, scope guard green). Each has a `<iso>-resource-2026-09-08/` batch doc.
+
+| Country | Fact | Verification |
+|---|---|---|
+| **Colombia** | Cédula de Extranjería registration deadline | CONFIRMED (0.93) — Decreto 1067/2015 on `cancilleria.gov.co` |
+| **Panama** | 5-year Panamanian-substitution duty (art. 18) | applier-verified via `pdfplumber` (cetippat server flaky) |
+| **Hong Kong** | HKID within 30 days of arrival | browser-verified — Cap. 177A reg. 3(1)(a), exact |
+| **Austria** | EU-registration late fine (€50–250) | CONFIRMED (1.0) — `wko.at` (added to `_SEMI_OFFICIAL_HOSTS`) |
+| **Japan** | Dependent visa 28-hrs/week cap | CONFIRMED (1.0) — ISA `moj.go.jp/isa` |
+
+**Still held — Indonesia (BPJS Kesehatan).** Claim is true, but the researcher's supplied quote
+is **inaccurate** (Perpres 82/2018 Pasal 1 reads *"…dan telah membayar iuran"*, not *"yang telah
+membayar Iuran Jaminan Kesehatan"*), and no reproducibly-fetchable official page renders the clean
+verbatim right now (BPK = garbled OCR; `peraturan.go.id` down). See `id-resource-2026-09-08/README.md`.
+
+---
+
 ## Tier 1 — structured holds (already in `held.ndjson`, one fact each)
 
 | Country | Fact | Pillar | Blocker | Re-source action |
 |---|---|---|---|---|
-| **Colombia** | Cédula de Extranjería — 15-day deadline | IDENTITY | `migracioncolombia.gov.co` cédula page returns empty/redirect (curl **and** browser) | Quote the 15-day rule from a loadable Migración page or the governing decree |
-| **Indonesia** | BPJS Kesehatan — foreigner ≥6 months must enrol | HEALTHCARE | Perpres 82/2018 on `jdih.kemenkeu.go.id` is unreachable + a ClearScan-OCR scan (mojibake) | OCR the scan, or find a clean copy of Perpres 82/2018 art. 4 |
-| **Panama** | 5-year Panamanian-substitution duty (Labour Code art. 18) | EMPLOYMENT | Quote not verbatim in the `cetippat.gob.pa` Labour Code PDF (`obligación de sustituir al trabajador` present, but not the full quoted phrasing) | Pull art. 18's exact wording from the PDF |
+| ✅ **Colombia** | Cédula de Extranjería registration deadline | IDENTITY | ~~`migracioncolombia.gov.co` cédula page empty/redirect~~ | **CLEARED** via Decreto 1067/2015 on `cancilleria.gov.co` |
+| ⏳ **Indonesia** | BPJS Kesehatan — foreigner ≥6 months must enrol | HEALTHCARE | Perpres 82/2018 on BPK is a garbled ClearScan-OCR scan; `peraturan.go.id` down. **Researcher's quote also inaccurate** (real: *"…dan telah membayar iuran"*) | STILL HELD — re-source clean verbatim; claim is sound |
+| ✅ **Panama** | 5-year Panamanian-substitution duty (Labour Code art. 18) | EMPLOYMENT | ~~quote not verbatim in the PDF~~ | **CLEARED** — applier-verified fragment via `pdfplumber` |
 
 ## Tier 2 — cluster / single holds blocked by a portal barrier
 
@@ -53,12 +73,13 @@ Grouped by blocker, because the blocker dictates the fix.
   SPAs — readable in a browser, not referee-reproducible by curl. → browser-ground via network capture.
 - **Portugal — 1–2 facts** (art. 61-A HQ-work-visa salary threshold — MFA page OCR-garbled; EU Blue
   Card 30-day intra-EU mobility deadline — not in static text). → re-source a clean page.
-- **Austria — 1 fact** (EU-registration late fine, €250). Not on the read `oesterreich.gv.at` page. → re-source.
+- ✅ **Austria — 1 fact** (EU-registration late fine, €50–250). ~~Not on the read `oesterreich.gv.at` page.~~ **CLEARED** — CONFIRMED (1.0) on `wko.at` (added to `_SEMI_OFFICIAL_HOSTS`).
 
 ### Quote-not-on-page / not verbatim (find the exact page)
-- **Hong Kong — 1 fact** (HKID "within 30 days of arrival" for adult new arrivals — lives in the
-  Registration of Persons Regs, Cap. 177A, not the fetched GovHK page). → re-source Cap. 177A.
-- **Japan — 1 fact** (Dependent visa 28-hours/week part-time cap — not on the cited page). → re-source.
+- ✅ **Hong Kong — 1 fact** (HKID "within 30 days of arrival"). **CLEARED** — browser-verified
+  verbatim at Cap. 177A reg. 3(1)(a) on `elegislation.gov.hk`.
+- ✅ **Japan — 1 fact** (Dependent visa 28-hrs/week cap). **CLEARED** — CONFIRMED (1.0) on the ISA
+  page `moj.go.jp/isa`.
 
 ## Tier 3 — earlier corridors (pre-wave-9, larger reject piles)
 - **FR→SG — 13 facts** in the batch's `rejects.ndjson` (quote-not-on-page). → re-source or drop.
