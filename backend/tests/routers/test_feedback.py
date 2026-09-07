@@ -144,6 +144,45 @@ class FeedbackEndpointTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             fb.FeedbackBody(category="idea", message="keep me", page_url="/", screenshot_data=big)
 
+    def test_submit_captures_posthog_keyed_by_report_id_not_message(self):
+        ph = mock.Mock()
+        with mock.patch("backend.app.posthog_client.get_posthog_client", return_value=ph):
+            res = fb.submit_feedback(
+                fb.FeedbackBody(
+                    category="bug",
+                    message="secret passport details",
+                    page_url="/admin/countries",
+                    report_id="BUG-x",
+                ),
+                _req(),
+                EMP,
+            )
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["report_id"], "BUG-x")
+        ph.capture.assert_called_once()
+        kwargs = ph.capture.call_args.kwargs
+        self.assertEqual(kwargs["event"], "feedback_submitted")
+        props = kwargs["properties"]
+        self.assertEqual(props["report_id"], "BUG-x")
+        self.assertEqual(props["category"], "bug")
+        self.assertEqual(props["source"], "api")
+        self.assertIn("/admin/countries", props["route"])
+        self.assertNotIn("message", props)
+        self.assertNotIn("secret passport", json.dumps(props))
+
+    def test_submit_ok_when_posthog_client_raises(self):
+        with mock.patch(
+            "backend.app.posthog_client.get_posthog_client",
+            side_effect=RuntimeError("posthog down"),
+        ):
+            res = fb.submit_feedback(
+                fb.FeedbackBody(category="bug", message="hi", page_url="/x"),
+                _req(),
+                EMP,
+            )
+        self.assertTrue(res["ok"])
+        self.assertIn("report_id", res)
+
 
 class _FakeConn:
     def __init__(self, row):

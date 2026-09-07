@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CountryPicker } from '../../components/location';
 import { Alert, Badge, Button, Card, Input } from '../../components/antigravity';
 import { CountryMultiSelect } from '../policy-config/CountryMultiSelect';
@@ -15,6 +15,10 @@ import {
 } from '../policy/employeePolicyAssistantModel';
 import { submitAiFeedback, type FeedbackVerdict } from '../../api/aiFeedback';
 import { routeAssistantDomain, type AssistantDomain } from '../../api/assistantRoute';
+import {
+  getDestinationImmigrationAuthority,
+  type DestinationImmigrationAuthority,
+} from '../../api/immigrationAuthority';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -137,6 +141,28 @@ export function ImmigrationAnswerPanel(
 
   const [verdict, setVerdict] = useState<FeedbackVerdict | null>(null);
   const [verdictError, setVerdictError] = useState(false);
+  // IDR-260820-28EC: standing link to the destination immigration authority.
+  // Null until loaded, or when nothing is curated — never invent a URL.
+  const [authority, setAuthority] = useState<DestinationImmigrationAuthority | null>(null);
+
+  useEffect(() => {
+    const dest = to.trim();
+    if (!dest) {
+      setAuthority(null);
+      return;
+    }
+    let active = true;
+    getDestinationImmigrationAuthority(dest)
+      .then((row) => {
+        if (active) setAuthority(row);
+      })
+      .catch(() => {
+        if (active) setAuthority(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [to]);
 
   const canAsk = !!query.trim();
   // AIQ-1476: permit type dropped from the gate (the assistant determines it). Nationality
@@ -328,11 +354,23 @@ export function ImmigrationAnswerPanel(
               ))}
             </div>
           )}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button variant="primary" onClick={() => void ask()} disabled={!canAsk || loading}>
               {loading ? 'Asking…' : 'Ask'}
             </Button>
             <span className="text-xs text-gray-500">Grounded + cited · always confirm with the cited source</span>
+            {/* IDR-260820-28EC — standing authority link, visible before any question. */}
+            {authority && (
+              <a
+                className="text-xs text-accent-700 underline"
+                href={authority.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="destination-authority-link"
+              >
+                Official immigration site: {authority.name}
+              </a>
+            )}
           </div>
         </div>
       </Card>
@@ -359,7 +397,23 @@ export function ImmigrationAnswerPanel(
             {isRefusal ? (
               <Alert variant="warning">
                 We don&apos;t have enough official, corridor-specific source material to answer
-                that confidently yet. Please confirm with the relevant authority.
+                that confidently yet. Please confirm with the relevant authority
+                {authority ? (
+                  <>
+                    {' '}
+                    (
+                    <a
+                      className="text-accent-700 underline"
+                      href={authority.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {authority.name}
+                    </a>
+                    )
+                  </>
+                ) : null}
+                .
               </Alert>
             ) : (
               <>

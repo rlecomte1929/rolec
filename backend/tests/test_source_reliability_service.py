@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import unittest
+from datetime import datetime, timezone
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _REPO_ROOT not in sys.path:
@@ -193,6 +194,10 @@ class ReliabilityFactorBlendTests(unittest.TestCase):
 
 
 class RetrieverRankingTests(unittest.TestCase):
+    # Pin ranking "now" to the fixture fetched_at so freshness stays 1.0.
+    # Wall-clock now after 90 days applies a 0.85 decay (CI 2026-09-06: 0.68 vs 0.8).
+    _NOW = datetime(2026, 6, 6, tzinfo=timezone.utc)
+
     def setUp(self):
         self._orig = cfg.RELIABILITY_WEIGHT
         self.addCleanup(lambda: setattr(cfg, "RELIABILITY_WEIGHT", self._orig))
@@ -206,7 +211,8 @@ class RetrieverRankingTests(unittest.TestCase):
         cfg.RELIABILITY_WEIGHT = 0.0
         low = self._chunk("low", 0.2)
         high = self._chunk("high", 0.9)
-        ranked = _apply_quality_gates([low, high], min_similarity=0.0, top_k=2)
+        ranked = _apply_quality_gates(
+            [low, high], min_similarity=0.0, top_k=2, now=self._NOW)
         # Equal raw/tier/freshness, reliability ignored -> equal adjusted scores.
         self.assertAlmostEqual(ranked[0]["adjusted_score"], ranked[1]["adjusted_score"])
         self.assertAlmostEqual(ranked[0]["adjusted_score"], 0.8)  # 0.8 * 1 * 1 * 1
@@ -215,14 +221,16 @@ class RetrieverRankingTests(unittest.TestCase):
         cfg.RELIABILITY_WEIGHT = 1.0
         low = self._chunk("low", 0.2)
         high = self._chunk("high", 0.9)
-        ranked = _apply_quality_gates([low, high], min_similarity=0.0, top_k=2)
+        ranked = _apply_quality_gates(
+            [low, high], min_similarity=0.0, top_k=2, now=self._NOW)
         self.assertEqual(ranked[0]["id"], "high")
         self.assertGreater(ranked[0]["adjusted_score"], ranked[1]["adjusted_score"])
 
     def test_full_weight_missing_reliability_uses_neutral(self):
         cfg.RELIABILITY_WEIGHT = 1.0
         c = {"id": "c", "score": 0.8, "trust_tier": 1, "fetched_at": "2026-06-06T00:00:00+00:00"}
-        ranked = _apply_quality_gates([c], min_similarity=0.0, top_k=1)
+        ranked = _apply_quality_gates(
+            [c], min_similarity=0.0, top_k=1, now=self._NOW)
         # 0.8 raw * 1.0 tier * 1.0 freshness * 0.5 neutral = 0.4
         self.assertAlmostEqual(ranked[0]["adjusted_score"], 0.4)
 
