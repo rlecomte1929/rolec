@@ -1,0 +1,89 @@
+# Held-facts re-source worklist (punch-list)
+
+Compiled 2026-09-08 from every batch's `held.ndjson` and README "could-not-verify" notes across the
+rank-3→70 coverage campaign. These are facts with **real, wanted content that was blocked purely by a
+fetch/verification barrier** — not landed, and re-sourceable. Deliberate scope exclusions
+(nationality-neutral facts that also bind an EU citizen; figures folded into `non_obvious_note`) are
+**not** on this list — those were correct calls, listed at the bottom for the record.
+
+**How to clear an item:** re-source the quote from a reproducibly-fetchable official page → add it to
+that batch's `facts.ndjson` (or a small `<iso>-resource-YYYY-MM-DD` batch) → `confirm_quotes.py`
+(browser-verify if WAF/SPA) → `verify_ledger.py --no-fetch --apply` → `import_otto_facts.py
+--batch-id` → `promote(country=<ISO>)` → `check_nationality_scope.py --db`. Everything lands **pending**;
+re-scope EU-registration-certificate rows to `["EU_EEA"]` before the scope guard (EEA corridors).
+
+---
+
+## Tier 1 — structured holds (already in `held.ndjson`, one fact each)
+
+| Country | Fact | Pillar | Blocker | Re-source action |
+|---|---|---|---|---|
+| **Colombia** | Cédula de Extranjería — 15-day deadline | IDENTITY | `migracioncolombia.gov.co` cédula page returns empty/redirect (curl **and** browser) | Quote the 15-day rule from a loadable Migración page or the governing decree |
+| **Indonesia** | BPJS Kesehatan — foreigner ≥6 months must enrol | HEALTHCARE | Perpres 82/2018 on `jdih.kemenkeu.go.id` is unreachable + a ClearScan-OCR scan (mojibake) | OCR the scan, or find a clean copy of Perpres 82/2018 art. 4 |
+| **Panama** | 5-year Panamanian-substitution duty (Labour Code art. 18) | EMPLOYMENT | Quote not verbatim in the `cetippat.gob.pa` Labour Code PDF (`obligación de sustituir al trabajador` present, but not the full quoted phrasing) | Pull art. 18's exact wording from the PDF |
+
+## Tier 2 — cluster / single holds blocked by a portal barrier
+
+Grouped by blocker, because the blocker dictates the fix.
+
+### Bot-walled / CAPTCHA / geo-gated (need a WAF-passing browser or a reachable mirror)
+- **Denmark — ~8 facts (whole batch held).** `borger.dk` / `lifeindenmark.dk` CAPTCHA/bot-walled; no
+  accessible verbatim. *(be-at-dk batch — Belgium 6 + Austria 2 landed, Denmark held.)* → browser-ground
+  or an archived snapshot.
+- **Malta — ~4 facts.** `cfr.gov.mt` (HQP 15% flat-tax, tax residency, non-dom/remittance) +
+  `socialsecurity.gov.mt` (social-security registration) — Cloudflare hard-block to every fetcher incl.
+  browser here. → re-source from a reproducibly-fetchable official page.
+- **Kuwait — ~2 facts** (Civil ID standalone; end-of-service indemnity / Labour Law No. 6/2010).
+  `e.gov.kw` / `paci.gov.kw` / `manpower.gov.kw` are **geo-gated to Kuwaiti IPs** (403 / timeout). →
+  hardest of the set: needs a Kuwait-egress fetch or an official mirror.
+- **Saudi Arabia — 2 facts** (SCE engineer accreditation; CCHI health-insurance ↔ iqama link).
+  `saudieng.sa` / `cchi.gov.sa` unreachable. → re-source when reachable, or from `laws.boe.gov.sa`.
+- **Malaysia — ~2 facts** (EPF/SOCSO social security; MDEC tech-specific). `hasil.gov.my` portal
+  upgrade broke the paths (404); `esd.imi.gov.my` 403. → current LHDN / IMI pages.
+- **Brazil — 1 fact** (VITEM V "prior residence authorization" ordering). `gov.br/mre` consular pages
+  CAPTCHA-gated (currently folded into a note). → re-source the MRE page.
+- **Israel — 1 fact** (foreign-expert flat-tax rule). ITA Income-Tax-Ordinance PDF unreachable; the
+  expert-procedure page 404s. → re-source.
+- **India — 1 fact** (PAN mandatory, Income-Tax Act §139A). `incometaxindia.gov.in` 403 to direct
+  fetch. → re-source.
+
+### JS-SPA (curl gets a shell — capture the rendered text / network payload, SINALEVI-style)
+- **Estonia — several facts** (labour-market-test wording; residence-permit-card-as-domestic-ID;
+  family-doctor choice; driving-licence 12-month rule). `eesti.ee` / `work.eesti.ee` are Cloudflare JS
+  SPAs — readable in a browser, not referee-reproducible by curl. → browser-ground via network capture.
+- **Portugal — 1–2 facts** (art. 61-A HQ-work-visa salary threshold — MFA page OCR-garbled; EU Blue
+  Card 30-day intra-EU mobility deadline — not in static text). → re-source a clean page.
+- **Austria — 1 fact** (EU-registration late fine, €250). Not on the read `oesterreich.gv.at` page. → re-source.
+
+### Quote-not-on-page / not verbatim (find the exact page)
+- **Hong Kong — 1 fact** (HKID "within 30 days of arrival" for adult new arrivals — lives in the
+  Registration of Persons Regs, Cap. 177A, not the fetched GovHK page). → re-source Cap. 177A.
+- **Japan — 1 fact** (Dependent visa 28-hours/week part-time cap — not on the cited page). → re-source.
+
+## Tier 3 — earlier corridors (pre-wave-9, larger reject piles)
+- **FR→SG — 13 facts** in the batch's `rejects.ndjson` (quote-not-on-page). → re-source or drop.
+- **NO→FR — ~13** (12 quotes unconfirmed on their source + 1 proven false). → re-source the 12; the
+  false one should be dropped, not re-sourced.
+
+---
+
+## Separate track — reconciliation holds (NOT re-source; dedup + decide)
+These batches were withheld because the destination was **already covered**, so they'd risk duplicate
+rows — a dedup/merge decision, not a sourcing task (titles are the dedup key).
+- **Spain** — `es-facts-2026-08-31` held for reconciliation against the 25 existing pending SPAIN rows.
+- **Netherlands** — `nl-facts-2026-08-31` held against the 10 approved (serving) NETHERLANDS rows.
+
+## Not on this list (correct calls, no action)
+Facts the researchers **deliberately did not write** because they were sound exclusions, not holds:
+nationality-neutral rules that also bind an EU citizen (Luxembourg impatriate regime, Finland 183-day,
+Hungary TB/TAJ, South Africa UIF/SARS, Chile AFP/isapre gaps, …); and figures not worth asserting
+without an on-page quote (folded into `non_obvious_note`). Re-sourcing these would add duplicate or
+out-of-scope rows — leave them.
+
+---
+
+### Roll-up
+~**11 countries** with genuine re-sourceable holds (Tier 1–2) ≈ **25–30 facts**, plus the FR→SG /
+NO→FR reject piles (~26). Highest-value quick wins: the 3 Tier-1 structured holds and Austria/Japan/
+Hong Kong (single clean facts). Hardest: Kuwait (geo-gated) and Malta (hard Cloudflare). Denmark (8) is
+the biggest single-country recovery.
