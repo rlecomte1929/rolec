@@ -46,5 +46,7 @@ truth and wins on any detail.
 - Never bare `git stash` / `git stash pop` (shared stack). Use a WIP commit instead.
 - Before flagging any task done: `cd frontend && npx tsc --noEmit` (strict), and `npm run build`
   must pass (Render auto-deploys `main`).
+- Backend: run the dev server from repo root (`uvicorn backend.main:app --reload --port 8000`);
+  tests are `cd backend && pytest`, with `RELOPASS_DISABLE_RATE_LIMITS=1` to bypass slowapi.
 - Frontend uses the in-house `frontend/src/components/antigravity/` design system and
   `lucide-react` icons; read `DESIGN.md` before any UI change (navy + teal, no purple).
