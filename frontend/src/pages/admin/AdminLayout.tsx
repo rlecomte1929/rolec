@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useMatch, useNavigate } from 'react-router-dom';
+import { useLocation, useMatch, useNavigate } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import { Input } from '../../components/antigravity/Input';
 import { Button } from '../../components/antigravity/Button';
 import { PageHeader } from '../../components/antigravity/PageHeader';
@@ -30,6 +31,21 @@ function deriveInitials(name: string): string {
 
 export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, headerRight }) => {
   const userName = getAuthItem('relopass_name') ?? 'Romain';
+  const location = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileNavOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileNavOpen]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -42,6 +58,20 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
         Skip to main content
       </a>
 
+      {mobileNavOpen && (
+        // eslint-disable-next-line local/no-clickable-div -- presentational mouse-dismiss overlay
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          aria-hidden="true"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      <div
+        className={`fixed inset-y-0 left-0 z-50 flex transition-transform duration-200 ease-out md:static md:z-auto md:translate-x-0 md:transition-none ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
       {/* eslint-disable jsx-a11y/aria-role */}
       {/* `role` is a PlatformShellSidebar component prop (SidebarRole enum), not an ARIA role */}
       <PlatformShellSidebar
@@ -54,6 +84,7 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
         }}
       />
       {/* eslint-enable jsx-a11y/aria-role */}
+      </div>
 
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -61,44 +92,37 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
         {/* Top bar */}
         <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-1.5 text-sm text-slate-500">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open navigation menu"
+              aria-expanded={mobileNavOpen}
+              className="md:hidden grid h-11 w-11 shrink-0 place-items-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30"
+            >
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            </button>
             <span className="text-slate-500">ReloPass admin</span>
             {title && (
               <>
-                <span className="text-slate-500">/</span>
+                <span className="text-slate-300">/</span>
                 <span className="text-slate-700 font-medium">{title}</span>
               </>
             )}
           </div>
           <div className="flex items-center gap-3">
-            {/* SHELL-1: removed the non-functional Download button + the hard-coded "3"
-               badge (fake UI). */}
-            <Button unstyled aria-label="Notifications" className="text-slate-500 hover:text-slate-600 transition-colors">
-              <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-            </Button>
-            <Button unstyled className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0b2b43] text-white text-xs font-medium hover:bg-[#0d3456] transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Ask ReloPass AI
-            </Button>
-            {/* AIQ-1442: top-right account menu with Sign out — mirrors the employee/HR
-               AppShell logout so admins have a consistent top-right exit path here, not
-               only in the sidebar footer. */}
+            {/* SHELL-1 + founder cockpit: removed non-functional Notifications,
+               Download, and Ask ReloPass AI — they had no handlers. */}
             <AdminAccountMenu name={userName} initials={deriveInitials(userName)} />
           </div>
         </header>
 
         {/* Page content — SHELL-1: capped + centered (wider than Employee/HR's 7xl,
-           per the dense admin tables) instead of full-bleed, and the page header now
-           uses the shared <PageHeader> (keeps the Admin "Internal Superuser Console"
-           identity eyebrow). */}
+           per the dense admin tables) instead of full-bleed. */}
         <main id="main-content" className="flex-1 overflow-y-auto">
           <div className="px-4 py-6 md:px-8 md:py-7 max-w-[1600px] mx-auto">
             {(title || headerRight) && (
               <PageHeader
-                eyebrow="ReloPass · Internal Superuser Console"
+                eyebrow="ReloPass · Founder console"
                 title={title ?? ''}
                 subtitle={subtitle}
                 actions={headerRight}
@@ -111,7 +135,7 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
 
       {/* Floating feedback widget — same one employee/HR get via AppShell, so admins can
           report bugs / ideas from inside the console. Submits to the same feedback stream
-          the "Feedback & Work" tab reads. */}
+          the Feedback tab reads. */}
       <FeedbackWidget userId={getAuthItem('relopass_user_id')} />
     </div>
   );
@@ -167,7 +191,7 @@ const AdminAccountMenu: React.FC<{ name: string; initials: string }> = ({ name, 
         <div className="w-7 h-7 rounded-full bg-[#0b2b43] flex items-center justify-center text-[11px] font-bold text-white shrink-0">
           {initials}
         </div>
-        <svg className={`w-3 h-3 text-slate-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={`w-3 h-3 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </Button>
@@ -176,7 +200,7 @@ const AdminAccountMenu: React.FC<{ name: string; initials: string }> = ({ name, 
         <div role="menu" className="absolute right-0 top-full mt-1 z-30 w-52 rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5">
           <div className="border-b border-slate-100 px-3 py-2">
             <p className="text-sm font-medium text-slate-800 truncate">{name}</p>
-            <p className="text-[11px] text-slate-500">Admin · superuser</p>
+            <p className="text-[11px] text-slate-400">Admin · superuser</p>
           </div>
           <Button unstyled
             type="button"
@@ -185,7 +209,7 @@ const AdminAccountMenu: React.FC<{ name: string; initials: string }> = ({ name, 
             disabled={signingOut}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
           >
-            <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             {signingOut ? 'Signing out…' : 'Sign out'}
@@ -282,7 +306,7 @@ const CompanySwitcher: React.FC = () => {
           {initials}
         </div>
         <span className="text-sm font-medium text-slate-800 flex-1 truncate">{displayName}</span>
-        <svg className={`w-3 h-3 text-slate-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={`w-3 h-3 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </Button>
@@ -303,7 +327,7 @@ const CompanySwitcher: React.FC = () => {
             {/* eslint-enable jsx-a11y/no-autofocus */}
           </div>
           {filtered.length === 0 ? (
-            <div className="px-3 py-3 text-xs text-slate-500">No tenants match.</div>
+            <div className="px-3 py-3 text-xs text-slate-400">No tenants match.</div>
           ) : (
             filtered.map((c) => {
               const isSelected = c.id === selectedCompany?.id;
@@ -319,7 +343,7 @@ const CompanySwitcher: React.FC = () => {
                   </div>
                   <span className="flex-1 truncate font-medium text-slate-800">{c.name}</span>
                   {c.country && (
-                    <span className="text-[10px] text-slate-500">{c.country}</span>
+                    <span className="text-[10px] text-slate-400">{c.country}</span>
                   )}
                   {isSelected && (
                     <span className="text-accent-600 text-[11px]" aria-label="selected">✓</span>
