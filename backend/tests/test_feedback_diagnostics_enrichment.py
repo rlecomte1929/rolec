@@ -22,3 +22,26 @@ def test_format_diagnostics_empty_safe():
 def test_format_diagnostics_parses_json_string():
     out = format_diagnostics('{"recentErrors":[{"message":"boom","fingerprint":"f1"}]}')
     assert "boom" in out and "f1" in out
+
+
+def test_format_diagnostics_includes_posthog_replay_and_person():
+    from backend.app.services.feedback_task_engineer import format_diagnostics
+
+    out = format_diagnostics(
+        {
+            "posthog_id": "user-abc",
+            "posthog_session_id": "sess-xyz",
+            "posthog_replay_url": "https://eu.posthog.com/replay/sess-xyz",
+            "route": "/admin/countries",
+        }
+    )
+    assert "https://eu.posthog.com/replay/sess-xyz" in out
+    assert "user-abc" in out
+    assert "sess-xyz" in out
+    assert "LEAD" in out or "lead" in out.lower()
+
+
+def test_format_diagnostics_posthog_absent_is_still_empty_safe():
+    from backend.app.services.feedback_task_engineer import format_diagnostics
+
+    assert "posthog" not in format_diagnostics({"route": "/x"}).lower()

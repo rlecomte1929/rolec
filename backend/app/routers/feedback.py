@@ -202,7 +202,8 @@ def submit_feedback(
 
     # ── Best-effort: seed a feedback_status ticket for this submission ────────
     # Wrapped in try/except so that any failure (table absent, constraint, etc.)
-    # never propagates to the caller.  This is a secondary concern.
+    # never fails the reporter. Surfaces ticket_seeded=False so admin can see the gap.
+    ticket_seeded = False
     try:
         labels = classify_best(message, category)
         now = datetime.utcnow().isoformat()
@@ -222,13 +223,34 @@ def submit_feedback(
                     "updated_at": now,
                 },
             )
-    except Exception:  # noqa: BLE001
-        log.warning(
-            "feedback_status pre-fill failed (best-effort, suppressed) report_id=%s",
+        ticket_seeded = True
+    except Exception as exc:  # noqa: BLE001
+        log.error(
+            "feedback_status seed failed report_id=%s type=%s",
             report_id,
+            type(exc).__name__,
+            exc_info=True,
         )
 
-    resp: Dict[str, Any] = {"ok": True, "report_id": report_id}
+    try:
+        from ..posthog_client import get_posthog_client
+
+        ph = get_posthog_client()
+        if ph is not None:
+            ph.capture(
+                distinct_id=str(reporter_id or report_id),
+                event="feedback_submitted",
+                properties={
+                    "report_id": report_id,
+                    "category": category,
+                    "route": (body.page_url or "")[:200],
+                    "source": "api",
+                },
+            )
+    except Exception:  # noqa: BLE001
+        log.warning("posthog feedback_submitted failed report_id=%s", report_id)
+
+    resp: Dict[str, Any] = {"ok": True, "report_id": report_id, "ticket_seeded": ticket_seeded}
     # [AIQ-1480] When the screenshot landed in Storage, tell the reporter how much image
     # storage is left (best-effort; omitted if it can't be computed).
     if screenshot_url:

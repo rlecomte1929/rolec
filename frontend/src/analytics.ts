@@ -131,6 +131,9 @@ export function ensureTestDriveReplay(): void {
 
 export function track(event: string, properties?: Record<string, unknown>): void {
   if (!enabled) return;
+  // Feedback join keys (never put message/screenshot here):
+  //   feedback_widget_opened { route }
+  //   feedback_submitted { report_id, category, route }
   posthog.capture(event, properties);
 }
 
