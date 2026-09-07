@@ -375,6 +375,7 @@ def _enriched_to_schema_task(
         why_this_matters=t.why_this_matters or None,
         estimated_effort=estimated_effort_for(t.task_code),
         instructions=list(t.instructions),
+        sources=list(t.sources),
         required_inputs=req_in,
         cta=RelocationPlanCta(type=cta_t, label=cta_label, target=None),
         auto_completion_source=_auto_completion_source(t),
