@@ -31,6 +31,7 @@ import {
   Circle,
   CircleDot,
   Diamond,
+  ExternalLink,
   TriangleAlert,
   X,
 } from 'lucide-react';
@@ -77,6 +78,15 @@ export interface RelocationTimelineProps {
 // ─── Visual state derivation ──────────────────────────────────────────────────
 
 type VisualStatus = 'done' | 'skipped' | 'in_progress' | 'blocked' | 'overdue' | 'pending';
+
+/** Accessible label for a source link — the hostname, never a bare URL (WCAG 2.1 AA). */
+function sourceLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
 
 function deriveVisualStatus(task: RelocationPlanPhaseTaskDTO): VisualStatus {
   const s = task.status;
@@ -449,6 +459,28 @@ function DetailPanelContent({ task, caseId, role, idPrefix, onSaved }: DetailPan
       <div className="px-4 py-4 space-y-4">
         {task.why_this_matters && (
           <p className="text-sm text-slate-600 leading-relaxed">{task.why_this_matters}</p>
+        )}
+
+        {task.sources && task.sources.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Sources</p>
+            <ul className="space-y-1">
+              {task.sources.map((url) => (
+                <li key={url}>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Source: ${sourceLabel(url)} (opens in a new tab)`}
+                    className="inline-flex items-center gap-1 text-sm text-[#1f8e8b] underline underline-offset-2 hover:text-[#0b2b43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43] rounded-sm"
+                  >
+                    {sourceLabel(url)}
+                    <ExternalLink className="size-3" aria-hidden />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {isHrOwned && role === 'employee' && (

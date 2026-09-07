@@ -225,6 +225,10 @@ class RelocationPlanPhaseTask(BaseModel):
         description='Representative effort label, e.g. "~10 min" (library-level approximation, not per-case).',
     )
     instructions: List[str] = Field(default_factory=list, description="Bullet steps for the task detail panel.")
+    sources: List[str] = Field(
+        default_factory=list,
+        description="Source URL(s) of the requirement whose copy this task displays; empty when none.",
+    )
     required_inputs: List[RelocationPlanRequiredInput] = Field(default_factory=list)
     cta: Optional[RelocationPlanCta] = None
     auto_completion_source: RelocationPlanAutoCompletionSource = Field(
