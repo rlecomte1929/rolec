@@ -1,0 +1,141 @@
+{
+  "batch": "my-facts-2026-08-31",
+  "counts": {
+    "CONFIRMED": 5,
+    "HOLD_WRONG_SRC": 7
+  },
+  "rows": [
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "esd_company_registration",
+      "host": "esd.imi.gov.my",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "esd_employer_eligibility",
+      "host": "esd.imi.gov.my",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "esd_registration_timeline",
+      "host": "esd.imi.gov.my",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "esd_company_activation",
+      "host": "esd.imi.gov.my",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "employment_pass_salary_policy",
+      "host": "esd.imi.gov.my",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "employment_pass_category_i",
+      "host": "esd.imi.gov.my",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (131224 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "replacement_plan",
+      "host": "esd.imi.gov.my",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (131224 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "dependant_pass",
+      "host": "esd.imi.gov.my",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (131224 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "tax_residency",
+      "host": "www.hasil.gov.my",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (5728591 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "nonresident_tax_rate",
+      "host": "www.hasil.gov.my",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (5728591 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "nonresident_no_relief",
+      "host": "www.hasil.gov.my",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (5728591 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "my-facts-2026-08-31",
+      "destination_country": "MY",
+      "entity_topic_key": "residency_records",
+      "host": "www.hasil.gov.my",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (5728591 chars) but 0% overlap — cited URL likely wrong"
+    }
+  ]
+}

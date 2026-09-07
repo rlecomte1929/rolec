@@ -1,0 +1,141 @@
+{
+  "batch": "co-facts-2026-09-01",
+  "counts": {
+    "CONFIRMED": 10,
+    "REVIEW_BROWSER": 2
+  },
+  "rows": [
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "work_visa",
+      "host": "www.cancilleria.gov.co",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.933,
+      "method": "utf-8",
+      "reason": "93% bigram"
+    },
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "visitor_visa",
+      "host": "www.cancilleria.gov.co",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.931,
+      "method": "utf-8",
+      "reason": "93% bigram"
+    },
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "foreigner_id",
+      "host": "www.migracioncolombia.gov.co",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "2789 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "visa_application",
+      "host": "www.cancilleria.gov.co",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.895,
+      "method": "utf-8",
+      "reason": "89% bigram"
+    },
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "tax_residency",
+      "host": "micrositios.dian.gov.co",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "income_tax",
+      "host": "www.funcionpublica.gov.co",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "tax_id",
+      "host": "www.funcionpublica.gov.co",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "health_insurance",
+      "host": "www.funcionpublica.gov.co",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "pension",
+      "host": "www.funcionpublica.gov.co",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "work_permit",
+      "host": "www.cancilleria.gov.co",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.947,
+      "method": "utf-8",
+      "reason": "95% bigram"
+    },
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "visa_validity",
+      "host": "www.cancilleria.gov.co",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.872,
+      "method": "utf-8",
+      "reason": "87% bigram"
+    },
+    {
+      "batch": "co-facts-2026-09-01",
+      "destination_country": "CO",
+      "entity_topic_key": "permanent_residence",
+      "host": "www.cancilleria.gov.co",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.818,
+      "method": "utf-8",
+      "reason": "82% overlap — likely present but markup-split; confirm in a browser"
+    }
+  ]
+}

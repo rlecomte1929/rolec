@@ -1,0 +1,12 @@
+corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry
+XX-LT,banks,AB SEB bankas,https://www.seb.lt,Bank of Lithuania - Financial market participants register,https://www.lb.lt/en/sfi-financial-market-participants,Bank of Lithuania,LB000258,
+XX-LT,banks,"""Swedbank"", AB",https://www.swedbank.lt,Bank of Lithuania - Financial market participants register,https://www.lb.lt/en/sfi-financial-market-participants,Bank of Lithuania,LB000298,
+XX-LT,banks,AB Artea bankas,https://www.artea.lt,Bank of Lithuania - Financial market participants register,https://www.lb.lt/en/sfi-financial-market-participants,Bank of Lithuania,LB000301,
+XX-LT,banks,UAB Urbo bankas,https://www.urbo.lt,Bank of Lithuania - Financial market participants register,https://www.lb.lt/en/sfi-financial-market-participants,Bank of Lithuania,LB000319,
+XX-LT,banks,Revolut Bank UAB,https://www.revolut.com,Bank of Lithuania - Financial market participants register,https://www.lb.lt/en/sfi-financial-market-participants,Bank of Lithuania,LB002119,
+XX-LT,banks,Luminor Bank AS Lietuvos skyrius,https://www.luminor.lt,Bank of Lithuania - Financial market participants register,https://www.lb.lt/en/sfi-financial-market-participants,Bank of Lithuania,304870069,
+XX-LT,banks,"Akciju sabiedriba ""Citadele banka"" Lietuvos filialas",https://www.citadele.lt,Bank of Lithuania - Financial market participants register,https://www.lb.lt/en/sfi-financial-market-participants,Bank of Lithuania,304940934,
+XX-LT,schools,American International School of Vilnius,https://www.aisv.lt,IB - Find an IB World School,https://www.ibo.org/programmes/find-an-ib-school/?SearchFields.Country=LT,International Baccalaureate Organization,049326,
+XX-LT,schools,Vilnius International School,https://vischool.lt,IB - Find an IB World School,https://www.ibo.org/programmes/find-an-ib-school/?SearchFields.Country=LT,International Baccalaureate Organization,004570,
+XX-LT,schools,Karalienes Mortos mokykla,https://www.karalienesmortosmokykla.lt,IB - Find an IB World School,https://www.ibo.org/programmes/find-an-ib-school/?SearchFields.Country=LT,International Baccalaureate Organization,061778,
+XX-LT,schools,Erudito Licejus Vilnius,https://erudito.lt/en/,IB - Find an IB World School,https://www.ibo.org/programmes/find-an-ib-school/?SearchFields.Country=LT,International Baccalaureate Organization,062045,
