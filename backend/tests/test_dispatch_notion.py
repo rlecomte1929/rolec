@@ -215,3 +215,60 @@ def test_create_surfaces_notion_not_configured(db_session, monkeypatch):
         json={"task": {"title": "t"}, "confirm": True},
     )
     assert resp.status_code == 503
+
+
+def test_force_dispatch_without_reason_is_422(db_session, monkeypatch):
+    client = _client(db_session)
+    calls = {"n": 0}
+
+    def _fake_create(*a, **k):
+        calls["n"] += 1
+        return "https://notion.so/should-not-create"
+    monkeypatch.setattr(admin_feedback.notion_work_queue, "create_work_queue_task", _fake_create)
+
+    resp = client.post(
+        "/api/admin/feedback/product/fb-1/dispatch/create",
+        json={
+            "task": {"title": "t"},
+            "confirm": True,
+            "force_dispatch": True,
+            "force_reason": "",
+        },
+    )
+    assert resp.status_code == 422, resp.text
+    assert calls["n"] == 0
+    row = db_session.execute(text(
+        "SELECT dispatch_ref FROM feedback_status WHERE stream='product' AND source_id='fb-1'"
+    )).fetchone()
+    assert row is None or row[0] != "PENDING"
+
+
+def test_force_dispatch_with_reason_appends_context(db_session, monkeypatch):
+    client = _client(db_session)
+    monkeypatch.setattr(
+        admin_feedback.notion_work_queue,
+        "create_work_queue_task",
+        lambda *a, **k: "https://notion.so/forced-page",
+    )
+    events: list = []
+
+    def _capture_event(_db, *, actor_id, event, entity=None, entity_id=None, detail=None):
+        events.append(detail)
+
+    monkeypatch.setattr(admin_feedback, "record_admin_event", _capture_event)
+    reason = "Reproduced on staging after the spec review."
+    resp = client.post(
+        "/api/admin/feedback/product/fb-1/dispatch/create",
+        json={
+            "task": {"title": "Force this", "priority": "P1", "status": "Ready for AI"},
+            "confirm": True,
+            "force_dispatch": True,
+            "force_reason": reason,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    ctx = db_session.execute(text(
+        "SELECT dispatch_context FROM feedback_status WHERE stream='product' AND source_id='fb-1'"
+    )).scalar()
+    assert ctx is not None and reason in ctx
+    assert any(isinstance(d, dict) and d.get("force_reason") == reason for d in events)

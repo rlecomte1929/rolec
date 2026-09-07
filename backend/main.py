@@ -240,6 +240,7 @@ from .app.routers import immigration_intake_interview as immigration_intake_inte
 from .app.routers import immigration_status as immigration_status_router
 from .app.routers import immigration_gdpr as immigration_gdpr_router
 from .app.routers import employee_immigration_snapshot as employee_immigration_snapshot_router
+from .app.routers import employee_immigration_authority as employee_immigration_authority_router
 from .app.routers import gdpr as gdpr_router
 from .app.routers import privacy_consents as privacy_consents_router
 from .app.routers import feedback as feedback_router
@@ -914,6 +915,7 @@ app.include_router(immigration_intake_interview_router.router)  # [AUDIT-B9-imm-
 app.include_router(immigration_status_router.router)  # [AUDIT-B9-imm-6] 4/5 — milestones, interview-status, immigration cases (8 handlers)
 app.include_router(immigration_gdpr_router.router)  # [AUDIT-B9-imm-6] 5/5 — GDPR subject-rights stubs (2 handlers)
 app.include_router(employee_immigration_snapshot_router.router)  # relocation-assistant Slice 2 — employee immigration snapshot
+app.include_router(employee_immigration_authority_router.router)  # IDR-260820-28EC — standing destination immigration-authority link
 app.include_router(gdpr_router.router)  # PRIV-001 / AIQ-469 — GDPR Art. 20 data-export
 app.include_router(privacy_consents_router.router)  # PRIV-005 / AIQ-473 — Art. 13 notice acknowledgement
 app.include_router(feedback_router.router)  # product "Share feedback" widget → public.feedback
