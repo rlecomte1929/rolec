@@ -349,7 +349,7 @@ const GroupHeading: React.FC<{
     type="button"
     onClick={onToggle}
     aria-expanded={!folded}
-    className={`group w-full flex items-center gap-1 px-3 mb-0.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30 ${
+    className={`group flex min-h-11 w-full items-center gap-1 rounded px-3 mb-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30 ${
       bordered ? 'mt-3 pt-2 border-t border-slate-100' : 'mt-1'
     }`}
   >
@@ -814,7 +814,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
               onClick={() => setCollapsed(true)}
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
-              className="ml-auto grid h-6 w-6 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+              className="ml-auto grid h-11 w-11 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             >
               <PanelLeftClose size={14} />
             </Button>
@@ -826,7 +826,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
             onClick={() => setCollapsed(false)}
             aria-label="Expand sidebar"
             title="Expand sidebar"
-            className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+            className="grid h-11 w-11 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
           >
             <PanelLeftOpen size={15} />
           </Button>
@@ -942,7 +942,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                   type="button"
                   onClick={() => setEditingLayout(true)}
                   title="Customise the sidebar"
-                  className="flex min-h-[24px] items-center gap-1 rounded px-2 py-1 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-600"
+                  className="flex min-h-11 items-center gap-1 rounded px-2 py-1 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-600"
                 >
                   <Pencil size={11} /> Edit layout
                 </Button>
@@ -1054,7 +1054,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                     aria-expanded={!childrenFolded}
                     title={childrenFolded ? 'Show sub-pages' : 'Hide sub-pages'}
                     onClick={() => toggleItemChildren(item.id)}
-                    className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                   >
                     {childrenFolded ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                   </Button>
@@ -1142,7 +1142,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                 aria-haspopup="menu"
                 aria-expanded={accountOpen}
                 onClick={() => setAccountOpen((o) => !o)}
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-600"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-600"
               >
                 {accountOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </Button>
