@@ -9,11 +9,11 @@ import { getAdminNotificationCounts, type AdminNotificationCounts } from '../api
 import { getUnreadMessageCount } from '../api/messageNotifications';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
-import { Button } from './antigravity/Button';
 import { swallow } from '../lib/errorTracking';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
-import { deriveJourneyMiniSteps } from '../features/employee-journey/caseStage';
+import { isIntakeComplete } from '../features/employee-journey/caseStage';
 import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
+import { Button } from './antigravity/Button';
 // Lazy-loaded: the editor pulls in @dnd-kit, which is only needed once the user opens
 // "Edit layout". Keeping it out of the eager app-shell chunk holds the bundle budget.
 const SidebarLayoutEditor = React.lazy(() =>
@@ -370,19 +370,23 @@ const GroupHeading: React.FC<{
 // border/shadow/10×10 dots) — this is a tiny inline ●─●─○ + "Step N of 3" line in
 // the sidebar's type scale, so it reads as wayfinding rather than a content block.
 //
-// Model: a linear 3-stage pipeline (Intake → Services & policy → Roadmap).
-// After intake submit, Services is current until an RFQ exists (`has_rfq`), then Roadmap.
+// Model: a linear 3-stage pipeline (Intake → Services & policy → Roadmap). The
+// current stage is Intake until intake is submitted, then advances to Services &
+// policy. We have intake_step + status per linked case via EmployeeAssignmentContext,
+// so this is data-correct. (Roadmap stays "upcoming" until the services stage is
+// done — the sidebar has no services/roadmap completion signal to advance further.)
 
 type MiniStepStatus = 'done' | 'current' | 'upcoming';
 const JOURNEY_STEP_LABELS = ['Intake', 'Services & policy', 'Roadmap'] as const;
 
 function deriveJourneySteps(row: EmployeeLinkedOverviewRow): MiniStepStatus[] {
-  return deriveJourneyMiniSteps({
-    status: row.status,
-    intakeStep: row.intake_step,
-    intakeTotalSteps: INTAKE_TOTAL_STEPS,
-    servicesComplete: !!row.has_rfq,
-  });
+  const step = row.intake_step ?? 0;
+  const submitted = isIntakeComplete(row.status) || (INTAKE_TOTAL_STEPS > 0 && step >= INTAKE_TOTAL_STEPS);
+  // Intake: done once submitted; otherwise it's the current focus (covers step 0
+  // and partial progress). Services becomes current once intake is submitted.
+  return submitted
+    ? ['done', 'current', 'upcoming']
+    : ['current', 'upcoming', 'upcoming'];
 }
 
 const JourneyProgressMini: React.FC<{ row: EmployeeLinkedOverviewRow }> = ({ row }) => {
@@ -422,6 +426,8 @@ export interface PlatformShellSidebarProps {
   role: SidebarRole;
   /** Optional slot for the company widget under the brand (CompanySwitcher / CompanyBrand). */
   companySlot?: React.ReactNode;
+  /** Same brand, rendered mark-only for the 64px collapsed rail. */
+  collapsedCompanySlot?: React.ReactNode;
   /** Footer identity. Defaults to a sensible placeholder if absent. */
   user?: { initials: string; name: string; role: string };
 }
@@ -469,7 +475,12 @@ const SCROLL_KEY = 'platform_sidebar_scroll';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role, companySlot, user }) => {
+export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
+  role,
+  companySlot,
+  collapsedCompanySlot,
+  user,
+}) => {
   const location = useLocation();
   const asideRef = useRef<HTMLElement | null>(null);
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed());
@@ -797,13 +808,13 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
             <span className="text-sm font-semibold text-slate-900">ReloPass</span>
-            <span className="text-slate-400 text-sm">/ Platform</span>
+            <span className="text-slate-500 text-sm">/ Platform</span>
             <Button unstyled
               type="button"
               onClick={() => setCollapsed(true)}
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
-              className="ml-auto grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+              className="ml-auto grid h-6 w-6 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             >
               <PanelLeftClose size={14} />
             </Button>
@@ -823,8 +834,10 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
       </div>
 
       {/* Company switcher / brand */}
-      {!collapsed && companySlot && (
-        <div className="px-3 py-2 border-b border-slate-100">{companySlot}</div>
+      {companySlot && (
+        <div className={`${collapsed ? 'px-2 py-2 flex justify-center' : 'px-3 py-2'} border-b border-slate-100`}>
+          {collapsed ? collapsedCompanySlot ?? companySlot : companySlot}
+        </div>
       )}
 
       {/* AIQ-1453: removed the decorative non-functional "Search cases and providers"
@@ -874,7 +887,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                 becomes independently draggable. Admin sees all three sections here, so
                 "all sections" is covered from the one place that renders them. */}
             <div className="flex items-center justify-between px-2 pt-3 pb-1">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Edit layout</span>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Edit layout</span>
               <div className="flex items-center gap-1">
                 <Button
                   unstyled
@@ -896,10 +909,10 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                 </Button>
               </div>
             </div>
-            <p className="px-2 pb-1 text-[10px] leading-tight text-slate-400">
+            <p className="px-2 pb-1 text-[10px] leading-tight text-slate-500">
               Drag tabs to reorder or move them between sub-groups. Click a group name to rename it.
             </p>
-            <React.Suspense fallback={<p className="px-2 py-2 text-[11px] text-slate-400">Loading editor…</p>}>
+            <React.Suspense fallback={<p className="px-2 py-2 text-[11px] text-slate-500">Loading editor…</p>}>
               {visibleSections
                 .filter((section) => !section.borrowed)
                 .map((section) => {
@@ -929,7 +942,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                   type="button"
                   onClick={() => setEditingLayout(true)}
                   title="Customise the sidebar"
-                  className="flex min-h-[24px] items-center gap-1 rounded px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  className="flex min-h-[24px] items-center gap-1 rounded px-2 py-1 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-600"
                 >
                   <Pencil size={11} /> Edit layout
                 </Button>
@@ -1129,7 +1142,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                 aria-haspopup="menu"
                 aria-expanded={accountOpen}
                 onClick={() => setAccountOpen((o) => !o)}
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-600"
               >
                 {accountOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </Button>
