@@ -372,6 +372,10 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     "porezna-uprava.hr", "hzzo.hr", "mirovinsko.hr",
     "policija.si", "zzzs.si", "zpiz.si",
     "minv.sk", "financnasprava.sk", "socpoist.sk", "slovensko.sk",
+    # slov-lex.sk is the official Slovak legislation portal (the state law gazette, like
+    # riigiteataja.ee / boe.es); vszp.sk is Všeobecná zdravotná poisťovňa, the state health
+    # insurer (a public-law body). Both publish the rule; neither carries the gov suffix.
+    "slov-lex.sk", "vszp.sk",
     "migracija.lrv.lt", "vmi.lt", "sodra.lt", "vlk.lt",
     "latvija.lv",
     # Cross-border / EU
