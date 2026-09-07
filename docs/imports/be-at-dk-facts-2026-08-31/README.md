@@ -1,8 +1,20 @@
 # Belgium + Austria + Denmark destination facts (2026-08-31)
 
-EEA destinations. **Landed: Belgium 6 + Austria 2 requirement_items (pending).** Denmark HELD (8 facts):
-DK already has 11 prod requirement_items (B3 batch) — reconcile before adding. 28 dual-audience facts;
-verify_ledger confirmed 21/24 quotes (ibz.be fetch-failed transiently — reported, not rejected).
+EEA destinations. **Landed: Belgium 6 + Austria 2 requirement_items (pending).** Denmark was HELD
+(8 facts) — borger.dk bot-walled the referee + reconcile-against-existing concern; **CLEARED
+2026-09-08** (see `## Update` below). 28 dual-audience facts; verify_ledger confirmed 21/24 quotes
+(ibz.be fetch-failed transiently — reported, not rejected).
+
+## Update 2026-09-08 — Denmark cleared (8 facts, DENMARK 11→19 pending)
+All 8 held DK facts browser-verified verbatim (the in-app browser renders borger.dk/skat.dk/
+nyidanmark.dk/kk.dk cleanly — no CAPTCHA, unlike the referee's HTTP fetch): EU residence document
+before CPR, residence & work permit (3C), CPR registration (EEA+3C), health insurance card
+(EEA+3C), full tax liability (EEA+3C). The 3 shared-topic pairs (cpr/tax/health) hit the
+nationality-conflict UNMAPPED, so the non-EEA fact of each was split to a `<topic>_3c` staging
+topic before promote — 8 rows, 0 unmapped. Reconcile check: distinct titles vs the 11 existing B3
+rows → append, no overwrite. EU-residence-document row re-scoped `["EU_EEA"]` (permission content;
+a Danish national doesn't need one). Append-only: approved 325 unchanged, expert_verified 0, scope
+guard green. nyidanmark.dk Pay-Limit figure confirmed current (DKK 552,000).
 
 Sources: BE = ibz.be (Immigration Office), brussels.be (City), onestopcounter.workinginbelgium.be,
 inami.fgov.be. AT = oesterreich.gv.at, migration.gv.at, wien.gv.at. DK = lifeindenmark.borger.dk, skat.dk,

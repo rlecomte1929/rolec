@@ -14,18 +14,20 @@ re-scope EU-registration-certificate rows to `["EU_EEA"]` before the scope guard
 
 ---
 
-## ✅ Cleared 2026-09-08 (quick wins)
+## ✅ Cleared 2026-09-08
 
-Five holds re-sourced and landed **pending** (append-only; approved count unchanged at 325,
-expert_verified 0, scope guard green). Each has a `<iso>-resource-2026-09-08/` batch doc.
+Holds re-sourced and landed **pending** (append-only; approved count unchanged at 325,
+expert_verified 0, scope guard green). Each has a `<iso>-resource-2026-09-08/` batch doc (Denmark:
+see the be-at-dk batch's § Update 2026-09-08).
 
-| Country | Fact | Verification |
+| Country | Fact(s) | Verification |
 |---|---|---|
 | **Colombia** | Cédula de Extranjería registration deadline | CONFIRMED (0.93) — Decreto 1067/2015 on `cancilleria.gov.co` |
 | **Panama** | 5-year Panamanian-substitution duty (art. 18) | applier-verified via `pdfplumber` (cetippat server flaky) |
 | **Hong Kong** | HKID within 30 days of arrival | browser-verified — Cap. 177A reg. 3(1)(a), exact |
 | **Austria** | EU-registration late fine (€50–250) | CONFIRMED (1.0) — `wko.at` (added to `_SEMI_OFFICIAL_HOSTS`) |
 | **Japan** | Dependent visa 28-hrs/week cap | CONFIRMED (1.0) — ISA `moj.go.jp/isa` |
+| **Denmark** | 8 facts — CPR, health card, tax liability, EU residence doc, work permit | browser-verified verbatim (borger.dk/skat.dk/nyidanmark.dk/kk.dk render cleanly) — DENMARK 11→19 |
 
 **Still held — Indonesia (BPJS Kesehatan).** Claim is true, but the researcher's supplied quote
 is **inaccurate** (Perpres 82/2018 Pasal 1 reads *"…dan telah membayar iuran"*, not *"yang telah
@@ -47,9 +49,11 @@ verbatim right now (BPK = garbled OCR; `peraturan.go.id` down). See `id-resource
 Grouped by blocker, because the blocker dictates the fix.
 
 ### Bot-walled / CAPTCHA / geo-gated (need a WAF-passing browser or a reachable mirror)
-- **Denmark — ~8 facts (whole batch held).** `borger.dk` / `lifeindenmark.dk` CAPTCHA/bot-walled; no
-  accessible verbatim. *(be-at-dk batch — Belgium 6 + Austria 2 landed, Denmark held.)* → browser-ground
-  or an archived snapshot.
+- ✅ **Denmark — 8 facts. CLEARED 2026-09-08.** `borger.dk`/`skat.dk`/`nyidanmark.dk`/`kk.dk` all
+  render cleanly in the in-app browser (no CAPTCHA — the referee's *HTTP fetch* was the only thing
+  bot-walled). All 8 quotes browser-verified verbatim; landed pending (DENMARK 11→19). Shared-topic
+  cpr/tax/health pairs split to `<topic>_3c` to clear the nationality-conflict; EU-residence-document
+  row re-scoped `["EU_EEA"]`. See `be-at-dk-facts-2026-08-31/README.md` § Update 2026-09-08.
 - **Malta — ~4 facts.** `cfr.gov.mt` (HQP 15% flat-tax, tax residency, non-dom/remittance) +
   `socialsecurity.gov.mt` (social-security registration) — Cloudflare hard-block to every fetcher incl.
   browser here. → re-source from a reproducibly-fetchable official page.
