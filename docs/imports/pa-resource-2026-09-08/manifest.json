@@ -1,0 +1,17 @@
+{
+  "batch_id": "pa-resource-2026-09-08",
+  "generated_at": "2026-09-02",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee)",
+  "corridor": "PA",
+  "origin_country_code": null,
+  "destination_country_code": "PA",
+  "nationality_class": "EEA",
+  "target_table": "public.requirement_items",
+  "target_country_code": "PANAMA",
+  "record_count": 1,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "fd9669fd5c39fc8eb582a99f547de2b83f29678b39095d646989b9f898a38f9f",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded"
+}

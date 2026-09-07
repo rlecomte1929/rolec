@@ -1,0 +1,19 @@
+{
+  "batch": "co-resource-2026-09-08",
+  "counts": {
+    "CONFIRMED": 1
+  },
+  "rows": [
+    {
+      "batch": "co-resource-2026-09-08",
+      "destination_country": "CO",
+      "entity_topic_key": "cedula_registration",
+      "host": "www.cancilleria.gov.co",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.927,
+      "method": "utf-8",
+      "reason": "93% bigram"
+    }
+  ]
+}

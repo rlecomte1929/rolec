@@ -409,6 +409,12 @@ _SEMI_OFFICIAL_HOSTS: Tuple[str, ...] = (
     # so a fact from here is worth keeping and belongs in the review queue for a check against
     # the statute. The `.vn` government suffix is `gov.vn`; baochinhphu.vn does not carry it.
     "baochinhphu.vn",
+    # Austria. wko.at is the Wirtschaftskammer Österreich, a public-law chamber (Körperschaft
+    # öffentlichen Rechts) that reproduces the NAG statute (§53/§77) verbatim, incl. the exact
+    # Anmeldebescheinigung fine that the strictly-statutory ris.bka.gv.at states but which is
+    # CAPTCHA-walled. Semi-official for the same reason as citizensinformation.ie / borger.dk:
+    # it restates the law published elsewhere, so a fact from here belongs in the review queue.
+    "wko.at",
 )
 
 
