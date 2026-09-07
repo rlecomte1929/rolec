@@ -11,7 +11,7 @@
   "record_count": 12,
   "needs_lawyer_review_count": 3,
   "artifact": "facts.ndjson",
-  "sha256": "a30bb5fa258391b5a923553412cf56a6af5112984fcc11e6b42032f83fa4ace7",
+  "sha256": "aba2d9c11fe52dbfc68473aa0fe031bb04e7c8bbf6610c4a35e130bcab2bd3b6",
   "review_status_all": "pending",
   "verification_status_all": "corpus_grounded"
 }
