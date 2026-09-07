@@ -146,8 +146,8 @@ export function ImmigrationAnswerPanel(
   const [authority, setAuthority] = useState<DestinationImmigrationAuthority | null>(null);
 
   useEffect(() => {
-    const dest = to.trim().toUpperCase();
-    if (!/^[A-Z]{2}$/.test(dest)) {
+    const dest = to.trim();
+    if (!dest) {
       setAuthority(null);
       return;
     }
