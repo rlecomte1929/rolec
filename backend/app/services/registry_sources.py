@@ -49,7 +49,7 @@ from typing import Dict, List, Optional, Tuple
 # wildcard and only the destination (`GB`) is meaningful. `_dest_iso_from_corridor` reads the
 # second token, so a candidate row `corridor="XX-GB"` scopes to country_code `GB`. Same shape
 # will follow for the next coverage-master destinations (XX-CA, XX-AU, …).
-CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT", "XX-TW", "XX-VN", "XX-ID", "XX-PH", "XX-CO", "XX-PE", "XX-UY", "XX-CR", "XX-PA")
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO", "ES-IE", "NO-FR", "FR-SG", "US-EC", "XX-GB", "XX-CA", "XX-AU", "XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT", "XX-TW", "XX-VN", "XX-ID", "XX-PH", "XX-CO", "XX-PE", "XX-UY", "XX-CR", "XX-PA", "XX-HR", "XX-SI", "XX-SK", "XX-LT", "XX-LV")
 
 # Categories with live suppliers. `schools` joined the original five on 2026-08-30 (the Dublin/
 # Paris batches source it from Tusla / annuaire-education). rmc / dsp / healthcare_ipmi /
@@ -847,7 +847,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
     RegistrySource(
         name="IBO — IB World Schools directory",
         base_url="https://www.ibo.org/programmes/find-an-ib-school/",
-        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT", "XX-TW", "XX-VN", "XX-ID", "XX-PH", "XX-CO", "XX-PE", "XX-UY", "XX-CR", "XX-PA"), categories=("schools",),
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-ES", "XX-NL", "XX-AE", "XX-CH", "XX-IT", "XX-SE", "XX-BE", "XX-AT", "XX-DK", "XX-SA", "XX-FI", "XX-PT", "XX-JP", "XX-HK", "XX-PL", "XX-NZ", "XX-QA", "XX-KW", "XX-KR", "XX-IL", "XX-LU", "XX-CZ", "XX-GR", "XX-MX", "XX-BR", "XX-CN", "XX-IN", "XX-TR", "XX-TH", "XX-OM", "XX-MY", "XX-BH", "XX-ZA", "XX-RO", "XX-AR", "XX-CL", "XX-HU", "XX-EE", "XX-IS", "XX-CY", "XX-MT", "XX-TW", "XX-VN", "XX-ID", "XX-PH", "XX-CO", "XX-PE", "XX-UY", "XX-CR", "XX-PA", "XX-HR", "XX-SI", "XX-SK", "XX-LT", "XX-LV"), categories=("schools",),
         notes="International Baccalaureate Organization — the authoritative directory of authorised IB "
               "World Schools. Search directory; a school's IB authorisation is the accreditation the "
               "vetter confirms. Used for international schools where a national per-entity register is "
@@ -1490,6 +1490,45 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-PA",), categories=("banks",),
         notes="Superintendencia de Bancos de Panamá — the statutory list of general-licence banks "
               "(a banking hub, foreign banks included). No per-entity public number; vetter confirms.",
+    ),
+    # ── Wave 11: EU cluster (XX-HR/SI/SK/LT/LV) — subagent batches 2026-09-01/02. Movers reuse
+    # global FIDI/IAM; schools reuse IBO (corridors added above). Net-new = each country's national
+    # central bank / bank supervisor register; legal/tax/housing are individual-practitioner rolls
+    # or voluntary associations (no browsable statutory firm register) → skipped everywhere.
+    RegistrySource(
+        name="HNB — Hrvatska narodna banka credit-institutions list",
+        base_url="https://www.hnb.hr/en/core-functions/supervision/list-of-credit-institutions",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-HR",), categories=("banks",),
+        notes="Croatian National Bank — the statutory list of credit institutions. No stable "
+              "per-entity URL; vetter confirms by name.",
+    ),
+    RegistrySource(
+        name="Banka Slovenije — register of supervised banks",
+        base_url="https://www.bsi.si/en/banking-supervision/register-of-supervised-entities",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-SI",), categories=("banks",),
+        notes="Bank of Slovenia — the statutory register of supervised banks. No per-entity public "
+              "number; vetter confirms by name.",
+    ),
+    RegistrySource(
+        name="NBS — Národná banka Slovenska supervised-entities register",
+        base_url="https://nbs.sk/en/financial-market-supervision/list-of-supervised-entities/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-SK",), categories=("banks",),
+        notes="National Bank of Slovakia — the statutory register of supervised banks. No per-entity "
+              "public number; vetter confirms by name.",
+    ),
+    RegistrySource(
+        name="Lietuvos bankas — financial-market-participants register",
+        base_url="https://www.lb.lt/en/sfi-financial-market-participants",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-LT",), categories=("banks",),
+        notes="Bank of Lithuania — the statutory register of licensed banks / financial-market "
+              "participants (with LB licence codes). Vetter confirms by name.",
+    ),
+    RegistrySource(
+        name="Latvijas Banka — licensed credit-institutions register",
+        base_url="https://www.bank.lv/en/",
+        tier=2, acquisition=Acquisition.PUBLIC_REGISTER, corridors=("XX-LV",), categories=("banks",),
+        notes="Bank of Latvia (absorbed the FKTK regulator in 2023) — the statutory register of "
+              "licensed credit institutions. No per-entity public number; vetter confirms by name.",
     ),
 )
 

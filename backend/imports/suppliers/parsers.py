@@ -222,6 +222,12 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("bcu.gub.uy",                    "BCU — Banco Central del Uruguay authorised-bank register"),
     ("sugef.fi.cr",                   "SUGEF — Superintendencia General de Entidades Financieras (Costa Rica) bank register"),
     ("superbancos.gob.pa",           "Superintendencia de Bancos de Panamá — general-licence bank register"),
+    # Wave 11 (XX-HR/SI/SK/LT/LV) — national central-bank / bank-supervisor registers.
+    ("hnb.hr",                        "HNB — Hrvatska narodna banka credit-institutions list"),
+    ("bsi.si",                        "Banka Slovenije — register of supervised banks"),
+    ("nbs.sk",                        "NBS — Národná banka Slovenska supervised-entities register"),
+    ("lb.lt",                         "Lietuvos bankas — financial-market-participants register"),
+    ("bank.lv",                       "Latvijas Banka — licensed credit-institutions register"),
 )
 
 
