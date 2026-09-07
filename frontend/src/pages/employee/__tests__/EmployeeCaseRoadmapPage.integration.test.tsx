@@ -44,6 +44,12 @@ vi.mock('../../../api/caseDetails', () => ({
 vi.mock('../../../api/cases', () => ({
   validateRoadmap: vi.fn().mockResolvedValue({ roadmap_validated_at: null }),
 }));
+// [AIQ-2142] The page now always consults server entitlement (no build flag). Resolve it
+// unlocked so these tests exercise the roadmap render, not the paywall gate — the same
+// state production sees while the server-side paywall is off.
+vi.mock('../../../utils/paymentStatus', () => ({
+  fetchRoadmapUnlocked: vi.fn().mockResolvedValue(true),
+}));
 
 const READY_PLAN: RelocationPlanViewResponseDTO = {
   case_id: 'c1',
