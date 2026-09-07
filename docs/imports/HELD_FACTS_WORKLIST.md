@@ -34,6 +34,16 @@ is **inaccurate** (Perpres 82/2018 Pasal 1 reads *"…dan telah membayar iuran"*
 membayar Iuran Jaminan Kesehatan"*), and no reproducibly-fetchable official page renders the clean
 verbatim right now (BPK = garbled OCR; `peraturan.go.id` down). See `id-resource-2026-09-08/README.md`.
 
+## 🔬 Dispatched to Otto 2026-09-08 (re-research tier)
+
+The remaining Tier-2 items below need **re-research from scratch** (their facts were folded into
+notes, not held in staging). Routed to Otto — bridge id 21, batch `otto-resource-2026-09-08`
+(5 countries / 8 facts: **India** PAN §139A, **Brazil** VITEM V ordering, **Israel** foreign-expert
+tax, **Portugal** Blue Card mobility deadline, **Estonia** ×4). When Otto delivers to GCS, fetch →
+verify every quote independently → promote-to-pending only what checks out. See
+`otto-resource-2026-09-08/README.md` for the pull-and-verify procedure. Kuwait/Malta/Saudi/Malaysia
+and the FR→SG / NO→FR reject piles are **not** in this batch (blocked sources / bulk — a later batch).
+
 ---
 
 ## Tier 1 — structured holds (already in `held.ndjson`, one fact each)
