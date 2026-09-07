@@ -114,6 +114,7 @@ def _resend_send(
     context: str = "email",
     from_addr: Optional[str] = None,
     reply_to: Optional[str] = None,
+    log_body: bool = True,
 ) -> Dict[str, Any]:
     """
     The single Resend delivery path, shared by the HR invite and the admin
@@ -122,13 +123,21 @@ def _resend_send(
     ``from_addr`` overrides ``EMAIL_FROM`` (any address on the verified domain);
     ``reply_to`` adds a Reply-To header when set. Both default to prior behaviour.
 
+    ``log_body`` controls only the no-key dev path: when False, the rendered body is
+    NOT logged (to=/subject still are). A sender whose body carries a security-sensitive
+    secret (e.g. the raw colleague-invite token) sets this False so the token never
+    reaches a log line. Default True preserves the assignment-invite behaviour.
+
     Returns status: no_key (RESEND_API_KEY absent — logged, not sent) | sent |
     failed (Resend non-2xx) | error (exception, suppressed). Includes ``from``.
     """
     resend_key = os.getenv("RESEND_API_KEY", "")
     from_addr = from_addr or os.getenv("EMAIL_FROM", "noreply@relopass.com")
     if not resend_key:
-        log.info("%s (no RESEND_API_KEY — logged, not sent): to=%s subject=%r\n\n%s", context, to_email, subject, plain)
+        if log_body:
+            log.info("%s (no RESEND_API_KEY — logged, not sent): to=%s subject=%r\n\n%s", context, to_email, subject, plain)
+        else:
+            log.info("%s (no RESEND_API_KEY — not sent, body withheld): to=%s subject=%r", context, to_email, subject)
         return {"status": "no_key", "from": from_addr}
     payload: Dict[str, Any] = {"from": from_addr, "to": [to_email], "subject": subject, "text": plain, "html": html}
     if reply_to:
