@@ -238,6 +238,76 @@ Same method. Admin people was 3.0s (transient on re-measure) so treat as a warni
 
 `EXECUTIVE_ROADMAP.md` measured ~861 ms of import-time work before DB writes in `backend.main`. Add `scripts/profile_import_time.py` (uses `python -X importtime -c "import backend.main"` and prints the top 25 cumulative modules) and commit its output as `docs/performance/import_time_2026-09.txt`. Then move any module-level DB write or network call found into the FastAPI `startup` event. Pin with a test that importing `backend.main` with `DATABASE_URL=sqlite:///:memory:` performs no `db.` call (monkeypatch and assert zero calls).
 
+#### Progress and measurement notes (2026-09-09)
+
+Shipped: 2.1 (#2179, caps 15→13 db calls), 2.2 (#2180, current 24→12, overview 25→13), 2.4 admin
+part (#2186, correlated COUNT subqueries → pre-aggregated joins; prod EXPLAIN 925 ms → 37 ms).
+
+**Measure with the server logs, not the harness verdict.** The perf-budget workflow takes 6 warm
+samples per endpoint, so its p95 is the max of 6 and swings ±1.5 s between runs on identical code.
+The reliable signal is the existing `query_counter` middleware line in Render logs:
+`query_count route=GET /api/… count=N threshold=10 elapsed_ms=M`. Pull it with the Render REST API
+(`GET /v1/logs?ownerId=…&resource=srv-d7ku8agjs32c7386fm4g&text=query_count&startTime=…&endTime=…`).
+
+**Two structural facts every WS2 task should know:**
+- Render `rolec-eu` runs in **Frankfurt**; `DATABASE_URL` is the Supabase pooler in **eu-west-1
+  (Ireland)**. Observed cost is **~125 ms per SQL query**. An endpoint lands under 2 s only below
+  ~14 queries. Co-locating the regions is the fix that moves every endpoint at once (founder
+  decision, not a Cursor task).
+- **Identity costs ~7–8 queries per authed request before the handler runs** (`auth_deps.
+  get_current_user`: sessions lookup, user by id, `ensure_profile_record`, `get_user_roles`,
+  `get_admin_session`; then per-router `_caller_company_id`: `get_hr_company_id` + `get_profile_record`).
+  That is ~1 s of the ~2 s on *every* slow endpoint in the table above. Task 2.7 below.
+
+#### Task 2.6: `/api/hr/catalog/notification-counts` — the most-hit slow route
+
+`backend/app/routers/hr_catalog.py:846`. 187 calls in 55 minutes at ~1.9 s median (11–12 queries):
+`PlatformShellSidebar.tsx:680` polls it every 60 s per HR session. The handler itself runs three
+COUNT queries; the rest is identity (Task 2.7).
+
+- [ ] Collapse the three COUNT statements into one round-trip (`SELECT (…) AS waiting, (…) AS
+  distinct_pairs, (…) AS pending` or a single CTE). Same response shape.
+- [ ] In `PlatformShellSidebar.tsx`, pause the interval while `document.visibilityState !== 'visible'`
+  and refetch once on `visibilitychange` back to visible. Same for the admin poller below it.
+- [ ] Query-count characterisation test on the handler (recording stub, as in
+  `backend/tests/test_employee_policy_caps_query_count.py`); vitest for the sidebar pause/resume.
+
+#### Task 2.7: Identity overhead — one lookup per request, not seven (needs founder sign-off on TTL)
+
+**Files:** `backend/app/auth_deps.py` (`get_current_user`), `backend/db/auth.py` (`get_user_by_token`),
+`backend/db/users.py` (`ensure_profile_record`, `get_user_roles`), the seven `_caller_company_id`
+copies (see WS1 Task 1.3, which should land first so there is one place to fix).
+
+**Design to implement (proposed; confirm TTL with Romain before coding):**
+- Collapse `get_user_by_token` + `get_user_by_id` + `get_user_roles` into one SQL joining `sessions`,
+  `users`, roles. Keep the returned dict shape identical.
+- `ensure_profile_record` becomes write-on-miss only: check a per-process set of user ids already
+  ensured this process lifetime; skip the query when present. (It is an idempotent upsert; skipping
+  it after the first success per process is safe.)
+- Per-process TTL cache (30 s) keyed by token for the assembled user context, **bypassed** when the
+  request path starts with `/api/auth/` or `/api/admin/impersonat`, and invalidated on logout. Admin
+  impersonation (`get_admin_session`) stays uncached.
+- Characterisation test: an authed request to a trivial endpoint records ≤3 identity queries on the
+  first call and 0 on the second within the TTL. A test that a revoked session is rejected within
+  the TTL window on the auth-prefixed paths.
+
+#### Task 2.8: `GET /api/cases/{id}` — 96 queries, 13.8 s (single observation)
+
+`backend/app/routers/cases_read.py`. Reproduce with the recording stub against a case with several
+forms/milestones; find the per-item loop; bulk it. Pin the count.
+
+#### Task 2.9: `GET /api/cases/{id}/services-state` — 45 queries, 5.7 s
+
+`backend/app/routers/services_state.py` (registered in `backend/main.py` only — note for WS1). Same
+method as 2.8. Observed both 11-query (fast) and 45-query (slow) shapes for the same route, so the
+loop is data-dependent; the characterisation fixture needs ≥5 service selections.
+
+#### Task 2.10: `POST /api/test-drive/provision-staged` — 212 queries, 33–41 s
+
+`backend/app/routers/test_drive.py` (1,356 lines). Provisioning writes many rows one INSERT at a
+time. Batch the inserts per table (`executemany` / multi-row VALUES) inside one transaction. This is
+an admin/test path, so correctness is the bar, not latency; keep it last in WS2.
+
 ---
 
 ### WS3 — Frontend hygiene: dead code, transport bypasses, honest empty states
