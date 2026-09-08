@@ -1,0 +1,252 @@
+{
+  "categories": [],
+  "tags": [],
+  "sources": [
+    {
+      "source_name": "www.numbeo.com",
+      "publisher": "www.numbeo.com",
+      "source_type": "commercial",
+      "url": "https://www.numbeo.com/cost-of-living/prices_by_city.jsp?displayCurrency=EUR&itemId=26",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.kbcbrussels.be",
+      "publisher": "www.kbcbrussels.be",
+      "source_type": "commercial",
+      "url": "https://www.kbcbrussels.be/retail/en/products/payments/current-accounts/open-plus-account-for-expats.html",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "ais-antwerp.be",
+      "publisher": "ais-antwerp.be",
+      "source_type": "commercial",
+      "url": "https://ais-antwerp.be/learning/curriculum/",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.antwerpen.be",
+      "publisher": "www.antwerpen.be",
+      "source_type": "commercial",
+      "url": "https://www.antwerpen.be/registratie-en-verblijf-niet-belg",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "finance.belgium.be",
+      "publisher": "finance.belgium.be",
+      "source_type": "commercial",
+      "url": "https://finance.belgium.be/sites/default/files/E-services/FORREG/FORREG_Userguide_EN_V1.pdf",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.delijn.be",
+      "publisher": "www.delijn.be",
+      "source_type": "commercial",
+      "url": "https://www.delijn.be/en/content/vervoerbewijzen/abonnementen/omnipas/",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.kbc.be",
+      "publisher": "www.kbc.be",
+      "source_type": "commercial",
+      "url": "https://www.kbc.be/retail/en/payments/open-an-account-online.html",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.brugge.be",
+      "publisher": "www.brugge.be",
+      "source_type": "commercial",
+      "url": "https://www.brugge.be/onderwijs-en-kinderopvang/brugse-scholen",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.oecd.org",
+      "publisher": "www.oecd.org",
+      "source_type": "commercial",
+      "url": "https://www.oecd.org/content/dam/oecd/en/topics/policy-issue-focus/aeoi/belgium-tin.pdf",
+      "trust_tier": "T2"
+    }
+  ],
+  "resources": [
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Antwerp",
+      "category_key": "housing",
+      "title": "Housing — Antwerp",
+      "body": "Numbeo's 1 August 2026 city table reports EUR 920.36 for a one-bedroom apartment in Antwerp city centre (https://www.numbeo.com/cost-of-living/prices_by_city.jsp?displayCurrency=EUR&itemId=26). The Vlaams Woninghuurdecreet of 9 November 2018 sets the rental guarantee for dwellings in the Flemish Region (which includes Antwerp) at a maximum of three months' rent, in force since 1 January 2019 (https://codex.vlaanderen.be/PrintDocument.ashx?id=1029963&datum=&geannoteerd=false&print=false). Immoweb has a dedicated Antwerp apartment-rental search (https://www.immoweb.be/en/search/apartment/for-rent/antwerp/2000).",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-antwerp-housing",
+      "source_url": "https://www.numbeo.com/cost-of-living/prices_by_city.jsp?displayCurrency=EUR&itemId=26",
+      "source_name": "www.numbeo.com"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Antwerp",
+      "category_key": "admin_essentials",
+      "title": "Banking — Antwerp",
+      "body": "KBC's official expat account page says people settling in Flanders should use KBC and that applicants arriving in Belgium must bring an ID card and residence permit to the branch to sign for and collect the debit card (https://www.kbcbrussels.be/retail/en/products/payments/current-accounts/open-plus-account-for-expats.html).",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-antwerp-banking",
+      "source_url": "https://www.kbcbrussels.be/retail/en/products/payments/current-accounts/open-plus-account-for-expats.html",
+      "source_name": "www.kbcbrussels.be"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Antwerp",
+      "category_key": "schools_childcare",
+      "title": "Schools & childcare — Antwerp",
+      "body": "Antwerp International School offers the International Baccalaureate PYP, MYP and DP (https://ais-antwerp.be/learning/curriculum/). Owl Academy in Antwerp teaches the British National Curriculum (https://owl-academy.com/curricula/elementary-school/). The University of Antwerp's schools page lists Antwerp international schools and links to the city's school finder (https://www.uantwerpen.be/en/jobs/international-staff-office/preparation/family-matters/schools/).",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-antwerp-schools",
+      "source_url": "https://ais-antwerp.be/learning/curriculum/",
+      "source_name": "ais-antwerp.be"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Antwerp",
+      "category_key": "admin_essentials",
+      "title": "Registration & admin — Antwerp",
+      "body": "Antwerp's official page says its Loket Migratie helps newcomers register their stay and works by appointment (https://www.antwerpen.be/registratie-en-verblijf-niet-belg).",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-antwerp-legal_admin",
+      "source_url": "https://www.antwerpen.be/registratie-en-verblijf-niet-belg",
+      "source_name": "www.antwerpen.be"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Antwerp",
+      "category_key": "admin_essentials",
+      "title": "Tax & finance — Antwerp",
+      "body": "Belgium uses the National Register Number, or BIS Register Number where applicable, as the relevant individual identifier. The National Register number is assigned automatically when a person's base record is entered (https://www.ibz.rrn.fgov.be/sites/default/files/documents/nl/rijksregister/onderrichtingen/IT-lijst/IT000_Rijksregisternummer.pdf). For an eligible foreign person using ForReg who has neither number, the FPS Finance processing officer creates one (https://finance.belgium.be/sites/default/files/E-services/FORREG/FORREG_Userguide_EN_V1.pdf); ForReg eligibility and steps are described at https://finance.belgium.be/en/E-services/forreg.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-antwerp-tax_finance",
+      "source_url": "https://finance.belgium.be/sites/default/files/E-services/FORREG/FORREG_Userguide_EN_V1.pdf",
+      "source_name": "finance.belgium.be"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Antwerp",
+      "category_key": "transport",
+      "title": "Transport — Antwerp",
+      "body": "An Antwerp city decision identifies De Lijn as the Flemish public-transport operator serving Antwerp (https://ebesluit.antwerpen.be/zittingen/23.0926.3894.4548/agendapunten/24.0729.9975.6708). De Lijn's adult Omnipas costs EUR 62 for one month, plus a EUR 10 MOBIB-card administration fee (https://www.delijn.be/en/content/vervoerbewijzen/abonnementen/omnipas/).",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-antwerp-transport",
+      "source_url": "https://www.delijn.be/en/content/vervoerbewijzen/abonnementen/omnipas/",
+      "source_name": "www.delijn.be"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Bruges",
+      "category_key": "housing",
+      "title": "Housing — Bruges",
+      "body": "Numbeo's June 2026 Brugge table reports EUR 825.00 for a one-bedroom apartment in the city centre, last updated 19 June 2026 (https://www.numbeo.com/cost-of-living/in/Brugge). The Vlaams Woninghuurdecreet of 9 November 2018 caps the rental guarantee for dwellings in the Flemish Region (which includes Bruges) at a maximum of three months' rent, in force since 1 January 2019 (https://codex.vlaanderen.be/PrintDocument.ashx?id=1029963&datum=&geannoteerd=false&print=false). Immoweb has a dedicated Bruges (postcode 8000) apartment-rental search (https://www.immoweb.be/en/search/apartment/for-rent/bruges/8000).",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-bruges-housing",
+      "source_url": "https://www.numbeo.com/cost-of-living/in/Brugge",
+      "source_name": "www.numbeo.com"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Bruges",
+      "category_key": "admin_essentials",
+      "title": "Banking — Bruges",
+      "body": "KBC allows applicants without Belgian citizenship or a permanent Belgian address to apply online from abroad; after arrival, they must visit a branch with an ID card and residence permit to sign for and collect the debit card.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-bruges-banking",
+      "source_url": "https://www.kbc.be/retail/en/payments/open-an-account-online.html",
+      "source_name": "www.kbc.be"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Bruges",
+      "category_key": "schools_childcare",
+      "title": "Schools & childcare — Bruges",
+      "body": "The official City of Bruges schools directory lists Dutch-medium nursery, primary, secondary, higher and adult-education categories with enrolment resources for the 2026-2027 school year, and identifies no international-curriculum (IB, British or American) school in Bruges (https://www.brugge.be/onderwijs-en-kinderopvang/brugse-scholen).",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-bruges-schools",
+      "source_url": "https://www.brugge.be/onderwijs-en-kinderopvang/brugse-scholen",
+      "source_name": "www.brugge.be"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Bruges",
+      "category_key": "admin_essentials",
+      "title": "Registration & admin — Bruges",
+      "body": "A non-Belgian moving from abroad to Bruges must register with the municipality by appointment at Huis van de Bruggeling; after documents are accepted, a neighbourhood inspector verifies the residence before the file proceeds.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-bruges-legal_admin",
+      "source_url": "https://www.brugge.be/burgerzaken/niet-belgen/aankomst-brugge/inschrijving-niet-belg",
+      "source_name": "www.brugge.be"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Bruges",
+      "category_key": "admin_essentials",
+      "title": "Tax & finance — Bruges",
+      "body": "For Belgian individuals, the tax identification number is the 11-digit National Number attributed when a person is registered in the National Register (source: https://www.oecd.org/content/dam/oecd/en/topics/policy-issue-focus/aeoi/belgium-tin.pdf). A resident cannot apply for a National registration number separately and receives it upon entry in the Belgian population registers (source: https://sigedis.be/en/our-digital-services/citizens/my-identity/my-identification-number). Flanders directs newcomers to register with their municipality to arrange the number, and Bruges provides the local registration procedure (sources: https://www.vlaanderen.be/en/your-future-in-flanders/need-to-know-before-coming-to-belgium and https://www.brugge.be/burgerzaken/niet-belgen/aankomst-brugge/inschrijving-niet-belg).",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-bruges-tax_finance",
+      "source_url": "https://www.oecd.org/content/dam/oecd/en/topics/policy-issue-focus/aeoi/belgium-tin.pdf",
+      "source_name": "www.oecd.org"
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "city_name": "Bruges",
+      "category_key": "transport",
+      "title": "Transport — Bruges",
+      "body": "De Lijn operates Bruges city-centre bus service (source: https://www.delijn.be/en/nieuws/brugge-p-r-gratis-tickets/); its official adult Omnipas for ages 25 to 64 costs EUR 62 for one month, plus a EUR 10 MOBIB administrative fee (source: https://www.delijn.be/en/content/vervoerbewijzen/tarieven/).",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-be-bruges-transport",
+      "source_url": "https://www.delijn.be/en/content/vervoerbewijzen/tarieven/",
+      "source_name": "www.delijn.be"
+    }
+  ],
+  "events": []
+}

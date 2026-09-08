@@ -83,7 +83,10 @@ def to_resources_and_sources(rec: dict) -> tuple[list[dict], list[dict]]:
         category = CATEGORY_BY_SERVICE.get(svc)
         if category is None:
             raise ValueError(f"{city}: no category mapped for service {svc!r}")
-        url = (payload.get("source_url") or "").strip()
+        url_raw = payload.get("source_url")
+        if isinstance(url_raw, list):  # some gap-fill cities (e.g. AU/wollongong) cite a list
+            url_raw = next((u for u in url_raw if u), "")
+        url = (url_raw or "").strip() if isinstance(url_raw, str) else ""
         has_src = bool(url) and not payload.get("source_missing")
         res = {
             "country_code": iso2,

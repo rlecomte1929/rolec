@@ -1,0 +1,18 @@
+{
+  "batch_id": "se-city-services-2026-09-08",
+  "generated_at": "2026-09-08",
+  "country": "Sweden",
+  "cities_imported": [
+    "boras",
+    "gavle",
+    "jonkoping",
+    "norrkoping",
+    "umea"
+  ],
+  "resource_count": 30,
+  "source_count": 7,
+  "target_table": "country_resources",
+  "status": "delivered \u2014 draft/invisible in prod",
+  "storage": "Otto GCS workspace-media (public-read)",
+  "converter": "scripts/gen_city_services_bundle.py"
+}
