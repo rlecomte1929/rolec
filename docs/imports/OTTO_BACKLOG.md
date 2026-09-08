@@ -48,13 +48,13 @@ Per-city `ndjson_url` + `manifest_url` under the GCS base (filenames in Otto's m
 - **SE** 5 confirmed (norrkoping/jonkoping/umea/gavle/boras) — ⚠️ malmö, västerås uncertain
 - **DK** roskilde confirmed — ⚠️ odense uncertain
 - **BE** 4 (Sep 8 gap-fills): antwerp/bruges/brussels/ghent (have .zip bundles too)
-- **FI** 7: manifests present, ⚠️ NDJSON URLs not in the top-100 window — recover via `psql workspace_media WHERE filename ILIKE '%fi%'`
+- **FI** 7: manifests present, ⚠️ NDJSON URLs not in the top-100 window — Audos-gated recovery (see §D.2; not a CLI `psql` query)
 - **IT/PL** (bergamo/brescia/modena/torun/genoa/florence + houston-US): ⚠️ validated in cursor tasks but **no standalone workspace-media URL** — live only in the original attachment path
 
 ### A4. Other GCS
 - **ICP research** (13 records): `1788824530010_t44l1k2q.ndjson` + manifest `1788824552512_ff6tkvq4.json`
 - **Demo Day brief** (23 records): `1788825247748_mshqn6ei.ndjson` + manifest `1788825284608_wr11bwm1.json`
-- **Technical/business roadmap** (.docx): ⚠️ URL truncated in Otto's manifest — recover via `psql … filename ILIKE '%roadmap%'`
+- **Technical/business roadmap** (.docx): ⚠️ URL truncated in Otto's manifest — Audos-gated recovery (see §D.2; not a CLI `psql` query)
 
 ---
 
@@ -95,12 +95,23 @@ before loading any WorkspaceDB facts, or we double-write.
 - **app_vendor_providers = 0** — no vendor promoted to the live catalogue (HR users see none).
 - **kg candidates (35)** — pending human review by design; must not be served.
 - Uncertain city files: SE/malmö, SE/västerås, DK/odense, US/houston (tasks done, files not in top-100).
-- FI NDJSON URLs + roadmap URL — recover via `psql workspace_media` queries.
+- FI NDJSON URLs + roadmap URL — Audos-gated recovery (see §D.2; `workspace_media` is not in prod, so this is not a CLI `psql` query).
 
 ---
 
 ## D. Recovery actions Otto flagged (to prevent loss)
 1. **Fix `OTTO_LOADER_TOKEN`** → dry_run → apply Bridge B, to load all of section B into prod.
-2. **`psql "$DATABASE_URL"` on `workspace_media`** for `filename ILIKE '%fi%' / %malmo% / %vasteras% /
-   %odense% / %roadmap%'` to recover the missing GCS URLs.
+2. **Recover the missing GCS URLs — this is an Audos-side query, NOT runnable from a CLI checkout.**
+   An earlier revision of this list said to run `psql "$DATABASE_URL"` on a `workspace_media` table.
+   That premise is **false and was verified so 2026-09-08**: `workspace_media` does **not** exist in
+   prod Supabase (it is an Audos WorkspaceDB table, unreachable via `DATABASE_URL` — only
+   `public.workspace_stats` matches), and the `audos-images` GCS bucket **denies anonymous LIST**
+   (`storage.objects.list` 401; individual-object read is public, but the `<epoch_ms>_<slug>` names
+   can't be enumerated without the index). The committed export
+   `data/workspace-db-export/2026-08-18/linked_references.*` is a fetched-URL cache, not the object
+   index. So the missing city NDJSON URLs (FI×7, IT/PL, SE malmö/västerås, DK odense) and the roadmap
+   `.docx` URL can only be recovered **inside Audos**: query the WorkspaceDB index there
+   (`SELECT filename, gcs_url FROM workspace_media WHERE filename ILIKE '%malmo%' …`) or have Otto
+   re-emit the master city manifest, then hand the URLs to the applier to `curl` + import. **Do not
+   guess-construct GCS filenames.**
 3. Everything already in GCS is safe (permanent public-read).
