@@ -951,7 +951,8 @@ class Database(CasesMixin, PoliciesMixin, UsersMixin, AuthMixin, IntakeMixin, Hr
 
     # [AUDIT-C1.3] policies batch 9 — company_policies reads/writes
     # (get_company_policy, get_latest_company_policy,
-    # get_company_policy_with_published_version, list_company_ids_with_published_policy,
+    # get_company_policy_with_published_version, get_company_policy_with_published_version_bulk,
+    # list_company_ids_with_published_policy,
     # update_company_policy_status, update_company_policy_meta) extracted to
     # backend/db/policies.py (PoliciesMixin). Database inherits them, callers unchanged.
 
@@ -1179,6 +1180,7 @@ class Database(CasesMixin, PoliciesMixin, UsersMixin, AuthMixin, IntakeMixin, Hr
 
     # [AUDIT-C1.3] policies batch 8 — policy_config_version publish/draft/history
     # (publish_policy_config_version_atomic, get_latest_published_policy_config_version,
+    # get_latest_published_policy_config_version_bulk,
     # get_policy_config_draft_for_config, list_policy_config_versions_history,
     # update_policy_config_version_effective_date) extracted to backend/db/policies.py
     # (PoliciesMixin). Database inherits them, callers unchanged.

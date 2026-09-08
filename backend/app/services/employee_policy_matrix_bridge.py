@@ -23,16 +23,31 @@ CONFIG_KEY = "compensation_allowance"
 
 def find_published_matrix_version(db: Any, company_ids: List[str]) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
     """First candidate company with a published policy_config matrix row."""
-    for cid in company_ids:
-        if not cid:
-            continue
+    ids = [str(c).strip() for c in (company_ids or []) if c and str(c).strip()]
+    if not ids:
+        return None, None
+    bulk_fn = getattr(db, "get_latest_published_policy_config_version_bulk", None)
+    found: Optional[Dict[str, Any]] = None
+    if callable(bulk_fn):
         try:
-            pub = db.get_latest_published_policy_config_version(str(cid), CONFIG_KEY)
+            found = bulk_fn(ids, CONFIG_KEY) or {}
+        except Exception as exc:
+            log.warning("matrix bridge get_latest_published bulk failed exc=%s", exc)
+            found = None
+    if found is not None:
+        for cid in ids:
+            pub = found.get(cid)
+            if pub:
+                return cid, pub
+        return None, None
+    for cid in ids:
+        try:
+            pub = db.get_latest_published_policy_config_version(cid, CONFIG_KEY)
         except Exception as exc:
             log.warning("matrix bridge get_latest_published failed company_id=%s exc=%s", cid, exc)
             pub = None
         if pub:
-            return str(cid), pub
+            return cid, pub
     return None, None
 
 
