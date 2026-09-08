@@ -59,6 +59,15 @@ def _uuid() -> str:
     return str(uuid.uuid4())
 
 
+def _distinct(objs):
+    seen, out = set(), []
+    for o in objs:
+        if id(o) not in seen:
+            seen.add(id(o))
+            out.append(o)
+    return out
+
+
 class StaleFormReportTests(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = create_engine(
@@ -68,11 +77,17 @@ class StaleFormReportTests(unittest.TestCase):
             for stmt in SCHEMA.split(";"):
                 if stmt.strip():
                     conn.execute(text(stmt))
-        # sfr.db is the shared database.db singleton (same object trigger_engine imports),
-        # so patching it here redirects both the report's own queries and the engine helpers.
-        patcher = mock.patch.object(sfr.db, "engine", self.engine)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        # In prod stale_form_report.db and trigger_engine.db are the one database.db singleton.
+        # But under full-suite collection the conftest installs a MagicMock for backend.database
+        # and real-SQL modules swap the real one back in mid-collection (AIQ-1776/1777), so the
+        # two modules can bind DIFFERENT db objects depending on import order. Patch the engine on
+        # every db reference the report touches — its own queries (sfr.db) AND the trigger-engine
+        # helpers it reuses (sfr.te.db) — or the helpers run on an unpatched engine and every gate
+        # silently fails to match, manufacturing false "stale" rows.
+        for target in _distinct((sfr.db, sfr.te.db)):
+            patcher = mock.patch.object(target, "engine", self.engine)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     # ── seeding helpers ──────────────────────────────────────────────────────
     def _case(self, *, origin: str, dest: str = "DE", purpose: str = "work") -> str:
