@@ -4,8 +4,9 @@ suppliers.based_in_country.
 
 These pin the master-creation contract at the approval gate without the app-ORM /
 dual-engine plumbing: `service_catalog.upsert_item` is mocked and the calls it
-receives are asserted. The AGS-France case — one FR-based supplier serving DE and NO
-— must yield a DE master and a NO master, not an FR one.
+receives are asserted. ADR-002 Option B: one FR-based supplier serving DE and NO
+under one name keeps a single master whose country is NULLed on the second
+distinct country — not two masters, and not an FR one.
 """
 from __future__ import annotations
 
@@ -44,15 +45,32 @@ class ApprovalCreatesMasterTests(unittest.TestCase):
         self.assertEqual(kw["source"], "registry_promoted")
         self.assertEqual(kw["external_id"], "registry:vc-ags:movers:NO")
 
-    def test_ags_france_one_supplier_two_countries(self):
-        """One FR-based supplier, two capabilities (DE, NO) → two masters, DE and NO."""
+    def test_ags_france_second_country_nulls_the_single_master(self):
+        """One FR-based supplier, two capabilities (DE then NO) → one master, country NULL."""
+        existing = {"id": "master-ags", "supplier_id": "vc-ags", "country": "DE"}
         with mock.patch.object(service_catalog, "find_master_by_category_name", return_value=None), \
-             mock.patch.object(service_catalog, "upsert_item") as up:
+             mock.patch.object(service_catalog, "upsert_item") as up, \
+             mock.patch.object(service_catalog, "clear_master_country") as clear:
             supplier_registry._ensure_catalog_master_for_capability(_cap("DE"), "AGS France")
+        up.assert_called_once()
+        self.assertEqual(up.call_args.kwargs["country"], "DE")
+        clear.assert_not_called()
+
+        with mock.patch.object(service_catalog, "find_master_by_category_name", return_value=existing), \
+             mock.patch.object(service_catalog, "upsert_item") as up, \
+             mock.patch.object(service_catalog, "clear_master_country") as clear:
             supplier_registry._ensure_catalog_master_for_capability(_cap("NO"), "AGS France")
-        countries = [c.kwargs["country"] for c in up.call_args_list]
-        self.assertEqual(countries, ["DE", "NO"])
-        self.assertNotIn("FR", countries)
+        up.assert_not_called()
+        clear.assert_called_once_with("master-ags")
+
+    def test_same_country_reapproval_leaves_master_country(self):
+        existing = {"id": "master-ags", "supplier_id": "vc-ags", "country": "DE"}
+        with mock.patch.object(service_catalog, "find_master_by_category_name", return_value=existing), \
+             mock.patch.object(service_catalog, "upsert_item") as up, \
+             mock.patch.object(service_catalog, "clear_master_country") as clear:
+            supplier_registry._ensure_catalog_master_for_capability(_cap("DE"), "AGS France")
+        up.assert_not_called()
+        clear.assert_not_called()
 
     def test_missing_category_creates_no_master(self):
         cap = _cap("NO", category="")

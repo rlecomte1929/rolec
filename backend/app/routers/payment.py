@@ -34,7 +34,7 @@ from ..db import SessionLocal
 from ..services.pii_masker import safe_log_text
 from ..services.roadmap_entitlement import (
     lookup_entitlement,
-    unlocked_from_lookup,
+    roadmap_entitlement_view,
 )
 
 logger = logging.getLogger(__name__)
@@ -209,10 +209,14 @@ def payment_status(
     found = lookup_entitlement(case_id)
     ent = found.row
     tier = (ent or {}).get("access_tier") or "free"
-    unlocked = unlocked_from_lookup(found)
+    # [AIQ-2142] Serve entitlement as DATA so the client renders the wall (or none) from the
+    # server's decision instead of a build-time flag. `unlocked` inside is the same value the
+    # enforcement gate uses; `roadmap_unlocked` stays as a top-level alias for back-compat.
+    entitlement = roadmap_entitlement_view(found)
     return JSONResponse(content={
         "case_id": case_id,
         "access_tier": tier,
         "payment_status": (ent or {}).get("payment_status") or "unpaid",
-        "roadmap_unlocked": unlocked,
+        "roadmap_unlocked": entitlement["unlocked"],
+        "entitlement": entitlement,
     })

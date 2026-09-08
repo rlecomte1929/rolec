@@ -601,11 +601,13 @@ def _ensure_catalog_master_for_capability(cap: Any, supplier_name: Optional[str]
     vetting status).
 
     Country comes from the CAPABILITY's ``country_code``, never
-    ``suppliers.based_in_country``: an AGS-France-style supplier based in FR but
-    serving DE and NO must get a DE master and a NO master — one per capability —
-    not an FR one. Idempotent via a deterministic ``external_id``. Best-effort: a
-    catalog failure must never roll back a completed approval (the coverage guard /
-    backfill catches any straggler)."""
+    ``suppliers.based_in_country``. The catalog UNIQUE
+    ``(category, lower(trim(name)))`` index allows only one master per name, so a
+    supplier serving DE and NO under one name keeps that single row: the first
+    approval tags it with that country, a second distinct country NULLs it
+    (ADR-002 Option B, country-agnostic). ``external_id`` stays keyed to the
+    first country. Best-effort: a catalog failure must never roll back a
+    completed approval (the coverage guard / backfill catches any straggler)."""
     from . import service_catalog
 
     category = (getattr(cap, "service_category", None) or "").strip().lower()
@@ -639,9 +641,16 @@ def _ensure_catalog_master_for_capability(cap: Any, supplier_name: Optional[str]
                     "supplier %s; not relinking to %s",
                     existing.get("id"), category, name, ex_supplier, supplier_id,
                 )
-            # ex_supplier == supplier_id → already linked; nothing to do. This also covers
-            # the multi-country case: a supplier serving two countries under one name keeps
-            # its single (category, name) master rather than erroring on a second insert.
+            else:
+                # Already linked to this supplier. A second distinct capability
+                # country promotes the master to country-agnostic (ADR-002 Option B).
+                existing_country = (existing.get("country") or "").strip().upper()[:2] or None
+                if (
+                    existing_country
+                    and country
+                    and existing_country != country
+                ):
+                    service_catalog.clear_master_country(existing["id"])
             return
         service_catalog.upsert_item(
             category=category,
