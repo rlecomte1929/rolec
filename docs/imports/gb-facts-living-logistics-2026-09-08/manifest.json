@@ -1,0 +1,26 @@
+{
+  "batch_id": "gb-facts-living-logistics-2026-09-08",
+  "kind": "manifest",
+  "corridor": "IN-GB",
+  "scope": "non-EEA professional",
+  "topic_areas": ["council_tax", "school_admissions", "driving_licence", "bank_account"],
+  "generated_date": "2026-09-08",
+  "source_policy": "official-gov.uk-only",
+  "allowed_hosts": ["gov.uk", "nhs.uk", "legislation.gov.uk", "assets.publishing.service.gov.uk"],
+  "files": [
+    {
+      "filename": "facts.ndjson",
+      "record_count": 20,
+      "sha256": "9cef6af9f510321ed6f466d65c4b778e721a860bfd31eddbfe303d93fa39ea48",
+      "bytes": 17774,
+      "content_type": "application/x-ndjson"
+    }
+  ],
+  "record_counts_by_category": {
+    "council_tax": 6,
+    "school_admissions": 5,
+    "driving_licence": 4,
+    "bank_account": 5
+  },
+  "notes": "India is not on the DVLA designated-country list (confirmed by 2013 DfT press release listing 22 non-EU/EEA designated countries). The 12-month GB residency rule is cited from two independent gov.uk sources. Bank account facts sourced from MHCLG Homes for Ukraine guidance which states the universally applicable UK banking ID requirements. All evidence_quote fields are verbatim from official sources. Monetary amounts (Council Tax band rates) are NOT included — confirm with local council at review as rates vary by LA and change annually."
+}
