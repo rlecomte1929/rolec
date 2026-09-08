@@ -4,12 +4,15 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ShieldCheck } from 'lucide-react';
 import { Button } from '../../components/antigravity/Button';
 import { Input } from '../../components/antigravity/Input';
 import { Card } from '../../components/antigravity';
 import { adminAPI, type AdminMobilityOperationalInspect } from '../../api/client';
+import { createCaseAttestation, type AttestationCreated } from '../../api/attestation';
+import { getApiErrorMessage } from '../../utils/apiDetail';
 import { buildRoute } from '../../navigation/routes';
 import { AdminLayout } from './AdminLayout';
 
@@ -50,6 +53,30 @@ function dash(v: unknown): string {
   return String(v);
 }
 
+function RequestValidationButton({
+  pending,
+  disabled,
+  onClick,
+}: {
+  pending: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      unstyled
+      type="button"
+      aria-label="Request validation"
+      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#0b2b43] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+      {pending ? 'Requesting…' : 'Request validation'}
+    </Button>
+  );
+}
+
 export const AdminMobilityCaseInspectPage: React.FC = () => {
   const { caseId } = useParams<{ caseId?: string }>();
   const navigate = useNavigate();
@@ -58,6 +85,8 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
   const [evalSubmitting, setEvalSubmitting] = useState(false);
   const [evalSuccess, setEvalSuccess] = useState<string | null>(null);
   const [evalError, setEvalError] = useState<string | null>(null);
+  const [createdAttestation, setCreatedAttestation] = useState<AttestationCreated | null>(null);
+  const [copiedReviewUrl, setCopiedReviewUrl] = useState(false);
 
   const trimmedCaseId = caseId?.trim() ?? '';
 
@@ -92,6 +121,8 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
   useEffect(() => {
     setEvalSuccess(null);
     setEvalError(null);
+    setCreatedAttestation(null);
+    setCopiedReviewUrl(false);
   }, [trimmedCaseId]);
 
   const handleRefresh = () => {
@@ -99,6 +130,19 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
     setEvalError(null);
     void inspectQuery.refetch();
   };
+
+  const requestValidation = useMutation({
+    mutationFn: () => createCaseAttestation({ case_id: trimmedCaseId }),
+    onSuccess: (data) => {
+      setEvalError(null);
+      setCreatedAttestation(data);
+      setCopiedReviewUrl(false);
+    },
+    onError: (err: unknown) => {
+      setCreatedAttestation(null);
+      setEvalError(getApiErrorMessage(err, 'Could not request validation.'));
+    },
+  });
 
   const context = payload?.context;
   const caseRow = context?.case as Record<string, unknown> | null | undefined;
@@ -198,7 +242,46 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
         </div>
       )}
       {evalError && (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 text-red-800 text-sm px-3 py-2">{evalError}</div>
+        <div
+          role="alert"
+          className="mb-4 rounded-md border border-red-200 bg-red-50 text-red-800 text-sm px-3 py-2"
+        >
+          {evalError}
+        </div>
+      )}
+      {createdAttestation && (
+        <div
+          role="status"
+          className="mb-4 rounded-md border-2 border-amber-300 bg-amber-50 px-3 py-3"
+        >
+          <h2 className="text-sm font-semibold text-[#0b2b43]">
+            Reviewer link — copy and send to counsel
+          </h2>
+          <p className="mt-1 text-xs text-[#64748b]">{createdAttestation.warning}</p>
+          <p className="mt-2 text-xs font-mono text-[#0b2b43] break-all">{createdAttestation.review_url}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <a
+              href={createdAttestation.review_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-[#0b2b43] underline"
+            >
+              Reviewer link — copy and send to counsel
+            </a>
+            <Button
+              unstyled
+              type="button"
+              aria-label="Copy reviewer link"
+              className="rounded bg-[#0b2b43] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+              onClick={() => {
+                void navigator.clipboard?.writeText(createdAttestation.review_url);
+                setCopiedReviewUrl(true);
+              }}
+            >
+              {copiedReviewUrl ? 'Copied' : 'Copy link'}
+            </Button>
+          </div>
+        </div>
       )}
 
       {loading && !payload && (
@@ -238,6 +321,20 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
               </p>
             )}
           </Card>
+
+          {!op && (
+            <Card padding="md">
+              <h2 className="text-sm font-semibold text-[#0b2b43] mb-2">Next actions</h2>
+              <RequestValidationButton
+                pending={requestValidation.isPending}
+                disabled={!trimmedCaseId || requestValidation.isPending || loading}
+                onClick={() => requestValidation.mutate()}
+              />
+              <p className="text-xs text-[#64748b] mt-2">
+                Snapshots this case&apos;s served legal requirements and mints a one-time reviewer link for counsel.
+              </p>
+            </Card>
+          )}
 
           {/* 2. Readiness checklist */}
           {op && rf && (
@@ -357,6 +454,16 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
           {op && (
             <Card padding="md">
               <h2 className="text-sm font-semibold text-[#0b2b43] mb-2">Next actions</h2>
+              <div className="mb-3">
+                <RequestValidationButton
+                  pending={requestValidation.isPending}
+                  disabled={!trimmedCaseId || requestValidation.isPending || loading}
+                  onClick={() => requestValidation.mutate()}
+                />
+                <p className="text-xs text-[#64748b] mt-2">
+                  Snapshots this case&apos;s served legal requirements and mints a one-time reviewer link for counsel.
+                </p>
+              </div>
               {!op.next_actions_preview?.actions?.length ? (
                 <p className="text-sm text-[#64748b]">No open next actions (nothing missing or needs review).</p>
               ) : (
