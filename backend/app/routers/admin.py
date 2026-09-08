@@ -816,3 +816,20 @@ def reconcile_policy_ingest(
             actor_id=actor_id,
         )
     return summary
+
+
+@router.get("/reports/stale-case-forms")
+def stale_case_forms_report(
+    country: Optional[str] = None,
+    user: dict = Depends(require_admin),
+) -> Dict[str, Any]:
+    """[AIQ-1866] Read-only report of attached case_forms whose template trigger rule no longer
+    matches the case — the cleanup list a gate change should have produced but the append-only
+    trigger engine never does. Never deletes or detaches; each row carries the safety facts
+    (`human_input_present` / `submitted` / `blocker_referenced` / derived `safe_to_retract`) a
+    human needs before acting. `country` optionally scopes to one destination (ISO-2).
+    """
+    from ..services.stale_form_report import find_stale_case_forms
+
+    rows = find_stale_case_forms(country)
+    return {"count": len(rows), "stale_case_forms": rows}
