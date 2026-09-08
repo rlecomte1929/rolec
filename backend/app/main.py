@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+
+from .cors import install_cors
 
 from .db import init_db
 from .routers import (
@@ -139,13 +140,7 @@ def create_app() -> FastAPI:
     seed_demo_cases()
 
     app = FastAPI(title="ReloPass Wizard API", version="1.0.0")
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    install_cors(app)
 
     # ── Pre-existing routers ──────────────────────────────────────────────────
     # [AUDIT-B9-cases-6] cases.router replaced by 3 modular routers (read/write/admin).
