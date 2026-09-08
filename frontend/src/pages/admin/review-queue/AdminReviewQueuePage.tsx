@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { Button } from '../../../components/antigravity/Button';
 import { Input } from '../../../components/antigravity/Input';
 import { Checkbox } from '../../../components/antigravity/Checkbox';
+import { CountryFlag } from '../../../components/antigravity/CountryFlag';
 import { ReviewQueuePriorityBadge } from '../../../components/admin/review-queue/ReviewQueuePriorityBadge';
 import { ReviewQueueStatusBadge } from '../../../components/admin/review-queue/ReviewQueueStatusBadge';
 import { BulkActionBar, type BulkActionResult } from '../../../components/antigravity/BulkActionBar';
@@ -420,7 +421,14 @@ export const AdminReviewQueuePage: React.FC = () => {
                         <ReviewQueueStatusBadge status={it.status} />
                       </td>
                       <td className="px-3 py-2 text-sm">
-                        {[it.country_code, it.city_name].filter(Boolean).join(' / ') || '-'}
+                        {it.country_code || it.city_name ? (
+                          <span className="inline-flex flex-wrap items-center gap-1">
+                            {it.country_code ? <CountryFlag country={it.country_code} className="text-sm" /> : null}
+                            {it.city_name ? <span>{it.city_name}</span> : null}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
                       </td>
                       <td className="px-3 py-2 text-sm">{it.assigned_to_user_id ? 'Assigned' : '-'}</td>
                       <td className="px-3 py-2 text-sm">{formatDue(it.due_at)}</td>

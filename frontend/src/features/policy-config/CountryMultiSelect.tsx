@@ -15,6 +15,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '../../components/antigravity/Input';
 import { Button } from '../../components/antigravity/Button';
+import { CountryFlag } from '../../components/antigravity/CountryFlag';
 import { COUNTRY_OPTIONS, countryName } from './countryList';
 
 type Props = {
@@ -103,8 +104,7 @@ export const CountryMultiSelect: React.FC<Props> = ({
             key={code}
             className="inline-flex items-center gap-1 rounded-full bg-[#eff6ff] border border-[#bfdbfe] px-2 py-0.5 text-xs text-[#1d4ed8]"
           >
-            <span className="font-medium">{code.toUpperCase()}</span>
-            <span className="text-[#64748b]">{countryName(code.toUpperCase())}</span>
+            <CountryFlag country={code} className="text-xs gap-1" />
             {!disabled && (
               <Button unstyled
                 type="button"
@@ -152,10 +152,7 @@ export const CountryMultiSelect: React.FC<Props> = ({
                     checked ? 'bg-[#eff6ff] text-[#1d4ed8]' : 'text-[#0f172a]'
                   }`}
                 >
-                  <span>
-                    <span className="font-mono mr-2 text-[#64748b]">{c.code}</span>
-                    {c.name}
-                  </span>
+                  <CountryFlag country={c.code} label={c.name} className="text-sm" />
                   {checked && <span aria-hidden>✓</span>}
                 </Button>
               );

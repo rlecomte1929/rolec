@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
 import { Checkbox } from '../../components/antigravity/Checkbox';
-import { Card, Button, Alert, Badge } from '../../components/antigravity';
+import { Card, Button, Alert, Badge, CountryFlag, CountrySelect, CountryCoverageText } from '../../components/antigravity';
 import { suppliersAPI } from '../../api/client';
 import { ROUTE_DEFS } from '../../navigation/routes';
 import { useIsAdmin } from '../../features/admin/useIsAdmin';
@@ -77,22 +77,39 @@ const COVERAGE_TYPES = ['global', 'country', 'city'] as const;
 
 function CoverageSummary({ capabilities }: { capabilities: Capability[] }) {
   const hasGlobal = capabilities.some((c) => c.coverage_scope_type === 'global');
-  const countries = [...new Set(capabilities.filter((c) => c.country_code).map((c) => c.country_code))].sort();
+  const countries = [...new Set(capabilities.filter((c) => c.country_code).map((c) => c.country_code as string))].sort();
   const cityCaps = capabilities.filter((c) => c.coverage_scope_type === 'city' && c.city_name && c.country_code);
 
   return (
     <div className="space-y-4">
       <div>
-        <dt className="text-[#6b7280] text-sm mb-1">Countries covered</dt>
-        <dd className="text-sm text-[#0b2b43]">
-          {hasGlobal ? 'Global (all countries)' : countries.length ? countries.join(', ') : '-'}
+        <dt className="text-slate-500 text-sm mb-1">Countries covered</dt>
+        <dd className="text-sm text-navy-800">
+          {hasGlobal ? (
+            'Global (all countries)'
+          ) : countries.length ? (
+            <span className="inline-flex flex-wrap gap-x-3 gap-y-1">
+              {countries.map((code) => (
+                <CountryFlag key={code} country={code} />
+              ))}
+            </span>
+          ) : (
+            '-'
+          )}
         </dd>
       </div>
       {cityCaps.length > 0 && (
         <div>
-          <dt className="text-[#6b7280] text-sm mb-1">City-specific coverage</dt>
-          <dd className="text-sm text-[#0b2b43]">
-            {cityCaps.map((c) => `${c.city_name} (${c.country_code})`).join('; ')}
+          <dt className="text-slate-500 text-sm mb-1">City-specific coverage</dt>
+          <dd className="text-sm text-navy-800">
+            <span className="inline-flex flex-wrap gap-x-3 gap-y-1">
+              {cityCaps.map((c) => (
+                <span key={c.id} className="inline-flex items-center gap-1">
+                  {c.city_name}
+                  <CountryFlag country={c.country_code || ''} className="text-sm" />
+                </span>
+              ))}
+            </span>
           </dd>
         </div>
       )}
@@ -645,13 +662,12 @@ export const AdminSupplierDetail: React.FC = () => {
                 </div>
                 {newCap.coverage_scope_type !== 'global' && (
                   <div>
-                    <label htmlFor="sd-country" className="block text-xs text-[#6b7280] mb-0.5">Country</label>
-                    <Input id="sd-country" unstyled
-                      type="text"
+                    <label htmlFor="sd-country" className="block text-xs text-slate-500 mb-0.5">Country</label>
+                    <CountrySelect
+                      id="sd-country"
                       value={newCap.country_code}
-                      onChange={(v) => setNewCap((c) => ({ ...c, country_code: v.toUpperCase().slice(0, 2) }))}
-                      className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
-                      placeholder="NO"
+                      onChange={(code) => setNewCap((c) => ({ ...c, country_code: code }))}
+                      placeholder="Select a country"
                     />
                   </div>
                 )}
@@ -737,10 +753,20 @@ export const AdminSupplierDetail: React.FC = () => {
                         {c.platform_vetting_status || 'pending'}
                       </Badge>
                     </div>
-                    <div className="text-sm text-[#6b7280] mt-1">
-                      {c.coverage_scope_type}
-                      {c.country_code && ` • ${c.country_code}`}
-                      {c.city_name && ` • ${c.city_name}`}
+                    <div className="text-sm text-slate-500 mt-1 flex flex-wrap items-center gap-1">
+                      <span>{c.coverage_scope_type}</span>
+                      {c.country_code && (
+                        <>
+                          <span aria-hidden>•</span>
+                          <CountryFlag country={c.country_code} className="text-sm" />
+                        </>
+                      )}
+                      {c.city_name && (
+                        <>
+                          <span aria-hidden>•</span>
+                          <span>{c.city_name}</span>
+                        </>
+                      )}
                     </div>
                     {c.specialization_tags?.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
@@ -1081,7 +1107,11 @@ function RankingDebugCard({
           <p className="font-medium">{result.would_match_search ? 'Included' : 'Excluded'}</p>
           <p className="mt-1">{result.match_reason}</p>
           {result.status && <p className="mt-1 text-xs">Status: {result.status}</p>}
-          {result.coverage_summary && <p className="text-xs mt-1">Coverage: {result.coverage_summary}</p>}
+          {result.coverage_summary && (
+            <p className="text-xs mt-1">
+              Coverage: <CountryCoverageText summary={result.coverage_summary} />
+            </p>
+          )}
         </div>
       )}
     </Card>
