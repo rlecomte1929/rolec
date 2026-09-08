@@ -1,10 +1,10 @@
 """
 HR Coordination — provider task management.
 
-GET    /api/hr/cases/{case_id}/providers   — list providers assigned to a case
-POST   /api/hr/cases/{case_id}/tasks       — assign a task to a provider
-PATCH  /api/hr/tasks/{task_id}             — update a provider task
-DELETE /api/hr/tasks/{task_id}             — cancel (soft-delete) a provider task
+GET    /api/hr/cases/{case_id}/providers        — list providers assigned to a case
+POST   /api/hr/cases/{case_id}/provider-tasks   — assign a task to a provider
+PATCH  /api/hr/tasks/{task_id}                  — update a provider task
+DELETE /api/hr/tasks/{task_id}                  — cancel (soft-delete) a provider task
 """
 from __future__ import annotations
 
@@ -360,10 +360,10 @@ def dispatch_case_rfq(
 
 
 # ---------------------------------------------------------------------------
-# POST /api/hr/cases/{case_id}/tasks
+# POST /api/hr/cases/{case_id}/provider-tasks
 # ---------------------------------------------------------------------------
 
-@router.post("/cases/{case_id}/tasks", status_code=status.HTTP_201_CREATED)
+@router.post("/cases/{case_id}/provider-tasks", status_code=status.HTTP_201_CREATED)
 def assign_task(
     case_id: str,
     body: AssignTaskBody,
