@@ -119,13 +119,19 @@ Applier-only, **outside** the harness: flip `status→ready` (scoped) · real
 
 ## 5. Stage specifications
 
-### 0 · INGEST
-- **URL entry:** pull the delivery message from the bridge (`{action:"pull",direction:"otto_to_claude"}`,
-  secret from `~/.otto-bridge-secret`, header only), extract the manifest + NDJSON GCS URLs, fetch
-  the objects byte-for-byte into `docs/imports/<batch>/`. (Net-new; the only stage that touches the
-  bus/GCS. Cursor builds a testable client with the bus/GCS calls injectable so acceptance tests run
-  offline against a local fixture.)
-- **Local entry:** `<dir>` already contains `manifest.json` + the NDJSON — skip fetch.
+### 0 · INGEST — three ways in (O1 resolved)
+- **Manifest-URL entry (primary):** the positional arg is a raw `https` manifest URL (GCS). Fetch
+  the manifest, read the NDJSON object URLs it declares, fetch those byte-for-byte into
+  `docs/imports/<batch>/`. This is the path that works even when Otto delivered to GCS **without**
+  posting to the bus.
+- **`--from-bus` resolver (optional):** pull the latest `otto_to_claude` delivery
+  (`{action:"pull",direction:"otto_to_claude"}`, secret from `~/.otto-bridge-secret`, header only),
+  extract the manifest URL from the delivery payload, then delegate to the manifest-URL path. A thin
+  convenience over the primary path, not a separate code path.
+- **Local-dir entry:** `<dir>` already contains `manifest.json` + the NDJSON — skip fetch. The
+  offline test surface.
+- The bus/GCS transport is **injectable** so acceptance tests run offline against a local fixture
+  (a `file://` manifest + local NDJSON) with no network.
 - **Output:** a populated batch dir + `run.json` seeded. **Never** acks the bus row until the batch
   is committed to the repo (an un-committed GCS object is one bucket-cleanup from gone).
 
@@ -181,9 +187,13 @@ Deterministic reads over the staged (or would-stage) rows' `applies_to`:
   `applies_to` in place — `status='new'`, dedupe_key stable — before proceeding).
 - **UNMAPPED nationality:** rows whose `applies_to.nationality` is absent/disagreeing within a topic
   → never promote. List them.
-- **Cross-batch `ready` enumeration:** count what else is already `status='ready'` for each of this
-  batch's destinations, so the operator sees the *full* set a real `promote(country=ISO)` would
-  sweep — not just this batch's rows.
+- **Cross-batch `ready` enumeration (O2 resolved):** count what else is already `status='ready'` for
+  each of this batch's destinations, so the operator sees the *full* set a real `promote(country=ISO)`
+  would sweep — not just this batch's rows. Rows this batch would stage and rows already `ready` from
+  *other* batches are reported as **separate, labelled counts** (never merged). If this batch itself
+  already has `'promoted'` rows from a prior run, report the status mix (`new`/`ready`/`promoted`) so
+  `promote: 0` is never ambiguous between "done" and "not ready". The run does **not** hard-stop on
+  any of this — it is dry; the block lives at the manual promote.
 
 ### 6 · PROMOTE DRY-RUN — applier-owned, always rolled back
 In-process (imports `executor.promote`), inside a single `BEGIN … ROLLBACK`:
@@ -303,13 +313,11 @@ integrate the returned PRs, run against prod, and keep the gates.
 3. **Full P1 suite green** — `pytest backend/tests scripts/tests` — before any of the four PRs is
    flagged done (not a subset).
 
-## 13. Open questions for review
+## 13. Resolved decisions (were open questions)
 
-- **O1 — Stage 0 GCS reach.** Otto sometimes delivers to GCS without posting URLs on the bus
-  (dispatch mechanics). If the bus row carries no GCS URL, the URL entry point can't self-fetch;
-  the local-dir entry point is the fallback. Accept this asymmetry, or should stage 0 also accept a
-  raw GCS URL argument?
-- **O2 — `--stage` idempotency across re-runs of a partially-promoted batch.** If some of a batch's
-  rows were promoted manually between runs, they sit `status='promoted'`; the harness should report
-  the status mix rather than treat `promote: 0` as either "done" or "not ready". Confirmed handled
-  by the cross-batch `ready` enumeration in stage 5 — flagging for explicit sign-off.
+- **O1 — Stage 0 reach → RESOLVED: three ways in.** Positional arg is a local dir *or* a raw
+  manifest URL; `--from-bus` is an optional resolver. The manifest-URL path works even when Otto
+  delivered to GCS without a bus post — no dead-end. See §5 stage 0.
+- **O2 — partially-promoted batches → RESOLVED: report-and-label, no hard-stop.** Stage 5 reports
+  the full status mix and keeps this-batch vs other-batch `ready` counts separate; the run is dry so
+  it never blocks; the block is at the manual promote. See §5 stage 5.
