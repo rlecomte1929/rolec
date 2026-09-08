@@ -802,5 +802,34 @@ class TriggerEngineIntegrationTests(unittest.TestCase):
         self.assertEqual(result, 0)
 
 
+class TriggerEngineStaysAppendOnlyTests(unittest.TestCase):
+    """[AIQ-1866] The engine is append-only by construction — that is the safety property the
+    stale-form REPORT relies on instead of an automatic delete. Fails if a future edit gives
+    trigger_engine a delete/detach path on case_forms WITHOUT the human-input predicate:
+    retracting a form an employee has worked on destroys their input, and case_forms cascades
+    ON DELETE to five child tables.
+    """
+
+    def test_no_unguarded_delete_path_on_case_forms(self) -> None:
+        import inspect
+        import re
+
+        src = inspect.getsource(engine_module).lower()
+        deletes_case_forms = (
+            bool(re.search(r"delete\s+from\s+\S*case_forms", src)) or ".delete(" in src
+        )
+        if not deletes_case_forms:
+            return  # append-only, exactly as AIQ-1866 requires
+
+        self.assertTrue(
+            ("filled_by" in src) and ("submitted_at" in src or "submitted" in src),
+            "trigger_engine gained a delete/detach path on case_forms without the human-input "
+            "safety predicate (filled_by + submitted_at). See AIQ-1866: a retraction must never "
+            "remove a form an employee has worked on; case_forms cascades ON DELETE to five "
+            "child tables. Surface stale rows via stale_form_report instead of deleting, or gate "
+            "any delete on the safety predicate.",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

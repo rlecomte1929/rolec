@@ -52,6 +52,7 @@ const MobilityTeamsPage = lazy(() => import('./pages/public/MobilityTeamsPage').
 const RelocationChecklistPage = lazy(() => import('./pages/public/RelocationChecklistPage').then((m) => ({ default: m.RelocationChecklistPage })));
 const PrivacyPage = lazy(() => import('./pages/public/PrivacyPage').then((m) => ({ default: m.PrivacyPage })));
 const Auth = lazy(() => import('./pages/Auth').then((m) => ({ default: m.Auth })));
+const InviteAccept = lazy(() => import('./pages/InviteAccept').then((m) => ({ default: m.InviteAccept })));
 const NavigationAudit = lazy(() => import('./pages/NavigationAudit').then((m) => ({ default: m.NavigationAudit })));
 
 // TD-3/TD-5: lazy-loaded so the public test-drive pages don't bloat the main entry chunk (bundle-size budget).
@@ -315,6 +316,8 @@ function App() {
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
         {/* AIQ-920: /login alias renders the same Auth screen (defaults to login mode). */}
         <Route path={ROUTE_DEFS.login.path} element={<Auth />} />
+        {/* [AIQ-2189] Colleague-invite accept landing — public route, authenticated redeem. */}
+        <Route path={ROUTE_DEFS.inviteAccept.path} element={<InviteAccept />} />
         {/* Design preview — sandboxed Claude Design handoff bundle in iframe. Static, no auth, mock data only. */}
         <Route path="/design-preview" element={<DesignPreview />} />
         {/* Provider portal — public, magic-link JWT auth */}

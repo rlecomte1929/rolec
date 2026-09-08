@@ -45,6 +45,11 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 from urllib.parse import urlsplit
 
+from backend.app.services.evidence_quote_validator import (
+    CorruptedEvidenceError,
+    validate_ingest_text,
+)
+
 #: Keys every record must carry. Mirrors the NOT NULL columns of
 #: `otto_staging.immigration_fact_candidates`, minus the ones this module derives
 #: (`confidence_score`, `accuracy_tier`, `dedupe_key`, `extraction_method`).
@@ -398,18 +403,30 @@ def _to_row(rec: Dict[str, Any], batch_id: str, lineno: int) -> FactRow:
     if fact_type not in KNOWN_FACT_TYPES:
         fact_type = "other"
 
+    try:
+        fact_text = validate_ingest_text(rec.get("fact_text"), field="fact_text")
+        if not fact_text:
+            raise FactRowError("missing required field(s): fact_text")
+        evidence_quote = validate_ingest_text(
+            rec.get("evidence_quote"),
+            field="evidence_quote",
+            checksum=rec.get("quote_sha256"),
+        )
+    except CorruptedEvidenceError:
+        raise
+
     row = FactRow(
         destination_country=str(rec["destination_country"]).strip().upper(),
         entity_topic_key=str(rec["entity_topic_key"]).strip(),
         fact_key=str(rec["fact_key"]).strip(),
-        fact_text=str(rec["fact_text"]).strip(),
+        fact_text=fact_text,
         source_url=str(rec["source_url"]).strip(),
         batch_id=batch_id,
         entity_title=str(rec.get("entity_title") or "").strip()
         or _humanise(str(rec["entity_topic_key"])),
         fact_type=fact_type,
         applies_to=applies_to,
-        evidence_quote=(str(rec.get("evidence_quote") or "").strip() or None),
+        evidence_quote=evidence_quote,
         confidence=str(rec.get("confidence") or "medium").strip().lower(),
     )
     row.source_class = classify_source(row.source_url)
@@ -440,6 +457,9 @@ def read_jsonl(path: Path, *, batch_id: str) -> Tuple[List[FactRow], List[str]]:
                 raise FactRowError(f"line {lineno}: expected an object, got {type(rec).__name__}")
             try:
                 row = _to_row(rec, batch_id, lineno)
+            except CorruptedEvidenceError as exc:
+                rejections.append(f"line {lineno}: {exc}")
+                continue
             except FactRowError as exc:
                 raise FactRowError(f"line {lineno}: {exc}") from exc
 

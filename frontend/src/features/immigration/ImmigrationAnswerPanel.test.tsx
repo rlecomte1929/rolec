@@ -131,10 +131,15 @@ describe('ImmigrationAnswerPanel', () => {
     expect(link).toHaveTextContent(/Official immigration site: Ausländerbehörde/);
   });
 
-  it('renders no standing authority link when none is curated', async () => {
-    mockAuthority.mockResolvedValue(null);
-    render(<ImmigrationAnswerPanel caseContext={{ ...CASE_CTX }} />);
-    await waitFor(() => expect(mockAuthority).toHaveBeenCalledWith('DE'));
-    expect(screen.queryByTestId('destination-authority-link')).toBeNull();
+  it('looks up the standing authority when To is a country name, not ISO-2', async () => {
+    mockAuthority.mockResolvedValue({ name: 'Ausländerbehörde', url: 'https://www.bamf.de' });
+    render(
+      <ImmigrationAnswerPanel
+        caseContext={{ from: 'Spain', to: 'Germany', nationalities: ['FR'] }}
+      />,
+    );
+    await waitFor(() => expect(mockAuthority).toHaveBeenCalledWith('Germany'));
+    const link = await screen.findByTestId('destination-authority-link');
+    expect(link).toHaveAttribute('href', 'https://www.bamf.de');
   });
 });

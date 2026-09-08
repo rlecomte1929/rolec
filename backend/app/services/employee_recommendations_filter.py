@@ -25,11 +25,14 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy import text
+
 from ..recommendations.types import (
     RecommendationExplanation,
     RecommendationItem,
     RecommendationTier,
 )
+from ...database import db
 from . import service_catalog, vendor_curation
 
 log = logging.getLogger(__name__)
@@ -60,6 +63,43 @@ def _canon_country(value: Optional[str]) -> str:
     return v.upper() if len(v) == 2 else ""
 
 
+def _approved_capability_covers_destination(
+    supplier_id: str,
+    category: str,
+    dest_country: str,
+) -> bool:
+    """True when an approved capability covers dest (country match or global).
+
+    Mirrors ``vendor_proposal``'s JOIN: ``platform_vetting_status = 'approved'``
+    and ``coverage_scope_type = 'global' OR country_code = dest``.
+    """
+    if not supplier_id or not category or not dest_country:
+        return False
+    sql = (
+        "SELECT 1 FROM supplier_service_capabilities "
+        "WHERE supplier_id = :sid AND service_category = :cat "
+        "AND platform_vetting_status = 'approved' "
+        "AND (coverage_scope_type = 'global' OR country_code = :dest) "
+        "LIMIT 1"
+    )
+    try:
+        with db.engine.begin() as conn:
+            row = conn.execute(
+                text(sql),
+                {"sid": supplier_id, "cat": category, "dest": dest_country},
+            ).first()
+    except Exception:
+        log.exception(
+            "hr_curation_filter: capability coverage lookup failed "
+            "supplier_id=%s category=%s dest=%s",
+            supplier_id,
+            category,
+            dest_country,
+        )
+        return False
+    return row is not None
+
+
 def _serves_destination(
     master: Dict[str, Any],
     destination_city: Optional[str],
@@ -73,13 +113,25 @@ def _serves_destination(
     Paris case. City is the decisive signal (canonicalised the same way HR's curation
     rows are, per AIQ-1457); country is a fallback; when neither side can be compared
     confidently, HR's explicit approval stands.
+
+    ADR-002: a country-agnostic master (``country`` NULL) must NOT pass through for
+    every destination. Gate it on the linked supplier's approved capabilities, the
+    same way ``vendor_proposal`` does. City-first comparison stays for country-tagged
+    masters only — a leftover city on a multi-country row must not hide other
+    countries the capabilities cover.
     """
+    m_country = _canon_country(master.get("country"))
+    d_country = _canon_country(destination_country)
+    if not m_country:
+        return _approved_capability_covers_destination(
+            str(master.get("supplier_id") or ""),
+            str(master.get("category") or ""),
+            d_country,
+        )
     m_city = vendor_curation._canon_city(master.get("city"))
     d_city = vendor_curation._canon_city(destination_city)
     if m_city and d_city:
         return m_city == d_city
-    m_country = _canon_country(master.get("country"))
-    d_country = _canon_country(destination_country)
     if m_country and d_country:
         return m_country == d_country
     return True

@@ -6,13 +6,14 @@ import { ROUTE_DEFS, buildRoute } from '../navigation/routes';
 import { authAPI } from '../api/client';
 import { getHrNotificationCounts, type HrNotificationCounts } from '../api/hrCatalog';
 import { getAdminNotificationCounts, type AdminNotificationCounts } from '../api/adminCatalog';
+import { getUnreadMessageCount } from '../api/messageNotifications';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
-import { Button } from './antigravity/Button';
 import { swallow } from '../lib/errorTracking';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
 import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
+import { Button } from './antigravity/Button';
 // Lazy-loaded: the editor pulls in @dnd-kit, which is only needed once the user opens
 // "Edit layout". Keeping it out of the eager app-shell chunk holds the bundle budget.
 const SidebarLayoutEditor = React.lazy(() =>
@@ -86,7 +87,7 @@ const ROLE_RANK: Record<SidebarRole, number> = { EMPLOYEE: 0, HR: 1, ADMIN: 2 };
 // Single source of truth. Routes pulled from ROUTE_DEFS so renames cascade.
 //
 // Section ORDER matters: it's the render order in the sidebar. Admin · ReloPass is
-// first so an admin lands on their own surfaces (Admin overview at the top) rather
+// first so an admin lands on their own surfaces (Home at the top of Usage) rather
 // than the borrowed Employee/HR persona-preview sections, which sit below. A lower
 // persona never sees the Admin section (rank filter), so their order is unchanged.
 
@@ -94,76 +95,92 @@ const SECTIONS: NavSection[] = [
   {
     label: 'Admin · ReloPass',
     minRole: 'ADMIN',
-    // Ordered by "what's needed when" and grouped by theme (a sub-group label renders
-    // at each `group` boundary): Overview → Customers → Content → Queues → Platform.
-    // Reorder/regroup only — every id/route/badge is preserved.
+    // Founder cockpit: Catalog → Usage → Pipeline → Machine.
+    // Nested `children` stay at their URLs; Permissions / Admin accounts / Auth page
+    // design are parked (still mounted in App.tsx, not listed here).
     items: [
-      // ── Overview (dashboards / at-a-glance) ──
-      { id: 'admin-overview', group: 'Overview', label: 'Admin overview', to: ROUTE_DEFS.adminOverview.path, exact: true },
-      { id: 'executive', group: 'Overview', label: 'Executive', to: ROUTE_DEFS.adminExecutive.path, badge: { kind: 'static', variant: 'new' } },
-      // Mission Control merged into the 'Feedback & Work' tab (Queues group) on 2026-07-06.
-      // 'Ops analytics' lands on /admin/ops (the former separate 'Workflow analytics'
-      // link to the Queue tab of the same page was removed to end the false split).
-      { id: 'ops-analytics', group: 'Overview', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
-      // Feedback & Work surfaced in Overview (moved from Queues) so pilot feedback sits
-      // alongside the at-a-glance dashboards. (AIQ-1565 retired the work-board sub-view;
-      // the tab is the Inbox only. Label kept — it's the established nav name.)
-      { id: 'feedback-console', group: 'Overview', label: 'Feedback & Work', to: ROUTE_DEFS.adminFeedback.path },
-
-      // ── Customers (live accounts + sales pipeline) ──
-      { id: 'admin-companies', group: 'Customers', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
-      { id: 'admin-assignments', group: 'Customers', label: 'Assignments', hint: 'Per-relocation controls', to: ROUTE_DEFS.adminAssignments.path },
-      { id: 'prospects', group: 'Customers', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
-      { id: 'outreach', group: 'Customers', label: 'Outreach', to: ROUTE_DEFS.adminOutreach.path },
-      { id: 'test-drive', group: 'Customers', label: 'Test Drive', to: ROUTE_DEFS.adminTestDrive.path },
-
-      // ── Content (the CMS admins author / maintain) ──
-      { id: 'resources-cms', group: 'Content', label: 'Resources CMS', to: ROUTE_DEFS.adminResources.path },
-      { id: 'form-templates', group: 'Content', label: 'Form templates', to: ROUTE_DEFS.adminFormTemplates.path, badge: { kind: 'static', variant: 'new' } },
-      { id: 'policy-versions', group: 'Content', label: 'Policy versions', to: ROUTE_DEFS.adminPolicyVersions.path },
-      // The review surface for requirement_items — what employees, HR and the public corridor
-      // endpoint are actually served. It existed but was linked from nowhere.
-      { id: 'country-requirements', group: 'Content', label: 'Country requirements', to: ROUTE_DEFS.adminCountries.path },
-      { id: 'requirement-facts', group: 'Content', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
-
-      // ── Queues (day-to-day work queues) ──
       {
-        id: 'review-queue',
-        group: 'Queues',
-        label: 'Review queue',
-        // AIQ-914: no badge — it was wired to admin.pending_tickets (HR-opened
-        // destination requests = the Catalog queue metric, not review-queue items)
-        // and carried a stale '24' fallback, so it never matched /admin/review-queue.
-        to: ROUTE_DEFS.adminReviewQueue.path,
+        id: 'country-requirements',
+        group: 'Catalog',
+        label: 'Country requirements',
+        to: ROUTE_DEFS.adminCountries.path,
+        children: [
+          { id: 'requirement-facts', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
+          { id: 'research-requests', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
+          { id: 'candidate-beam', label: 'Candidate beam', to: ROUTE_DEFS.adminCandidateBeam.path },
+          { id: 'staging', label: 'Staging', to: ROUTE_DEFS.adminStagingDashboard.path },
+          { id: 'freshness', label: 'Freshness / crawl', to: ROUTE_DEFS.adminFreshness.path },
+          { id: 'review-queue', label: 'Review queue', to: ROUTE_DEFS.adminReviewQueue.path },
+          { id: 'integrations', label: 'Catalog queue', to: ROUTE_DEFS.adminCatalogQueue.path },
+          { id: 'resources-cms', label: 'Resources CMS', to: ROUTE_DEFS.adminResources.path },
+          { id: 'form-templates', label: 'Form templates', to: ROUTE_DEFS.adminFormTemplates.path },
+        ],
+      },
+      { id: 'content-review', group: 'Catalog', label: 'Content review', to: ROUTE_DEFS.adminContentReview.path },
+      {
+        id: 'admin-policies',
+        group: 'Catalog',
+        label: 'Policy workspace',
+        to: ROUTE_DEFS.adminPolicies.path,
+        children: [
+          { id: 'policy-versions', label: 'Policy versions', to: ROUTE_DEFS.adminPolicyVersions.path },
+        ],
       },
       {
-        id: 'integrations',
-        group: 'Queues',
-        label: 'Catalog queue',
-        to: ROUTE_DEFS.adminCatalogQueue.path,
-        badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_tickets ?? 0 },
-      },
-      {
-        id: 'vetting-queue',
-        group: 'Queues',
-        label: 'Vetting queue',
-        to: ROUTE_DEFS.adminVettingQueue.path,
+        id: 'admin-suppliers',
+        group: 'Catalog',
+        label: 'Suppliers',
+        to: ROUTE_DEFS.adminSuppliers.path,
         badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_capabilities ?? 0 },
+        children: [
+          { id: 'vetting-queue', label: 'Vetting queue', to: ROUTE_DEFS.adminVettingQueue.path },
+          { id: 'supplier-submissions', label: 'Supplier submissions', to: ROUTE_DEFS.adminSupplierSubmissions.path },
+        ],
       },
-      { id: 'content-review', group: 'Queues', label: 'Content review', to: ROUTE_DEFS.adminContentReview.path },
-      { id: 'supplier-submissions', group: 'Queues', label: 'Supplier submissions', to: ROUTE_DEFS.adminSupplierSubmissions.path },
-      { id: 'research-requests', group: 'Queues', label: 'Research requests', to: ROUTE_DEFS.adminResearchRequests.path },
 
-      // ── Platform & governance (config, access, compliance) ──
-      { id: 'feature-flags', group: 'Platform & governance', label: 'Feature flags', to: ROUTE_DEFS.adminFeatureFlags.path },
-      { id: 'permissions', group: 'Platform & governance', label: 'Permissions', to: ROUTE_DEFS.adminPermissions.path },
-      { id: 'admin-accounts', group: 'Platform & governance', label: 'Admin accounts', to: ROUTE_DEFS.adminAdmins.path },
-      { id: 'ai-governance', group: 'Platform & governance', label: 'AI governance', to: ROUTE_DEFS.adminAiControls.path },
-      { id: 'data-rights', group: 'Platform & governance', label: 'Data-rights desk', to: ROUTE_DEFS.adminDsar.path },
-      { id: 'audit-log', group: 'Platform & governance', label: 'Audit log', to: ROUTE_DEFS.adminAuditLog.path },
-      // Auth page design lives with platform config (moved from Content) — it governs the
-      // shipped /auth login experience, not authored CMS content.
-      { id: 'auth-page-design', group: 'Platform & governance', label: 'Auth page design', to: ROUTE_DEFS.adminAuthPageDesign.path },
+      {
+        id: 'admin-overview',
+        group: 'Usage',
+        label: 'Home',
+        to: ROUTE_DEFS.adminOverview.path,
+        exact: true,
+        children: [
+          { id: 'executive', label: 'Executive', to: ROUTE_DEFS.adminExecutive.path },
+          { id: 'ops-analytics', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
+        ],
+      },
+      { id: 'admin-companies', group: 'Usage', label: 'Companies', to: ROUTE_DEFS.adminCompanies.path },
+      { id: 'admin-assignments', group: 'Usage', label: 'Assignments', hint: 'Per-relocation controls', to: ROUTE_DEFS.adminAssignments.path },
+      { id: 'admin-people', group: 'Usage', label: 'People', to: ROUTE_DEFS.adminPeople.path },
+      { id: 'feedback-console', group: 'Usage', label: 'Feedback', to: ROUTE_DEFS.adminFeedback.path },
+
+      {
+        id: 'prospects',
+        group: 'Pipeline',
+        label: 'Prospects',
+        to: ROUTE_DEFS.adminProspects.path,
+        children: [
+          { id: 'leads', label: 'Leads', to: ROUTE_DEFS.adminLeads.path },
+          { id: 'marketing-analytics', label: 'Marketing analytics', to: ROUTE_DEFS.adminMarketingAnalytics.path },
+        ],
+      },
+      { id: 'outreach', group: 'Pipeline', label: 'Outreach', to: ROUTE_DEFS.adminOutreach.path },
+      { id: 'test-drive', group: 'Pipeline', label: 'Test Drive', to: ROUTE_DEFS.adminTestDrive.path },
+
+      { id: 'feature-flags', group: 'Machine', label: 'Feature flags', to: ROUTE_DEFS.adminFeatureFlags.path },
+      {
+        id: 'ai-governance',
+        group: 'Machine',
+        label: 'AI governance',
+        to: ROUTE_DEFS.adminAiControls.path,
+        children: [
+          { id: 'rag-quality', label: 'RAG quality', to: ROUTE_DEFS.adminRagQuality.path },
+          { id: 'ai-economics', label: 'AI economics', to: ROUTE_DEFS.adminAiUnitEconomics.path },
+          { id: 'prompts', label: 'Prompts', to: ROUTE_DEFS.adminPrompts.path },
+        ],
+      },
+      { id: 'data-rights', group: 'Machine', label: 'Data-rights desk', to: ROUTE_DEFS.adminDsar.path },
+      { id: 'audit-log', group: 'Machine', label: 'Audit log', to: ROUTE_DEFS.adminAuditLog.path },
     ],
   },
   {
@@ -275,7 +292,7 @@ const INBOX_ITEM = SECTIONS.flatMap((s) => s.items).find((i) => i.id === 'inbox'
 const Badge: React.FC<{ count?: number; variant?: BadgeVariant }> = ({ count, variant = 'count' }) => {
   if (variant === 'new') {
     return (
-      <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-accent-50 text-accent-600 border border-accent-100">
+      <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-accent-50 text-accent-500 border border-accent-100">
         NEW
       </span>
     );
@@ -295,6 +312,12 @@ const Badge: React.FC<{ count?: number; variant?: BadgeVariant }> = ({ count, va
   );
 };
 
+const InboxCount: React.FC<{ count: number }> = ({ count }) => (
+  <span className="ml-auto min-w-[1.25rem] px-1 text-center rounded-full bg-accent-50 text-accent-700 text-[10px] font-semibold leading-5">
+    {count > 99 ? '99+' : count}
+  </span>
+);
+
 const SectionHeading: React.FC<{
   label: string;
   count?: number;
@@ -312,15 +335,45 @@ const SectionHeading: React.FC<{
       className="group w-full flex items-center gap-1.5 px-3 pt-5 pb-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30"
     >
       {folded ? (
-        <ChevronRight size={12} className="shrink-0 text-slate-500 group-hover:text-slate-600" aria-hidden="true" />
+        <ChevronRight size={12} className="shrink-0 text-slate-500 group-hover:text-slate-700" aria-hidden="true" />
       ) : (
-        <ChevronDown size={12} className="shrink-0 text-slate-500 group-hover:text-slate-600" aria-hidden="true" />
+        <ChevronDown size={12} className="shrink-0 text-slate-500 group-hover:text-slate-700" aria-hidden="true" />
       )}
-      <span className="text-[10px] font-semibold tracking-widest text-slate-500 group-hover:text-slate-600 uppercase">{label}</span>
+      <span className={`font-semibold tracking-widest uppercase ${
+        label.startsWith('Preview ·')
+          ? 'text-[9px] text-slate-500 group-hover:text-slate-600'
+          : 'text-[10px] text-slate-500 group-hover:text-slate-700'
+      }`}>{label}</span>
       {count !== undefined && <span className="text-[10px] text-slate-500 font-medium">{count}</span>}
     </button>
   );
 };
+
+/** Catalog / Usage / Pipeline / Machine — the small sub-titles inside a section. */
+const GroupHeading: React.FC<{
+  label: string;
+  folded: boolean;
+  bordered: boolean;
+  onToggle: () => void;
+}> = ({ label, folded, bordered, onToggle }) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    aria-expanded={!folded}
+    className={`group flex min-h-11 w-full items-center gap-1 rounded px-3 mb-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30 ${
+      bordered ? 'mt-3 pt-2 border-t border-slate-100' : 'mt-1'
+    }`}
+  >
+    {folded ? (
+      <ChevronRight size={11} className="shrink-0 text-slate-500 group-hover:text-slate-700" aria-hidden="true" />
+    ) : (
+      <ChevronDown size={11} className="shrink-0 text-slate-500 group-hover:text-slate-700" aria-hidden="true" />
+    )}
+    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 group-hover:text-slate-700">
+      {label}
+    </span>
+  </button>
+);
 
 // ── Employee journey-progress mini indicator (NAV-EMP-1) ─────────────────────────
 // A compact 3-step progress line shown under the "My cases" header for employees
@@ -406,6 +459,12 @@ function readCollapsed(): boolean {
 // Per-section fold (independent of the whole-sidebar icon-collapse above). Keyed by
 // section label → folded?. Default (absent) = expanded. Persisted + cross-tab synced.
 const FOLD_KEY = 'platform_sidebar_sections_v1';
+const GROUP_FOLD_KEY = 'platform_sidebar_groups_v1';
+const CHILD_FOLD_KEY = 'platform_sidebar_item_children_v1';
+
+function groupFoldId(sectionLabel: string, group: string): string {
+  return `${sectionLabel}::${group}`;
+}
 
 function readFolded(): Record<string, boolean> {
   if (typeof window === 'undefined') return {};
@@ -526,7 +585,17 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
   }, []);
 
   // Per-section fold state (label → folded?), persisted + cross-tab synced.
-  const [folded, setFolded] = useState<Record<string, boolean>>(() => readFolded());
+  const [folded, setFolded] = useState<Record<string, boolean>>(() => {
+    const stored = readFolded();
+    if (typeof window === 'undefined') return stored;
+    const mobile = window.matchMedia('(max-width: 767px)').matches;
+    if (!mobile || role !== 'ADMIN') return stored;
+    return {
+      Employee: true,
+      'HR Operations': true,
+      ...stored,
+    };
+  });
   useEffect(() => {
     try {
       window.localStorage.setItem(FOLD_KEY, JSON.stringify(folded));
@@ -537,15 +606,75 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === FOLD_KEY) setFolded(readFolded());
+      if (e.key === GROUP_FOLD_KEY) {
+        try {
+          const parsed: unknown = e.newValue ? JSON.parse(e.newValue) : {};
+          setFoldedGroups(parsed && typeof parsed === 'object' ? (parsed as Record<string, boolean>) : {});
+        } catch {
+          /* ignore */
+        }
+      }
+      if (e.key === CHILD_FOLD_KEY) {
+        try {
+          const parsed: unknown = e.newValue ? JSON.parse(e.newValue) : {};
+          setFoldedChildren(parsed && typeof parsed === 'object' ? (parsed as Record<string, boolean>) : {});
+        } catch {
+          /* ignore */
+        }
+      }
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
   const toggleSection = (label: string) => setFolded((f) => ({ ...f, [label]: !f[label] }));
 
+  const [foldedGroups, setFoldedGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = window.localStorage.getItem(GROUP_FOLD_KEY);
+      if (!raw) return {};
+      const parsed: unknown = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, boolean>) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [foldedChildren, setFoldedChildren] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = window.localStorage.getItem(CHILD_FOLD_KEY);
+      if (!raw) return {};
+      const parsed: unknown = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, boolean>) : {};
+    } catch {
+      return {};
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(GROUP_FOLD_KEY, JSON.stringify(foldedGroups));
+    } catch {
+      /* ignore */
+    }
+  }, [foldedGroups]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CHILD_FOLD_KEY, JSON.stringify(foldedChildren));
+    } catch {
+      /* ignore */
+    }
+  }, [foldedChildren]);
+  const toggleGroup = (sectionLabel: string, group: string) => {
+    const id = groupFoldId(sectionLabel, group);
+    setFoldedGroups((f) => ({ ...f, [id]: !f[id] }));
+  };
+  const toggleItemChildren = (itemId: string) =>
+    setFoldedChildren((f) => ({ ...f, [itemId]: f[itemId] === false }));
+
   // Notification polling — only what the visible sections need
   const [hrNotif, setHrNotif] = useState<HrNotificationCounts | null>(null);
   const [adminNotif, setAdminNotif] = useState<AdminNotificationCounts | null>(null);
+  const [inboxUnread, setInboxUnread] = useState<number | null>(null);
   const rank = ROLE_RANK[role];
 
   useEffect(() => {
@@ -573,6 +702,18 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
     const id = window.setInterval(fetchAdmin, 60_000);
     return () => { cancelled = true; window.clearInterval(id); };
   }, [rank]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchInbox = () => {
+      void getUnreadMessageCount()
+        .then((n) => { if (!cancelled) setInboxUnread(n); })
+        .catch((e) => swallow(e, 'PlatformShellSidebar: inbox unread poll'));
+    };
+    fetchInbox();
+    const id = window.setInterval(fetchInbox, 60_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, []);
 
   const notifCtx: NotifContext = { hr: hrNotif, admin: adminNotif };
 
@@ -622,6 +763,9 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
   // so /hr/policy with no query highlights "Published policy". (NAV-POL-1)
   const isChildActive = (childTo: string) => {
     const [childPath, childQuery = ''] = childTo.split('?');
+    if (!childQuery) {
+      return location.pathname === childPath || location.pathname.startsWith(`${childPath}/`);
+    }
     if (location.pathname !== childPath) return false;
     const childTab = new URLSearchParams(childQuery).get('tab') ?? 'policy';
     const currentTab = new URLSearchParams(location.search).get('tab') ?? 'policy';
@@ -670,8 +814,6 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
           <>
             <img
               src="/relopass-logo.png"
-              width={122}
-              height={128}
               alt="ReloPass"
               className="h-6 w-auto"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
@@ -683,7 +825,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
               onClick={() => setCollapsed(true)}
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
-              className="ml-auto grid h-6 w-6 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+              className="ml-auto grid h-11 w-11 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             >
               <PanelLeftClose size={14} />
             </Button>
@@ -695,7 +837,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
             onClick={() => setCollapsed(false)}
             aria-label="Expand sidebar"
             title="Expand sidebar"
-            className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+            className="grid h-11 w-11 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
           >
             <PanelLeftOpen size={15} />
           </Button>
@@ -721,7 +863,9 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
             <Link
               to={resolveItemTo(INBOX_ITEM)}
               title="Inbox"
-              className={`group relative flex items-center gap-2.5 rounded-lg text-sm transition-colors ${
+              aria-current={isActive(INBOX_ITEM) ? 'page' : undefined}
+              aria-label={inboxUnread && inboxUnread > 0 ? `Inbox (${inboxUnread} unread)` : 'Inbox'}
+              className={`group relative flex items-center gap-2.5 rounded-lg text-sm transition-colors min-h-11 ${
                 collapsed ? 'justify-center px-2 py-2' : 'px-3 py-1.5'
               } ${
                 isActive(INBOX_ITEM)
@@ -735,6 +879,10 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                 className={`shrink-0 ${isActive(INBOX_ITEM) ? 'opacity-100' : 'opacity-75 group-hover:opacity-100'}`}
               />
               {!collapsed && <span className="min-w-0 flex-1 truncate">Inbox</span>}
+              {!collapsed && inboxUnread !== null && inboxUnread > 0 && <InboxCount count={inboxUnread} />}
+              {collapsed && inboxUnread !== null && inboxUnread > 0 && (
+                <span aria-hidden="true" className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent-500" />
+              )}
               {collapsed && (
                 <span className="pointer-events-none absolute left-full top-1/2 z-40 ml-2 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11.5px] font-medium text-white opacity-0 shadow-lg transition-all group-hover:translate-x-0 group-hover:opacity-100">
                   Inbox
@@ -805,7 +953,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                   type="button"
                   onClick={() => setEditingLayout(true)}
                   title="Customise the sidebar"
-                  className="flex min-h-[24px] items-center gap-1 rounded px-2 py-1 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-600"
+                  className="flex min-h-11 items-center gap-1 rounded px-2 py-1 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-600"
                 >
                   <Pencil size={11} /> Edit layout
                 </Button>
@@ -817,7 +965,11 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
           <React.Fragment key={section.label}>
             {!section.borrowed && (
               <SectionHeading
-                label={section.label}
+                label={
+                  role === 'ADMIN' && section.minRole !== 'ADMIN'
+                    ? `Preview · ${section.label}`
+                    : section.label
+                }
                 count={section.items.length}
                 collapsed={collapsed}
                 folded={Boolean(folded[section.label])}
@@ -825,11 +977,15 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
               />
             )}
             {!isFolded && section.items.map((item, idx) => {
-              const active = isActive(item);
+              const anyChildActive = Boolean(item.children?.some((c) => isChildActive(c.to)));
+              const active = isActive(item) || anyChildActive;
               const to = resolveItemTo(item);
-              // Themed sub-group label at each group boundary (Admin only; items without
-              // a group render flat). Skipped in icon-collapsed mode.
               const showGroupLabel = !collapsed && !!item.group && item.group !== section.items[idx - 1]?.group;
+              const groupFolded =
+                !collapsed &&
+                !!item.group &&
+                Boolean(foldedGroups[groupFoldId(section.label, item.group)]);
+              const childrenFolded = foldedChildren[item.id] !== false && !anyChildActive;
 
               let badgeVariant: BadgeVariant | undefined;
               let badgeCount: number | undefined;
@@ -845,15 +1001,22 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
 
               return (
                 <React.Fragment key={item.id}>
-                {showGroupLabel && (
-                  <div className={`px-3 mb-0.5 ${idx > 0 ? 'mt-3 pt-2 border-t border-slate-100' : 'mt-1'}`}>
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">{item.group}</span>
-                  </div>
+                {showGroupLabel && item.group && (
+                  <GroupHeading
+                    label={item.group}
+                    folded={groupFolded}
+                    bordered={idx > 0}
+                    onToggle={() => toggleGroup(section.label, item.group!)}
+                  />
                 )}
+                {!groupFolded && (
+                <>
+                <div className={`group relative flex items-center ${collapsed ? '' : 'gap-0.5'}`}>
                 <Link
                   to={to}
                   title={item.label}
-                  className={`group relative flex items-center gap-2.5 rounded-lg text-sm transition-colors ${
+                  aria-current={isActive(item) ? 'page' : undefined}
+                  className={`relative flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-sm transition-colors min-h-11 ${
                     collapsed ? 'justify-center px-2 py-2' : 'px-3 py-1.5'
                   } ${
                     active
@@ -871,7 +1034,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                       <span className="flex-1 min-w-0">
                         <span className="block truncate">{item.label}</span>
                         {item.hint && (
-                          <span className="block truncate text-[10px] leading-tight mt-0.5 font-normal text-slate-500 group-hover:text-slate-500">
+                          <span className="block truncate text-[10px] leading-tight mt-0.5 font-normal text-slate-500 group-hover:text-slate-600">
                             {item.hint}
                           </span>
                         )}
@@ -888,24 +1051,32 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                   {collapsed && badgeVariant === 'live' && (
                     <span aria-hidden="true" className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   )}
-                  {/* Tooltip when collapsed */}
                   {collapsed && (
                     <span className="pointer-events-none absolute left-full top-1/2 z-40 ml-2 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11.5px] font-medium text-white opacity-0 shadow-lg transition-all group-hover:translate-x-0 group-hover:opacity-100">
                       {item.label}
                     </span>
                   )}
                 </Link>
+                {!collapsed && item.children && item.children.length > 0 && (
+                  <Button
+                    unstyled
+                    type="button"
+                    aria-label={childrenFolded ? `Show ${item.label} pages` : `Hide ${item.label} pages`}
+                    aria-expanded={!childrenFolded}
+                    title={childrenFolded ? 'Show sub-pages' : 'Hide sub-pages'}
+                    onClick={() => toggleItemChildren(item.id)}
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  >
+                    {childrenFolded ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                  </Button>
+                )}
+                </div>
 
-                {/* NAV-EMP-1: compact journey-progress indicator under "My cases"
-                    for employees with an active linked case. Hidden when collapsed. */}
                 {item.id === 'intake' && role === 'EMPLOYEE' && !collapsed && activeJourneyRow && (
                   <JourneyProgressMini row={activeJourneyRow} />
                 )}
 
-                {/* NAV-POL-1: indented sub-items deep-linking to the parent's
-                    ?tab= variants. Always visible when expanded so every step is
-                    reachable directly from the sidebar (hidden when collapsed). */}
-                {!collapsed && item.children && (
+                {!collapsed && item.children && !childrenFolded && (
                   <div className="ml-7 mb-1 mt-0.5 flex flex-col gap-0.5 border-l border-slate-200 pl-2">
                     {item.children.map((child) => {
                       const childActive = isChildActive(child.to);
@@ -914,17 +1085,20 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                           key={child.id}
                           to={child.to}
                           title={child.label}
-                          className={`block truncate rounded-md px-2 py-1 text-[13px] transition-colors ${
+                          className={`block truncate rounded-md px-2 py-1 text-[13px] transition-colors min-h-11 ${
                             childActive
                               ? 'text-[#0b2b43] font-medium bg-[#0b2b43]/8'
                               : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                           }`}
+                          aria-current={childActive ? 'page' : undefined}
                         >
                           {child.label}
                         </Link>
                       );
                     })}
                   </div>
+                )}
+                </>
                 )}
                 </React.Fragment>
               );
@@ -979,7 +1153,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                 aria-haspopup="menu"
                 aria-expanded={accountOpen}
                 onClick={() => setAccountOpen((o) => !o)}
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-600"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-600"
               >
                 {accountOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </Button>

@@ -1,3 +1,4 @@
+import { countryFlagCode } from '../lib/countryFlagCode';
 import { apiGet } from './client';
 
 /**
@@ -11,11 +12,20 @@ export interface DestinationImmigrationAuthority {
   source?: string;
 }
 
+/** CountryPicker stores names ("Germany"); the API keys on ISO-2 ("DE"). */
+export function toDestinationIso2(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (/^[A-Za-z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
+  const mapped = countryFlagCode(trimmed);
+  return mapped ? mapped.toUpperCase() : null;
+}
+
 export async function getDestinationImmigrationAuthority(
   countryCode: string,
 ): Promise<DestinationImmigrationAuthority | null> {
-  const code = countryCode.trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(code)) return null;
+  const code = toDestinationIso2(countryCode);
+  if (!code) return null;
   const res = await apiGet<{ authority: DestinationImmigrationAuthority | null }>(
     `/api/employee/immigration-authority/${encodeURIComponent(code)}`,
   );

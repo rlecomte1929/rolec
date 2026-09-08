@@ -232,6 +232,36 @@ def test_normalise_text_folds_presentation_without_changing_words():
     assert "eight weeks" not in parsers.normalise_text("eight  months")
 
 
+def test_truncated_evidence_quote_is_rejected_from_seed(tmp_path):
+    path = tmp_path / "seed.json"
+    path.write_text(json.dumps([{
+        "destination_country": "GB", "topic_key": "t", "entity_title": "T",
+        "fact_type": "fee", "fact_key": "k", "fact_text": "The fee is 320 EUR.",
+        "source_url": "https://example.gov/a", "confidence": "high",
+        "accuracy_tier": "auto_accepted", "applies_to": {},
+        "evidence_quote": "a" * 255,
+    }]))
+    seed = parsers.read_seed(path)
+    assert seed.rows == []
+    assert "column limit" in seed.rejections[0]
+
+
+def test_utf8_quote_is_kept_in_original_language(tmp_path):
+    quote = "La carte de séjour est délivrée gratuitement."
+    path = tmp_path / "seed.json"
+    path.write_text(json.dumps([{
+        "destination_country": "FR", "topic_key": "t", "entity_title": "T",
+        "fact_type": "fee", "fact_key": "k", "fact_text": "The card is free.",
+        "source_url": "https://example.gov/a", "confidence": "high",
+        "accuracy_tier": "auto_accepted", "applies_to": {},
+        "evidence_quote": quote,
+    }]))
+    seed = parsers.read_seed(path)
+    assert seed.rejections == []
+    assert seed.rows[0].evidence_quote == quote
+    assert "séjour" in seed.rows[0].evidence_quote
+
+
 # --------------------------------------------------------------------------- evidence
 
 

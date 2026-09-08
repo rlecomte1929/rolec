@@ -103,6 +103,8 @@ export interface RelocationPlanPhaseTaskDTO {
   /** Representative effort label, e.g. "~10 min" (library-level approximation). */
   estimated_effort?: string | null;
   instructions: string[];
+  /** Source URL(s) of the requirement whose copy this task displays; empty when none. */
+  sources?: string[];
   required_inputs: RelocationPlanRequiredInputDTO[];
   cta?: RelocationPlanCtaDTO | null;
   auto_completion_source: RelocationPlanAutoCompletionSourceWire;
