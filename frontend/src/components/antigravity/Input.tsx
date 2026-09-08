@@ -62,7 +62,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
     return <input ref={ref} {...nativeProps} className={className} />;
   }
 
-  const widthClass = fullWidth ? 'w-full' : '';
+  const widthClass = fullWidth ? 'w-full min-w-0 max-w-full' : '';
   const errorClass = error ? 'border-[#7a2a2a] focus:ring-[#7a2a2a]' : 'border-[#d1d5db] focus:ring-[#0b2b43]';
 
   return (
