@@ -29,4 +29,11 @@ describe('countryFlagCode', () => {
     expect(countryFlagCode('Atlantis')).toBeNull();
     expect(countryFlagCode('')).toBeNull();
   });
+
+  it('resolves ISO list names that were never in the corridor demonym map', () => {
+    expect(countryFlagCode('Argentina')).toBe('ar');
+    expect(countryFlagCode('Hong Kong')).toBe('hk');
+    expect(countryFlagCode('Bahrain')).toBe('bh');
+    expect(countryFlagCode('Czech Republic')).toBe('cz');
+  });
 });
