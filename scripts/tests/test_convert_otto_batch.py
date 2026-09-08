@@ -329,8 +329,69 @@ def test_unknown_profile_exit_2(tmp_path):
     assert "foo" in err and "bar" in err
 
 
+def test_beam_derives_fact_key_from_corridor(tmp_path):
+    rec = {
+        "category": "immigration_work_authorization",
+        "official_guidance": "You need a visa.",
+        "actual_reality": "Sponsors file first.",
+        "action_required": "Start 8 weeks out.",
+        "source_url": "https://www.gov.uk/x",
+        "corridor": "NO->GB",
+        "employee_type": "all",
+    }
+    code, out, _, _ = _run(tmp_path, [rec], extra=["--default-status", "professional"])
+    assert code == 0
+    got = json.loads(out.read_text().splitlines()[0])
+    assert got["entity_topic_key"] == "immigration_work_authorization"
+    assert got["fact_key"] == "b3_no_gb_immigration_work_authorization_01"
+    assert got["entity_title"] == "GB immigration work authorization"
+    assert got["fact_type"] == "eligibility"
+    assert "nationality" not in got["applies_to"]
+
+
+def test_b3_beam_parses_with_zero_rejections(tmp_path):
+    src = REPO / "docs" / "imports" / "data" / "B3" / "corridor_facts.ndjson"
+    if not src.is_file():
+        pytest.skip("B3 corridor_facts.ndjson not in this checkout")
+    out = tmp_path / "out.ndjson"
+    report_path = tmp_path / "report.json"
+    code = c.main(
+        [
+            str(src),
+            "--out",
+            str(out),
+            "--report",
+            str(report_path),
+            "--default-status",
+            "professional",
+        ]
+    )
+    assert code == 0
+    report = json.loads(report_path.read_text())
+    assert report["profile"] == "beam"
+    assert report["records_in"] == report["records_out"] == 20
+    rows = [json.loads(l) for l in out.read_text().splitlines() if l.strip()]
+    assert len(rows) == 20
+    assert all("nationality" not in r["applies_to"] for r in rows)
+    assert len(report["missing_nationality"]) == 20
+    assert rows[0]["fact_key"] == "b3_no_gb_immigration_work_authorization_01"
+    identity = [r for r in rows if r["entity_topic_key"] == "identity_number"]
+    assert {r["fact_key"] for r in identity} == {
+        "b3_gb_no_identity_number_01",
+        "b3_dk_no_identity_number_02",
+    }
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from backend.imports.otto.parsers import read_jsonl
+
+    accepted, rejections = read_jsonl(out, batch_id="B3-corridor-facts-2026-08-18")
+    assert rejections == []
+    assert len(accepted) == 20
+
+
 @pytest.mark.integration
 def test_integration_parity_b3_ve_ie_es_ie():
     if not os.environ.get("DATABASE_URL"):
         pytest.skip("applier-owned live parity")
     pytest.skip("applier-owned live parity")
+
