@@ -15,6 +15,7 @@ from backend.imports.suppliers.base_country import (
     SRC_DE_CHAMBER,
     SRC_FIDI,
     SRC_FINANSTILSYNET,
+    SRC_GB_REGISTER,
     SRC_SIRENE,
     SupplierEvidence,
     resolve,
@@ -95,9 +96,24 @@ class RegistryTierTests(unittest.TestCase):
 
     def test_german_registers_imply_germany(self) -> None:
         for body in ("BaFin (Federal Financial Supervisory Authority)",
-                     "Rechtsanwaltskammer Berlin", "Hanseatische RAK Hamburg"):
+                     "Rechtsanwaltskammer Berlin", "Hanseatische RAK Hamburg",
+                     "Steuerberaterkammer Berlin", "IVD Immobilienverband Deutschland"):
             r = resolve(_ev(accreditations=((body, "u"),)))
             self.assertEqual((r.country, r.source), ("DE", SRC_DE_CHAMBER), body)
+
+    def test_uk_registers_imply_gb_and_are_registry_grade(self) -> None:
+        for body in ("Solicitors Regulation Authority (SRA)", "Financial Conduct Authority",
+                     "ICAEW", "British Association of Removers", "Propertymark / NAEA",
+                     "Royal Institution of Chartered Surveyors (RICS)"):
+            r = resolve(_ev(accreditations=((body, "u"),)))
+            self.assertEqual((r.country, r.source), ("GB", SRC_GB_REGISTER), body)
+            self.assertTrue(r.is_registry_grade, body)
+
+    def test_a_uk_register_beats_a_catalog_listing(self) -> None:
+        """A GB register must win over a directory's placement, same as every other register."""
+        r = resolve(_ev(accreditations=(("Financial Conduct Authority", "u"),),
+                        catalog_country="SG"))
+        self.assertEqual((r.country, r.source), ("GB", SRC_GB_REGISTER))
 
 
 class ProxyTierTests(unittest.TestCase):
