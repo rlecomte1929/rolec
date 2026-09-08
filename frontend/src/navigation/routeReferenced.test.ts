@@ -87,20 +87,33 @@ function referencedKeys(): Set<string> {
 /**
  * Routes nothing links to, as of 2026-08-22. Drain this list; do not grow it.
  * A new entry here means a page was built that no user can open.
+ *
+ * Reconciled 2026-09-08 for the founder-cockpit IA (#2148): the new /admin sidebar
+ * wired up `adminCandidateBeam`, `adminLeads`, `adminMarketingAnalytics` and
+ * `adminPrompts` as children, so they were DRAINED from this list. Five entries were
+ * added: `adminAdmins`, `adminAuthPageDesign` and `adminPermissions` are intentionally
+ * parked (mounted in App.tsx, deliberately not surfaced in the cockpit sidebar yet), and
+ * `adminOpsSla` / `adminOpsQueue` stay reachable via the AdminOpsLayout SLA/Queue tab
+ * strip but lost the AdminOverviewPage ModuleCards that used to give them a `buildRoute`
+ * reference this guard can see — the tab hrefs are built dynamically, so the guard can't
+ * count them. Neither is a newly-built dead page; both pre-date this PR on main.
  */
 const KNOWN_UNREFERENCED = [
-  'adminAbTests', 'adminAiQuestions', 'adminAttestations', 'adminAutopilotMetrics',
-  'adminCandidateBeam', 'adminCorrectionsTrends', 'adminCrawlSchedules', 'adminErrors',
-  'adminFreshnessCities', 'adminFreshnessSources', 'adminLeads', 'adminMarketingAnalytics',
-  'adminMessages', 'adminMissionControl', 'adminMobilityCaseInspect', 'adminOpsDestinations',
-  'adminOpsErrors', 'adminOpsNotifications', 'adminOpsReviewers', 'adminPrompts',
-  'adminRelocations', 'adminResearch', 'adminReviewQueueWorkload', 'adminSourceChangeReviews',
-  'adminSourceMonitor', 'adminSpecialistReview', 'adminSupport', 'adminWorkflowFunnel',
-  'auditNavigation', 'caseServices', 'caseServicesConclusion', 'caseServicesEstimate',
-  'caseServicesRecommendations', 'compliance', 'employeeCaseDossierBuild', 'employeeDocuments',
-  'employeePolicy', 'employeeRichProfile', 'hrAnalytics', 'hrCaseDossier',
-  'hrEmployeeDashboard', 'hrErasureRequests', 'hrPackage', 'hrPolicyBuilder',
-  'hrPolicyDashboard', 'hrPolicyManagement', 'hrVendorCuration',
+  'adminAbTests', 'adminAdmins', 'adminAiQuestions', 'adminAttestations',
+  'adminAuthPageDesign', 'adminAutopilotMetrics', 'adminCorrectionsTrends', 'adminCrawlSchedules',
+  'adminErrors', 'adminFreshnessCities', 'adminFreshnessSources', 'adminMessages',
+  'adminMissionControl', 'adminMobilityCaseInspect', 'adminOpsDestinations', 'adminOpsErrors',
+  'adminOpsNotifications', 'adminOpsQueue', 'adminOpsReviewers', 'adminOpsSla',
+  'adminPermissions', 'adminRelocations', 'adminResearch', 'adminReviewQueueWorkload',
+  'adminSourceChangeReviews', 'adminSourceMonitor', 'adminSpecialistReview', 'adminSupport',
+  'adminWorkflowFunnel', 'auditNavigation', 'caseServices', 'caseServicesConclusion',
+  'caseServicesEstimate', 'caseServicesRecommendations', 'compliance', 'employeeCaseDossierBuild',
+  'employeeDocuments', 'employeePolicy', 'employeeRichProfile', 'hrAnalytics',
+  'hrCaseDossier', 'hrEmployeeDashboard', 'hrErasureRequests', 'hrPackage',
+  'hrPolicyBuilder', 'hrPolicyDashboard', 'hrPolicyManagement', 'hrVendorCuration',
+  // [AIQ-2189] Reached only from the emailed colleague-invite link — an external entry
+  // point, like a magic link — so it has no in-app inbound reference by design.
+  'inviteAccept',
   'notificationSettings', 'providerPortal', 'quoteRfqDetail', 'servicesConclusion',
   'supplierQuote', 'vendorRfq',
 ];

@@ -64,13 +64,7 @@ export const isCoordinatorEnabled = (): boolean =>
 export const isTriggerFixEnabled = (): boolean =>
   isOn(import.meta.env.VITE_FEATURE_FEEDBACK_FIX);
 
-/**
- * Per-move roadmap paywall (TEST MODE). Gates the employee roadmap behind an
- * €800 Stripe Checkout unlock (`RoadmapPaywallGate` on the roadmap page; the
- * dashboard consumes the `?payment=success` return and marks it unlocked). Kept
- * OFF so the live roadmap is never paywalled until we turn it on per environment.
- *
- * Set `VITE_ENABLE_ROADMAP_PAYWALL=true` to activate the gate.
- */
-export const isRoadmapPaywallEnabled = (): boolean =>
-  isOn(import.meta.env.VITE_ENABLE_ROADMAP_PAYWALL);
+// [AIQ-2142] The roadmap paywall is no longer a client build flag. Whether a case's roadmap
+// is gated is served as data by GET /api/payment/status/:caseId (`entitlement`), decided by
+// the server behind its own RELOPASS_ROADMAP_PAYWALL_ENABLED switch. The client reads that
+// served state, never a client-side build constant — one switch, server-side, not two.

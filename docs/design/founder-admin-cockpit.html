@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ReloPass — Founder Admin cockpit (mock)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy: #0b2b43;
+      --navy-700: #133456;
+      --accent: #1f8e8b;
+      --text: #1f2937;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --surface: #ffffff;
+      --page: #f8fafc;
+      --keep: #047857;
+      --nest: #b45309;
+      --park: #64748b;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--page);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .shell { display: flex; height: 100vh; }
+    aside {
+      width: 240px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .brand span.sub { color: var(--muted); font-weight: 400; }
+    .aside-scroll { flex: 1; overflow-y: auto; padding: 8px 8px 16px; }
+    .inbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      padding: 10px 12px;
+      min-height: 44px;
+      border-radius: 8px;
+      color: #475569;
+      font: inherit;
+      cursor: pointer;
+    }
+    .inbox-row:hover { background: #f1f5f9; }
+    .inbox-row.active {
+      background: rgba(11, 43, 67, 0.08);
+      color: var(--navy);
+      font-weight: 500;
+    }
+    .inbox-row span.label { flex: 1; }
+    .inbox-count {
+      min-width: 1.25rem;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: #ebf7f6;
+      color: #105d5b;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 20px;
+      text-align: center;
+    }
+    .rule { margin: 8px 4px 0; border: 0; border-top: 1px solid #f1f5f9; }
+    .sec-h {
+      margin: 16px 8px 4px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .sec-h.preview {
+      margin-top: 20px;
+      padding-top: 12px;
+      border-top: 1px solid #f1f5f9;
+      font-size: 9px;
+      color: var(--muted);
+    }
+    .grp {
+      margin: 12px 8px 4px;
+      padding-top: 8px;
+      border-top: 1px solid #f1f5f9;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .grp.first { margin-top: 4px; padding-top: 0; border-top: 0; }
+    .nav-btn {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      padding: 10px 12px;
+      min-height: 44px;
+      border-radius: 8px;
+      color: #475569;
+      font: inherit;
+      cursor: pointer;
+    }
+    .nav-btn:hover { background: #f1f5f9; color: #0f172a; }
+    .nav-btn.active {
+      background: rgba(11, 43, 67, 0.08);
+      color: var(--navy);
+      font-weight: 500;
+    }
+    .kids {
+      margin: 2px 0 4px 28px;
+      padding-left: 8px;
+      border-left: 1px solid var(--line);
+    }
+    .kid {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      padding: 8px;
+      min-height: 44px;
+      border-radius: 6px;
+      color: var(--muted);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .kid:hover { background: #f1f5f9; color: #1e293b; }
+    .kid.active {
+      background: rgba(11, 43, 67, 0.08);
+      color: var(--navy);
+      font-weight: 500;
+    }
+    .preview .nav-btn { font-size: 13px; color: #64748b; }
+    main { flex: 1; overflow-y: auto; }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 32px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .top strong { color: #334155; font-weight: 500; }
+    .content { max-width: 960px; margin: 0 auto; padding: 28px 32px 64px; }
+    h1 { font-size: 22px; line-height: 1.3; margin: 0 0 8px; color: var(--navy); }
+    .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+    .lede { color: var(--muted); margin: 0 0 24px; }
+    .legend { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+    .pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .pill.keep { color: var(--keep); border-color: #a7f3d0; }
+    .pill.nest { color: var(--nest); border-color: #fde68a; }
+    .pill.park { color: var(--park); }
+    .pill.kill { color: #be123c; border-color: #fecdd3; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); background: #f8fafc; }
+    tr:last-child td { border-bottom: 0; }
+    code { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 12px; color: var(--navy-700); }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { font-size: 16px; margin: 0 0 8px; color: var(--navy); }
+    .url { font-size: 12px; color: var(--muted); margin-top: 12px; }
+    .note { font-size: 13px; color: var(--muted); }
+    .banner {
+      border: 1px solid #fecdd3;
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+    }
+    .banner strong { color: #9f1239; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+    .stat .k { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+    .stat .v { font-size: 28px; font-weight: 600; color: #0f172a; margin-top: 8px; }
+    .doors { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+    .doors li { border-bottom: 1px solid var(--line); }
+    .doors li:last-child { border-bottom: 0; }
+    .doors button {
+      display: flex;
+      width: 100%;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      border: 0;
+      background: transparent;
+      padding: 14px 16px;
+      min-height: 44px;
+      font: inherit;
+      cursor: pointer;
+      text-align: left;
+    }
+    .doors button:hover { background: #f8fafc; }
+    .doors .job { font-weight: 500; color: var(--navy); }
+    .doors .meta { font-size: 13px; color: var(--muted); }
+    .ghost {
+      margin-top: 16px;
+      border: 0;
+      background: transparent;
+      color: var(--accent);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    @media (max-width: 767px) {
+      .stats { grid-template-columns: 1fr; }
+      aside { width: 100%; max-width: 240px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand">ReloPass <span class="sub">/ Platform</span></div>
+      <div class="aside-scroll" id="nav"></div>
+    </aside>
+    <main>
+      <div class="top">
+        ReloPass admin / <strong id="crumb">Home</strong>
+        <span>Mock only — not a live route</span>
+      </div>
+      <div class="content" id="panel"></div>
+    </main>
+  </div>
+  <script>
+    const CATALOG_NEST = [
+      { id: "requirement-facts", label: "Requirement facts", url: "/admin/requirement-facts" },
+      { id: "research-requests", label: "Research requests", url: "/admin/research-requests" },
+      { id: "candidate-beam", label: "Candidate beam", url: "/admin/candidate-beam" },
+      { id: "staging", label: "Staging", url: "/admin/staging" },
+      { id: "freshness", label: "Freshness / crawl", url: "/admin/freshness" },
+      { id: "review-queue", label: "Review queue", url: "/admin/review-queue" },
+      { id: "integrations", label: "Catalog queue", url: "/admin/catalog-queue" },
+      { id: "resources-cms", label: "Resources CMS", url: "/admin/resources" },
+      { id: "form-templates", label: "Form templates", url: "/admin/form-templates" },
+    ];
+    const NAV = [
+      { kind: "inbox", id: "inbox", label: "Inbox", url: "/hr/messages", count: 2 },
+      { kind: "section", label: "Admin · ReloPass" },
+      { kind: "group", label: "Catalog", first: true },
+      {
+        id: "country-requirements", label: "Country requirements", url: "/admin/countries",
+        job: "What you ship. Live served requirement_items by country.",
+        nested: "Extract queues, Catalog queue, Resources CMS, and Form templates nest here.",
+        children: CATALOG_NEST,
+      },
+      {
+        id: "content-review", label: "Content review", url: "/admin/content-review",
+        job: "Evidence queue. Approve or reject a fact with the source quote on screen.",
+      },
+      {
+        id: "admin-policies", label: "Policy workspace", url: "/admin/policies",
+        job: "Edit a tenant policy matrix.",
+        children: [{ id: "policy-versions", label: "Policy versions", url: "/admin/policy-versions" }],
+      },
+      {
+        id: "admin-suppliers", label: "Suppliers", url: "/admin/suppliers",
+        job: "Supplier records. Vetting and submissions nest here.",
+        children: [
+          { id: "vetting-queue", label: "Vetting queue", url: "/admin/vetting-queue" },
+          { id: "supplier-submissions", label: "Supplier submissions", url: "/admin/supplier-submissions" },
+        ],
+      },
+      { kind: "group", label: "Usage" },
+      {
+        id: "admin-overview", label: "Home", url: "/admin",
+        job: "Today’s work, then four job doors. Executive and Ops nest under Home.",
+        children: [
+          { id: "executive", label: "Executive", url: "/admin/executive" },
+          { id: "ops-analytics", label: "Ops analytics", url: "/admin/ops" },
+        ],
+      },
+      { id: "admin-companies", label: "Companies", url: "/admin/companies", job: "Tenants." },
+      { id: "admin-assignments", label: "Assignments", url: "/admin/assignments", job: "Per-relocation controls." },
+      { id: "admin-people", label: "People", url: "/admin/people", job: "HR and employee accounts." },
+      { id: "feedback-console", label: "Feedback", url: "/admin/feedback", job: "Pilot inbox." },
+      { kind: "group", label: "Pipeline" },
+      {
+        id: "prospects", label: "Prospects", url: "/admin/prospects",
+        job: "ICP-scored company pipeline.",
+        children: [
+          { id: "leads", label: "Leads", url: "/admin/leads" },
+          { id: "marketing-analytics", label: "Marketing analytics", url: "/admin/marketing-analytics" },
+        ],
+      },
+      { id: "outreach", label: "Outreach", url: "/admin/outreach", job: "LinkedIn / follow-up." },
+      { id: "test-drive", label: "Test Drive", url: "/admin/test-drive", job: "Campaign and referrals." },
+      { kind: "group", label: "Machine" },
+      { id: "feature-flags", label: "Feature flags", url: "/admin/feature-flags", job: "Ship experiments without a deploy." },
+      {
+        id: "ai-governance", label: "AI governance", url: "/admin/ai-controls",
+        job: "Kill switches and groundedness.",
+        children: [
+          { id: "rag-quality", label: "RAG quality", url: "/admin/rag-quality" },
+          { id: "ai-economics", label: "AI economics", url: "/admin/ai-unit-economics" },
+          { id: "prompts", label: "Prompts", url: "/admin/prompts" },
+        ],
+      },
+      { id: "data-rights", label: "Data-rights desk", url: "/admin/data-rights", job: "DSAR handling." },
+      { id: "audit-log", label: "Audit log", url: "/admin/audit-log", job: "What you changed." },
+      { kind: "section", label: "Preview · Employee", preview: true },
+      { kind: "preview", id: "emp-cases", label: "My cases", url: "/employee/dashboard", job: "Walk the employee tree. Live nav is the full tree, not this excerpt." },
+      { kind: "preview", id: "emp-intake", label: "Intake form", url: "/employee/intake", job: "Preview the form relocating people fill in." },
+      { kind: "preview", id: "emp-roadmap", label: "Roadmap", url: "/employee/dashboard", job: "Same route as today." },
+      { kind: "section", label: "Preview · HR Operations", preview: true },
+      { kind: "preview", id: "hr-cc", label: "Mobility command center", url: "/hr/dashboard", job: "Customer home. You impersonate; you do not rebuild it here." },
+      { kind: "preview", id: "hr-policy", label: "Policy", url: "/hr/policy", job: "HR policy builder. Tenant edits stay on Policy workspace above." },
+    ];
+
+    const PARKED = [
+      ["/admin/permissions", "Permissions matrix — read-only route table"],
+      ["/admin/admins", "Admin accounts — solo allowlist"],
+      ["/admin/auth-page-design", "Auth page Globe canvas"],
+      ["/admin/companies-legacy", "Legacy companies rollback"],
+      ["/admin/review-queue-legacy", "Legacy review queue rollback"],
+      ["/admin/mobility-inspect", "Mobility inspect"],
+      ["/admin/workflow-funnel", "Workflow funnel"],
+      ["/admin/errors", "Errors"],
+    ];
+
+    const PANELS = {};
+    NAV.forEach((n) => {
+      if (n.job) PANELS[n.id] = n;
+      (n.children || []).forEach((c) => {
+        PANELS[c.id] = {
+          ...c,
+          job: "Nested under the parent. Same live URL. Not a top-level founder job.",
+        };
+      });
+    });
+
+    function parentOf(id) {
+      for (const n of NAV) {
+        if (n.children && n.children.some((c) => c.id === id)) return n.id;
+      }
+      return null;
+    }
+
+    function legendHtml() {
+      return `
+        <p class="eyebrow">IA legend</p>
+        <h1>Keep, nest, park, kill</h1>
+        <p class="lede">This table is documentation. It is not Home.</p>
+        <div class="legend">
+          <span class="pill keep">Keep — primary</span>
+          <span class="pill nest">Nest — under a parent</span>
+          <span class="pill park">Park — URL stays</span>
+          <span class="pill kill">Kill — dead chrome</span>
+        </div>
+        <table>
+          <thead><tr><th>Group</th><th>Primary</th><th>Nested or parked</th></tr></thead>
+          <tbody>
+            <tr><td>Catalog</td><td>Country requirements, Content review, Policy workspace, Suppliers</td><td>Facts, research, beam, staging, freshness, review queue, Catalog queue, Resources CMS, Form templates, policy versions, vetting, submissions</td></tr>
+            <tr><td>Usage</td><td>Home, Companies, Assignments, People, Feedback</td><td>Executive, Ops. Parked: mobility inspect, workflow funnel, errors</td></tr>
+            <tr><td>Pipeline</td><td>Prospects, Outreach, Test Drive</td><td>Leads, Marketing analytics</td></tr>
+            <tr><td>Machine</td><td>Flags, AI governance, Data-rights, Audit</td><td>RAG, AI economics, Prompts. Parked: permissions, admins, auth-page-design</td></tr>
+            <tr><td>Preview</td><td>Full live Employee + HR trees, quieter chrome</td><td>Unchanged routes</td></tr>
+          </tbody>
+        </table>
+        <div class="card" style="margin-top:20px">
+          <h2>Parked (still at these URLs)</h2>
+          <ul>${PARKED.map(([u, d]) => `<li><code>${u}</code> — ${d}</li>`).join("")}</ul>
+        </div>
+        <div class="banner">
+          <strong>Chrome to kill.</strong>
+          <ul>
+            <li>Overview “All tenants” button</li>
+            <li>Header Notifications bell</li>
+            <li>Header “Ask ReloPass AI”</li>
+            <li>Static NEW badges</li>
+            <li>Copy that says “Switch role in the Tweaks panel”</li>
+          </ul>
+        </div>
+        <button class="ghost" type="button" id="back-home">Back to Home</button>
+      `;
+    }
+
+    function homeHtml() {
+      return `
+        <p class="eyebrow">Founder console</p>
+        <h1>Today</h1>
+        <p class="lede">Three numbers, then four jobs. No classification table.</p>
+        <div class="stats">
+          <div class="stat"><div class="k">Content review pending</div><div class="v">6</div></div>
+          <div class="stat"><div class="k">Tenants</div><div class="v">2</div></div>
+          <div class="stat"><div class="k">Prospects waiting</div><div class="v">17</div></div>
+        </div>
+        <nav aria-label="Founder jobs">
+          <ul class="doors">
+            <li><button type="button" data-go="country-requirements"><span class="job">Catalog</span><span class="meta">Country requirements · 6 pending</span></button></li>
+            <li><button type="button" data-go="admin-companies"><span class="job">Usage</span><span class="meta">Companies</span></button></li>
+            <li><button type="button" data-go="prospects"><span class="job">Pipeline</span><span class="meta">Prospects · 17</span></button></li>
+            <li><button type="button" data-go="feature-flags"><span class="job">Machine</span><span class="meta">Feature flags</span></button></li>
+          </ul>
+        </nav>
+        <button class="ghost" type="button" id="open-legend">IA legend (keep / nest / park)</button>
+      `;
+    }
+
+    function itemHtml(item) {
+      return `
+        <p class="eyebrow">Founder job</p>
+        <h1>${item.label}</h1>
+        <p class="lede">${item.job || ""}</p>
+        ${item.nested ? `<div class="card"><h2>Nested</h2><p>${item.nested}</p></div>` : ""}
+        ${item.children && item.children.length ? `<div class="card"><h2>Nested in the sidebar (collapsed until you are here)</h2><ul>${item.children.map((c) => `<li>${c.label} — <code>${c.url}</code></li>`).join("")}</ul></div>` : ""}
+        <p class="url">Live URL: <code>${item.url}</code></p>
+      `;
+    }
+
+    let activeId = "admin-overview";
+    const navEl = document.getElementById("nav");
+    const panelEl = document.getElementById("panel");
+    const crumbEl = document.getElementById("crumb");
+
+    function childActive(n) {
+      return n.children && n.children.some((c) => c.id === activeId);
+    }
+
+    function renderNav() {
+      navEl.innerHTML = "";
+      NAV.forEach((n) => {
+        if (n.kind === "inbox") {
+          const a = document.createElement("button");
+          a.className = "inbox-row" + (activeId === n.id ? " active" : "");
+          a.innerHTML = `<span class="label">Inbox</span>${n.count ? `<span class="inbox-count">${n.count}</span>` : ""}`;
+          a.onclick = () => select(n.id);
+          navEl.appendChild(a);
+          const hr = document.createElement("hr");
+          hr.className = "rule";
+          navEl.appendChild(hr);
+          return;
+        }
+        if (n.kind === "section") {
+          const h = document.createElement("div");
+          h.className = "sec-h" + (n.preview ? " preview" : "");
+          h.textContent = n.label;
+          navEl.appendChild(h);
+          return;
+        }
+        if (n.kind === "group") {
+          const g = document.createElement("div");
+          g.className = "grp" + (n.first ? " first" : "");
+          g.textContent = n.label;
+          navEl.appendChild(g);
+          return;
+        }
+        const wrap = document.createElement("div");
+        if (n.kind === "preview") wrap.className = "preview";
+        const b = document.createElement("button");
+        b.className = "nav-btn" + (activeId === n.id || childActive(n) ? " active" : "");
+        b.textContent = n.label;
+        b.onclick = () => select(n.id);
+        wrap.appendChild(b);
+        if (n.children && n.children.length && (activeId === n.id || childActive(n))) {
+          const kids = document.createElement("div");
+          kids.className = "kids";
+          n.children.forEach((c) => {
+            const k = document.createElement("button");
+            k.className = "kid" + (activeId === c.id ? " active" : "");
+            k.textContent = c.label;
+            k.onclick = () => select(c.id);
+            kids.appendChild(k);
+          });
+          wrap.appendChild(kids);
+        }
+        navEl.appendChild(wrap);
+      });
+    }
+
+    function bindHomeActions() {
+      document.getElementById("open-legend")?.addEventListener("click", () => {
+        crumbEl.textContent = "IA legend";
+        panelEl.innerHTML = legendHtml();
+        document.getElementById("back-home")?.addEventListener("click", () => select("admin-overview"));
+      });
+      panelEl.querySelectorAll("[data-go]").forEach((el) => {
+        el.addEventListener("click", () => select(el.getAttribute("data-go")));
+      });
+    }
+
+    function select(id) {
+      activeId = id;
+      renderNav();
+      if (id === "admin-overview") {
+        crumbEl.textContent = "Home";
+        panelEl.innerHTML = homeHtml();
+        bindHomeActions();
+        return;
+      }
+      if (id === "inbox") {
+        crumbEl.textContent = "Inbox";
+        panelEl.innerHTML = itemHtml({ label: "Inbox", url: "/hr/messages", job: "Pinned above Catalog. Count uses teal. Hide the badge at 0." });
+        return;
+      }
+      const item = PANELS[id];
+      crumbEl.textContent = item ? item.label : "Founder cockpit";
+      panelEl.innerHTML = item ? itemHtml(item) : homeHtml();
+      if (!item) bindHomeActions();
+    }
+
+    select("admin-overview");
+  </script>
+</body>
+</html>

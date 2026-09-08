@@ -95,7 +95,19 @@ class ApprovalLinkOrInsertDecisionTests(unittest.TestCase):
         upsert.assert_not_called()
 
     def test_row_already_linked_to_same_supplier_is_noop(self):
-        _, link, upsert = self._run({"id": "row-1", "supplier_id": "sup-1"})
+        _, link, upsert = self._run({"id": "row-1", "supplier_id": "sup-1", "country": "NO"})
+        link.assert_not_called()
+        upsert.assert_not_called()
+
+    def test_second_distinct_country_clears_master_country(self):
+        with mock.patch.object(
+            service_catalog, "find_master_by_category_name",
+            return_value={"id": "row-1", "supplier_id": "sup-1", "country": "DE"},
+        ), mock.patch.object(service_catalog, "link_supplier_to_master") as link, \
+           mock.patch.object(service_catalog, "upsert_item") as upsert, \
+           mock.patch.object(service_catalog, "clear_master_country") as clear:
+            supplier_registry._ensure_catalog_master_for_capability(_cap("NO"), "Santa Fe Relocation")
+        clear.assert_called_once_with("row-1")
         link.assert_not_called()
         upsert.assert_not_called()
 

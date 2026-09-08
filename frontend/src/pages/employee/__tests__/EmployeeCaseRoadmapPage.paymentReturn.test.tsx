@@ -34,11 +34,9 @@ vi.mock('../../../api/cases', () => ({
   validateRoadmap: vi.fn().mockResolvedValue({ roadmap_validated_at: null }),
 }));
 
-// The paywall is off by default; this whole path only exists when it is on.
-vi.mock('../../../featureFlags', async (orig) => ({
-  ...(await orig<Record<string, unknown>>()),
-  isRoadmapPaywallEnabled: () => true,
-}));
+// [AIQ-2142] No featureFlags mock — the build flag is gone. Gating is purely server-driven
+// (fetchRoadmapUnlocked reads the entitlement served by /api/payment/status), so these tests
+// drive that directly and the page always consults it.
 
 // A marker so "did we show the buy CTA?" is unambiguous.
 vi.mock('../../../features/employee-journey/RoadmapPaywallGate', () => ({
