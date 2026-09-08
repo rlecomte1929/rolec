@@ -51,6 +51,23 @@ STATUS_TO_PURPOSE = {
 }
 SCORE = {"low": 0.3, "medium": 0.6, "high": 0.9}
 
+FACT_TYPE_BY_CATEGORY = {
+    "immigration_work_authorization": "eligibility",
+    "immigration_registration": "step",
+    "registration_anmeldung": "step",
+    "registration_cpr": "step",
+    "identity_number": "step",
+    "payroll_id": "step",
+    "tax_id_payroll": "step",
+    "banking_digital_id": "step",
+    "social_security": "eligibility",
+    "social_security_offshore": "eligibility",
+    "tax_expat_scheme": "eligibility",
+    "tax_payroll": "other",
+    "healthcare_cost": "fee",
+    "broadcasting_fee": "fee",
+}
+
 # Artifact class names used by requirement_items batches → parsers vocab.
 NATIONALITY_ALIASES = {
     "EU": "EU",
@@ -170,14 +187,31 @@ def _dedupe_key(rec: dict) -> str:
     return f"{dest}|{topic}|{fact}"
 
 
+def split_corridor(corridor: str) -> Tuple[str, str]:
+    """`"NO->GB"` or `"DK-DE"` → `(origin, dest)`. Destination is where the requirement applies.
+
+    This is a field parse, not a nationality class. Never feed the pair to classify().
+    """
+    raw = str(corridor).strip()
+    if "->" in raw:
+        origin, dest = raw.split("->", 1)
+    elif "-" in raw:
+        origin, dest = raw.split("-", 1)
+    else:
+        raise ConvertError(f"unparseable corridor {corridor!r}")
+    origin, dest = origin.strip().upper(), dest.strip().upper()
+    if len(origin) != 2 or len(dest) != 2:
+        raise ConvertError(f"unparseable corridor {corridor!r}")
+    return origin, dest
+
+
 def _destination(rec: dict, profile: str) -> str:
     raw = rec.get("destination_country") or rec.get("destination_country_code")
     if not raw and isinstance(rec.get("entity"), dict):
         raw = rec["entity"].get("destination_country")
     if not raw and rec.get("corridor"):
-        # Artifact field (e.g. "NO->GB") — destination of the move, not a nationality class.
-        _, _, dest = str(rec["corridor"]).partition("->")
-        raw = dest.strip()
+        _, dest = split_corridor(rec["corridor"])
+        raw = dest
     if not raw:
         raise ConvertError(f"{_dedupe_key(rec)}: missing destination_country")
     return str(raw).strip().upper()
@@ -195,21 +229,37 @@ def _topic(rec: dict) -> str:
     raise ConvertError(f"{_dedupe_key(rec)}: missing topic / entity_topic_key")
 
 
-def _fact_key(rec: dict) -> str:
+def _fact_key(
+    rec: dict,
+    *,
+    profile: str,
+    dest: str,
+    topic: str,
+    beam_seq: Dict[Tuple[str, str], int],
+) -> str:
     if rec.get("fact_key"):
         return str(rec["fact_key"]).strip()
     if rec.get("fact_uid"):
         return str(rec["fact_uid"]).strip()
+    if profile == "beam" and rec.get("corridor") and topic:
+        origin, dest_c = split_corridor(rec["corridor"])
+        dest_key = dest_c or dest
+        counter_key = (dest_key, topic)
+        beam_seq[counter_key] = beam_seq.get(counter_key, 0) + 1
+        seq = beam_seq[counter_key]
+        return f"b3_{origin.lower()}_{dest_key.lower()}_{topic}_{seq:02d}"
     raise ConvertError(f"{_dedupe_key(rec)}: missing fact_key/fact_uid")
 
 
-def _title(rec: dict, topic: str) -> str:
+def _title(rec: dict, topic: str, *, dest: str = "", profile: str = "") -> str:
     if rec.get("entity_title"):
         return str(rec["entity_title"])
     if rec.get("title"):
         return str(rec["title"])
     if isinstance(rec.get("entity"), dict) and rec["entity"].get("title"):
         return str(rec["entity"]["title"])
+    if profile == "beam" and dest and topic:
+        return f"{dest} {topic.replace('_', ' ')}"
     return _humanise(topic)
 
 
@@ -251,8 +301,12 @@ def _domain(rec: dict) -> Tuple[str, Optional[str]]:
 
 def _fact_type(rec: dict, profile: str) -> Tuple[str, Optional[str]]:
     raw = rec.get("fact_type")
-    if not raw and profile == "beam":
-        raw = rec.get("category")
+    if not raw and profile == "beam" and rec.get("category"):
+        cat = str(rec["category"]).strip()
+        mapped = FACT_TYPE_BY_CATEGORY.get(cat)
+        if mapped:
+            return mapped, None
+        raw = cat
     if not raw:
         return "other", None
     raw_s = str(raw).strip()
@@ -290,8 +344,6 @@ def flatten_profile(rec: dict, profile: str) -> dict:
         out.setdefault("domain_area", ent.get("domain_area"))
     elif profile == "beam":
         out.setdefault("entity_topic_key", rec.get("category"))
-        if not out.get("fact_key") and rec.get("fact_uid"):
-            out["fact_key"] = rec["fact_uid"]
     return out
 
 
@@ -325,12 +377,14 @@ def convert_record(
     *,
     default_status: Optional[str],
     report: dict,
+    beam_seq: Optional[Dict[Tuple[str, str], int]] = None,
 ) -> dict:
     src = flatten_profile(rec, profile)
     dest = _destination(src, profile)
     topic = _topic(src)
-    fact_key = _fact_key(src)
-    title = _title(src, topic)
+    seq = beam_seq if beam_seq is not None else {}
+    fact_key = _fact_key(src, profile=profile, dest=dest, topic=topic, beam_seq=seq)
+    title = _title(src, topic, dest=dest, profile=profile)
     fact_text = _fact_text(src)
     source_url = _source_url(src)
     fact_type, ft_down = _fact_type(src, profile)
@@ -368,6 +422,9 @@ def convert_record(
     if src.get("pillar") is not None:
         applies["pillar"] = src["pillar"]
 
+    if profile == "beam" and rec.get("corridor"):
+        origin, dest_c = split_corridor(rec["corridor"])
+        applies["corridor"] = f"{origin}->{dest_c}"
     if profile == "beam" or any(src.get(k) for k in ("official_guidance", "actual_reality", "action_required")):
         beam = {
             k: src.get(k)
@@ -436,10 +493,17 @@ def convert_rows(
     missing_status: List[str] = []
     converted: List[dict] = []
     errors: List[str] = []
+    beam_seq: Dict[Tuple[str, str], int] = {}
     for rec in rows:
         try:
             converted.append(
-                convert_record(rec, detected, default_status=default_status, report=report)
+                convert_record(
+                    rec,
+                    detected,
+                    default_status=default_status,
+                    report=report,
+                    beam_seq=beam_seq,
+                )
             )
         except ConvertError as exc:
             if "missing applies_to.status" in str(exc):
