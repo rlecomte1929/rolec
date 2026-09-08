@@ -23,6 +23,10 @@ export const ROUTE_DEFS = {
    *  renders the same Auth screen (defaults to login mode) so a direct hit
    *  shows the form instead of bouncing to the marketing homepage. */
   login: { path: '/login', roles: ['PUBLIC'] as RouteRole[] },
+  /** [AIQ-2189] Landing for a colleague-invite accept link. Public so a logged-out
+   *  invitee sees the "create your account first" step instead of bouncing to a bare
+   *  login screen; the redemption call itself is authenticated + email-matched. */
+  inviteAccept: { path: '/invite/:token', roles: ['PUBLIC'] as RouteRole[] },
   employeeJourney: { path: '/employee/journey', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeeDashboard: { path: '/employee/dashboard', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** First-login orientation, shown once per user (welcomeSeen). */

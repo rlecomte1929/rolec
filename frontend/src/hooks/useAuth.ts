@@ -7,6 +7,7 @@ import { normalizeStoredRole, setAuthItem, setStoredRoles, setActiveRole } from 
 import { seedWelcomeSeenFromLogin } from '../utils/welcomeSeen';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { homeRouteKeyForRole, type RouteKey } from '../navigation/routes';
+import { readPendingInvite } from '../api/companyInvites';
 import { trackAuthPerf } from '../perf/authPerf';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
 import type { PostSignupReconciliation } from '../types';
@@ -53,6 +54,15 @@ export const useAuth = () => {
   const postAuthRouteKey = (role: UserRole | string): RouteKey => homeRouteKeyForRole(normalizeStoredRole(role));
 
   const redirectByRole = (role: UserRole) => {
+    // [AIQ-2189] If the user arrived via a colleague-invite link, finish the round trip on
+    // the invite page (which redeems the token) rather than dropping them at their role
+    // home. Guarded: only fires when an invite is actually pending, so normal auth is
+    // unchanged. InviteAccept clears the stash once it redeems (or hits a terminal error).
+    const pendingInvite = readPendingInvite();
+    if (pendingInvite) {
+      navigate(`/invite/${encodeURIComponent(pendingInvite)}`);
+      return;
+    }
     safeNavigate(navigate, postAuthRouteKey(role));
   };
 

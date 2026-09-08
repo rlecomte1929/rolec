@@ -217,6 +217,7 @@ import secrets  # noqa: E402
 
 from ..auth_deps import require_admin  # noqa: E402
 from ..services.admin_audit import record_admin_event  # noqa: E402
+from ..services.company_invite_email import send_company_invite_email  # noqa: E402
 
 # How long an approved invite stays acceptable. ST4 refuses an expired one and
 # flips it to 'expired'.
@@ -307,7 +308,34 @@ def admin_approve_company_invite(
         detail={"company_id": str(row._mapping.get("company_id")),
                 "invited_email": row._mapping.get("invited_email")},
     )
-    log.info("company_invite approved id=%s by=%s", invite_id, admin_id)
+
+    # [AIQ-2188] Deliver the accept link NOW — this handler's local scope is the only
+    # place raw_token ever exists (only sha256 is persisted). Reaching here means the
+    # status-guarded UPDATE succeeded, so a replayed approve (409 above) sends nothing.
+    # Double-guarded and best-effort: a delivery failure must never roll back a valid
+    # approval, and the raw token is never logged or audited.
+    invited_email = row._mapping.get("invited_email")
+    company_name = None
+    try:
+        # SAVEPOINT so a failed lookup (e.g. no companies table in a test harness) unwinds
+        # only itself and leaves the approval's transaction intact — same idiom as issue_invite.
+        with session.begin_nested():
+            company_name = session.execute(
+                text("SELECT name FROM companies WHERE id = :cid"),
+                {"cid": str(row._mapping.get("company_id"))},
+            ).scalar()
+    except Exception as exc:  # noqa: BLE001 — a name lookup must not break approval
+        log.warning("company_invite approve: company-name lookup failed id=%s: %s", invite_id, exc)
+    try:
+        email_res = send_company_invite_email(
+            to_email=invited_email, company_name=company_name, raw_token=raw_token,
+        )
+    except Exception as exc:  # noqa: BLE001 — email must never break a valid approval
+        log.error("company_invite approve: email send crashed (suppressed) id=%s: %s", invite_id, exc)
+        email_res = {"status": "error"}
+
+    log.info("company_invite approved id=%s by=%s email=%s",
+             invite_id, admin_id, email_res.get("status"))
     return {
         "id": invite_id,
         "status": "approved",
