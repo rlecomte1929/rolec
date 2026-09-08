@@ -97,51 +97,21 @@ Workstreams are ordered by leverage. Within a workstream, tasks are ordered so e
 6. Snapshot the route table after; `diff /tmp/routes_before.json /tmp/routes_after.json` must be empty.
 7. Route order: extracted routes are registered *after* remaining inline routes. If any remaining inline route has a path parameter that would shadow the extracted path (e.g. inline `/api/admin/{id}` vs extracted `/api/admin/reconciliation`), register the new router **before** that inline handler's declaration or extract the shadowing handler in the same task.
 
-#### Task 1.1: Resolve the `POST /api/hr/cases/{case_id}/tasks` double definition
+#### Task 1.1: Resolve the `POST /api/hr/cases/{case_id}/tasks` double definition — DONE (#2174, #2176)
 
-**Files:**
-- Modify: `backend/main.py:6792` (inline `create_case_task_for_hr`)
-- Modify: `backend/app/routers/hr_coordination.py:366` (router `assign_task`)
-- Test: `backend/tests/test_hr_case_tasks_single_definition.py` (new)
+**Correction (2026-09-08).** This task was written on a wrong premise: it assumed the inline
+handler and the router handler were two copies of one API. They were two *different* APIs on one
+path. The inline `create_case_task_for_hr` creates an **employee** task and was what prod served;
+the router `assign_task` creates a **provider** task and was dead in prod, so every "assign task to
+provider" submit from the HR coordination panel failed validation against the wrong handler.
+Cursor caught this on the characterisation step and stopped instead of deleting the live handler.
 
-**Interfaces:**
-- Consumes: `backend.main.app`, `backend.app.auth_deps.get_current_user`
-- Produces: exactly one handler for that path+method, in `hr_coordination.py`
-
-- [ ] **Step 1: Write the failing test** — assert the route is defined once and served by the router module.
-
-```python
-# backend/tests/test_hr_case_tasks_single_definition.py
-from backend.main import app
-
-def test_hr_case_tasks_post_is_defined_once():
-    matches = [
-        r for r in app.routes
-        if getattr(r, "path", None) == "/api/hr/cases/{case_id}/tasks"
-        and "POST" in getattr(r, "methods", set())
-    ]
-    assert len(matches) == 1, [r.endpoint.__module__ for r in matches]
-    assert matches[0].endpoint.__module__ == "backend.app.routers.hr_coordination"
-```
-
-- [ ] **Step 2: Run it, expect FAIL** with `len(matches) == 2`.
-
-Run: `RELOPASS_DISABLE_RATE_LIMITS=1 ./.venv311/bin/python -m pytest backend/tests/test_hr_case_tasks_single_definition.py -v`
-
-- [ ] **Step 3: Diff the two bodies.** Read `main.py:6792-…` and `hr_coordination.py:366-…` side by side. The inline one is what prod serves today, so its behaviour is the contract. Port any behaviour the router version lacks into the router version (validation, audit-log write, response shape). Do not change the response shape.
-
-- [ ] **Step 4: Delete the inline handler** at `main.py:6792` (the whole function). Re-run Step 2; expect PASS.
-
-- [ ] **Step 5: Run the existing hr_coordination and hr-case tests.**
-
-Run: `RELOPASS_DISABLE_RATE_LIMITS=1 ./.venv311/bin/python -m pytest backend/tests -k "hr_coordination or case_task" -q`
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add backend/main.py backend/app/routers/hr_coordination.py backend/tests/test_hr_case_tasks_single_definition.py
-git commit -m "fix(hr): single definition for POST /api/hr/cases/{case_id}/tasks (router wins)"
-```
+**Resolution shipped:** the employee-task API keeps `/tasks`; provider assignment moved to
+`POST /api/hr/cases/{case_id}/provider-tasks` (`hr_coordination.py`), its only client
+`frontend/src/api/hrCoordination.ts` `assignTask` was updated, and
+`backend/tests/test_hr_case_tasks_single_definition.py` now asserts exactly one POST handler on each
+path. Lesson for the remaining extractions: **diff the bodies before assuming a duplicate**, and
+treat a path collision as a possible product-level split, not a copy.
 
 #### Task 1.2: Fix CORS in the modular app before any cutover work
 
