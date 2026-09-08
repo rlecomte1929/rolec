@@ -30,6 +30,6 @@ def test_full_names_pass_through_uppercased():
 
 
 def test_unknown_falls_back_to_raw_upper():
-    assert _resolve_catalog_country("IT") == "IT"          # no catalog data yet
-    assert _resolve_catalog_country("Japan") == "JAPAN"
+    assert _resolve_catalog_country("NG") == "NG"          # no catalog data yet (IT is now covered)
+    assert _resolve_catalog_country("Nepal") == "NEPAL"
     assert _resolve_catalog_country("") == "UNKNOWN"

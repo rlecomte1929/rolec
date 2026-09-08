@@ -1,0 +1,17 @@
+{
+  "batch_id": "ae-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code research subagent (verify_ledger referee)",
+  "corridor": "AE",
+  "destination_country_code": "AE",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "UNITED ARAB EMIRATES",
+  "record_count": 16,
+  "artifact": "facts.ndjson",
+  "sha256": "6f30be7d0d68acfc90891c159ebe18f708a62f54b8b1561035dafbc9fe12888c",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "referee_caveat": "u.ae is a JS SPA \u2014 verify_ledger re-confirmed 5/16 quotes; the u.ae ones return intro-only to the fetcher (subagent confirmed them via WebFetch). 1 quote dropped to worklist. 15 importable, promoted to 9 requirement_items. Re-confirm u.ae quotes before approval.",
+  "scope": "UAE as a destination (coverage-master rank 8, Dubai hub), greenfield. 16 facts (u.ae, tax.gov.ae, icp.gov.ae, gdrfad.gov.ae): no personal income tax, corporate-tax-not-on-salary, Emirates ID (mandatory + carry), residence permit (linked to EID, 2yr), medical fitness + communicable-disease screen, Dubai employer health insurance (+1 Jan 2025 prerequisite), MoHRE work permit (employer-held, 13 types, approval allows entry), employment process sequence, contract registration 14 days, work-only-for-sponsor, overstay fines. All non-EEA/THIRD_COUNTRY. Promoted country='AE' (no landmine) -> 9 requirement_items pending/representative. Code: \"AE\":\"UNITED ARAB EMIRATES\" catalog + gov.ae/u.ae allowlist (7th too-narrow-allowlist instance)."
+}

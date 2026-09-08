@@ -1,0 +1,17 @@
+{
+  "batch_id": "jp-resource-2026-09-08",
+  "generated_at": "2026-09-02",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee)",
+  "corridor": "JP",
+  "origin_country_code": null,
+  "destination_country_code": "JP",
+  "nationality_class": "EEA",
+  "target_table": "public.requirement_items",
+  "target_country_code": "JAPAN",
+  "record_count": 1,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "0aae83615632122f1b7fd8e2ee16401a4d7a6ffcfe1fe2e18e90c9757138e943",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded"
+}

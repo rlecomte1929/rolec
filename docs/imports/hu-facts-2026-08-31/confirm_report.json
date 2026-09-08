@@ -1,0 +1,141 @@
+{
+  "batch": "hu-facts-2026-08-31",
+  "counts": {
+    "CONFIRMED": 11,
+    "REVIEW_BROWSER": 1
+  },
+  "rows": [
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "guest_worker_permit",
+      "host": "oif.gov.hu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "employment_permit_family",
+      "host": "oif.gov.hu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "100% bigram"
+    },
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "employment_permit_purpose_change",
+      "host": "oif.gov.hu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "hungarian_card",
+      "host": "oif.gov.hu",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.765,
+      "method": "utf-8",
+      "reason": "76% overlap — likely present but markup-split; confirm in a browser"
+    },
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "application_location",
+      "host": "oif.gov.hu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "type_d_visa",
+      "host": "oif.gov.hu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "single_permit",
+      "host": "oif.gov.hu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.875,
+      "method": "utf-8",
+      "reason": "88% bigram"
+    },
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "eu_blue_card_employer_change",
+      "host": "oif.gov.hu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "eu_blue_card_salary",
+      "host": "oif.gov.hu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "tax_identification_number",
+      "host": "nav.gov.hu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "accommodation_registration",
+      "host": "oif.gov.hu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hu-facts-2026-08-31",
+      "destination_country": "HU",
+      "entity_topic_key": "entry_deadline",
+      "host": "oif.gov.hu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.931,
+      "method": "utf-8",
+      "reason": "93% bigram"
+    }
+  ]
+}

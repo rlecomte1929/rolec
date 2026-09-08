@@ -1,0 +1,16 @@
+{
+  "batch_id": "be-at-dk-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code research subagent (verify_ledger referee)",
+  "destination_country_code": "BE/AT/DK",
+  "target_table": "public.requirement_items",
+  "record_count": 28,
+  "artifact": "facts.ndjson",
+  "sha256": "603c10e6be53e989f2e0784e37b4cb97b331da7217c28ac1c6497d66277e1cd3",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "landed": "BELGIUM 6 + AUSTRIA 2 = 8 requirement_items",
+  "held": "DENMARK 8 facts (DK already has 11 prod rows \u2014 reconcile)",
+  "verify_rejected": 4,
+  "scope": "EEA destinations Belgium (rank15,Brussels) + Austria (rank16,Vienna) greenfield -> promoted; Denmark (rank20) already covered (11 rows) -> HELD. 28 dual-audience facts (ibz.be/brussels.be/workinginbelgium/inami.fgov.be; oesterreich/migration/wien.gv.at; lifeindenmark.borger.dk/skat.dk/nyidanmark/international.kk.dk). verify_ledger 24/28 importable. Code: BE->BELGIUM, AT->AUSTRIA catalog (+test); fgov.be/gv.at suffixes + ibz.be/brussels.be/workinginbelgium hosts allowlisted. EEA permit-gating: 2 BE registration rows re-scoped to [EU_EEA]. BE CAPTCHA-walled tax/social-security/national-register + AT fine + DK pay-limit-accordion in rejects."
+}

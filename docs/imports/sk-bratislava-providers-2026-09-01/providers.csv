@@ -1,0 +1,15 @@
+corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry
+XX-SK,banks,"365.bank, a. s.",https://www.365.bank,NBS Register of Supervised Entities - Banks and branches of foreign banks,https://subjekty.nbs.sk/?s=930,Národná banka Slovenska (NBS),31340890,
+XX-SK,banks,"Československá obchodná banka, a.s.",https://www.csob.sk,NBS Register of Supervised Entities - Banks and branches of foreign banks,https://subjekty.nbs.sk/?s=930,Národná banka Slovenska (NBS),36854140,
+XX-SK,banks,"Slovenská sporiteľňa, a.s.",https://www.slsp.sk,NBS Register of Supervised Entities - Banks and branches of foreign banks,https://subjekty.nbs.sk/?s=930,Národná banka Slovenska (NBS),00151653,
+XX-SK,banks,"Tatra banka, a.s.",https://www.tatrabanka.sk,NBS Register of Supervised Entities - Banks and branches of foreign banks,https://subjekty.nbs.sk/?s=930,Národná banka Slovenska (NBS),00686930,
+XX-SK,banks,"Všeobecná úverová banka, a.s.",https://www.vub.sk,NBS Register of Supervised Entities - Banks and branches of foreign banks,https://subjekty.nbs.sk/?s=930,Národná banka Slovenska (NBS),31320155,
+XX-SK,banks,"UniCredit Bank Czech Republic and Slovakia, a.s., pobočka zahraničnej banky",https://www.unicreditbank.sk,NBS Register of Supervised Entities - Banks and branches of foreign banks,https://subjekty.nbs.sk/?s=930,Národná banka Slovenska (NBS),47251336,
+XX-SK,banks,"Fio banka, a. s., pobočka zahraničnej banky",https://www.fio.sk,NBS Register of Supervised Entities - Banks and branches of foreign banks,https://subjekty.nbs.sk/?s=930,Národná banka Slovenska (NBS),36869376,
+XX-SK,banks,"mBank S.A., pobočka zahraničnej banky",https://www.mbank.sk,NBS Register of Supervised Entities - Banks and branches of foreign banks,https://subjekty.nbs.sk/?s=930,Národná banka Slovenska (NBS),36819638,
+XX-SK,banks,"Raiffeisen Bank International AG Slovak Branch, pobočka zahraničnej banky",https://www.raiffeisen.sk,NBS Register of Supervised Entities - Banks and branches of foreign banks,https://subjekty.nbs.sk/?s=930,Národná banka Slovenska (NBS),50875621,
+XX-SK,movers,AGS BRATISLAVA INTL MOVERS SRO,,FIDI FAIM Affiliate Directory,https://www.fidi.org/find-fidi-affiliate/ags-bratislava,FIDI (FAIM Plus),,2029
+XX-SK,movers,Santa Fe Relocation Bratislava,https://www.santaferelo.com,FIDI FAIM Affiliate Directory,https://www.fidi.org/find-fidi-affiliate/santa-fe-relocation-bratislava,FIDI (FAIM),,
+XX-SK,schools,The British International School Bratislava,https://www.nordangliaeducation.com/bisb-bratislava,IB World School Register (ibo.org),https://www.ibo.org/en/school/003503,International Baccalaureate Organization (IB),003503,
+XX-SK,schools,English International School of Bratislava,https://eisbratislava.org,IB World School Register (ibo.org),https://www.ibo.org/en/school/050174,International Baccalaureate Organization (IB),050174,
+XX-SK,schools,Spojená škola Novohradská (Gymnázium Jura Hronca),https://www.gjh.sk,IB World School Register (ibo.org),https://www.ibo.org/en/school/000771,International Baccalaureate Organization (IB),000771,

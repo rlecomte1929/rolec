@@ -1,0 +1,18 @@
+{
+  "batch_id": "id-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "ID",
+  "origin_country_code": null,
+  "destination_country_code": "ID",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "INDONESIA",
+  "record_count": 11,
+  "needs_lawyer_review_count": 1,
+  "artifact": "facts.ndjson",
+  "sha256": "47208aaec8b95026c2a73b4def82c827b424100798ecb9b92d45a041e3d84e68",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "12 researched, 11 landed, 1 held. confirm_quotes: 5 CONFIRMED via headless fetch (imigrasi.go.id work_visa x2, pajak.go.id tax_residency x2, salatiga.go.id SKTT). 6 initially mis-held HOLD_WRONG_SRC by the confirm_quotes PDF-detection bug (fixed same wave); all 6 then applier-verified by direct pdfplumber substring against the real official PDFs: Permenaker 8/2021 (jdih.kemnaker.go.id, 826KB — server flaky, confirmed on retry) yields all 5 kemnaker quotes verbatim (RPTKA disahkan Menteri, DKPTKA US$100, Tenaga Kerja Pendamping, pelatihan bahasa Indonesia, RPTKA jabatan+jangka waktu); UU 24/2011 (bpjsketenagakerjaan.go.id, 72K chars) yields the BPJS Ketenagakerjaan 6-month quote. HELD (held.ndjson): bpjs_kesehatan — cited to Perpres 82/2018 on jdih.kemenkeu.go.id, which is unreachable from here and is a ClearScan OCR scan with mojibake; not independently confirmable, so not landed. All sources official *.go.id. Imported --no-fetch."
+}

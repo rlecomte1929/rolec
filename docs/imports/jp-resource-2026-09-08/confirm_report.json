@@ -1,0 +1,19 @@
+{
+  "batch": "jp-resource-2026-09-08",
+  "counts": {
+    "CONFIRMED": 1
+  },
+  "rows": [
+    {
+      "batch": "jp-resource-2026-09-08",
+      "destination_country": "JP",
+      "entity_topic_key": "dependent_work_cap",
+      "host": "www.moj.go.jp",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    }
+  ]
+}

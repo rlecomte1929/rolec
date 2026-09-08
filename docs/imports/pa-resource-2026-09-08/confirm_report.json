@@ -1,0 +1,19 @@
+{
+  "batch": "pa-resource-2026-09-08",
+  "counts": {
+    "REVIEW_BROWSER": 1
+  },
+  "rows": [
+    {
+      "batch": "pa-resource-2026-09-08",
+      "destination_country": "PA",
+      "entity_topic_key": "specialist_substitution",
+      "host": "cetippat.gob.pa",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    }
+  ]
+}

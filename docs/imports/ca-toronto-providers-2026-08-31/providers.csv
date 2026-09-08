@@ -1,0 +1,21 @@
+corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry
+XX-CA,movers,Orbit International Logistics Ltd.,https://www.orbitmoving.com,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/orbit-international-moving-canada-toronto,FIDI Global Alliance,,2027
+XX-CA,movers,AMJ International,https://www.amjmove.com,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/amj-campbell-international-toronto,FIDI Global Alliance,,2027
+XX-CA,movers,Paramount Transportation Systems - Canada,http://www.paramountinternational.ca,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/paramount-transportation-systems-canada,FIDI Global Alliance,,2028
+XX-CA,legal_admin,Green and Spiegel LLP,https://gands.com,Law Society of Ontario,https://lso.ca/public-resources/finding-a-lawyer-or-paralegal/lawyer-and-paralegal-directory,Law Society of Ontario,,
+XX-CA,legal_admin,Chaudhary Law Office,https://chaudharylaw.com,Law Society of Ontario,https://lso.ca/public-resources/finding-a-lawyer-or-paralegal/lawyer-and-paralegal-directory,Law Society of Ontario,,
+XX-CA,legal_admin,Waldman & Associates,https://waldmanlaw.ca,Law Society of Ontario,https://lso.ca/public-resources/finding-a-lawyer-or-paralegal/lawyer-and-paralegal-directory,Law Society of Ontario,,
+XX-CA,tax_finance,BDO Canada LLP,https://www.bdo.ca,CPA Ontario Firm Directory,https://www.cpaontario.ca/protecting-the-public/directories/firm,CPA Ontario,,
+XX-CA,tax_finance,Baker Tilly Canada,https://www.bakertilly.ca,CPA Ontario Firm Directory,https://www.cpaontario.ca/protecting-the-public/directories/firm,CPA Ontario,,
+XX-CA,tax_finance,MNP LLP,https://www.mnp.ca,CPA Ontario Firm Directory,https://www.cpaontario.ca/protecting-the-public/directories/firm,CPA Ontario,,
+XX-CA,banks,Royal Bank of Canada (RBC),https://www.rbcroyalbank.com,Canada Deposit Insurance Corporation (CDIC),https://www.cdic.ca/depositors/list-of-members/,Canada Deposit Insurance Corporation,,
+XX-CA,banks,The Toronto-Dominion Bank (TD),https://www.td.com,Canada Deposit Insurance Corporation (CDIC),https://www.cdic.ca/depositors/list-of-members/,Canada Deposit Insurance Corporation,,
+XX-CA,banks,The Bank of Nova Scotia (Scotiabank),https://www.scotiabank.com,Canada Deposit Insurance Corporation (CDIC),https://www.cdic.ca/depositors/list-of-members/,Canada Deposit Insurance Corporation,,
+XX-CA,banks,Bank of Montreal (BMO),https://www.bmo.com,Canada Deposit Insurance Corporation (CDIC),https://www.cdic.ca/depositors/list-of-members/,Canada Deposit Insurance Corporation,,
+XX-CA,banks,Canadian Imperial Bank of Commerce (CIBC),https://www.cibc.com,Canada Deposit Insurance Corporation (CDIC),https://www.cdic.ca/depositors/list-of-members/,Canada Deposit Insurance Corporation,,
+XX-CA,schools,Toronto French School (TFS - Canada's International School),https://www.tfs.ca,Ontario Ministry of Education — Private School Location List,https://data.ontario.ca/dataset/private-school-location-list,Ontario Ministry of Education,887072,
+XX-CA,schools,German International School Toronto,https://gistonline.ca,Ontario Ministry of Education — Private School Location List,https://data.ontario.ca/dataset/private-school-location-list,Ontario Ministry of Education,666130,
+XX-CA,schools,Branksome Hall,https://branksome.on.ca,Ontario Ministry of Education — Private School Location List,https://data.ontario.ca/dataset/private-school-location-list,Ontario Ministry of Education,886912,
+XX-CA,housing_agencies,Chestnut Park Real Estate Limited,https://www.chestnutpark.com,Real Estate Council of Ontario (RECO),https://registrantsearch.reco.on.ca/,Real Estate Council of Ontario,,
+XX-CA,housing_agencies,Bosley Real Estate Ltd.,https://www.bosleyrealestate.com,Real Estate Council of Ontario (RECO),https://registrantsearch.reco.on.ca/,Real Estate Council of Ontario,,
+XX-CA,housing_agencies,Royal LePage Real Estate Services Ltd.,https://www.royallepage.ca,Real Estate Council of Ontario (RECO),https://registrantsearch.reco.on.ca/,Real Estate Council of Ontario,,

@@ -1,0 +1,17 @@
+{
+  "batch_id": "hk-resource-2026-09-08",
+  "generated_at": "2026-09-02",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee)",
+  "corridor": "HK",
+  "origin_country_code": null,
+  "destination_country_code": "HK",
+  "nationality_class": "EEA",
+  "target_table": "public.requirement_items",
+  "target_country_code": "HONG KONG",
+  "record_count": 1,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "edf39223b7cc241b01ec39a2a385fb4a9d3054a8ce73dd96e28680bfe3ac70f1",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded"
+}

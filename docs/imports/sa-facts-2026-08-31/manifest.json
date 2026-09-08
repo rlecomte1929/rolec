@@ -1,0 +1,18 @@
+{
+  "batch_id": "sa-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "SA",
+  "origin_country_code": null,
+  "destination_country_code": "SA",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "SAUDI ARABIA",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "5c0c0a0cbb0953e7215bf26bc27ee82f5a4383aa4a9a44d09b859bb5a8b21199",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources are official MHRSD (hrsd.gov.sa) + MISA (misa.gov.sa) PDFs \u2014 official-tier. verify_ledger cannot parse PDF binary, so quotes were independently reconfirmed as verbatim substrings of the extracted PDF text via pypdf (12/12), then imported with --no-fetch. my.gov.sa/absher.sa are Cloudflare-bot-walled; cchi.gov.sa/saudieng.sa unreachable (worklist in README)."
+}

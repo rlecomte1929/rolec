@@ -1,0 +1,18 @@
+{
+  "batch_id": "il-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "IL",
+  "origin_country_code": null,
+  "destination_country_code": "IL",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "ISRAEL",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "8b0487f33bb31d6abd07250c71ceb464093ccec39ed605eecb63fd525018912c",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources: PIBA pages on www.gov.il (Cloudflare-gated to curl/verify_ledger \u2014 imported --no-fetch) + btl.gov.il (Bituach Leumi). Independently confirmed: btl 3/3 via curl (2 of which verify_ledger falsely rejected on a fetch/encoding diff); gov.il service-page quotes browser-verified by the applier (employer-permit intro + '1,420 NIS' fee, both exact). The remaining gov.il PIBA-form-PDF quotes were browser+pdfminer-confirmed by the research subagent (methodology validated against the service-page checks). Foreign-expert flat-tax fact was DROPPED by the subagent (ITA source unreachable) \u2014 not invented."
+}

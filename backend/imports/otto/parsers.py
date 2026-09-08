@@ -99,6 +99,123 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # (social security), registrocivil.gob.ec (cédula). `gob.es` above is Spain only; the
     # bare `gov` does not match `.ec`. 5th too-narrow-allowlist instance.
     "gob.ec",
+    # Canada (destination rank 5, Toronto). Federal content lives on `canada.ca` (IRCC, CRA,
+    # Service Canada all publish there now), which the legacy `gc.ca` suffix above does NOT
+    # match — every canada.ca fact scored UNOFFICIAL until this was added. `ontario.ca` is the
+    # Government of Ontario's own domain (OHIP, ServiceOntario, driving, the private-school
+    # list on data.ontario.ca), a statutory provincial government publishing its own rules —
+    # same call as `madrid.es` / `service.berlin.de`. 6th too-narrow-allowlist instance.
+    "canada.ca", "ontario.ca",
+    # United Arab Emirates (destination rank 8, Dubai). Federal bodies publish under `.gov.ae`
+    # (tax.gov.ae = Federal Tax Authority, icp.gov.ae = ICP/residency, gdrfad.gov.ae = GDRFA Dubai,
+    # mohre.gov.ae = labour) and the official one-stop portal is `u.ae` — neither matched the bare
+    # `gov` suffix (`.gov.ae` ≠ `.gov`). 7th too-narrow-allowlist instance.
+    "gov.ae", "u.ae",
+    # Belgium (rank 15, Brussels) — federal bodies publish under `.fgov.be` (inami.fgov.be, rsz.fgov.be).
+    # Austria (rank 16, Vienna) — the whole public sector sits under `.gv.at` (oesterreich.gv.at,
+    # migration.gv.at, wien.gv.at, help.gv.at). Neither matched the bare `gov`.
+    "fgov.be", "gv.at",
+    # Japan (destination rank 18, Tokyo) — the entire central government publishes under `.go.jp`
+    # (isa.go.jp = Immigration Services Agency, moj.go.jp, mofa.go.jp, mhlw.go.jp, nta.go.jp,
+    # digital.go.jp), and cities/prefectures under `.lg.jp` (residence registration, My Number).
+    # `.go.jp` ≠ `.gov`, so the bare `gov` matched none of them.
+    "go.jp", "lg.jp",
+    # Saudi Arabia (destination rank 12, Riyadh) — federal bodies publish under `.gov.sa`
+    # (mol.gov.sa / hrsd.gov.sa labour, moi.gov.sa Interior/Absher, mofa.gov.sa visas,
+    # zatca.gov.sa tax, sama.gov.sa central bank, premiumresidency.gov.sa). `.gov.sa` ≠ `.gov`.
+    "gov.sa",
+    # Hong Kong (destination rank 21) — the whole government publishes under `.gov.hk`
+    # (immd.gov.hk Immigration, ird.gov.hk Inland Revenue, td.gov.hk Transport, gov.hk portal,
+    # mpfa.org.hk is the MPF authority — added as a host below). `.gov.hk` ≠ `.gov`.
+    "gov.hk",
+    # Qatar (destination rank 23, Doha) — government bodies publish under `.gov.qa`
+    # (moi.gov.qa Interior, hukoomi.gov.qa the e-gov portal, mol.gov.qa labour). `.gov.qa` ≠ `.gov`.
+    "gov.qa",
+    # (New Zealand rank 22 uses `govt.nz`, already listed above; Poland rank 25 uses `gov.pl`,
+    # already listed above — udsc.gov.pl, podatki.gov.pl, nfz.gov.pl all match it.)
+    # South Korea (destination rank 27, Seoul) — government publishes under `.go.kr`
+    # (hikorea.go.kr immigration, immigration.go.kr, nts.go.kr tax, moel.go.kr labour). `.go.kr` ≠ `.gov`.
+    "go.kr",
+    # Israel (destination rank 28, Tel Aviv) — government bodies publish under `.gov.il`
+    # (piba.gov.il Population & Immigration Authority, taxes.gov.il, gov.il). `.gov.il` ≠ `.gov`.
+    "gov.il",
+    # Kuwait (destination rank 29, Kuwait City) — government publishes under `.gov.kw`
+    # (moi.gov.kw Interior, paci.gov.kw Civil Information / Civil ID, e.gov.kw portal). `.gov.kw` ≠ `.gov`.
+    "gov.kw",
+    # (Luxembourg rank 30 uses `public.lu`, already listed above — guichet.public.lu matches it;
+    # the bare guichet.lu host is added below.)
+    # Czech Republic (destination rank 31, Prague) — the new unified portal is `gov.cz`; the
+    # statutory bodies also publish on their own `.cz` (mvcr.cz, mzv.cz — added as hosts below).
+    "gov.cz",
+    # Greece (destination rank 32, Athens) — the unified portal + ministries publish under `.gov.gr`
+    # (migration.gov.gr, efka.gov.gr). `.gov.gr` ≠ `.gov`.
+    "gov.gr",
+    # Mexico (destination rank 33, Mexico City) — the whole federal government publishes under `.gob.mx`
+    # (inm.gob.mx immigration, sat.gob.mx tax, imss.gob.mx social security, sre.gob.mx foreign affairs).
+    "gob.mx",
+    # Brazil (destination rank 34, São Paulo) — the whole federal government publishes under `.gov.br`
+    # (gov.br/mj + gov.br/pf residence, gov.br/receitafederal tax, gov.br/inss social security).
+    "gov.br",
+    # Bahrain (destination rank 35, Manama) — government bodies publish under `.gov.bh`
+    # (lmra.gov.bh Labour Market Regulatory Authority, moi.gov.bh, nbr.gov.bh VAT). `.gov.bh` ≠ `.gov`.
+    "gov.bh",
+    # Oman (destination rank 36, Muscat) — government bodies publish under `.gov.om`
+    # (rop.gov.om Royal Oman Police / residence, manpower/labour, tax authority). `.gov.om` ≠ `.gov`.
+    "gov.om",
+    # South Africa (destination rank 37, Johannesburg) — the whole government publishes under `.gov.za`
+    # (dha.gov.za Home Affairs / visas & permits, sars.gov.za tax, labour.gov.za). `.gov.za` ≠ `.gov`.
+    "gov.za",
+    # Malaysia (destination rank 38, Kuala Lumpur) — the whole government publishes under `.gov.my`
+    # (imi.gov.my Immigration / Expatriate Services Division, hasil.gov.my Inland Revenue). `.gov.my` ≠ `.gov`.
+    "gov.my",
+    # Thailand (destination rank 39, Bangkok) — the whole government publishes under `.go.th`
+    # (immigration.go.th, rd.go.th tax, mfa.go.th visa, sso.go.th social security). `.go.th` ≠ `.gov`.
+    "go.th",
+    # China (destination rank 40, Shanghai) — the government publishes under `.gov.cn`
+    # (nia.gov.cn National Immigration Administration, chinatax.gov.cn, mfa.gov.cn visa). `.gov.cn` ≠ `.gov`.
+    "gov.cn",
+    # India (destination rank 41, Bengaluru) — the government publishes under `.gov.in`
+    # (mha.gov.in Home Affairs, indianfrro.gov.in / boi.gov.in immigration, incometax.gov.in, mea.gov.in visa).
+    "gov.in",
+    # Turkey (destination rank 42, Istanbul) — the government publishes under `.gov.tr`
+    # (goc.gov.tr Migration Management, gib.gov.tr tax, turkiye.gov.tr e-portal). `.gov.tr` ≠ `.gov`.
+    "gov.tr",
+    # Hungary (rank 43) — `.gov.hu` (oif.gov.hu / enterhungary.gov.hu residence, nav.gov.hu tax).
+    "gov.hu",
+    # Romania (rank 44) — `.gov.ro` (igi.mai.gov.ro immigration). ANAF tax = anaf.ro (host below).
+    "gov.ro",
+    # Argentina (rank 45) — `.gob.ar` (migraciones.gob.ar, argentina.gob.ar, arca.gob.ar tax).
+    "gob.ar",
+    # Chile (rank 46) — `.gob.cl` (chileatiende.gob.cl, extranjeria.gob.cl). serviciomigraciones.cl /
+    # sii.cl are not gob.cl — hosts below.
+    "gob.cl",
+    # Cyprus (rank 48) — `.gov.cy` (moi.gov.cy Civil Registry & Migration, mof.gov.cy tax).
+    "gov.cy",
+    # Malta (rank 50) — `.gov.mt` (identita.gov.mt residence, cfr.gov.mt tax, homeaffairs.gov.mt).
+    "gov.mt",
+    # (Estonia rank 47 and Iceland rank 49 use no governmental suffix — their statutory bodies are
+    # added as hosts below.)
+    # Wave 9 — Asia-Pacific tail, ranks 53-56. Each is a registry-reserved government namespace:
+    # Taiwan `.gov.tw` (immigration.gov.tw NIA, mol.gov.tw labour, nhi.gov.tw health, ntbt.gov.tw tax);
+    # Vietnam `.gov.vn` (xuatnhapcanh.gov.vn immigration, molisa.gov.vn labour, gdt.gov.vn tax,
+    # baohiemxahoi.gov.vn social insurance); Indonesia `.go.id` (imigrasi.go.id, kemnaker.go.id labour,
+    # pajak.go.id tax, bpjsketenagakerjaan.go.id); Philippines `.gov.ph` (immigration.gov.ph BI,
+    # dole.gov.ph labour, bir.gov.ph tax, philhealth.gov.ph, sss.gov.ph).
+    "gov.tw", "gov.vn", "go.id", "gov.ph",
+    # Wave 10 — Latin America cluster, ranks 57-61. Registry-reserved government namespaces:
+    # Colombia `.gov.co` (migracioncolombia.gov.co, dian.gov.co tax); Peru `.gob.pe`
+    # (migraciones.gob.pe, sunat.gob.pe tax); Uruguay `.gub.uy` (migracion.gub.uy, dgi.gub.uy tax,
+    # bps.gub.uy); Costa Rica `.go.cr` (migracion.go.cr, hacienda.go.cr tax) — plus ccss.sa.cr
+    # (the Caja / social-security fund, a `.sa.cr` host, added below); Panama `.gob.pa`
+    # (migracion.gob.pa, css.gob.pa social security).
+    "gov.co", "gob.pe", "gub.uy", "go.cr", "gob.pa",
+    # Wave 11 — EU cluster, ranks 66-70. EU member states; each has a government suffix, though
+    # several statutory bodies sit on bare national domains (added as hosts below): Croatia
+    # `.gov.hr` (mup.gov.hr police/residence); Slovenia `.gov.si` (fu.gov.si tax, e-uprava.gov.si);
+    # Slovakia `.gov.sk` (many ministries use bare `.sk` — hosts below); Latvia `.gov.lv`
+    # (pmlp.gov.lv migration, vid.gov.lv tax, vsaa.gov.lv social insurance); Lithuania `.gov.lt`
+    # (plus migracija.lrv.lt / vmi.lt / sodra.lt on bare `.lt` — hosts below).
+    "gov.hr", "gov.si", "gov.sk", "gov.lv", "gov.lt",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -122,6 +239,11 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Germany
     "bamf.de", "auswaertiges-amt.de", "gesetze-im-internet.de", "bundesregierung.de",
     "make-it-in-germany.com", "arbeitsagentur.de",
+    # FR-DE wave (2026-09): the federal portal is make-it-in-germany.DE (the .com above is the
+    # legacy host); deutsche-rentenversicherung.de is the statutory pension body and
+    # gkv-spitzenverband.de the statutory-health-insurance umbrella — both public-law bodies that
+    # publish the rule, like bamf.de. Missing here = same too-narrow-allowlist reject as riigiteataja.
+    "make-it-in-germany.de", "deutsche-rentenversicherung.de", "gkv-spitzenverband.de",
     # Portugal
     "aima.gov.pt", "seg-social.pt", "portaldasfinancas.gov.pt",
     # Ireland. Immigration Service Delivery, the Department of Justice unit that operates
@@ -175,6 +297,92 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # padrón vanished from any ES-side deliverable. Named hosts only — a third city is a
     # decision, not a silent addition.
     "madrid.es", "barcelona.cat",
+    # Italy (destination rank 11, Milan). `gov.it` above catches interno.gov.it / agenziaentrate.gov.it,
+    # but `normattiva.it` — the official consolidated-law database (Istituto Poligrafico e Zecca dello
+    # Stato) where the D.Lgs / TUIR articles are published — has no gov TLD, like boe.es / lovdata.no.
+    "normattiva.it",
+    # Sweden (destination rank 14, Stockholm). Sweden uses no governmental suffix; each agency has its
+    # own `.se` domain: Migrationsverket (migration), Skatteverket (tax + population register),
+    # Försäkringskassan (social insurance). Each publishes its own rule. 8th too-narrow-allowlist instance.
+    "migrationsverket.se", "skatteverket.se", "forsakringskassan.se",
+    # Belgium — statutory bodies not under `.fgov.be`: the Immigration Office (ibz.be), the City of
+    # Brussels (brussels.be) and the federal single-permit One-Stop Counter.
+    "ibz.be", "brussels.be", "onestopcounter.workinginbelgium.be",
+    # Saudi Arabia — statutory portals not under `.gov.sa`: Qiwa (labour/work-permit platform,
+    # MHRSD), Absher (MoI e-services) and Muqeem (residency). Each is the operator of the process
+    # it documents, like Absher/Muqeem being where the Iqama and exit/re-entry visa are actioned.
+    "qiwa.sa", "absher.sa", "muqeem.sa",
+    # Portugal — IMT (Instituto da Mobilidade e dos Transportes) runs and publishes driving-licence
+    # exchange; its `imt-ip.pt` domain has no `gov.pt` suffix. (aima.gov.pt / seg-social.pt /
+    # portaldasfinancas.gov.pt above cover immigration/social-security/tax; `gov.pt` covers sns.gov.pt.)
+    "imt-ip.pt",
+    # Finland (destination rank 26, Helsinki) — Finland uses no governmental suffix; each agency owns
+    # its own `.fi`: Migri (immigration), Enter Finland (permit portal), UM (MFA), Vero (tax),
+    # Kela (social insurance), DVV (population register / personal identity code), Suomi.fi (state
+    # portal), Traficom (driving), Tyosuojelu (occupational safety) and Finlex (the official law
+    # database, like normattiva.it / boe.es / lovdata.no). Each publishes its own rule.
+    "migri.fi", "enterfinland.fi", "um.fi", "vero.fi", "kela.fi", "dvv.fi",
+    "suomi.fi", "traficom.fi", "tyosuojelu.fi", "finlex.fi",
+    # Hong Kong — the MPF (Mandatory Provident Fund) Schemes Authority publishes retirement-savings
+    # rules under `mpfa.org.hk`, an org TLD, so `gov.hk` does not catch it.
+    "mpfa.org.hk",
+    # Poland — ZUS (Zakład Ubezpieczeń Społecznych, the social-insurance institution) publishes its
+    # own contribution/coverage rules under `zus.pl`, which is not a `gov.pl` host.
+    "zus.pl",
+    # South Korea — the national health-insurance service publishes coverage rules under `nhis.or.kr`
+    # (an or.kr TLD, not go.kr).
+    "nhis.or.kr",
+    # Luxembourg — the state's one-stop portal is `guichet.lu` (the content also mirrors under
+    # guichet.public.lu, which the `public.lu` suffix catches; the bare host is added for safety).
+    "guichet.lu",
+    # Czech Republic — statutory bodies on their own `.cz` (not gov.cz): mvcr.cz (Ministry of Interior /
+    # immigration), mzv.cz (MFA / visas), mpsv.cz (labour), financnisprava.cz (tax), cssz.cz (social
+    # security), vzp.cz (public health insurer).
+    "mvcr.cz", "mzv.cz", "mpsv.cz", "financnisprava.cz", "cssz.cz", "vzp.cz",
+    # Greece — statutory bodies not under gov.gr: aade.gr (Independent Authority for Public Revenue /
+    # tax), mfa.gr (Ministry of Foreign Affairs / visas).
+    "aade.gr", "mfa.gr",
+    # Bahrain — the national e-government portal is `bahrain.bh` (the eGovernment Authority's own
+    # domain), which is not a `gov.bh` host.
+    "bahrain.bh",
+    # Romania — ANAF (Agenția Națională de Administrare Fiscală, the tax authority) publishes under
+    # `anaf.ro`, not a `gov.ro` host.
+    "anaf.ro",
+    # Chile — the National Migration Service (`serviciomigraciones.cl`) and the tax authority SII
+    # (`sii.cl`) publish on their own `.cl`, not under `gob.cl`.
+    "serviciomigraciones.cl", "sii.cl",
+    # Estonia (rank 47) — no governmental suffix; each body owns its own `.ee`: politsei.ee (Police
+    # & Border Guard Board / residence permits), emta.ee (Tax & Customs Board), eesti.ee (state
+    # portal), sotsiaalkindlustusamet.ee (Social Insurance Board). riigiteataja.ee is the Riigi
+    # Teataja (State Gazette) — the official consolidated-law database that publishes the Aliens Act
+    # itself, exactly like boe.es / lovdata.no / normattiva.it above. It was missing here, so the two
+    # Estonian immigration-quota facts (Aliens Act §113/§115) scored UNOFFICIAL and were rejected —
+    # the same too-narrow-allowlist failure whose rejects always cluster by source.
+    "politsei.ee", "emta.ee", "eesti.ee", "sotsiaalkindlustusamet.ee", "riigiteataja.ee",
+    # Iceland (rank 49) — no governmental suffix; utl.is (Directorate of Immigration /
+    # Útlendingastofnun), skatturinn.is (tax), island.is (state portal).
+    "utl.is", "skatturinn.is", "island.is",
+    # Costa Rica (wave 10) — the Caja Costarricense de Seguro Social publishes on ccss.sa.cr, a
+    # `.sa.cr` host the `.go.cr` suffix does not cover (migracion.go.cr / hacienda.go.cr do).
+    "ccss.sa.cr",
+    # EU cluster (wave 11) — statutory bodies that publish the rule on bare national domains, not
+    # under the government suffix. Croatia: porezna-uprava.hr (Tax Administration), hzzo.hr (health
+    # fund), mirovinsko.hr (pension). Slovenia: policija.si (police / residence registration),
+    # zzzs.si (health-insurance institute), zpiz.si (pension institute). Slovakia (ministries sit
+    # on bare `.sk`): minv.sk (Interior/police — residence), financnasprava.sk (Financial
+    # Administration/tax), socpoist.sk (Sociálna poisťovňa), slovensko.sk (state e-portal).
+    # Lithuania: migracija.lrv.lt (Migration Dept), vmi.lt (State Tax Inspectorate), sodra.lt
+    # (social insurance), vlk.lt (compulsory-health-insurance fund). Latvia: latvija.lv (state
+    # portal; pmlp/vid/vsaa are gov.lv, covered by the suffix above).
+    "porezna-uprava.hr", "hzzo.hr", "mirovinsko.hr",
+    "policija.si", "zzzs.si", "zpiz.si",
+    "minv.sk", "financnasprava.sk", "socpoist.sk", "slovensko.sk",
+    # slov-lex.sk is the official Slovak legislation portal (the state law gazette, like
+    # riigiteataja.ee / boe.es); vszp.sk is Všeobecná zdravotná poisťovňa, the state health
+    # insurer (a public-law body). Both publish the rule; neither carries the gov suffix.
+    "slov-lex.sk", "vszp.sk",
+    "migracija.lrv.lt", "vmi.lt", "sodra.lt", "vlk.lt",
+    "latvija.lv",
     # Cross-border / EU
     "eur-lex.europa.eu", "ec.europa.eu", "efta.int",
 )
@@ -198,6 +406,20 @@ _SEMI_OFFICIAL_HOSTS: Tuple[str, ...] = (
     # as citizensinformation.ie: it is a portal that restates what SKAT, the CPR office and
     # the regions publish elsewhere, so a fact from here belongs in the review queue.
     "borger.dk",
+    # Vietnam. baochinhphu.vn (Báo Chính phủ / the Online Newspaper of the Government of Viet
+    # Nam) is run by the Government Office (Văn phòng Chính phủ) — a state organ, so it belongs
+    # in, not out. Semi-official for the same reason as citizensinformation.ie / borger.dk: it
+    # reports and restates the decrees (219/2025, 152/2020, 143/2018 …) rather than promulgating
+    # them, and the primary texts (vbpl.vn) sit behind a WAF while the decree PDFs are scanned —
+    # so a fact from here is worth keeping and belongs in the review queue for a check against
+    # the statute. The `.vn` government suffix is `gov.vn`; baochinhphu.vn does not carry it.
+    "baochinhphu.vn",
+    # Austria. wko.at is the Wirtschaftskammer Österreich, a public-law chamber (Körperschaft
+    # öffentlichen Rechts) that reproduces the NAG statute (§53/§77) verbatim, incl. the exact
+    # Anmeldebescheinigung fine that the strictly-statutory ris.bka.gv.at states but which is
+    # CAPTCHA-walled. Semi-official for the same reason as citizensinformation.ie / borger.dk:
+    # it restates the law published elsewhere, so a fact from here belongs in the review queue.
+    "wko.at",
 )
 
 

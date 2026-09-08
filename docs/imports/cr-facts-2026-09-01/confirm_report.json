@@ -1,0 +1,140 @@
+{
+  "batch": "cr-facts-2026-09-01",
+  "counts": {
+    "REVIEW_BROWSER": 12
+  },
+  "rows": [
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "dimex",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.032,
+      "method": "utf-8",
+      "reason": "18442 chars, 3% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "residencia_temporal_empresa",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.04,
+      "method": "utf-8",
+      "reason": "18442 chars, 4% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "residencia_temporal_plazo",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.03,
+      "method": "utf-8",
+      "reason": "18442 chars, 3% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "residencia_permanente",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "18442 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "transferencia_intraempresa",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.031,
+      "method": "utf-8",
+      "reason": "18442 chars, 3% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "autorizacion_trabajo",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.037,
+      "method": "utf-8",
+      "reason": "18442 chars, 4% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "verificacion_patrono",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.057,
+      "method": "utf-8",
+      "reason": "18442 chars, 6% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "sancion_patrono",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.015,
+      "method": "utf-8",
+      "reason": "18442 chars, 2% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "renta_territorial",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.062,
+      "method": "utf-8",
+      "reason": "18442 chars, 6% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "ccss_requisito_migratorio",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "18442 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "ccss_obligatorio",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.034,
+      "method": "utf-8",
+      "reason": "18448 chars, 3% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cr-facts-2026-09-01",
+      "destination_country": "CR",
+      "entity_topic_key": "estancia_irregular",
+      "host": "pgrweb.go.cr",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.017,
+      "method": "utf-8",
+      "reason": "18442 chars, 2% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    }
+  ]
+}

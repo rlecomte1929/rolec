@@ -1,0 +1,18 @@
+{
+  "batch_id": "uy-facts-2026-09-01",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "UY",
+  "origin_country_code": null,
+  "destination_country_code": "UY",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "URUGUAY",
+  "record_count": 12,
+  "needs_lawyer_review_count": 5,
+  "artifact": "facts.ndjson",
+  "sha256": "6b368bc99c030b84df0a5175c541eda98b6b95ef21763d5f6a3554446cd07f3d",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "confirm_quotes: 10/12 CONFIRMED headless; 2 browser-verified (bps.gub.uy WAF-blocked to curl — declarar-al-personal + fondo-nacional-de-salud confirmed verbatim in-browser). All 12 landed. Sources all *.gub.uy (Migración/DGI via gub.uy, BPS). nationality=non-EEA -> THIRD_COUNTRY; scope guard clean. 5 DGI tax facts carry needs_lawyer_review. Imported --no-fetch. Greenfield."
+}

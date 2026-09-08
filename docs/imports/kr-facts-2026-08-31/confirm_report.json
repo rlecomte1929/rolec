@@ -1,0 +1,119 @@
+{
+  "batch": "kr-facts-2026-08-31",
+  "counts": {
+    "CONFIRMED": 3,
+    "HOLD_WRONG_SRC": 7
+  },
+  "rows": [
+    {
+      "batch": "kr-facts-2026-08-31",
+      "destination_country": "KR",
+      "entity_topic_key": "national_health_insurance",
+      "host": "www.nhis.or.kr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "kr-facts-2026-08-31",
+      "destination_country": "KR",
+      "entity_topic_key": "national_health_insurance",
+      "host": "www.nhis.or.kr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "kr-facts-2026-08-31",
+      "destination_country": "KR",
+      "entity_topic_key": "nhis_contributions",
+      "host": "www.nhis.or.kr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "kr-facts-2026-08-31",
+      "destination_country": "KR",
+      "entity_topic_key": "work_authorization",
+      "host": "www.immigration.go.kr",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (1722904 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "kr-facts-2026-08-31",
+      "destination_country": "KR",
+      "entity_topic_key": "alien_registration_card",
+      "host": "www.immigration.go.kr",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (1722904 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "kr-facts-2026-08-31",
+      "destination_country": "KR",
+      "entity_topic_key": "re_entry_permit",
+      "host": "www.immigration.go.kr",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (1722904 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "kr-facts-2026-08-31",
+      "destination_country": "KR",
+      "entity_topic_key": "address_registration",
+      "host": "www.immigration.go.kr",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.04,
+      "method": "utf-8",
+      "reason": "text-rich source (1722904 chars) but 4% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "kr-facts-2026-08-31",
+      "destination_country": "KR",
+      "entity_topic_key": "income_tax",
+      "host": "www.nts.go.kr",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.056,
+      "method": "utf-8",
+      "reason": "text-rich source (28892 chars) but 6% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "kr-facts-2026-08-31",
+      "destination_country": "KR",
+      "entity_topic_key": "tax_residency",
+      "host": "www.nts.go.kr",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (28892 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "kr-facts-2026-08-31",
+      "destination_country": "KR",
+      "entity_topic_key": "tax_residency",
+      "host": "www.nts.go.kr",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (28892 chars) but 0% overlap — cited URL likely wrong"
+    }
+  ]
+}

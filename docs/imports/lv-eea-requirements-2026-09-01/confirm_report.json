@@ -1,0 +1,151 @@
+{
+  "batch": "lv-eea-requirements-2026-09-01",
+  "counts": {
+    "CONFIRMED": 13
+  },
+  "rows": [
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "eu_registration_card",
+      "host": "www.pmlp.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.966,
+      "method": "utf-8",
+      "reason": "97% bigram"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "registration_over_90_days",
+      "host": "www.pmlp.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "registration_decision_time",
+      "host": "www.pmlp.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "personas_kods",
+      "host": "www.pmlp.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "declared_place_of_residence",
+      "host": "www.pmlp.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.853,
+      "method": "utf-8",
+      "reason": "85% bigram"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "tax_residency",
+      "host": "likumi.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.955,
+      "method": "utf-8",
+      "reason": "95% bigram"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "employer_pre_registration",
+      "host": "www.vid.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "vsaoi_from_first_day",
+      "host": "www.vsaa.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "minimum_contributions",
+      "host": "www.vsaa.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "healthcare_via_contributions",
+      "host": "www.vsaa.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.971,
+      "method": "utf-8",
+      "reason": "97% bigram"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "healthcare_eligibility_workers",
+      "host": "www.vmnvd.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.946,
+      "method": "utf-8",
+      "reason": "95% bigram"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "s1_one_country_insurance",
+      "host": "www.vmnvd.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "lv-eea-requirements-2026-09-01",
+      "destination_country": "LV",
+      "entity_topic_key": "patient_copayments",
+      "host": "www.vmnvd.gov.lv",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    }
+  ]
+}

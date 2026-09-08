@@ -1,0 +1,56 @@
+{
+  "batch_id": "au-sydney-providers-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code research subagent",
+  "corridor": "XX-AU",
+  "destination_country_code": "AU",
+  "city": "Sydney",
+  "target_table": "public.suppliers + public.supplier_service_capabilities",
+  "platform_vetting_status_all": "pending",
+  "record_count": 24,
+  "coverage": {
+    "movers": {
+      "n": 5,
+      "register": "FIDI FAIM",
+      "tier": 1
+    },
+    "legal_admin": {
+      "n": 3,
+      "register": "OMARA",
+      "tier": 2
+    },
+    "tax_finance": {
+      "n": 3,
+      "register": "TPB",
+      "tier": 2
+    },
+    "banks": {
+      "n": 5,
+      "register": "APRA ADI list",
+      "tier": 2
+    },
+    "schools": {
+      "n": 4,
+      "register": "NESA CRICOS",
+      "tier": 2
+    },
+    "housing_agencies": {
+      "n": 4,
+      "register": "NSW Fair Trading",
+      "tier": 2
+    }
+  },
+  "blocked": [
+    {
+      "category": "tax_finance",
+      "register": "CPA Australia / CA-ANZ",
+      "reason": "Cloudflare-blocked; substituted TPB statutory register"
+    },
+    {
+      "category": "housing_agencies",
+      "register": "REINSW",
+      "reason": "JS geocode autocomplete; substituted NSW Fair Trading statutory register"
+    }
+  ],
+  "scope": "Sydney providers, Australia destination. Movers per-entity FIDI (tier 1); the other 5 Australian registers (OMARA, TPB, APRA, NESA-CRICOS, NSW Fair Trading) are search-form/flat -> PUBLIC_REGISTER tier 2. Staged run-scoped, promoted to suppliers + one capability each at pending. Append-only verified: suppliers 253->277 (+24), +24 capabilities, approved unchanged (130->130). CPA Australia/CA-ANZ/REINSW were bot-blocked and substituted with the statutory TPB + NSW Fair Trading registers."
+}

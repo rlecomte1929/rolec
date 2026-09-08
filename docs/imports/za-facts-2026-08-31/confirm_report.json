@@ -1,0 +1,152 @@
+{
+  "batch": "za-facts-2026-08-31",
+  "counts": {
+    "HOLD_WRONG_SRC": 10,
+    "CONFIRMED": 3
+  },
+  "rows": [
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "work_visa_points_system",
+      "host": "www.dha.gov.za",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (125168 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "work_visa_salary_threshold",
+      "host": "www.dha.gov.za",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (125168 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "work_visa_route_split",
+      "host": "www.dha.gov.za",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (125168 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "critical_skills_list",
+      "host": "www.dha.gov.za",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (654757 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "saqa_evaluation",
+      "host": "www.dha.gov.za",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.05,
+      "method": "utf-8",
+      "reason": "text-rich source (675424 chars) but 5% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "work_visa_employer_tie",
+      "host": "www.dha.gov.za",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.036,
+      "method": "utf-8",
+      "reason": "text-rich source (675424 chars) but 4% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "work_visa_extension_deadline",
+      "host": "www.dha.gov.za",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (675424 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "ict_visa_cap",
+      "host": "www.dha.gov.za",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (1147826 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "ict_visa_role_tie",
+      "host": "www.dha.gov.za",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (1147826 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "ict_prior_employment",
+      "host": "www.dha.gov.za",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (1147826 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "tax_residency_two_tests",
+      "host": "www.sars.gov.za",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "100% bigram"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "tax_presence_daycount",
+      "host": "www.sars.gov.za",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.958,
+      "method": "utf-8",
+      "reason": "96% bigram"
+    },
+    {
+      "batch": "za-facts-2026-08-31",
+      "destination_country": "ZA",
+      "entity_topic_key": "ordinarily_resident_meaning",
+      "host": "www.sars.gov.za",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    }
+  ]
+}

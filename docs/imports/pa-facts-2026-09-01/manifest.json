@@ -1,0 +1,18 @@
+{
+  "batch_id": "pa-facts-2026-09-01",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "PA",
+  "origin_country_code": null,
+  "destination_country_code": "PA",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "PANAMA",
+  "record_count": 11,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "9f428906c59f25bea7da80aa4345568dc87effffb21f0a64f3e19899ed238954",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "12 researched, 11 landed, 1 held. confirm_quotes 2/12 headless (Panama gov is heavily Imperva/WAF-walled to curl); the other 9 applier-verified — 5 migracion + 2 Labour-Code(cetippat) via direct curl+pdfplumber of the real PDFs, 2 panamadigital via in-browser. HELD (held.ndjson): specialist_substitution — the cited Labour-Code substring is not verbatim in the PDF ('obligación de sustituir al trabajador' present but not the quoted 'especializado extranjero por uno panameño' phrasing); re-source art.18. Sources all .gob.pa (migracion, cetippat Labour Code, panamadigital, dgi.mef, gacetaoficial). nationality=non-EEA->THIRD_COUNTRY; scope clean. Greenfield."
+}

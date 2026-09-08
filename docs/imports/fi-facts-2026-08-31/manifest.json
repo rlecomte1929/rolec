@@ -1,0 +1,17 @@
+{
+  "batch_id": "fi-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "FI",
+  "origin_country_code": null,
+  "destination_country_code": "FI",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "FINLAND",
+  "record_count": 14,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "40930cf15c6a69338c1d0c88bd866c088219f35e84822bb07c7c482c14590dc8",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded"
+}

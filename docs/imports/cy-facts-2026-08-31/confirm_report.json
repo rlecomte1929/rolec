@@ -1,0 +1,140 @@
+{
+  "batch": "cy-facts-2026-08-31",
+  "counts": {
+    "REVIEW_BROWSER": 12
+  },
+  "rows": [
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "residence_employment_permit",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "7867 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "highly_paid_work_authorisation",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "7867 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "third_country_staff_ratio",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "7867 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "highly_paid_salary_threshold",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "7867 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "employment_contract_requirement",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "7867 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "foreign_interest_company_register",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "7867 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "support_staff_labour_market_test",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "7867 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "permit_processing_time",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "7867 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "aliens_register_arc",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "8149 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "biometric_enrolment",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "8149 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "unlimited_residence_highly_paid",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "8149 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "cy-facts-2026-08-31",
+      "destination_country": "CY",
+      "entity_topic_key": "change_of_employer",
+      "host": "www.gov.cy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "8149 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    }
+  ]
+}

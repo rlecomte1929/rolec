@@ -1,0 +1,141 @@
+{
+  "batch": "pa-facts-2026-09-01",
+  "counts": {
+    "REVIEW_BROWSER": 10,
+    "CONFIRMED": 2
+  },
+  "rows": [
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "friendly_nations",
+      "host": "www.migracion.gob.pa",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    },
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "residence_work_permit_split",
+      "host": "www.migracion.gob.pa",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    },
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "permanent_residence",
+      "host": "www.migracion.gob.pa",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    },
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "residence_fees",
+      "host": "www.migracion.gob.pa",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    },
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "dependents_solvency",
+      "host": "www.migracion.gob.pa",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    },
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "foreign_worker_quota",
+      "host": "cetippat.gob.pa",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    },
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "work_authorization",
+      "host": "cetippat.gob.pa",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    },
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "specialist_substitution",
+      "host": "cetippat.gob.pa",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    },
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "work_permit_carne",
+      "host": "www.panamadigital.gob.pa",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    },
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "css_affiliation",
+      "host": "www.panamadigital.gob.pa",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    },
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "territorial_tax",
+      "host": "www.gacetaoficial.gob.pa",
+      "content_type": "pdf",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "pdfplumber",
+      "reason": "exact"
+    },
+    {
+      "batch": "pa-facts-2026-09-01",
+      "destination_country": "PA",
+      "entity_topic_key": "income_tax_filing",
+      "host": "dgi.mef.gob.pa",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.974,
+      "method": "utf-8",
+      "reason": "97% bigram"
+    }
+  ]
+}
