@@ -13,6 +13,7 @@ import {
   catalogConfidenceScore,
   confidenceLevel,
   confidencePercent,
+  displayCountryIso,
   displayCountryName,
   filterCatalog,
   formatUpdatedLabel,
@@ -39,11 +40,21 @@ const SORT_OPTIONS: { value: CatalogSortKey; label: string }[] = [
   { value: 'updated', label: 'Last updated' },
 ];
 
-function ConfidenceMark({ score }: { score: number | undefined }) {
+function ConfidenceMark({
+  score,
+  empty,
+}: {
+  score: number | null;
+  empty: boolean;
+}) {
   const level = confidenceLevel(score);
   const pct = confidencePercent(score);
   if (level === 'unknown') {
-    return <Badge variant="neutral" size="sm">No catalog</Badge>;
+    return (
+      <Badge variant="neutral" size="sm">
+        {empty ? 'No evidence' : 'Unknown'}
+      </Badge>
+    );
   }
   const variant = level === 'high' ? 'success' : level === 'medium' ? 'warning' : 'error';
   const label = level === 'high' ? 'High' : level === 'medium' ? 'Medium' : 'Low';
@@ -103,11 +114,15 @@ function DomainChips({ domains }: { domains: string[] }) {
 
 function CountryIdentity({ code }: { code: string }) {
   const name = displayCountryName(code);
-  // Flag + resolved name only. Repeating countryCode next to the label doubled
-  // "CHINA CHINA" because many catalog rows store the English name as
-  // country_code, not ISO-2.
+  const iso = displayCountryIso(code);
   return (
-    <CountryFlag country={code} label={name} className="min-w-0 text-sm font-semibold text-navy-800" />
+    <span className="flex min-w-0 items-center gap-3">
+      {/* Show the English name once; ISO chip is the code, not the name again */}
+      <CountryFlag country={code} label={name} className="min-w-0 text-sm font-semibold text-navy-800" />
+      {iso && (
+        <span className="shrink-0 font-mono text-[11px] uppercase tracking-wide text-slate-500">{iso}</span>
+      )}
+    </span>
   );
 }
 
@@ -202,6 +217,9 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
           </label>
         </div>
       </div>
+      <p className="text-xs text-slate-500">
+        Confidence is shown only when this catalog has recorded requirements and sources.
+      </p>
 
       {rows.length === 0 ? (
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-600">
@@ -248,7 +266,10 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
                     {stale && <Badge variant="warning" size="sm">Needs refresh</Badge>}
                   </div>
                   <RequirementCount count={row.requirementsCount} max={maxRequirements} />
-                  <ConfidenceMark score={catalogConfidenceScore(row.confidenceScore, row.requirementsCount)} />
+                  <ConfidenceMark
+                    score={catalogConfidenceScore(row)}
+                    empty={(row.requirementsCount || 0) === 0}
+                  />
                   <DomainChips domains={row.topDomains} />
                   <ChevronRight className="mt-1 h-4 w-4 text-slate-500" aria-hidden="true" />
                 </Button>
@@ -325,7 +346,10 @@ function CountryCard({
           )}
         </div>
         <RequirementCount count={row.requirementsCount} max={max} />
-        <ConfidenceMark score={catalogConfidenceScore(row.confidenceScore, row.requirementsCount)} />
+        <ConfidenceMark
+          score={catalogConfidenceScore(row)}
+          empty={(row.requirementsCount || 0) === 0}
+        />
         <DomainChips domains={row.topDomains} />
       </div>
     </Button>
