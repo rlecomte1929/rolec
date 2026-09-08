@@ -1,0 +1,14 @@
+{
+  "batch_id": "berlin-city-enrichment-2026-09-01",
+  "generated_at": "2026-09-02",
+  "generated_by": "claude-code (subagent research; \u00a73B city enrichment; import_resources.py --bundle draft_only)",
+  "city": "Berlin",
+  "country_code": "DE",
+  "target_table": "country_resources",
+  "record_count": 16,
+  "artifact": "facts.ndjson",
+  "bundle": "bundle.json",
+  "sha256": "c7db6d4f72d8303609daddc2c2d1aaf798d5500a05147d7ca494eead1b3ef254",
+  "status_all": "draft",
+  "note": "\u00a73B 8-key city-enrichment NDJSON -> bundle.json (topic->category_key) -> import_resources.py --bundle. 16 resources + 8 sources inserted as draft; published resources untouched (non-draft fingerprint unchanged)."
+}

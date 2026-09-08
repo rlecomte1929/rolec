@@ -1,0 +1,16 @@
+{
+  "batch_id": "ch-it-se-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code research subagent (verify_ledger referee)",
+  "destination_country_code": "CH/IT/SE",
+  "target_table": "public.requirement_items",
+  "record_count": 36,
+  "artifact": "facts.ndjson",
+  "sha256": "58ce26d107ef1cf4e49d3a7a824bc77131ffb950796000ef0ea97233b89ea1c7",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "landed": 10,
+  "verify_rejected": 14,
+  "unmapped_topics": 6,
+  "scope": "EEA destinations Switzerland/Italy/Sweden (coverage-master 10/11/14), all greenfield. 36 dual-audience facts (EEA free-mover + non-EEA) from official gov (admin.ch/fedlex/bag; normattiva/agenziaentrate/interno; migrationsverket/skatteverket/forsakringskassan). verify_ledger confirmed 22/36 verbatim (14 JS-rendered German/Italian consolidated-law quotes mismatched -> worklist). Promoted country-scoped (CH+SE Aug-12 landmines parked+restored) -> 10 requirement_items (CH 3, IT 2, SE 5). 6 topics unmapped (pillar conflicts) stay staged. Honesty: CH has NO 183-day rule (recorded real 30/90-day); IT EEA-SSN rejected (no verbatim). Code: IT->ITALY, SE->SWEDEN catalog; normattiva.it + migrationsverket/skatteverket/forsakringskassan.se allowlist (8th too-narrow instance). Scope-guard fix: 1 SE right-of-residence row re-scoped OWN_NATIONAL+EU_EEA -> EU_EEA (EEA permit-gating invariant \u2014 first EEA destination promoted)."
+}

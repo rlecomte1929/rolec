@@ -1,0 +1,18 @@
+{
+  "batch_id": "sk-eea-requirements-2026-09-01",
+  "generated_at": "2026-09-02",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee)",
+  "corridor": "SK",
+  "origin_country_code": null,
+  "destination_country_code": "SK",
+  "nationality_class": "EEA",
+  "target_table": "public.requirement_items",
+  "target_country_code": "SLOVAKIA",
+  "record_count": 15,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "b83cea9e56923abaac14c05b6191c88b400dd145f36fc97a71efaed5821c1ba8",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "EEA corridor (EU professional -> Slovakia). confirm_quotes 13/15 CONFIRMED + 2 browser-verified (socpoist.sk markup-split; slov-lex.sk Act 301/1995 birth-number statute, WAF-thin to curl). Sources minv.sk (foreign-police FAQ PDF), financnasprava.sk, socpoist.sk, vszp.sk, slov-lex.sk, europa.eu — slov-lex.sk (official law portal) + vszp.sk (state health insurer) added to the allowlist this wave. nationality=EEA; the 2 EU-residence-card/certificate rows re-scoped to [EU_EEA] so the scope guard passes. Greenfield. Imported --no-fetch."
+}

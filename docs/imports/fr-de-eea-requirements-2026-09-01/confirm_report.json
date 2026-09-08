@@ -1,0 +1,197 @@
+{
+  "batch": "fr-de-eea-requirements-2026-09-01",
+  "counts": {
+    "CONFIRMED": 13,
+    "REVIEW_BROWSER": 1,
+    "HOLD_WRONG_SRC": 3
+  },
+  "rows": [
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "anmeldung",
+      "host": "service.berlin.de",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "wohnungsgeberbestaetigung",
+      "host": "service.berlin.de",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "meldebestaetigung",
+      "host": "service.berlin.de",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "eu_residence_right",
+      "host": "europa.eu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.884,
+      "method": "utf-8",
+      "reason": "88% bigram"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "family_derived_rights",
+      "host": "europa.eu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.977,
+      "method": "utf-8",
+      "reason": "98% bigram"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "steuer_id",
+      "host": "www.bzst.de",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.882,
+      "method": "utf-8",
+      "reason": "88% bigram"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "eu_driving_licence",
+      "host": "europa.eu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "100% bigram"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "no_work_permit",
+      "host": "europa.eu",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.846,
+      "method": "utf-8",
+      "reason": "85% overlap — likely present but markup-split; confirm in a browser"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "lohnsteuer_steuerklasse",
+      "host": "www.gesetze-im-internet.de",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.98,
+      "method": "latin-1",
+      "reason": "98% bigram"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "health_insurance_mandatory",
+      "host": "www.make-it-in-germany.com",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.111,
+      "method": "utf-8",
+      "reason": "text-rich source (117501 chars) but 11% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "gkv_vs_pkv",
+      "host": "www.make-it-in-germany.com",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (117501 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "familienversicherung",
+      "host": "www.make-it-in-germany.com",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (117501 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "social_security_applicable_law",
+      "host": "www.cleiss.fr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "a1_certificate",
+      "host": "europa.eu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "pension_aggregation",
+      "host": "europa.eu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "kindergeld",
+      "host": "www.arbeitsagentur.de",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "fr-de-eea-requirements-2026-09-01",
+      "destination_country": "DE",
+      "entity_topic_key": "u1_unemployment",
+      "host": "europa.eu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    }
+  ]
+}

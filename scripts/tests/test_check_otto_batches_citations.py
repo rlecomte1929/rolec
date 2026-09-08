@@ -127,7 +127,15 @@ class UrlSpecificityAllows(unittest.TestCase):
         ratchet: re-sourcing kolumbus makes this test fail and the entry gets deleted,
         and any NEW unspecific citation fails it too.
         """
-        known = {"https://www.kolumbus.no/en/"}
+        known = {
+            "https://www.kolumbus.no/en/",
+            # minv.sk routes every page through a query string and exposes no path, so the
+            # path-based heuristic flags this official MoI "Hlásenie pobytu" page even though
+            # it states the 10-working-day report-of-stay rule verbatim (confirmed in-browser
+            # 2026-09-08). Unlike kolumbus (a content-free language root that evidences
+            # nothing), this page IS the specific source — accepted, not a defect to re-source.
+            "https://www.minv.sk/?hlasenie-pobytu-1",
+        }
         imports = REPO_ROOT / "docs" / "imports"
         checked = 0
         offenders = set()

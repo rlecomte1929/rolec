@@ -1,0 +1,141 @@
+{
+  "batch": "ro-facts-2026-08-31",
+  "counts": {
+    "CONFIRMED": 10,
+    "HOLD_WRONG_SRC": 2
+  },
+  "rows": [
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "work_permit_single_employer",
+      "host": "igi.mai.gov.ro",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "100% bigram"
+    },
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "work_permit_obtained_by_employer",
+      "host": "www.euraxess.gov.ro",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "work_permit_annual_quota",
+      "host": "igi.mai.gov.ro",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "work_permit_labour_market_test",
+      "host": "igi.mai.gov.ro",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "work_permit_fee",
+      "host": "igi.mai.gov.ro",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "work_permit_cancelled_on_termination",
+      "host": "igi.mai.gov.ro",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "eu_blue_card_labour_mobility",
+      "host": "igi.mai.gov.ro",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "long_stay_employment_visa_fee",
+      "host": "igi.mai.gov.ro",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "long_stay_visa_validity_window",
+      "host": "igi.mai.gov.ro",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "single_permit_proof_of_accommodation",
+      "host": "igi.mai.gov.ro",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "100% bigram"
+    },
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "tax_residency_arrival_questionnaire",
+      "host": "static.anaf.ro",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (370777 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "ro-facts-2026-08-31",
+      "destination_country": "RO",
+      "entity_topic_key": "worldwide_taxation_on_residency",
+      "host": "static.anaf.ro",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (370777 chars) but 0% overlap — cited URL likely wrong"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "batch_id": "in-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "IN",
+  "origin_country_code": null,
+  "destination_country_code": "IN",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "INDIA",
+  "record_count": 11,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "030717c01593e4df60af6b2382fb60afee789ec2ebdbc942df37f069cc604ca3",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "9 facts from the MHA work-visa FAQ PDF (mha.gov.in) + 2 from incometax.gov.in. verify_ledger hard-rejected the 9 PDF facts (column-scrambled \u2192 pypdf line-break splits); the applier independently reconfirmed all 9 as exact verbatim substrings via pdfplumber (full-match 9/9), and the 2 incometax facts via curl. Imported --no-fetch. US$25,000/annum Employment-Visa salary floor confirmed verbatim. PAN dropped (Section 139A page 403) \u2014 not invented."
+}

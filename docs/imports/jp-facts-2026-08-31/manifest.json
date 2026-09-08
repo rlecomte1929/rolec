@@ -1,0 +1,18 @@
+{
+  "batch_id": "jp-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "JP",
+  "origin_country_code": null,
+  "destination_country_code": "JP",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "JAPAN",
+  "record_count": 13,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "2317a3c45e7f753b0e32241d96aec9d8e5ce127e6ac7b3b45dda3209599ad5d3",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources are official ISA/MOJ/NTA PDFs (moj.go.jp/isa, nta.go.jp) \u2014 official-tier, so promote assigns corpus_grounded. verify_ledger cannot parse PDF binary (V3 hard-rejected all 13 as quote_not_on_page), so quotes were independently reconfirmed as verbatim substrings of the extracted PDF text via pypdf (13/13), then imported with --no-fetch. MOFA/emb-japan pages are 403-blocked."
+}

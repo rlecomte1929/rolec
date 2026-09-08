@@ -1,0 +1,152 @@
+{
+  "batch": "ee-facts-2026-08-31",
+  "counts": {
+    "CONFIRMED": 10,
+    "REVIEW_BROWSER": 3
+  },
+  "rows": [
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "residence_permit_employment",
+      "host": "www.politsei.ee",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "residence_permit_employment",
+      "host": "www.politsei.ee",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "short_term_employment",
+      "host": "www.politsei.ee",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "short_term_employment",
+      "host": "www.politsei.ee",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "short_term_employment",
+      "host": "www.politsei.ee",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "population_register",
+      "host": "www.politsei.ee",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "residence_permit_employment",
+      "host": "www.politsei.ee",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "tax_residency",
+      "host": "www.emta.ee",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "100% bigram"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "tax_residency",
+      "host": "www.emta.ee",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "e_residency",
+      "host": "www.politsei.ee",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "personal_identification_code",
+      "host": "www.eesti.ee",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "195886 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "immigration_quota",
+      "host": "www.riigiteataja.ee",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.038,
+      "method": "utf-8",
+      "reason": "51571 chars, 4% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "ee-facts-2026-08-31",
+      "destination_country": "EE",
+      "entity_topic_key": "immigration_quota",
+      "host": "www.riigiteataja.ee",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "51571 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    }
+  ]
+}

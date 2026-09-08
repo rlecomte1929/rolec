@@ -1,0 +1,18 @@
+{
+  "batch_id": "lt-eea-requirements-2026-09-01",
+  "generated_at": "2026-09-02",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee)",
+  "corridor": "LT",
+  "origin_country_code": null,
+  "destination_country_code": "LT",
+  "nationality_class": "EEA",
+  "target_table": "public.requirement_items",
+  "target_country_code": "LITHUANIA",
+  "record_count": 15,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "4b900185a773c99d6357afe6929ca75756644cab4486a7b80ddd176a88dbbabd",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "EEA corridor (EU professional -> Lithuania). confirm_quotes 15/15 CONFIRMED. Sources vmi.lt (PIT law: 183/280-day residency) + EC official guides (ec.europa.eu/europa.eu) for health/Sodra/free-movement — migracija.lrv.lt and sodra.lt are Cloudflare-gated so the researcher routed to the EC statutory guides. nationality=EEA -> EU categories; scope guard clean. Greenfield. Imported --no-fetch."
+}

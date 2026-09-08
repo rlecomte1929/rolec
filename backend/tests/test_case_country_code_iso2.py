@@ -81,13 +81,16 @@ class TestToIsoIsStillNarrow(unittest.TestCase):
     """
 
     def test_still_none_for_countries_without_catalog_data(self):
-        self.assertIsNone(to_iso("IT"))
-        self.assertIsNone(to_iso("Japan"))
+        # Uncovered origin countries (not relocation destinations). Swap these if the
+        # catalog ever gains coverage for them — IT/JP/AU used to live here until the
+        # destination-coverage campaign added catalog data for them.
+        self.assertIsNone(to_iso("NG"))
+        self.assertIsNone(to_iso("Kenya"))
 
     def test_the_two_functions_disagree_on_purpose(self):
-        # Same input, different questions: Italy has an ISO code but no catalog rows.
-        self.assertEqual(to_iso_alpha2("Italy"), "IT")
-        self.assertIsNone(to_iso("Italy"))
+        # Same input, different questions: Nigeria has an ISO code but no catalog rows.
+        self.assertEqual(to_iso_alpha2("Nigeria"), "NG")
+        self.assertIsNone(to_iso("Nigeria"))
 
 
 class TestWriterNormalisesBeforeStoring(unittest.TestCase):

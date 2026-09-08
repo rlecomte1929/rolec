@@ -1,0 +1,141 @@
+{
+  "batch": "uy-facts-2026-09-01",
+  "counts": {
+    "CONFIRMED": 10,
+    "REVIEW_BROWSER": 2
+  },
+  "rows": [
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "residencia",
+      "host": "www.gub.uy",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "residencia",
+      "host": "www.gub.uy",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "documentacion",
+      "host": "www.gub.uy",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "residencia",
+      "host": "www.gub.uy",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "cedula_identidad",
+      "host": "www.gub.uy",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "residencia_fiscal",
+      "host": "www.gub.uy",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "residencia_fiscal",
+      "host": "www.gub.uy",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "residencia_fiscal",
+      "host": "www.gub.uy",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "residencia_fiscal",
+      "host": "www.gub.uy",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "tax_holiday",
+      "host": "www.gub.uy",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.976,
+      "method": "utf-8",
+      "reason": "98% bigram"
+    },
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "bps_seguridad_social",
+      "host": "www.bps.gub.uy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "15420 chars, 0% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    },
+    {
+      "batch": "uy-facts-2026-09-01",
+      "destination_country": "UY",
+      "entity_topic_key": "fonasa_salud",
+      "host": "www.bps.gub.uy",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.029,
+      "method": "utf-8",
+      "reason": "15617 chars, 3% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    }
+  ]
+}

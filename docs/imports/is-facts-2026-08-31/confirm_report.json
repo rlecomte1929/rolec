@@ -1,0 +1,152 @@
+{
+  "batch": "is-facts-2026-08-31",
+  "counts": {
+    "CONFIRMED": 12,
+    "REVIEW_BROWSER": 1
+  },
+  "rows": [
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "work_permit_authority",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "start_work_restriction",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "employer_tied_permit",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "change_employer",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "shortage_labour_test",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "stay_during_processing",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "means_of_support",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.833,
+      "method": "utf-8",
+      "reason": "83% overlap — likely present but markup-split; confirm in a browser"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "domicile_revocation",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "health_insurance_certificate",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.962,
+      "method": "utf-8",
+      "reason": "96% bigram"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "national_health_insurance_wait",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "kennitala",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "legal_domicile",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "is-facts-2026-08-31",
+      "destination_country": "IS",
+      "entity_topic_key": "permit_issuance_deadline",
+      "host": "island.is",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "batch_id": "co-facts-2026-09-01",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "CO",
+  "origin_country_code": null,
+  "destination_country_code": "CO",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "COLOMBIA",
+  "record_count": 11,
+  "needs_lawyer_review_count": 1,
+  "artifact": "facts.ndjson",
+  "sha256": "f78b926f9fc9fc55bb5504ba07e0a5f93f634a4e2db0a203b3f4aad67db51f78",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "confirm_quotes 10/12 CONFIRMED + 1 browser-verified (permanent_residence, cancilleria Resolución 5477). 1 HELD (held.ndjson): foreigner_id — the migracioncolombia.gov.co cédula page returns empty/redirect in both curl and browser, quote unverifiable; re-source the 15-day cédula deadline. 11 landed. Sources cancilleria.gov.co / migracioncolombia.gov.co / dian.gov.co / funcionpublica.gov.co. nationality=non-EEA->THIRD_COUNTRY; scope guard clean. Greenfield."
+}

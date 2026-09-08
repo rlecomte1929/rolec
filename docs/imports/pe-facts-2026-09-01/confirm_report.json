@@ -1,0 +1,140 @@
+{
+  "batch": "pe-facts-2026-09-01",
+  "counts": {
+    "CONFIRMED": 12
+  },
+  "rows": [
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "work_visa",
+      "host": "www.gob.pe",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "work_visa",
+      "host": "www.gob.pe",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "work_visa",
+      "host": "www.gob.pe",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "work_permit",
+      "host": "www2.congreso.gob.pe",
+      "content_type": "pdf",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "pdfplumber",
+      "reason": "exact"
+    },
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "work_permit",
+      "host": "www2.congreso.gob.pe",
+      "content_type": "pdf",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "pdfplumber",
+      "reason": "exact"
+    },
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "work_permit",
+      "host": "www2.congreso.gob.pe",
+      "content_type": "pdf",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "pdfplumber",
+      "reason": "exact"
+    },
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "work_visa",
+      "host": "www.gob.pe",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "tax_residency",
+      "host": "www.gob.pe",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "income_tax",
+      "host": "www.gob.pe",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "health_insurance",
+      "host": "www.gob.pe",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "pension",
+      "host": "www.gob.pe",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "pe-facts-2026-09-01",
+      "destination_country": "PE",
+      "entity_topic_key": "residence_card",
+      "host": "www.gob.pe",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    }
+  ]
+}

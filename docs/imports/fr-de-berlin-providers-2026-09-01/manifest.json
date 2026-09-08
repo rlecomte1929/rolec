@@ -1,0 +1,98 @@
+{
+  "batch_id": "fr-de-berlin-providers-2026-09-01",
+  "generated": "2026-08-31T18:11:00+02:00",
+  "corridor": "FR-DE",
+  "city": "Berlin",
+  "target_table": "supplier_candidates",
+  "counts": {
+    "records_total": 8,
+    "accepted": 0,
+    "rejected": 8,
+    "categories": [
+      {
+        "service_category": "movers",
+        "register": "FIDI FAIM",
+        "denominator": 3,
+        "accepted": 0,
+        "rejected": 3,
+        "confidence": "high",
+        "notes": "Three Berlin FIDI affiliates were evaluated. Each official FIDI page supplies FAIM status and an expiry year, but none exposes the required membership/accreditation number. All three are therefore rejected under the user-specified ID+expiry gate."
+      },
+      {
+        "service_category": "legal_admin",
+        "register": "Rechtsanwaltskammer Berlin / BRAK official lawyer register",
+        "denominator": 2,
+        "accepted": 0,
+        "rejected": 2,
+        "confidence": "high",
+        "notes": "Two Berlin migration-law firms identifiable in official RAK Berlin publications were evaluated. The public RAK/BRAK search interfaces do not provide a stable provider-specific registry page exposing both membership ID and expiry for these candidates; both remain re-sourcing items."
+      },
+      {
+        "service_category": "banking",
+        "register": "BaFin (official account comparison / institution supervision context)",
+        "denominator": 3,
+        "accepted": 0,
+        "rejected": 3,
+        "confidence": "high",
+        "notes": "Three Berlin-relevant banks were evaluated on official BaFin account-comparison pages. Those pages identify the regulated provider but do not expose both a qualifying licence/registration number and expiry; all three are rejected under the strict schema."
+      }
+    ]
+  },
+  "sources": [
+    {
+      "url": "https://www.fidi.org/find-fidi-affiliate/ags-global-solutions-berlin",
+      "source_name": "FIDI — AGS GLOBAL SOLUTIONS BERLIN",
+      "records_citing": 1
+    },
+    {
+      "url": "https://www.fidi.org/find-fidi-affiliate/hertling-gmbh-co-kg",
+      "source_name": "FIDI — HERTLING GMBH & CO. KG",
+      "records_citing": 1
+    },
+    {
+      "url": "https://www.fidi.org/find-fidi-affiliate/hasenkamp-relocation-services-gmbh-0",
+      "source_name": "FIDI — HASENKAMP RELOCATION SERVICES GMBH",
+      "records_citing": 1
+    },
+    {
+      "url": "https://www.rak-berlin.de/site/assets/files/32834/ausschreibung_refa_08_25.pdf",
+      "source_name": "Rechtsanwaltskammer Berlin — BLKR recruitment notice",
+      "records_citing": 1
+    },
+    {
+      "url": "https://www.rak-berlin.de/site/assets/files/32204/stellenausschreibung_uznanski_rechtsanwaltsgesellschaft_mbh.pdf",
+      "source_name": "Rechtsanwaltskammer Berlin — Uznanski recruitment notice",
+      "records_citing": 1
+    },
+    {
+      "url": "https://kontenvergleich.bafin.de/en/account/d1724063",
+      "source_name": "BaFin Kontenvergleich — N26 Standard",
+      "records_citing": 1
+    },
+    {
+      "url": "https://kontenvergleich.bafin.de/de/konto/1d30edb8",
+      "source_name": "BaFin Kontenvergleich — Berliner Sparkasse Giro Individual",
+      "records_citing": 1
+    },
+    {
+      "url": "https://kontenvergleich.bafin.de/de/konto/4d7aefc4",
+      "source_name": "BaFin Kontenvergleich — DKB Girokonto",
+      "records_citing": 1
+    }
+  ],
+  "policy": {
+    "candidate_only": true,
+    "imported": false,
+    "served": false,
+    "acceptance_gate": "A provider is accepted only when an official registry/accreditation page proves the provider and supplies both accreditation/membership number and accreditation expiry. No inference from page IDs, product IDs, brand names, or certification names is permitted.",
+    "counts_reconcile": true
+  },
+  "honesty_notes": [
+    "No provider met the complete accreditation_number + accreditation_expiry gate, so providers.csv intentionally contains only its required header and zero data rows.",
+    "FIDI pages for AGS, Hertling, and Hasenkamp publish FAIM status and expiry years but no membership/accreditation number; those facts were preserved in rejects.csv without inventing an ID.",
+    "EuRA Berlin relocation providers were not promoted as mover substitutes because the pages reviewed did not expose a membership ID and expiry and several are destination/immigration service firms rather than removal companies.",
+    "RAK Berlin and the BRAK nationwide official lawyer register are interactive; the publicly retrievable materials used here did not yield a stable provider-specific registry record containing both membership number and expiry. The two chamber-published migration-law firms therefore remain rejects for re-sourcing.",
+    "BaFin account-comparison record keys were not treated as bank licence/registration numbers. BaFin pages reviewed did not show a licence expiry, so all banking candidates remain rejects.",
+    "No websites, accreditation IDs, or expiries were inferred or fabricated. Blank fields are deliberate."
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "batch_id": "fr-de-eea-requirements-2026-09-01",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "DE",
+  "origin_country_code": null,
+  "destination_country_code": "DE",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "GERMANY",
+  "record_count": 17,
+  "needs_lawyer_review_count": 1,
+  "artifact": "facts.ndjson",
+  "sha256": "bd7ee2205cff036aca0c4ff950976c0c2c80246769b205a1dddaabfa066590f2",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "EEA corridor (FR->DE, EU professional Paris->Berlin); nationality=EEA -> EU free-mover categories; nationality scope guard clean (exemptions/registrations, no permission reaches OWN_NATIONAL). confirm_quotes: 13/17 CONFIRMED via headless fetch. 4 browser-verified: no_work_permit (europa.eu Your Europe, markup-split 85%) + the 3 health facts (make-it-in-germany.com health-insurance page — curl was WAF-blocked to a 117k-char decoy page at ~0% overlap; the real 8.7k page renders in-browser and carries all 3 quotes verbatim). All 17 landed. Sources official/statutory: service.berlin.de, europa.eu, bzst.de, gesetze-im-internet.de (§39c EStG), make-it-in-germany.com, cleiss.fr, arbeitsagentur.de. Imported --no-fetch. GERMANY was partially covered (7 approved / 4 pending) — new facts land append-only, approved fingerprint unchanged."
+}

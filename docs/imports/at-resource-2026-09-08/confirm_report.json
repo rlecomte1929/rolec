@@ -1,0 +1,19 @@
+{
+  "batch": "at-resource-2026-09-08",
+  "counts": {
+    "CONFIRMED": 1
+  },
+  "rows": [
+    {
+      "batch": "at-resource-2026-09-08",
+      "destination_country": "AT",
+      "entity_topic_key": "eu_registration",
+      "host": "www.wko.at",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    }
+  ]
+}

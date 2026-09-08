@@ -1,0 +1,19 @@
+{
+  "batch": "hk-resource-2026-09-08",
+  "counts": {
+    "REVIEW_BROWSER": 1
+  },
+  "rows": [
+    {
+      "batch": "hk-resource-2026-09-08",
+      "destination_country": "HK",
+      "entity_topic_key": "hkid_30_days",
+      "host": "www.elegislation.gov.hk",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.143,
+      "method": "utf-8",
+      "reason": "6377 chars, 14% overlap — looks like a WAF/JS challenge or thin page, not the real content; confirm in a browser"
+    }
+  ]
+}

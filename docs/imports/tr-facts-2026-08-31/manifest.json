@@ -1,0 +1,18 @@
+{
+  "batch_id": "tr-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "TR",
+  "origin_country_code": null,
+  "destination_country_code": "TR",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "TURKEY",
+  "record_count": 11,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "c5613baf5a9a977191ec30c7e64d4b118e7a4363f3930992d7c0f7291bf88879",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources all gov.tr: csgb.gov.tr (Labour/work-permit) + en.goc.gov.tr (Migration) + one gib 2025 Guidebook PDF. Applier independently curl-confirmed 10/11 (csgb 7/7, goc 3/3); the gib-PDF tax_residency fact (>6-month continuous stay) is subagent-confirmed against the official gib Guidebook PDF but not reproduced by the applier \u2014 re-confirm before approve. Imported --no-fetch (csgb intermittently 403s verify_ledger)."
+}

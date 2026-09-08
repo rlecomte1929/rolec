@@ -1,0 +1,19 @@
+corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry
+XX-PE,banks,BANCO DE CREDITO,,"Superintendencia de Banca, Seguros y AFP (SBS)",https://www.sbs.gob.pe/supervisados-y-registros/empresas-supervisadas/directorio-del-sistema-financiero/empresas-bancarias,SBS,,
+XX-PE,banks,BBVA,,"Superintendencia de Banca, Seguros y AFP (SBS)",https://www.sbs.gob.pe/supervisados-y-registros/empresas-supervisadas/directorio-del-sistema-financiero/empresas-bancarias,SBS,,
+XX-PE,banks,INTERBANK,,"Superintendencia de Banca, Seguros y AFP (SBS)",https://www.sbs.gob.pe/supervisados-y-registros/empresas-supervisadas/directorio-del-sistema-financiero/empresas-bancarias,SBS,,
+XX-PE,banks,SCOTIABANK PERU,,"Superintendencia de Banca, Seguros y AFP (SBS)",https://www.sbs.gob.pe/supervisados-y-registros/empresas-supervisadas/directorio-del-sistema-financiero/empresas-bancarias,SBS,,
+XX-PE,banks,CITIBANK DEL PERU,,"Superintendencia de Banca, Seguros y AFP (SBS)",https://www.sbs.gob.pe/supervisados-y-registros/empresas-supervisadas/directorio-del-sistema-financiero/empresas-bancarias,SBS,,
+XX-PE,banks,SANTANDER PERU,,"Superintendencia de Banca, Seguros y AFP (SBS)",https://www.sbs.gob.pe/supervisados-y-registros/empresas-supervisadas/directorio-del-sistema-financiero/empresas-bancarias,SBS,,
+XX-PE,banks,BANBIF,,"Superintendencia de Banca, Seguros y AFP (SBS)",https://www.sbs.gob.pe/supervisados-y-registros/empresas-supervisadas/directorio-del-sistema-financiero/empresas-bancarias,SBS,,
+XX-PE,movers,"CLASS INTERNATIONAL MOVERS, S.A.",http://www.classmoving.com,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/class-international-movers-sa,FIDI (FAIM),,2027
+XX-PE,movers,EXPRESS TRANSPORTS S.A.,http://www.express.com.pe,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/express-transports-sa,FIDI (FAIM),,2027
+XX-PE,movers,SECURITY INTERNATIONAL MOVING S.A.C.,http://www.simoving.com.pe,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/security-international-moving-sac,FIDI (FAIM),,2029
+XX-PE,schools,Colegio Franklin Delano Roosevelt,https://www.amersol.edu.pe/,International Baccalaureate Organization,https://www.ibo.org/school/000682/,International Baccalaureate (IB),000682,
+XX-PE,schools,Markham College,https://www.markham.edu.pe/,International Baccalaureate Organization,https://www.ibo.org/school/000633/,International Baccalaureate (IB),000633,
+XX-PE,schools,Newton College,https://www.newton.edu.pe/,International Baccalaureate Organization,https://www.ibo.org/school/000448/,International Baccalaureate (IB),000448,
+XX-PE,schools,San Silvestre School Asociacion Civil,https://www.sansilvestre.edu.pe/,International Baccalaureate Organization,https://www.ibo.org/school/000606/,International Baccalaureate (IB),000606,
+XX-PE,schools,"Hiram Bingham, The British International School of Lima",https://www.hirambingham.edu.pe/,International Baccalaureate Organization,https://www.ibo.org/school/001004/,International Baccalaureate (IB),001004,
+XX-PE,schools,Casuarinas International College,https://www.casuarinas.edu.pe/,International Baccalaureate Organization,https://www.ibo.org/school/000741/,International Baccalaureate (IB),000741,
+XX-PE,schools,Colegio Peruano Británico,https://www.britishschool.edu.pe/,International Baccalaureate Organization,https://www.ibo.org/school/001173/,International Baccalaureate (IB),001173,
+XX-PE,schools,Cambridge College Lima,https://cambridge.edu.pe/home,International Baccalaureate Organization,https://www.ibo.org/school/061750/,International Baccalaureate (IB),061750,

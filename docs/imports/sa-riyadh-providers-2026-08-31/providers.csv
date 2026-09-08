@@ -1,0 +1,14 @@
+corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry
+XX-SA,movers,"Four Winds Saudi Arabia, Ltd - Riyadh",https://www.fourwinds-ksa.com,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/four-winds-saudi-arabia-ltd-riyadh,FIDI Global Alliance,,2027
+XX-SA,banks,Al Rajhi Bank,https://www.alrajhibank.com.sa,SAMA - Licensed Entities: Local Banks,https://www.sama.gov.sa/en-US/Supervision/LicenseEntities/Pages/LocalBanks.aspx,Saudi Central Bank (SAMA),,
+XX-SA,banks,Riyad Bank,https://www.riyadbank.com,SAMA - Licensed Entities: Local Banks,https://www.sama.gov.sa/en-US/Supervision/LicenseEntities/Pages/LocalBanks.aspx,Saudi Central Bank (SAMA),,
+XX-SA,banks,The Saudi British Bank (SABB),https://www.sabb.com,SAMA - Licensed Entities: Local Banks,https://www.sama.gov.sa/en-US/Supervision/LicenseEntities/Pages/LocalBanks.aspx,Saudi Central Bank (SAMA),,
+XX-SA,banks,Arab National Bank,https://www.anb.com.sa,SAMA - Licensed Entities: Local Banks,https://www.sama.gov.sa/en-US/Supervision/LicenseEntities/Pages/LocalBanks.aspx,Saudi Central Bank (SAMA),,
+XX-SA,schools,American International School - Riyadh,https://www.aisr.org,International Baccalaureate - Find an IB World School,https://www.ibo.org/school/001218/,International Baccalaureate Organization (IBO),001218,
+XX-SA,schools,British International School Riyadh,https://www.bisr.com.sa,International Baccalaureate - Find an IB World School,https://www.ibo.org/school/062374/,International Baccalaureate Organization (IBO),062374,
+XX-SA,schools,Advanced Learning Schools,https://www.alsschools.com,International Baccalaureate - Find an IB World School,https://www.ibo.org/school/004364/,International Baccalaureate Organization (IBO),004364,
+XX-SA,schools,SEK International School Riyadh,https://sek.sa,International Baccalaureate - Find an IB World School,https://www.ibo.org/school/062477/,International Baccalaureate Organization (IBO),062477,
+XX-SA,legal_admin,Al-Jehani Law Office,https://www.aljehani.com.sa,Saudi Bar Association - Legal Firms Directory,https://eservice.sba.gov.sa/directory/38,Saudi Bar Association,,
+XX-SA,legal_admin,Ali Abdullah Al-Shareef Law Firm,https://www.alshareeflaw.sa,Saudi Bar Association - Legal Firms Directory,https://eservice.sba.gov.sa/directory/3507,Saudi Bar Association,,
+XX-SA,legal_admin,Al Kheraiji Lawyers and Consultants,https://www.alkheraiji.com,Saudi Bar Association - Legal Firms Directory,https://eservice.sba.gov.sa/directory/84,Saudi Bar Association,,
+XX-SA,legal_admin,Worth Law Consultants,https://www.worth.sa,Saudi Bar Association - Legal Firms Directory,https://eservice.sba.gov.sa/directory/1461,Saudi Bar Association,,
