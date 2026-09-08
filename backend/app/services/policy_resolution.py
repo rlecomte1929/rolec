@@ -318,7 +318,26 @@ def find_first_published_company_policy(
     Return (company_id, company_policy_row, published_version_row) for the first
     candidate company that has a published policy_versions row.
     """
-    for cid in company_ids:
+    ids = [str(c).strip() for c in (company_ids or []) if c is not None and str(c).strip()]
+    if not ids:
+        return None
+    bulk_fn = getattr(db, "get_company_policy_with_published_version_bulk", None)
+    found: Optional[Dict[str, Any]] = None
+    if callable(bulk_fn):
+        try:
+            found = bulk_fn(ids) or {}
+        except Exception:
+            found = None
+    if found is not None:
+        for cid in ids:
+            pub = found.get(cid)
+            if not pub:
+                continue
+            policy, version = pub
+            if policy and version:
+                return (cid, policy, version)
+        return None
+    for cid in ids:
         try:
             pub = db.get_company_policy_with_published_version(cid)
         except Exception:

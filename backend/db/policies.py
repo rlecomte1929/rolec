@@ -20,7 +20,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import bindparam, text
 # [AUDIT-C1.6a] imports for appended policies methods
@@ -984,6 +984,59 @@ class PoliciesMixin:
             ).fetchone()
         return self._row_to_dict(row)
 
+    def get_latest_published_policy_config_version_bulk(
+        self, company_ids: List[str], config_key: str
+    ) -> Dict[str, Dict[str, Any]]:
+        """Latest published policy_config_versions row per company_id for one config_key.
+
+        Same pick as :meth:`get_latest_published_policy_config_version`. Used by
+        ``find_published_matrix_version`` so candidate companies are not queried in a loop.
+        """
+        ids: List[str] = []
+        seen: Set[str] = set()
+        for raw in company_ids or []:
+            if raw is None:
+                continue
+            cid = str(raw).strip()
+            if not cid or cid in seen:
+                continue
+            seen.add(cid)
+            ids.append(cid)
+        if not ids:
+            return {}
+
+        ranked = text(
+            """
+            SELECT * FROM (
+              SELECT
+                v.*,
+                c.company_id AS lookup_company_id,
+                ROW_NUMBER() OVER (
+                  PARTITION BY c.company_id
+                  ORDER BY v.effective_date DESC, v.version_number DESC
+                ) AS rn
+              FROM policy_config_versions v
+              JOIN policy_configs c ON c.id = v.policy_config_id
+              WHERE c.company_id IN :cids AND c.config_key = :ck AND v.status = 'published'
+            ) ranked
+            WHERE rn = 1
+            """
+        ).bindparams(bindparam("cids", expanding=True))
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(ranked, {"cids": ids, "ck": str(config_key)}).fetchall()
+
+        out: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            d = self._row_to_dict(row)
+            if not d:
+                continue
+            cid = d.pop("lookup_company_id", None)
+            d.pop("rn", None)
+            if cid:
+                out[str(cid)] = d
+        return out
+
     def get_policy_config_draft_for_config(self, policy_config_id: str) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
             row = conn.execute(
@@ -1098,6 +1151,84 @@ class PoliciesMixin:
         if policy and version:
             return (policy, version)
         return None
+
+    def get_company_policy_with_published_version_bulk(
+        self, company_ids: List[str]
+    ) -> Dict[str, Tuple[Dict[str, Any], Dict[str, Any]]]:
+        """Best published (policy, version) per company_id, one round-trip set for the whole list.
+
+        Same pick as :meth:`get_company_policy_with_published_version` (latest company_policies
+        row, then highest published version_number). Used by
+        ``find_first_published_company_policy`` so candidate company ids are not queried in a loop.
+        """
+        ids: List[str] = []
+        seen: Set[str] = set()
+        for raw in company_ids or []:
+            if raw is None:
+                continue
+            cid = str(raw).strip()
+            if not cid or cid in seen:
+                continue
+            seen.add(cid)
+            ids.append(cid)
+        if not ids:
+            return {}
+
+        ranked = text(
+            """
+            SELECT company_id, policy_id, version_id FROM (
+              SELECT
+                cp.company_id AS company_id,
+                cp.id AS policy_id,
+                pv.id AS version_id,
+                ROW_NUMBER() OVER (
+                  PARTITION BY cp.company_id
+                  ORDER BY cp.created_at DESC, pv.version_number DESC, pv.created_at DESC
+                ) AS rn
+              FROM company_policies cp
+              INNER JOIN policy_versions pv
+                ON pv.policy_id = cp.id AND LOWER(TRIM(pv.status)) = 'published'
+              WHERE cp.company_id IN :cids
+            ) ranked
+            WHERE rn = 1
+            """
+        ).bindparams(bindparam("cids", expanding=True))
+
+        with self.engine.connect() as conn:
+            pairs = conn.execute(ranked, {"cids": ids}).fetchall()
+            if not pairs:
+                return {}
+            policy_ids = [str(r._mapping["policy_id"]) for r in pairs]
+            version_ids = [str(r._mapping["version_id"]) for r in pairs]
+            policy_rows = conn.execute(
+                text("SELECT * FROM company_policies WHERE id IN :ids").bindparams(
+                    bindparam("ids", expanding=True)
+                ),
+                {"ids": policy_ids},
+            ).fetchall()
+            version_rows = conn.execute(
+                text("SELECT * FROM policy_versions WHERE id IN :ids").bindparams(
+                    bindparam("ids", expanding=True)
+                ),
+                {"ids": version_ids},
+            ).fetchall()
+
+        policies_by_id = {str(d["id"]): d for d in self._rows_to_list(policy_rows) if d.get("id")}
+        versions_by_id: Dict[str, Dict[str, Any]] = {}
+        for row in version_rows:
+            d = self._row_to_dict(row)
+            self._decode_policy_version_row(d)
+            if d and d.get("id"):
+                versions_by_id[str(d["id"])] = d
+
+        out: Dict[str, Tuple[Dict[str, Any], Dict[str, Any]]] = {}
+        for r in pairs:
+            m = r._mapping
+            policy = policies_by_id.get(str(m["policy_id"]))
+            version = versions_by_id.get(str(m["version_id"]))
+            if policy and version:
+                out[str(m["company_id"])] = (policy, version)
+        return out
 
     def list_company_ids_with_published_policy(self) -> List[Dict[str, Any]]:
         """Return list of {company_id, company_name} for companies that have at least one published policy (for debug logging)."""
