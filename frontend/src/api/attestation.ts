@@ -115,6 +115,17 @@ export const createAttestation = (body: {
   ttl_days?: number;
 }): Promise<AttestationCreated> => apiPost('/api/admin/attestations', body);
 
+/** Snapshot one case's served requirements and mint a reviewer link. */
+export const createCaseAttestation = (body: {
+  case_id: string;
+  title?: string;
+  reviewer_org?: string;
+  reviewer_name?: string;
+  reviewer_email?: string;
+  reviewer_credential?: string;
+  ttl_days?: number;
+}): Promise<AttestationCreated> => apiPost('/api/admin/attestations/case', body);
+
 export const sendAttestation = (id: string): Promise<AttestationAdmin> =>
   apiPost(`/api/admin/attestations/${encodeURIComponent(id)}/send`, {});
 
