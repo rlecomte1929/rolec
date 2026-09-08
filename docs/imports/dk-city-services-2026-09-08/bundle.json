@@ -1,0 +1,141 @@
+{
+  "categories": [],
+  "tags": [],
+  "sources": [
+    {
+      "source_name": "www.boligportal.dk",
+      "publisher": "www.boligportal.dk",
+      "source_type": "commercial",
+      "url": "https://www.boligportal.dk/lejeboliger/roskilde/",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.danskebank.dk",
+      "publisher": "www.danskebank.dk",
+      "source_type": "commercial",
+      "url": "https://www.danskebank.dk",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.internationalschools.dk",
+      "publisher": "www.internationalschools.dk",
+      "source_type": "commercial",
+      "url": "https://www.internationalschools.dk",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "lifeindenmark.borger.dk",
+      "publisher": "lifeindenmark.borger.dk",
+      "source_type": "official",
+      "url": "https://lifeindenmark.borger.dk/settle-in-denmark",
+      "trust_tier": "T1"
+    },
+    {
+      "source_name": "skat.dk",
+      "publisher": "skat.dk",
+      "source_type": "commercial",
+      "url": "https://skat.dk/en-us",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.rejsekort.dk",
+      "publisher": "www.rejsekort.dk",
+      "source_type": "commercial",
+      "url": "https://www.rejsekort.dk/en",
+      "trust_tier": "T2"
+    }
+  ],
+  "resources": [
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "city_name": "Roskilde",
+      "category_key": "housing",
+      "title": "Housing — Roskilde",
+      "body": "Roskilde is Denmark's tenth largest city, located approximately 30 km west of Copenhagen on Zealand. It is well connected to the capital by train. 1-bedroom apartments in the city centre typically range from 7,100 to 9,950 DKK/month based on current BoligPortal listings. Standard deposit is 3 months rent plus 3 months prepaid rent. Main rental portals are boligportal.dk and lejebolig.dk.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-dk-roskilde-housing",
+      "source_url": "https://www.boligportal.dk/lejeboliger/roskilde/",
+      "source_name": "www.boligportal.dk"
+    },
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "city_name": "Roskilde",
+      "category_key": "admin_essentials",
+      "title": "Banking — Roskilde",
+      "body": "To open a bank account in Denmark you generally need a valid passport or national ID, CPR number, proof of address, and employment or enrollment documentation. Roskilde has branches of major Danish banks including Danske Bank and Nordea.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-dk-roskilde-banking",
+      "source_url": "https://www.danskebank.dk",
+      "source_name": "www.danskebank.dk"
+    },
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "city_name": "Roskilde",
+      "category_key": "schools_childcare",
+      "title": "Schools & childcare — Roskilde",
+      "body": "Roskilde has an international school: Skt Josef's International School located at Frederiksborgvej 10, 4000 Roskilde. The national directory internationalschools.dk provides the full listing. Roskilde's proximity to Copenhagen also gives families access to the large number of international schools in the capital region.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-dk-roskilde-schools",
+      "source_url": "https://www.internationalschools.dk",
+      "source_name": "www.internationalschools.dk"
+    },
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "city_name": "Roskilde",
+      "category_key": "admin_essentials",
+      "title": "Registration & admin — Roskilde",
+      "body": "EU/EEA citizens staying more than 3 months must register at the nearest International Citizen Service (nearest ICS in Copenhagen). Non-EU citizens need a residence permit via nyidanmark.dk. All residents must obtain a CPR number from Roskilde Kommune Borgerservice.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-dk-roskilde-legal_admin",
+      "source_url": "https://lifeindenmark.borger.dk/settle-in-denmark",
+      "source_name": "lifeindenmark.borger.dk"
+    },
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "city_name": "Roskilde",
+      "category_key": "admin_essentials",
+      "title": "Tax & finance — Roskilde",
+      "body": "The CPR number also serves as the Danish tax identification number. A skattekort (tax card) must be obtained from SKAT before starting work. Manage tax affairs at skat.dk. Roskilde residents pay municipal tax to Roskilde Kommune.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-dk-roskilde-tax_finance",
+      "source_url": "https://skat.dk/en-us",
+      "source_name": "skat.dk"
+    },
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "city_name": "Roskilde",
+      "category_key": "transport",
+      "title": "Transport — Roskilde",
+      "body": "Roskilde is served by Movia buses and DSB S-tog and regional trains with frequent direct connections to Copenhagen Central Station (approx. 25 minutes). The Rejsekort app is used for all public transport across Zealand zones. A monthly pass for Roskilde-Copenhagen commuting zones via Movia/DSB is approximately 560 DKK. EU driving licences are valid; non-EU licences must be exchanged at the local Kørekortkontor. Sundhedskort issued by Roskilde Kommune after CPR registration; register with a GP via sundhed.dk.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-dk-roskilde-transport",
+      "source_url": "https://www.rejsekort.dk/en",
+      "source_name": "www.rejsekort.dk"
+    }
+  ],
+  "events": []
+}

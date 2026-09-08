@@ -1,0 +1,14 @@
+{
+  "batch_id": "dk-city-services-2026-09-08",
+  "generated_at": "2026-09-08",
+  "country": "Denmark",
+  "cities_imported": [
+    "roskilde"
+  ],
+  "resource_count": 6,
+  "source_count": 6,
+  "target_table": "country_resources",
+  "status": "delivered \u2014 draft/invisible in prod",
+  "storage": "Otto GCS workspace-media (public-read)",
+  "converter": "scripts/gen_city_services_bundle.py"
+}
