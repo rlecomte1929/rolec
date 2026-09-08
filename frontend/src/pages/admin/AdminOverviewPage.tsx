@@ -85,8 +85,8 @@ export const AdminOverviewPage: React.FC = () => {
           <div data-testid="metric-review-open" className="bg-white rounded-xl border border-slate-200 px-5 py-4 shadow-sm">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Content review pending</p>
             <p className="text-sm text-slate-700">No review waiting.</p>
-            <Link to={buildRoute('adminCountries')} className="mt-2 inline-block text-sm text-accent-600 hover:text-accent-700">
-              Country requirements
+            <Link to={buildRoute('adminCoverage')} className="mt-2 inline-block text-sm text-accent-600 hover:text-accent-700">
+              Coverage
             </Link>
           </div>
         ) : (
@@ -119,13 +119,13 @@ export const AdminOverviewPage: React.FC = () => {
           <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white overflow-hidden">
             <li>
               <Link
-                to={buildRoute('adminCountries')}
+                to={buildRoute('adminCoverage')}
                 data-testid="job-door-catalog"
                 className="flex min-h-11 items-baseline justify-between gap-3 px-4 py-3 text-sm hover:bg-slate-50"
               >
                 <span className="font-medium text-navy-800">Catalog</span>
                 <span className="text-slate-500">
-                  Country requirements
+                  Coverage
                   {stats.contentReviewPending !== null && stats.contentReviewPending > 0
                     ? ` · ${stats.contentReviewPending} pending`
                     : ''}

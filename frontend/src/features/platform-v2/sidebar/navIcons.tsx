@@ -45,6 +45,7 @@ import {
   Link2,
   PlaneTakeoff,
   UsersRound,
+  Map,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -114,6 +115,7 @@ export const NAV_ICONS = {
   'admin-people': UserRound,
   'admin-suppliers': Link2,
   'country-requirements': Globe2,
+  coverage: Map,
   'requirement-facts': ListChecks,
   'auth-page-design': Palette,
   'research-requests': FlaskConical,

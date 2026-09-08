@@ -100,6 +100,12 @@ const SECTIONS: NavSection[] = [
     // design are parked (still mounted in App.tsx, not listed here).
     items: [
       {
+        id: 'coverage',
+        group: 'Catalog',
+        label: 'Coverage',
+        to: ROUTE_DEFS.adminCoverage.path,
+      },
+      {
         id: 'country-requirements',
         group: 'Catalog',
         label: 'Country requirements',
@@ -133,6 +139,7 @@ const SECTIONS: NavSection[] = [
         to: ROUTE_DEFS.adminSuppliers.path,
         badge: { kind: 'dynamic', getCount: (c) => c.admin?.pending_capabilities ?? 0 },
         children: [
+          { id: 'supplier-registry', label: 'Registry', to: ROUTE_DEFS.adminSuppliersRegistry.path },
           { id: 'vetting-queue', label: 'Vetting queue', to: ROUTE_DEFS.adminVettingQueue.path },
           { id: 'supplier-submissions', label: 'Supplier submissions', to: ROUTE_DEFS.adminSupplierSubmissions.path },
         ],
