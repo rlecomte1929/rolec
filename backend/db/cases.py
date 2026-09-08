@@ -1259,6 +1259,44 @@ class CasesMixin:
             ).fetchone()
         return self._row_to_dict(row)
 
+    def get_assignments_by_ids(
+        self,
+        assignment_ids: Sequence[str],
+        request_id: Optional[str] = None,
+        *,
+        include_archived: bool = False,
+    ) -> Dict[str, Dict[str, Any]]:
+        """Bulk ``get_assignment_by_id`` — one SELECT for the whole id list."""
+        ids: List[str] = []
+        seen: Set[str] = set()
+        for raw in assignment_ids or []:
+            aid = str(raw).strip() if raw is not None else ""
+            if not aid or aid in seen:
+                continue
+            seen.add(aid)
+            ids.append(aid)
+        if not ids:
+            return {}
+        placeholders = ", ".join(f":a{i}" for i in range(len(ids)))
+        params: Dict[str, Any] = {f"a{i}": ids[i] for i in range(len(ids))}
+        where = f"WHERE id IN ({placeholders})" if include_archived else (
+            f"WHERE id IN ({placeholders}) AND archived_at IS NULL"
+        )
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                f"SELECT * FROM case_assignments {where}",
+                params,
+                op_name="get_assignments_by_ids",
+                request_id=request_id,
+            ).fetchall()
+        out: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            d = self._row_to_dict(row)
+            if d and d.get("id"):
+                out[str(d["id"])] = d
+        return out
+
     def get_assignment_by_case_id(self, case_id: str, request_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Prefer canonical_case_id when resolving, fall back to case_id, then to the
         assignment's own id for legacy. The `id = :cid` arm matters for callers keyed on
@@ -3692,6 +3730,45 @@ class CasesMixin:
             ).fetchall()
         return self._rows_to_list(rows)
 
+    def list_unassigned_assignments_for_employee_contacts(
+        self,
+        employee_contact_ids: Sequence[str],
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Bulk ``list_unassigned_assignments_for_employee_contact`` (input-id order)."""
+        ids: List[str] = []
+        seen: Set[str] = set()
+        for raw in employee_contact_ids or []:
+            cid = str(raw).strip() if raw is not None else ""
+            if not cid or cid in seen:
+                continue
+            seen.add(cid)
+            ids.append(cid)
+        if not ids:
+            return []
+        placeholders = ", ".join(f":c{i}" for i in range(len(ids)))
+        params: Dict[str, Any] = {f"c{i}": ids[i] for i in range(len(ids))}
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_assignments "
+                f"WHERE employee_contact_id IN ({placeholders}) AND employee_user_id IS NULL "
+                "AND (employee_link_mode IS NULL OR TRIM(COALESCE(employee_link_mode, '')) = '' "
+                "OR LOWER(TRIM(employee_link_mode)) NOT IN ('pending_claim', 'dismissed'))",
+                params,
+                op_name="list_unassigned_assignments_for_employee_contacts",
+                request_id=request_id,
+            ).fetchall()
+        by_ec: Dict[str, List[Dict[str, Any]]] = {cid: [] for cid in ids}
+        for d in self._rows_to_list(rows):
+            ecid = str(d.get("employee_contact_id") or "").strip()
+            if ecid in by_ec:
+                by_ec[ecid].append(d)
+        out: List[Dict[str, Any]] = []
+        for cid in ids:
+            out.extend(by_ec[cid])
+        return out
+
     def list_pending_claim_assignments_for_employee_contact(
         self, employee_contact_id: str, request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
@@ -3712,6 +3789,44 @@ class CasesMixin:
             ).fetchall()
         return self._rows_to_list(rows)
 
+    def list_pending_claim_assignments_for_employee_contacts(
+        self,
+        employee_contact_ids: Sequence[str],
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Bulk ``list_pending_claim_assignments_for_employee_contact`` (input-id order)."""
+        ids: List[str] = []
+        seen: Set[str] = set()
+        for raw in employee_contact_ids or []:
+            cid = str(raw).strip() if raw is not None else ""
+            if not cid or cid in seen:
+                continue
+            seen.add(cid)
+            ids.append(cid)
+        if not ids:
+            return []
+        placeholders = ", ".join(f":c{i}" for i in range(len(ids)))
+        params: Dict[str, Any] = {f"c{i}": ids[i] for i in range(len(ids))}
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_assignments "
+                f"WHERE employee_contact_id IN ({placeholders}) AND employee_user_id IS NULL "
+                "AND LOWER(TRIM(COALESCE(employee_link_mode, ''))) = 'pending_claim'",
+                params,
+                op_name="list_pending_claim_assignments_for_employee_contacts",
+                request_id=request_id,
+            ).fetchall()
+        by_ec: Dict[str, List[Dict[str, Any]]] = {cid: [] for cid in ids}
+        for d in self._rows_to_list(rows):
+            ecid = str(d.get("employee_contact_id") or "").strip()
+            if ecid in by_ec:
+                by_ec[ecid].append(d)
+        out: List[Dict[str, Any]] = []
+        for cid in ids:
+            out.extend(by_ec[cid])
+        return out
+
     def list_unassigned_assignments_legacy_for_identifiers(
         self, identifiers: List[str], request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
@@ -3724,27 +3839,27 @@ class CasesMixin:
         )
         if not idents:
             return []
+        placeholders = ", ".join(f":i{i}" for i in range(len(idents)))
+        params: Dict[str, Any] = {f"i{i}": idents[i] for i in range(len(idents))}
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_assignments WHERE employee_user_id IS NULL "
+                "AND (employee_contact_id IS NULL OR TRIM(COALESCE(employee_contact_id, '')) = '') "
+                f"AND LOWER(TRIM(COALESCE(employee_identifier, ''))) IN ({placeholders}) "
+                "AND (employee_link_mode IS NULL OR TRIM(COALESCE(employee_link_mode, '')) = '' "
+                "OR LOWER(TRIM(employee_link_mode)) NOT IN ('pending_claim', 'dismissed'))",
+                params,
+                op_name="list_unassigned_assignments_legacy_for_identifiers",
+                request_id=request_id,
+            ).fetchall()
         seen: Set[str] = set()
         out: List[Dict[str, Any]] = []
-        with self.engine.connect() as conn:
-            for ident in idents:
-                rows = self._exec(
-                    conn,
-                    "SELECT * FROM case_assignments WHERE employee_user_id IS NULL "
-                    "AND (employee_contact_id IS NULL OR TRIM(COALESCE(employee_contact_id, '')) = '') "
-                    "AND LOWER(TRIM(COALESCE(employee_identifier, ''))) = :ident "
-                    "AND (employee_link_mode IS NULL OR TRIM(COALESCE(employee_link_mode, '')) = '' "
-                    "OR LOWER(TRIM(employee_link_mode)) NOT IN ('pending_claim', 'dismissed'))",
-                    {"ident": ident},
-                    op_name="list_unassigned_assignments_legacy_for_identifiers",
-                    request_id=request_id,
-                ).fetchall()
-                for row in rows:
-                    d = self._row_to_dict(row)
-                    aid = d.get("id") if d else None
-                    if aid and aid not in seen:
-                        seen.add(aid)
-                        out.append(d)
+        for d in self._rows_to_list(rows):
+            aid = d.get("id") if d else None
+            if aid and aid not in seen:
+                seen.add(aid)
+                out.append(d)
         return out
 
     def list_rfqs_for_case(

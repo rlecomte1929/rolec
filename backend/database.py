@@ -559,6 +559,8 @@ class Database(CasesMixin, PoliciesMixin, UsersMixin, AuthMixin, IntakeMixin, Hr
     # [AUDIT-C1.4] get_vendor_for_user extracted to backend/db/users.py (UsersMixin).
 
     # [AUDIT-C1.2] cases batch 4a — list_linked_assignments_for_employee extracted to backend/db/cases.py (CasesMixin).
+    # get_assignments_by_ids, list_unassigned_assignments_for_employee_contacts,
+    # list_pending_claim_assignments_for_employee_contacts live on CasesMixin too.
 
     # [AUDIT-C1.4] list_pending_claim_assignments_for_auth_user extracted to backend/db/auth.py (AuthMixin).
 

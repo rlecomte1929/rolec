@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 from ...identity_normalize import normalize_invite_key
 from ...identity_observability import identity_event, principal_fingerprint
@@ -63,6 +63,9 @@ class ClaimLinkResult:
         }
 
 
+_UNSET = object()
+
+
 def _principal_identifiers(email: Optional[str], username: Optional[str]) -> Set[str]:
     out: Set[str] = set()
     for raw in (email, username):
@@ -89,6 +92,100 @@ def _collect_employee_contacts(db: "Database", idents: Set[str], request_id: Opt
     return list(by_id.values())
 
 
+def _revoked_invites_block_auto_claim(statuses: List[str]) -> bool:
+    """Same rule as Database.is_assignment_auto_claim_blocked_by_revoked_invites."""
+    if not statuses:
+        return False
+    if "pending" in statuses or "claimed" in statuses:
+        return False
+    return all(x == "revoked" for x in statuses)
+
+
+def _unique_assignment_ids(assignments: List[Dict[str, Any]]) -> List[str]:
+    ids: List[str] = []
+    seen: Set[str] = set()
+    for assignment in assignments:
+        aid = (assignment.get("id") or "").strip()
+        if aid and aid not in seen:
+            seen.add(aid)
+            ids.append(aid)
+    return ids
+
+
+def _call_optional(db: "Database", name: str, *args: Any, **kwargs: Any) -> Any:
+    fn = getattr(db, name, None)
+    if not callable(fn):
+        return _UNSET
+    try:
+        return fn(*args, **kwargs)
+    except TypeError:
+        try:
+            return fn(*args)
+        except Exception:
+            return _UNSET
+    except Exception:
+        return _UNSET
+
+
+def _list_unassigned_for_contacts(
+    db: "Database",
+    contact_ids: List[str],
+    request_id: Optional[str],
+) -> List[Dict[str, Any]]:
+    bulk = _call_optional(
+        db, "list_unassigned_assignments_for_employee_contacts", contact_ids, request_id=request_id
+    )
+    if bulk is not _UNSET:
+        return list(bulk or [])
+    out: List[Dict[str, Any]] = []
+    for cid in contact_ids:
+        out.extend(db.list_unassigned_assignments_for_employee_contact(cid, request_id=request_id))
+    return out
+
+
+def _list_pending_claim_for_contacts(
+    db: "Database",
+    contact_ids: List[str],
+    request_id: Optional[str],
+) -> List[Dict[str, Any]]:
+    bulk = _call_optional(
+        db, "list_pending_claim_assignments_for_employee_contacts", contact_ids, request_id=request_id
+    )
+    if bulk is not _UNSET:
+        return list(bulk or [])
+    out: List[Dict[str, Any]] = []
+    for cid in contact_ids:
+        out.extend(db.list_pending_claim_assignments_for_employee_contact(cid, request_id=request_id))
+    return out
+
+
+def _prefetch_assignments_and_invite_statuses(
+    db: "Database",
+    assignments: List[Dict[str, Any]],
+    request_id: Optional[str],
+) -> Tuple[Dict[str, Dict[str, Any]], Optional[Dict[str, List[str]]]]:
+    ids = _unique_assignment_ids(assignments)
+    if not ids:
+        return {}, {}
+
+    fresh_map: Dict[str, Dict[str, Any]] = {}
+    bulk_get = _call_optional(db, "get_assignments_by_ids", ids, request_id=request_id)
+    if bulk_get is not _UNSET:
+        for aid, row in (bulk_get or {}).items():
+            if aid and row:
+                fresh_map[str(aid)] = row
+        for aid in ids:
+            fresh_map.setdefault(aid, {})
+    else:
+        for aid in ids:
+            fresh_map[aid] = db.get_assignment_by_id(aid, request_id=request_id) or {}
+
+    invite_map = _call_optional(db, "map_claim_invite_statuses_by_assignments", ids, request_id=request_id)
+    if invite_map is _UNSET:
+        return fresh_map, None
+    return fresh_map, dict(invite_map or {})
+
+
 def _try_attach_assignment(
     db: "Database",
     *,
@@ -98,12 +195,17 @@ def _try_attach_assignment(
     request_id: Optional[str],
     emit_side_effects: bool,
     result: ClaimLinkResult,
+    prefetched_assignment: Any = _UNSET,
+    invite_statuses: Any = _UNSET,
 ) -> None:
     aid = (assignment.get("id") or "").strip()
     if not aid:
         return
 
-    fresh = db.get_assignment_by_id(aid, request_id=request_id) or {}
+    if prefetched_assignment is _UNSET:
+        fresh = db.get_assignment_by_id(aid, request_id=request_id) or {}
+    else:
+        fresh = prefetched_assignment or {}
     current = (fresh.get("employee_user_id") or "").strip()
     if current == user_id:
         result.skipped_already_linked_same_user += 1
@@ -130,7 +232,11 @@ def _try_attach_assignment(
         )
         return
 
-    if db.is_assignment_auto_claim_blocked_by_revoked_invites(aid):
+    if invite_statuses is _UNSET:
+        blocked = db.is_assignment_auto_claim_blocked_by_revoked_invites(aid)
+    else:
+        blocked = _revoked_invites_block_auto_claim(list(invite_statuses or []))
+    if blocked:
         result.skipped_revoked_invites += 1
         log.info("claim_link skip assignment %s revoked invites only", aid[:8])
         identity_event(
@@ -237,6 +343,7 @@ def reconcile_pending_assignment_claims(
     result = ClaimLinkResult()
     contacts = _collect_employee_contacts(db, idents, request_id)
 
+    own_contact_ids: List[str] = []
     for c in contacts:
         cid = (c.get("id") or "").strip()
         if not cid:
@@ -248,28 +355,38 @@ def reconcile_pending_assignment_claims(
         db.link_employee_contact_to_auth_user(cid, user_id, request_id=request_id)
         if cid not in result.linked_contact_ids:
             result.linked_contact_ids.append(cid)
+        own_contact_ids.append(cid)
 
-        candidates = list(db.list_unassigned_assignments_for_employee_contact(cid, request_id=request_id))
+    candidates: List[Dict[str, Any]] = []
+    if own_contact_ids:
+        candidates = _list_unassigned_for_contacts(db, own_contact_ids, request_id)
         # Verified email match → also auto-attach pending_claim rows (no manual accept).
         if attach_pending_claim:
-            candidates.extend(
-                db.list_pending_claim_assignments_for_employee_contact(cid, request_id=request_id)
-            )
-        for asn in candidates:
-            ident = (asn.get("employee_identifier") or "").strip() or next(iter(idents), "")
-            _try_attach_assignment(
-                db,
-                user_id=user_id,
-                assignment=asn,
-                mark_identifier=ident,
-                request_id=request_id,
-                emit_side_effects=emit_side_effects,
-                result=result,
-            )
+            candidates.extend(_list_pending_claim_for_contacts(db, own_contact_ids, request_id))
 
     legacy_list = db.list_unassigned_assignments_legacy_for_identifiers(
         list(idents), request_id=request_id
     )
+    prefetch_rows = list(candidates) + list(legacy_list)
+    fresh_map, invite_map = _prefetch_assignments_and_invite_statuses(
+        db, prefetch_rows, request_id
+    )
+
+    for asn in candidates:
+        ident = (asn.get("employee_identifier") or "").strip() or next(iter(idents), "")
+        aid = (asn.get("id") or "").strip()
+        _try_attach_assignment(
+            db,
+            user_id=user_id,
+            assignment=asn,
+            mark_identifier=ident,
+            request_id=request_id,
+            emit_side_effects=emit_side_effects,
+            result=result,
+            prefetched_assignment=fresh_map.get(aid, {}) if aid else {},
+            invite_statuses=(invite_map.get(aid, []) if invite_map is not None else _UNSET),
+        )
+
     processed: Set[str] = set(result.newly_attached_assignment_ids)
     for asn in legacy_list:
         aid = (asn.get("id") or "").strip()
@@ -285,6 +402,8 @@ def reconcile_pending_assignment_claims(
             request_id=request_id,
             emit_side_effects=emit_side_effects,
             result=result,
+            prefetched_assignment=fresh_map.get(aid, {}) if aid else {},
+            invite_statuses=(invite_map.get(aid, []) if invite_map is not None else _UNSET),
         )
         if result.newly_attached_assignment_ids != before:
             processed.add(aid)
