@@ -1,0 +1,143 @@
+{
+  "batch_id": "vendor-candidates-2026-09-08",
+  "batch": "otto-vendor-candidates-2026-09-08",
+  "source": "Otto delivery manifest (OTTO_BACKLOG.md \u00a7A2); GCS public-read, permanent",
+  "fetched": "2026-09-08",
+  "target_table": "public.vendor_candidates (staging) \u2014 candidate/pending only",
+  "converter": "scripts/convert_vendor_ndjson_to_csv.py",
+  "converted_csv": "vendor_candidates_all.csv",
+  "total_ndjson_records": 250,
+  "tier_gate_result": {
+    "validated_with": "backend.app.services.vendor_harvester.validate",
+    "pass": 15,
+    "reject": 235,
+    "reject_reason": "tier-3 self-declared (source_url is the vendor's own site / an aggregator, not a registry per-entity page)"
+  },
+  "files": [
+    {
+      "file": "src/b1_combined.ndjson",
+      "batch": "B1",
+      "kind": "Paris/Oslo",
+      "bytes": 21115,
+      "sha256": "084a1f1d321fcd1926c7a4fcb6a3970f43e6048f9e940bc839e5e5007422a650",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973825603_nlk1i9ly.ndjson",
+      "record_count": 44,
+      "otto_manifest_count": 44,
+      "reconciles": true
+    },
+    {
+      "file": "src/b1_manifest.json",
+      "batch": "B1",
+      "kind": "manifest",
+      "bytes": 862,
+      "sha256": "9518f1bac1682fb0ce837df4d22abed8b5756fbd1c8638218e4f1aa53c5ab182",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973835754_14vg1tca.json"
+    },
+    {
+      "file": "src/b2_combined.ndjson",
+      "batch": "B2",
+      "kind": "Madrid/Dublin",
+      "bytes": 19649,
+      "sha256": "1750276a960fef88b960751cfe5887a865277e1e2a3a7d6263293b85f3c6989b",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973548495_urc8afl7.ndjson",
+      "record_count": 43,
+      "otto_manifest_count": 43,
+      "reconciles": true
+    },
+    {
+      "file": "src/b2_manifest.json",
+      "batch": "B2",
+      "kind": "manifest",
+      "bytes": 784,
+      "sha256": "6a25b865f24460681a2eb8df06fda8d59ab3caa0a021506039cd6cf33f135e3c",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973557688_pz5vonwn.json"
+    },
+    {
+      "file": "src/b3_combined.ndjson",
+      "batch": "B3",
+      "kind": "Stavanger/Aberdeen",
+      "bytes": 21564,
+      "sha256": "2ee43deeb8a536c801bb693b73c9987b2613ec5a75b14be80aa8b9934540b8b0",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973528302_93z03j6q.ndjson",
+      "record_count": 45,
+      "otto_manifest_count": 45,
+      "reconciles": true
+    },
+    {
+      "file": "src/b3_manifest.json",
+      "batch": "B3",
+      "kind": "manifest",
+      "bytes": 794,
+      "sha256": "db3cf748d527c771a5e318ff37041f2116e7d8ab5a72d99931d2392e8ccaa218",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973538170_wkri8agj.json"
+    },
+    {
+      "file": "src/b4_combined.ndjson",
+      "batch": "B4",
+      "kind": "Stockholm/Copenhagen",
+      "bytes": 27571,
+      "sha256": "7e20e2499c0360fd97b88727279bcaec107b8820a9fde2807ceb6457352139bc",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786974127011_k4fzwzmc.ndjson",
+      "record_count": 42,
+      "otto_manifest_count": 42,
+      "reconciles": true
+    },
+    {
+      "file": "src/b4_manifest.json",
+      "batch": "B4",
+      "kind": "manifest",
+      "bytes": 798,
+      "sha256": "f85645005052b4e482fc347560be0a7fe175ed5b0ced79771c673d54be7aec8c",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786974137036_94rli07e.json"
+    },
+    {
+      "file": "src/b5_combined.ndjson",
+      "batch": "B5",
+      "kind": "Helsinki/Berlin",
+      "bytes": 24320,
+      "sha256": "8a8c2f628a325aed899842b92b5db75c051e8fcd52b2927477296aac7c5fe958",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973432524_leuwncn1.ndjson",
+      "record_count": 36,
+      "otto_manifest_count": 36,
+      "reconciles": true
+    },
+    {
+      "file": "src/b5_manifest.json",
+      "batch": "B5",
+      "kind": "manifest",
+      "bytes": 872,
+      "sha256": "7e0ef219e49195aa9c98a48bf6e687d084e05329488e5980f5ca1b40a6273ba5",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973442900_r2nvhsm2.json"
+    },
+    {
+      "file": "src/a2a_frankfurt_clean.ndjson",
+      "batch": "A2a",
+      "kind": "Frankfurt-clean",
+      "bytes": 11707,
+      "sha256": "07c524cae41616b500dad8a8980df67705ba4b02ae2a8e7f698e5af2ccb2c9be",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786976258278_r01j557o.ndjson",
+      "record_count": 19,
+      "otto_manifest_count": 19,
+      "reconciles": true
+    },
+    {
+      "file": "src/a2a_milan_clean.ndjson",
+      "batch": "A2a",
+      "kind": "Milan-clean",
+      "bytes": 10713,
+      "sha256": "73578aabd37aa5cdb0035b412e097ed1d406d7160dc2e6a251891d21c12faa23",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786976265316_3w5rio37.ndjson",
+      "record_count": 21,
+      "otto_manifest_count": 21,
+      "reconciles": true
+    },
+    {
+      "file": "src/a2a_manifest.json",
+      "batch": "A2a",
+      "kind": "manifest",
+      "bytes": 5135,
+      "sha256": "e74dd3ef6d77e390e017a98a0d80b210c08949d2d8d0fcd98c9b3298098a6d0a",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786976294051_2nmzmq26.json"
+    }
+  ]
+}

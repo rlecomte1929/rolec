@@ -1,0 +1,10 @@
+{
+  "batch": "B4",
+  "generated": "2026-08-17T00:00:00Z",
+  "cities": ["Stockholm", "Copenhagen"],
+  "files": [
+    { "city": "Stockholm", "target_table": "vendor_candidates", "record_count": 21, "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786974121946_l4byndgn.ndjson" },
+    { "city": "Copenhagen", "target_table": "vendor_candidates", "record_count": 21, "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786974123083_vfrwb776.ndjson" },
+    { "city": "combined", "target_table": "vendor_candidates", "record_count": 42, "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786974127011_k4fzwzmc.ndjson" }
+  ]
+}

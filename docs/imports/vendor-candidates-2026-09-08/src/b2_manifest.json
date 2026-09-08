@@ -1,0 +1,10 @@
+{
+  "batch": "B2",
+  "generated": "2026-08-17T00:00:00Z",
+  "cities": ["Madrid", "Dublin"],
+  "files": [
+    { "city": "Madrid", "target_table": "vendor_candidates", "record_count": 22, "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973545391_gsxsb04h.ndjson" },
+    { "city": "Dublin", "target_table": "vendor_candidates", "record_count": 21, "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973547426_du51f0w0.ndjson" },
+    { "city": "combined", "target_table": "vendor_candidates", "record_count": 43, "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973548495_urc8afl7.ndjson" }
+  ]
+}

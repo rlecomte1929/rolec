@@ -1,0 +1,25 @@
+{
+  "batch": "B5",
+  "generated": "2026-08-17T00:00:00Z",
+  "cities": ["Helsinki", "Berlin"],
+  "files": [
+    {
+      "city": "Helsinki",
+      "target_table": "vendor_candidates",
+      "record_count": 18,
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973429865_wgbskxg3.ndjson"
+    },
+    {
+      "city": "Berlin",
+      "target_table": "vendor_candidates",
+      "record_count": 18,
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973431383_75ifo1wt.ndjson"
+    },
+    {
+      "city": "combined",
+      "target_table": "vendor_candidates",
+      "record_count": 36,
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973432524_leuwncn1.ndjson"
+    }
+  ]
+}

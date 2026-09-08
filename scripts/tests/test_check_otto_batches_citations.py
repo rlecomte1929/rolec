@@ -44,6 +44,26 @@ import check_otto_batches as cob  # noqa: E402
 REPO_ROOT = SCRIPTS_DIR.parent
 
 
+def _batch_targets_vendor_candidates(imports: Path, stream: Path) -> bool:
+    """True if `stream`'s batch declares ``target_table`` = vendor_candidates.
+
+    The batch dir is the first path segment under ``docs/imports/``; its ``manifest.json``
+    top-level ``target_table`` names the store. Vendor-candidate batches are out of scope
+    for the fact/content citation ratchet: a vendor row's ``source_url`` is a VENDOR
+    evidence URL graded by the supplier tier gate (``vendor_harvester.validate()``, which
+    rejects a self-declared or aggregator URL outright), not a normative citation. Grading
+    them here would judge one batch by another's contract — the #1990 mistake this module
+    exists to avoid. Keyed on the manifest, not record shape, so a fact batch can never
+    opt out.
+    """
+    try:
+        batch_dir = imports / stream.relative_to(imports).parts[0]
+        manifest = json.loads((batch_dir / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, IndexError):
+        return False
+    return "vendor_candidates" in str(manifest.get("target_table") or "").lower()
+
+
 class UrlSpecificityBlocks(unittest.TestCase):
     """URLs that cannot evidence a rule, and the reason each is refused."""
 
@@ -140,6 +160,8 @@ class UrlSpecificityAllows(unittest.TestCase):
         checked = 0
         offenders = set()
         for stream in sorted(imports.rglob("*.ndjson")):
+            if _batch_targets_vendor_candidates(imports, stream):
+                continue  # graded by the supplier tier gate, not this fact-citation ratchet
             for line in stream.read_text(encoding="utf-8").splitlines():
                 if not line.strip():
                     continue
