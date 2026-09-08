@@ -128,16 +128,19 @@ def test_unreachable_is_on_needs_grounding(tmp_path):
     assert report2["needs_grounding"][0]["source_url"] == URL
 
 
-def test_no_quote_does_not_fail_exit(tmp_path):
+def test_no_quote_fails_exit(tmp_path):
+    # Hardened: a fact with no evidence_quote can never be verbatim-confirmed, so it must GATE the
+    # batch (non-zero exit) rather than pass silently. It previously passed because norm("") is a
+    # substring of every page. This is the no_quote hardening — see gating_exit.
     rec = _rec()
     rec.pop("evidence_quote")
     resolver = qg.make_text_resolver({}, None)
     verdicts = qg.check_quotes([rec], text_for_url=resolver, normalise=qg.default_normalise)
     assert verdicts[0].status == "no_quote"
     assert verdicts[0].grounded_by is None
-    assert qg.gating_exit(verdicts) == 0
+    assert qg.gating_exit(verdicts) == 1
     code, report, _ = _verdicts_via_cli(tmp_path, [rec])
-    assert code == 0
+    assert code == 1
     assert report["counts"]["no_quote"] == 1
 
 
