@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { FileInput } from '../../../components/antigravity/FileInput';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
+import { CountrySelect } from '../../../components/antigravity/CountrySelect';
 import type { CompanyProfilePayload } from '../../../types';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import { useCompanyProfileForm } from './useCompanyProfileForm';
@@ -327,6 +328,8 @@ export function CompanyProfileForm({
                     value={field.value}
                     onChange={field.onChange}
                     options={COUNTRY_OPTIONS}
+                    allowEmpty
+                    emptyLabel="—"
                   />
                 )}
               />
@@ -436,6 +439,8 @@ export function CompanyProfileForm({
                     value={field.value}
                     onChange={field.onChange}
                     options={DESTINATION_COUNTRIES}
+                    allowEmpty
+                    emptyLabel="—"
                   />
                 )}
               />
@@ -677,33 +682,6 @@ function InfoBanner({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
-function CountrySelect({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: ReadonlyArray<{ code: string; name: string }>;
-}) {
-  return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={selectCx}
-      >
-        <option value="">—</option>
-        {options.map((c) => (
-          <option key={c.code} value={c.code}>{c.name}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-// ── Icons (tiny inline SVGs to avoid a new dependency) ─────────────────────
 
 function CheckIcon({ className = '' }: { className?: string }) {
   return (

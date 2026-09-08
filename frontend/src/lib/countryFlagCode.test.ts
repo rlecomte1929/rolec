@@ -15,6 +15,13 @@ describe('countryFlagCode', () => {
   it('accepts an existing ISO alpha-2 code', () => {
     expect(countryFlagCode('DE')).toBe('de');
   });
+  it('accepts ISO codes that are not in the corridor name map', () => {
+    expect(countryFlagCode('CZ')).toBe('cz');
+    expect(countryFlagCode('LB')).toBe('lb');
+  });
+  it('maps the UK alias to GB for the flag sprite', () => {
+    expect(countryFlagCode('UK')).toBe('gb');
+  });
   it('is case- and whitespace-insensitive', () => {
     expect(countryFlagCode('  french ')).toBe('fr');
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { COUNTRY_OPTIONS } from './countryList';
+import { COUNTRY_OPTIONS, countryName, isKnownCountryCode } from './countryList';
 import { DESTINATION_COUNTRIES } from '../../utils/countries';
 
 // AIQ-1341: identity fields (nationality, passport, country of incorporation) must
@@ -60,5 +60,22 @@ describe('country lists are ordered by display name (AIQ-1861)', () => {
     const codes = COUNTRY_OPTIONS.map((c) => c.code);
     expect(new Set(codes).size).toBe(codes.length);
     expect(COUNTRY_OPTIONS.find((c) => c.code === 'LB')?.name).toBe('Lebanon');
+  });
+});
+
+describe('countryName display (BUG-260908-B3D0)', () => {
+  it('resolves ISO codes case-insensitively', () => {
+    expect(countryName('NO')).toBe('Norway');
+    expect(countryName('no')).toBe('Norway');
+  });
+
+  it('treats UK as the United Kingdom', () => {
+    expect(countryName('UK')).toBe('United Kingdom');
+    expect(isKnownCountryCode('UK')).toBe(true);
+  });
+
+  it('passes through unknown text', () => {
+    expect(countryName('Atlantis')).toBe('Atlantis');
+    expect(isKnownCountryCode('Atlantis')).toBe(false);
   });
 });

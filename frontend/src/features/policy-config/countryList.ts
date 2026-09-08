@@ -202,6 +202,28 @@ const _NAME_BY_CODE: Map<string, string> = new Map(
   COUNTRY_OPTIONS.map((c) => [c.code, c.name])
 );
 
+/** Non-ISO aliases seen in ReloPass data. GB is the ISO code; UK is the legacy key. */
+const _CODE_ALIASES: Record<string, string> = { UK: 'GB' };
+
+function canonicalCode(raw: string): string {
+  const up = raw.trim().toUpperCase();
+  return _CODE_ALIASES[up] ?? up;
+}
+
+/** True when `raw` is a known ISO alpha-2 (or the UK alias). */
+export function isKnownCountryCode(raw: string | null | undefined): boolean {
+  const v = (raw ?? '').trim();
+  if (!v) return false;
+  return _NAME_BY_CODE.has(canonicalCode(v));
+}
+
+/**
+ * ISO alpha-2 → English display name.
+ * Case-insensitive; `UK` resolves as `GB`. Unknown input is returned unchanged
+ * so already-full names and free text stay safe to wrap.
+ */
 export function countryName(code: string): string {
-  return _NAME_BY_CODE.get(code) || code;
+  const v = (code ?? '').trim();
+  if (!v) return '';
+  return _NAME_BY_CODE.get(canonicalCode(v)) || v;
 }

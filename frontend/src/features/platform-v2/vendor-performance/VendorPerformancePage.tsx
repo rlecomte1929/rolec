@@ -15,6 +15,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
+import { CountryFlag } from '../../../components/antigravity/CountryFlag';
+import { countryName } from '../../policy-config/countryList';
 import { hrAPI } from '../../../api/client';
 
 type RangeKey = '30d' | '90d' | '12mo';
@@ -243,7 +245,12 @@ function CoverageHeatmap({ coverage }: { coverage: CoverageEntry[] }) {
           <tr>
             <th />
             {countries.map((co) => (
-              <th key={co} className="px-1 text-[10px] font-medium text-slate-500">{co}</th>
+              <th key={co} className="px-1 text-[10px] font-medium text-slate-500">
+                <span className="inline-flex flex-col items-center gap-0.5 max-w-[4.5rem]">
+                  <CountryFlag country={co} hideLabel />
+                  <span className="truncate w-full" title={countryName(co)}>{countryName(co)}</span>
+                </span>
+              </th>
             ))}
           </tr>
         </thead>
@@ -259,7 +266,7 @@ function CoverageHeatmap({ coverage }: { coverage: CoverageEntry[] }) {
                   <td key={co}>
                     <div
                       className={`flex h-9 w-10 flex-col items-center justify-center rounded text-[13px] font-semibold text-white ${cellCls(status)}`}
-                      title={`${fmtCat(cat)} · ${co}: ${count} vendor${count === 1 ? '' : 's'}${status === 'gap' ? ' — qualify more' : ''}`}
+                      title={`${fmtCat(cat)} · ${countryName(co)}: ${count} vendor${count === 1 ? '' : 's'}${status === 'gap' ? ' — qualify more' : ''}`}
                     >
                       {count}
                     </div>

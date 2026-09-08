@@ -5,7 +5,7 @@
  * Self-contained so it doesn't thread state through the large HrVendorCuration.
  */
 import React, { useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Input } from '../components/antigravity';
+import { Alert, Badge, Button, Card, CountryFlag, CountrySelect, Input } from '../components/antigravity';
 import {
   createSupplierSubmission,
   listMySupplierSubmissions,
@@ -55,7 +55,7 @@ export const HrPreferredSupplierCard: React.FC = () => {
         name: name.trim(),
         service_category: category.trim(),
         coverage_scope_type: city.trim() ? 'city' : 'country',
-        country_code: country.trim() || null,
+        country_code: country.trim().toUpperCase() || null,
         city_name: city.trim() || null,
         contact_email: email.trim() || null,
       });
@@ -101,11 +101,16 @@ export const HrPreferredSupplierCard: React.FC = () => {
           <Input unstyled type="text" value={category} onChange={(v) => setCategory(v)}
             placeholder="e.g. movers, banks, insurance" className={`mt-1 w-full ${inputCls}`} />
         </label>
-        <label className="block text-sm font-medium text-[#0b2b43]">
-          Country
-          <Input unstyled type="text" value={country} onChange={(v) => setCountry(v)}
-            placeholder="e.g. DE" className={`mt-1 w-full ${inputCls}`} />
-        </label>
+        <div>
+          <span className="block text-sm font-medium text-[#0b2b43] mb-1">Country</span>
+          <CountrySelect
+            value={country}
+            onChange={setCountry}
+            allowEmpty
+            emptyLabel="—"
+            placeholder="Select a country"
+          />
+        </div>
         <label className="block text-sm font-medium text-[#0b2b43]">
           City <span className="font-normal text-[#6b7280]">(optional)</span>
           <Input unstyled type="text" value={city} onChange={(v) => setCity(v)}
@@ -132,10 +137,10 @@ export const HrPreferredSupplierCard: React.FC = () => {
               <li key={s.id} className="p-3 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="font-medium text-[#0b2b43]">{s.name}</div>
-                  <div className="text-xs text-[#64748b] mt-0.5">
-                    {s.service_category}
-                    {s.city_name ? ` · ${s.city_name}` : ''}
-                    {s.country_code ? `, ${s.country_code}` : ''}
+                  <div className="text-xs text-[#64748b] mt-0.5 flex flex-wrap items-center gap-1">
+                    <span>{s.service_category}</span>
+                    {s.city_name ? <span>· {s.city_name}</span> : null}
+                    {s.country_code ? <CountryFlag country={s.country_code} className="text-xs" /> : null}
                   </div>
                   {s.status === 'rejected' && s.review_notes && (
                     <p className="text-xs text-[#b91c1c] mt-1">Reason: {s.review_notes}</p>
