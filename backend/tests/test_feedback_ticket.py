@@ -128,6 +128,7 @@ def test_submit_prefills_feedback_status(patched_db):
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["ok"] is True
+    assert body["ticket_seeded"] is True
     report_id = body["report_id"]
 
     # Check feedback_status was seeded
@@ -198,7 +199,9 @@ def test_submit_still_succeeds_without_feedback_status_table(monkeypatch):
         json={"category": "bug", "message": "broken form"},
     )
     assert resp.status_code == 201, f"submit must survive missing feedback_status: {resp.text}"
-    assert resp.json()["ok"] is True
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["ticket_seeded"] is False
 
 
 def test_submit_isolation_bug_classified_critical(patched_db):

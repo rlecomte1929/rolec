@@ -10,7 +10,6 @@ import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeN
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { getAuthItem } from '../utils/demo';
-import { isRoadmapPaywallEnabled } from '../featureFlags';
 import { hasSeenWelcome } from '../utils/welcomeSeen';
 import { useWelcomeRedirect } from '../hooks/useWelcomeRedirect';
 import type { PostSignupReconciliation } from '../types';
@@ -348,12 +347,11 @@ export const EmployeeJourney: React.FC = () => {
 
   // Stripe roadmap checkout returns here with ?payment=success — show a "payment
   // received" notice, then strip the params so a refresh doesn't re-trigger. Mirrors the
-  // ?token= cleanup above. Flag-gated so it is inert unless the paywall is enabled.
-  // NOTE: this no longer unlocks anything client-side — the webhook flips access_tier
-  // server-side and the roadmap page reads the server status (paymentStatus.ts). The
-  // notice is purely informational while that propagates.
+  // ?token= cleanup above. [AIQ-2142] No longer flag-gated: it runs only on the
+  // ?payment=success return, and does NOT unlock anything client-side — the webhook flips
+  // access_tier server-side and the roadmap page reads the server status (paymentStatus.ts).
+  // The notice is purely informational while that propagates.
   useEffect(() => {
-    if (!isRoadmapPaywallEnabled()) return;
     if (searchParams.get('payment') !== 'success') return;
     setRoadmapUnlockedNotice(true);
     const next = new URLSearchParams(searchParams);
