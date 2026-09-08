@@ -237,6 +237,17 @@ const SECTIONS: NavSection[] = [
         // (116 in prod). No active-case count is exposed by the notification
         // endpoints, so show nothing rather than a misleading number (AIQ-914).
       },
+      // [AIQ-2086] Relocations + Employees were absent from this sidebar entirely.
+      //
+      // /hr/dashboard is the ONLY surface with the new-case form (HrDashboard's
+      // openNewCaseForm), and it was reachable only via the command centre's "Manage
+      // cases" button — one page deep, from a control whose label does not suggest
+      // "create". /hr/employees was worse: its only inbound links were the command
+      // centre's `noCasesYet` empty-state CTA ("Import your team roster") and the
+      // back-link on its own detail page, so the roster became unreachable the moment
+      // a company had one case and the empty state stopped rendering.
+      { id: 'relocations', label: 'Relocations', hint: 'Case list and the new-relocation form', to: ROUTE_DEFS.hrDashboard.path, exact: true },
+      { id: 'employees', label: 'Employees', hint: 'Your team roster', to: ROUTE_DEFS.hrEmployees.path, exact: true },
       { id: 'risk', label: 'Risk', to: ROUTE_DEFS.hrRisk.path, exact: true },
       // NAV-POL-1: surface the existing HrPolicy ?tab= tabs as sidebar sub-items
       // (shown indented while on /hr/policy). Each deep-links to a bookmarkable tab.
