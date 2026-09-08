@@ -1,0 +1,68 @@
+{
+  "batch": "A2a",
+  "batch_date": "2026-08-17",
+  "target_table": "vendor_candidates",
+  "cities": [
+    {
+      "city": "Frankfurt",
+      "country": "DE",
+      "batch_date": "2026-08-17",
+      "category_counts": {
+        "legal_admin": 3,
+        "tax_finance": 4,
+        "housing_agencies": 3,
+        "banks": 3,
+        "movers": 3,
+        "schools": 3
+      },
+      "clean_count": 19,
+      "rejected_count": 4,
+      "t2_flag_summary": {
+        "website_unreachable": 0,
+        "source_url_unverified": 9,
+        "accreditation_unverified": 1
+      },
+      "t2_clean_pct": 53,
+      "import_recommendation": "yellow",
+      "notes": "All 19 clean records pass Tier-1 (every field present, correct slug/category, source_url on a different domain from website, valid https; legal_admin+tax_finance carry a real official register number read off a fetched page). All 6 categories >=3 (tax_finance=4 after adding NAU PR 2325 and Taxmain HRB 124350). YELLOW because t2_clean_pct<80: several directory/register source pages (gelbeseiten, IBO, MumAbroad, 11880, justlanded, some Wikipedia/northdata) returned 403 or were confirmed via search snippet rather than a rendered fetch, so are flagged source_url_unverified rather than dropped. German bar/Steuerberater chambers do not publish per-person numeric IDs, so firm-entity register numbers (HRB/PR at Amtsgericht Frankfurt) were used; four sole-practitioner immigration lawyers with only un-numbered chamber membership were REJECTED rather than given invented numbers. No fabricated providers, URLs, phones, or numbers.",
+      "files": {
+        "clean": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786976258278_r01j557o.ndjson",
+        "rejected": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786976259946_qi6hatiu.ndjson",
+        "qa": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786976261379_ytrisce3.json"
+      }
+    },
+    {
+      "city": "Milan",
+      "country": "IT",
+      "batch_date": "2026-08-17",
+      "category_counts": {
+        "legal_admin": 4,
+        "tax_finance": 3,
+        "housing_agencies": 3,
+        "banks": 4,
+        "movers": 3,
+        "schools": 4
+      },
+      "clean_count": 21,
+      "rejected_count": 7,
+      "t2_flag_summary": {
+        "website_unreachable": 0,
+        "source_url_unverified": 6,
+        "accreditation_unverified": 4
+      },
+      "t2_clean_pct": 38,
+      "import_recommendation": "yellow",
+      "notes": "All 21 clean records pass Tier-1; all 6 categories >=3 (legal_admin=4, tax_finance=3 after a targeted gap-fill). Italian bars/commercialisti orders do not expose per-individual albo/ODCEC numbers in a fetchable form, so firm-level company registrations (P.IVA via Registro Imprese CCIAA Milano, or REA for Mazzeschi/Siena) were used as the accreditation number and read off firm footers and/or ufficiocamerale.it registry pages. YELLOW because t2_clean_pct<80: several ufficiocamerale registry pages and directory/forum sources returned 403 to fetch (numbers were visible in indexed snippets), flagged accreditation_unverified/source_url_unverified rather than dropped. Mazzeschi is Registro-Imprese-Siena (REA SI-128403) operating a Milan office. Firms with no findable registration number or registered outside Milan (FMLAW, EXPATH, Studio Genise, Studio Paci, LBMG, Giambrone/Palermo, Boschetti/Rome) were REJECTED rather than fabricated.",
+      "files": {
+        "clean": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786976265316_3w5rio37.ndjson",
+        "rejected": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786976268452_hym750d4.ndjson",
+        "qa": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786976268788_6dl7rb6v.json"
+      }
+    }
+  ],
+  "total_clean_records": 40,
+  "total_flagged_records": 22,
+  "total_rejected_records": 11,
+  "overall_import_recommendation": "yellow",
+  "batch_notes": "Both cities YELLOW. All 40 clean records pass Tier-1 and all 6 categories in both cities are >=3. Yellow (not green) because Tier-2 live-verification pass rate is under 80% in both cities: many official registers and directory pages (German northdata/gelbeseiten/IBO/11880, Italian ufficiocamerale/paginegialle, forum sources) returned 403 to automated fetch, so their records carry source_url_unverified / accreditation_unverified flags rather than being dropped. Accreditation numbers for legal_admin/tax_finance are firm-entity register numbers (DE: HRB/PR at Amtsgericht Frankfurt; IT: P.IVA via Registro Imprese CCIAA / REA) because neither the German chambers nor the Italian albi publish fetchable per-individual professional numbers. 11 candidates were rejected rather than fabricated (sole practitioners with no numeric registration, or firms registered outside the target city). No providers, URLs, phones, or accreditation numbers were invented."
+}

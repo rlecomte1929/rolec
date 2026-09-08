@@ -1,0 +1,25 @@
+{
+  "batch": "B1",
+  "generated": "2026-08-17T00:00:00Z",
+  "cities": ["Paris", "Oslo"],
+  "files": [
+    {
+      "city": "Paris",
+      "target_table": "vendor_candidates",
+      "record_count": 21,
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973822443_2wu5xuu9.ndjson"
+    },
+    {
+      "city": "Oslo",
+      "target_table": "vendor_candidates",
+      "record_count": 23,
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973823979_flxke73l.ndjson"
+    },
+    {
+      "city": "combined",
+      "target_table": "vendor_candidates",
+      "record_count": 44,
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973825603_nlk1i9ly.ndjson"
+    }
+  ]
+}

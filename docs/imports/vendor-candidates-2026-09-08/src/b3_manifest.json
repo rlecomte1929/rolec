@@ -1,0 +1,10 @@
+{
+  "batch": "B3",
+  "generated": "2026-08-17T13:32:08Z",
+  "cities": ["Stavanger", "Aberdeen"],
+  "files": [
+    { "city": "Stavanger", "target_table": "vendor_candidates", "record_count": 22, "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973525113_aandhdg8.ndjson" },
+    { "city": "Aberdeen", "target_table": "vendor_candidates", "record_count": 23, "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973526610_1biiy657.ndjson" },
+    { "city": "combined", "target_table": "vendor_candidates", "record_count": 45, "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1786973528302_93z03j6q.ndjson" }
+  ]
+}

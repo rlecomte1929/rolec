@@ -34,6 +34,7 @@ SRC_SIRENE = "registry:insee_sirene"
 SRC_FINANSTILSYNET = "registry:finanstilsynet"
 SRC_BRONNOYSUND = "registry:bronnoysund"
 SRC_DE_CHAMBER = "registry:de_chamber"
+SRC_GB_REGISTER = "registry:gb_register"
 SRC_CATALOG = "catalog_listing"   # ⚠ proxy, not a register
 
 REGISTRY_PREFIX = "registry:"
@@ -174,10 +175,19 @@ def resolve(ev: SupplierEvidence) -> Resolution:
                   "Brønnøysund organisation number evidences Norwegian registration "
                   "(company only — not bar membership)", org)
 
-    # 5 — German chambers and BaFin.
-    for needle in ("BaFin", "Rechtsanwaltskammer", "RAK"):
+    # 5 — German chambers, BaFin, and the tax/property registers.
+    for needle in ("BaFin", "Rechtsanwaltskammer", "RAK", "Steuerberaterkammer", "IVD"):
         if _body_matches(ev.accreditations, needle):
             return _r("DE", SRC_DE_CHAMBER, f"listed by {needle}, a German register")
+
+    # 5b — UK statutory registers and regulated professional bodies. Movers already resolve via
+    #      FIDI above; these cover legal / financial / accounting / property, which have no FIDI
+    #      page. The specific body is named in the reason, one source tags the tier (as with DE).
+    for needle in ("Solicitors Regulation Authority", "SRA", "Financial Conduct Authority", "FCA",
+                   "ICAEW", "British Association of Removers", "Propertymark", "NAEA",
+                   "Royal Institution of Chartered Surveyors", "RICS"):
+        if _body_matches(ev.accreditations, needle):
+            return _r("GB", SRC_GB_REGISTER, f"listed by {needle}, a UK register")
 
     # 6 — PROXY. A directory placed them here; no register says so.
     if ev.catalog_country:
