@@ -24,6 +24,7 @@
 #
 # Usage (from repo root, matching CI env):
 #   RELOPASS_DISABLE_RATE_LIMITS=1 RELOPASS_QUERY_COUNTER_OFF=1 \
+#     DATABASE_URL=sqlite:///./ci_test.db \
 #     scripts/run_backend_tests.sh
 #
 # Prefer the repo venv if you are not already on Python 3.11:
@@ -36,6 +37,9 @@ cd "${ROOT_DIR}"
 
 # CI's setup-python step puts 3.11 on PATH as `python`. Override locally with PYTHON=.
 PYTHON="${PYTHON:-python}"
+
+# Match backend-tests job env so a local run does not inherit a leftover Postgres URL.
+export DATABASE_URL="${DATABASE_URL:-sqlite:///./ci_test.db}"
 
 # Call 1 — full-suite discovery.
 "${PYTHON}" -m pytest -q -c backend/pytest.ini --rootdir . \
