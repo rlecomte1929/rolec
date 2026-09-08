@@ -40,9 +40,18 @@ website", and it is — but that different domain is `northdata.com` (a commerci
 aggregator) and Wikipedia, neither of which is a statutory/professional register, so A2a rejects
 too. The `_DOMAIN_TO_SOURCE` allowlist is hosts of registers on purpose.
 
-## The decision (founder) — held before any import
+## The decision (founder) — DECIDED 2026-09-08: **Option B**
 
-This is a product quality-bar call, so it is not the applier's to make:
+**Founder chose to route everything back to Otto first — stage nothing yet.** All cities go
+back to Otto with a corrected "cite the register, not your own site" instruction, then the
+re-sourced batch imports in one pass. The precise per-city × category register targets (with
+the exact URL shape the gate requires) are in
+[`otto_resourcing_brief.md`](otto_resourcing_brief.md): **53 pairs are harvestable now**, **17
+are registry-gaps** (no register wired for that country/category — needs a `registry_sources.py`
+entry added first, a ReloPass code task, not Otto), and **2 are unharvestable** (register known
+but login-gated / no public search). Otto is scoped to the 53 harvestable pairs only.
+
+The options as originally framed (this is a product quality-bar call, not the applier's to make):
 
 - **(A) Import the 15 registry-evidenced rows now.** Honest and shippable today; small.
   `land_vendor_candidates.py vendor_candidates_all.csv --apply` stages exactly those 15
