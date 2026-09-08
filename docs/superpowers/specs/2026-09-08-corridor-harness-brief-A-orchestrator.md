@@ -133,7 +133,8 @@ docs/imports/<batch-id>/
     worklist.ndjson        # stage 3 rejections
     grounding/
       worklist.json        # sources needing an applier browser hop (stage 3 pause)
-      <host>.txt           # applier-captured page text (filled between pause and resume)
+      index.json           # {source_url: text-filename} — the applier fills this + the text files
+      <url-slug>.txt       # applier-captured page text (Brief B defines this dir's format)
     prepromote.json        # stage 5 lint findings
     promote_preview.json   # stage 6 per-country drafts
     fingerprint.baseline.json
