@@ -41,6 +41,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend.app.services.fact_evidence import normalise as _normalise  # noqa: E402
+from backend.imports.otto import quote_grounding  # noqa: E402
 
 UA = "Mozilla/5.0 (compatible; ReloPass-evidence-check/1.0)"
 
@@ -91,9 +92,16 @@ def main() -> int:
     ap.add_argument("--refetch", action="store_true", help="re-download even if cached")
     ap.add_argument("--stamp", action="store_true",
                     help="write applies_to.quote_verbatim_confirmed on each row from THIS check")
+    ap.add_argument("--target", type=Path, default=None,
+                    help="explicit NDJSON to check (default: the batch dir's non-.flat stream)")
+    ap.add_argument("--grounding-dir", type=Path, default=None,
+                    help="applier-captured page text (index.json + <slug>.txt); grounded text wins over the fetch")
+    ap.add_argument("--report", type=Path, default=None,
+                    help="write the machine-readable quote report the harness reads to decide the pause")
     args = ap.parse_args()
 
-    stream = next(p for p in sorted(args.batch_dir.glob("*.ndjson")) if ".flat." not in p.name)
+    stream = args.target if args.target else next(
+        p for p in sorted(args.batch_dir.glob("*.ndjson")) if ".flat." not in p.name)
     rows = [json.loads(l) for l in stream.read_text().splitlines() if l.strip()]
     sources_dir = args.batch_dir / "sources"
     sources_dir.mkdir(exist_ok=True)
@@ -150,6 +158,23 @@ def main() -> int:
         print(f"  NOT FOUND: {key}")
     for url in unreachable:
         print(f"  UNREACHABLE: {url}")
+
+    # Grafted (Brief B): the machine-readable report + grounding-dir path. Uses the SAME `norm`
+    # as the legacy check above, so with no --grounding-dir the verdicts agree by construction;
+    # a --grounding-dir lets an applier's browser capture confirm a source the HTTP fetch could
+    # not reach (reported grounded_by='browser_grounded', never the researcher's flag).
+    if args.report is not None or args.grounding_dir is not None:
+        fetched = {u: (sources_dir / index[u]["file"]).read_text() for u in urls if u in index}
+        resolver = quote_grounding.make_text_resolver(fetched, args.grounding_dir)
+        verdicts = quote_grounding.check_quotes(rows, text_for_url=resolver, normalise=norm)
+        if args.report is not None:
+            report = quote_grounding.build_report(
+                verdicts, ndjson=str(stream),
+                grounding_dir=str(args.grounding_dir) if args.grounding_dir else None)
+            args.report.parent.mkdir(parents=True, exist_ok=True)
+            args.report.write_text(json.dumps(report, indent=2) + "\n")
+        return quote_grounding.gating_exit(verdicts)
+
     # An unreachable source is not a pass. It is also not a disproof — say which it is.
     return 1 if (missing or unreachable) else 0
 
