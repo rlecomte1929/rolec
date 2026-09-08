@@ -130,13 +130,13 @@ def test_convert_sample_ndjson_blank_accreditation_and_unknown_domain(tmp_path):
     garrigues = by_name["Garrigues"]
     assert garrigues["corridor"] == "IE-ES"
     assert garrigues["source_url"].startswith("https://www.abogacia.es/")
-    assert source_for_url(garrigues["source_url"]).name == SELF_DECLARED
+    assert source_for_url(garrigues["source_url"]).name != SELF_DECLARED
 
     _rows, unknown, skips = convert.convert(records)
     assert skips == []
-    assert "abogacia.es" in unknown
-    assert "group.bnpparibas" in unknown or "bnpparibas" in "".join(unknown)
+    assert "abogacia.es" not in unknown
     assert "fidi.org" not in unknown
+    assert any("bnpparibas" in h for h in unknown)
 
 
 def test_never_invents_accreditation_from_adjacent_fields():

@@ -448,6 +448,81 @@ SOURCES: Tuple[RegistrySource, ...] = (
               "PSRA licence. Search form, no per-entity URL; the licence number is the vetter's "
               "check against the register.",
     ),
+    # Otto flywheel 2026-08-17 cited these professional directories (search-form, no permalink).
+    # Same PUBLIC_REGISTER exception as the Irish set — do not map commercial aggregators
+    # (proff.no, northdata, ufficiocamerale.it) onto this path.
+    RegistrySource(
+        name="Chartered Accountants Ireland — Find a Firm",
+        base_url="https://www.charteredaccountants.ie/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE",),
+        categories=("tax_finance",),
+        notes="CAI (distinct from CPA Ireland). Search directory; vetter confirms the firm. "
+              "Otto's Dublin flywheel cited this host rather than cpaireland.ie.",
+    ),
+    RegistrySource(
+        name="Irish Tax Institute — member directory",
+        base_url="https://taxinstitute.ie/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE",),
+        categories=("tax_finance",),
+        notes="Professional body for Irish tax practitioners. Search/member listing; vetter "
+              "confirms. Not a statutory licence register — tier 2 is the ceiling.",
+    ),
+    RegistrySource(
+        name="Consejo General de la Abogacía — Censo de Letrados (ES)",
+        base_url="https://www.abogacia.es/servicios-abogacia/censo-de-letrados/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE", "XX-ES"),
+        categories=("legal_admin",),
+        notes="National Spanish bar census. Otto's Madrid rows cite the censo search page, not a "
+              "per-lawyer permalink; PUBLIC_REGISTER so the domain is not SELF_DECLARED. Vetter "
+              "confirms the firm on the censo.",
+    ),
+    RegistrySource(
+        name="REAF — Registro de Economistas Auditores (ES)",
+        base_url="https://reaf.economistas.es/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE", "XX-ES"),
+        categories=("tax_finance",),
+        notes="Spanish economists-auditors professional register (Consejo General de Economistas). "
+              "Search directory; vetter confirms membership.",
+    ),
+    RegistrySource(
+        name="Law Society of England and Wales — Find a Solicitor",
+        base_url="https://solicitors.lawsociety.org.uk/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-GB",),
+        categories=("legal_admin",),
+        notes="Find-a-solicitor directory (distinct from the SRA register on sra.org.uk). "
+              "Otto's Aberdeen flywheel cited solicitors.lawsociety.org.uk. Search form; "
+              "vetter confirms the firm.",
+    ),
+    RegistrySource(
+        name="Sveriges Advokatsamfund — find a lawyer",
+        base_url="https://www.advokatsamfundet.se/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-SE",),
+        categories=("legal_admin",),
+        notes="Swedish Bar Association — mandatory to practise as advokat. Search directory; "
+              "vetter confirms. Otto's Stockholm flywheel cited this host.",
+    ),
+    RegistrySource(
+        name="FAR — Swedish authorised public accountants directory",
+        base_url="https://www.far.se/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-SE",),
+        categories=("tax_finance",),
+        notes="FAR is the Swedish professional institute for authorised public accountants. "
+              "Member directory; vetter confirms. Otto's Stockholm flywheel cited far.se.",
+    ),
     # ── France / Paris (NO-FR / Denis, Norway→Paris) ─────────────────────────
     #
     # Otto's Paris preflight (2026-08-30) found most French registers DO expose per-entity URLs,

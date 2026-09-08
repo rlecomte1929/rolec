@@ -68,6 +68,13 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("centralbank.ie",        "Central Bank of Ireland — Register of Authorised Firms"),
     ("tusla.ie",              "Tusla — Register of Independent Schools"),
     ("psr.ie",                "PSRA — Register of Licensed Property Services Providers"),
+    ("charteredaccountants.ie", "Chartered Accountants Ireland — Find a Firm"),
+    ("taxinstitute.ie",         "Irish Tax Institute — member directory"),
+    ("abogacia.es",             "Consejo General de la Abogacía — Censo de Letrados (ES)"),
+    ("reaf.economistas.es",     "REAF — Registro de Economistas Auditores (ES)"),
+    ("lawsociety.org.uk",       "Law Society of England and Wales — Find a Solicitor"),
+    ("advokatsamfundet.se",    "Sveriges Advokatsamfund — find a lawyer"),
+    ("far.se",                  "FAR — Swedish authorised public accountants directory"),
     # France / Paris (NO-FR) — most expose per-entity pages; Barreau is PUBLIC_REGISTER.
     ("regafi.fr",                     "REGAFI — registre des agents financiers (ACPR / Banque de France)"),
     ("annuaire-education.fr",         "Annuaire de l'Éducation nationale (annuaire-education.fr)"),
@@ -127,6 +134,7 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("finanstilsynet.dk",            "Finanstilsynet — Danish FSA company register"),
     ("de.dk",                         "MDE — Dansk Ejendomsmæglerforening members"),
     ("advokatnoeglen.dk",            "Advokatsamfundet — Advokatnøglen (Danish bar)"),
+    ("advokatsamfundet.dk",          "Advokatsamfundet — Advokatnøglen (Danish bar)"),
     ("fsr.dk",                        "FSR — danske revisorer member directory"),
     # Tier-3 hub cities: Riyadh (XX-SA) + Helsinki (XX-FI) + Lisbon (XX-PT), subagent batch 2026-08-31.
     ("sama.gov.sa",                  "SAMA — Saudi Central Bank licensed local banks"),

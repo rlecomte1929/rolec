@@ -72,6 +72,9 @@ def test_registry_is_identified_by_domain(url, expected):
     "https://www.ey.com/de_de/legal-and-privacy/impressum",
     "https://www.wikidata.org/wiki/Q27479372",
     "https://se-legal.de/impressum/",
+    "https://www.northdata.com/FZF+Rechtsanwaelte",
+    "https://www.proff.no/selskap/wikborg-rein",
+    "https://www.ufficiocamerale.it/6988/lca-studio-legale",
     "",
 ])
 def test_a_non_registry_url_is_self_declared_not_a_guess(url):
@@ -315,6 +318,22 @@ def test_dest_country_is_none_rather_than_junk(junk):
      "Tusla — Register of Independent Schools"),
     ("https://www.psr.ie/en/psra/register/",
      "PSRA — Register of Licensed Property Services Providers"),
+    ("https://www.charteredaccountants.ie/find-a-firm",
+     "Chartered Accountants Ireland — Find a Firm"),
+    ("https://taxinstitute.ie/members/",
+     "Irish Tax Institute — member directory"),
+    ("https://www.abogacia.es/servicios-abogacia/censo-de-letrados/",
+     "Consejo General de la Abogacía — Censo de Letrados (ES)"),
+    ("https://reaf.economistas.es/",
+     "REAF — Registro de Economistas Auditores (ES)"),
+    ("https://solicitors.lawsociety.org.uk/search/results",
+     "Law Society of England and Wales — Find a Solicitor"),
+    ("https://www.advokatsamfundet.se/hitta-advokat/",
+     "Sveriges Advokatsamfund — find a lawyer"),
+    ("https://www.far.se/hitta-revisor/",
+     "FAR — Swedish authorised public accountants directory"),
+    ("https://www.advokatsamfundet.dk/",
+     "Advokatsamfundet — Advokatnøglen (Danish bar)"),
 ])
 def test_irish_register_urls_map_to_their_register_not_self_declared(url, expected_source):
     src = source_for_url(url)
