@@ -147,3 +147,67 @@ def test_status_flag_on_unknown_case_fails_closed(monkeypatch):
     body = c.get("/api/payment/status/case-1").json()
     assert body["access_tier"] == "free"
     assert body["roadmap_unlocked"] is False
+
+
+# ── [AIQ-2142] entitlement served as data (replaces the old client roadmap-paywall build flag) ──
+
+def _view(monkeypatch, row, *, flag_on, available=True):
+    monkeypatch.setenv("RELOPASS_ROADMAP_PAYWALL_ENABLED", "true" if flag_on else "false")
+    return ent.roadmap_entitlement_view(ent.EntitlementLookup(row, available))
+
+
+def test_view_flag_off_is_unlocked_no_gate(monkeypatch):
+    v = _view(monkeypatch, {"access_tier": "free"}, flag_on=False)
+    assert v["unlocked"] is True
+    assert v["gate_stage"] == "none"
+    assert v["price_cents"] == ent.ROADMAP_PRICE_CENTS
+    assert v["reason"] == ""
+
+
+def test_view_flag_on_free_unknown_funder_locks_with_default_view(monkeypatch):
+    # No funder → no enabled policy speaks → descriptive fields stay default, but the tier
+    # check still locks a free case.
+    v = _view(monkeypatch, {"access_tier": "free"}, flag_on=True)
+    assert v["unlocked"] is False
+    assert v["gate_stage"] == "none"
+
+
+def test_view_sponsor_funder_never_gated_and_priced_zero(monkeypatch):
+    v = _view(monkeypatch, {"access_tier": "free", "funding_source": "sponsor"}, flag_on=True)
+    assert v["unlocked"] is True          # a sponsored move's gate falls nowhere
+    assert v["gate_stage"] == "none"
+    assert v["price_cents"] == 0
+    assert v["reason"]                    # the sponsor rationale is surfaced to the client
+
+
+def test_view_store_unreachable_fails_open_default_view(monkeypatch):
+    v = _view(monkeypatch, None, flag_on=True, available=False)
+    assert v["unlocked"] is True
+    assert v["gate_stage"] == "none"
+
+
+def test_view_unlocked_never_disagrees_with_the_enforcement_gate(monkeypatch):
+    # The whole point of serving entitlement as data: what the client renders can never
+    # diverge from what assert_roadmap_access enforces, because both read the same decision.
+    monkeypatch.setenv("RELOPASS_ROADMAP_PAYWALL_ENABLED", "true")
+    for row, avail in [
+        ({"access_tier": "free"}, True),
+        ({"access_tier": "roadmap"}, True),
+        ({"access_tier": "free", "funding_source": "sponsor"}, True),
+        (None, True),
+        (None, False),
+    ]:
+        found = ent.EntitlementLookup(row, avail)
+        assert ent.roadmap_entitlement_view(found)["unlocked"] == ent.unlocked_from_lookup(found)
+
+
+def test_status_serves_the_entitlement_object(monkeypatch):
+    # The client reads `entitlement` (data), not a build flag; the top-level roadmap_unlocked
+    # alias stays consistent with entitlement.unlocked.
+    c = _status_client(monkeypatch, {"access_tier": "free", "payment_status": "unpaid"}, True)
+    body = c.get("/api/payment/status/case-1").json()
+    assert "entitlement" in body
+    e = body["entitlement"]
+    assert set(e) == {"unlocked", "gate_stage", "price_cents", "reason"}
+    assert e["unlocked"] == body["roadmap_unlocked"]
+    assert e["unlocked"] is False   # flag on + free tier → locked
