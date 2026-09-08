@@ -93,7 +93,7 @@ class EmployeeRecommendationsFilterTests(unittest.TestCase):
                 s = stmt.strip()
                 if s:
                     conn.execute(text(s))
-        for mod in (service_catalog, vendor_curation):
+        for mod in (service_catalog, vendor_curation, flt):
             patcher = mock.patch.object(mod.db, "engine", self.engine)
             patcher.start()
             self.addCleanup(patcher.stop)
