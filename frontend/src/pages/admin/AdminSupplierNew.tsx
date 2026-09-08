@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
 import { Checkbox } from '../../components/antigravity/Checkbox';
-import { Card, Button, Alert } from '../../components/antigravity';
+import { Card, Button, Alert, CountrySelect } from '../../components/antigravity';
 import { suppliersAPI } from '../../api/client';
 import { ROUTE_DEFS } from '../../navigation/routes';
 import { AdminLayout } from './AdminLayout';
@@ -363,13 +363,12 @@ export const AdminSupplierNew: React.FC = () => {
                       </div>
                       {cap.coverage_scope_type !== 'global' && (
                         <div>
-                          <label htmlFor="sup-country-2letter" className="block text-xs text-[#6b7280] mb-0.5">Country (2-letter)</label>
-                          <Input id="sup-country-2letter" unstyled
-                            type="text"
+                          <label htmlFor={`sup-country-${idx}`} className="block text-xs text-slate-500 mb-0.5">Country</label>
+                          <CountrySelect
+                            id={`sup-country-${idx}`}
                             value={cap.country_code}
-                            onChange={(v) => updateCapability(idx, { country_code: v.toUpperCase().slice(0, 2) })}
-                            className="w-full border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
-                            placeholder="NO"
+                            onChange={(code) => updateCapability(idx, { country_code: code })}
+                            placeholder="Select a country"
                           />
                         </div>
                       )}

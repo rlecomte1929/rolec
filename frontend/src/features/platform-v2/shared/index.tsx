@@ -18,6 +18,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type * as React from 'react';
+import { countryName } from '../../policy-config/countryList';
 import { Button } from '../../../components/antigravity/Button';
 import type { DocStatus, StepStatus, FormStatus } from '../../../types/relopass-api-contracts';
 
@@ -639,16 +640,17 @@ export function countryFlag(isoCode: string): string {
 export interface CountryFlagProps {
   /** ISO 3166-1 alpha-2 country code */
   code: string;
-  /** Append the country code as text */
+  /** Append the country name (legacy prop name: originally appended the ISO code) */
   showCode?: boolean;
   style?: React.CSSProperties;
 }
 
 export function CountryFlag({ code, showCode, style }: CountryFlagProps) {
+  const name = countryName(code);
   return (
-    <span aria-label={code} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', ...style }}>
+    <span aria-label={name} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', ...style }}>
       <span aria-hidden="true">{countryFlag(code)}</span>
-      {showCode && <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>{code.toUpperCase()}</span>}
+      {showCode && <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>{name}</span>}
     </span>
   );
 }

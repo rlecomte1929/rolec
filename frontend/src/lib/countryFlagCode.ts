@@ -22,12 +22,26 @@ const MAP: Record<string, string> = {
   sweden: 'se', swedish: 'se',
 };
 
-const ISO2 = new Set(Object.values(MAP));
+/** flag-icons uses GB for the Union Jack; ReloPass also stores UK. */
+const CODE_ALIASES: Record<string, string> = { uk: 'gb' };
 
 export function countryFlagCode(input: string | null | undefined): string | null {
   if (!input) return null;
   const key = input.trim().toLowerCase();
   if (!key) return null;
-  if (key.length === 2 && ISO2.has(key)) return key;
+  if (CODE_ALIASES[key]) return CODE_ALIASES[key];
+  // Any syntactically valid ISO 3166-1 alpha-2 — flag-icons ships the full set.
+  // Restricting to a corridor allowlist left most of the world without a flag.
+  if (/^[a-z]{2}$/.test(key)) return key;
   return MAP[key] ?? null;
+}
+
+/** Regional-indicator pair for native <option> labels (CSS flags cannot render there). */
+export function countryFlagEmoji(input: string | null | undefined): string {
+  const code = countryFlagCode(input);
+  if (!code) return '';
+  const up = code.toUpperCase();
+  return String.fromCodePoint(
+    ...[...up].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65),
+  );
 }

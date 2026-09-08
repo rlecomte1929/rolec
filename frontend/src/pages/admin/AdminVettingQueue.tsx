@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Alert, Badge, Select, Input } from '../../components/antigravity';
+import { Card, Button, Alert, Badge, Select, Input, CountryFlag, CountrySelect } from '../../components/antigravity';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { suppliersAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
@@ -229,13 +229,17 @@ export const AdminVettingQueue: React.FC = () => {
       {/* [AIQ-1850] Filters + summary counts at the top of the page. */}
       <Card padding="lg" className="mb-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Select
-            label="Country"
-            value={filters.country}
-            onChange={(v) => updateFilter({ country: v })}
-            options={countryOptions}
-            placeholder="All countries"
-          />
+          <div>
+            <span className="block text-sm font-medium text-[#374151] mb-1">Country</span>
+            <CountrySelect
+              value={filters.country}
+              onChange={(v) => updateFilter({ country: v })}
+              codes={countryOptions.map((o) => o.value)}
+              allowEmpty
+              emptyLabel="All countries"
+              placeholder="All countries"
+            />
+          </div>
           <Select
             label="Type of service"
             value={filters.service}
@@ -328,10 +332,20 @@ export const AdminVettingQueue: React.FC = () => {
                         <span className="font-medium text-[#0b2b43]">{row.supplier_name}</span>
                         {row.source && <Badge variant="neutral" size="sm">{row.source}</Badge>}
                       </div>
-                      <div className="text-sm text-[#6b7280] mt-1">
-                        {row.service_category}
-                        {row.country_code && ` • ${row.country_code}`}
-                        {row.city_name && ` • ${row.city_name}`}
+                      <div className="text-sm text-[#6b7280] mt-1 flex flex-wrap items-center gap-1">
+                        <span>{row.service_category}</span>
+                        {row.country_code && (
+                          <>
+                            <span aria-hidden>•</span>
+                            <CountryFlag country={row.country_code} className="text-sm" />
+                          </>
+                        )}
+                        {row.city_name && (
+                          <>
+                            <span aria-hidden>•</span>
+                            <span>{row.city_name}</span>
+                          </>
+                        )}
                       </div>
                       {row.created_at && (
                         <div className="text-xs text-gray-500 mt-1">

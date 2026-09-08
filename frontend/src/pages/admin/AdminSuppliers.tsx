@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Alert } from '../../components/antigravity';
+import { Card, Button, Alert, CountrySelect, CountryCoverageText } from '../../components/antigravity';
 import { suppliersAPI } from '../../api/client';
 import { ROUTE_DEFS } from '../../navigation/routes';
 import { AdminLayout } from './AdminLayout';
@@ -146,20 +146,17 @@ export const AdminSuppliers: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <div className="flex flex-wrap items-center gap-4">
               <div>
-                <label htmlFor="as-country" className="block text-xs font-medium text-[#6b7280] mb-1">Country</label>
-                <select
+                <label htmlFor="as-country" className="block text-xs font-medium text-slate-500 mb-1">Country</label>
+                <CountrySelect
                   id="as-country"
                   value={countryFilter}
-                  onChange={(e) => setCountryFilter(e.target.value)}
-                  className="border border-[#d1d5db] rounded px-3 py-2 text-sm min-w-[120px]"
-                >
-                  <option value="">All</option>
-                  {countries.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCountryFilter}
+                  codes={countries}
+                  allowEmpty
+                  emptyLabel="All"
+                  placeholder="All"
+                  className="min-w-[220px]"
+                />
               </div>
               <div>
                 <label htmlFor="as-status" className="block text-xs font-medium text-[#6b7280] mb-1">Status</label>
@@ -235,9 +232,9 @@ export const AdminSuppliers: React.FC = () => {
                           ? (s.service_categories || []).map(categoryLabel).join(', ')
                           : '-'}
                       </td>
-                      <td className="py-3 px-4 text-[#4b5563] max-w-[220px]">
+                      <td className="py-3 px-4 text-[#4b5563] max-w-[280px]">
                         <span className="block truncate" title={s.coverage_summary || ''}>
-                          {s.coverage_summary || '-'}
+                          <CountryCoverageText summary={s.coverage_summary} />
                         </span>
                       </td>
                       <td className="py-3 px-4">

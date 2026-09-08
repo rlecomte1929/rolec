@@ -4,7 +4,7 @@
  * Mirrors AdminVettingQueue.tsx.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Card, Button, Alert, Badge } from '../../components/antigravity';
+import { Card, Button, Alert, Badge, CountryFlag } from '../../components/antigravity';
 import {
   listSupplierSubmissions,
   resolveSupplierSubmission,
@@ -138,11 +138,11 @@ export const AdminSupplierSubmissions: React.FC = () => {
                         {row.status}
                       </Badge>
                     </div>
-                    <div className="text-sm text-[#64748b] mt-1">
-                      {row.service_category}
-                      {row.city_name ? ` · ${row.city_name}` : ''}
-                      {row.country_code ? `, ${row.country_code}` : ''}
-                      {row.contact_email ? ` · ${row.contact_email}` : ''}
+                    <div className="text-sm text-[#64748b] mt-1 flex flex-wrap items-center gap-1">
+                      <span>{row.service_category}</span>
+                      {row.city_name ? <span>· {row.city_name}</span> : null}
+                      {row.country_code ? <CountryFlag country={row.country_code} className="text-sm" /> : null}
+                      {row.contact_email ? <span>· {row.contact_email}</span> : null}
                     </div>
                     <div className="text-xs text-slate-500 mt-1">
                       Company {row.company_id}

@@ -3,6 +3,8 @@
  * Extensible: add more countries/cities as needed.
  */
 
+import { countryName as countryNameFromIso } from '../features/policy-config/countryList';
+
 export interface CountryOption {
   code: string;
   name: string;
@@ -81,9 +83,12 @@ export const DESTINATION_COUNTRIES: CountryOption[] = [...DESTINATION_COUNTRIES_
 export function getCountryName(codeOrName: string | null | undefined): string {
   const v = (codeOrName ?? '').trim();
   if (!v) return '';
-  const byCode = DESTINATION_COUNTRIES.find((c) => c.code.toLowerCase() === v.toLowerCase());
-  if (byCode) return byCode.name;
-  return v;
+  const byDest = DESTINATION_COUNTRIES.find((c) => c.code.toLowerCase() === v.toLowerCase());
+  if (byDest) return byDest.name;
+  // Full ISO list for identity / supplier / nationality codes not on the
+  // destination allowlist. Destination lookup stays first so CZ stays
+  // "Czech Republic" rather than ISO's "Czechia".
+  return countryNameFromIso(v);
 }
 
 /** Get cities for a country by name */

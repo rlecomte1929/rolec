@@ -60,8 +60,8 @@ describe('CountryPicker — a closed list', () => {
 
   it('offers real ISO-3166 countries', () => {
     render(<CountryPicker value="" onChange={() => {}} label="Country" />);
-    expect(screen.getByRole('option', { name: 'Ireland' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Norway' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Ireland/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Norway/ })).toBeInTheDocument();
   });
 
   it('stores the ISO code when the caller keys on country_code', () => {

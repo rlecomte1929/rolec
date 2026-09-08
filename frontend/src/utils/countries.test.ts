@@ -24,4 +24,8 @@ describe('getCountryName', () => {
     expect(getCountryName(undefined)).toBe('');
     expect(getCountryName('  ')).toBe('');
   });
+
+  it('resolves identity-list countries that are not relocation destinations', () => {
+    expect(getCountryName('LB')).toBe('Lebanon');
+  });
 });
