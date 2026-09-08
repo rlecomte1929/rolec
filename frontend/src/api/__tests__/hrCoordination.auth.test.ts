@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getCaseProviders } from '../hrCoordination';
+import { assignTask, getCaseProviders } from '../hrCoordination';
 
 /**
  * AIQ-862 regression guard. hr-coordination calls (providers list + task
@@ -93,5 +93,33 @@ describe('hrCoordination auth header (AIQ-862)', () => {
 
     // Empty string, not the string "null" — the old bug.
     expect(authHeaderFrom(fetchMock)).toBe('Bearer ');
+  });
+
+  it('assignTask posts to /provider-tasks', async () => {
+    window.localStorage.setItem('relopass_token', 'tok');
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          task: {
+            id: 't1',
+            title: 'Book housing',
+            description: null,
+            status: 'pending',
+            due_date: null,
+            updated_at: '2026-09-08T00:00:00Z',
+          },
+        }),
+        { status: 201, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await assignTask('case-1', 'prov-1', 'Book housing');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('/api/hr/cases/case-1/provider-tasks');
+    expect(url).not.toMatch(/\/cases\/case-1\/tasks$/);
+    expect((fetchMock.mock.calls[0][1] as RequestInit).method).toBe('POST');
   });
 });
