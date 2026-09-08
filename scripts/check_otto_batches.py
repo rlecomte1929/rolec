@@ -294,6 +294,19 @@ def evidence_group_failure(rec: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def is_vendor_listing_record(rec: Dict[str, Any]) -> bool:
+    """True for Otto vendor-candidate rows, which cite a company site, not a rule.
+
+    Harvest NDJSON identifies a supplier (``name`` + ``website`` + ``category``). A
+    homepage ``source_url`` there is the firm's front door, not a missing statute
+    page. Fact streams (``fact_key`` / ``fact_uid`` / ``evidence_quote``) and city
+    content (``topic``) still go through the specificity ratchet.
+    """
+    if rec.get("fact_key") or rec.get("fact_uid") or rec.get("evidence_quote") or rec.get("topic"):
+        return False
+    return bool(rec.get("website") and rec.get("category") and rec.get("name"))
+
+
 def check_citations(r: Result, records: List[Dict[str, Any]]) -> None:
     """Section 0 -- runs for EVERY batch, whatever contract it declares.
 
@@ -304,12 +317,20 @@ def check_citations(r: Result, records: List[Dict[str, Any]]) -> None:
     is exactly as worthless in a batch of a different shape. Grading these here keeps
     #1990's lesson -- do not judge a batch by another batch's schema -- while not
     letting a batch skip the one check that is about evidence itself.
+
+    Vendor listings are the exception: their ``source_url`` is a company identifier,
+    not evidence of a rule, so they are not graded here.
     """
     r.section("SECTION 0: EVIDENCE CITATION QUALITY")
-    n = len(records)
+    citable = [rec for rec in records if not is_vendor_listing_record(rec)]
+    if not citable:
+        r.skip("source_url specificity",
+               "every record is a vendor listing (company website, not a rule citation)")
+        return
+    n = len(citable)
 
     unspecific = [(rec.get("fact_key") or rec.get("fact_uid"), why) for rec, why in
-                  ((rec, url_specificity_failure(str(rec.get("source_url") or ""))) for rec in records)
+                  ((rec, url_specificity_failure(str(rec.get("source_url") or ""))) for rec in citable)
                   if why]
     r.check(not unspecific,
             "every source_url is specific enough to evidence a rule "

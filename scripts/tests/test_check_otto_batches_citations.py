@@ -113,6 +113,26 @@ class UrlSpecificityAllows(unittest.TestCase):
         self.assertIsNone(cob.url_specificity_failure(
             "https://www.revenue.ie/en/vrt/contacting-us-about-vrt.aspx"))
 
+    def test_vendor_listing_homepage_is_not_a_fact_citation(self):
+        vendor = {
+            "name": "Expat Taxes",
+            "website": "https://expattaxes.ie/",
+            "category": "tax_finance",
+            "source_url": "https://expattaxes.ie/",
+        }
+        self.assertTrue(cob.is_vendor_listing_record(vendor))
+        self.assertFalse(cob.is_vendor_listing_record({
+            "topic": "transport",
+            "title": "Buses",
+            "source_url": "https://www.kolumbus.no/en/",
+        }))
+        self.assertFalse(cob.is_vendor_listing_record({
+            "fact_key": "k",
+            "website": "https://example.gov",
+            "category": "immigration",
+            "name": "unused",
+        }))
+
     def test_the_only_unspecific_citation_on_disk_is_the_one_we_know_about(self):
         """Calibration against real delivered work, as a ratchet.
 
@@ -146,6 +166,8 @@ class UrlSpecificityAllows(unittest.TestCase):
                 try:
                     rec = json.loads(line)
                 except json.JSONDecodeError:
+                    continue
+                if cob.is_vendor_listing_record(rec):
                     continue
                 url = rec.get("source_url")
                 if not url:
