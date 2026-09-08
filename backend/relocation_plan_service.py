@@ -51,6 +51,10 @@ class EnrichedPlanTask:
     notes: Optional[str] = None
     # Preserve original row for PATCH / debugging (strip before external API if needed)
     raw_milestone: Dict[str, Any] = field(default_factory=dict)
+    # Source URL(s) of the requirement whose copy the overlay applied to this row, so the
+    # plan view can surface the published rule the step traces to. Empty unless the row
+    # was rewritten by enrich_milestones_with_requirements.
+    sources: Tuple[str, ...] = ()
 
 
 @dataclass
@@ -229,6 +233,7 @@ def adapt_milestone_row(row: Mapping[str, Any]) -> EnrichedPlanTask:
         target_date=_norm_date_str(row.get("target_date")),
         notes=_norm_notes(row.get("notes")),
         raw_milestone=dict(row),
+        sources=tuple(str(s) for s in (row.get("sources") or ())),
     )
 
 

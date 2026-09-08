@@ -40,7 +40,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from ..db import SessionLocal
 from .paywall_policy import (
+    GATE_NONE,
     ROADMAP_GATING_STAGES,
+    ROADMAP_PRICE_CENTS,
     PaywallContext,
     resolve_paywall_policy,
 )
@@ -162,6 +164,43 @@ def unlocked_from_lookup(found: EntitlementLookup) -> bool:
         return True
 
     return (found.row.get("access_tier") or "free") in PAID_TIERS
+
+
+def roadmap_entitlement_view(found: EntitlementLookup) -> Dict[str, Any]:
+    """[AIQ-2142] The full entitlement the status endpoint serves the client, computed ONCE.
+
+    `unlocked` is the SAME answer `unlocked_from_lookup` gives the enforcement gate, so the
+    client can never render a state the server would 402 (or the reverse). `gate_stage`,
+    `price_cents` and `reason` describe the policy behind that answer — where this funder's
+    gate falls and what it would cost — so the client renders the right wall (or none) from
+    data instead of a build flag. When the mechanism is off, the store is unreachable, or no
+    policy positively applies, the view is the neutral default: no gate, standard price.
+
+    The policy is re-derived here from the same PaywallContext `unlocked_from_lookup` builds;
+    `resolve_paywall_policy` is pure, so the two cannot drift.
+    """
+    unlocked = unlocked_from_lookup(found)
+    gate_stage = GATE_NONE
+    price_cents = ROADMAP_PRICE_CENTS
+    reason = ""
+    if roadmap_paywall_enabled() and found.available and found.row is not None:
+        decision = resolve_paywall_policy(
+            PaywallContext(
+                funding_source=found.row.get("funding_source"),
+                sponsor_id=found.row.get("sponsor_id"),
+                current_tier=found.row.get("access_tier"),
+            )
+        )
+        if decision.applies:
+            gate_stage = decision.gate_stage
+            price_cents = decision.price_cents
+            reason = decision.reason
+    return {
+        "unlocked": unlocked,
+        "gate_stage": gate_stage,
+        "price_cents": price_cents,
+        "reason": reason,
+    }
 
 
 def is_roadmap_unlocked(case_id: str) -> bool:
