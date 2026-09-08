@@ -151,6 +151,7 @@ export const ROUTE_DEFS = {
   // reachable only by typing the URL, which is why content shipped unreviewed.
   adminCountries: { path: '/admin/countries', roles: ['ADMIN'] as RouteRole[] },
   adminCountryDetail: { path: '/admin/countries/:countryCode', roles: ['ADMIN'] as RouteRole[] },
+  adminCoverage: { path: '/admin/coverage', roles: ['ADMIN'] as RouteRole[] },
   adminRequirementFacts: { path: '/admin/requirement-facts', roles: ['ADMIN'] as RouteRole[] },
   adminResearchRequests: { path: '/admin/research-requests', roles: ['ADMIN'] as RouteRole[] },
   adminCompanies: { path: '/admin/companies', roles: ['ADMIN'] as RouteRole[] },
@@ -158,6 +159,7 @@ export const ROUTE_DEFS = {
   adminAssignments: { path: '/admin/assignments', roles: ['ADMIN'] as RouteRole[] },
   adminPolicies: { path: '/admin/policies', roles: ['ADMIN'] as RouteRole[] },
   adminSuppliers: { path: '/admin/suppliers', roles: ['ADMIN'] as RouteRole[] },
+  adminSuppliersRegistry: { path: '/admin/suppliers/registry', roles: ['ADMIN'] as RouteRole[] },
   adminVettingQueue: { path: '/admin/vetting-queue', roles: ['ADMIN'] as RouteRole[] },
   adminContentReview: { path: '/admin/content-review', roles: ['ADMIN'] as RouteRole[] },
   adminCandidateBeam: { path: '/admin/candidate-beam', roles: ['ADMIN'] as RouteRole[] },

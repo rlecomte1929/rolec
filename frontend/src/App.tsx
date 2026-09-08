@@ -182,6 +182,8 @@ const OutreachPage = lazy(() => import('./pages/admin/OutreachPage').then((m) =>
 const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage'));
 const AdminAuditLogPage = lazy(() => import('./pages/admin/AdminAuditLogPage'));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
+const AdminSupplierRegistry = lazy(() => import('./pages/admin/AdminSupplierRegistry').then((module) => ({ default: module.AdminSupplierRegistry })));
+const CoverageDashboardPage = lazy(() => import('./pages/admin/coverage/CoverageDashboardPage').then((module) => ({ default: module.CoverageDashboardPage })));
 const AdminVettingQueue = lazy(() => import('./pages/admin/AdminVettingQueue').then((module) => ({ default: module.AdminVettingQueue })));
 const AdminContentReviewPage = lazy(() => import('./pages/admin/AdminContentReviewPage').then((m) => ({ default: m.AdminContentReviewPage })));
 const AdminSupplierSubmissions = lazy(() => import('./pages/admin/AdminSupplierSubmissions').then((module) => ({ default: module.AdminSupplierSubmissions })));
@@ -516,7 +518,9 @@ function App() {
         <Route path={ROUTE_DEFS.adminTestDrive.path} element={<RequireAdminRoute><AdminTestDrive /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAdmins.path} element={<RequireAdminRoute><AdminAdminsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAuditLog.path} element={<RequireAdminRoute><AdminAuditLogPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCoverage.path} element={<RequireAdminRoute><CoverageDashboardPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliers.path} element={<RequireAdminRoute><AdminSuppliers /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminSuppliersRegistry.path} element={<RequireAdminRoute><AdminSupplierRegistry /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminVettingQueue.path} element={<RequireAdminRoute><AdminVettingQueue /></RequireAdminRoute>} />
             <Route path={ROUTE_DEFS.adminContentReview.path} element={<RequireAdminRoute><AdminContentReviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSupplierSubmissions.path} element={<RequireAdminRoute><AdminSupplierSubmissions /></RequireAdminRoute>} />

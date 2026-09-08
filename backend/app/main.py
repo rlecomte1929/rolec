@@ -34,6 +34,7 @@ from .routers import (
     requirement_facts,
     admin_candidate_beam,
     admin_content_review,
+    coverage,
     benefit_optimizer,
     case_forms_adhoc,
     cases,
@@ -242,6 +243,7 @@ def create_app() -> FastAPI:
     app.include_router(assistant_router.router)  # policy-bridge domain routing — POST /api/assistant/route
     app.include_router(requirement_facts.router)  # [AIQ-1091] P4-02 requirement-facts extract
     app.include_router(admin_content_review.router)  # [AIQ-1821] content review queue
+    app.include_router(coverage.router)  # Admin coverage dashboard — GET /api/admin/coverage
     app.include_router(admin_candidate_beam.router)  # corridor candidate beam review
     # [Parker-A] Case-duration prediction (canary: PREDICTIONS_ENABLED, default off)
     app.include_router(predictions.router)
