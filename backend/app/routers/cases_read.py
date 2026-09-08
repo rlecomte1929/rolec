@@ -2701,12 +2701,20 @@ def get_budget_summary(
         caps_by_key=caps_by_key,
     )
 
+    # [AIQ-2089] Committed ACTUAL spend, derived from validated RFQ quotes
+    # (rfqs.validated_quote_id ⋈ quotes), per currency. This is the "actual" against the caps
+    # "budget" above, from real rows only. Never totals case_services.estimated_cost (mixes
+    # agreed with estimate) and never sums across currencies (no FX source). A case with no
+    # validated quote returns has_spend=False + empty by_currency → an honest empty state.
+    from ..services.case_spend import committed_spend_for_case
+
     return {
         "case_id": case_id,
         "categories": categories,
         # AIQ-1551: the full list of the company's published CAPs, so the estimate page can
         # surface everything HR configured even when no matching service is selected.
         "hr_policy_caps": _shape_hr_policy_caps(caps_list),
+        "committed_spend": committed_spend_for_case(case_id),
     }
 
 
