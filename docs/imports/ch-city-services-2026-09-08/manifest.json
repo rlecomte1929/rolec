@@ -1,0 +1,23 @@
+{
+  "batch_id": "ch-city-services-2026-09-08",
+  "generated_at": "2026-09-08",
+  "country": "Switzerland",
+  "cities_imported": [
+    "basel",
+    "bern",
+    "geneva",
+    "lausanne",
+    "lucerne",
+    "lugano",
+    "st-gallen",
+    "winterthur",
+    "zug",
+    "zurich"
+  ],
+  "resource_count": 60,
+  "source_count": 19,
+  "target_table": "country_resources",
+  "status": "delivered \u2014 draft/invisible in prod",
+  "storage": "Otto GCS workspace-media (public-read)",
+  "converter": "scripts/gen_city_services_bundle.py"
+}

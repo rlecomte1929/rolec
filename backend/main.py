@@ -31,7 +31,6 @@ init_langfuse()
 log = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, Response
 from typing import Annotated, Literal, Optional, Dict, Any, List, Tuple, Union
 import uuid
@@ -55,6 +54,7 @@ from .schemas import (
     UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest,
     AddEvidenceRequest, AddEvidenceResponse,
 )
+from .app.cors import cors_origin_regex, cors_origins, install_cors
 from .app.services.dossier import evaluate_applies_if, validate_answer
 from .app.services.guidance_pack_service import generate_guidance_pack
 from .app.services.immigration_service import _log_access  # data_access_log PII-access writer
@@ -657,24 +657,9 @@ log.info(
     ALLOW_LEGACY_DEMO_SEED,
 )
 
-# CORS middleware (include Vite fallback ports 3002–3005 for local dev)
-default_origins = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002",
-    "http://localhost:3003",
-    "http://localhost:3004",
-    "http://localhost:3005",
-    "http://localhost:5173",
-    "https://relopass.com",
-    "https://www.relopass.com",
-]
-env_origins = os.getenv("CORS_ORIGINS")
-if env_origins:
-    extra = [o.strip() for o in env_origins.split(",") if o.strip()]
-    default_origins = list(dict.fromkeys(default_origins + extra))
-# Match apex + subdomains (fullmatch). A plain `https://.*\.relopass\.com` misses https://relopass.com.
-origin_regex = os.getenv("CORS_ORIGIN_REGEX") or r"^https://([\w-]+\.)*relopass\.com$"
+# CORS policy lives in backend.app.cors (shared with the modular app).
+default_origins = cors_origins()
+origin_regex = cors_origin_regex()
 
 _cors_origin_pattern = re.compile(origin_regex) if origin_regex else None
 
@@ -808,17 +793,7 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=default_origins,
-    allow_origin_regex=origin_regex,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["X-Request-ID", "Server-Timing"],
-    # Fewer preflight round-trips on repeat requests (helps perceived lag on slow networks).
-    max_age=86400,
-)
+install_cors(app)
 
 # AUDIT-B7 / PERF-5 — query-count middleware. Logs per-request SQL count.
 # WARNING when count > threshold (default 10) flags likely N+1 patterns.

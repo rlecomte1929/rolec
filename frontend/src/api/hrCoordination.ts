@@ -171,7 +171,7 @@ export async function assignTask(
   description?: string,
   dueDate?: string
 ): Promise<ProviderTask> {
-  const res = await fetch(`${BASE}/api/hr/cases/${encodeURIComponent(caseId)}/tasks`, {
+  const res = await fetch(`${BASE}/api/hr/cases/${encodeURIComponent(caseId)}/provider-tasks`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify({

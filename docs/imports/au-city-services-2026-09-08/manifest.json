@@ -1,0 +1,25 @@
+{
+  "batch_id": "au-city-services-2026-09-08",
+  "generated_at": "2026-09-08",
+  "country": "Australia",
+  "cities_imported": [
+    "adelaide",
+    "brisbane",
+    "canberra",
+    "darwin",
+    "gold-coast",
+    "hobart",
+    "melbourne",
+    "newcastle",
+    "perth",
+    "sunshine-coast",
+    "sydney",
+    "wollongong"
+  ],
+  "resource_count": 72,
+  "source_count": 14,
+  "target_table": "country_resources",
+  "status": "delivered \u2014 draft/invisible in prod",
+  "storage": "Otto GCS workspace-media (public-read)",
+  "converter": "scripts/gen_city_services_bundle.py"
+}

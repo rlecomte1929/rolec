@@ -1,0 +1,15 @@
+{
+  "batch_id": "be-city-services-2026-09-08",
+  "generated_at": "2026-09-08",
+  "country": "Belgium",
+  "cities_imported": [
+    "antwerp",
+    "bruges"
+  ],
+  "resource_count": 12,
+  "source_count": 9,
+  "target_table": "country_resources",
+  "status": "delivered \u2014 draft/invisible in prod",
+  "storage": "Otto GCS workspace-media (public-read)",
+  "converter": "scripts/gen_city_services_bundle.py"
+}
