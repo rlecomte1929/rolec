@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { CountryDetail } from '../CountryDetail';
 import type { AdminRequirementReview } from '../../../api/admin';
 import type { CountryProfileDTO } from '../../../types';
@@ -136,5 +136,20 @@ describe('CountryDetail citations', () => {
 
     expect(screen.getAllByRole('link', { name: 'Immigration Service Delivery' })).toHaveLength(9);
     expect(screen.getAllByRole('link', { name: 'DETE — employment permits' })).toHaveLength(20);
+  });
+
+  it('hides published rows when the pending filter is selected', () => {
+    renderDetail([
+      requirement({ id: 'pending-row', title: 'Pending residence card', reviewStatus: 'pending' }),
+      requirement({ id: 'published-row', title: 'Published tax card', reviewStatus: 'approved' }),
+    ]);
+
+    expect(screen.getByText('Pending residence card')).toBeInTheDocument();
+    expect(screen.getByText('Published tax card')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pending 1' }));
+
+    expect(screen.getByText('Pending residence card')).toBeInTheDocument();
+    expect(screen.queryByText('Published tax card')).not.toBeInTheDocument();
   });
 });

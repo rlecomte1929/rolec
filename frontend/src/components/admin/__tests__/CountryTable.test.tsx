@@ -6,8 +6,12 @@ import type { CountryListDTO } from '../../../types';
 import {
   confidenceLevel,
   confidencePercent,
+  countRequirementStatuses,
+  displayCatalogLabel,
   filterCatalog,
+  filterRequirements,
   formatUpdatedLabel,
+  groupRequirementsByPillar,
   isCatalogStale,
   sortCatalog,
   summarizeCatalog,
@@ -83,6 +87,43 @@ describe('countryCatalog helpers', () => {
     expect(formatUpdatedLabel('2026-09-08T00:00:00Z', now).relative).toBe('Today');
     expect(formatUpdatedLabel(undefined, now).relative).toBe('Never updated');
   });
+
+  it('groups requirements by pillar with pending first', () => {
+    const grouped = groupRequirementsByPillar([
+      {
+        id: 'a',
+        purpose: 'employment',
+        pillar: 'TAX',
+        title: 'Tax card',
+        description: 'Apply for a skattekort.',
+        severity: 'WARN',
+        owner: 'EMPLOYEE',
+        reviewStatus: 'approved',
+        citations: [],
+      },
+      {
+        id: 'b',
+        purpose: 'employment',
+        pillar: 'RESIDENCE',
+        title: 'Residence permit',
+        description: 'Register after arrival.',
+        severity: 'BLOCK',
+        owner: 'EMPLOYEE',
+        reviewStatus: 'pending',
+        citations: [],
+      },
+    ]);
+    expect(grouped.map((g) => g.pillar)).toEqual(['RESIDENCE', 'TAX']);
+    expect(grouped[0].items[0].title).toBe('Residence permit');
+    expect(countRequirementStatuses(grouped.flatMap((g) => g.items))).toEqual({
+      all: 2,
+      pending: 1,
+      approved: 1,
+      rejected: 0,
+    });
+    expect(filterRequirements(grouped.flatMap((g) => g.items), '', 'pending')).toHaveLength(1);
+    expect(displayCatalogLabel('THIRD_COUNTRY')).toBe('Third Country');
+  });
 });
 
 describe('CountryTable', () => {
@@ -99,6 +140,13 @@ describe('CountryTable', () => {
     render(<CountryTable data={DATA} onSelect={() => undefined} />);
     fireEvent.change(screen.getByLabelText('Search country catalogs'), { target: { value: 'norway' } });
     expect(screen.getAllByText('Norway').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Germany')).not.toBeInTheDocument();
+  });
+
+  it('filters to empty catalogs when the empty tile is pressed', () => {
+    render(<CountryTable data={DATA} onSelect={() => undefined} />);
+    fireEvent.click(screen.getByTestId('catalog-stat-empty'));
+    expect(screen.getAllByText('France').length).toBeGreaterThan(0);
     expect(screen.queryByText('Germany')).not.toBeInTheDocument();
   });
 });
