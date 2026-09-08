@@ -17,7 +17,6 @@ import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePoli
 import { RoadmapBeingBuilt } from '../../features/employee-journey/RoadmapBeingBuilt';
 import { RoadmapPaywallGate } from '../../features/employee-journey/RoadmapPaywallGate';
 import { fetchRoadmapUnlocked } from '../../utils/paymentStatus';
-import { isRoadmapPaywallEnabled } from '../../featureFlags';
 import { RuleUpdateBanner } from '../../features/platform-v2/roadmap/RuleUpdateBanner';
 import { CorridorAdvisories } from '../../features/platform-v2/roadmap/CorridorAdvisories';
 import { useEmployeeRelocationPlanPageData } from '../../features/relocation-plan-employee/useEmployeeRelocationPlanPageData';
@@ -195,11 +194,13 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   const attemptsRef = useRef(0);
 
   // ── Roadmap paywall (Phase 4a is the server-side enforcement; this is the UX) ──
-  // Flag-gated (default off). We resolve the unlock from the SERVER (not localStorage)
-  // and gate the render BEFORE the roadmap fetch below: the roadmap endpoints 402 when
-  // locked, so a locked case must reach the paywall, not the "being built" fallback.
-  const paywallOn = isRoadmapPaywallEnabled();
-  const [roadmapUnlocked, setRoadmapUnlocked] = useState<boolean | null>(paywallOn ? null : true);
+  // [AIQ-2142] The SERVER decides (roadmap_entitlement.py, itself behind
+  // RELOPASS_ROADMAP_PAYWALL_ENABLED) — the client no longer reads a build flag. We always
+  // consult the server and gate the render BEFORE the roadmap fetch below: the roadmap
+  // endpoints 402 when locked, so a locked case must reach the paywall, not the "being built"
+  // fallback. roadmap_unlocked is already true when the server-side flag is off, so dropping
+  // the old client flag is behaviour-preserving.
+  const [roadmapUnlocked, setRoadmapUnlocked] = useState<boolean | null>(null);
   // [AIQ-1723] Did the user arrive straight from Stripe checkout? Captured once, from the
   // URL at mount, because the grace-window poll below strips nothing and a re-render must
   // not change the answer. Drives the payment-aware copy in the two gates further down.
@@ -211,7 +212,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   // state. It never unlocks anything — the gate stays fail-CLOSED.
   const [paymentUnconfirmed, setPaymentUnconfirmed] = useState(false);
   useEffect(() => {
-    if (!paywallOn || !caseId) {
+    if (!caseId) {
       setRoadmapUnlocked(true);
       return;
     }
@@ -243,7 +244,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [paywallOn, caseId]);
+  }, [caseId]);
 
   const planEmpty = !!data && data.summary.total_tasks === 0;
   const planReady = !!data && data.summary.total_tasks > 0 && data.phases.length > 0;
@@ -286,7 +287,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
 
   // Paywall gate — runs BEFORE the loading/build-state returns so a locked case reaches
   // the paywall rather than the "being built" fallback (the roadmap fetch 402s when locked).
-  if (paywallOn && roadmapUnlocked === null) {
+  if (roadmapUnlocked === null) {
     // [AIQ-1723] Same bounded wait either way, but say WHY we're waiting when the user
     // just came back from checkout. "Loading roadmap…" at the highest-anxiety moment in
     // the funnel reads as a hang; naming the payment makes the same seconds tolerable.
@@ -302,7 +303,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   // fail-CLOSED — the roadmap stays locked — but showing the €800 buy CTA to someone who
   // has already paid is the worst copy in the product. Tell them the truth and give them
   // a way forward instead.
-  if (paywallOn && roadmapUnlocked === false && paymentUnconfirmed) {
+  if (roadmapUnlocked === false && paymentUnconfirmed) {
     return (
       <AppShell>
         <div className="mx-auto max-w-5xl px-6 py-6">
@@ -331,7 +332,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
       </AppShell>
     );
   }
-  if (paywallOn && roadmapUnlocked === false) {
+  if (roadmapUnlocked === false) {
     return (
       <AppShell>
         <div className="mx-auto max-w-5xl px-6 py-6">

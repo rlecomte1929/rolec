@@ -278,6 +278,23 @@ def find_master_by_category_name(category: str, name: str) -> Optional[Dict[str,
     return _row_to_item(row) if row else None
 
 
+def clear_master_country(item_id: str) -> None:
+    """[AIQ-2195] Promote a linked master to country-agnostic (``country = NULL``).
+
+    Coverage then comes from ``supplier_service_capabilities.country_code`` at
+    serve time (ADR-002 Option B). Touches only ``country`` and ``updated_at``.
+    """
+    now = datetime.utcnow().isoformat()
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE service_catalog_items SET country = NULL, updated_at = :now "
+                "WHERE id = :id"
+            ),
+            {"now": now, "id": item_id},
+        )
+
+
 def link_supplier_to_master(
     item_id: str, supplier_id: str, country: Optional[str] = None
 ) -> None:

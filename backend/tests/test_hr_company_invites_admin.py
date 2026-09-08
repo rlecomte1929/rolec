@@ -21,6 +21,7 @@ are NULL until approval — an unapproved invite has no token at all.
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 
 # backend.main attaches the query-counter SQLAlchemy listener at import time, which blows
@@ -241,3 +242,96 @@ def test_the_admin_routes_are_registered_on_the_production_app():
     assert "/api/admin/company-invites" in paths, f"not on backend.main: {paths}"
     assert any(p.endswith("/approve") for p in paths), f"approve missing: {paths}"
     assert any(p.endswith("/reject") for p in paths), f"reject missing: {paths}"
+
+
+# ── [AIQ-2188] the approve handler delivers the accept link by email ───────────
+#
+# AIQ-2094 shipped the lifecycle but left delivery to a human relay. These pin the
+# gap-closing send: exactly one email on a real approve, none on a replay, the emailed
+# token is the working one, a send failure never rolls back the approval, and the raw
+# token never reaches a log line.
+
+def _capture_sender(monkeypatch) -> list:
+    """Replace the router's email sender with a stub that records its kwargs."""
+    calls: list = []
+    monkeypatch.setattr(
+        hr_company_invites, "send_company_invite_email",
+        lambda **kw: calls.append(kw) or {"status": "logged"},
+    )
+    return calls
+
+
+def test_approving_sends_exactly_one_invite_email_to_the_invited_address(db_session, monkeypatch):
+    calls = _capture_sender(monkeypatch)
+    _seed(db_session, "inv-e1", email="colleague@acme.com")
+    r = _admin_client(db_session).post("/api/admin/company-invites/inv-e1/approve")
+    assert r.status_code == 200, r.text
+    assert len(calls) == 1, f"expected one email, got {len(calls)}"
+    assert calls[0]["to_email"] == "colleague@acme.com"
+    assert calls[0]["raw_token"], "the emailed link needs the raw token"
+
+
+def test_no_second_email_is_sent_on_a_replayed_approve(db_session, monkeypatch):
+    calls = _capture_sender(monkeypatch)
+    _seed(db_session, "inv-e2")
+    c = _admin_client(db_session)
+    assert c.post("/api/admin/company-invites/inv-e2/approve").status_code == 200
+    assert c.post("/api/admin/company-invites/inv-e2/approve").status_code == 409
+    assert len(calls) == 1, "a replayed (409) approve must not send a second email"
+
+
+def test_the_emailed_token_hashes_to_the_stored_hash(db_session, monkeypatch):
+    calls = _capture_sender(monkeypatch)
+    _seed(db_session, "inv-e3")
+    r = _admin_client(db_session).post("/api/admin/company-invites/inv-e3/approve")
+    assert r.status_code == 200
+    emailed = calls[0]["raw_token"]
+    # the token in the email is exactly the one minted, and only its sha256 is stored
+    assert emailed == r.json()["accept_token"]
+    assert _row(db_session, "inv-e3")["token_hash"] == hashlib.sha256(emailed.encode()).hexdigest()
+
+
+def test_the_emailed_token_actually_accepts(db_session, monkeypatch):
+    """The real proof: feed the emailed token to the accept route and it redeems."""
+    from backend.app.auth_deps import get_current_user
+
+    calls = _capture_sender(monkeypatch)
+    monkeypatch.setattr(hr_company_invites.db, "ensure_hr_user_for_profile", lambda *a, **k: None)
+    _seed(db_session, "inv-e4", email="rt@acme.com")
+    approve = _admin_client(db_session).post("/api/admin/company-invites/inv-e4/approve")
+    assert approve.status_code == 200
+    emailed = calls[0]["raw_token"]
+
+    app = FastAPI()
+    app.include_router(hr_company_invites.router)
+    app.dependency_overrides[get_current_user] = lambda: {"id": "user-rt", "email": "rt@acme.com"}
+    app.dependency_overrides[hr_company_invites._get_db] = lambda: db_session
+    accepted = TestClient(app).post(f"/api/company-invites/{emailed}/accept")
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["status"] == "accepted"
+
+
+def test_a_send_failure_leaves_the_invite_approved(db_session, monkeypatch):
+    """A delivery crash must not roll back a valid approval, and must not 500."""
+    def boom(**kw):
+        raise RuntimeError("mail transport down")
+    monkeypatch.setattr(hr_company_invites, "send_company_invite_email", boom)
+    _seed(db_session, "inv-e5")
+    r = _admin_client(db_session).post("/api/admin/company-invites/inv-e5/approve")
+    assert r.status_code == 200, r.text
+    row = _row(db_session, "inv-e5")
+    assert row["status"] == "approved"
+    assert row["token_hash"] is not None, "the approval (and its token) must survive a send failure"
+
+
+def test_the_invite_email_never_logs_the_raw_token(caplog, monkeypatch):
+    """ST3's property extends to logs: the no-key dev path withholds the token-bearing body."""
+    from backend.app.services.company_invite_email import send_company_invite_email
+
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    with caplog.at_level(logging.INFO):
+        res = send_company_invite_email(
+            to_email="c@acme.com", company_name="Acme", raw_token="SUPERSECRETTOKEN123",
+        )
+    assert res["status"] == "logged"
+    assert "SUPERSECRETTOKEN123" not in caplog.text, "the raw token leaked into a log line"

@@ -52,6 +52,7 @@ from ..models import (
     CorridorAttestationRequest,
     CorridorAttestationSignature,
     RequirementItem,
+    RoadmapReviewStatus,
 )
 from ..schemas import (
     AttestationAdminDTO,
@@ -795,6 +796,42 @@ def public_decide_item(
         return _public_view(db, req)
 
 
+def _release_case_roadmap(db: Session, case_id: str, *, actor: str, request_id: Any) -> None:
+    """[ATT-3.3] Release a case's roadmap to the employee when its case-scoped attestation is
+    validly signed with `advance_review_status`.
+
+    Mirrors the HR release path (`hr_roadmap_review.py`): upsert the `roadmap_review_status`
+    row and set `released_to_user = True`. Reusing that table rather than inventing a second
+    release signal means the employee's non-blocking review banner clears the same way whether
+    HR released it or counsel's signature did.
+
+    Fails OPEN, exactly like `_maybe_auto_promote`: the signature and the promotion are already
+    committed, so a release failure is logged and swallowed — never raised at a reviewer whose
+    act succeeded. It can only ever release LESS than intended (the manual HR release stays
+    available), never publish more.
+    """
+    try:
+        status = db.get(RoadmapReviewStatus, case_id)
+        if status is None:
+            status = RoadmapReviewStatus(case_id=case_id)
+            db.add(status)
+        if status.released_to_user:
+            return
+        status.released_to_user = True
+        status.reviewer_id = actor
+        status.notes = f"Auto-released on counsel signature (attestation request {request_id})."
+        status.updated_at = _now()
+        db.commit()
+        logger.info("ATT-3.3 case %s roadmap released on attestation signature (request %s)", case_id, request_id)
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "ATT-3.3 case-release FAILED for case %s (attestation request %s). Signature and "
+            "promotion are committed; the case stays un-released and HR can release it manually.",
+            case_id, request_id,
+        )
+
+
 def _maybe_auto_promote(
     db: Session, req: CorridorAttestationRequest, body: AttestationSignIn
 ) -> None:
@@ -868,6 +905,16 @@ def _maybe_auto_promote(
         "attestation auto_on_sign: request %s promoted %d item(s), advance_review_status=%s",
         req.id, result.promoted_count, bool(req.advance_review_status),
     )
+
+    # [ATT-3.3] A case-scoped attestation that just auto-promoted with `advance_review_status`
+    # also releases the case roadmap to the employee — the case-level analogue of advancing a
+    # requirement's `review_status` inside `_apply_promotion`. Only when the request is
+    # case-scoped (`case_id`) and opted in; fails open, so a release failure never disturbs the
+    # committed signature/promotion.
+    if req.case_id and req.advance_review_status:
+        _release_case_roadmap(
+            db, str(req.case_id), actor=f"auto:{body.signer_name}", request_id=req.id
+        )
 
 
 @public_router.post("/{token}/sign", response_model=AttestationPublicViewDTO)
