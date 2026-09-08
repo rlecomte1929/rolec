@@ -1418,14 +1418,23 @@ class UsersMixin:
         # B9b: p.created_at removed — column may not exist in production Supabase profiles
         # table (schema drift). Ordering falls back to full_name-only to avoid
         # ProgrammingError → 500. If created_at is later confirmed present, add it back.
+        # Link counts used to be correlated COUNT(*) subqueries (once per profile
+        # row). employees.profile_id is unindexed, so that scanned employees once
+        # per person. Pre-aggregate once, then LEFT JOIN.
         sql = f"""
             SELECT p.id, p.role, p.email, p.full_name, p.company_id,
                    'active' AS status,
                    c.name AS company_name,
-                   (SELECT COUNT(*) FROM hr_users hu WHERE hu.profile_id = CAST(p.id AS TEXT)) AS hr_link_count,
-                   (SELECT COUNT(*) FROM employees e WHERE e.profile_id = CAST(p.id AS TEXT)) AS employee_link_count
+                   COALESCE(hl.n, 0) AS hr_link_count,
+                   COALESCE(el.n, 0) AS employee_link_count
             FROM profiles p
             LEFT JOIN companies c ON c.id = p.company_id
+            LEFT JOIN (
+                SELECT profile_id, COUNT(*) AS n FROM hr_users GROUP BY profile_id
+            ) hl ON hl.profile_id = CAST(p.id AS TEXT)
+            LEFT JOIN (
+                SELECT profile_id, COUNT(*) AS n FROM employees GROUP BY profile_id
+            ) el ON el.profile_id = CAST(p.id AS TEXT)
             WHERE 1=1 {where}
             ORDER BY p.full_name ASC NULLS LAST
         """

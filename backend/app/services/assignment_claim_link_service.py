@@ -11,6 +11,7 @@ NULL `employee_link_mode` remain auto-reconcile eligible.
 """
 from __future__ import annotations
 
+import inspect
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -112,18 +113,35 @@ def _unique_assignment_ids(assignments: List[Dict[str, Any]]) -> List[str]:
     return ids
 
 
+def _kwargs_supported_by(fn: Any, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep only kwargs ``fn`` actually accepts (one signature inspect, no retry)."""
+    if not kwargs:
+        return {}
+    try:
+        params = inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return {}
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return kwargs
+    names = {
+        n
+        for n, p in params.items()
+        if p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+    }
+    return {k: v for k, v in kwargs.items() if k in names}
+
+
 def _call_optional(db: "Database", name: str, *args: Any, **kwargs: Any) -> Any:
     fn = getattr(db, name, None)
     if not callable(fn):
         return _UNSET
     try:
-        return fn(*args, **kwargs)
-    except TypeError:
-        try:
-            return fn(*args)
-        except Exception:
-            return _UNSET
-    except Exception:
+        return fn(*args, **_kwargs_supported_by(fn, kwargs))
+    except TypeError as e:
+        log.warning("optional db.%s failed: %s", name, e)
+        return _UNSET
+    except Exception as e:
+        log.warning("optional db.%s failed: %s", name, e)
         return _UNSET
 
 
