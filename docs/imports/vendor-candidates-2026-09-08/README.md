@@ -5,8 +5,10 @@ Full inventory reference: [`docs/imports/OTTO_BACKLOG.md`](../OTTO_BACKLOG.md) �
 ## What this is
 
 The six Otto "flywheel" vendor-candidate batches, fetched from GCS (public-read, permanent),
-verified, converted to the import CSV, and measured against the tier gate. **Nothing here has
-been written to the database.** The import is held on a founder decision (below).
+verified, converted to the import CSV, and measured against the tier gate. **Applied 2026-09-08
+(Option A + B):** the registry-evidenced set was staged + scoped-promoted to the vetting queue
+(pending), and the 235 tier-3 rejects were routed back to Otto for re-sourcing. See
+[Applied 2026-09-08](#applied-2026-09-08) below.
 
 | Batch | Cities | Records |
 |---|---|---|
@@ -40,11 +42,30 @@ website", and it is — but that different domain is `northdata.com` (a commerci
 aggregator) and Wikipedia, neither of which is a statutory/professional register, so A2a rejects
 too. The `_DOMAIN_TO_SOURCE` allowlist is hosts of registers on purpose.
 
-## The decision (founder) — DECIDED 2026-09-08: **Option B**
+## Applied 2026-09-08
 
-**Founder chose to route everything back to Otto first — stage nothing yet.** All cities go
-back to Otto with a corrected "cite the register, not your own site" instruction, then the
-re-sourced batch imports in one pass. The precise per-city × category register targets (with
+Decision resolved to **A now + B for the rest** — the applier recommendation below. Executed by
+the wired applier against prod, append-only, verified:
+
+- **Option A — DONE.** `land_vendor_candidates.py vendor_candidates_all.csv --apply --promote`.
+  The tier gate staged only registry-evidenced rows (235 rejects are never staged). Result:
+  **+5 new `suppliers` (status='active'), +7 `supplier_service_capabilities` at
+  `platform_vetting_status='pending'`** (2 capabilities skipped as exact duplicates), +9
+  `vendor_candidates` (4 staged `pending`, 5 kept as `duplicate` history). The 5 new suppliers:
+  Metropolitan School Frankfurt (IBO), SBK Moving (FIDI), International College Spain (IBO),
+  Hasenkamp Relocation Services Spain (EuRA), Nordic Expat Accounting (Finanstilsynet).
+  They are in `/admin/vetting-queue` awaiting the human approve-to-serve gate — **nothing served**.
+- **Append-only tripwire OK.** `platform_vetting_status='approved'` capabilities **130 → 130**
+  (+0); the md5 fingerprint over the approved rows was **unchanged** before/after — no reviewed
+  or served row was touched.
+- **Option B — dispatched.** The 235 tier-3 rejects go back to Otto to be re-sourced against a
+  real register (see [`otto_resourcing_brief.md`](otto_resourcing_brief.md)); Audos-gated, owned
+  by the founder's Otto session. When the re-sourced batch returns it imports via the same
+  `land_vendor_candidates.py` path.
+
+## The options (as originally framed)
+
+The precise per-city × category register targets (with
 the exact URL shape the gate requires) are in
 [`otto_resourcing_brief.md`](otto_resourcing_brief.md): **53 pairs are harvestable now**, **17
 are registry-gaps** (no register wired for that country/category — needs a `registry_sources.py`
