@@ -165,6 +165,7 @@ from .app.routers import admin_rag_eval as admin_rag_eval_router  # [P3-01e] RAG
 from .app.routers import admin_dsar as admin_dsar_router  # GDPR/DSAR desk (dual-layer registration)
 from .app.routers import admin_feature_flags as admin_feature_flags_router  # Feature-flag console (dual-layer registration)
 from .app.routers import admin_exec_overview as admin_exec_overview_router  # Executive dashboard (dual-layer registration)
+from .app.routers import coverage as coverage_router  # Admin coverage dashboard (dual-layer registration)
 from .app.routers import admin_test_drive as admin_test_drive_router  # [AIQ-1428] TD-10 admin dashboard (dual-layer registration)
 from .app.routers import admin_work_items as admin_work_items_router  # Mission Control P1 — demands console (dual-layer registration)
 from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer registration (PR #207 §9)
@@ -868,6 +869,7 @@ app.include_router(admin_rag_eval_router.router)  # [P3-01e] /api/admin/rag-eval
 app.include_router(admin_dsar_router.router)  # GDPR/DSAR desk — /api/admin/erasure-requests — dual-layer registration
 app.include_router(admin_feature_flags_router.router)  # Feature-flag console — /api/admin/feature-flags — dual-layer registration
 app.include_router(admin_exec_overview_router.router)  # Executive dashboard — /api/admin/exec-overview — dual-layer registration
+app.include_router(coverage_router.router)  # Admin coverage dashboard — /api/admin/coverage — dual-layer registration
 app.include_router(admin_test_drive_router.router)  # [AIQ-1428] TD-10 — /api/admin/test-drive/* — dual-layer registration
 app.include_router(admin_work_items_router.router)  # Mission Control P1 — /api/admin/work-items — dual-layer registration
 app.include_router(conjoint_router.router)  # [Parker-H] PR #207 §9 — dual-layer registration

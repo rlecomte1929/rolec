@@ -171,6 +171,7 @@ export const ROUTE_DEFS = {
   adminFeatureFlags: { path: '/admin/feature-flags', roles: ['ADMIN'] as RouteRole[] },
   adminPermissions: { path: '/admin/permissions', roles: ['ADMIN'] as RouteRole[] },
   adminExecutive: { path: '/admin/executive', roles: ['ADMIN'] as RouteRole[] },
+  adminCoverage: { path: '/admin/coverage', roles: ['ADMIN'] as RouteRole[] },
   adminMissionControl: { path: '/admin/mission-control', roles: ['ADMIN'] as RouteRole[] },
   adminAiControls: { path: '/admin/ai-controls', roles: ['ADMIN'] as RouteRole[] },
   adminProspects: { path: '/admin/prospects', roles: ['ADMIN'] as RouteRole[] },

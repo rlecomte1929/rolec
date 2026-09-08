@@ -44,6 +44,7 @@ import {
   MessageCircleQuestion,
   PlaneTakeoff,
   UsersRound,
+  Map,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -111,6 +112,7 @@ export const NAV_ICONS = {
   'policy-versions': GitBranch,
   'country-requirements': Globe2,
   'requirement-facts': ListChecks,
+  coverage: Map,
   'auth-page-design': Palette,
   'research-requests': FlaskConical,
   'feedback-console': MessagesSquare,

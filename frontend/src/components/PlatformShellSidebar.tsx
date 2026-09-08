@@ -125,6 +125,7 @@ const SECTIONS: NavSection[] = [
       // endpoint are actually served. It existed but was linked from nowhere.
       { id: 'country-requirements', group: 'Content', label: 'Country requirements', to: ROUTE_DEFS.adminCountries.path },
       { id: 'requirement-facts', group: 'Content', label: 'Requirement facts', to: ROUTE_DEFS.adminRequirementFacts.path },
+      { id: 'coverage', group: 'Content', label: 'Coverage', to: ROUTE_DEFS.adminCoverage.path, badge: { kind: 'static', variant: 'new' } },
 
       // ── Queues (day-to-day work queues) ──
       {

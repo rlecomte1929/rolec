@@ -155,6 +155,7 @@ const AdminPolicyVersionsPage = lazy(() => import('./pages/admin/AdminPolicyVers
 const AdminFeatureFlagsPage = lazy(() => import('./pages/admin/AdminFeatureFlagsPage').then((module) => ({ default: module.AdminFeatureFlagsPage })));
 const AdminPermissionsPage = lazy(() => import('./pages/admin/AdminPermissionsPage').then((module) => ({ default: module.AdminPermissionsPage })));
 const ExecutiveDashboardPage = lazy(() => import('./pages/admin/executive/ExecutiveDashboardPage').then((module) => ({ default: module.ExecutiveDashboardPage })));
+const CoverageDashboardPage = lazy(() => import('./pages/admin/coverage/CoverageDashboardPage').then((module) => ({ default: module.CoverageDashboardPage })));
 const AdminAiControlsPage = lazy(() => import('./pages/admin/AdminAiControlsPage').then((module) => ({ default: module.AdminAiControlsPage })));
 const AdminMobilityCaseInspectPage = lazy(() => import('./pages/admin/AdminMobilityCaseInspectPage').then((module) => ({ default: module.AdminMobilityCaseInspectPage })));
 const AdminPoliciesPage = lazy(() => import('./pages/admin/AdminPoliciesPage').then((module) => ({ default: module.AdminPoliciesPage })));
@@ -468,6 +469,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminFeatureFlags.path} element={<RequireAdminRoute><AdminFeatureFlagsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPermissions.path} element={<RequireAdminRoute><AdminPermissionsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminExecutive.path} element={<RequireAdminRoute><ExecutiveDashboardPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCoverage.path} element={<RequireAdminRoute><CoverageDashboardPage /></RequireAdminRoute>} />
         {/* Mission Control merged into the "Feedback & Work" tab (2026-07-06), then the
             work-board sub-view itself was retired (AIQ-1565) — the Inbox already carries
             the same information and is where triage-to-Notion happens. The legacy route
