@@ -1,0 +1,18 @@
+{
+  "batch_id": "pl-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "PL",
+  "origin_country_code": null,
+  "destination_country_code": "PL",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "POLAND",
+  "record_count": 13,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "4c87806c0626fcd58c3852f1699728341b1db01e805eab98de47cb737d5f8f21",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources are the official Office-for-Foreigners MOS portal (mos.cudzoziemcy.gov.pl) + gov.pl \u2014 official-tier. The MOS SPA blocks verify_ledger's fetcher (only 1/13 confirmed, rest fetch_failed reported-not-rejected); quotes independently reconfirmed on the live pages via curl (10/13 exact + 3/13 confirmed on lenient alnum-window match \u2014 markup split the exact opening). Subagent browser-confirmed 12/13 verbatim; fact 13 (driving) WebFetch-sourced."
+}

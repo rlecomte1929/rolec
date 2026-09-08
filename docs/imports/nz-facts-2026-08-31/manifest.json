@@ -1,0 +1,18 @@
+{
+  "batch_id": "nz-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "NZ",
+  "origin_country_code": null,
+  "destination_country_code": "NZ",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "NEW ZEALAND",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "2558a91195c4837a76eedc217f1606bc16700705e64e5ad289422d4e16f112f0",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "All govt.nz official sources; verify_ledger confirmed 10/12 quotes live, 2 fetch_failed (reported-not-rejected, INZ/health path restructures). NZ is in the Aug-12 landmine: the 8 NZ-immig-2026-08-12 'ready' rows were parked during promote and restored after \u2014 NOT promoted."
+}

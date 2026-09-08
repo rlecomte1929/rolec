@@ -1,0 +1,18 @@
+{
+  "batch_id": "mt-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "MT",
+  "origin_country_code": null,
+  "destination_country_code": "MT",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "MALTA",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "2b2f6881bc1b5599a73783e01e85a18c9c41c724a3991bb461be2b8ea6870729",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources: identita.gov.mt + jobsplus.gov.mt (server-fetchable). confirm_quotes.py referee: CONFIRMED 12/12, zero holds/browser \u2014 the research subagent self-filtered to reproducible sources per the verification-priors brief. cfr.gov.mt/homeaffairs/socialsecurity HQP-tax/non-dom/social-security facts deliberately NOT written (those hosts hard-block all fetchers -> would be held). KEI EUR45,000 cited (Identit\u00e0); Jobsplus EUR35,000 flagged stale in README."
+}

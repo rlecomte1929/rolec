@@ -1,0 +1,18 @@
+{
+  "batch_id": "cy-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "CY",
+  "origin_country_code": null,
+  "destination_country_code": "CY",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "CYPRUS",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "37e40de6cdd56254d371c39ad02df4c776336646c979931884211e28eca74a18",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources: 2 gov.cy Migration Dept pages. gov.cy WAF-blocks curl (returns an ~8KB challenge page) so confirm_quotes flagged REVIEW_BROWSER; the applier browser-verified the legislation page (residence-permit intro, cancelled-quotas, EUR2500 threshold, 70:30 ratio, one-month exam, BSC registration, 2-year contract \u2014 all exact) + the procedure page. Third-country-only (60-day/non-dom/social-insurance dropped as EU-applicable)."
+}

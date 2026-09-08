@@ -1,0 +1,21 @@
+{
+  "batch_id": "ca-toronto-providers-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (statutory-register sourced via research subagent)",
+  "corridor": "XX-CA",
+  "destination_country_code": "CA",
+  "city": "Toronto",
+  "target_table": "public.suppliers + public.supplier_service_capabilities",
+  "platform_vetting_status_all": "pending",
+  "record_count": 20,
+  "coverage": {
+    "movers":           { "n": 3, "register": "FIDI FAIM member directory", "tier": 1, "per_entity_url": true },
+    "legal_admin":      { "n": 3, "register": "LSO — Law Society of Ontario directory", "tier": 2, "per_entity_url": false },
+    "tax_finance":      { "n": 3, "register": "CPA Ontario — firm directory", "tier": 2, "per_entity_url": false },
+    "banks":            { "n": 5, "register": "CDIC — member institutions list", "tier": 2, "per_entity_url": false },
+    "schools":          { "n": 3, "register": "Ontario Ministry of Education — Private School Location List (BSID)", "tier": 2, "per_entity_url": false },
+    "housing_agencies": { "n": 3, "register": "RECO — Real Estate Council of Ontario registrant search", "tier": 2, "per_entity_url": false }
+  },
+  "blocked": [],
+  "scope": "Toronto providers for the Canada destination. Movers cite per-entity FIDI URLs (tier 1, FAIM expiry captured); the other 5 Canadian registers are search-form/flat with no per-entity URL, so they take PUBLIC_REGISTER tier 2 (staged 'claimed', vetter confirms — the Dublin Option-C model). Staged run-scoped and promoted to suppliers + one capability each at platform_vetting_status='pending'. Append-only verified: suppliers 233->253 (+20), +20 capabilities, approved capabilities unchanged (130->130)."
+}

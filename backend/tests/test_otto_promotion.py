@@ -138,8 +138,9 @@ def test_promotion_never_produces_expert_verified():
 
 def test_a_country_outside_the_requirement_catalog_does_not_promote():
     """`iso_to_catalog_name` is the narrow map — it answers 'do we hold catalog data?'.
-    Australia and Canada have staged facts but no catalog coverage."""
-    got = resolve(_entity(destination_country="AU", topic_key="189-visa-fee"), [_fact()])
+    Nigeria is an origin country with no catalog coverage (AU/CA used to be the example
+    here until the destination-coverage campaign added catalog data for them)."""
+    got = resolve(_entity(destination_country="NG", topic_key="work-permit-fee"), [_fact()])
     assert isinstance(got, Unmapped)
     assert "catalog coverage" in got.reason
 

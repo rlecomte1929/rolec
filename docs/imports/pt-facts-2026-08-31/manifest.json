@@ -1,0 +1,18 @@
+{
+  "batch_id": "pt-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "PT",
+  "origin_country_code": null,
+  "destination_country_code": "PT",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "PORTUGAL",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "456ebdd9cac611d1e0d62793570bfbac250002d0bb4cb334615eb8760f258be4",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources are official gov.pt bodies (vistos.mne.gov.pt, aima.gov.pt, info.portaldasfinancas.gov.pt, www2.gov.pt) \u2014 official-tier. verify_ledger's fetcher could not reach any of the 12 (all fetch_failed, reported-not-rejected \u2014 PT gov sites block it); quotes independently reconfirmed as verbatim substrings via curl+pypdf (12/12), imported with fetch (V3 informational). The 8 PT-immig-2026-08-12 landmine 'ready' rows were parked to 'new' during promote and restored after \u2014 NOT promoted."
+}

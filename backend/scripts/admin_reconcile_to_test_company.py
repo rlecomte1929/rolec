@@ -258,7 +258,7 @@ def reconcile_to_test_company(db: Database) -> Dict[str, Any]:
                 created_by=None,
             )
             actions["backfill_policy_result"] = result
-                actions["policies_linked_to_test_company"] = bool(result.get("ok"))
+            actions["policies_linked_to_test_company"] = bool(result.get("ok"))
     except Exception as exc:  # pragma: no cover - defensive
         actions["backfill_policy_result"] = {"ok": False, "error": str(exc)}
         actions["policies_linked_to_test_company"] = False

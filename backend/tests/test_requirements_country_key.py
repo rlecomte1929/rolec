@@ -33,8 +33,8 @@ def test_to_iso_aliases():
 def test_to_iso_unknown_or_empty_is_none():
     # None signals "unrecognised" so callers fail closed (1473c) instead of
     # querying with a bad key.
-    assert to_iso("IT") is None          # no catalog data yet
-    assert to_iso("Japan") is None
+    assert to_iso("ZZ") is None          # genuinely unmapped code (IT/SE are now catalog-mapped)
+    assert to_iso("Narnia") is None      # fictional name — real ones keep getting catalog-mapped
     assert to_iso("") is None
     assert to_iso("   ") is None
     assert to_iso(None) is None
@@ -75,7 +75,7 @@ def test_resolve_catalog_country_preserves_legacy_behaviour():
     assert resolve_catalog_country("UK") == "UNITED KINGDOM"
     assert resolve_catalog_country("usa") == "UNITED STATES"
     assert resolve_catalog_country("UNITED KINGDOM") == "UNITED KINGDOM"
-    assert resolve_catalog_country("IT") == "IT"       # unknown → raw upper
+    assert resolve_catalog_country("ZZ") == "ZZ"       # unknown → raw upper
     assert resolve_catalog_country("Japan") == "JAPAN"
     assert resolve_catalog_country("") == "UNKNOWN"
     assert resolve_catalog_country("  ") == "UNKNOWN"
@@ -139,6 +139,175 @@ def test_ecuador_is_covered():
     assert iso_to_catalog_name("EC") == "ECUADOR"
     assert resolve_catalog_country("EC") == "ECUADOR"
     assert resolve_catalog_country("Ecuador") == "ECUADOR"
+
+
+def test_canada_is_covered():
+    """CA resolves — a Destination Coverage Master destination (rank 5, Toronto).
+
+    A destination-only entry like GB: no corridor profile, but Canada facts must resolve to a
+    catalog name or `mappings.resolve()` refuses to promote them and they reach no case.
+    """
+    assert to_iso("CA") == "CA"
+    assert to_iso("Canada") == "CA"
+    assert iso_to_catalog_name("CA") == "CANADA"
+    assert resolve_catalog_country("CA") == "CANADA"
+    assert resolve_catalog_country("Canada") == "CANADA"
+
+
+def test_australia_is_covered():
+    """AU resolves — Destination Coverage Master rank 6 (Sydney), destination-only."""
+    assert to_iso("AU") == "AU"
+    assert to_iso("Australia") == "AU"
+    assert iso_to_catalog_name("AU") == "AUSTRALIA"
+    assert resolve_catalog_country("AU") == "AUSTRALIA"
+    assert resolve_catalog_country("Australia") == "AUSTRALIA"
+
+
+def test_uae_is_covered():
+    """AE resolves — Destination Coverage Master rank 8 (Dubai), destination-only, non-EEA."""
+    assert to_iso("AE") == "AE"
+    assert iso_to_catalog_name("AE") == "UNITED ARAB EMIRATES"
+    assert resolve_catalog_country("AE") == "UNITED ARAB EMIRATES"
+    assert resolve_catalog_country("United Arab Emirates") == "UNITED ARAB EMIRATES"
+
+
+def test_italy_and_sweden_are_covered():
+    """IT + SE resolve — coverage-master destinations (Milan rank 11, Stockholm rank 14)."""
+    assert resolve_catalog_country("IT") == "ITALY"
+    assert resolve_catalog_country("Italy") == "ITALY"
+    assert resolve_catalog_country("SE") == "SWEDEN"
+    assert resolve_catalog_country("Sweden") == "SWEDEN"
+    assert resolve_catalog_country("BE") == "BELGIUM"
+    assert resolve_catalog_country("AT") == "AUSTRIA"
+
+
+def test_tier3_destinations_are_covered():
+    """SA/JP/PT/FI resolve — Tier-3 coverage-master destinations, destination-only.
+
+    Saudi Arabia (rank 12, Riyadh), Japan (rank 18, Tokyo), Portugal (rank 24, Lisbon) and
+    Finland (rank 26, Helsinki). All served on the third-country-national pathway; each must
+    resolve to a catalog name or `mappings.resolve()` refuses to promote and they reach no case.
+    """
+    assert resolve_catalog_country("SA") == "SAUDI ARABIA"
+    assert resolve_catalog_country("Saudi Arabia") == "SAUDI ARABIA"
+    assert resolve_catalog_country("JP") == "JAPAN"
+    assert resolve_catalog_country("Japan") == "JAPAN"
+    assert resolve_catalog_country("PT") == "PORTUGAL"
+    assert resolve_catalog_country("Portugal") == "PORTUGAL"
+    assert resolve_catalog_country("FI") == "FINLAND"
+    assert resolve_catalog_country("Finland") == "FINLAND"
+
+
+def test_tier3_wave2_destinations_are_covered():
+    """HK/NZ/QA/PL resolve — Tier-3 wave 2 coverage-master destinations, destination-only.
+
+    Hong Kong (rank 21), New Zealand (rank 22, Auckland), Qatar (rank 23, Doha), Poland
+    (rank 25, Warsaw). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("HK") == "HONG KONG"
+    assert resolve_catalog_country("Hong Kong") == "HONG KONG"
+    assert resolve_catalog_country("NZ") == "NEW ZEALAND"
+    assert resolve_catalog_country("New Zealand") == "NEW ZEALAND"
+    assert resolve_catalog_country("QA") == "QATAR"
+    assert resolve_catalog_country("Qatar") == "QATAR"
+    assert resolve_catalog_country("PL") == "POLAND"
+    assert resolve_catalog_country("Poland") == "POLAND"
+
+
+def test_tier3_wave3_destinations_are_covered():
+    """KR/IL/KW/LU resolve — Tier-3 wave 3 coverage-master destinations, destination-only.
+
+    South Korea (rank 27, Seoul), Israel (rank 28, Tel Aviv), Kuwait (rank 29, Kuwait City),
+    Luxembourg (rank 30, Luxembourg City). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("KR") == "SOUTH KOREA"
+    assert resolve_catalog_country("South Korea") == "SOUTH KOREA"
+    assert resolve_catalog_country("IL") == "ISRAEL"
+    assert resolve_catalog_country("Israel") == "ISRAEL"
+    assert resolve_catalog_country("KW") == "KUWAIT"
+    assert resolve_catalog_country("Kuwait") == "KUWAIT"
+    assert resolve_catalog_country("LU") == "LUXEMBOURG"
+    assert resolve_catalog_country("Luxembourg") == "LUXEMBOURG"
+
+
+def test_tier3_wave4_destinations_are_covered():
+    """CZ/GR/MX/BR resolve — Tier-3 wave 4 coverage-master destinations, destination-only.
+
+    Czech Republic (rank 31, Prague), Greece (rank 32, Athens), Mexico (rank 33, Mexico City),
+    Brazil (rank 34, São Paulo). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("CZ") == "CZECH REPUBLIC"
+    assert resolve_catalog_country("Czech Republic") == "CZECH REPUBLIC"
+    assert resolve_catalog_country("GR") == "GREECE"
+    assert resolve_catalog_country("Greece") == "GREECE"
+    assert resolve_catalog_country("MX") == "MEXICO"
+    assert resolve_catalog_country("Mexico") == "MEXICO"
+    assert resolve_catalog_country("BR") == "BRAZIL"
+    assert resolve_catalog_country("Brazil") == "BRAZIL"
+
+
+def test_tier3_wave5_destinations_are_covered():
+    """BH/OM/ZA/MY resolve — Tier-3 wave 5 coverage-master destinations, destination-only.
+
+    Bahrain (rank 35, Manama), Oman (rank 36, Muscat), South Africa (rank 37, Johannesburg),
+    Malaysia (rank 38, Kuala Lumpur). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("BH") == "BAHRAIN"
+    assert resolve_catalog_country("Bahrain") == "BAHRAIN"
+    assert resolve_catalog_country("OM") == "OMAN"
+    assert resolve_catalog_country("Oman") == "OMAN"
+    assert resolve_catalog_country("ZA") == "SOUTH AFRICA"
+    assert resolve_catalog_country("South Africa") == "SOUTH AFRICA"
+    assert resolve_catalog_country("MY") == "MALAYSIA"
+    assert resolve_catalog_country("Malaysia") == "MALAYSIA"
+
+
+def test_tier3_wave7_destinations_are_covered():
+    """HU/RO/AR/CL resolve — Tier-3 wave 7 coverage-master destinations, destination-only.
+
+    Hungary (rank 43, Budapest), Romania (rank 44, Bucharest), Argentina (rank 45, Buenos Aires),
+    Chile (rank 46, Santiago). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("HU") == "HUNGARY"
+    assert resolve_catalog_country("Hungary") == "HUNGARY"
+    assert resolve_catalog_country("RO") == "ROMANIA"
+    assert resolve_catalog_country("Romania") == "ROMANIA"
+    assert resolve_catalog_country("AR") == "ARGENTINA"
+    assert resolve_catalog_country("Argentina") == "ARGENTINA"
+    assert resolve_catalog_country("CL") == "CHILE"
+    assert resolve_catalog_country("Chile") == "CHILE"
+
+
+def test_tier3_wave8_destinations_are_covered():
+    """EE/CY/IS/MT resolve — Tier-3 wave 8 coverage-master destinations, destination-only.
+
+    Estonia (rank 47, Tallinn), Cyprus (rank 48, Nicosia), Iceland (rank 49, Reykjavik),
+    Malta (rank 50, Valletta). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("EE") == "ESTONIA"
+    assert resolve_catalog_country("Estonia") == "ESTONIA"
+    assert resolve_catalog_country("CY") == "CYPRUS"
+    assert resolve_catalog_country("Cyprus") == "CYPRUS"
+    assert resolve_catalog_country("IS") == "ICELAND"
+    assert resolve_catalog_country("Iceland") == "ICELAND"
+    assert resolve_catalog_country("MT") == "MALTA"
+    assert resolve_catalog_country("Malta") == "MALTA"
+
+
+def test_tier3_wave6_destinations_are_covered():
+    """TH/CN/IN/TR resolve — Tier-3 wave 6 coverage-master destinations, destination-only.
+
+    Thailand (rank 39, Bangkok), China (rank 40, Shanghai), India (rank 41, Bengaluru),
+    Turkey (rank 42, Istanbul). All served on the third-country-national pathway.
+    """
+    assert resolve_catalog_country("TH") == "THAILAND"
+    assert resolve_catalog_country("Thailand") == "THAILAND"
+    assert resolve_catalog_country("CN") == "CHINA"
+    assert resolve_catalog_country("China") == "CHINA"
+    assert resolve_catalog_country("IN") == "INDIA"
+    assert resolve_catalog_country("India") == "INDIA"
+    assert resolve_catalog_country("TR") == "TURKEY"
+    assert resolve_catalog_country("Turkey") == "TURKEY"
 
 
 def test_every_corridor_destination_resolves():

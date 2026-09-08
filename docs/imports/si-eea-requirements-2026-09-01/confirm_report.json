@@ -1,0 +1,162 @@
+{
+  "batch": "si-eea-requirements-2026-09-01",
+  "counts": {
+    "CONFIRMED": 14
+  },
+  "rows": [
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "registration_certificate",
+      "host": "www.gov.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "registration_certificate",
+      "host": "www.gov.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.957,
+      "method": "utf-8",
+      "reason": "96% bigram"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "residence_registration_eu",
+      "host": "europa.eu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.893,
+      "method": "utf-8",
+      "reason": "89% bigram"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "address_registration",
+      "host": "e-uprava.gov.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.857,
+      "method": "utf-8",
+      "reason": "86% bigram"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "address_registration",
+      "host": "e-uprava.gov.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "tax_number",
+      "host": "www.fu.gov.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.983,
+      "method": "utf-8",
+      "reason": "98% bigram"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "tax_number",
+      "host": "www.fu.gov.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "emso",
+      "host": "www.gov.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "tax_residency",
+      "host": "www.fu.gov.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.981,
+      "method": "utf-8",
+      "reason": "98% bigram"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "tax_residency",
+      "host": "www.fu.gov.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "health_insurance",
+      "host": "www.zzzs.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "health_insurance",
+      "host": "www.zzzs.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "pension_coordination",
+      "host": "www.zpiz.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "100% bigram"
+    },
+    {
+      "batch": "si-eea-requirements-2026-09-01",
+      "destination_country": "SI",
+      "entity_topic_key": "pension_coordination",
+      "host": "www.zpiz.si",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    }
+  ]
+}

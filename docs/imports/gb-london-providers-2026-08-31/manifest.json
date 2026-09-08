@@ -1,0 +1,21 @@
+{
+  "batch_id": "gb-london-providers-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (statutory-register sourced via research subagent)",
+  "corridor": "XX-GB",
+  "destination_country_code": "GB",
+  "city": "London",
+  "target_table": "public.suppliers + public.supplier_service_capabilities",
+  "platform_vetting_status_all": "pending",
+  "record_count": 27,
+  "coverage": {
+    "movers":           { "n": 7, "register": "FIDI FAIM member directory", "tier": 1, "per_entity_url": true },
+    "legal_admin":      { "n": 3, "register": "SRA — Solicitors Regulation Authority register", "tier": 2, "per_entity_url": true },
+    "tax_finance":      { "n": 2, "register": "ICAEW — Find a Chartered Accountant", "tier": 2, "per_entity_url": true },
+    "banks":            { "n": 6, "register": "FCA Financial Services Register", "tier": 2, "per_entity_url": true },
+    "schools":          { "n": 5, "register": "GIAS — Get Information About Schools (DfE)", "tier": 2, "per_entity_url": true },
+    "housing_agencies": { "n": 4, "register": "ARLA Propertymark — member directory", "tier": 2, "per_entity_url": true }
+  },
+  "blocked": [],
+  "scope": "London providers for the UK destination, one per-entity statutory/professional register per category. Unlike the Irish batch every UK register exposes a stable per-entity URL, so all are HTTP_LISTING (tier 2) rather than PUBLIC_REGISTER — movers on the existing global FIDI source. Staged run-scoped and promoted to suppliers + one capability each at platform_vetting_status='pending' (24 new candidates + 3 companies already held gained a GB capability). Append-only verified: 207->233 suppliers, +27 capabilities, approved capabilities unchanged (130->130)."
+}

@@ -1,0 +1,142 @@
+{
+  "batch": "id-facts-2026-08-31",
+  "counts": {
+    "HOLD_WRONG_SRC": 6,
+    "CONFIRMED": 5,
+    "REVIEW_BROWSER": 1
+  },
+  "rows": [
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "rptka",
+      "host": "jdih.kemnaker.go.id",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (819578 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "work_visa",
+      "host": "www.imigrasi.go.id",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.971,
+      "method": "utf-8",
+      "reason": "97% bigram"
+    },
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "work_visa",
+      "host": "www.imigrasi.go.id",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "dkptka",
+      "host": "jdih.kemnaker.go.id",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (819578 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "companion_worker",
+      "host": "jdih.kemnaker.go.id",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (819578 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "companion_worker",
+      "host": "jdih.kemnaker.go.id",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (819578 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "rptka",
+      "host": "jdih.kemnaker.go.id",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (819578 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "tax_residency",
+      "host": "pajak.go.id",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "tax_residency",
+      "host": "pajak.go.id",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "bpjs_ketenagakerjaan",
+      "host": "www.bpjsketenagakerjaan.go.id",
+      "content_type": "html",
+      "verdict": "HOLD_WRONG_SRC",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "text-rich source (293697 chars) but 0% overlap — cited URL likely wrong"
+    },
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "bpjs_kesehatan",
+      "host": "jdih.kemenkeu.go.id",
+      "content_type": "html",
+      "verdict": "REVIEW_BROWSER",
+      "bigram": 0.0,
+      "method": null,
+      "reason": "blocked/stub response"
+    },
+    {
+      "batch": "id-facts-2026-08-31",
+      "destination_country": "ID",
+      "entity_topic_key": "sktt",
+      "host": "kecandran.salatiga.go.id",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.964,
+      "method": "utf-8",
+      "reason": "96% bigram"
+    }
+  ]
+}

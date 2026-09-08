@@ -1,0 +1,18 @@
+{
+  "batch_id": "si-eea-requirements-2026-09-01",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "SI",
+  "origin_country_code": null,
+  "destination_country_code": "SI",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "SLOVENIA",
+  "record_count": 14,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "fb339b9f20244714510c3256afeb7840651431990ca6b39f84c3b28a36011abd",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "EEA corridor (EU professional -> SLOVENIA). confirm_quotes CONFIRMED all. nationality=EEA -> EU categories; the EU-registration-certificate rows were re-scoped to [EU_EEA] only (a host national needs no certificate) so the nationality scope guard passes. Imported --no-fetch. Greenfield."
+}

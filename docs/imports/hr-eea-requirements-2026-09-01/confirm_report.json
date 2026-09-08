@@ -1,0 +1,162 @@
+{
+  "batch": "hr-eea-requirements-2026-09-01",
+  "counts": {
+    "CONFIRMED": 14
+  },
+  "rows": [
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "oib",
+      "host": "porezna-uprava.gov.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "oib",
+      "host": "porezna-uprava.gov.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "oib",
+      "host": "porezna-uprava.gov.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.96,
+      "method": "utf-8",
+      "reason": "96% bigram"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "short_term_stay",
+      "host": "mup.gov.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "temporary_stay_registration",
+      "host": "mup.gov.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.959,
+      "method": "utf-8",
+      "reason": "96% bigram"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "registration_certificate",
+      "host": "mup.gov.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.952,
+      "method": "utf-8",
+      "reason": "95% bigram"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "permanent_stay",
+      "host": "mup.gov.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "accommodation_proof",
+      "host": "mup.gov.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "tax_residency",
+      "host": "porezna-uprava.gov.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "hzzo_mandatory_insurance",
+      "host": "hzzo.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "ehic_s1",
+      "host": "employment-social-affairs.ec.europa.eu",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 0.935,
+      "method": "utf-8",
+      "reason": "94% bigram"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "pension_aggregation",
+      "host": "mirovinsko.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "a1_certificate",
+      "host": "mirovinsko.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "exact"
+    },
+    {
+      "batch": "hr-eea-requirements-2026-09-01",
+      "destination_country": "HR",
+      "entity_topic_key": "hzzo_registration_deadline",
+      "host": "hzzo.hr",
+      "content_type": "html",
+      "verdict": "CONFIRMED",
+      "bigram": 1.0,
+      "method": "utf-8",
+      "reason": "100% bigram"
+    }
+  ]
+}

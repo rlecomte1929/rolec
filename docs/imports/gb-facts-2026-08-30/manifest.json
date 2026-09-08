@@ -1,0 +1,20 @@
+{
+  "batch_id": "gb-facts-2026-08-30",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded gov.uk via research subagent; verify_ledger referee)",
+  "corridor": "GB",
+  "origin_country_code": null,
+  "destination_country_code": "GB",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "UNITED KINGDOM",
+  "record_count": 11,
+  "non_obvious_count": 6,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "b5e7c905d72d41df4684bf5db152dfc2dfcc8d2439c082dfb128f5cb00aa0a46",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "scope": "Completes the UK destination: the settling-in topics that were still missing after the 12 substantive immigration/tax facts landed 2026-08-30 — council tax, state-school admissions, driving-licence exchange. Deliberately EXCLUDES 'opening a UK bank account': no official gov.uk page carries a verbatim rule (content lives on council/MoneyHelper sites), so per the never-invent rule it is a documented reject, not a fabricated fact. Reconciles: 11 facts, all official gov.uk hosts, all applies_to.nationality=non-EEA (THIRD_COUNTRY), verify_ledger confirmed 11/11 quotes verbatim on the live pages. Promoted topic-grained into 3 public.requirement_items at UNITED KINGDOM (Council tax [employment], Driving licence exchange [employment], State school admissions [family]), all review_status=pending / verification_status=representative.",
+  "load_task": null
+}

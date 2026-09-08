@@ -1,0 +1,17 @@
+{
+  "batch_id": "at-resource-2026-09-08",
+  "generated_at": "2026-09-02",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee)",
+  "corridor": "AT",
+  "origin_country_code": null,
+  "destination_country_code": "AT",
+  "nationality_class": "EEA",
+  "target_table": "public.requirement_items",
+  "target_country_code": "AUSTRIA",
+  "record_count": 1,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "d770e5015e9a840b6db8d8d7c7dbae0a040338d4f43e7424fc06bc99cb3f4520",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded"
+}

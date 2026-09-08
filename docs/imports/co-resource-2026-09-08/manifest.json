@@ -1,0 +1,17 @@
+{
+  "batch_id": "co-resource-2026-09-08",
+  "generated_at": "2026-09-02",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee)",
+  "corridor": "CO",
+  "origin_country_code": null,
+  "destination_country_code": "CO",
+  "nationality_class": "EEA",
+  "target_table": "public.requirement_items",
+  "target_country_code": "COLOMBIA",
+  "record_count": 1,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "0078f91d01ec3057b7e901043aca85a4363e2339a93c0b3144ce70571c6acbb2",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded"
+}

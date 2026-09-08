@@ -1,0 +1,18 @@
+{
+  "batch_id": "gr-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "GR",
+  "origin_country_code": null,
+  "destination_country_code": "GR",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "GREECE",
+  "record_count": 10,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "8af9261f7c13e001acecae90a46831ccfbb7793fab25929744888abb872c7132",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources: migration.gov.gr + e-efka.gov.gr (curl-confirmed 5/5) and WAF-gated mfa.gr/aade.gr/gov.gr (403 to curl/verify_ledger \u2192 imported --no-fetch). Applier browser-verified the WAF domains: aade.gr tax-residency-183 and mfa.gr type-D quotes both exact; subagent browser-grounded all 10. NOTE facts tax_residency_183/afm_tin/art_5c/amka are third-country-scoped (non-EEA) but not strictly TCN-exclusive (an EU relocator meets them too) \u2014 flagged for the reviewer. No salary numbers quoted (Blue Card threshold + Art.5C rate live only in WAF-blocked PDFs) \u2014 not invented."
+}

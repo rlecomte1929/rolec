@@ -68,6 +68,92 @@ _ISO_TO_CATALOG_NAME = {
     # with corridors/US_EC/corridor.yaml — `test_every_corridor_destination_resolves`
     # fails the moment the profile lands without this row.
     "EC": "ECUADOR",
+    # CA is a Destination Coverage Master destination (rank 5, Toronto hub). No corridor
+    # profile — authored as a destination like GB above. Without this entry Canada facts stage
+    # but `mappings.resolve()` refuses to promote them (no catalog coverage), reaching no case.
+    "CA": "CANADA",
+    # AU — Destination Coverage Master rank 6 (Sydney hub). Destination-only, like GB/CA.
+    "AU": "AUSTRALIA",
+    # AE — Destination Coverage Master rank 8 (Dubai hub). Destination-only; non-EEA.
+    "AE": "UNITED ARAB EMIRATES",
+    # IT — Destination Coverage Master rank 11 (Milan hub). EEA destination, dual-audience facts.
+    "IT": "ITALY",
+    # SE — Destination Coverage Master rank 14 (Stockholm hub). EEA destination.
+    "SE": "SWEDEN",
+    # BE — rank 15 (Brussels hub). EEA destination. AT — rank 16 (Vienna hub). EEA destination.
+    "BE": "BELGIUM",
+    "AT": "AUSTRIA",
+    # Tier-3 Destination Coverage Master destinations (no prior corridor data). Destination-only,
+    # authored like GB/CA above; all served on the third-country-national (non-EEA) professional
+    # relocation pathway. SA rank 12 (Riyadh), JP rank 18 (Tokyo), PT rank 24 (Lisbon; EEA dest,
+    # non-EEA audience), FI rank 26 (Helsinki; EEA dest, non-EEA audience).
+    "SA": "SAUDI ARABIA",
+    "JP": "JAPAN",
+    "PT": "PORTUGAL",
+    "FI": "FINLAND",
+    # Tier-3 wave 2 — HK rank 21 (Hong Kong), NZ rank 22 (Auckland), QA rank 23 (Doha),
+    # PL rank 25 (Warsaw). Destination-only, third-country-national pathway.
+    "HK": "HONG KONG",
+    "NZ": "NEW ZEALAND",
+    "QA": "QATAR",
+    "PL": "POLAND",
+    # Tier-3 wave 3 — KR rank 27 (Seoul), IL rank 28 (Tel Aviv), KW rank 29 (Kuwait City),
+    # LU rank 30 (Luxembourg City). Destination-only, third-country-national pathway.
+    "KR": "SOUTH KOREA",
+    "IL": "ISRAEL",
+    "KW": "KUWAIT",
+    "LU": "LUXEMBOURG",
+    # Tier-3 wave 4 — CZ rank 31 (Prague), GR rank 32 (Athens), MX rank 33 (Mexico City),
+    # BR rank 34 (São Paulo). Destination-only, third-country-national pathway.
+    "CZ": "CZECH REPUBLIC",
+    "GR": "GREECE",
+    "MX": "MEXICO",
+    "BR": "BRAZIL",
+    # Tier-3 wave 5 — BH rank 35 (Manama), OM rank 36 (Muscat), ZA rank 37 (Johannesburg),
+    # MY rank 38 (Kuala Lumpur). Destination-only, third-country-national pathway.
+    "BH": "BAHRAIN",
+    "OM": "OMAN",
+    "ZA": "SOUTH AFRICA",
+    "MY": "MALAYSIA",
+    # Tier-3 wave 6 — TH rank 39 (Bangkok), CN rank 40 (Shanghai), IN rank 41 (Bengaluru),
+    # TR rank 42 (Istanbul). Destination-only, third-country-national pathway.
+    "TH": "THAILAND",
+    "CN": "CHINA",
+    "IN": "INDIA",
+    "TR": "TURKEY",
+    # Tier-3 wave 7 — HU rank 43 (Budapest), RO rank 44 (Bucharest), AR rank 45 (Buenos Aires),
+    # CL rank 46 (Santiago). Destination-only, third-country-national pathway.
+    "HU": "HUNGARY",
+    "RO": "ROMANIA",
+    "AR": "ARGENTINA",
+    "CL": "CHILE",
+    # Tier-3 wave 8 — EE rank 47 (Tallinn), CY rank 48 (Nicosia), IS rank 49 (Reykjavik),
+    # MT rank 50 (Valletta). Destination-only, third-country-national pathway.
+    "EE": "ESTONIA",
+    "CY": "CYPRUS",
+    "IS": "ICELAND",
+    "MT": "MALTA",
+    # Tier-3 wave 9 — Asia-Pacific tail, coverage-master ranks 53-56 (Taipei, Ho Chi Minh
+    # City, Jakarta, Manila). Ranks 51-52 (Russia, Ukraine) deliberately skipped: sanctions /
+    # active conflict make corporate relocation there a non-starter for the customer base.
+    "TW": "TAIWAN",
+    "VN": "VIETNAM",
+    "ID": "INDONESIA",
+    "PH": "PHILIPPINES",
+    # Tier-3 wave 10 — Latin America cluster, coverage-master ranks 57-61 (Bogotá, Lima,
+    # Montevideo, San José, Panama City). Third-country-national pathway.
+    "CO": "COLOMBIA",
+    "PE": "PERU",
+    "UY": "URUGUAY",
+    "CR": "COSTA RICA",
+    "PA": "PANAMA",
+    # Tier-3 wave 11 — EU cluster, coverage-master ranks 66-70 (Zagreb, Ljubljana, Bratislava,
+    # Vilnius, Riga). EEA corridors like FR->DE: the audience is an EU/EEA professional relocating in.
+    "HR": "CROATIA",
+    "SI": "SLOVENIA",
+    "SK": "SLOVAKIA",
+    "LT": "LITHUANIA",
+    "LV": "LATVIA",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.

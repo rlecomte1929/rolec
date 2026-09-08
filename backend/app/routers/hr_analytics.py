@@ -29,6 +29,27 @@ from ..auth_deps import get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db as main_db
 
 router = APIRouter(prefix="/api/hr", tags=["hr-analytics"])
+
+
+@router.get(
+    "/committed-spend",
+    summary="Committed spend across the caller's company, derived from validated RFQ quotes",
+)
+def get_company_committed_spend(user: dict = Depends(require_admin_or_hr)) -> dict:
+    """[AIQ-2089] Committed spend derived from validated RFQ quotes (rfqs.validated_quote_id ⋈
+    quotes), tenant-scoped to the caller's company via relocation_cases.company_id. Per-currency
+    subtotals; a company with no validated quote yet returns has_spend=False (never a fabricated
+    0). Never totals estimates and never sums across currencies.
+    """
+    from ..services.case_spend import committed_spend_for_company
+
+    company_id = None
+    try:
+        company_id = get_org_id_for_hr_user(user)
+    except Exception:  # noqa: BLE001 — fall back to the token claim, never 500 the report
+        company_id = None
+    company_id = company_id or user.get("company_id")
+    return committed_spend_for_company(company_id or "")
 logger = logging.getLogger(__name__)
 
 # [AIQ-2087] The Policy-vs-Reality compliance matrix was REMOVED here, along with

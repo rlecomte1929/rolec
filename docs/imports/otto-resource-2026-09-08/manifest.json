@@ -1,0 +1,13 @@
+{
+  "batch_id": "otto-resource-2026-09-08",
+  "status": "DISPATCHED",
+  "note": "Research handoff to Otto (bridge id 21). Awaiting GCS NDJSON+manifest. Not yet landed.",
+  "targets": [
+    "IN:pan_139a",
+    "BR:vitem_v_ordering",
+    "IL:foreign_expert_tax",
+    "PT:bluecard_mobility",
+    "EE:x4"
+  ],
+  "artifacts": []
+}

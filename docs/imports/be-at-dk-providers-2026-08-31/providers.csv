@@ -1,0 +1,51 @@
+corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry
+XX-BE,movers,COMPAS INTERNATIONAL MOVERS NV,https://compasim.be,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/compas-international-movers,FIDI Global Alliance,,2027
+XX-BE,movers,Santa Fe Relocation Services NV,https://www.santaferelocation.com/office/belgium/international-movers-belgium/,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/santa-fe-relocation-brussels,FIDI Global Alliance,,2026
+XX-BE,movers,AGS Belgium BV,https://www.agsmovers.com/,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/ags-belgium,FIDI Global Alliance,,2029
+XX-BE,movers,Putters International N.V.,http://www.putters.be,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/putters-international,FIDI Global Alliance,,2029
+XX-AT,movers,Santa Fe Relocation Service GmbH,https://www.santaferelocation.com/office/austria/international-moving-company-austria/,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/santa-fe-relocation-vienna,FIDI Global Alliance,,2029
+XX-AT,movers,H. Fuchs GesmbH (Fuchs Relocations),http://www.spedition-fuchs.at,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/fuchs-relocations,FIDI Global Alliance,,2029
+XX-AT,movers,Zdenko Dworak Ges.m.b.H.,http://www.zdenkodworak.at,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/zdenko-dworak-international-removals,FIDI Global Alliance,,2025
+XX-DK,movers,Alfa Mobility Denmark A/S,https://www.alfamoving.com,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/alfa-mobility,FIDI Global Alliance,,2027
+XX-DK,movers,Aspire Mobility Group A/S,http://www.aspiremobility.com,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/aspire-mobility-group,FIDI Global Alliance,,2029
+XX-DK,movers,Inter Express Transport A/S,http://www.interexpress.dk,FIDI Global Alliance,https://www.fidi.org/find-fidi-affiliate/inter-express-transport/s,FIDI Global Alliance,,2026
+XX-BE,banks,KBC Bank NV,https://www.kbc.be,National Bank of Belgium - list of authorised credit institutions,https://www.nbb.be/en/financial-oversight/prudential-supervision/areas-responsibility/credit-institutions/lists,National Bank of Belgium (NBB),,
+XX-BE,banks,BNP Paribas Fortis SA/NV,https://www.bnpparibasfortis.be,National Bank of Belgium - list of authorised credit institutions,https://www.nbb.be/en/financial-oversight/prudential-supervision/areas-responsibility/credit-institutions/lists,National Bank of Belgium (NBB),,
+XX-BE,banks,Belfius Bank SA/NV,https://www.belfius.be,National Bank of Belgium - list of authorised credit institutions,https://www.nbb.be/en/financial-oversight/prudential-supervision/areas-responsibility/credit-institutions/lists,National Bank of Belgium (NBB),,
+XX-BE,banks,ING Belgium SA/NV,https://www.ing.be,National Bank of Belgium - list of authorised credit institutions,https://www.nbb.be/en/financial-oversight/prudential-supervision/areas-responsibility/credit-institutions/lists,National Bank of Belgium (NBB),,
+XX-AT,banks,Erste Bank der oesterreichischen Sparkassen AG,https://www.erstebank.at,FMA Austria - Company Database,https://www.fma.gv.at/en/search-company-database/,Finanzmarktaufsicht (FMA),,
+XX-AT,banks,UniCredit Bank Austria AG,https://www.bankaustria.at,FMA Austria - Company Database,https://www.fma.gv.at/en/search-company-database/,Finanzmarktaufsicht (FMA),,
+XX-AT,banks,BAWAG P.S.K.,https://www.bawag.at,FMA Austria - Company Database,https://www.fma.gv.at/en/search-company-database/,Finanzmarktaufsicht (FMA),,
+XX-AT,banks,Raiffeisenlandesbank Niederösterreich-Wien AG,https://www.raiffeisenbank.at,FMA Austria - Company Database,https://www.fma.gv.at/en/search-company-database/,Finanzmarktaufsicht (FMA),,
+XX-DK,banks,Danske Bank A/S,https://danskebank.dk,Finanstilsynet (Danish FSA) Company Register,https://virksomhedsregister.finanstilsynet.dk/index-en.html,Finanstilsynet,25712,
+XX-DK,banks,Nykredit Bank A/S,https://www.nykredit.dk,Finanstilsynet (Danish FSA) Company Register,https://virksomhedsregister.finanstilsynet.dk/index-en.html,Finanstilsynet,36000,
+XX-DK,banks,"Nordea Danmark, Filial af Nordea Bank Abp",https://www.nordea.dk,Finanstilsynet (Danish FSA) Company Register,https://virksomhedsregister.finanstilsynet.dk/index-en.html,Finanstilsynet,2222,
+XX-BE,schools,International School of Brussels,https://www.isb.be,International Baccalaureate - Find an IB World School,https://www.ibo.org/en/school/000050,International Baccalaureate Organization (IBO),000050,
+XX-BE,schools,BEPS International School,https://www.beps.com,International Baccalaureate - Find an IB World School,https://www.ibo.org/en/school/001928,International Baccalaureate Organization (IBO),001928,
+XX-BE,schools,The British School of Brussels,https://www.britishschool.be,International Baccalaureate - Find an IB World School,https://www.ibo.org/en/school/002144,International Baccalaureate Organization (IBO),002144,
+XX-AT,schools,Vienna International School,https://www.vis.ac.at,International Baccalaureate - Find an IB World School,https://www.ibo.org/en/school/000114,International Baccalaureate Organization (IBO),000114,
+XX-AT,schools,The American International School Vienna,https://www.ais.at,International Baccalaureate - Find an IB World School,https://www.ibo.org/en/school/000072,International Baccalaureate Organization (IBO),000072,
+XX-AT,schools,AMADEUS International School Vienna,https://amadeus-vienna.com,International Baccalaureate - Find an IB World School,https://www.ibo.org/en/school/049897,International Baccalaureate Organization (IBO),049897,
+XX-DK,schools,Copenhagen International School,https://www.cis.dk,International Baccalaureate - Find an IB World School,https://www.ibo.org/en/school/000004,International Baccalaureate Organization (IBO),000004,
+XX-DK,schools,International School of Hellerup,https://www.ish.dk,International Baccalaureate - Find an IB World School,https://www.ibo.org/en/school/007078,International Baccalaureate Organization (IBO),007078,
+XX-DK,schools,Nørre Gymnasium,https://norreg.dk,International Baccalaureate - Find an IB World School,https://www.ibo.org/en/school/000598,International Baccalaureate Organization (IBO),000598,
+XX-AT,housing_agencies,ADEMUS Immobilien KG,http://www.ademus.at,WKO Firmen A-Z (Immobilienmakler register),https://firmen.wko.at/,Wirtschaftskammer Österreich (WKO),,
+XX-AT,housing_agencies,"""AKTUELL"" Immobilien GmbH",http://www.aktuell-imm.at,WKO Firmen A-Z (Immobilienmakler register),https://firmen.wko.at/,Wirtschaftskammer Österreich (WKO),,
+XX-AT,housing_agencies,ANOBIS Immobilien GmbH,http://www.anobis.at,WKO Firmen A-Z (Immobilienmakler register),https://firmen.wko.at/,Wirtschaftskammer Österreich (WKO),,
+XX-AT,housing_agencies,be real Immobilienmakler GmbH,https://www.bereal-makler.at,WKO Firmen A-Z (Immobilienmakler register),https://firmen.wko.at/,Wirtschaftskammer Österreich (WKO),,
+XX-BE,housing_agencies,Omnium Real Estate Services SA,,BIV/IPI - Register of recognised real estate agents,https://www.biv.be/vastgoedmakelaars,BIV/IPI,500054,
+XX-BE,housing_agencies,So Estates,,BIV/IPI - Register of recognised real estate agents,https://www.biv.be/vastgoedmakelaars,BIV/IPI,504451,
+XX-BE,housing_agencies,Dewaele Brussel Tour & Taxy,,BIV/IPI - Register of recognised real estate agents,https://www.biv.be/vastgoedmakelaars,BIV/IPI,519775,
+XX-BE,housing_agencies,BO-IMMO,,BIV/IPI - Register of recognised real estate agents,https://www.biv.be/vastgoedmakelaars,BIV/IPI,510796,
+XX-DK,housing_agencies,"home Østerbro Bengtson, Frydendall & Berg A/S",https://www.home.dk,Dansk Ejendomsmæglerforening (MDE) - Find medlem,https://www.de.dk/boligkob-salg/find-medlem,Dansk Ejendomsmæglerforening (MDE),,
+XX-DK,housing_agencies,"EDC Poul Erik Bech, Østerbro og Nordhavn",https://www.edc.dk,Dansk Ejendomsmæglerforening (MDE) - Find medlem,https://www.de.dk/boligkob-salg/find-medlem,Dansk Ejendomsmæglerforening (MDE),,
+XX-DK,housing_agencies,danbolig Østerbro & Nordhavn,https://www.danbolig.dk,Dansk Ejendomsmæglerforening (MDE) - Find medlem,https://www.de.dk/boligkob-salg/find-medlem,Dansk Ejendomsmæglerforening (MDE),,
+XX-DK,housing_agencies,Nybolig Østerbro & Nordhavn,https://www.nybolig.dk,Dansk Ejendomsmæglerforening (MDE) - Find medlem,https://www.de.dk/boligkob-salg/find-medlem,Dansk Ejendomsmæglerforening (MDE),,
+XX-DK,legal_admin,Jacobsen Poblador Law Firm I/S,,Advokatsamfundet - Advokatnøglen,https://www.advokatnoeglen.dk/,Advokatsamfundet (Danish Bar and Law Society),,
+XX-DK,legal_admin,Rosenberg Khawaja Law Firm,,Advokatsamfundet - Advokatnøglen,https://www.advokatnoeglen.dk/,Advokatsamfundet (Danish Bar and Law Society),,
+XX-DK,legal_admin,Holm Thomsen Law Advokatanpartsselskab,,Advokatsamfundet - Advokatnøglen,https://www.advokatnoeglen.dk/,Advokatsamfundet (Danish Bar and Law Society),,
+XX-DK,legal_admin,Advokatfirmaet Maria Dommer Nielsen,,Advokatsamfundet - Advokatnøglen,https://www.advokatnoeglen.dk/,Advokatsamfundet (Danish Bar and Law Society),,
+XX-DK,tax_finance,Deloitte Statsautoriseret Revisionspartnerselskab,https://www.deloitte.dk,FSR - danske revisorer (Find revisor),https://www.fsr.dk/vaerktoejer/find-revisor,FSR - danske revisorer,,
+XX-DK,tax_finance,"Grant Thornton, Godkendt Revisionspartnerselskab",https://www.grantthornton.dk,FSR - danske revisorer (Find revisor),https://www.fsr.dk/vaerktoejer/find-revisor,FSR - danske revisorer,,
+XX-DK,tax_finance,Christensen Kjærulff Statsautoriseret Revisionsaktieselskab,https://www.ck.dk,FSR - danske revisorer (Find revisor),https://www.fsr.dk/vaerktoejer/find-revisor,FSR - danske revisorer,,
+XX-DK,tax_finance,Kreston CM Statsautoriseret Revisionsinteressentskab,https://www.krestoncm.dk,FSR - danske revisorer (Find revisor),https://www.fsr.dk/vaerktoejer/find-revisor,FSR - danske revisorer,,

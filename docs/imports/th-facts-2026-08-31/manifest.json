@@ -1,0 +1,18 @@
+{
+  "batch_id": "th-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "TH",
+  "origin_country_code": null,
+  "destination_country_code": "TH",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "THAILAND",
+  "record_count": 12,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "408ec373449560206caf6357b064ffb592740f20b52dc111cd173dd691c35c1a",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "referee_note": "Sources all go.th: HTML (mfa.go.th, rd.go.th, smart-visa.boi.go.th \u2014 applier curl-confirmed 6/7) + official PDFs (royalthaipolice.go.th English Immigration Act B.E.2522, sso.go.th Social Security Act \u2014 subagent machine-confirmed verbatim; immigration.go.th/doe.go.th were Cloudflare-CAPTCHA-gated so the Immigration-Bureau facts were sourced from the parent-agency Act PDF). Imported --no-fetch (heavy PDFs time out verify_ledger's fetcher). 2024 remitted-foreign-income tightening noted as guidance, not a quoted number."
+}

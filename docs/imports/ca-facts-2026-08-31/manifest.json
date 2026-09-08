@@ -1,0 +1,20 @@
+{
+  "batch_id": "ca-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded canada.ca/ontario.ca via research subagent; verify_ledger referee)",
+  "corridor": "CA",
+  "origin_country_code": null,
+  "destination_country_code": "CA",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "CANADA",
+  "record_count": 16,
+  "non_obvious_count": 15,
+  "needs_lawyer_review_count": 1,
+  "artifact": "facts.ndjson",
+  "sha256": "2ce0663c6d87e2249cd88f94feb2898e731a8362b64180ad0a5892664a706c70",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "scope": "Canada as a destination (coverage-master rank 5, Toronto hub), greenfield. 12 federal facts (canada.ca — IRCC work permits/LMIA/IMP/GTS, Express Entry, SIN, CRA tax residency/filing) + 4 provincial (ontario.ca — OHIP, Ontario driving-licence exchange). Every fact non-EEA/THIRD_COUNTRY (Canada is non-EEA). verify_ledger confirmed 16/16 quotes verbatim on live pages. Promoted topic-grained (country='CA' scoped, with the 8 CA-immig-2026-08-12 'ready' rows parked+restored) into 10 requirement_items at CANADA, all review_status=pending / verification_status=representative. Corrections the research caught: OHIP 3-month wait no longer exists; Global Talent Stream is LMIA-required not exempt. 1 needs_lawyer_review (day-one tax-residency determination).",
+  "load_task": null
+}

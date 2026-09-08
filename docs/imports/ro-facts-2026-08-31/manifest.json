@@ -1,0 +1,19 @@
+{
+  "batch_id": "ro-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "RO",
+  "origin_country_code": null,
+  "destination_country_code": "RO",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "ROMANIA",
+  "record_count": 10,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "439d833b48632bc7b4a476a6bed48256346ab69246cc650adbf3ce7ea8440a7f",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "held_count": 2,
+  "referee_note": "12 researched; 10 promoted (igi.mai.gov.ro 9/9 + euraxess.gov.ro 1/1, applier-confirmed). 2 ANAF tax facts HELD: the static.anaf.ro Fiscal-Residence Guidelines PDF is image/scanned (%PDF, 0 extractable chars) so the quotes cannot be reproduced \u2014 re-source via OCR. 2026 caveat (README): OUG 32/2026 moves employer filings to WorkinRomania.gov.ro; the quoted mechanisms are stable but re-check the channel/fees."
+}

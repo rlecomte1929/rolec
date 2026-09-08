@@ -1,0 +1,19 @@
+{
+  "batch_id": "br-facts-2026-08-31",
+  "generated_at": "2026-08-31",
+  "generated_by": "claude-code (browser-grounded official-gov via research subagent; verify_ledger referee; pillar remap IMMIGRATION/FAMILY->RESIDENCE)",
+  "corridor": "BR",
+  "origin_country_code": null,
+  "destination_country_code": "BR",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "target_country_code": "BRAZIL",
+  "record_count": 9,
+  "needs_lawyer_review_count": 0,
+  "artifact": "facts.ndjson",
+  "sha256": "32357a99d1ed4fec19db7fa97318eb62265b5dfd486dac1bb273e0bae3507638",
+  "review_status_all": "pending",
+  "verification_status_all": "corpus_grounded",
+  "held_count": 1,
+  "referee_note": "10 facts researched (facts.ndjson); 9 promoted. verify_ledger confirmed 8 live; the applier independently curl-confirmed 9/10 (all gov.br) \u2014 residence_authorization_processing was a verify_ledger false-negative (curl-HIT, included). cpf_tax_number is HELD (worklist): its servicos.receita.fazenda.gov.br page is CAPTCHA/JS-gated, not independently reproducible. Sources all official gov.br (MJSP MigranteWeb, Portal Gov.br PF service page, Receita Federal, INSS). No HEALTHCARE fact (none verbatim-sourced in scope)."
+}
