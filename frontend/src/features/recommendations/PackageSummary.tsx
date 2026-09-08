@@ -679,9 +679,15 @@ export const PackageSummary: React.FC<Props> = ({
 
               <div className="pt-6 border-t border-[#e2e8f0] space-y-2">
                 <div className="flex justify-between font-semibold text-[#0b2b43]">
-                  <span>Total package cost</span>
+                  <span>Indicative package total</span>
                   <span>{fmt(totalPackage)}</span>
                 </div>
+                <p className="text-xs text-[#64748b] leading-relaxed">
+                  This is not a quote and not a policy budget. It adds the cheapest shortlisted
+                  catalogue estimate per service (monthly rent, annual school fees, and a one-off
+                  move) using ReloPass ranking brackets — not a city benchmark and not a supplier
+                  offer. Employer caps above come from the published HR policy when a numeric cap exists.
+                </p>
                 <div className="flex justify-between text-[#22c55e]">
                   <span>Company covered</span>
                   <span>{fmt(totalCovered)}</span>

@@ -1,0 +1,124 @@
+{
+  "generated_at": "2026-08-13",
+  "source": "ReloPass Supabase project nsvefcvpvwwwhuqyuqmp, verified live",
+  "current_state": {
+    "requirement_entities": 917,
+    "requirement_facts": 2676,
+    "destination_countries": 37,
+    "vendor_candidates": 534,
+    "service_catalog_items_live": 985,
+    "provider_cities_live": 21,
+    "pet_import_rules": 66,
+    "staged_resource_candidates": 33,
+    "facts_missing_source_url": 0,
+    "facts_missing_evidence_quote": 182
+  },
+  "delivery_contract": {
+    "write_to": "GCS via store_attachment — never inline",
+    "manifest_key": "manifest_rows",
+    "manifest_row_fields": ["target_table", "unit", "record_count", "gcs_url"],
+    "report_format": "bare plain-text URL, one per line, no markdown, no truncation",
+    "required_on_every_fact": ["fact_text", "evidence_quote", "source_url"],
+    "entity_country_field": "destination_country",
+    "fact_country_field": "destination_country",
+    "forbidden_field_aliases": ["country", "destination_iso2", "fact_value", "body", "requirement", "text"]
+  },
+  "batches": [
+    {
+      "batch": "A",
+      "title": "Vehicle import facts",
+      "target_tables": ["requirement_entities", "requirement_facts"],
+      "domain_area": "vehicle_import",
+      "task_count": 18,
+      "reason": "topics loaded, zero facts against them",
+      "units": [
+        {"unit": "NO-vehicle_import", "orphan_entities": 9},
+        {"unit": "PT-vehicle_import", "orphan_entities": 9},
+        {"unit": "AT-vehicle_import", "orphan_entities": 9},
+        {"unit": "CZ-vehicle_import", "orphan_entities": 9},
+        {"unit": "PL-vehicle_import", "orphan_entities": 9},
+        {"unit": "IN-vehicle_import", "orphan_entities": 8},
+        {"unit": "IE-vehicle_import", "orphan_entities": 8},
+        {"unit": "JP-vehicle_import", "orphan_entities": 8},
+        {"unit": "IT-vehicle_import", "orphan_entities": 8},
+        {"unit": "SE-vehicle_import", "orphan_entities": 8},
+        {"unit": "BR-vehicle_import", "orphan_entities": 8},
+        {"unit": "HK-vehicle_import", "orphan_entities": 8},
+        {"unit": "AE-vehicle_import", "orphan_entities": 8},
+        {"unit": "IL-vehicle_import", "orphan_entities": 8},
+        {"unit": "DK-vehicle_import", "orphan_entities": 8},
+        {"unit": "KR-vehicle_import", "orphan_entities": 8},
+        {"unit": "ZA-vehicle_import", "orphan_entities": 8},
+        {"unit": "BE-vehicle_import", "orphan_entities": 8}
+      ]
+    },
+    {
+      "batch": "B",
+      "title": "Immigration top-up to >=40 facts",
+      "target_tables": ["requirement_entities", "requirement_facts"],
+      "domain_area": "immigration",
+      "task_count": 16,
+      "units": [
+        {"unit": "UA-immigration", "facts_today": 9, "tier": "critical"},
+        {"unit": "RU-immigration", "facts_today": 9, "tier": "critical"},
+        {"unit": "BR-immigration", "facts_today": 9, "tier": "critical"},
+        {"unit": "KR-immigration", "facts_today": 10, "tier": "critical"},
+        {"unit": "ZA-immigration", "facts_today": 10, "tier": "critical"},
+        {"unit": "IL-immigration", "facts_today": 10, "tier": "critical"},
+        {"unit": "HK-immigration", "facts_today": 11, "tier": "critical"},
+        {"unit": "CZ-immigration", "facts_today": 11, "tier": "critical"},
+        {"unit": "IN-immigration", "facts_today": 11, "tier": "critical"},
+        {"unit": "QA-immigration", "facts_today": 19, "tier": "thin"},
+        {"unit": "PL-immigration", "facts_today": 19, "tier": "thin"},
+        {"unit": "IT-immigration", "facts_today": 30, "tier": "thin"},
+        {"unit": "SA-immigration", "facts_today": 30, "tier": "thin"},
+        {"unit": "TH-immigration", "facts_today": 30, "tier": "thin"},
+        {"unit": "LU-immigration", "facts_today": 32, "tier": "thin"},
+        {"unit": "FI-immigration", "facts_today": 33, "tier": "thin"}
+      ],
+      "reference_depth": {"NO": 377, "DE": 205, "FR": 169, "US": 163, "CH": 134, "IE": 130}
+    },
+    {
+      "batch": "C",
+      "title": "Provider cities",
+      "target_tables": ["vendor_candidates"],
+      "task_count": 8,
+      "units": [
+        {"unit": "providers-Frankfurt-DE", "rows_today": 0, "categories_today": 0},
+        {"unit": "providers-Milan-IT", "rows_today": 0, "categories_today": 0},
+        {"unit": "providers-Amsterdam-NL", "rows_today": 0, "categories_today": 0},
+        {"unit": "providers-Dublin-IE", "rows_today": 0, "categories_today": 0},
+        {"unit": "providers-London-GB", "rows_today": 0, "categories_today": 0},
+        {"unit": "providers-Dubai-AE", "rows_today": 5, "categories_today": 1},
+        {"unit": "providers-Munich-DE", "rows_today": 8, "categories_today": 2},
+        {"unit": "providers-Oslo-NO", "rows_today": 12, "categories_today": 5}
+      ],
+      "reference_depth_per_city": "32-66 rows across 7-10 categories",
+      "categories": ["housing_agencies", "movers", "schools", "legal_admin", "tax_finance", "banks", "medical", "telecom", "insurance", "storage", "language_cultural", "rmc", "dsp"]
+    },
+    {
+      "batch": "D",
+      "title": "Repair statement-less facts from wave 3a",
+      "target_tables": ["requirement_facts"],
+      "task_count": 1,
+      "records_affected": 133,
+      "defect": "records carry source_quote, source_url, fact_key, confidence_score but no fact_text in any field",
+      "instruction": "write the missing fact_text from the quote and source already held; do not re-research; drop and list any record whose quote does not support a statable fact"
+    },
+    {
+      "batch": "E",
+      "title": "Reference content",
+      "target_tables": ["staged_resource_candidates"],
+      "task_count": 2,
+      "units": [
+        {"unit": "guides-neighbourhoods-col", "cities": ["Frankfurt", "Milan", "Amsterdam", "Dublin", "London"]},
+        {"unit": "guides-first30days", "countries": ["DE", "NO", "FR", "US", "IE"]}
+      ],
+      "reason": "staged_resource_candidates holds 33 rows total, 22 of them German and from June"
+    }
+  ],
+  "already_requested_separately": {
+    "note": "re-emit requests already posted in the ES, GB and IT immigration routine meetings — do not duplicate here",
+    "units": ["ES-immigration-reemit", "GB-immigration-reemit", "IT-immigration-reemit"]
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "aggregate": 0.348,
+  "by_corridor": {
+    "BR->PT": 0.3,
+    "FR->NO": 0.36,
+    "IN->DE": 0.34,
+    "UK->DE": 0.36,
+    "US->FR": 0.38
+  },
+  "by_difficulty": {
+    "easy": 0.3778,
+    "hard": 0.2286,
+    "medium": 0.4111
+  },
+  "by_intent": {
+    "document_requirements": 0.48,
+    "edge_case": 0.22,
+    "eligibility": 0.2182,
+    "fact_lookup": 0.32,
+    "process_steps": 0.5333
+  },
+  "extra": {
+    "k": 5,
+    "retriever": "ImmigrationRetrieverAdapter"
+  },
+  "lowest_queries": [
+    {
+      "corridor": "FR->NO",
+      "intent": "edge_case",
+      "query_id": "Q-FRNO-004",
+      "retrieved_ids": [
+        "fr_no_overview",
+        "fr_no_corridor.post_arrival.address_registration_folkeregisteret",
+        "fr_no_corridor.eea_registration.proof_of_accommodation",
+        "fr_no_corridor.pathway.eea_free_movement",
+        "fr_no_corridor.post_arrival.register_with_police"
+      ],
+      "value": 0.0
+    },
+    {
+      "corridor": "IN->DE",
+      "intent": "fact_lookup",
+      "query_id": "Q-INDE-006",
+      "retrieved_ids": [
+        "in_de_pathway_skilled_worker",
+        "in_de_pathway_blue_card",
+        "in_de_residence_title_pickup",
+        "in_de_overview",
+        "in_de_bank_account"
+      ],
+      "value": 0.0
+    },
+    {
+      "corridor": "BR->PT",
+      "intent": "eligibility",
+      "query_id": "Q-BRPT-001",
+      "retrieved_ids": [
+        "br_pt_overview",
+        "br_pt_proof_of_accommodation",
+        "br_pt_passport",
+        "br_pt_pathway_d7_visa",
+        "br_pt_pathway_d2_visa"
+      ],
+      "value": 0.0
+    },
+    {
+      "corridor": "BR->PT",
+      "intent": "edge_case",
+      "query_id": "Q-BRPT-010",
+      "retrieved_ids": [
+        "br_pt_passport",
+        "br_pt_overview",
+        "br_pt_nif_registration",
+        "br_pt_corridor.pathway.long_stay_visa.processing",
+        "br_pt_civil_status"
+      ],
+      "value": 0.0
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "eligibility",
+      "query_id": "Q-FRNO-003",
+      "retrieved_ids": [
+        "fr_no_overview",
+        "fr_no_corridor.eea_registration.proof_of_employment",
+        "fr_no_corridor.eea_registration.passport",
+        "fr_no_corridor.eea_registration.employment_contract",
+        "fr_no_corridor.pathway.eea_free_movement"
+      ],
+      "value": 0.2
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "fact_lookup",
+      "query_id": "Q-FRNO-005",
+      "retrieved_ids": [
+        "fr_no_corridor.post_arrival.register_with_police",
+        "fr_no_corridor.post_arrival.address_registration_folkeregisteret",
+        "fr_no_corridor.post_arrival.d_number_application",
+        "fr_no_corridor.post_arrival.spouse_registration",
+        "fr_no_corridor.post_arrival.tax_card_skattekort"
+      ],
+      "value": 0.2
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "eligibility",
+      "query_id": "Q-FRNO-008",
+      "retrieved_ids": [
+        "fr_no_corridor.eea_registration.proof_of_employment",
+        "fr_no_corridor.post_arrival.register_with_police",
+        "fr_no_pathway_eu_free_movement",
+        "fr_no_corridor.eea_registration.employment_contract",
+        "fr_no_corridor.eea_registration.jobseeker_period"
+      ],
+      "value": 0.2
+    },
+    {
+      "corridor": "FR->NO",
+      "intent": "edge_case",
+      "query_id": "Q-FRNO-010",
+      "retrieved_ids": [
+        "fr_no_corridor.eea_registration.qualification_recognition",
+        "fr_no_overview",
+        "fr_no_corridor.eea_registration.proof_of_accommodation",
+        "fr_no_corridor.pathway.eea_free_movement",
+        "fr_no_corridor.post_arrival.d_number_application"
+      ],
+      "value": 0.2
+    },
+    {
+      "corridor": "US->FR",
+      "intent": "eligibility",
+      "query_id": "Q-USFR-003",
+      "retrieved_ids": [
+        "us_fr_pathway_passeport_talent",
+        "us_fr_pt_form_15614",
+        "us_fr_pathway_long_stay_visa",
+        "us_fr_overview",
+        "us_fr_pt_employment_contract"
+      ],
+      "value": 0.2
+    },
+    {
+      "corridor": "US->FR",
+      "intent": "fact_lookup",
+      "query_id": "Q-USFR-007",
+      "retrieved_ids": [
+        "us_fr_pathway_long_stay_visa",
+        "us_fr_lsv_passport",
+        "us_fr_lsv_proof_of_accommodation",
+        "us_fr_residence_card_renewal",
+        "us_fr_lsv_financial_means"
+      ],
+      "value": 0.2
+    }
+  ],
+  "metric": "precision_at_k",
+  "passes_threshold": false,
+  "queries_evaluated": 50,
+  "threshold": 0.85
+}

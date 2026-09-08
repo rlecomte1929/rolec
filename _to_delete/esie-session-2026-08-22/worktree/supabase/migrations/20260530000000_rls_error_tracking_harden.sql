@@ -1,0 +1,10 @@
+-- SUPERSEDED by 20260601130000_fix_rls_error_harden_uuid_cast.sql (#212)
+-- and 20260604200000_rls_error_tracking_replay_safe.sql (this PR).
+--
+-- Original content had `profiles.id = auth.uid()::text` predicate which
+-- fails on uuid columns (ERROR 42883). Prod was protected because the
+-- transaction rolled back on apply; the fix-forward landed via #212.
+--
+-- This file is intentionally a no-op so fresh `supabase db reset` walks
+-- past this timestamp cleanly. The canonical correct policies are recreated
+-- by the replay-safe migration at 20260604200000. See audit/194-replay-landmine-2026-06-02.md.

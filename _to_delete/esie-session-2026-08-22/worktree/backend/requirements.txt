@@ -1,0 +1,105 @@
+fastapi==0.115.6
+python-dotenv==1.0.0
+uvicorn==0.32.1
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+sqlalchemy==2.0.23
+alembic==1.13.2
+psycopg2-binary==2.9.9
+openai==1.51.2
+# passlib is pinned at latest (1.7.4, Oct 2020). No newer release exists.
+# Used only for PBKDF2 password hashing/verification (no known CVEs).
+# Migrating to argon2-cffi with a PBKDF2 compat shim is tracked separately.
+passlib==1.7.4
+python-dateutil==2.8.2
+dateparser==1.2.0  # C1-06: locale-aware date parsing for relopass.normalize.dates
+PyYAML>=6.0
+supabase==2.5.1
+# Pin supabase's transitive deps to the exact versions its 2.5.1 resolves to.
+# Left unpinned, pip backtracks for a long time resolving `realtime`/`websockets`
+# (the resolver logs "still looking at multiple versions of realtime … this is
+# taking longer than usual"), which bloats build time and trips Render deploy
+# timeouts. These pins remove that search space and keep builds fast + reproducible.
+gotrue==2.12.4
+postgrest==0.16.11
+realtime==1.0.6
+storage3==0.7.7
+supafunc==0.4.7
+websockets==12.0
+requests
+beautifulsoup4
+croniter>=1.4.0
+python-docx==1.1.0
+pdfplumber==0.11.4
+# N10/AIQ-850: OCR fallback for scanned/image-only PDFs. Requires the system
+# binaries `tesseract-ocr` (+ `tesseract-ocr-nor` language pack) and `poppler-utils`
+# in the runtime image; the fallback fails soft if they're absent.
+pytesseract==0.3.13
+pdf2image==1.17.0
+tiktoken>=0.7.0
+pytest>=8.0
+pytest-asyncio>=0.23  # QG-2: collect/run async tests (asyncio_mode=auto in pytest.ini)
+reportlab>=4.0
+pypdf>=4.0
+slowapi==0.1.9
+sentry-sdk[fastapi]==2.17.0
+python-json-logger==2.0.7
+anthropic==0.39.0
+# [P5-8] AI observability — LangSmith trace forwarding (optional; no-op when LANGSMITH_API_KEY unset)
+langsmith>=0.1.147
+# [AIQ-571] AI observability — Langfuse EU Cloud, the committed eval/trace substrate
+# (supersedes LangSmith/Weave per audit/AI_AGENT_STRATEGY.md §5). No-op when LANGFUSE_* unset.
+# v4 SDK: get_client() / @observe / update_current_generation() (see llm_tracing.py, app/observability.py).
+langfuse>=4
+PyJWT>=2.10.1,<3.0.0
+email-validator>=2.0.0
+# [Parker-A] Survival analysis for case-duration prediction. lifelines is pinned
+# exactly so the pickled CoxPHFitter blob stays loadable across the local (3.9)
+# and Render production (3.11) runtimes — pickle is version-sensitive.
+lifelines==0.27.8
+# [Parker-A] + [Parker-C] shared ML stack — KMeans/silhouette cluster tiering
+# (recommendations.tiering) and survival features both lazily import sklearn/scipy;
+# pinned once (deduped at cherry-pick time; pre-empts Parker integration commit e32cc3e3).
+scikit-learn>=1.3
+scipy>=1.11
+pandas>=2.0
+# [Parker-B] Benefit-mix optimizer. PuLP bundles the CBC MILP backend (one small
+# native binary) — far lighter at container build time than cvxpy's scs/osqp/ecos
+# chain, and the benefit-selection problem is a small mixed-integer program CBC
+# solves trivially. Imported lazily in benefit_optimizer so the rest of the
+# backend never requires it.
+pulp>=2.7,<4
+# [Parker-C] Cluster-relative supplier tiering. KMeans + silhouette pick K per
+# (category, country) cell; imported lazily in recommendations.tiering so importing
+# the recommendations package never requires the ML stack. Tests importorskip sklearn.
+# (scikit-learn>=1.3 + scipy>=1.11 already declared by Parker-A above — deduped at
+# integration; identical pins, no contradiction.)
+# [Parker-H] Conjoint analysis numerical stack. statsmodels transitively pins
+# numpy/scipy/pandas; the conditional-logit fit itself uses scipy.optimize
+# (lazy-imported in conjoint_service so the module imports without these).
+statsmodels>=0.14
+# [Parker-I] Neural translation layer — DeepL Pro adapter (lazy-imported; NLLB-200 is
+# reached over HTTP via `requests`, no heavy local-inference dep). See ADR-002.
+deepl>=1.18
+# SEC-006 (AIQ-478): server-side upload validation.
+# python-magic does content-based MIME detection (needs the system libmagic
+# library - Render python 3.11-slim ships it via apt; see backend/README.md).
+# Werkzeug is pulled in ONLY for secure_filename (filename sanitisation).
+python-magic==0.4.27
+Werkzeug==3.0.4
+# [AI-I.3] Microsoft Presidio — custom GDPR PII recognizers (IBAN, passports,
+# national IDs, multilingual names) for the cross-border mobility flows. Pulls
+# spaCy transitively. Lazy-imported: every module under
+# backend/app/services/pii/presidio_recognizers/ imports without presidio, and
+# the registry factory imports it only when called, so the backend boots and
+# tests run without it (tests importorskip presidio_analyzer). NOTE: no spaCy
+# language MODEL is provisioned yet — the pattern recognizers (IBAN etc.) don't
+# need one; the NLP-based multilingual-name recognizer (AI-I.3e) + masker wiring
+# (AI-I.3f) own adding the model download.
+presidio-analyzer>=2.2,<3
+posthog>=3.0.0
+# Stripe SDK — used ONLY for webhook signature verification (Webhook.construct_event,
+# timing-safe HMAC + timestamp tolerance) in backend/app/routers/stripe_webhook.py.
+# Checkout-session creation deliberately uses plain `requests`, not this SDK.
+stripe>=9,<12

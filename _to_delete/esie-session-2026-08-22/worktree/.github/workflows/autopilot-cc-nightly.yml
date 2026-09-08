@@ -1,0 +1,65 @@
+# autopilot-cc-nightly.yml — Feedback Autopilot Phase 3 (Claude Code agent lane)
+# ─────────────────────────────────────────────────────────────────────────────
+# Nightly: picks the top Ready-for-AI task eligible for the Claude Code agent lane
+# (🟢/🟡 tier, Medium/High complexity — the slice the headless Haiku pipeline can't do)
+# and dispatches it to agent-dispatch.yml, which runs claude-code-action → /relopass-dev-queue
+# → pushes an autofix/** branch → re-enters the autofix-validate canary/merge gate.
+#
+# INERT until BOTH: repo var AGENT_DISPATCH_ENABLED == 'true' AND secret ANTHROPIC_API_KEY set.
+# See docs/autopilot/cc-lane-activation.md before enabling.
+# ─────────────────────────────────────────────────────────────────────────────
+name: Autopilot CC Nightly
+
+on:
+  schedule:
+    - cron: "0 21 * * *"   # after the 20:00 ingest
+  workflow_dispatch:
+    inputs:
+      max_tasks:
+        description: "Max tasks to dispatch this run"
+        type: string
+        default: "1"
+
+concurrency:
+  group: autopilot-cc-nightly
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Select + dispatch CC tasks
+    if: vars.AGENT_DISPATCH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Select + dispatch eligible tasks
+        env:
+          NOTION_QUEUE_TOKEN: ${{ secrets.NOTION_QUEUE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MAX_TASKS: ${{ (github.event_name == 'workflow_dispatch' && inputs.max_tasks) || vars.AUTOPILOT_MAX_CC_TASKS_PER_NIGHT || '1' }}
+        run: |
+          set -uo pipefail
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "ANTHROPIC_API_KEY not set — CC lane inert. Exiting cleanly."
+            exit 0
+          fi
+          cap="${MAX_TASKS:-1}"
+          prev=""
+          for _ in $(seq 1 "$cap"); do
+            task=$(python scripts/notion_ready_queue.py --cc-next 2>/dev/null || echo '{}')
+            aiq=$(echo "$task" | python3 -c "import sys,json;print(json.load(sys.stdin).get('aiq',''))" 2>/dev/null || echo "")
+            page=$(echo "$task" | python3 -c "import sys,json;print(json.load(sys.stdin).get('page_id',''))" 2>/dev/null || echo "")
+            if [ -z "$aiq" ]; then echo "No eligible CC task remaining — done."; break; fi
+            # The selector re-picks the same task until it leaves Ready-for-AI (dispatch is async),
+            # so stop on a repeat to avoid re-dispatching. Multi-per-night needs in-flight exclusion.
+            if [ "$aiq" = "$prev" ]; then echo "Same task returned ($aiq) — stopping to avoid re-dispatch."; break; fi
+            echo "Dispatching $aiq (page $page) to the Claude Code agent lane"
+            gh workflow run agent-dispatch.yml \
+              -f prompt="Run /relopass-dev-queue $aiq to progress this Work Queue task end-to-end." \
+              -f work_item_id="$page" || echo "dispatch failed for $aiq"
+            prev="$aiq"
+          done

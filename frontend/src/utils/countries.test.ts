@@ -24,4 +24,12 @@ describe('getCountryName', () => {
     expect(getCountryName(undefined)).toBe('');
     expect(getCountryName('  ')).toBe('');
   });
+
+  it('title-cases catalog keys and resolves Ecuador', () => {
+    expect(getCountryName('ECUADOR')).toBe('Ecuador');
+    expect(getCountryName('EC')).toBe('Ecuador');
+    expect(getCountryName('SINGAPORE')).toBe('Singapore');
+    expect(getCountryName('DE')).toBe('Germany');
+    expect(getCountryName('DK')).toBe('Denmark');
+  });
 });

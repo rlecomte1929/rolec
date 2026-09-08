@@ -1,0 +1,66 @@
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { AppShell } from '../components/AppShell';
+import { Card } from '../components/antigravity';
+import { getAuthItem } from '../utils/demo';
+
+const DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true';
+
+export const DebugAuth: React.FC = () => {
+  const [lastError] = useState(() => localStorage.getItem('debug_last_auth_error') || 'none');
+  if (!DEV_TOOLS) return null;
+  const token = getAuthItem('relopass_token');
+  const userId = getAuthItem('relopass_user_id');
+  const email = getAuthItem('relopass_email');
+  const username = getAuthItem('relopass_username');
+  const role = getAuthItem('relopass_role');
+
+  return (
+    <AppShell title="Auth Debug" subtitle="Dev-only diagnostics">
+      <Card padding="lg">
+        <div className="space-y-4 text-sm font-mono">
+          <div>
+            <span className="text-[#6b7280]">Session: </span>
+            <span className={token ? 'text-green-600' : 'text-red-600'}>
+              {token ? 'present' : 'none'}
+            </span>
+          </div>
+          <div>
+            <span className="text-[#6b7280]">Token (first 12 chars): </span>
+            <span>{token ? `${token.slice(0, 12)}...` : '-'}</span>
+          </div>
+          <div>
+            <span className="text-[#6b7280]">User ID: </span>
+            <span>{userId || '-'}</span>
+          </div>
+          <div>
+            <span className="text-[#6b7280]">Email: </span>
+            <span>{email || '-'}</span>
+          </div>
+          <div>
+            <span className="text-[#6b7280]">Username: </span>
+            <span>{username || '-'}</span>
+          </div>
+          <div>
+            <span className="text-[#6b7280]">Role: </span>
+            <span>{role || '-'}</span>
+          </div>
+          <div>
+            <span className="text-[#6b7280]">Storage: </span>
+            <span>localStorage (relopass_* keys)</span>
+          </div>
+          <div>
+            <span className="text-[#6b7280]">Last auth error: </span>
+            <span className="text-amber-600">{lastError}</span>
+          </div>
+        </div>
+      </Card>
+      <Link
+        to="/debug/assignment"
+        className="inline-block mt-4 text-sm text-[#0b2b43] hover:underline"
+      >
+        → Assignment Debug
+      </Link>
+    </AppShell>
+  );
+};

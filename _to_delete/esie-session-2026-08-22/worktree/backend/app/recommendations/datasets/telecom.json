@@ -1,0 +1,1 @@
+[{"item_id": "t-1", "name": "Singtel", "rating": 4.5, "rating_count": 500, "availability_level": "high", "confidence": 90}, {"item_id": "t-2", "name": "StarHub", "rating": 4.3, "rating_count": 400, "availability_level": "high", "confidence": 88}, {"item_id": "t-3", "name": "M1", "rating": 4.2, "rating_count": 350, "availability_level": "high", "confidence": 87}]

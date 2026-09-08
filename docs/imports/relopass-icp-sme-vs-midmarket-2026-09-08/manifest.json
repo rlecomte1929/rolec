@@ -1,0 +1,26 @@
+{
+  "artifact": "ReloPass ICP evidence set",
+  "research_question": "For an HR-led corporate cross-border relocation product in Europe, is the realistic first ICP 50-200 employee SMEs or 1,000-5,000 employee mid-market (German Mittelstand framing)?",
+  "generated_by": "Otto (ReloPass workspace)",
+  "generated_at_utc": "2026-09-07T23:41:00Z",
+  "ndjson": {
+    "filename": "relopass_icp_evidence.ndjson",
+    "url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788824530010_t44l1k2q.ndjson",
+    "content_type": "application/x-ndjson",
+    "byte_length": 12638,
+    "row_count": 13,
+    "sha256": "8bd6f4ecd3d17862ce76bb2eb3a349266fe8e2625ae37d10fb83a84da84859e9",
+    "sha256_algorithm": "SHA-256",
+    "row_schema": ["id","dimension","claim","segment","buyer","move_volume","who_owns_mobility","budget_owner","vendor_used_today","publisher","source_title","url","quote","retrieved"]
+  },
+  "sourcing_policy": "Named public sources only. No fabricated numbers. Every quote field is a verbatim excerpt from the cited URL retrieved 2026-09-07.",
+  "sources": [
+    {"publisher": "IfM Bonn (Institut fuer Mittelstandsforschung)", "url": "https://www.ifm-bonn.org/definitionen/mittelstandsdefinition-des-ifm-bonn", "used_for": "Mittelstand definition (owner-managed, not size-capped)"},
+    {"publisher": "European Union SME definition (Rec. 2003/361/EC) via UNESCWA", "url": "https://www.unescwa.org/sd-glossary/small-and-medium-sized-enterprises", "used_for": "EU medium/large employee + turnover thresholds"},
+    {"publisher": "Mercer Mobility Exchange (Juliane Gruethner)", "url": "https://mobilityexchange.mercer.com/insights/article/global-mobility-management-strategies-for-small-and-medium-sized-companies", "used_for": "SME mobility ownership, outsourcing, volume framing"},
+    {"publisher": "KPMG International", "url": "https://kpmg.com/xx/en/our-insights/workforce/global-mobility-benchmarking-report.html", "used_for": "Benchmark population (456 multinationals), spreadsheet/analytics gap"},
+    {"publisher": "Santa Fe Relocation (John Rason) via Relocate Magazine", "url": "https://www.relocatemagazine.com/the-evolving-role-of-global-mobility-john-rason-santa-fe-relocation-mcurphey-0525", "used_for": "Who owns mobility, budget/tech capacity, PE risk, team-to-assignee ratio"},
+    {"publisher": "Lucintel", "url": "https://www.lucintel.com/corporate-relocation-service-market.aspx", "used_for": "Incumbent RMC vendor landscape and market size"}
+  ],
+  "verification": "Recompute with: shasum -a 256 relopass_icp_evidence.ndjson  ->  8bd6f4ecd3d17862ce76bb2eb3a349266fe8e2625ae37d10fb83a84da84859e9"
+}

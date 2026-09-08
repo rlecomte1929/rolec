@@ -191,7 +191,7 @@ export const HrPolicy: React.FC = () => {
         {adminCompanyId && (
           <p className="text-sm text-[#6b7280] mb-4">
             Admin mode: viewing policy for company <code className="bg-[#f1f5f9] px-1 rounded">{adminCompanyId}</code>.{' '}
-            <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policy Workspace</Link>
+            <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policy workspace</Link>
           </p>
         )}
         {/* AIQ-1600: 'builder' tab now opens with "Start with a standard baseline"

@@ -1,0 +1,412 @@
+"""FastAPI router for recommendations API."""
+from __future__ import annotations
+
+import json
+import logging
+import time
+import uuid
+from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request
+
+from ..auth_deps import get_current_user, require_assignment_visibility, require_hr_or_employee
+from ...database import db as _db
+from .criteria_builder import _flatten_saved_answers, build_criteria_for_assignment
+from .engine import recommend, recommend_debug
+
+log = logging.getLogger(__name__)
+from .registry import get_plugin, list_categories
+from .types import RecommendationResponse
+
+router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
+
+
+def _log_slate(
+    category: str,
+    criteria: Dict[str, Any],
+    *,
+    case_id: Optional[str] = None,
+    assignment_id: Optional[str] = None,
+    company_id: Optional[str] = None,
+    request_id: Optional[str] = None,
+) -> None:
+    """[P2] Best-effort persist of the ranked candidate slate for training data.
+
+    Re-runs ``recommend_debug`` (admin/uncurated path) to capture the full ranked
+    item_ids + per-factor breakdown + scores + segment, then writes one
+    ``recommendation_slates`` row. Never raises — slate logging must never break a
+    recommendation request, mirroring the surrounding analytics emit blocks.
+    """
+    try:
+        dbg = recommend_debug(category, criteria)
+        ranked = dbg.get("ranked") or []
+        if not ranked:
+            return
+        _db.insert_recommendation_slate(
+            category=category,
+            criteria=criteria,
+            items=ranked,
+            segment=dbg.get("segment"),
+            case_id=case_id,
+            assignment_id=assignment_id,
+            company_id=company_id,
+            request_id=request_id,
+        )
+    except Exception:
+        pass
+
+
+class _BatchRequest:
+    def __init__(
+        self,
+        assignment_id: str,
+        selected_services: Optional[List[str]] = None,
+        shortlisted_area_ids: Optional[List[str]] = None,
+    ):
+        self.assignment_id = assignment_id
+        self.selected_services = selected_services or []
+        # Living-areas item_ids the employee has shortlisted (Δ1); used to boost the
+        # housing agencies serving those neighbourhoods (Δ2/Δ3).
+        self.shortlisted_area_ids = [str(a) for a in (shortlisted_area_ids or []) if a]
+
+
+@router.post("/batch")
+def post_recommendations_batch(
+    request: Request,
+    # AIQ-1856 follow-up: defaulted, NOT required. FastAPI still injects a real
+    # BackgroundTasks for an HTTP request, but `test_drive.provision-staged` calls this
+    # function DIRECTLY as Python; a required parameter made that a TypeError -> 500.
+    background_tasks: BackgroundTasks = None,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+    body: Dict[str, Any] = Body(...),
+):
+    """
+    Get recommendations for all selected services in one round-trip.
+    Uses canonical criteria builder (assignment, case, saved answers, policy).
+    """
+    # AIQ-1249b: accept case_id OR assignment_id (mirrors /api/services/answers).
+    # The gate id resolves through require_assignment_visibility (rejects
+    # cross-case access); the canonical assignment id is taken from the resolved
+    # assignment below so the criteria builder always sees a real assignment id.
+    gate_id = body.get("assignment_id") or body.get("case_id")
+    if not gate_id:
+        raise HTTPException(status_code=400, detail="case_id or assignment_id is required")
+    req = _BatchRequest(
+        assignment_id=str(gate_id),
+        selected_services=body.get("selected_services"),
+        shortlisted_area_ids=body.get("shortlisted_area_ids"),
+    )
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    start = time.perf_counter()
+
+    # A direct caller gets no FastAPI queue and nothing would ever drain one, so own it
+    # and run the tasks inline at the end — exactly what this code did before the slate
+    # writes moved off the response path. Never silently drop the telemetry.
+    _drain_inline = background_tasks is None
+    if _drain_inline:
+        background_tasks = BackgroundTasks()
+
+    # Avoid circular imports
+    from ...database import db
+    from ...policy_engine import PolicyEngine
+    from ..services.policy_adapter import normalize_policy_caps
+
+    from ..db import SessionLocal
+    from .. import crud as app_crud
+
+    assignment = require_assignment_visibility(req.assignment_id, user)
+    # Normalise to the canonical assignment id (req.assignment_id may have been a
+    # case_id); everything downstream — criteria builder, logs — keys on this.
+    req.assignment_id = str(assignment.get("id") or req.assignment_id)
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
+
+    selected_keys = req.selected_services
+    if not selected_keys:
+        services = db.list_case_services(assignment["id"])
+        selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
+    valid_svc = {"housing", "schools", "movers", "banks", "insurances", "electricity", "pets"}
+    selected_keys = [k for k in selected_keys if k in valid_svc]
+
+    if not selected_keys:
+        return {"results": {}, "message": "No selected services with recommendation support"}
+
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+    draft = {}
+    dest_city = dest_country = origin_city = origin_country = None
+    if case:
+        try:
+            draft = json.loads(case.draft_json or "{}")
+        except Exception:
+            draft = {}
+        dest_city = getattr(case, "dest_city", None)
+        dest_country = getattr(case, "dest_country", None)
+        origin_city = getattr(case, "origin_city", None)
+        origin_country = getattr(case, "origin_country", None)
+    basics = draft.get("relocationBasics") or {}
+    assignment_ctx = draft.get("assignmentContext") or {}
+    case_context = {
+        "destCity": basics.get("destCity") or dest_city,
+        "destCountry": basics.get("destCountry") or dest_country,
+        "originCity": basics.get("originCity") or origin_city,
+        "originCountry": origin_country or basics.get("originCountry"),
+        # Phase 0: single source of office address = the intake-captured value.
+        "officeAddress": assignment_ctx.get("workLocation"),
+    }
+    # Phase 3: gate the housing schools layer on the case having school-age kids.
+    from .schools_nearby import school_age_from_draft, attach_nearby_schools
+    has_school_age = school_age_from_draft(draft)
+
+    answer_rows = db.list_case_service_answers(case_id)
+    saved_answers = _flatten_saved_answers(answer_rows)
+
+    policy_context = None
+    try:
+        policy_engine = PolicyEngine()
+        policy = policy_engine.load_policy()
+        if policy:
+            policy_context = normalize_policy_caps(policy)
+    except Exception:
+        pass
+
+    company_id = assignment.get("company_id")
+    if not company_id and assignment.get("hr_user_id"):
+        # AIQ-1550: resolve the HR's company for curation. Try hr_users FIRST — it's the
+        # authoritative link and the only one that works for legacy text-id HR accounts.
+        # profiles.id is a uuid, so get_profile_record never matched a legacy hr_user_id,
+        # leaving company_id None and silently skipping HR curation entirely (movers/etc.
+        # showed the "HR is finalizing" empty state even though HR had curated). Fall back to
+        # the profile for UUID-native accounts whose company lives there.
+        company_id = db.get_hr_company_id(assignment["hr_user_id"])
+        if not company_id:
+            profile = db.get_profile_record(assignment["hr_user_id"])
+            company_id = profile.get("company_id") if profile else None
+    criteria_map = build_criteria_for_assignment(
+        assignment_id=req.assignment_id,
+        case_id=case_id,
+        selected_services=selected_keys,
+        saved_answers=saved_answers,
+        case_context=case_context,
+        policy_context=policy_context,
+        company_id=company_id,
+    )
+    # Δ3: re-rank the housing agencies by the neighbourhoods the employee shortlisted.
+    if req.shortlisted_area_ids and "housing_agencies" in criteria_map:
+        criteria_map["housing_agencies"]["shortlisted_area_ids"] = req.shortlisted_area_ids
+
+    def _run_one(backend_key: str, criteria: Dict[str, Any]) -> tuple[str, Any | None]:
+        dest_city_val = (criteria.get("destination_city") or "").strip()
+        # AIQ-1550: living_areas/schools are ranked purely on the destination and stay gated.
+        # movers is different: it's served from HR's company-scoped curation (a hard allowlist),
+        # so a case with no destination city yet must STILL surface HR's curated movers instead
+        # of silently showing the "HR is finalizing" empty state. Only skip movers on a blank
+        # destination when there's no company to curate against (nothing meaningful to show).
+        if not dest_city_val and (
+            backend_key in ("living_areas", "schools")
+            or (backend_key == "movers" and not company_id)
+        ):
+            log.warning(
+                "request_id=%s category=%s recommendations_batch skipped_missing_destination",
+                request_id, backend_key,
+            )
+            return (backend_key, None)
+        try:
+            resp = recommend(backend_key, criteria, top_n=10, company_id=company_id)
+            if backend_key == "living_areas" and has_school_age and resp is not None:
+                # AIQ-1456: a nearby-schools enrichment failure must NOT drop the whole
+                # housing result — guard it so the base `resp` survives. (This was a
+                # prime cause of "housing selected but only movers shown".)
+                try:
+                    attach_nearby_schools(resp, (case_context.get("destCity") or ""))
+                except Exception as e:
+                    log.warning(
+                        "request_id=%s category=%s attach_nearby_schools failed (kept base result) error=%s",
+                        request_id, backend_key, str(e),
+                    )
+            return (backend_key, resp)
+        except Exception as e:
+            log.warning(
+                "request_id=%s category=%s recommendations_batch failed error=%s",
+                request_id, backend_key, str(e),
+            )
+            return (backend_key, None)
+
+    results: Dict[str, Any] = {}
+    with ThreadPoolExecutor(max_workers=min(6, len(criteria_map) or 1)) as ex:
+        futures = {
+            ex.submit(_run_one, backend_key, criteria): backend_key
+            for backend_key, criteria in criteria_map.items()
+        }
+        for future in as_completed(futures):
+            key, rec_result = future.result()
+            # AIQ-1456: render a block for EVERY selected category. A failed/empty run
+            # yields an empty response (the UI shows its "no results / HR finalizing"
+            # placeholder) instead of silently vanishing — so the page always shows as
+            # many recommendation blocks as the employee picked.
+            results[key] = rec_result if rec_result is not None else RecommendationResponse(
+                category=key,
+                generated_at=datetime.now(timezone.utc).isoformat(),
+                criteria_echo={"status": "unavailable"},
+                recommendations=[],
+            )
+
+    dur_ms = (time.perf_counter() - start) * 1000
+    log.info(
+        "request_id=%s assignment_id=%s services=%s recommendations_batch succeeded dur_ms=%.2f",
+        request_id, req.assignment_id, list(results.keys()), dur_ms,
+    )
+    # [P2] Persist each candidate slate for learned-ranking training data.
+    # AIQ-1856: this runs the engine a SECOND time per category (recommend_debug),
+    # entirely after the answer the caller is waiting for has been computed. On a
+    # 4-category case it added ~6.5s to a ~4.5s request — 55% of an 11.9s response,
+    # enough to push it past the client timeout and surface as "cannot reach server".
+    # It is best-effort training telemetry that nothing in the response depends on,
+    # so dispatch it after the response is sent instead of ahead of it.
+    for backend_key in results:
+        background_tasks.add_task(
+            _log_slate,
+            backend_key,
+            criteria_map.get(backend_key, {}),
+            case_id=case_id,
+            assignment_id=req.assignment_id,
+            company_id=company_id,
+            request_id=request_id,
+        )
+    if _drain_inline:
+        # Direct (non-FastAPI) caller: run the scheduled slate writes now. `_log_slate`
+        # swallows its own exceptions, so this cannot break the response.
+        for _task in background_tasks.tasks:
+            _task.func(*_task.args, **_task.kwargs)
+
+    try:
+        from ..services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED
+        total_count = sum(len(r.recommendations) for r in results.values())
+        emit_event(
+            EVENT_RECOMMENDATIONS_GENERATED,
+            request_id=request_id,
+            assignment_id=req.assignment_id,
+            case_id=case_id,
+            user_id=user.get("id"),
+            user_role=user.get("role"),
+            duration_ms=dur_ms,
+            service_categories=list(results.keys()),
+            counts={"categories": len(results), "items": total_count},
+        )
+    except Exception:
+        pass
+    try:
+        from ..posthog_client import get_posthog_client
+        ph = get_posthog_client()
+        if ph and user.get("id"):
+            total_count = sum(len(r.recommendations) for r in results.values())
+            ph.capture(
+                distinct_id=user["id"],
+                event="recommendations_requested",
+                properties={
+                    "service_count": len(results),
+                    "service_categories": list(results.keys()),
+                    "total_items": total_count,
+                    "duration_ms": round(dur_ms, 1),
+                },
+            )
+    except Exception:
+        pass
+    return {"results": results}
+
+
+@router.get("/categories")
+def get_categories():
+    """List all recommendation categories with schema info."""
+    return {"categories": list_categories()}
+
+
+@router.get("/{category}/schema")
+def get_schema(category: str):
+    """Get JSON schema for category criteria."""
+    plugin = get_plugin(category)
+    if not plugin:
+        raise HTTPException(status_code=404, detail=f"Category not found: {category}")
+    return plugin.CriteriaModel.model_json_schema()
+
+
+class RecommendRequest:
+    def __init__(self, criteria: Dict[str, Any], top_n: Optional[int] = None):
+        self.criteria = criteria
+        self.top_n = top_n or 10
+
+
+DESTINATION_REQUIRING = ("living_areas", "schools", "movers")
+
+
+@router.post("/{category}", response_model=RecommendationResponse)
+def post_recommend(
+    category: str,
+    body: Dict[str, Any],
+    request: Request,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Get recommendations for a category, filtered through HR's curation."""
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    start = time.perf_counter()
+    # Phase 2c: resolve the caller's company_id so the engine can filter the
+    # ranked items through HR's company_vendor_selections. Falls back to the
+    # legacy un-curated behavior if the caller has no tenant.
+    profile = _db.get_profile_record(user.get("id"))
+    user_company_id = (profile or {}).get("company_id") or user.get("company")
+    plugin = get_plugin(category)
+    if not plugin:
+        raise HTTPException(status_code=404, detail=f"Category not found: {category}")
+    criteria = body.get("criteria", {})
+    top_n = body.get("top_n", 10)
+    if not isinstance(criteria, dict):
+        raise HTTPException(status_code=400, detail="criteria must be an object")
+    dest_city = (criteria.get("destination_city") or "").strip()
+    if category in DESTINATION_REQUIRING and not dest_city:
+        log.warning(
+            "request_id=%s category=%s recommendations_load rejected_missing_destination",
+            request_id, category,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="destination_city is required for this category. Please complete your preferences with a destination city.",
+        )
+    try:
+        result = recommend(category, criteria, top_n=int(top_n), company_id=user_company_id)
+        dur_ms = (time.perf_counter() - start) * 1000
+        dest = (criteria.get("destination_city") or "").strip()
+        log.info(
+            "request_id=%s category=%s dest_city=%s recommendations_load succeeded dur_ms=%.2f",
+            request_id, category, dest or "(none)", dur_ms,
+        )
+        # [P2] Persist the candidate slate for learned-ranking training data.
+        _log_slate(
+            category,
+            criteria,
+            company_id=user_company_id,
+            request_id=request_id,
+        )
+        try:
+            from ..services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED
+            items = result.get("items", []) if isinstance(result, dict) else []
+            emit_event(
+                EVENT_RECOMMENDATIONS_GENERATED,
+                request_id=request_id,
+                duration_ms=dur_ms,
+                service_categories=[category],
+                counts={"items": len(items)},
+                extra={"destination_city": dest or None},
+            )
+        except Exception:
+            pass
+        return result
+    except Exception as e:
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.warning(
+            "request_id=%s category=%s recommendations_load failed dur_ms=%.2f error=%s",
+            request_id, category, dur_ms, str(e),
+        )
+        raise HTTPException(status_code=400, detail=str(e))

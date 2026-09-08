@@ -1,0 +1,106 @@
+{
+ "table": "pathway_eligibility_rules",
+ "sqlName": "app_pathway_eligibility_rules",
+ "exported_at": "2026-08-18T17:47:03.642586+00:00",
+ "rowCount": 2,
+ "rows": [
+  {
+   "id": 1,
+   "pathway_id": 2,
+   "rule_name": "EEA National Employment — Norway",
+   "condition_tree": {
+    "op": "AND",
+    "conditions": [
+     {
+      "field": "nationality.is_eea_member",
+      "value": true,
+      "operator": "eq",
+      "description": "Applicant must hold EEA nationality"
+     },
+     {
+      "field": "destination.country_id",
+      "value": 2,
+      "operator": "eq",
+      "description": "Destination must be Norway (country_id=2)"
+     },
+     {
+      "field": "case.purpose",
+      "value": "employment",
+      "operator": "eq",
+      "description": "Move purpose must be employment"
+     }
+    ]
+   },
+   "priority": 100,
+   "effective_from": "2024-01-01T00:00:00.000Z",
+   "effective_to": null,
+   "source_url": "https://www.udi.no/en/want-to-apply/the-eea-and-eea-family-members/eea-citizens/",
+   "source_authority_id": 1,
+   "regulatory_version_id": 1,
+   "notes": "France satisfies nationality.is_eea_member=true. Norway satisfies destination check. The EEA-not-EU distinction is handled at the pathway level (EEA_FREE_MOVEMENT_EMPLOYMENT_NO) not here — Norway is EEA but not EU so EU-only pathways do not apply.",
+   "session_id": null,
+   "created_at": "2026-07-01T21:38:18.530Z",
+   "updated_at": "2026-07-01T21:38:18.530Z"
+  },
+  {
+   "id": 2,
+   "pathway_id": 3,
+   "rule_name": "Non-EU Highly Qualified Employment — Germany",
+   "condition_tree": {
+    "op": "AND",
+    "conditions": [
+     {
+      "field": "nationality.is_eu_member",
+      "value": false,
+      "operator": "eq",
+      "description": "Applicant must be a non-EU national (EU nationals use free movement)"
+     },
+     {
+      "field": "destination.country_id",
+      "value": 3,
+      "operator": "eq",
+      "description": "Destination must be Germany"
+     },
+     {
+      "field": "case.purpose",
+      "value": "employment",
+      "operator": "eq",
+      "description": "Move purpose must be employment"
+     },
+     {
+      "op": "OR",
+      "conditions": [
+       {
+        "field": "facts.annual_salary_eur",
+        "value": 43992,
+        "operator": "gte",
+        "description": "Salary at or above EU Blue Card threshold (2024)"
+       },
+       {
+        "field": "facts.sector",
+        "value": [
+         "engineering",
+         "ict",
+         "medicine",
+         "research"
+        ],
+        "operator": "in",
+        "description": "Shortage occupation sectors have lower salary threshold"
+       }
+      ]
+     }
+    ]
+   },
+   "priority": 100,
+   "effective_from": "2024-01-01T00:00:00.000Z",
+   "effective_to": null,
+   "source_url": "https://www.gesetze-im-internet.de/aufenthg/__18b.html",
+   "source_authority_id": 8,
+   "regulatory_version_id": 2,
+   "notes": "India satisfies nationality.is_eu_member=false. Salary threshold subject to annual adjustment by Federal Employment Agency.",
+   "session_id": null,
+   "created_at": "2026-07-01T21:38:18.565Z",
+   "updated_at": "2026-07-01T21:38:18.565Z"
+  }
+ ]
+}

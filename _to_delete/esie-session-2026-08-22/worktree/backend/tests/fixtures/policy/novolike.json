@@ -1,0 +1,100 @@
+{
+  "_comment": "NovoLike fixture — multi-region pharma profile inspired by published Novo Nordisk mobility practices. Used as a Sprint 1 acceptance test: this whole policy must round-trip through put_draft → publish → employee fetch with country resolution. NOT a real Novo Nordisk policy; values are illustrative.",
+  "fixture_key": "novolike",
+  "company_name": "NovoLike Pharma (test)",
+  "categories": [
+    {
+      "category_key": "compensation_allowances",
+      "benefits": [
+        {
+          "benefit_key": "housing_allowance",
+          "benefit_label": "Housing allowance",
+          "covered": true,
+          "value_type": "currency",
+          "amount_value": 4500,
+          "currency_code": "USD",
+          "unit_frequency": "monthly",
+          "notes": "Base allowance for mid-cost cities. Region overrides apply for high-cost destinations.",
+          "jurisdiction_overrides": [
+            {
+              "jurisdiction_countries": ["SG"],
+              "employee_level": "manager",
+              "amount_value": 6500,
+              "currency_code": "SGD",
+              "reimbursement_md": "Singapore housing reimbursement requires a registered tenancy agreement filed with HR. Capped at SGD 6,500/month.",
+              "repayment_md": "If the employee leaves within 12 months of relocation, prorated repayment of the previous 6 months of housing allowance applies."
+            },
+            {
+              "jurisdiction_countries": ["SG"],
+              "employee_level": "director",
+              "amount_value": 9500,
+              "currency_code": "SGD"
+            },
+            {
+              "jurisdiction_countries": ["US"],
+              "employee_level": "director",
+              "amount_value": 7800,
+              "currency_code": "USD"
+            },
+            {
+              "jurisdiction_countries": ["DE"],
+              "amount_value": 3200,
+              "currency_code": "EUR",
+              "reimbursement_md": "German housing allowance is tax-equalized. Submit Mietvertrag and Steuerbescheinigung."
+            },
+            {
+              "jurisdiction_countries": ["DK"],
+              "employee_level": "vp",
+              "amount_value": 28000,
+              "currency_code": "DKK"
+            }
+          ]
+        },
+        {
+          "benefit_key": "cola",
+          "benefit_label": "Cost of living adjustment",
+          "covered": true,
+          "value_type": "percentage",
+          "percentage_value": 12,
+          "unit_frequency": "monthly",
+          "jurisdiction_overrides": [
+            {
+              "jurisdiction_countries": ["SG", "JP"],
+              "amount_value": null,
+              "currency_code": null,
+              "reimbursement_md": "High-cost APAC destinations include a 22% COLA premium instead of the global 12%."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category_key": "relocation_assistance",
+      "benefits": [
+        {
+          "benefit_key": "shipment",
+          "benefit_label": "Household goods shipment",
+          "covered": true,
+          "value_type": "currency",
+          "amount_value": 12000,
+          "currency_code": "USD",
+          "unit_frequency": "one_time",
+          "jurisdiction_overrides": [
+            {
+              "jurisdiction_countries": ["SG", "MY", "TH"],
+              "assignment_type": "permanent",
+              "amount_value": 18000,
+              "currency_code": "USD",
+              "reimbursement_md": "SEA permanent assignments cover full container shipment. Air freight up to 200kg per dependent."
+            },
+            {
+              "jurisdiction_countries": ["DK"],
+              "amount_value": 95000,
+              "currency_code": "DKK"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

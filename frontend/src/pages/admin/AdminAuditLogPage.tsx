@@ -3,6 +3,7 @@ import { Button } from "../../components/antigravity/Button";
 import { Input } from "../../components/antigravity/Input";
 import { Card } from "../../components/antigravity/Card";
 import apiClient from "../../api/client";
+import { AdminLayout } from "./AdminLayout";
 
 // Cap the rendered audit payload so full records (which can carry subject PII) aren't
 // shipped verbatim into the admin DOM. The cell is also CSS-truncated for display.
@@ -94,9 +95,7 @@ export default function AdminAuditLogPage() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-semibold text-navy-900 mb-6">Platform Audit Log</h1>
-
+    <AdminLayout title="Audit log" subtitle="Platform mutations recorded for this environment.">
       <Card className="mb-6" padding="sm">
         <form onSubmit={handleFilter} className="flex flex-wrap gap-3 items-end">
           <div>
@@ -199,6 +198,6 @@ export default function AdminAuditLogPage() {
           </div>
         </>
       )}
-    </div>
+    </AdminLayout>
   );
 }

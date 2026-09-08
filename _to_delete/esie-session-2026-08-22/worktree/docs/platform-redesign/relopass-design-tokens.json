@@ -1,0 +1,484 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "date": "2026-05-20",
+    "description": "ReloPass platform design tokens — consumed by T02 to generate CSS custom properties. All CSS vars derive from this file. Do not hardcode hex values in any component.",
+    "theme_default": "light",
+    "theme_toggle_key": "rp-theme",
+    "css_selector_dark": "[data-theme='dark']"
+  },
+
+  "colors": {
+    "_comment": "Primitive palette — raw hex values. Reference these in semantic tokens, never directly in components.",
+
+    "teal": {
+      "50":  "#EDFAF7",
+      "100": "#C9F0E8",
+      "200": "#97E3D4",
+      "300": "#5FD0BB",
+      "400": "#35C0A8",
+      "500": "#1DBFA2",
+      "600": "#179E87",
+      "700": "#117B69",
+      "800": "#0C5B4D",
+      "900": "#073D34"
+    },
+    "blue": {
+      "50":  "#EEF5FD",
+      "100": "#CCE1F9",
+      "200": "#9EC6F3",
+      "300": "#6DA6EB",
+      "400": "#4A9AE8",
+      "500": "#2B82D8",
+      "600": "#1F69B8",
+      "700": "#165091",
+      "800": "#0E3868",
+      "900": "#072343"
+    },
+    "amber": {
+      "50":  "#FFF9EC",
+      "100": "#FFF0C7",
+      "200": "#FFE091",
+      "300": "#FFCC55",
+      "400": "#EFA827",
+      "500": "#D98F10",
+      "600": "#B3730A",
+      "700": "#8A5807",
+      "800": "#613E05",
+      "900": "#3B2503"
+    },
+    "green": {
+      "50":  "#ECFDF5",
+      "100": "#D1FAE5",
+      "200": "#A7F3D0",
+      "300": "#6EE7B7",
+      "400": "#34D399",
+      "500": "#10B981",
+      "600": "#059669",
+      "700": "#047857",
+      "800": "#065F46",
+      "900": "#064E3B"
+    },
+    "red": {
+      "50":  "#FEF2F2",
+      "100": "#FEE2E2",
+      "200": "#FECACA",
+      "300": "#FCA5A5",
+      "400": "#F87171",
+      "500": "#EF4444",
+      "600": "#DC2626",
+      "700": "#B91C1C",
+      "800": "#991B1B",
+      "900": "#7F1D1D"
+    },
+    "gray": {
+      "50":  "#F9FAFB",
+      "100": "#F3F4F6",
+      "200": "#E5E7EB",
+      "300": "#D1D5DB",
+      "400": "#9CA3AF",
+      "500": "#6B7280",
+      "600": "#4B5563",
+      "700": "#374151",
+      "800": "#1F2937",
+      "900": "#111827",
+      "950": "#080C14"
+    },
+    "white": "#FFFFFF",
+    "black": "#000000"
+  },
+
+  "semantic": {
+    "_comment": "These map to CSS custom properties. Use --bg, --surface, --accent etc in all components.",
+
+    "light": {
+      "bg":              "#F7F8FA",
+      "bg_2":            "#F0F2F6",
+      "surface":         "#FFFFFF",
+      "surface_2":       "#F3F4F6",
+      "surface_3":       "#E9ECF2",
+      "surface_hover":   "#F0F2F6",
+      "border":          "#E5E7EB",
+      "border_2":        "#D1D5DB",
+      "text":            "#111827",
+      "text_secondary":  "#374151",
+      "text_muted":      "#6B7280",
+      "text_disabled":   "#9CA3AF",
+      "text_inverse":    "#FFFFFF",
+      "accent":          "#1DBFA2",
+      "accent_hover":    "#179E87",
+      "accent_soft":     "#EDFAF7",
+      "accent_soft_2":   "#C9F0E8",
+      "accent_text":     "#0C5B4D",
+      "link":            "#2B82D8",
+      "link_hover":      "#1F69B8",
+      "success":         "#10B981",
+      "success_soft":    "#ECFDF5",
+      "success_text":    "#065F46",
+      "warning":         "#EFA827",
+      "warning_soft":    "#FFF9EC",
+      "warning_text":    "#8A5807",
+      "danger":          "#EF4444",
+      "danger_soft":     "#FEF2F2",
+      "danger_text":     "#991B1B",
+      "info":            "#4A9AE8",
+      "info_soft":       "#EEF5FD",
+      "info_text":       "#165091",
+      "overlay":         "rgba(0, 0, 0, 0.40)",
+      "shadow_color":    "rgba(0, 0, 0, 1)"
+    },
+    "dark": {
+      "bg":              "#0F1117",
+      "bg_2":            "#13161F",
+      "surface":         "#1A1D27",
+      "surface_2":       "#242838",
+      "surface_3":       "#2D3347",
+      "surface_hover":   "#2A2F42",
+      "border":          "#2D3347",
+      "border_2":        "#3A4060",
+      "text":            "#F3F4F6",
+      "text_secondary":  "#D1D5DB",
+      "text_muted":      "#6B7280",
+      "text_disabled":   "#4B5563",
+      "text_inverse":    "#111827",
+      "accent":          "#1DBFA2",
+      "accent_hover":    "#35C0A8",
+      "accent_soft":     "#0C3830",
+      "accent_soft_2":   "#0E4A3C",
+      "accent_text":     "#5FD0BB",
+      "link":            "#4A9AE8",
+      "link_hover":      "#6DA6EB",
+      "success":         "#10B981",
+      "success_soft":    "#064E3B",
+      "success_text":    "#6EE7B7",
+      "warning":         "#EFA827",
+      "warning_soft":    "#3B2503",
+      "warning_text":    "#FFCC55",
+      "danger":          "#EF4444",
+      "danger_soft":     "#7F1D1D",
+      "danger_text":     "#FCA5A5",
+      "info":            "#4A9AE8",
+      "info_soft":       "#072343",
+      "info_text":       "#9EC6F3",
+      "overlay":         "rgba(0, 0, 0, 0.60)",
+      "shadow_color":    "rgba(0, 0, 0, 1)"
+    }
+  },
+
+  "globe_canvas_colors": {
+    "_comment": "Used exclusively by GlobeCanvas component on S0 Auth screen. Canvas 2D, flat-map projection, 60fps animation.",
+    "arc_teal":           "#1DBFA2",
+    "arc_blue":           "#4A9AE8",
+    "arc_amber":          "#EFA827",
+    "arc_opacity":        0.75,
+    "arc_stroke_width":   2.5,
+    "arc_glow_blur":      6,
+    "city_dot":           "rgba(255, 255, 255, 0.86)",
+    "city_dot_radius":    4,
+    "city_dot_pulse_max": 8,
+    "dot_pulse_scale":    1.4,
+    "dot_pulse_duration": 2000,
+    "background":         "#0A0E1A",
+    "landmass":           "#1C2235",
+    "landmass_stroke":    "#252C42",
+    "ocean":              "#0A0E1A",
+    "grid_line":          "rgba(255, 255, 255, 0.04)",
+    "animation_fps":      60,
+    "arc_count":          7,
+    "arc_bezier_tension": 0.35
+  },
+
+  "typography": {
+    "font_family_ui":   "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    "font_family_mono": "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+
+    "scale": {
+      "xs":   { "size_px": 11, "line_height": 1.5,  "letter_spacing": "0.02em" },
+      "sm":   { "size_px": 12, "line_height": 1.5,  "letter_spacing": "0.01em" },
+      "base": { "size_px": 14, "line_height": 1.6,  "letter_spacing": "0" },
+      "md":   { "size_px": 15, "line_height": 1.6,  "letter_spacing": "0" },
+      "lg":   { "size_px": 16, "line_height": 1.625,"letter_spacing": "-0.01em" },
+      "xl":   { "size_px": 18, "line_height": 1.5,  "letter_spacing": "-0.01em" },
+      "2xl":  { "size_px": 20, "line_height": 1.4,  "letter_spacing": "-0.015em" },
+      "3xl":  { "size_px": 24, "line_height": 1.35, "letter_spacing": "-0.02em" },
+      "4xl":  { "size_px": 30, "line_height": 1.25, "letter_spacing": "-0.025em" },
+      "5xl":  { "size_px": 36, "line_height": 1.2,  "letter_spacing": "-0.03em" }
+    },
+
+    "weight": {
+      "regular":  400,
+      "medium":   500,
+      "semibold": 600,
+      "bold":     700
+    },
+
+    "tracking": {
+      "tighter": "-0.05em",
+      "tight":   "-0.025em",
+      "normal":  "0em",
+      "wide":    "0.025em",
+      "wider":   "0.05em",
+      "widest":  "0.1em"
+    }
+  },
+
+  "spacing": {
+    "_comment": "8px base grid. All values in pixels. Use as: --space-{key}",
+    "0":    "0px",
+    "0.5":  "4px",
+    "1":    "8px",
+    "1.5":  "12px",
+    "2":    "16px",
+    "2.5":  "20px",
+    "3":    "24px",
+    "4":    "32px",
+    "5":    "40px",
+    "6":    "48px",
+    "8":    "64px",
+    "10":   "80px",
+    "12":   "96px",
+    "16":   "128px",
+    "20":   "160px",
+    "24":   "192px"
+  },
+
+  "shadows": {
+    "_comment": "shadow_color uses opacity trick for theme adaptability in CSS.",
+    "0":  "none",
+    "1":  "0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05)",
+    "2":  "0 4px 12px rgba(0, 0, 0, 0.10), 0 2px 4px rgba(0, 0, 0, 0.06)",
+    "3":  "0 10px 30px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.08)",
+    "4":  "0 20px 50px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.10)",
+    "inset": "inset 0 1px 3px rgba(0, 0, 0, 0.08)",
+    "focus_ring": "0 0 0 3px rgba(29, 191, 162, 0.35)"
+  },
+
+  "radius": {
+    "sm":   "4px",
+    "md":   "8px",
+    "lg":   "12px",
+    "xl":   "16px",
+    "2xl":  "24px",
+    "full": "9999px"
+  },
+
+  "layout": {
+    "_comment": "Critical shell dimensions. Components must reference these vars to stay layout-consistent.",
+    "sidebar_w_expanded":  "232px",
+    "sidebar_w_collapsed": "58px",
+    "topbar_h":            "56px",
+    "ai_panel_w":          "360px",
+    "content_max_w":       "1280px",
+    "page_padding_x":      "32px",
+    "page_padding_y":      "24px",
+    "card_padding":        "20px",
+    "table_row_h":         "48px",
+    "input_h":             "36px",
+    "button_h_sm":         "28px",
+    "button_h_md":         "36px",
+    "button_h_lg":         "44px",
+    "modal_max_w":         "560px",
+    "drawer_w":            "400px",
+    "inbox_col_left_w":    "240px",
+    "inbox_col_mid_w":     "320px"
+  },
+
+  "transitions": {
+    "fast":    "120ms ease",
+    "base":    "200ms ease",
+    "slow":    "300ms ease-out",
+    "sidebar": "200ms ease",
+    "panel":   "300ms cubic-bezier(0.4, 0, 0.2, 1)",
+    "fade":    "150ms ease-in-out",
+    "bounce":  "400ms cubic-bezier(0.34, 1.56, 0.64, 1)"
+  },
+
+  "z_index": {
+    "base":      0,
+    "above":     10,
+    "dropdown":  100,
+    "sticky":    200,
+    "overlay":   300,
+    "modal":     400,
+    "panel":     500,
+    "toast":     600,
+    "tooltip":   700
+  },
+
+  "pill_variants": {
+    "_comment": "6 canonical pill/badge variants used by StatusBadge, Pill components (T24). Each has bg, text, border for light and dark themes.",
+
+    "success": {
+      "_usage": "verified, covered, done, approved, complete",
+      "light": { "bg": "#ECFDF5", "text": "#065F46", "border": "#A7F3D0" },
+      "dark":  { "bg": "#064E3B", "text": "#6EE7B7", "border": "#047857" }
+    },
+    "warning": {
+      "_usage": "pending, partial, translating, apostille, soon",
+      "light": { "bg": "#FFF9EC", "text": "#8A5807", "border": "#FFE091" },
+      "dark":  { "bg": "#3B2503", "text": "#FFCC55", "border": "#8A5807" }
+    },
+    "danger": {
+      "_usage": "missing, blocked, rejected, excluded, urgent, high-risk",
+      "light": { "bg": "#FEF2F2", "text": "#991B1B", "border": "#FECACA" },
+      "dark":  { "bg": "#7F1D1D", "text": "#FCA5A5", "border": "#B91C1C" }
+    },
+    "accent": {
+      "_usage": "active, in_progress, ai-sourced, ocr, ready",
+      "light": { "bg": "#EDFAF7", "text": "#0C5B4D", "border": "#97E3D4" },
+      "dark":  { "bg": "#0C3830", "text": "#5FD0BB", "border": "#117B69" }
+    },
+    "neutral": {
+      "_usage": "draft, waiting, info, system messages",
+      "light": { "bg": "#F3F4F6", "text": "#374151", "border": "#D1D5DB" },
+      "dark":  { "bg": "#242838", "text": "#D1D5DB", "border": "#3A4060" }
+    },
+    "ghost": {
+      "_usage": "tags, secondary labels, starred, very low priority",
+      "light": { "bg": "transparent", "text": "#6B7280", "border": "#E5E7EB" },
+      "dark":  { "bg": "transparent", "text": "#6B7280", "border": "#2D3347" }
+    }
+  },
+
+  "status_color_maps": {
+    "_comment": "Maps each domain status value to a pill_variant key. Used by StatusBadge component.",
+
+    "doc_status": {
+      "verified":   "success",
+      "pending":    "neutral",
+      "ocr":        "accent",
+      "translating":"warning",
+      "apostille":  "warning",
+      "missing":    "danger",
+      "rejected":   "danger"
+    },
+    "step_status": {
+      "done":       "success",
+      "active":     "accent",
+      "available":  "neutral",
+      "waiting":    "ghost"
+    },
+    "form_status": {
+      "ready":      "success",
+      "draft":      "neutral",
+      "submitted":  "accent",
+      "approved":   "success",
+      "rejected":   "danger"
+    },
+    "form_urgency": {
+      "urgent":     "danger",
+      "soon":       "warning",
+      "flexible":   "neutral"
+    },
+    "benefit_status": {
+      "covered":    "success",
+      "partial":    "warning",
+      "excluded":   "danger"
+    },
+    "risk_level": {
+      "low":        "success",
+      "medium":     "warning",
+      "high":       "danger"
+    },
+    "exception_status": {
+      "pending":    "warning",
+      "approved":   "success",
+      "rejected":   "danger",
+      "withdrawn":  "neutral"
+    },
+    "message_category": {
+      "hr":         "accent",
+      "vendors":    "neutral",
+      "auth":       "warning",
+      "family":     "success",
+      "system":     "ghost",
+      "starred":    "ghost"
+    },
+    "case_stage": {
+      "discovery":  "accent",
+      "dossier":    "warning",
+      "roadmap":    "accent",
+      "in_progress":"success",
+      "closing":    "warning",
+      "closed":     "neutral"
+    },
+    "case_status": {
+      "draft":      "neutral",
+      "active":     "success",
+      "on_hold":    "warning",
+      "completed":  "success",
+      "cancelled":  "danger"
+    },
+    "ai_tone": {
+      "good":       "success",
+      "wait":       "warning",
+      "block":      "danger"
+    },
+    "coverage_status": {
+      "covered":      "success",
+      "partial":      "warning",
+      "employee_pays":"neutral"
+    }
+  },
+
+  "nav_items": {
+    "_comment": "Sidebar navigation definitions. min_tier controls visibility (basic=employee, hr=HR, admin=Admin only).",
+    "sections": [
+      {
+        "key": "my_case",
+        "label": "My Relocation",
+        "min_tier": "basic",
+        "items": [
+          { "id": "profile",    "label": "My Profile",      "icon": "user-circle",  "route": "/profile",    "min_tier": "basic" },
+          { "id": "roadmap",    "label": "Roadmap",         "icon": "map",          "route": "/roadmap",    "min_tier": "basic" },
+          { "id": "discovery",  "label": "Requirements",    "icon": "search",       "route": "/discovery",  "min_tier": "basic" },
+          { "id": "dossier",    "label": "My Dossier",      "icon": "file-text",    "route": "/dossier",    "min_tier": "basic" },
+          { "id": "documents",  "label": "Documents",       "icon": "folder",       "route": "/documents",  "min_tier": "basic" },
+          { "id": "policy",     "label": "My Policy",       "icon": "shield",       "route": "/policy",     "min_tier": "basic" },
+          { "id": "vendors",    "label": "Service Hub",     "icon": "store",        "route": "/marketplace","min_tier": "basic" },
+          { "id": "inbox",      "label": "Inbox",           "icon": "inbox",        "route": "/inbox",      "min_tier": "basic", "badge_key": "unread_messages" }
+        ]
+      },
+      {
+        "key": "team",
+        "label": "HR Control",
+        "min_tier": "hr",
+        "items": [
+          { "id": "hr_dashboard","label": "Control Panel",  "icon": "layout-dashboard","route": "/hr",       "min_tier": "hr" },
+          { "id": "hr_profile",  "label": "HR Profile",     "icon": "settings",     "route": "/hr/profile", "min_tier": "hr" },
+          { "id": "policy_mgmt", "label": "Policy Builder", "icon": "edit-3",       "route": "/policy/builder","min_tier": "hr" }
+        ]
+      },
+      {
+        "key": "admin",
+        "label": "Platform Admin",
+        "min_tier": "admin",
+        "items": [
+          { "id": "admin_dash",   "label": "Admin Dashboard","icon": "bar-chart-2", "route": "/admin",      "min_tier": "admin" },
+          { "id": "admin_co",     "label": "Companies",      "icon": "building",    "route": "/admin/companies","min_tier": "admin" },
+          { "id": "admin_users",  "label": "Users",          "icon": "users",       "route": "/admin/users","min_tier": "admin" },
+          { "id": "admin_exc",    "label": "Exceptions",     "icon": "alert-circle","route": "/admin/exceptions","min_tier": "admin", "badge_key": "pending_exceptions" }
+        ]
+      }
+    ]
+  },
+
+  "route_ai_context": {
+    "_comment": "Maps each route to the AI Panel context string shown as the system prompt preamble.",
+    "/profile":          "You are helping the employee understand their relocation profile, personal info, and upcoming deadlines.",
+    "/roadmap":          "You are helping the employee understand their relocation roadmap — what steps are done, active, and next. Be specific and encouraging.",
+    "/discovery":        "You are helping the employee understand the compliance requirements the AI found for their corridor. Explain what each requirement means in plain language.",
+    "/dossier":          "You are helping the employee understand their government forms. Explain what each form is for, what fields are missing, and what to do next.",
+    "/documents":        "You are helping the employee understand their document checklist — which are verified, which are missing, and what to do to resolve each gap.",
+    "/policy":           "You are helping the employee understand their company relocation policy — what is covered, what requires an exception, and how to request one.",
+    "/marketplace":      "You are helping the employee choose a relocation service provider. Compare vendors honestly and help them shortlist the right one for their needs.",
+    "/inbox":            "You are an AI assistant helping draft professional messages to HR, vendors, and authorities. Match the tone of the thread context provided.",
+    "/hr":               "You are helping the HR manager review their case portfolio, spot risks, and prioritize their attention.",
+    "/hr/profile":       "You are helping the HR user manage their account settings and notification preferences.",
+    "/policy/builder":   "You are helping HR design their company relocation policy. Suggest reasonable benefit caps based on destination city cost-of-living data.",
+    "/admin":            "You are helping the ReloPass platform administrator monitor platform health, manage companies, and resolve escalations.",
+    "/admin/companies":  "You are helping the admin manage company accounts and review their plan tiers.",
+    "/admin/users":      "You are helping the admin manage user accounts, roles, and company assignments.",
+    "/admin/exceptions": "You are helping the admin review cross-company policy exception requests that require platform-level approval."
+  }
+}

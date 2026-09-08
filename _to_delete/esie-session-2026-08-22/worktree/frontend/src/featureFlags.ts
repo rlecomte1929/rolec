@@ -1,0 +1,76 @@
+/**
+ * Frontend feature flags. Reads from VITE_ env vars so the value is fixed at
+ * build time. Add new flags here so the rest of the app has one place to look.
+ *
+ * Convention: a flag is enabled only when the env var equals the literal
+ * string `'true'`. Anything else (undefined, '', '1', 'yes') is OFF — keeps
+ * production safe by default when ops forget to set the var.
+ */
+
+const isOn = (raw: unknown): boolean =>
+  typeof raw === 'string' && raw.trim().toLowerCase() === 'true';
+
+/**
+ * Quotes / RFQ surface. Controls the RFQ tab in the Services nav ribbon.
+ * The core workflow (ServicesRfqNew + rfqAPI) is shipped; set this to `true`
+ * to surface the ribbon tab.  Step 4 in EmployeeJourney is always shown once
+ * the employee has shortlisted services (independent of this flag).
+ * Set `VITE_ENABLE_RFQ=true` in `.env.local` to enable the ribbon tab.
+ */
+export const isRfqEnabled = (): boolean => isOn(import.meta.env.VITE_ENABLE_RFQ);
+
+/**
+ * Section C of HR Policy: per-(jurisdiction × employee_level × assignment_type)
+ * overrides on benefit rows. The editor renders inside the benefit-edit drawer
+ * so HR can author region-specific caps. Backend stack (resolver, endpoints,
+ * persistence) ships in PRs #66 / #68; this flag gates the editor UI.
+ *
+ * Set `VITE_FEATURE_SECTION_C_OVERRIDES=true` in `.env.local` to enable for dev.
+ */
+export const isSectionCOverridesEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_FEATURE_SECTION_C_OVERRIDES);
+
+/**
+ * AIQ-1415 — Natural-Language Policy Builder. Gates the "Describe" tab on the HR
+ * Policy page where HR types a plain-English description and Claude generates a
+ * config-matrix draft for confirm-before-save. The backend also gates per-account
+ * (the `nl_policy_builder` feature flag), so both must be on to use it.
+ *
+ * Set `VITE_ENABLE_NL_POLICY_BUILDER=true` to surface the tab.
+ */
+export const isNlPolicyBuilderEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_ENABLE_NL_POLICY_BUILDER);
+
+/**
+ * AIQ-1414 — persistent Mobility Coordinator chat panel on the case pages (HR +
+ * employee). The backend also gates it (`RELOPASS_AI_COORDINATOR_ENABLED`), so both
+ * must be on; the panel also self-hides if the API 404s (defense in depth). Kept OFF
+ * until the coordinator's UI is ready to surface.
+ *
+ * Set `VITE_FEATURE_COORDINATOR=true` to render the panel.
+ */
+export const isCoordinatorEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_FEATURE_COORDINATOR);
+
+/**
+ * Feedback "Trigger fix" / "Auto-attempt" actions on a dispatched feedback row
+ * (admin Feedback console). Once a row is dispatched to the Notion AI Work Queue,
+ * these let an admin manually flip it to "Ready for AI" (with the /relopass-dev-queue
+ * command) or fire the autofix pipeline. The backend also gates it
+ * (`FEEDBACK_FIX_TRIGGER_ENABLED`), so both must be on.
+ *
+ * Set `VITE_FEATURE_FEEDBACK_FIX=true` to surface the buttons.
+ */
+export const isTriggerFixEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_FEATURE_FEEDBACK_FIX);
+
+/**
+ * Per-move roadmap paywall (TEST MODE). Gates the employee roadmap behind an
+ * €800 Stripe Checkout unlock (`RoadmapPaywallGate` on the roadmap page; the
+ * dashboard consumes the `?payment=success` return and marks it unlocked). Kept
+ * OFF so the live roadmap is never paywalled until we turn it on per environment.
+ *
+ * Set `VITE_ENABLE_ROADMAP_PAYWALL=true` to activate the gate.
+ */
+export const isRoadmapPaywallEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_ENABLE_ROADMAP_PAYWALL);

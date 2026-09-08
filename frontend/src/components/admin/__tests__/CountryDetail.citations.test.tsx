@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { CountryDetail } from '../CountryDetail';
 import type { AdminRequirementReview } from '../../../api/admin';
 import type { CountryProfileDTO } from '../../../types';
@@ -136,5 +136,31 @@ describe('CountryDetail citations', () => {
 
     expect(screen.getAllByRole('link', { name: 'Immigration Service Delivery' })).toHaveLength(9);
     expect(screen.getAllByRole('link', { name: 'DETE — employment permits' })).toHaveLength(20);
+  });
+});
+
+describe('CountryDetail bulk review', () => {
+  it('publishes every ticked requirement in one action', () => {
+    const onReviewBatch = vi.fn();
+    const rows = [
+      requirement({ id: 'req-a', title: 'Employment Pass' }),
+      requirement({ id: 'req-b', title: 'MOM medical' }),
+    ];
+    render(
+      <CountryDetail
+        profile={PROFILE}
+        requirements={rows}
+        pendingCount={2}
+        busyId={null}
+        onRerun={vi.fn()}
+        onReview={vi.fn()}
+        onReviewBatch={onReviewBatch}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText('Select all requirements'));
+    fireEvent.click(screen.getByRole('button', { name: /Publish selected \(2\)/ }));
+
+    expect(onReviewBatch).toHaveBeenCalledWith(['req-a', 'req-b'], 'approved');
   });
 });

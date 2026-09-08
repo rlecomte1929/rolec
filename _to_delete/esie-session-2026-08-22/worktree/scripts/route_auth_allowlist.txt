@@ -1,0 +1,282 @@
+# Route-auth allowlist — AUDIT-B6
+# =================================
+# Each non-comment line has format:  relative/path/to/file.py:function_name
+# Lines starting with # are ignored.
+#
+# Add a route here ONLY if it is:
+#   (a) intentionally public (health checks, static reference data), OR
+#   (b) uses a non-standard auth mechanism (manual JWT header extraction) that
+#       the AST scanner cannot detect, OR
+#   (c) a known security gap tracked in the backlog (add a TODO:SEC comment).
+#
+# Rule: every allowlist entry MUST have a comment explaining why it is exempt.
+# Blank entries without justification will be rejected in code review.
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+# ── Intentionally public — no auth needed ─────────────────────────────────────
+
+backend/main.py:supabase_health
+# Health probe. Returns degraded-state body but no PII. Always 200.
+# Used by uptime monitors and the frontend splash screen.
+
+backend/app/routers/providers.py:verify_provider_token_endpoint
+# Token validity check: the *token itself* is the credential.
+# Returns {valid: true/false} — does not expose sensitive data.
+# A valid provider token is issued by the server, so this is safe.
+
+backend/app/routers/rules.py:get_pet_restrictions
+# Returns static country-level pet import rules (public IATA/gov data).
+# No user data; used by the household builder before login.
+
+backend/app/routers/rules.py:check_breed
+# Returns public breed-restriction lookup for a destination country.
+# Same reasoning as get_pet_restrictions above.
+
+backend/app/routers/policy_templates.py:get_policy_templates
+# Returns the 3-tier template library (Conservative/Standard/Premium).
+# Seeded from public benchmark data (AIRINC, Mercer, ECA).
+# No company-specific data; used for HR onboarding before policy is created.
+
+
+# ── Non-standard auth — manual JWT extraction via Authorization header ─────────
+# These routes call get_supabase_client_from_header() / _get_client() on the
+# raw Authorization header instead of using FastAPI Depends().
+# The AST scanner cannot detect header-based auth patterns.
+
+backend/routes/compat.py:compat_get_case
+# Compat shim; manually validates Supabase JWT via Authorization header.
+# See routes/compat.py:_get_supabase_client_from_header.
+
+backend/routes/compat.py:compat_get_requirements
+# Same pattern as compat_get_case above.
+
+backend/routes/compat.py:compat_admin_context
+# Same pattern. Validates @relopass.com admin JWT manually.
+
+backend/routes/relocation.py:list_relocation_cases
+# Manual Supabase JWT check via Authorization header + looks_like_supabase_jwt().
+
+backend/routes/relocation.py:get_relocation_case
+# Same pattern as list_relocation_cases above.
+
+backend/routes/relocation.py:list_relocation_runs
+# Same pattern as list_relocation_cases above.
+
+backend/routes/relocation_classify.py:get_relocation_classification
+# Same pattern: _get_client(authorization) validates Supabase JWT in header.
+
+
+# ── Known security gaps — tracked in backlog ──────────────────────────────────
+# TODO:SEC — these routes expose sensitive data without enforced auth.
+# Remove from this allowlist once the fix is deployed.
+
+# (no open entries)
+
+# SEC GAP-9 closed (2026-05-28): get_research_status now requires an
+# authenticated session and a case-access check via require_case_access().
+# Both the live copy in cases_read.py and the dormant cases.py copy were
+# fixed in the same commit so the route-auth audit stays green and no
+# allowlist entry is needed.
+
+# SEC debug endpoints closed (2026-05-28): debug_db, debug_kv_set, debug_kv_get,
+# debug_supabase now require an admin session via Depends(require_admin) from
+# backend/app/auth_deps.py. No allowlist entries needed.
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Mutation endpoints — POST/PATCH/PUT/DELETE auth audit.
+# The route-auth guard now audits mutations (SEC-CASES-2 guard extension,
+# 2026-06-04) in addition to GET. SEC-MUT-DRAIN (2026-06-04) then DRAINED the
+# TODO:SEC backlog to empty by actually adding auth to the open gaps:
+#   • ab_tests.promote_variant / rollback_flag → Depends(require_admin)
+#   • support.triage_ticket / send_auto_reply / update_ticket_status
+#       → decorator dep Depends(verify_support_automation_secret)
+#   • support.inbound_email_webhook → decorator dep Depends(verify_postmark_secret)
+# Those endpoints now pass on their own merit and are NO LONGER allowlisted.
+# Remaining entries below are PERMANENT exemptions only (public / inline-auth /
+# dead code) — there are no open TODO:SEC gaps. Keep it that way.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Intentionally public (auth / invite redemption / anonymous intake) ─────────
+backend/app/routers/auth.py:register
+# PUBLIC: account registration is pre-auth by definition.
+backend/app/routers/auth.py:login
+# PUBLIC: login issues the session token; cannot require it.
+backend/app/routers/auth.py:exchange_supabase_token
+# PUBLIC (AIQ-1239): bridges a verified Supabase JWT (passkey/OAuth) to a ReloPass
+# session. The Supabase access token in the body IS the credential (verified HS256).
+backend/app/routers/auth.py:logout
+# PUBLIC: token-scoped / no-op; safe without an auth dep.
+backend/app/routers/providers.py:accept_provider_invite
+# PUBLIC: invite redemption — the invite token in the body IS the credential
+# (validated internally), mirroring providers.verify_provider_token_endpoint.
+backend/app/routers/support.py:create_in_app_ticket
+# PUBLIC: in-app Help form. Employee portal allows anonymous submission
+# (session_id falls back to "anonymous"); write-only INSERT into support_tickets,
+# exposes no data back to the caller. Intentionally unauthenticated by design.
+backend/app/routers/lead_capture.py:capture_lead
+# PUBLIC (audos-P1): marketing-site lead capture. Rate-limited (10/hour;50/day),
+# write-only INSERT into leads, returns only {id, matched_prospect} — exposes no
+# data back to the caller. company_domain derived server-side. Unauthenticated by design.
+backend/app/routers/public_corridor.py:corridor_requirements
+# PUBLIC (audos): generic corridor requirements read model for an anonymous demo/landing.
+# Rate-limited (60/hour;600/day), no auth, no case/user data, no PII — returns only generic
+# statutory/immigration requirements the deterministic engine produces for a destination +
+# assignment type. Wildcard CORS (credential-free). See public_corridor.py docstring.
+backend/app/routers/attestation.py:public_get_attestation
+# PUBLIC (counsel attestation): the tokenized reviewer's read of one corridor legal
+# checklist. The link token IS the credential — the reader is a lawyer at an external firm
+# with no ReloPass account, which is the whole point of the feature. Rate-limited
+# (60/hour;600/day). Returns AttestationPublicViewDTO, a whitelist of corridor-legal fields
+# with no case/employee/company data and not even the reviewer's own email. Token is
+# shape-checked, then matched against a stored SHA-256 (the raw token is never stored);
+# expiry enforced; unknown/expired/malformed/draft all return an IDENTICAL 404, never 403,
+# so the endpoint is not an enumeration oracle.
+backend/app/routers/attestation.py:public_decide_item
+# PUBLIC (counsel attestation): records one item decision. Same token credential and same
+# 404 discipline as above; rate-limited (240/hour;2000/day). Writes ONLY to
+# corridor_attestation_items, and only rows scoped to the token's own request — a guessed
+# item id from another envelope 404s. Cannot touch requirement_items: see the two-key rule
+# in the module docstring.
+backend/app/routers/attestation.py:public_sign
+# PUBLIC (counsel attestation): records the signature. Same token credential; rate-limited
+# (20/hour;100/day). INSERT-only into corridor_attestation_signatures. Requires every item
+# decided, explicit disclaimer agreement, and a client-submitted content hash matching the
+# stored snapshot (409 otherwise) so counsel cannot sign a checklist that moved under them.
+# Deliberately does NOT write requirement_items — publishing an attestation is a separate,
+# authenticated admin action (/api/admin/attestations/{id}/promote).
+backend/app/routers/public_analytics.py:track_event
+# PUBLIC (audos-P2): marketing funnel event ingest. Rate-limited (120/hour;1000/day),
+# allow-lists event names (landing_page_view/landing_cta_click) and persists only
+# scalar utm/cta keys into analytics_events. No PII, returns {ok:true}. Unauthenticated by design.
+backend/app/routers/test_drive.py:provision
+# PUBLIC (AIQ-1420 / TD-2): self-serve test-drive provisioning. Intentionally
+# unauthenticated so campaign prospects can mint their own HR+Employee test
+# identities. Defense in depth: campaign gate (404 unless RELOPASS_TEST_DRIVE_ENABLED,
+# dark by default) + invite-token gate (constant-time vs RELOPASS_TEST_DRIVE_INVITE_TOKEN,
+# 403 incl. when unset — never fails open) + slowapi rate-limit + is_test stamping.
+backend/app/routers/test_drive.py:provision_staged
+# PUBLIC (Task 4, QA-only): staged-provisioning fixture — mints a session AND drives it to
+# a named stage via the REAL handlers so QA can reach the RFQ-submit step in one call.
+# Intentionally unauthenticated (same public surface as :provision) but gated HARDER: campaign
+# gate (404 unless RELOPASS_TEST_DRIVE_ENABLED) + qa-* campaign only (404 for insead-2026 and
+# any non-qa) + is_test-company assertion + optional invite-token + slowapi rate-limit.
+backend/app/routers/test_drive.py:survey
+# PUBLIC (AIQ-1423 / TD-5): completion-survey submission. Intentionally unauthenticated
+# (post-test feedback from the same public flow). Campaign gate (404 unless
+# RELOPASS_TEST_DRIVE_ENABLED) + slowapi rate-limit; write-only INSERT into the
+# admin-read RLS table survey_responses; returns only {ok, response_id}.
+backend/app/routers/test_drive.py:record_event
+# PUBLIC (AIQ-1426 / TD-8): funnel-event recorder (invite/click/stage). Intentionally
+# unauthenticated (records /test-drive link clicks + funnel stages). Campaign gate
+# (404 unless RELOPASS_TEST_DRIVE_ENABLED) + slowapi rate-limit + allow-listed event_type
+# + scalar-only metadata; write-only INSERT into the admin-read RLS table funnel_events.
+backend/app/routers/test_drive.py:complete
+# PUBLIC (AIQ-1422 / TD-4): completion marker ("I've completed my test"). Intentionally
+# unauthenticated (self-declared from the public flow). Campaign gate (404 unless
+# RELOPASS_TEST_DRIVE_ENABLED) + slowapi rate-limit; soft state-check + UPDATE of the
+# admin-read RLS table test_sessions; returns {ok, reached, nudge}.
+
+# ── Webhooks (external system; inline HMAC/signature, not a FastAPI Depends) ───
+# The signature check runs in the handler body, so the AST scanner cannot see it.
+backend/app/routers/integrations_personio_webhook.py:personio_webhook
+# WEBHOOK (PERMANENT): verifies X-Personio-Signature HMAC-SHA256 inline against
+# PERSONIO_WEBHOOK_SECRET (integrations_personio_webhook.py:_verify_signature,
+# raises 401 on mismatch) before any work.
+
+backend/app/routers/stripe_webhook.py:stripe_webhook
+# WEBHOOK (PERMANENT): Stripe webhook (Path A). Intentionally public — Stripe calls it.
+# Authenticates by verifying the Stripe signature on the RAW request body via the SDK's
+# stripe.Webhook.construct_event (timing-safe HMAC + timestamp tolerance), returning 400
+# on an invalid signature, not a FastAPI Depends the AST scanner can see. Also 503s when
+# RELOPASS_STRIPE_ENABLED is off. Same pattern as the Personio webhook above.
+
+# ── Cron (invoked by the scheduler, not an end user; inline secret check) ──────
+backend/app/routers/crons.py:deadline_reminder
+backend/app/routers/crons.py:autopilot_canary
+# CRON (Autopilot P0): _verify_cron_secret(request) inline (503 if unset, 401 on
+# mismatch). Read-only post-deploy diagnostics-replay canary; invoked by the
+# autopilot workflow, not an end user.
+backend/app/routers/crons.py:autopilot_ingest
+# CRON (Autopilot P1): _verify_cron_secret(request) inline. Nightly feedback dedup +
+# auto-dispatch; governor-gated (default OFF), invoked by the autopilot-nightly
+# workflow, not an end user.
+backend/app/routers/crons.py:autopilot_event
+# CRON (Autopilot P2): _verify_cron_secret(request) inline. Records a funnel event fired
+# by the autofix-validate workflow (merged/canary/reverted/done); not an end user.
+backend/app/routers/crons.py:feedback_notion_sync
+# CRON: _verify_cron_secret(request) inline. Polls Notion Work Queue task Status for
+# dispatched feedback items and advances feedback_status (done→green in the console).
+# Read-only against Notion; writes feedback_status only. Not an end user.
+backend/app/routers/crons.py:autopilot_digest
+# CRON (Autopilot P4): _verify_cron_secret(request) inline. Writes the nightly autopilot
+# funnel+cost summary to daily_summaries; invoked by autopilot-nightly, not an end user.
+backend/app/routers/crons.py:process_crawl_schedules
+# CRON (P3-02a): _verify_cron_secret(request) inline (503 if unset, 401 on
+# mismatch). Invoked by the crawl-scheduler workflow, not an end user.
+backend/app/routers/crons.py:milestone_reminders
+# CRON (AIQ-656): _verify_cron_secret(request) inline (503 if unset, 401 on
+# mismatch). Hourly milestone D-7/D-3/D-0 reminder scan, invoked by pg_cron.
+backend/app/routers/crons.py:corridor_deadline_sweep
+# CRON: _verify_cron_secret(request) inline (503 if unset, 401 on mismatch).
+# Daily corridor deadline-alert sweep, invoked by the corridor-deadline-sweep
+# workflow (and by pg_cron). Reads open cases and writes notification_outbox +
+# corridor_deadline_events; exactly-once via that ledger's PK. Not an end-user route.
+backend/app/routers/crons.py:weekly_mobility_status
+# CRON (AIQ-1237): _verify_cron_secret(request) inline. Weekly (Mon 08:00 UTC)
+# overdue-steps digest to HR owners, invoked by the weekly-mobility-status workflow.
+backend/app/routers/crons.py:roadmap_review_notify
+# CRON (AIQ-1526): _verify_cron_secret(request) inline. Hourly safety-net that
+# (re)notifies HR about roadmaps stuck pending review, invoked by the
+# roadmap-review-notify workflow, not an end user.
+backend/app/routers/crons.py:dispatch_outbox
+# CRON (AIQ-1610): _verify_cron_secret(request) inline. ~15-min notification_outbox
+# email-delivery consumer, invoked by the outbox-dispatch workflow, not an end user.
+backend/app/routers/crons.py:recompute_source_reliability
+# CRON (N8/AIQ-848): _verify_cron_secret(request) inline. Nightly source-reliability
+# recompute, invoked by the scheduler, not an end user.
+backend/app/routers/crons.py:test_monitoring_alert
+# CRON (P3-02c): _verify_cron_secret(request) inline. Staging-only test
+# endpoint that fires a sample Slack/email monitoring alert.
+backend/app/routers/crons.py:case_health_scan
+# CRON (AIQ-378b): _verify_cron_secret(request) inline. Nightly proactive
+# case-health scan, invoked by the case-health-scan workflow, not an end user.
+backend/app/routers/crons.py:coordinator_proactive_scan
+# CRON (AIQ-1414 Phase 3b): _verify_cron_secret(request) inline. Daily proactive
+# Mobility Coordinator scan, invoked by the coordinator-proactive-scan workflow,
+# not an end user. Also doubly gated by the RELOPASS_AI_COORDINATOR_ENABLED flag.
+backend/app/routers/crons.py:promote_hr_vendors_cron
+# CRON (CATALOG-2-FU/AIQ-1077): _verify_cron_secret(request) inline. Daily
+# automatic HR-vendor promotion, invoked by the catalog-promotion workflow,
+# not an end user.
+backend/app/routers/crons.py:snapshot_vendor_metrics_cron
+# CRON (NAV-SP-2 Tier 3): _verify_cron_secret(request) inline. Daily
+# vendor-metric snapshot, invoked by the vendor-metric-snapshot-daily workflow,
+# not an end user.
+backend/app/routers/crons.py:hr_mobility_briefing_cron
+# CRON (AIQ-1220): _verify_cron_secret(request) inline. Weekly Monday-08:00 HR
+# mobility briefing, invoked by the hr-mobility-briefing workflow, not an end user.
+
+# CRON (PERMANENT): calls _verify_cron_secret(request) in the body — fail-closed
+# (503 if CRON_SECRET unset, 401 on mismatch). Inline, not a Depends().
+
+# ── Non-standard auth — manual JWT extraction via Authorization header ─────────
+backend/routes/relocation_classify.py:classify_relocation_case
+# PERMANENT: validates the Supabase JWT manually — raises 401 if Authorization
+# is missing, then _get_client(authorization) enforces the token via RLS.
+# Header-based auth the AST scanner cannot detect (mirrors get_relocation_classification).
+
+# ── Dead code (unwired router) ────────────────────────────────────────────────
+backend/app/routers/cases.py:start_research
+# DEAD: cases.py router is unwired (AUDIT-B9-cases-6). The live route is
+# cases_write.start_research, which is guarded (SEC-CASES-2 / #314).
+
+# Mission Control P2 run-status callback — shared-secret gated (_verify_callback_secret), mirrors the cron pattern.
+backend/app/routers/admin_work_items.py:run_callback
+
+# ── Intentionally public (pre-login) ──────────────────────────────────────────
+backend/app/routers/auth_page_config.py:get_auth_page_config
+# PUBLIC BY DESIGN: the /auth login page reads this decorative GlobeNetwork config
+# BEFORE authentication, so GET has no auth dependency and always returns 200 with
+# defaults. The paired PUT /api/admin/auth-page-config is require_admin-guarded.

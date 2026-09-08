@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { AppShell } from '../../components/AppShell';
 import { CountryDetail } from '../../components/admin/CountryDetail';
+import { AdminLayout } from './AdminLayout';
 import {
   getCountryProfile,
   listCountryRequirements,
   rerunCountryResearch,
   reviewCountryRequirement,
+  reviewCountryRequirementsBatch,
 } from '../../api/admin';
 import type { AdminRequirementReview, ReviewStatus } from '../../api/admin';
 import type { CountryProfileDTO } from '../../types';
@@ -44,8 +45,11 @@ export const CountryDetailPage: React.FC = () => {
     setError(null);
     try {
       const updated = await reviewCountryRequirement(countryCode, id, status);
-      setRequirements((prev) => prev.map((r) => (r.id === id ? updated : r)));
-      setPendingCount((prev) => (status === 'approved' || status === 'rejected' ? Math.max(0, prev - 1) : prev));
+      setRequirements((prev) => {
+        const next = prev.map((r) => (r.id === id ? updated : r));
+        setPendingCount(next.filter((r) => r.reviewStatus === 'pending').length);
+        return next;
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not update this requirement');
     } finally {
@@ -53,10 +57,29 @@ export const CountryDetailPage: React.FC = () => {
     }
   };
 
+  const handleReviewBatch = async (ids: string[], status: Exclude<ReviewStatus, 'pending'>) => {
+    if (!countryCode || ids.length === 0) return;
+    setBusyId('batch');
+    setError(null);
+    try {
+      const updated = await reviewCountryRequirementsBatch(countryCode, ids, status);
+      const byId = new Map(updated.items.map((item) => [item.id, item]));
+      setRequirements((prev) => {
+        const next = prev.map((row) => byId.get(row.id) ?? row);
+        setPendingCount(next.filter((r) => r.reviewStatus === 'pending').length);
+        return next;
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not update the selected requirements');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
-    <AppShell
-      title="Country Requirements"
-      subtitle="Review the evidence, then publish or withhold each requirement."
+    <AdminLayout
+      title="Country requirements"
+      subtitle="This list is what employees and HR are served. Approve publishes the row; withhold keeps it out of the live catalog."
     >
       {error && <div className="text-sm text-[#b91c1c] mb-4">{error}</div>}
       {!profile && !error && <div className="text-sm text-[#6b7280]">Loading country profile...</div>}
@@ -71,8 +94,9 @@ export const CountryDetailPage: React.FC = () => {
             await load();
           }}
           onReview={handleReview}
+          onReviewBatch={handleReviewBatch}
         />
       )}
-    </AppShell>
+    </AdminLayout>
   );
 };

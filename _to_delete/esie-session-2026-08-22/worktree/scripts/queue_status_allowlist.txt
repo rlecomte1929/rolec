@@ -1,0 +1,26 @@
+# queue_status_allowlist.txt
+#
+# Suppresses known-acceptable findings for check_queue_status_hygiene.py
+# (HYGIENE-2): an AI Work Queue task left "Ready for AI" while a task it depends
+# on is not yet "Done", where that is intentional.
+#
+# One entry per line. Two accepted forms:
+#   <TAG>             — suppress the whole task (e.g. P3-01d)
+#   <TAG>:<DEP_TAG>   — suppress one blocking edge (e.g. P3-01e:P3-01d)
+# Inline "# comment" is allowed and required: say WHY it's allowlisted.
+#
+# This list should DRAIN over time. The guard is report-only by default; once
+# the live backlog is triaged into this file, flip the CI job to --strict.
+#
+# Seeded from the first live run (2026-06-04). The 10 tasks blocked by
+# Ready-for-AI / Blocked / Archived dependencies were set to Blocked in Notion
+# directly. The 5 below are blocked ONLY by a dependency that is already in
+# "Human Review" (work effectively done, awaiting sign-off) — expected to land
+# imminently, so they are left "Ready for AI" rather than Blocked. DRAIN these
+# when the Human-Review dependency is approved→Done (then the entry is moot) or
+# rejected (then set the task to Blocked).
+P2-06F  # dep P2-06e in Human Review (re-index chunks)
+P2-07E  # dep P2-07c in Human Review (per-step effort/confidence)
+P3-02D  # deps P3-02a/P3-02b in Human Review (dead-link detection)
+P2-08E  # dep P2-08a in Human Review (stale-steps admin alert)
+P1-05B  # dep P1-05a in Human Review (FormCard component)

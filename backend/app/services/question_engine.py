@@ -12,6 +12,12 @@ from .question_schema import SERVICE_QUESTION_BANK, ServiceQuestionDef, get_ques
 
 log = logging.getLogger(__name__)
 
+# Keys the intake wizard (or published housing cap) already holds. Hidden here so
+# the employee is not asked twice; values still flow via case_context / saved answers.
+_OMIT_WHEN_KNOWN = frozenset({
+    "child_ages", "people", "commute_mins", "origin_city", "budget_min", "budget_max",
+})
+
 
 def _eval_applies_if(applies_if: Optional[Dict[str, Any]], answers: Dict[str, Any]) -> bool:
     """Return True if question should be shown given applies_if and current answers."""
@@ -78,6 +84,22 @@ def generate_questions(
         if not _eval_applies_if(q.applies_if, effective_answers):
             continue
         prefill = _get_prefill_value(q.prefill_source, ctx, answers) if q.prefill_source else None
+        if prefill is None and q.question_key in answers:
+            prefill = answers.get(q.question_key)
+        if q.question_key in _OMIT_WHEN_KNOWN:
+            known = None
+            if q.question_key == "child_ages":
+                known = ctx.get("dependents_ages")
+            elif q.question_key == "people":
+                known = ctx.get("household_size")
+            elif q.question_key == "commute_mins":
+                known = ctx.get("commute_mins")
+            elif q.question_key in ("budget_min", "budget_max"):
+                known = ctx.get("housing_cap_amount")
+            elif q.question_key == "origin_city":
+                known = ctx.get("originCity")
+            if known not in (None, "", []):
+                continue
         default = prefill if prefill is not None else (answers.get(q.question_key) if q.question_key in answers else q.default)
         item = {
             "question_key": q.question_key,

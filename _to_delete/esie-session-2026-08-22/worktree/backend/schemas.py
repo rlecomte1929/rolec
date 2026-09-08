@@ -1,0 +1,560 @@
+import html as _html
+
+from pydantic import BaseModel, Field, AliasChoices, field_validator
+from typing import Optional, List, Dict, Any
+from datetime import date
+from enum import Enum
+
+
+def _escape_html(v: Optional[str]) -> Optional[str]:
+    """XSS defence: escape HTML special chars in user-supplied free-text before storage.
+
+    Uses Python's stdlib html.escape so <script>alert(1)</script> becomes
+    &lt;script&gt;alert(1)&lt;/script&gt; and is never reflected unescaped.
+    No external library required.
+    """
+    if v is None:
+        return None
+    return _html.escape(str(v))
+
+
+class MaritalStatus(str, Enum):
+    MARRIED = "married"
+    SINGLE = "single"
+    DIVORCED = "divorced"
+    WIDOWED = "widowed"
+
+
+class ContractType(str, Enum):
+    PERMANENT = "permanent"
+    ASSIGNMENT = "assignment"
+    CONTRACT = "contract"
+
+
+class CurriculumType(str, Enum):
+    IB = "IB"
+    UK = "UK"
+    US = "US"
+    LOCAL = "Local"
+    NO_PREFERENCE = "No preference"
+
+
+class InventorySize(str, Enum):
+    SMALL = "small"
+    MEDIUM = "medium"
+    LARGE = "large"
+
+
+class ReadinessStatus(str, Enum):
+    GREEN = "GREEN"
+    AMBER = "AMBER"
+    RED = "RED"
+
+
+class OverallStatus(str, Enum):
+    ON_TRACK = "On track"
+    AT_RISK = "At risk"
+
+
+class UserRole(str, Enum):
+    HR = "HR"
+    EMPLOYEE = "EMPLOYEE"
+    ADMIN = "ADMIN"
+
+
+# Child model
+class Child(BaseModel):
+    firstName: Optional[str] = None
+    dateOfBirth: Optional[date] = None
+    currentGrade: Optional[str] = None
+    languageNeeds: Optional[str] = None
+
+
+# Spouse model
+class Spouse(BaseModel):
+    fullName: Optional[str] = None
+    nationality: Optional[str] = None
+    wantsToWork: bool = True
+    occupation: Optional[str] = None
+    educationLevel: Optional[str] = None
+
+
+# Passport model
+class Passport(BaseModel):
+    number: Optional[str] = None
+    expiryDate: Optional[date] = None
+    issuingCountry: Optional[str] = None
+
+
+# Employer model
+class Employer(BaseModel):
+    name: Optional[str] = None
+    roleTitle: Optional[str] = None
+    jobLevel: Optional[str] = None
+    contractType: Optional[ContractType] = None
+    salaryBand: Optional[str] = None
+
+
+# Assignment model
+class Assignment(BaseModel):
+    startDate: Optional[date] = None
+    expectedDurationMonths: Optional[int] = None
+    relocationPackage: Optional[bool] = None
+    relocationPackageNotes: Optional[str] = None
+
+
+# Primary applicant model
+class PrimaryApplicant(BaseModel):
+    fullName: Optional[str] = None
+    nationality: Optional[str] = None
+    dateOfBirth: Optional[date] = None
+    photoUrl: Optional[str] = None
+    passport: Passport = Field(default_factory=Passport)
+    employer: Employer = Field(default_factory=Employer)
+    assignment: Assignment = Field(default_factory=Assignment)
+
+
+# Housing preferences
+class HousingPreferences(BaseModel):
+    desiredMoveInDate: Optional[date] = None
+    temporaryStayWeeks: Optional[int] = None
+    budgetMonthlySGD: Optional[str] = None
+    bedroomsMin: int = 3
+    preferredAreas: List[str] = Field(default_factory=list)
+    mustHave: List[str] = Field(default_factory=list)
+
+
+# Schooling preferences
+class SchoolingPreferences(BaseModel):
+    schoolingStartDate: Optional[date] = None
+    curriculumPreference: Optional[CurriculumType] = None
+    budgetAnnualSGD: Optional[str] = None
+    priorities: List[str] = Field(default_factory=list)
+
+
+# Movers preferences
+class MoversPreferences(BaseModel):
+    inventoryRough: Optional[InventorySize] = None
+    specialItems: List[str] = Field(default_factory=list)
+    storageNeeded: Optional[bool] = None
+    insuranceNeeded: Optional[bool] = None
+
+
+# Move plan model
+class MovePlan(BaseModel):
+    # These were "Oslo, Norway" / "Singapore". As pydantic DEFAULTS they were written into
+    # relocation_cases.profile_json for every case that never set them explicitly — 1365 of 1401
+    # cases in production (97.4%) carried the pair, including Paris->Oslo cases on the FR-NO
+    # corridor, whose summary therefore read "Oslo, Norway -> Singapore".
+    #
+    # The value is not inert: frontend/src/features/cases/caseEssentials.ts resolves
+    # `movePlan.origin ?? caseOriginHint`, movePlan FIRST, so a non-empty default beats the real
+    # route on every case that has one.
+    #
+    # Empty string rather than None: "" is already how this codebase spells "city unknown"
+    # (recommendations/plugins/movers.py `origin_city: str = ""`, and criteria_builder only sets
+    # the key `if origin_city`), and it keeps the annotation `str` so no caller has to learn to
+    # handle None. Every reader treats empty as absent and falls through to the real route.
+    origin: str = ""
+    destination: str = ""
+    targetArrivalDate: Optional[date] = None
+    shippingDatePreference: Optional[date] = None
+    housing: HousingPreferences = Field(default_factory=HousingPreferences)
+    schooling: SchoolingPreferences = Field(default_factory=SchoolingPreferences)
+    movers: MoversPreferences = Field(default_factory=MoversPreferences)
+
+
+# Compliance & docs
+class ComplianceDocs(BaseModel):
+    hasPassportScans: Optional[bool] = None
+    hasMarriageCertificate: Optional[bool] = None
+    hasBirthCertificates: Optional[bool] = None
+    hasEmploymentLetter: Optional[bool] = None
+    hasBankStatements: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+# Main RelocationProfile
+class RelocationProfile(BaseModel):
+    userId: Optional[str] = None
+    familySize: int = 4
+    maritalStatus: Optional[MaritalStatus] = None
+    dependents: List[Child] = Field(default_factory=lambda: [Child(), Child()])
+    spouse: Spouse = Field(default_factory=Spouse)
+    primaryApplicant: PrimaryApplicant = Field(default_factory=PrimaryApplicant)
+    movePlan: MovePlan = Field(default_factory=MovePlan)
+    complianceDocs: ComplianceDocs = Field(default_factory=ComplianceDocs)
+
+
+# Question models
+class QuestionOption(BaseModel):
+    value: str
+    label: str
+    icon: Optional[str] = None
+
+
+class Question(BaseModel):
+    id: str
+    title: str
+    whyThisMatters: str
+    type: str  # single_select, multi_select, text, date, number, range, boolean, address
+    options: Optional[List[QuestionOption]] = None
+    required: bool = True
+    mapsTo: str  # JSON pointer in profile
+    dependsOn: Optional[Dict[str, Any]] = None
+    validation: Optional[Dict[str, Any]] = None
+    allowUnknown: bool = False
+
+
+# API request/response models
+class RegisterRequest(BaseModel):
+    username: Optional[str] = None
+    email: Optional[str] = None
+    password: str
+    role: UserRole
+    name: Optional[str] = None
+    company_name: Optional[str] = None
+    company_size: Optional[str] = None  # AIQ-829 — HR headcount band → companies.size_band
+
+    # XSS defence: strip HTML from user-supplied text before storage
+    @field_validator("name", "company_name", "company_size", mode="before")
+    @classmethod
+    def _sanitize_name(cls, v: Optional[str]) -> Optional[str]:
+        return _escape_html(v)
+
+
+class LoginRequest(BaseModel):
+    identifier: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    username: Optional[str] = None
+    email: Optional[str] = None
+    role: UserRole
+    # [AIQ-1361] Multi-role: all roles the user holds + their primary/active role.
+    # Default to empty/None so legacy callers and existing tests are unaffected.
+    roles: List[str] = []
+    primary_role: Optional[str] = None
+    name: Optional[str] = None
+    company: Optional[str] = None
+    # [AIQ-1701] Whether this user has already dismissed their role's first-login
+    # welcome page. Carried on the login response (the profile row is already loaded
+    # there, so it costs no extra query) and mirrored into localStorage by the client,
+    # which keeps the redirect check synchronous — no async gate on the role home.
+    # Defaults False so legacy callers and existing tests are unaffected.
+    welcome_seen: bool = False
+
+
+class PostSignupReconciliation(BaseModel):
+    """Returned after EMPLOYEE register/login when pending contacts/assignments were linked."""
+
+    linkedContactIds: List[str] = Field(default_factory=list)
+    attachedAssignmentIds: List[str] = Field(default_factory=list)
+    skippedContactsLinkedToOtherUser: int = 0
+    skippedAssignmentsLinkedToOtherUser: int = 0
+    skippedRevokedInvites: int = 0
+    skippedAlreadyLinkedSameUser: int = 0
+    headline: Optional[str] = None
+    message: Optional[str] = None
+
+
+class LoginResponse(BaseModel):
+    token: str
+    user: UserResponse
+    reconciliation: Optional[PostSignupReconciliation] = None
+
+
+
+
+class AnswerRequest(BaseModel):
+    questionId: str
+    answer: Any
+    isUnknown: bool = False
+
+
+class NextQuestionResponse(BaseModel):
+    question: Optional[Question] = None
+    isComplete: bool = False
+    progress: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidationError(BaseModel):
+    field: str
+    message: str
+
+
+class ImmigrationReadiness(BaseModel):
+    score: int
+    status: ReadinessStatus
+    reasons: List[str]
+    missingDocs: List[str]
+
+
+class HousingRecommendation(BaseModel):
+    id: str
+    name: str
+    area: str
+    bedrooms: int
+    furnished: bool
+    nearMRT: bool
+    estMonthlySGDMin: int
+    estMonthlySGDMax: int
+    familyFriendlyScore: int
+    notes: str
+    rationale: str
+    nextAction: str = "View details"
+
+
+class SchoolRecommendation(BaseModel):
+    id: str
+    name: str
+    area: str
+    curriculumTags: List[str]
+    ageRange: str
+    estAnnualSGDMin: int
+    estAnnualSGDMax: int
+    languageSupport: List[str]
+    notes: str
+    rationale: str
+    nextAction: str = "Request application info"
+
+
+class MoverRecommendation(BaseModel):
+    id: str
+    name: str
+    serviceTags: List[str]
+    notes: str
+    rfqTemplate: str
+    rationale: str
+    nextAction: str = "Request quote"
+
+
+class TimelineTask(BaseModel):
+    title: str
+    status: str  # todo, in_progress, done
+    dueDate: Optional[str] = None
+
+
+class TimelinePhase(BaseModel):
+    phase: str
+    tasks: List[TimelineTask]
+
+
+class DashboardResponse(BaseModel):
+    profileCompleteness: int
+    immigrationReadiness: ImmigrationReadiness
+    nextActions: List[str]
+    timeline: List[TimelinePhase]
+    recommendations: Dict[str, List[Any]]
+    overallStatus: OverallStatus
+
+
+class AssignmentStatus(str, Enum):
+    """
+    Canonical assignment statuses (aligned with Postgres constraint).
+
+    All API responses and internal logic should use these values only.
+    Legacy/uppercase variants are normalized via normalize_status() in main.py.
+    """
+
+    CREATED = "created"
+    ASSIGNED = "assigned"
+    AWAITING_INTAKE = "awaiting_intake"
+    SUBMITTED = "submitted"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CLOSED = "closed"
+
+
+class IntakeChecklistItem(BaseModel):
+    """Explicit HR-visible intake/document checkpoints (same GET as assignment detail)."""
+
+    key: str
+    label: str
+    satisfied: bool
+    category: str = "intake"
+    linked_tracker_task_type: Optional[str] = None
+
+
+class ReadinessBlockingItemView(BaseModel):
+    source: str
+    title: str
+    detail: Optional[str] = None
+    human_review_required: bool = False
+    provenance_note: Optional[str] = None
+    linked_tracker_task_type: Optional[str] = None
+
+
+class ReadinessNextActionView(BaseModel):
+    title: str
+    category: str = "general"
+    linked_tracker_task_type: Optional[str] = None
+
+
+class CaseReadinessUi(BaseModel):
+    """Merged readiness + compliance + checklist summary for HR case page (no extra requests)."""
+
+    overall_status: str
+    overall_label: str
+    completion_basis: str
+    intake_satisfied: int
+    intake_total: int
+    checklist_satisfied: Optional[int] = None
+    checklist_total: Optional[int] = None
+    checklist_applicable: bool = False
+    checklist_pending: Optional[int] = Field(default=None)
+    blocking_items: List[ReadinessBlockingItemView] = Field(default_factory=list)
+    next_actions: List[ReadinessNextActionView] = Field(default_factory=list)
+    trust_banner: Optional[str] = None
+    next_deadline_display: Optional[str] = None
+
+
+class AssignmentSummary(BaseModel):
+    id: str
+    caseId: str
+    employeeIdentifier: str
+    status: AssignmentStatus
+    submittedAt: Optional[str] = None
+    complianceStatus: Optional[str] = None
+    employeeFirstName: Optional[str] = None
+    employeeLastName: Optional[str] = None
+    # 6B/6C: Optional relocation case summary attached to assignment
+    # Contains a safe subset of fields from relocation_cases.
+    case: Optional[Dict[str, Any]] = None
+    nextDeadline: Optional[str] = Field(
+        default=None,
+        description="Earliest open milestone due date for HR list (human-readable).",
+    )
+
+
+class AssignmentsListResponse(BaseModel):
+    """Paginated assignments list. Summary-only, no per-row compliance N+1."""
+    assignments: List[AssignmentSummary]
+    total: int
+
+
+class AssignmentDetail(BaseModel):
+    id: str
+    caseId: str
+    employeeIdentifier: str
+    status: AssignmentStatus
+    submittedAt: Optional[str] = None
+    hrNotes: Optional[str] = None
+    profile: Optional[RelocationProfile] = None
+    completeness: Optional[int] = None
+    complianceReport: Optional[Dict[str, Any]] = None
+    employeeFirstName: Optional[str] = None
+    employeeLastName: Optional[str] = None
+    # HR Case Essentials (same GET — profiles + relocation_cases; no extra HTTP round-trips)
+    employeeEmail: Optional[str] = Field(default=None)
+    # [AIQ-1648] The HR account that OWNS the case (case_assignments.hr_user_id → users.email).
+    # The Package & limits page's "HR owner" chip was mistakenly bound to the employee identity.
+    hrOwnerEmail: Optional[str] = Field(default=None)
+    linkedEmployeeFullName: Optional[str] = Field(default=None)
+    caseOriginHint: Optional[str] = Field(default=None)
+    caseDestinationHint: Optional[str] = Field(default=None)
+    # [AIQ-1336] City-level corridor so the HR case detail can show "Paris, France"
+    # rather than just "France". Optional; the frontend falls back to the country hint.
+    caseOriginCity: Optional[str] = Field(default=None)
+    caseDestinationCity: Optional[str] = Field(default=None)
+    intakeChecklist: List[IntakeChecklistItem] = Field(default_factory=list)
+    readinessSnapshot: Optional[Dict[str, Any]] = None
+    caseReadinessUi: Optional[CaseReadinessUi] = None
+
+
+class HRAssignmentDecision(BaseModel):
+    decision: AssignmentStatus
+    notes: Optional[str] = None
+    requestedSections: Optional[List[str]] = None
+
+
+class CreateCaseResponse(BaseModel):
+    caseId: str
+
+
+class AssignCaseRequest(BaseModel):
+    # Accept both camelCase (current) and snake_case (legacy test runner / old clients)
+    employeeIdentifier: str = Field(validation_alias=AliasChoices("employeeIdentifier", "employee_email"))
+    employeeFirstName: Optional[str] = None
+    employeeLastName: Optional[str] = None
+    # Optional seniority band HR sets when linking the employee, so benefit
+    # comparison can target the employee's level (matrix caps are level-gated).
+    # Stored into the case profile_json; resolved by extract_resolution_context.
+    employeeLevel: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("employeeLevel", "employee_level")
+    )
+
+    # XSS defence: strip HTML from user-supplied text before storage
+    @field_validator("employeeFirstName", "employeeLastName", mode="before")
+    @classmethod
+    def _sanitize_name_fields(cls, v: Optional[str]) -> Optional[str]:
+        return _escape_html(v)
+
+
+class AssignCaseResponse(BaseModel):
+    assignmentId: str
+    inviteToken: Optional[str] = None
+    # AIQ-1572: whether an invite email was actually queued. The HR UI used to state
+    # flatly that one "has been sent" off the mere presence of an assignmentId — true
+    # while every assignment emailed, false the moment test-drive assignments stopped.
+    # Defaults True (the pre-existing behaviour) so nothing else has to change.
+    inviteEmailSent: bool = True
+
+
+class UpdateAssignmentIdentifierRequest(BaseModel):
+    employeeIdentifier: str
+
+
+class ClaimAssignmentRequest(BaseModel):
+    email: str
+
+
+class ClaimByTokenRequest(BaseModel):
+    token: str
+
+
+class EmployeeJourneyRequest(BaseModel):
+    assignmentId: str
+    questionId: str
+    answer: Any
+
+
+class EmployeeJourneyNextQuestion(BaseModel):
+    question: Optional[Question] = None
+    isComplete: bool = False
+    progress: Dict[str, Any] = Field(default_factory=dict)
+    completeness: int = 0
+    missingItems: List[str] = Field(default_factory=list)
+    assignmentStatus: Optional[AssignmentStatus] = None
+    hrNotes: Optional[str] = None
+    profile: Optional[RelocationProfile] = None
+
+
+class UpdateProfilePhotoRequest(BaseModel):
+    assignmentId: str
+    photoUrl: str
+
+
+class PolicyExceptionRequest(BaseModel):
+    category: str
+    reason: Optional[str] = None
+    amount: Optional[float] = None
+class ComplianceActionRequest(BaseModel):
+    actionType: str
+    checkId: str
+    notes: Optional[str] = None
+    payload: Optional[Dict[str, Any]] = None
+
+
+class AddEvidenceRequest(BaseModel):
+    evidence_type: str = Field(validation_alias=AliasChoices("evidenceType", "evidence_type"))
+    participant_id: Optional[str] = Field(None, validation_alias=AliasChoices("participantId", "participant_id"))
+    requirement_id: Optional[str] = Field(None, validation_alias=AliasChoices("requirementId", "requirement_id"))
+    file_url: Optional[str] = Field(None, validation_alias=AliasChoices("fileUrl", "file_url"))
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class AddEvidenceResponse(BaseModel):
+    evidenceId: str

@@ -1,0 +1,776 @@
+"""
+Policy resolution: transforms published policy versions into concrete assignment packages.
+
+**Layer 2 only:** This module reads published `policy_versions` / related tables and writes
+`resolved_assignment_policies`. It does not use `policy_documents.extracted_metadata` or
+clause-level `normalized_hint_json`. Employee comparison must consume this path (or equivalent
+resolved snapshots), not Layer-1 document metadata — see docs/policy/metadata-vs-decision-layer.md.
+
+Resolves benefit rules, exclusions, and applicability conditions for a specific assignment
+using assignment context (type, family status, destination, duration, tier).
+"""
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+from .policy_hr_rule_override_layer import (
+    compute_entitlement_value_trace,
+    force_excluded_by_hr_override,
+    index_hr_overrides_by_benefit_rule_id,
+    load_merged_benefit_rule_for_resolution,
+)
+from .policy_taxonomy import ASSIGNMENT_TYPE_MAP, FAMILY_STATUS_MAP, get_benefit_meta
+
+log = logging.getLogger(__name__)
+
+
+def _normalize_assignment_type(raw: Optional[str]) -> str:
+    """Normalize assignment type to LTA, STA, etc."""
+    if not raw or not str(raw).strip():
+        return "LTA"
+    key = str(raw).lower().replace("-", "_").replace(" ", "_")
+    return ASSIGNMENT_TYPE_MAP.get(key, raw.strip().upper()[:20])
+
+
+def _normalize_family_status(raw: Optional[str]) -> str:
+    """Normalize family status."""
+    if not raw or not str(raw).strip():
+        return "single"
+    key = str(raw).lower().strip()
+    return FAMILY_STATUS_MAP.get(key, key)
+
+
+def _deep_merge_dict(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(base)
+    for k, v in update.items():
+        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
+            out[k] = _deep_merge_dict(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def _intake_overlay_from_case_draft(draft: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Flatten CaseWizard / relocation_cases.profile_json (CaseDraftDTO) into the loose profile
+    shape expected by extract_resolution_context (maritalStatus, spouse, dependents, movePlan, assignmentType).
+    """
+    if not draft or not isinstance(draft, dict):
+        return {}
+    if draft.get("relocationBasics") is None and draft.get("familyMembers") is None:
+        return {}
+
+    out: Dict[str, Any] = {}
+    fm = draft.get("familyMembers") or {}
+    if fm.get("maritalStatus"):
+        out["maritalStatus"] = fm["maritalStatus"]
+    sp = fm.get("spouse") or {}
+    if isinstance(sp, dict) and (sp.get("fullName") or "").strip():
+        out["spouse"] = {"fullName": sp.get("fullName"), "accompanying": True}
+    ch = fm.get("children") or []
+    if isinstance(ch, list) and ch:
+        deps = []
+        for c in ch:
+            if not isinstance(c, dict):
+                continue
+            entry: Dict[str, Any] = {}
+            if c.get("fullName"):
+                entry["fullName"] = c.get("fullName")
+            if c.get("dateOfBirth"):
+                entry["dateOfBirth"] = c.get("dateOfBirth")
+            if c.get("age") is not None:
+                try:
+                    entry["age"] = int(c["age"])
+                except (TypeError, ValueError):
+                    pass
+            deps.append(entry)
+        if deps:
+            out["dependents"] = deps
+
+    rb = draft.get("relocationBasics") or {}
+    oc = ", ".join(filter(None, [rb.get("originCity"), rb.get("originCountry")]))
+    dc = ", ".join(filter(None, [rb.get("destCity"), rb.get("destCountry")]))
+    if oc or dc:
+        mp = out.setdefault("movePlan", {})
+        if oc:
+            mp["origin"] = oc
+        if dc:
+            mp["destination"] = dc
+    dm = rb.get("durationMonths")
+    if dm is not None:
+        try:
+            n = int(dm)
+            mp = out.setdefault("movePlan", {})
+            mp["duration"] = f"{n} months"
+        except (TypeError, ValueError):
+            pass
+
+    ac = draft.get("assignmentContext") or {}
+    if isinstance(ac, dict):
+        explicit_at = (ac.get("assignmentType") or ac.get("assignment_type") or "").strip()
+        if explicit_at:
+            out["assignmentType"] = explicit_at
+        else:
+            ct = str(ac.get("contractType") or "").strip().lower()
+            if ct == "permanent":
+                out["assignmentType"] = "permanent"
+            elif ct == "assignment":
+                out["assignmentType"] = "long_term"
+            elif ct == "contract":
+                out["assignmentType"] = "short_term"
+        if ac.get("jobTitle") or ac.get("salaryBand"):
+            pa = out.setdefault("primaryApplicant", {})
+            emp = pa.setdefault("employer", {})
+            if ac.get("jobTitle"):
+                emp["roleTitle"] = ac.get("jobTitle")
+            if ac.get("salaryBand"):
+                emp["salaryBand"] = ac.get("salaryBand")
+    return out
+
+
+def extract_resolution_context(
+    assignment: Dict[str, Any],
+    case: Optional[Dict[str, Any]],
+    profile: Optional[Dict[str, Any]],
+    employee_profile: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Extract resolution context from assignment, case, and profiles.
+    """
+    ctx: Dict[str, Any] = {
+        "assignment_type": "LTA",
+        "family_status": "single",
+        "family_size": 1,
+        "destination_country": None,
+        "destination_city": None,
+        "duration_months": None,
+        "accompanied_family": False,
+        "tier": None,
+        "children_count": 0,
+        "has_spouse": False,
+        "school_age_children": False,
+    }
+
+    # Merge wizard case draft (profile_json) with wizard_employee_profiles row; latter wins on conflicts.
+    p_merged: Dict[str, Any] = {}
+    if profile and isinstance(profile, dict):
+        if profile.get("relocationBasics") is not None or profile.get("familyMembers") is not None:
+            p_merged.update(_intake_overlay_from_case_draft(profile))
+        else:
+            p_merged.update(profile)
+    if employee_profile and isinstance(employee_profile, dict):
+        p = _deep_merge_dict(p_merged, employee_profile)
+    else:
+        p = p_merged
+
+    # Assignment type: from employees table, profile, or assignment metadata
+    at = (
+        assignment.get("assignment_type")
+        or p.get("assignmentType")
+        or p.get("primaryApplicant", {}).get("assignmentType")
+        or p.get("movePlan", {}).get("assignmentType")
+    )
+    ctx["assignment_type"] = _normalize_assignment_type(at)
+
+    # Family status and size
+    spouse = p.get("spouse") or p.get("spousal", {})
+    ctx["has_spouse"] = bool(spouse.get("fullName") or spouse.get("accompanying"))
+    deps = p.get("dependents") or p.get("children") or []
+    if isinstance(deps, list):
+        ctx["children_count"] = len(deps)
+    elif isinstance(deps, (int, float)):
+        ctx["children_count"] = int(deps)
+    ctx["family_size"] = 1 + (1 if ctx["has_spouse"] else 0) + ctx["children_count"]
+    ctx["accompanied_family"] = ctx["family_size"] > 1
+
+    if ctx["children_count"] > 0:
+        fs_raw = "dependents"
+    else:
+        fs_raw = (
+            p.get("maritalStatus")
+            or p.get("familyStatus")
+            or ("accompanied" if ctx["accompanied_family"] else "single")
+        )
+    ctx["family_status"] = _normalize_family_status(fs_raw)
+
+    # School age: check dependents ages
+    for d in deps if isinstance(deps, list) else []:
+        age = d.get("age") if isinstance(d, dict) else None
+        if age is not None and 5 <= int(age) <= 18:
+            ctx["school_age_children"] = True
+            break
+
+    # Destination
+    mp = p.get("movePlan") or {}
+    dest = mp.get("destination") or (case or {}).get("host_country") or ""
+    if isinstance(dest, str) and "," in dest:
+        parts = dest.split(",")
+        ctx["destination_city"] = parts[0].strip() if parts else None
+        ctx["destination_country"] = parts[-1].strip()[:2].upper() if parts else None
+    elif dest:
+        ctx["destination_country"] = str(dest)[:2].upper() if len(str(dest)) >= 2 else str(dest)
+
+    # Duration
+    dur = mp.get("duration") or p.get("assignmentDuration") or assignment.get("expected_duration_months")
+    if dur:
+        if isinstance(dur, (int, float)):
+            ctx["duration_months"] = int(dur)
+        elif isinstance(dur, str) and "month" in dur.lower():
+            try:
+                ctx["duration_months"] = int("".join(c for c in dur if c.isdigit()) or 12)
+            except ValueError:
+                ctx["duration_months"] = 12
+
+    # Tier / band — free-text breadcrumb (preserved for older resolvers).
+    tier = (
+        p.get("primaryApplicant", {}).get("employer", {}).get("jobLevel")
+        or p.get("band")
+        or p.get("tier")
+        or assignment.get("tier")
+    )
+    ctx["tier"] = str(tier).strip() if tier else None
+
+    # Employee level — canonical slug for the 3rd matrix targeting axis (Phase 2).
+    # Reads the same sources as `tier` but normalizes through the shared alias
+    # map so "Band3" / "L3" / "senior_manager" / "Director" all resolve to the
+    # canonical 'director' value. Also picks up AssignmentContextDTO.seniorityBand
+    # when the resolver is invoked via the case-draft intake overlay above.
+    from .policy_config_targeting import normalize_employee_level  # local to avoid cycle
+
+    level_raw = (
+        tier
+        or p.get("primaryApplicant", {}).get("employer", {}).get("seniorityBand")
+        or p.get("seniorityBand")
+        or p.get("employee_level")
+        or assignment.get("employee_level")
+    )
+    ctx["employee_level"] = normalize_employee_level(level_raw)
+
+    return ctx
+
+
+_UNSET = object()  # sentinel: distinguishes "not supplied" from a real None
+
+
+def collect_company_id_candidates_for_assignment(
+    db: Any,
+    assignment: Dict[str, Any],
+    case: Optional[Dict[str, Any]],
+    *,
+    hr_company_id: Any = _UNSET,
+    employee_profile: Any = _UNSET,
+) -> List[str]:
+    """
+    Ordered unique company_ids to try when resolving a published policy.
+    Matches product order: case.company_id → HR owner's company → employee profile company_id.
+
+    [AIQ-1014/PERF-3] N+1 dedup: callers that have already fetched the HR owner's
+    company and/or the employee profile (e.g. ``_resolve_published_policy_for_employee``)
+    may pass them via ``hr_company_id`` / ``employee_profile`` to skip the two
+    redundant DB lookups. The sentinel default preserves the original
+    query-on-demand behaviour for callers that don't, so the candidate list is
+    byte-identical either way.
+    """
+    candidates: List[str] = []
+    seen: Set[str] = set()
+
+    def add(cid: Optional[Any]) -> None:
+        if cid is None:
+            return
+        s = str(cid).strip()
+        if not s or s in seen:
+            return
+        seen.add(s)
+        candidates.append(s)
+
+    if case:
+        add(case.get("company_id"))
+    hr_uid = assignment.get("hr_user_id") or (case.get("hr_user_id") if case else None)
+    if hr_uid:
+        if hr_company_id is not _UNSET:
+            add(hr_company_id)
+        else:
+            try:
+                add(db.get_hr_company_id(hr_uid))
+            except Exception:
+                pass
+    emp_uid = assignment.get("employee_user_id")
+    if emp_uid:
+        if employee_profile is not _UNSET:
+            if employee_profile:
+                add(employee_profile.get("company_id"))
+        else:
+            try:
+                prof = db.get_profile_record(emp_uid)
+                if prof:
+                    add(prof.get("company_id"))
+            except Exception:
+                pass
+    return candidates
+
+
+def find_first_published_company_policy(
+    db: Any,
+    company_ids: List[str],
+) -> Optional[Tuple[str, Dict[str, Any], Dict[str, Any]]]:
+    """
+    Return (company_id, company_policy_row, published_version_row) for the first
+    candidate company that has a published policy_versions row.
+    """
+    for cid in company_ids:
+        try:
+            pub = db.get_company_policy_with_published_version(cid)
+        except Exception:
+            pub = None
+        if not pub:
+            continue
+        policy, version = pub
+        if policy and version:
+            return (cid, policy, version)
+    return None
+
+
+def _rule_applies_by_assignment_type(
+    rule_id: str,
+    assignment_type: str,
+    assignment_applicability: List[Dict[str, Any]],
+) -> bool:
+    """True if benefit rule has no assignment restriction or assignment_type matches."""
+    apps = [a for a in assignment_applicability if a.get("benefit_rule_id") == rule_id]
+    if not apps:
+        return True
+    types_ok = [a.get("assignment_type") for a in apps if a.get("assignment_type")]
+    if not types_ok:
+        return True
+    return assignment_type.upper() in [t.upper() for t in types_ok]
+
+
+def _rule_applies_by_family_status(
+    rule_id: str,
+    family_status: str,
+    family_applicability: List[Dict[str, Any]],
+) -> bool:
+    """True if benefit rule has no family restriction or family_status matches."""
+    apps = [a for a in family_applicability if a.get("benefit_rule_id") == rule_id]
+    if not apps:
+        return True
+    statuses_ok = [a.get("family_status") for a in apps if a.get("family_status")]
+    if not statuses_ok:
+        return True
+    fs_lower = family_status.lower()
+    return fs_lower in [s.lower() for s in statuses_ok]
+
+
+def _evaluate_condition(
+    cond: Dict[str, Any],
+    ctx: Dict[str, Any],
+) -> bool:
+    """Evaluate a policy_rule_condition against context."""
+    ctype = cond.get("condition_type", "")
+    val = cond.get("condition_value_json") or {}
+    if not isinstance(val, dict):
+        return True
+
+    if ctype == "assignment_type":
+        allowed = val.get("assignment_types") or val.get("values") or []
+        if not allowed:
+            return True
+        return ctx.get("assignment_type", "").upper() in [str(a).upper() for a in allowed]
+
+    if ctype == "family_status":
+        allowed = val.get("family_statuses") or val.get("values") or []
+        if not allowed:
+            return True
+        return ctx.get("family_status", "").lower() in [str(a).lower() for a in allowed]
+
+    if ctype == "duration_threshold":
+        min_months = val.get("min_months") or val.get("min_duration")
+        if min_months is None:
+            return True
+        dur = ctx.get("duration_months")
+        if dur is None:
+            return True
+        return int(dur) >= int(min_months)
+
+    if ctype == "accompanied_family":
+        req = val.get("required", True)
+        return ctx.get("accompanied_family", False) == req
+
+    if ctype == "school_age_threshold":
+        req = val.get("has_school_age", True)
+        return ctx.get("school_age_children", False) == req
+
+    if ctype == "remote_location":
+        # If condition says remote required, we'd need destination to be in remote list
+        return True
+
+    if ctype == "localization_exclusion":
+        # Excludes certain countries; we'd check destination_country
+        excluded = val.get("excluded_countries") or []
+        dest = ctx.get("destination_country")
+        if not dest or not excluded:
+            return True
+        return dest.upper() not in [str(c).upper() for c in excluded]
+
+    return True
+
+
+def _is_benefit_excluded(
+    benefit_key: str,
+    domain: str,
+    exclusions: List[Dict[str, Any]],
+    ctx: Dict[str, Any],
+) -> bool:
+    """Check if benefit is excluded by any exclusion rule."""
+    for ex in exclusions:
+        ex_bk = ex.get("benefit_key")
+        ex_domain = (ex.get("domain") or "").lower()
+        if ex_bk and ex_bk != benefit_key:
+            continue
+        if ex_domain == "all" or ex_domain == "general":
+            return True
+        if ex_domain == "tax" and benefit_key in ("tax",):
+            return True
+        if ex_bk == benefit_key:
+            return True
+    return False
+
+
+def _get_tier_override(
+    benefit_rule_id: str,
+    tier: Optional[str],
+    tier_overrides: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Get tier override limits for benefit rule if tier matches."""
+    if not tier:
+        return None
+    for to in tier_overrides:
+        if to.get("benefit_rule_id") != benefit_rule_id:
+            continue
+        tk = (to.get("tier_key") or "").lower()
+        if tk and tier.lower() in (tk, tk.replace(" ", ""), tk.replace("band", "")):
+            return to.get("override_limits_json") or {}
+    return None
+
+
+def _meta(r: Dict[str, Any], key: str, default: Any = None) -> Any:
+    m = r.get("metadata_json") or r.get("metadata") or {}
+    if not isinstance(m, dict):
+        return default
+    return m.get(key, default)
+
+
+def resolve_benefits_matrix_for_version(
+    db: Any,
+    assignment_id: str,
+    assignment: Dict[str, Any],
+    case: Optional[Dict[str, Any]],
+    profile: Optional[Dict[str, Any]],
+    employee_profile: Optional[Dict[str, Any]],
+    *,
+    company_id: str,
+    policy_row: Dict[str, Any],
+    version_row: Dict[str, Any],
+    persist_resolution: bool = True,
+) -> Optional[Dict[str, Any]]:
+    """
+    Resolve benefit matrix for a specific policy version (published or draft preview).
+
+    When persist_resolution=True, upserts resolved_assignment_policies and returns the same shape as
+    the historical resolve_policy_for_assignment output. When False, returns benefits/exclusions in-memory
+    only (employee entitlement preview before publish).
+    """
+    ctx = extract_resolution_context(assignment, case, profile, employee_profile)
+    case_id = assignment.get("case_id")
+    canonical_case_id = assignment.get("canonical_case_id") or case_id
+
+    policy_id = (policy_row or {}).get("id")
+    vid = (version_row or {}).get("id")
+    if not policy_id or not vid:
+        log.warning("policy_resolution: policy or version missing id assignment_id=%s", assignment_id)
+        return None
+    benefit_rules = db.list_policy_benefit_rules(vid)
+    exclusions = db.list_policy_exclusions(vid)
+    evidence_reqs = db.list_policy_evidence_requirements(vid)
+    conditions = db.list_policy_rule_conditions(vid)
+    assignment_applicability = db.list_policy_assignment_applicability(vid)
+    family_applicability = db.list_policy_family_applicability(vid)
+    tier_overrides = db.list_policy_tier_overrides(vid)
+    try:
+        hr_ov_rows = db.list_hr_benefit_rule_overrides(str(vid))
+    except Exception:
+        hr_ov_rows = []
+    hr_ov_by = index_hr_overrides_by_benefit_rule_id(list(hr_ov_rows))
+
+    # Build evidence by benefit_rule_id
+    evidence_by_rule: Dict[str, List[str]] = {}
+    for ev in evidence_reqs:
+        brid = ev.get("benefit_rule_id")
+        items = ev.get("evidence_items_json") or []
+        if isinstance(items, list):
+            evidence_by_rule.setdefault(brid or "", []).extend(items)
+
+    # Conditions by object
+    conditions_by_object: Dict[tuple, List[Dict]] = {}
+    for c in conditions:
+        key = (c.get("object_type"), c.get("object_id"))
+        conditions_by_object.setdefault(key, []).append(c)
+
+    assignment_type = ctx["assignment_type"]
+    family_status = ctx["family_status"]
+    tier = ctx["tier"]
+
+    resolved_benefits: List[Dict[str, Any]] = []
+    resolved_exclusions: List[Dict[str, Any]] = []
+    review_notes: List[str] = []
+    resolution_status = "ok"
+
+    # Apply exclusions to build exclusion list (global and benefit-specific)
+    for ex in exclusions:
+        domain = ex.get("domain") or "general"
+        desc = ex.get("description") or ex.get("raw_text", "")[:200]
+        resolved_exclusions.append({
+            "benefit_key": ex.get("benefit_key"),
+            "domain": domain,
+            "description": desc,
+            "source_rule_ids_json": [ex.get("id")],
+        })
+
+    # Resolve each benefit rule
+    for rule in benefit_rules:
+        rid = rule.get("id")
+        bk = rule.get("benefit_key")
+        if not bk:
+            continue
+
+        ov = hr_ov_by.get(str(rid)) if rid is not None else None
+        merged, ent_trace = load_merged_benefit_rule_for_resolution(
+            db, str(vid), rule, overrides_by_rule_id=hr_ov_by
+        )
+
+        # Check assignment type applicability
+        if not _rule_applies_by_assignment_type(rid, assignment_type, assignment_applicability):
+            continue
+
+        # Check family status applicability
+        if not _rule_applies_by_family_status(rid, family_status, family_applicability):
+            continue
+
+        # Evaluate conditions for this rule
+        conds = conditions_by_object.get(("benefit_rule", rid), [])
+        if conds:
+            if not all(_evaluate_condition(cond, ctx) for cond in conds):
+                continue  # Skip this rule - at least one condition failed
+
+        # HR envelope: force excluded without mutating stored Layer-2 row
+        if force_excluded_by_hr_override(ov):
+            resolved_benefits.append({
+                "benefit_key": bk,
+                "included": False,
+                "min_value": None,
+                "standard_value": None,
+                "max_value": None,
+                "currency": merged.get("currency") or rule.get("currency"),
+                "amount_unit": merged.get("amount_unit") or rule.get("amount_unit"),
+                "frequency": merged.get("frequency") or rule.get("frequency"),
+                "approval_required": False,
+                "evidence_required_json": [],
+                "exclusions_json": [{"domain": "excluded", "description": "Excluded by HR policy override"}],
+                "condition_summary": "HR override: excluded",
+                "source_rule_ids_json": [rid],
+                "entitlement_value_trace": ent_trace,
+            })
+            continue
+
+        # Check exclusions
+        excluded = _is_benefit_excluded(bk, "general", exclusions, ctx)
+        if excluded:
+            resolved_benefits.append({
+                "benefit_key": bk,
+                "included": False,
+                "min_value": None,
+                "standard_value": None,
+                "max_value": None,
+                "currency": rule.get("currency"),
+                "amount_unit": rule.get("amount_unit"),
+                "frequency": rule.get("frequency"),
+                "approval_required": False,
+                "evidence_required_json": [],
+                "exclusions_json": [{"domain": "excluded", "description": "Excluded by policy"}],
+                "condition_summary": "Excluded",
+                "source_rule_ids_json": [rid],
+                "entitlement_value_trace": compute_entitlement_value_trace(rule, ov),
+            })
+            continue
+
+        # Allowed - compute values (merged applies HR cap / approval / duration overrides)
+        allowed = _meta(merged, "allowed", True)
+        if not allowed:
+            resolved_benefits.append({
+                "benefit_key": bk,
+                "included": False,
+                "min_value": None,
+                "standard_value": None,
+                "max_value": None,
+                "currency": merged.get("currency") or rule.get("currency"),
+                "amount_unit": merged.get("amount_unit") or rule.get("amount_unit"),
+                "frequency": merged.get("frequency") or rule.get("frequency"),
+                "approval_required": False,
+                "evidence_required_json": [],
+                "exclusions_json": [],
+                "condition_summary": "Not allowed",
+                "source_rule_ids_json": [rid],
+                "entitlement_value_trace": ent_trace,
+            })
+            continue
+
+        # Base values
+        std = merged.get("amount_value") or _meta(merged, "standard_value")
+        minv = _meta(merged, "min_value")
+        maxv = _meta(merged, "max_value")
+        approval = _meta(merged, "approval_required", False) or rule.get("review_status") == "edited"
+        ev_items = evidence_by_rule.get(rid, [])
+
+        # Tier override
+        override = _get_tier_override(rid, tier, tier_overrides)
+        if override:
+            std = override.get("standard_value") or override.get("amount") or std
+            minv = override.get("min_value") or minv
+            maxv = override.get("max_value") or maxv
+
+        cond_summary_parts = [f"{assignment_type}", f"{family_status}"]
+        if tier:
+            cond_summary_parts.append(f"tier:{tier}")
+
+        resolved_benefits.append({
+            "benefit_key": bk,
+            "included": True,
+            "min_value": minv,
+            "standard_value": std,
+            "max_value": maxv,
+            "currency": merged.get("currency") or rule.get("currency") or "USD",
+            "amount_unit": merged.get("amount_unit") or rule.get("amount_unit"),
+            "frequency": merged.get("frequency") or rule.get("frequency"),
+            "approval_required": bool(approval),
+            "evidence_required_json": ev_items if isinstance(ev_items, list) else list(ev_items),
+            "exclusions_json": [],
+            "condition_summary": ", ".join(cond_summary_parts),
+            "source_rule_ids_json": [rid],
+            "entitlement_value_trace": ent_trace,
+        })
+
+    if not persist_resolution:
+        return {
+            "benefits": resolved_benefits,
+            "exclusions": resolved_exclusions,
+            "policy": policy_row,
+            "version": version_row,
+            "resolution_context": ctx,
+            "resolution_company_id": company_id,
+            "assignment_id": assignment_id,
+            "case_id": case_id,
+            "persisted": False,
+        }
+
+    # Persist
+    rid = db.upsert_resolved_assignment_policy(
+        assignment_id=assignment_id,
+        case_id=case_id,
+        company_id=company_id,
+        policy_id=policy_id,
+        policy_version_id=vid,
+        canonical_case_id=canonical_case_id,
+        resolution_status=resolution_status,
+        resolution_context=ctx,
+        benefits=resolved_benefits,
+        exclusions=resolved_exclusions,
+    )
+
+    # Fetch and return
+    resolved = db.get_resolved_assignment_policy(assignment_id)
+    if not resolved:
+        return None
+    resolved["benefits"] = db.list_resolved_policy_benefits(rid)
+    resolved["exclusions"] = db.list_resolved_policy_exclusions(rid)
+    resolved["policy"] = policy_row
+    resolved["version"] = version_row
+    resolved["resolution_context"] = ctx
+    resolved["resolution_company_id"] = company_id
+    return resolved
+
+
+def resolve_policy_for_assignment(
+    db: Any,
+    assignment_id: str,
+    assignment: Dict[str, Any],
+    case: Optional[Dict[str, Any]],
+    profile: Optional[Dict[str, Any]],
+    employee_profile: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """
+    Resolve published policy for assignment. Returns resolved policy dict or None if no policy.
+    """
+    candidates = collect_company_id_candidates_for_assignment(db, assignment, case)
+    if not candidates:
+        log.warning(
+            "policy_resolution: no company_id for assignment %s (case=%s, hr_user=%s, emp_user=%s)",
+            assignment_id,
+            bool(case),
+            assignment.get("hr_user_id"),
+            assignment.get("employee_user_id"),
+        )
+        return None
+
+    pub = find_first_published_company_policy(db, candidates)
+    if not pub:
+        # [Bridge ii] No legacy company_policies/policy_versions policy for any candidate —
+        # fall back to the config-matrix subsystem (the newer authoring path the working
+        # /employee/policy view uses). The matrix bridge translates policy_config_benefits
+        # into the same entitlement shape the comparison consumes. Purely additive: the
+        # legacy path above is unchanged, so companies on either authoring path resolve.
+        from .employee_policy_matrix_bridge import (
+            build_matrix_assignment_package,
+            find_published_matrix_version,
+        )
+
+        matrix_cid, matrix_version = find_published_matrix_version(db, candidates)
+        if matrix_version:
+            ctx = extract_resolution_context(assignment, case, profile, employee_profile)
+            resolved_matrix, readiness = build_matrix_assignment_package(
+                db,
+                company_id=str(matrix_cid),
+                pub_version=matrix_version,
+                assignment_type_ctx=ctx.get("assignment_type"),
+                family_status_ctx=ctx.get("family_status"),
+                company_name=None,
+                assignment_id=assignment_id,
+                case_id=(case.get("id") if case else assignment.get("case_id")),
+                employee_level_ctx=ctx.get("employee_level"),
+            )
+            # Thread the matrix-computed readiness so the comparison uses it instead of the
+            # policy_version-based evaluator (a matrix policy has no policy_version_id).
+            if isinstance(resolved_matrix, dict):
+                resolved_matrix["comparison_readiness_precalc"] = readiness
+            return resolved_matrix
+
+        log.info(
+            "policy_resolution: no published policy for any of companies %s (assignment %s)",
+            candidates,
+            assignment_id,
+        )
+        return None
+
+    company_id, policy, version = pub
+    return resolve_benefits_matrix_for_version(
+        db,
+        assignment_id,
+        assignment,
+        case,
+        profile,
+        employee_profile,
+        company_id=str(company_id),
+        policy_row=policy,
+        version_row=version,
+        persist_resolution=True,
+    )

@@ -1,0 +1,22 @@
+{"title": "The save button throws a 500 error", "body": "every time I click save", "expected_kind": "bug", "expected_priority": "P1"}
+{"title": "App crashes when I upload a file", "body": "", "expected_kind": "bug", "expected_priority": "P0"}
+{"title": "The page is broken after login", "body": "blank screen", "expected_kind": "bug", "expected_priority": "P1"}
+{"title": "Can't submit the intake form", "body": "button does nothing", "expected_kind": "bug"}
+{"title": "Dashboard freezes on load", "body": "", "expected_kind": "bug"}
+{"title": "Exception when opening the case", "body": "stack trace shown", "expected_kind": "bug"}
+{"title": "It would be nice to have dark mode", "body": "", "expected_kind": "idea", "expected_priority": "P3"}
+{"title": "Feature request: export to PDF", "body": "", "expected_kind": "idea", "expected_priority": "P3"}
+{"title": "Could you add bulk actions to the list?", "body": "", "expected_kind": "idea"}
+{"title": "Suggest adding keyboard shortcuts", "body": "", "expected_kind": "idea"}
+{"title": "Enhancement: remember my filters", "body": "", "expected_kind": "idea"}
+{"title": "I wish there was a calendar view", "body": "", "expected_kind": "idea"}
+{"title": "The answer was incorrect", "body": "wrong visa info", "expected_kind": "quality"}
+{"title": "This information is outdated", "body": "", "expected_kind": "quality"}
+{"title": "The assistant gave a misleading response", "body": "", "expected_kind": "quality"}
+{"title": "Wrong answer about the work permit", "body": "", "expected_kind": "quality"}
+{"title": "The source has a bad citation", "body": "", "expected_kind": "quality"}
+{"title": "The numbers look inaccurate", "body": "", "expected_kind": "quality"}
+{"title": "Update the onboarding copy", "body": "", "expected_kind": "task"}
+{"title": "Review the supplier list", "body": "", "expected_kind": "task"}
+{"title": "Add a new country to the catalog", "body": "", "expected_kind": "task"}
+{"title": "Schedule a content refresh", "body": "", "expected_kind": "task"}

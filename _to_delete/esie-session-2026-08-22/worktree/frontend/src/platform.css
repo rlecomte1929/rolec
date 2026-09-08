@@ -1,0 +1,488 @@
+/**
+ * platform.css — ReloPass Platform Design Token System
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Generated from relopass-design-tokens.json v1.0.0
+ *
+ * Usage:
+ *   import './platform.css'   ← once in main.tsx / root
+ *
+ * All components MUST use these CSS custom properties.
+ * No hardcoded hex values anywhere in the platform UI.
+ *
+ * Light theme is default (:root).
+ * Dark theme is applied via [data-theme='dark'] on <html>.
+ * Persisted in localStorage['rp-theme'].
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+/* Inter is self-hosted via @fontsource/inter (imported in main.tsx). The
+   Google Fonts @import was removed here too (GDPR: no visitor IPs to Google's
+   CDN). --font-mono below falls back to the local mono stack; if this file is
+   ever wired into the app, self-host JetBrains Mono via @fontsource rather than
+   re-adding a Google Fonts request. */
+
+/* ────────────────────────────────────────────────────────────────────────────
+   LIGHT THEME (default)
+   ──────────────────────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme='light'] {
+
+  /* ── Semantic colours ───────────────────────────────────────────────────── */
+
+  --bg:              #F7F8FA;
+  --bg-2:            #F0F2F6;
+  --surface:         #FFFFFF;
+  --surface-2:       #F3F4F6;
+  --surface-3:       #E9ECF2;
+  --surface-hover:   #F0F2F6;
+  --border:          #E5E7EB;
+  --border-2:        #D1D5DB;
+
+  --text:            #111827;
+  --text-secondary:  #374151;
+  --text-muted:      #6B7280;
+  --text-disabled:   #9CA3AF;
+  --text-inverse:    #FFFFFF;
+
+  --accent:          #1DBFA2;
+  --accent-hover:    #179E87;
+  --accent-soft:     #EDFAF7;
+  --accent-soft-2:   #C9F0E8;
+  --accent-text:     #0C5B4D;
+
+  --link:            #2B82D8;
+  --link-hover:      #1F69B8;
+
+  --success:         #10B981;
+  --success-soft:    #ECFDF5;
+  --success-text:    #065F46;
+
+  --warning:         #EFA827;
+  --warning-soft:    #FFF9EC;
+  --warning-text:    #8A5807;
+
+  --danger:          #EF4444;
+  --danger-soft:     #FEF2F2;
+  --danger-text:     #991B1B;
+
+  --info:            #4A9AE8;
+  --info-soft:       #EEF5FD;
+  --info-text:       #165091;
+
+  --overlay:         rgba(0, 0, 0, 0.40);
+  --shadow-color:    rgba(0, 0, 0, 1);
+
+  /* ── Pill variants ──────────────────────────────────────────────────────── */
+
+  --pill-success-bg:     #ECFDF5;
+  --pill-success-text:   #065F46;
+  --pill-success-border: #A7F3D0;
+
+  --pill-warning-bg:     #FFF9EC;
+  --pill-warning-text:   #8A5807;
+  --pill-warning-border: #FFE091;
+
+  --pill-danger-bg:      #FEF2F2;
+  --pill-danger-text:    #991B1B;
+  --pill-danger-border:  #FECACA;
+
+  --pill-accent-bg:      #EDFAF7;
+  --pill-accent-text:    #0C5B4D;
+  --pill-accent-border:  #97E3D4;
+
+  --pill-neutral-bg:     #F3F4F6;
+  --pill-neutral-text:   #374151;
+  --pill-neutral-border: #D1D5DB;
+
+  --pill-ghost-bg:       transparent;
+  --pill-ghost-text:     #6B7280;
+  --pill-ghost-border:   #E5E7EB;
+
+  /* ── Skeleton loading ───────────────────────────────────────────────────── */
+  --skeleton-base:      #E5E7EB;
+  --skeleton-highlight: #F3F4F6;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   DARK THEME
+   ──────────────────────────────────────────────────────────────────────────── */
+
+[data-theme='dark'] {
+
+  --bg:              #0F1117;
+  --bg-2:            #13161F;
+  --surface:         #1A1D27;
+  --surface-2:       #242838;
+  --surface-3:       #2D3347;
+  --surface-hover:   #2A2F42;
+  --border:          #2D3347;
+  --border-2:        #3A4060;
+
+  --text:            #F3F4F6;
+  --text-secondary:  #D1D5DB;
+  --text-muted:      #6B7280;
+  --text-disabled:   #4B5563;
+  --text-inverse:    #111827;
+
+  --accent:          #1DBFA2;
+  --accent-hover:    #35C0A8;
+  --accent-soft:     #0C3830;
+  --accent-soft-2:   #0E4A3C;
+  --accent-text:     #5FD0BB;
+
+  --link:            #4A9AE8;
+  --link-hover:      #6DA6EB;
+
+  --success:         #10B981;
+  --success-soft:    #064E3B;
+  --success-text:    #6EE7B7;
+
+  --warning:         #EFA827;
+  --warning-soft:    #3B2503;
+  --warning-text:    #FFCC55;
+
+  --danger:          #EF4444;
+  --danger-soft:     #7F1D1D;
+  --danger-text:     #FCA5A5;
+
+  --info:            #4A9AE8;
+  --info-soft:       #072343;
+  --info-text:       #9EC6F3;
+
+  --overlay:         rgba(0, 0, 0, 0.60);
+  --shadow-color:    rgba(0, 0, 0, 1);
+
+  /* ── Pill variants (dark) ───────────────────────────────────────────────── */
+
+  --pill-success-bg:     #064E3B;
+  --pill-success-text:   #6EE7B7;
+  --pill-success-border: #047857;
+
+  --pill-warning-bg:     #3B2503;
+  --pill-warning-text:   #FFCC55;
+  --pill-warning-border: #8A5807;
+
+  --pill-danger-bg:      #7F1D1D;
+  --pill-danger-text:    #FCA5A5;
+  --pill-danger-border:  #B91C1C;
+
+  --pill-accent-bg:      #0C3830;
+  --pill-accent-text:    #5FD0BB;
+  --pill-accent-border:  #117B69;
+
+  --pill-neutral-bg:     #242838;
+  --pill-neutral-text:   #D1D5DB;
+  --pill-neutral-border: #3A4060;
+
+  --pill-ghost-bg:       transparent;
+  --pill-ghost-text:     #6B7280;
+  --pill-ghost-border:   #2D3347;
+
+  /* ── Skeleton loading (dark) ────────────────────────────────────────────── */
+  --skeleton-base:      #2D3347;
+  --skeleton-highlight: #3A4060;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   THEME-INDEPENDENT TOKENS (same in light and dark)
+   ──────────────────────────────────────────────────────────────────────────── */
+
+:root {
+
+  /* ── Typography ─────────────────────────────────────────────────────────── */
+  --font-ui:   'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+
+  --text-xs:   11px;  --lh-xs:   1.5;  --ls-xs:   0.02em;
+  --text-sm:   12px;  --lh-sm:   1.5;  --ls-sm:   0.01em;
+  --text-base: 14px;  --lh-base: 1.6;  --ls-base: 0em;
+  --text-md:   15px;  --lh-md:   1.6;  --ls-md:   0em;
+  --text-lg:   16px;  --lh-lg:   1.625; --ls-lg:  -0.01em;
+  --text-xl:   18px;  --lh-xl:   1.5;  --ls-xl:   -0.01em;
+  --text-2xl:  20px;  --lh-2xl:  1.4;  --ls-2xl:  -0.015em;
+  --text-3xl:  24px;  --lh-3xl:  1.35; --ls-3xl:  -0.02em;
+  --text-4xl:  30px;  --lh-4xl:  1.25; --ls-4xl:  -0.025em;
+  --text-5xl:  36px;  --lh-5xl:  1.2;  --ls-5xl:  -0.03em;
+
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+
+  /* ── Spacing (8px base grid) ────────────────────────────────────────────── */
+  --space-0:    0px;
+  --space-0-5:  4px;
+  --space-1:    8px;
+  --space-1-5:  12px;
+  --space-2:    16px;
+  --space-2-5:  20px;
+  --space-3:    24px;
+  --space-4:    32px;
+  --space-5:    40px;
+  --space-6:    48px;
+  --space-8:    64px;
+  --space-10:   80px;
+  --space-12:   96px;
+  --space-16:   128px;
+  --space-20:   160px;
+  --space-24:   192px;
+
+  /* ── Shadows ────────────────────────────────────────────────────────────── */
+  --shadow-0:     none;
+  --shadow-1:     0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-2:     0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-3:     0 10px 30px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.08);
+  --shadow-4:     0 20px 50px rgba(0,0,0,0.15), 0 8px 16px rgba(0,0,0,0.10);
+  --shadow-inset: inset 0 1px 3px rgba(0,0,0,0.08);
+  --focus-ring:   0 0 0 3px rgba(29, 191, 162, 0.35);
+
+  /* ── Border radius ──────────────────────────────────────────────────────── */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-2xl:  24px;
+  --radius-full: 9999px;
+
+  /* ── Layout shell dimensions ────────────────────────────────────────────── */
+  --sidebar-w:           232px;
+  --sidebar-w-collapsed: 58px;
+  --topbar-h:            56px;
+  --ai-panel-w:          360px;
+  --content-max-w:       1280px;
+  --page-px:             32px;
+  --page-py:             24px;
+  --card-padding:        20px;
+  --table-row-h:         48px;
+  --input-h:             36px;
+  --btn-h-sm:            28px;
+  --btn-h-md:            36px;
+  --btn-h-lg:            44px;
+  --modal-max-w:         560px;
+  --drawer-w:            400px;
+  --inbox-col-left-w:    240px;
+  --inbox-col-mid-w:     320px;
+
+  /* ── Transitions ────────────────────────────────────────────────────────── */
+  --transition-fast:    120ms ease;
+  --transition-base:    200ms ease;
+  --transition-slow:    300ms ease-out;
+  --transition-sidebar: 200ms ease;
+  --transition-panel:   300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fade:    150ms ease-in-out;
+  --transition-bounce:  400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── Z-index stack ──────────────────────────────────────────────────────── */
+  --z-base:     0;
+  --z-above:    10;
+  --z-dropdown: 100;
+  --z-sticky:   200;
+  --z-overlay:  300;
+  --z-modal:    400;
+  --z-panel:    500;
+  --z-toast:    600;
+  --z-tooltip:  700;
+
+  /* ── Globe canvas colours (S0 Auth screen) ──────────────────────────────── */
+  --globe-bg:        #0A0E1A;
+  --globe-landmass:  #1C2235;
+  --globe-land-stroke: #252C42;
+  --globe-arc-teal:  #1DBFA2;
+  --globe-arc-blue:  #4A9AE8;
+  --globe-arc-amber: #EFA827;
+  --globe-city-dot:  rgba(255, 255, 255, 0.86);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   GLOBAL RESETS & BASE STYLES
+   ──────────────────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: var(--lh-base);
+  color: var(--text);
+  background-color: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color var(--transition-base), color var(--transition-base);
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono);
+}
+
+/* ── Focus ring ─────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Prefers-color-scheme fallback (when no data-theme attribute is set) ─────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg:              #0F1117;
+    --bg-2:            #13161F;
+    --surface:         #1A1D27;
+    --surface-2:       #242838;
+    --surface-3:       #2D3347;
+    --surface-hover:   #2A2F42;
+    --border:          #2D3347;
+    --border-2:        #3A4060;
+    --text:            #F3F4F6;
+    --text-secondary:  #D1D5DB;
+    --text-muted:      #6B7280;
+    --text-disabled:   #4B5563;
+    --text-inverse:    #111827;
+    --accent:          #1DBFA2;
+    --accent-hover:    #35C0A8;
+    --accent-soft:     #0C3830;
+    --accent-soft-2:   #0E4A3C;
+    --accent-text:     #5FD0BB;
+    --link:            #4A9AE8;
+    --link-hover:      #6DA6EB;
+    --success:         #10B981;
+    --success-soft:    #064E3B;
+    --success-text:    #6EE7B7;
+    --warning:         #EFA827;
+    --warning-soft:    #3B2503;
+    --warning-text:    #FFCC55;
+    --danger:          #EF4444;
+    --danger-soft:     #7F1D1D;
+    --danger-text:     #FCA5A5;
+    --info:            #4A9AE8;
+    --info-soft:       #072343;
+    --info-text:       #9EC6F3;
+    --overlay:         rgba(0, 0, 0, 0.60);
+    --pill-success-bg:     #064E3B;  --pill-success-text:   #6EE7B7;  --pill-success-border: #047857;
+    --pill-warning-bg:     #3B2503;  --pill-warning-text:   #FFCC55;  --pill-warning-border: #8A5807;
+    --pill-danger-bg:      #7F1D1D;  --pill-danger-text:    #FCA5A5;  --pill-danger-border:  #B91C1C;
+    --pill-accent-bg:      #0C3830;  --pill-accent-text:    #5FD0BB;  --pill-accent-border:  #117B69;
+    --pill-neutral-bg:     #242838;  --pill-neutral-text:   #D1D5DB;  --pill-neutral-border: #3A4060;
+    --pill-ghost-bg:       transparent; --pill-ghost-text: #6B7280;  --pill-ghost-border:   #2D3347;
+    --skeleton-base:      #2D3347;
+    --skeleton-highlight: #3A4060;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   PLATFORM SHELL LAYOUT HELPERS
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Main content area — shifts right to accommodate sidebar */
+.rp-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--bg);
+}
+
+.rp-sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  transition: width var(--transition-sidebar);
+}
+.rp-sidebar--collapsed {
+  width: var(--sidebar-w-collapsed);
+}
+
+.rp-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rp-topbar {
+  height: var(--topbar-h);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.rp-content {
+  flex: 1;
+  padding: var(--page-py) var(--page-px);
+  max-width: var(--content-max-w);
+  width: 100%;
+}
+
+.rp-ai-panel {
+  width: var(--ai-panel-w);
+  flex-shrink: 0;
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  z-index: var(--z-panel);
+  background-color: var(--surface);
+  border-left: 1px solid var(--border);
+  transform: translateX(100%);
+  transition: transform var(--transition-panel);
+}
+.rp-ai-panel--open {
+  transform: translateX(0);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   SKELETON SHIMMER ANIMATION
+   ──────────────────────────────────────────────────────────────────────────── */
+
+@keyframes rp-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.rp-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 25%,
+    var(--skeleton-highlight) 50%,
+    var(--skeleton-base) 75%
+  );
+  background-size: 200% 100%;
+  animation: rp-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}

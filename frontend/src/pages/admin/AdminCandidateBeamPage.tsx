@@ -424,7 +424,7 @@ export function AdminCandidateBeamPage(): React.ReactElement {
   );
 
   return (
-    <AdminLayout title="Corridor candidate beam">
+    <AdminLayout title="Candidate beam">
       <Alert variant="warning" className="mb-4">
         Candidate beams are research tools, not a source of truth. Every imported candidate must
         be reviewed and signed off by a lawyer before it appears in any HR-facing output.

@@ -1,0 +1,65 @@
+meeting_title,age,group,destination_or_scope,otto_delivered,relopass_holds,evidence,verdict,closed_2026_08_13,reason
+Content Classifier Migration AIQ-1768,1h,Code fix,,yes,no,AIQ-1768 Status=Ready for AI; no commit on main,KEEP OPEN,no,Classifier still the filename/MIME stub
+Fix Employee ID on Case Creation,1h,Code fix,,yes,yes,AIQ-1818 Done/Passed; commit d13bf80a,CLOSE,YES,Shipped and validated
+Fix HR Case Tests In CI,1h,Code fix,,yes,yes,AIQ-1806 Done/Passed; commit 07dd094a,CLOSE,YES,Shipped and validated
+Passport Extraction UI Upload Review,2h,Code fix,,yes,no,AIQ-1790 Status=Ready for AI,KEEP OPEN,no,UI layer not built
+ReloPass Pet Vehicle Relocation Modules,2h,Research load,pet+vehicle,yes,partial,pet_import_rules 66 rows OK; vehicle_import 145 entities with 0 facts across 18 countries,KEEP OPEN,no,Vehicle facts never loaded
+ReloPass Provider Research Coordination,2h,Provider wave,Wave1+WaveA1 cities,yes,no,service_catalog_items has nothing after 2026-08-12; Frankfurt/Milan/Amsterdam/Dublin/London = 0 rows,HARVEST FIRST,no,Nine completed runs never loaded
+AI Decisions Audit Race Fix,2h,Code fix,,yes,yes,AIQ-1812 Done/Passed; commit 91a99eed,CLOSE,YES,Shipped and validated
+CERFA Field Mapping Migration Draft,3h,Code fix,,yes,no,AIQ-1796 Status=Ready for AI,KEEP OPEN,no,Draft only
+ReloPass Allowlist OpenAI Bots,3h,Code fix,,yes,yes,ADS-2 / AIQ-1782 Done/Passed,CLOSE,YES,Shipped and validated
+ReloPass Ingestion Spine Upgrade,3h,Pipeline,,yes,partial,AIQ-1825 Human Review / Pending,KEEP OPEN,no,Seed-ingest tool awaiting review
+can you extract all the GCS deliverable URLs,4h,Index,all waves,yes,n/a,Master GCS deliverable index: 15 immigration countries + 5 provider batches,HARVEST FIRST,no,Index for every other meeting
+ReloPass Global Data Build,4h,Research load,multi,yes,partial,243 entities + 515 facts + 233 vendors + 36 pets + 7 resources at 2026-08-13 10:00 UTC,KEEP OPEN,no,Landed but vehicle facts and provider cities missing
+ReloPass Reference Content Stream Research,7h,Research load,guides,yes,partial,staged_resource_candidates = 33 total; only UA 5 + RU 2 today,KEEP OPEN,no,Stream barely landed
+Norwegian Lawyer Register Research,7h,Research,NO advokat,yes,yes,otto-i-no-reconciliation.json committed; AIQ-1828/1829 Human Review,CLOSE,YES,Harvested to repo with provenance
+Otto Overnight Autonomous Run,8h,Research load,multi,yes,partial,Bulk load landed; wave manifests still only in chat,HARVEST FIRST,no,Recover manifests before closing
+Otto Research Methods Knowledge Transfer,8h,Process,,yes,yes,docs/research-task-playbook.md committed,CLOSE,YES,Method captured in repo
+ReloPass Otto Meeting Two Streams,8h,Planning,,yes,n/a,Stream A/B brief superseded by corrected Wave A1 brief,CLOSE,YES,Superseded
+Singapore Immigration Research Matrix,9h,Immigration,SG,yes,yes,SG 21 entities / 77 facts,CLOSE,YES,Loaded and queryable
+Sweden Immigration Persona Research,9h,Immigration,SE,yes,yes,SE 24 entities / 71 facts,CLOSE,YES,Loaded and queryable
+Portugal Immigration Research Routing Guide,9h,Immigration,PT,yes,yes,PT 14 entities / 67 facts,CLOSE,YES,Loaded and queryable
+Switzerland Immigration Personas Research,9h,Immigration,CH,yes,yes,CH 28 entities / 77 facts,CLOSE,YES,Loaded and queryable
+TrendNest Invalid Delegation Token Error,1d,Not ReloPass,,n/a,n/a,No ReloPass artefact,VERIFY,no,Belongs to a different Audos space — confirm then close
+Trigger Engine Form Detachment Design,1d,Code fix,,yes,no,AIQ-1807 Status=Ready for AI,KEEP OPEN,no,Design only
+New task from the ReloPass AI Work Queue (1d),1d,Ambiguous,,unknown,unknown,Untitled queue handoff,VERIFY,no,No task id in title
+Agent Memory Beta Spike,1d,Code fix,,yes,no,AIQ-1696 Status=Ready for AI,KEEP OPEN,no,Spike not executed
+Payslip Extraction Agent Build,1d,Code fix,,yes,no,AIQ-1767 Status=Ready for AI,KEEP OPEN,no,Agent not built
+IMMIGRATION CASE RESEARCH ROUTINE (France),1d,Immigration routine,FR,yes,yes,Otto: 20 routes / 109 facts / 100% T1 — DB FR 20 entities / 106 facts,CLOSE,YES,Deliverable and DB match
+RELOCATION SERVICE PROVIDER RESEARCH — category =,1d,Provider,NY immigration lawyers,yes,no,Otto: 7 providers 6/7 T1 via AILA — no New York legal_admin rows in vendor_candidates,HARVEST FIRST,no,Delivered but not loaded
+OpenAI Pixel UTM Tracking Draft,1d,GTM,,yes,no,ADS-4 / AIQ-1784 Status=Blocked (ADS-1 Parked),KEEP OPEN,no,Blocked upstream
+EU AI Act Compliance Layer,1d,Compliance,,yes,partial,AIQ-1583 Done; AIQ-1789 Ready for AI; AIQ-1222 Rejected,KEEP OPEN,no,Only half shipped
+New task from the ReloPass AI Work Queue (2d),1d,Ambiguous,,unknown,unknown,Untitled queue handoff,VERIFY,no,No task id in title
+HR Vendor Approval Pipeline Fix,2d,Code fix,,yes,no,AIQ-1814 Status=Ready for AI,KEEP OPEN,no,Not implemented
+Task from the ReloPass AI Work Queue —,2d,Ambiguous,,unknown,unknown,Untitled queue handoff,VERIFY,no,No task id in title
+Fix Vendor Management State Inconsistency,2d,Code fix,,yes,no,AIQ-1817 Status=Ready for AI,KEEP OPEN,no,Not implemented
+Register Ireland Readiness Template,2d,Code fix,,yes,no,AIQ-1809 Status=Ready for AI,KEEP OPEN,no,Not implemented
+IMMIGRATION CASE RESEARCH ROUTINE (United States),2d,Immigration routine,US,yes,yes,Otto: 22 routes / 107 facts — DB US 25 entities / 109 facts (4 USCIS URLs 404),CLOSE,YES,Deliverable and DB match
+Immigration Q&A Bug Fixes,2d,Code fix,,yes,no,AIQ-1810 Ready for AI / Pending,KEEP OPEN,no,Markdown render + PII false positive open
+Corridor Filter Vendor Recommendations Fix,2d,Code fix,,yes,no,AIQ-1816 Ready for AI / Pending,KEEP OPEN,no,Not implemented
+CONFIG QUESTION — I do NOT need any,2d,Ambiguous,,n/a,n/a,One-off config exchange,CLOSE,YES,No deliverable expected
+CARD C — accreditation-registry harvest,2d,Research,FR-DE/FR-NO,yes,yes,card-c-harvest.csv 38 rows + PROVENANCE.md committed; AIQ-1788 Done/Passed,CLOSE,YES,Reviewed and committed; 7 flagged rows tracked separately
+FR-NO Relocation Data Sheet Build,2d,Build,FR-NO,yes,yes,personal-relocation-data-sheet-eval.md committed; AIQ-1770/1773 Done/Passed,CLOSE,YES,Built and evaluated
+Canada Immigration Personas Research,2d,Immigration,CA,yes,yes,CA 21 entities / 44 facts,CLOSE,YES,Loaded and queryable
+Australia Immigration Persona Research,2d,Immigration,AU,yes,yes,AU 19 entities / 44 facts,CLOSE,YES,Loaded and queryable
+Netherlands Immigration Research Routine,2d,Immigration,NL,yes,yes,NL 23 entities / 58 facts,CLOSE,YES,Loaded and queryable
+Belgium Immigration Research Matrix,2d,Immigration,BE,yes,yes,BE 17 entities / 63 facts,CLOSE,YES,Loaded and queryable
+Austria Immigration Research By Nationality,2d,Immigration,AT,yes,yes,AT 24 entities / 82 facts,CLOSE,YES,Loaded and queryable
+New Zealand Immigration Research Routine,2d,Immigration,NZ,yes,yes,NZ 22 entities / 88 facts,CLOSE,YES,Loaded and queryable
+Denmark Immigration Research by Nationality,2d,Immigration,DK,yes,yes,DK 31 entities / 87 facts,CLOSE,YES,Loaded and queryable
+Ireland Immigration Persona Research,2d,Immigration,IE,yes,yes,IE 26 entities / 130 facts,CLOSE,YES,Richest corridor in the set
+France Immigration Research,2d,Immigration,FR,yes,yes,FR 20 entities / 106 facts,CLOSE,YES,Loaded and queryable
+IMMIGRATION CASE RESEARCH ROUTINE (United States batch 4),2d,Immigration routine,US,yes,yes,Otto: STOP research complete; 5 named gaps — DB US 25/109,CLOSE,YES,Loaded; 5 gaps logged for a later targeted run
+IMMIGRATION CASE RESEARCH ROUTINE (Japan),2d,Immigration routine,JP,yes,partial,GCS requirement_facts_JP.json = 37 facts — DB JP 1 entity / 11 facts,KEEP OPEN,no,Under-loaded: 11 of 37 facts
+IMMIGRATION CASE RESEARCH ROUTINE (Norway),2d,Immigration routine,NO,yes,partial,GCS requirement_facts_NO.json = 308 facts — DB NO ~63 facts across 4 domains,KEEP OPEN,no,Under-loaded: 63 of 308 facts — worst gap
+IMMIGRATION CASE RESEARCH ROUTINE (UAE),2d,Immigration routine,AE,yes,partial,DB AE 1 entity / 11 facts; 5 named gaps incl. icp.gov.ae 404,KEEP OPEN,no,Under-loaded and gaps unresolved
+IMMIGRATION CASE RESEARCH ROUTINE (Italy),2d,Immigration routine,IT,yes,no,Otto instruction was explicitly "Do NOT import"; DB IT 1 entity / 9 facts,KEEP OPEN,no,Held back deliberately — decide whether to import
+IMMIGRATION CASE RESEARCH ROUTINE (Spain),2d,Immigration routine,ES,yes,partial,Otto: 13 entities / 65 facts / golden set 100% — DB ES 13 entities / 29 facts,KEEP OPEN,no,Entities all landed; 29 of 65 facts did
+IMMIGRATION CASE RESEARCH ROUTINE (Germany),2d,Immigration routine,DE,yes,no,DB has ZERO DE immigration rows (only domestic_move 9 and vehicle 2),KEEP OPEN,no,Primary corridor with no immigration data at all
+IMMIGRATION CASE RESEARCH ROUTINE (United Kingdom),2d,Immigration routine,GB,yes,partial,Otto: 15 routes incl. Skilled Worker / ILR — DB GB 8 entities / 8 facts,KEEP OPEN,no,Under-loaded: 8 facts for 15 routes
+Relocation Service Provider Research Dataset,2d,Provider wave,21 cities,yes,yes,service_catalog_items 877 rows across 21 cities loaded 2026-08-12,CLOSE,YES,Phase 1A + 1B landed and live
+Leads Routing Export And Analytics,3d,Product,Meta Insights,yes,n/a,Otto ended with an open question about the lead-forwarding hook,KEEP OPEN,no,Live question awaiting your answer
+RFQ Batch Processing Setup,7/21/2026,Stale,,partial,no,AIQ-1521 RFQ risk spike still Ready for AI,CLOSE,YES,3+ weeks old — restart fresh
+LinkedIn Outreach Management System,7/14/2026,Stale,,yes,n/a,LinkedIn_Outreach_Build_Spec.md committed,CLOSE,YES,Spec captured — restart fresh
+Financial planning,7/5/2026,Stale,,unknown,n/a,No linked artefact,CLOSE,YES,6 weeks old
+Experiment: What does paying customer really mean for ReloPass at scale?,7/1/2026,Stale,,unknown,n/a,No linked artefact,CLOSE,YES,6 weeks old

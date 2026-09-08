@@ -1,0 +1,18 @@
+{
+  "fixture_id": "ADV-CLS-03",
+  "fixture_name": "german-diploma-fraktur-typeface",
+  "adversarial_category": "archaic_typography_ocr_degradation",
+  "expected_label": "DIPLOMA",
+  "expected_confidence_band": [0.45, 0.79],
+  "escalation_to_gpt4o_expected": true,
+  "document_text": "ALBERT-LUDWIGS-UNIVERSITÄT FREIBURG IM BREISGAU\n(Founded 1457 — OCR rendered from Fraktur/Blackletter typeface)\n\n[OCR NOTE: Fraktur typeface causes systematic character substitutions]\n[ß→B, ü→u, ö→o, ä→a, long-s (ſ) → f or i]\n\nZEUGNIß\nüber die Promotionsprüfung\n\nHerr Hans-Joachim von Holzhaußen\ngeboren zu München am 15. März 1928\nhat die akademiſche Würde eines\nDoktors der Naturwiſſenſchaften\nerlangt nach Ablegung der vorgeſchriebenen Prüfungen\nund Verteidigung ſeiner Diſſertation\n\"Über die Quantenmechanik des Waſſerſtoffatoms\"\nmit dem Urteil: ſehr gut (magna cum laude)\n\nFreiburg im Breisgau, den 12. Juli 1955\n\nDer Rektor: [Rektor-Siegel]\nDer Dekan der Naturwiſſenſchaftlichen Fakultät: [Dekan-Siegel]",
+  "why_adversarial": "This pre-war German doctoral diploma uses Fraktur (Blackletter) typeface, which Azure DI and most OCR engines handle poorly: (a) the long-s (ſ) is misread as 'f' or 'i' — 'Dissertation' becomes 'Difsertation'; (b) 'ß' becomes 'B' — 'Zeugniß' becomes 'Zeugni B'; (c) the document is from 1955 — historical German academic documents use formal Fraktur. A classifier that relies on modern keyword matching ('Zeugnis', 'Doktor') will miss the OCR-corrupted variants. The document clearly describes a doctorate (Doctor of Natural Sciences, magna cum laude, thesis defense) but the OCR output is systematically degraded. Expected: DIPLOMA at moderate confidence triggering escalation.",
+  "classifier_failure_mode": "Classifier emits UNKNOWN because keywords like 'Zeugnis'/'Dissertation' are corrupted to 'Zeugni B'/'Difsertation' by Fraktur OCR. Or classifier emits ACADEMIC_TRANSCRIPT (confused by grades/scores) rather than DIPLOMA (the document confers the doctorate, it is not a grade sheet).",
+  "gold_signals_expected": [
+    "ZEUGNI_ header (corrupted Zeugniß) at top of document",
+    "Doctor/Doktor degree conferral language present despite OCR corruption",
+    "University name with founding date — established academic institution",
+    "Rector/Dean seal references confirm official conferral document"
+  ],
+  "notes": "ISCED level 8 (doctorate) should be inferrable despite Fraktur OCR corruption. The signals array must cite the surviving readable cues — university name header, rector/dean seal references, magna cum laude grade string — NOT the corrupted Fraktur tokens directly. The 1955 date means anabin lookup will likely return 'not found' — this is expected and must not lower classification confidence."
+}

@@ -1,0 +1,18 @@
+OTTO-I-BEGIN
+[Otto's raw JSON as returned in the Audos thread, 2026-08-13.
+ Preserved verbatim as the audit trail. NOT the ingest artefact: every URL in the
+ original was mangled by the chat UI into a markdown artifact of the form
+ [host/path%22](https://host/path") and the bar_register / eura sections were keyed by
+ question number (1a..1e, 3a..3e) rather than by the schema's field names.
+ The normalised, schema-conforming version is otto-i-no-reconciliation.json.
+
+ Headline finding, beyond what the card asked for:
+   org number 914450133 (stored for Advokatfirmaet Sulland AS) returns 0 results from
+   data.brreg.no. It is not a wrong-TYPE number. It is not a real number at all.
+   The firm's actual organisation number is 918627995.
+
+ Otto reported 0/4 rows with real bar evidence and named the blocker honestly:
+ both Advokatforeningen's member search and Advokattilsynet's register at
+ tilsynet.no/register are JavaScript-rendered and returned no per-entity URL to a
+ static fetch. Under contract rule 6 that is a finding, not a failure.]
+OTTO-I-END

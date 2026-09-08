@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
 import { RefreshButton } from '../../components/RefreshButton';
@@ -8,6 +9,9 @@ import {
   type ProspectRow,
   type ProspectSeedItem,
 } from '../../api/client';
+import { createProspect } from '../../api/outreach';
+import type { ProspectInsert } from '../../types/outreach';
+import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
 
@@ -65,6 +69,46 @@ function statusBadge(status: string): React.ReactElement {
   return <Badge variant="info">{status}</Badge>;
 }
 
+function normalizeLinkedInUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  return trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
+}
+
+/** Company or person LinkedIn URL — not a search page and not empty. */
+function usableLinkedInUrl(raw: string | null | undefined): string | null {
+  const url = normalizeLinkedInUrl(raw || '');
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    if (host !== 'linkedin.com' && !host.endsWith('.linkedin.com')) return null;
+  } catch {
+    return null;
+  }
+  if (/\/search\//i.test(url)) return null;
+  return url;
+}
+
+function outreachPayloadFromRow(row: ProspectRow, linkedin_url: string): ProspectInsert {
+  const job_title = row.suggested_contact_title?.trim() || 'HR';
+  return {
+    full_name: `${row.company_name} · ${job_title}`,
+    linkedin_url,
+    profile_headline: row.suggested_hook ?? null,
+    company_name: row.company_name,
+    company_size: null,
+    job_title,
+    corridor_relevance: null,
+    notes: row.suggested_hook ?? null,
+    source: 'hr_prospect_pipeline',
+    status: 'flagged',
+    message_sent_at: null,
+    last_reply_at: null,
+    follow_up_sent_at: null,
+    converted_at: null,
+  };
+}
+
 export const AdminProspects: React.FC = () => {
   const [rows, setRows] = useState<ProspectRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -91,6 +135,8 @@ export const AdminProspects: React.FC = () => {
   const [onboardWelcome, setOnboardWelcome] = useState(true);
   const [onboardBusy, setOnboardBusy] = useState(false);
   const [onboardMsg, setOnboardMsg] = useState<string | null>(null);
+  const [outreachBusy, setOutreachBusy] = useState(false);
+  const [outreachMsg, setOutreachMsg] = useState<string | null>(null);
 
   const parsedSeeds = useMemo(() => parseSeedText(seedText), [seedText]);
   const failedCount = useMemo(
@@ -342,14 +388,42 @@ export const AdminProspects: React.FC = () => {
     }
   };
 
+  const sendSelectedToOutreach = async () => {
+    if (!selected) return;
+    const linkedin_url = usableLinkedInUrl(selected.company_linkedin_url);
+    if (!linkedin_url) {
+      setOutreachMsg(null);
+      setError(
+        'Add a company LinkedIn URL on this prospect before sending to Outreach. A search page is not enough.',
+      );
+      return;
+    }
+    setOutreachBusy(true);
+    setOutreachMsg(null);
+    setError(null);
+    try {
+      await createProspect(outreachPayloadFromRow(selected, linkedin_url));
+      setOutreachMsg(`Copied ${selected.company_name} into Outreach as a flagged contact.`);
+    } catch (err) {
+      setError((err as Error)?.message || 'Could not copy this row into Outreach');
+    } finally {
+      setOutreachBusy(false);
+    }
+  };
+
   return (
     <AdminLayout
-      title="HR Prospect Pipeline"
-      subtitle="Seed → enrich → triage. Approved prospects export to CSV for outreach."
+      title="Prospects"
+      subtitle="Seed → enrich → triage. Approved rows can onboard as a company, export CSV, or copy a contact into Outreach (a separate LinkedIn list)."
     >
       {error && (
         <div className="mb-4">
           <Alert variant="error">{error}</Alert>
+        </div>
+      )}
+      {outreachMsg && (
+        <div className="mb-4">
+          <Alert variant="success">{outreachMsg}</Alert>
         </div>
       )}
 
@@ -425,6 +499,9 @@ export const AdminProspects: React.FC = () => {
             <Button variant="secondary" size="sm" onClick={exportApproved}>
               Export approved CSV
             </Button>
+            <Link to={buildRoute('adminOutreach')}>
+              <Button variant="outline" size="sm">Open Outreach</Button>
+            </Link>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -602,6 +679,18 @@ export const AdminProspects: React.FC = () => {
                   Onboard as company →
                 </Button>
               )}
+              <Button
+                variant="outline"
+                disabled={detailBusy || outreachBusy || !usableLinkedInUrl(selected.company_linkedin_url)}
+                title={
+                  usableLinkedInUrl(selected.company_linkedin_url)
+                    ? 'Copy this company as a flagged contact in Outreach'
+                    : 'Add a company LinkedIn URL first (not a search page)'
+                }
+                onClick={() => void sendSelectedToOutreach()}
+              >
+                {outreachBusy ? 'Sending…' : 'Send to Outreach'}
+              </Button>
               {selected.status === 'onboarded' && (
                 <Badge variant="success">onboarded</Badge>
               )}

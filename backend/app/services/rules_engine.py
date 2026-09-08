@@ -4,6 +4,10 @@ from datetime import date
 from typing import Any, Dict, List, Tuple, Optional
 
 from .nationality_class import EU_EEA, OWN_NATIONAL, THIRD_COUNTRY, classify, classify_best
+from .requirement_serve_hygiene import (
+    addressed_to_third_country_only,
+    is_generic_thirty_day_lead,
+)
 from .requirements_country_key import iso_to_catalog_name, to_iso
 
 
@@ -163,13 +167,26 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
             if confirmation is not None:
                 expanded.append(confirmation)
 
+    # Free-movement default copied onto every catalog. Unsafe on a work-pass
+    # corridor (Employment Pass, CSEP, Ecuador residence visa).
+    if effective_class == THIRD_COUNTRY:
+        expanded = [r for r in expanded if not is_generic_thirty_day_lead(r)]
+
     return required_fields, expanded, flags
 
 
 def _applies_to_nationality_class(requirement: Dict[str, Any], nationality_class: str) -> bool:
     """True when the requirement applies to the case's nationality class. A
     requirement with no ``appliesToNationalityClasses`` (None/empty) applies to
-    all — same null-means-universal contract as appliesToAssignmentTypes."""
+    all — same null-means-universal contract as appliesToAssignmentTypes.
+
+    Titles that are instructions *to* Non-EEA/Non-EU nationals still bind only
+    THIRD_COUNTRY when the JSON scope was left NULL (the ES→IE IRP leak).
+    """
+    if nationality_class in (EU_EEA, OWN_NATIONAL) and addressed_to_third_country_only(
+        requirement.get("title")
+    ):
+        return False
     allowed = requirement.get("appliesToNationalityClasses")
     if not allowed:
         return True
@@ -233,6 +250,11 @@ def _immigration_confirmation(
         "requiredFields": [],
         "outcomeType": "nothing_to_do",
         "reason": reason,
+        # Official primer, not a determination. Empty citations made the
+        # confirmation look unsourced on the public corridor payload.
+        "citations": [
+            "https://europa.eu/youreurope/citizens/residence/residence-rights/index_en.htm",
+        ],
     }
 
 

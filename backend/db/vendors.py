@@ -106,6 +106,32 @@ class VendorsMixin:
             )
         return {"id": rfq_id, "rfq_ref": rfq_ref}
 
+    def case_ids_with_rfqs(
+        self, case_ids: List[str], request_id: Optional[str] = None
+    ) -> set:
+        """Case ids that already have an RFQ row (services phase complete for the sidebar)."""
+        ids = [str(c).strip() for c in (case_ids or []) if str(c).strip()]
+        if not ids:
+            return set()
+        placeholders = ", ".join(f":c{i}" for i in range(len(ids)))
+        params = {f"c{i}": ids[i] for i in range(len(ids))}
+        sql = (
+            f"SELECT CAST(case_id AS TEXT) AS cid FROM rfqs "
+            f"WHERE CAST(case_id AS TEXT) IN ({placeholders}) "
+            f"UNION "
+            f"SELECT CAST(canonical_case_id AS TEXT) AS cid FROM rfqs "
+            f"WHERE canonical_case_id IS NOT NULL AND CAST(canonical_case_id AS TEXT) IN ({placeholders})"
+        )
+        try:
+            with self.engine.connect() as conn:
+                rows = self._exec(
+                    conn, sql, params, op_name="case_ids_with_rfqs", request_id=request_id,
+                ).fetchall()
+            return {str(r[0]) for r in rows if r and r[0]}
+        except Exception:
+            log.warning("case_ids_with_rfqs failed", exc_info=True)
+            return set()
+
     def _list_rfq_items(self, conn, rfq_id: str) -> List[Dict[str, Any]]:
         rows = conn.execute(
             text("SELECT * FROM rfq_items WHERE rfq_id = :rfq_id ORDER BY created_at"),

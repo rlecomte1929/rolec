@@ -1,0 +1,69 @@
+name: Daily compliance evaluation
+
+# [BL-Compliance Phase C3] Calls POST /api/compliance/evaluate-all once a day.
+# Dry-run by default during the initial review window — flip to dry_run=false
+# via the workflow_dispatch input after ~2 weeks of reviewing the dry-run
+# output. Gated behind `vars.COMPLIANCE_CRON_ENABLED` so this is a no-op until
+# the secrets/vars are configured.
+
+on:
+  schedule:
+    # 04:00 UTC every day.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry-run mode (no alerts persisted)"
+        required: false
+        default: "true"
+
+concurrency:
+  group: compliance-daily
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    name: Run compliance evaluation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # No-op unless explicitly enabled via repo vars.
+    if: ${{ vars.COMPLIANCE_CRON_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      DRY_RUN: ${{ github.event.inputs.dry_run || 'true' }}
+      API_BASE: ${{ vars.COMPLIANCE_API_BASE }}        # e.g. https://api.relopass.com
+      ADMIN_TOKEN: ${{ secrets.COMPLIANCE_ADMIN_TOKEN }}
+    steps:
+      - name: POST /api/compliance/evaluate-all
+        run: |
+          set -euo pipefail
+          # Hard-validate the workflow_dispatch input before letting it touch
+          # any curl URL. Anything other than the two allowed literals aborts.
+          case "${DRY_RUN}" in
+            true|false) ;;
+            *)
+              echo "DRY_RUN must be 'true' or 'false' (got: ${DRY_RUN})"
+              exit 1
+              ;;
+          esac
+          if [ -z "${API_BASE:-}" ] || [ -z "${ADMIN_TOKEN:-}" ]; then
+            echo "API_BASE or ADMIN_TOKEN not configured; skipping."
+            exit 0
+          fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "${API_BASE}/api/compliance/evaluate-all?dry_run=${DRY_RUN}")
+          echo "$response"
+          # Surface counts in the workflow run summary so reviewers can see the
+          # dry-run distribution without downloading an artifact.
+          {
+            echo "## Compliance run (dry_run=${DRY_RUN})"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

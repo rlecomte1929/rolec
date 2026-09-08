@@ -15,7 +15,7 @@ export const AdminMarketingAnalyticsPage: React.FC = () => {
   }, []);
 
   return (
-    <AdminLayout title="Marketing Analytics" subtitle="Pre-signup acquisition funnel (last 30 days)">
+    <AdminLayout title="Marketing analytics" subtitle="Pre-signup acquisition funnel (last 30 days)">
       {error && (
         <Card>
           <p className="text-[#b91c1c] text-sm">{error}</p>

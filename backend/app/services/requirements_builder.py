@@ -16,6 +16,7 @@ from .requirements_purpose_key import (
     is_known_catalog_gap,
     to_purpose,
 )
+from .requirement_serve_hygiene import display_title
 from .rules_engine import apply_rules
 
 log = logging.getLogger(__name__)
@@ -348,7 +349,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                 RequirementItemDTO(
                     id=item.get("id") or item.get("title"),
                     pillar=item.get("pillar"),
-                    title=item.get("title"),
+                    title=display_title(item.get("title"), item.get("description")),
                     description=item.get("description"),
                     severity=item.get("severity"),
                     owner=item.get("owner"),

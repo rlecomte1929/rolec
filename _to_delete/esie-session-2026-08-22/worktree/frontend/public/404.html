@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReloPass</title>
+    <!--
+      SPA deep-link restore. Static hosts (Render) serve this 404.html for any
+      path that isn't a real file (e.g. /hr/command-center on hard load / refresh
+      / bookmark). 404-redirect.js preserves the requested path in ?__redirect=
+      and bounces to "/", where App.tsx's <QueryRedirect> routes to it.
+
+      The redirect logic is an EXTERNAL script (not inline) because the prod CSP
+      is `script-src 'self'` with NO 'unsafe-inline' — an inline script here is
+      blocked and the page sits blank at the deep path. Same-origin
+      /404-redirect.js satisfies 'self'. The no-JS fallback lives in <noscript>.
+    -->
+    <script src="/404-redirect.js"></script>
+    <noscript><meta http-equiv="refresh" content="0; url=/" /></noscript>
+  </head>
+  <body></body>
+</html>

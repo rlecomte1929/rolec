@@ -10,6 +10,7 @@ import { buildRoute } from '../../navigation/routes';
 import { DESTINATION_COUNTRIES } from '../../utils/countries';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../../utils/apiDetail';
 import { AdminLayout } from './AdminLayout';
+import { useAdminViewingCompany } from '../../features/admin/AdminViewingCompanyContext';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -61,6 +62,7 @@ export const AdminAssignments: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const companyIdFromUrl = searchParams.get('company_id')?.trim() ?? '';
+  const { selectedCompanyId: viewingCompanyId } = useAdminViewingCompany();
   const [filters, setFilters] = useState({
     company_id: '',
     employee_search: '',
@@ -122,10 +124,15 @@ export const AdminAssignments: React.FC = () => {
   const detailError = !!selectedId && (detailQuery.isError || (detailQuery.isSuccess && detailQuery.data === null));
 
   useEffect(() => {
-    if (!companyIdFromUrl) return;
-    setFilters((f) => ({ ...f, company_id: companyIdFromUrl }));
+    if (companyIdFromUrl) {
+      setFilters((f) => ({ ...f, company_id: companyIdFromUrl }));
+      return;
+    }
+    if (viewingCompanyId) {
+      setFilters((f) => (f.company_id ? f : { ...f, company_id: viewingCompanyId }));
+    }
     // location.key: honor ?company_id= on each navigation; avoid resetting user-cleared company on same visit.
-  }, [location.key, companyIdFromUrl]);
+  }, [location.key, companyIdFromUrl, viewingCompanyId]);
 
   const applyFilters = () => {
     void assignmentsQuery.refetch();

@@ -30,6 +30,8 @@ export type EmployeeLinkedOverviewRow = {
   intake_step?: number | null;
   intake_total_steps?: number | null;
   intake_updated_at?: string | null;
+  /** True once an RFQ exists for this case — Services phase is done. */
+  has_rfq?: boolean | null;
 };
 
 export type EmployeePendingClaimInfo = {

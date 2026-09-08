@@ -3136,6 +3136,7 @@ export const servicesAPI = {
     answers: Array<{ service_key: string; answers: Record<string, unknown> }>;
     questions: unknown[];
     selected_services: string[];
+    derived_answers?: Record<string, unknown>;
   }> => {
     const params: Record<string, string> = { assignment_id: assignmentId };
     if (fallbackServices?.length) {
@@ -3181,12 +3182,28 @@ export const servicesAPI = {
   createRfq: async (
     caseId: string,
     items: Array<{ service_key: string; requirements: Record<string, unknown> }>,
-    supplierIds: string[]
+    supplierIds: string[],
+    messageBody?: string,
   ): Promise<RfqCreateResult> => {
     const response = await api.post<RfqCreateResult>(
       '/api/rfqs',
-      { case_id: caseId, items, supplier_ids: supplierIds },
+      {
+        case_id: caseId,
+        items,
+        supplier_ids: supplierIds,
+        ...(messageBody ? { message_body: messageBody } : {}),
+      },
     );
+    return response.data;
+  },
+
+  getRfqDraft: async (
+    caseId: string,
+    services: string[],
+  ): Promise<{ ok: boolean; message: string; items: Array<{ service_key: string; requirements: Record<string, unknown> }> }> => {
+    const response = await api.get('/api/rfqs/draft', {
+      params: { case_id: caseId, services: services.join(',') },
+    });
     return response.data;
   },
 

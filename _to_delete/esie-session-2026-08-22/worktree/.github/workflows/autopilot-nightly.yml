@@ -1,0 +1,57 @@
+# autopilot-nightly.yml — Feedback Autopilot Phase 1 (ingest + dedup + auto-dispatch)
+# ─────────────────────────────────────────────────────────────────────────────
+# Nightly trigger for POST /api/crons/autopilot-ingest. The endpoint is a no-op
+# (returns {halted:true}) until the backend flags are on (AUTOPILOT_ENABLED +
+# AUTOPILOT_DISPATCH_ENABLED), so scheduling this is safe before go-live.
+#
+# INERT until repo var AUTOPILOT_CRON_ENABLED == 'true'.
+# Secret: CRON_SECRET.
+# ─────────────────────────────────────────────────────────────────────────────
+name: Autopilot Nightly
+
+on:
+  schedule:
+    - cron: "0 20 * * *"   # 20:00 UTC — evening
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no LLM / Notion / DB writes)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: autopilot-nightly
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: Ingest + dedup + dispatch
+    if: vars.AUTOPILOT_CRON_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger autopilot ingest
+        env:
+          API_BASE: https://api.relopass.com
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          # workflow_dispatch honours the dry_run input (default true); scheduled runs are
+          # real (dry_run=false) — the backend flags are the actual safety gate.
+          DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && 'true' || 'false' }}
+        run: |
+          set -uo pipefail
+          echo "dry_run=$DRY_RUN"
+          code=$(curl -s -o /tmp/out.json -w '%{http_code}' -X POST "$API_BASE/api/crons/autopilot-ingest" \
+            -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" \
+            -d "{\"dry_run\": $DRY_RUN}")
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          [ "$code" = "200" ] || { echo "autopilot-ingest failed"; exit 1; }
+
+      - name: Write nightly digest
+        if: always()
+        env:
+          API_BASE: https://api.relopass.com
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -uo pipefail
+          curl -s -X POST "$API_BASE/api/crons/autopilot-digest" \
+            -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" -d '{}' | tee /tmp/digest.json || true
+          echo

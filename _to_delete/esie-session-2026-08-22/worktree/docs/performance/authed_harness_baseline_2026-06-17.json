@@ -1,0 +1,209 @@
+{
+  "base_url": "https://api.relopass.com",
+  "samples": 6,
+  "personas": {
+    "admin": {
+      "identifier": "admin@relopass.com",
+      "logged_in": true,
+      "endpoints": [
+        {
+          "endpoint": "/api/admin/people",
+          "cold_ms": 723.0,
+          "cold_status": 200,
+          "warm": {
+            "n": 6,
+            "p50_ms": 720.9,
+            "p95_ms": 755.4,
+            "max_ms": 755.4
+          },
+          "rate_limited": 0,
+          "statuses": [
+            200
+          ]
+        },
+        {
+          "endpoint": "/api/admin/companies",
+          "cold_ms": 703.8,
+          "cold_status": 200,
+          "warm": {
+            "n": 6,
+            "p50_ms": 767.8,
+            "p95_ms": 1213.0,
+            "max_ms": 1213.0
+          },
+          "rate_limited": 0,
+          "statuses": [
+            200
+          ]
+        },
+        {
+          "endpoint": "/api/admin/assignments",
+          "cold_ms": 1241.9,
+          "cold_status": 200,
+          "warm": {
+            "n": 5,
+            "p50_ms": 1322.9,
+            "p95_ms": 2057.4,
+            "max_ms": 2057.4
+          },
+          "rate_limited": 1,
+          "statuses": [
+            200,
+            429
+          ]
+        },
+        {
+          "endpoint": "/api/admin/policy-config/templates",
+          "cold_ms": 194.8,
+          "cold_status": 429,
+          "warm": null,
+          "rate_limited": 6,
+          "statuses": [
+            429
+          ]
+        }
+      ]
+    },
+    "hr": {
+      "identifier": "hr@testingapril.com",
+      "logged_in": true,
+      "endpoints": [
+        {
+          "endpoint": "/api/hr/command-center/cases",
+          "cold_ms": 871.2,
+          "cold_status": 200,
+          "warm": {
+            "n": 6,
+            "p50_ms": 851.4,
+            "p95_ms": 1426.0,
+            "max_ms": 1426.0
+          },
+          "rate_limited": 0,
+          "statuses": [
+            200
+          ]
+        },
+        {
+          "endpoint": "/api/hr/cases",
+          "cold_ms": 603.7,
+          "cold_status": 200,
+          "warm": {
+            "n": 6,
+            "p50_ms": 599.1,
+            "p95_ms": 623.5,
+            "max_ms": 623.5
+          },
+          "rate_limited": 0,
+          "statuses": [
+            200
+          ]
+        },
+        {
+          "endpoint": "/api/hr/assignments",
+          "cold_ms": 1087.5,
+          "cold_status": 200,
+          "warm": {
+            "n": 6,
+            "p50_ms": 1140.7,
+            "p95_ms": 1356.4,
+            "max_ms": 1356.4
+          },
+          "rate_limited": 0,
+          "statuses": [
+            200
+          ]
+        },
+        {
+          "endpoint": "/api/hr/policy-config/templates",
+          "cold_ms": 925.2,
+          "cold_status": 200,
+          "warm": {
+            "n": 6,
+            "p50_ms": 910.3,
+            "p95_ms": 934.7,
+            "max_ms": 934.7
+          },
+          "rate_limited": 0,
+          "statuses": [
+            200
+          ]
+        }
+      ]
+    },
+    "employee": {
+      "identifier": "employee@testingapril.com",
+      "logged_in": true,
+      "endpoints": [
+        {
+          "endpoint": "/api/employee/assignments/overview",
+          "cold_ms": 1779.0,
+          "cold_status": 200,
+          "warm": {
+            "n": 6,
+            "p50_ms": 1810.6,
+            "p95_ms": 1835.7,
+            "max_ms": 1835.7
+          },
+          "rate_limited": 0,
+          "statuses": [
+            200
+          ]
+        },
+        {
+          "endpoint": "/api/employee/assignments/current",
+          "cold_ms": 1821.3,
+          "cold_status": 200,
+          "warm": {
+            "n": 6,
+            "p50_ms": 1821.2,
+            "p95_ms": 2650.5,
+            "max_ms": 2650.5
+          },
+          "rate_limited": 0,
+          "statuses": [
+            200
+          ]
+        },
+        {
+          "endpoint": "/api/employee/policy/caps",
+          "cold_ms": 1965.7,
+          "cold_status": 200,
+          "warm": {
+            "n": 6,
+            "p50_ms": 1939.5,
+            "p95_ms": 2119.4,
+            "max_ms": 2119.4
+          },
+          "rate_limited": 0,
+          "statuses": [
+            200
+          ]
+        },
+        {
+          "endpoint": "/api/employee/tasks",
+          "cold_ms": 708.0,
+          "cold_status": 200,
+          "warm": {
+            "n": 6,
+            "p50_ms": 663.4,
+            "p95_ms": 780.6,
+            "max_ms": 780.6
+          },
+          "rate_limited": 0,
+          "statuses": [
+            200
+          ]
+        }
+      ]
+    }
+  },
+  "budget": {
+    "p95_budget_ms": 2000.0,
+    "max_budget_ms": 3000.0,
+    "breaches": [
+      "admin /api/admin/assignments: p95 2057.4ms > 2000.0ms",
+      "employee /api/employee/assignments/current: p95 2650.5ms > 2000.0ms",
+      "employee /api/employee/policy/caps: p95 2119.4ms > 2000.0ms"
+    ]
+  }
+}

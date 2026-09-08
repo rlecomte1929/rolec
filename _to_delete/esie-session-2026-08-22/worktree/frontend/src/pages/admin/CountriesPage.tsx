@@ -1,0 +1,24 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AppShell } from '../../components/AppShell';
+import { CountryTable } from '../../components/admin/CountryTable';
+import { listCountries } from '../../api/admin';
+import type { CountryListDTO } from '../../types';
+
+export const CountriesPage: React.FC = () => {
+  const [data, setData] = useState<CountryListDTO | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    void listCountries().then(setData);
+  }, []);
+
+  return (
+    <AppShell title="Country Requirements DB" subtitle="Browse destination requirements and research sources.">
+      <div data-testid="countries-page">
+        {!data && <div className="text-sm text-[#6b7280]">Loading countries...</div>}
+        {data && <CountryTable data={data} onSelect={(code) => navigate(`/admin/countries/${code}`)} />}
+      </div>
+    </AppShell>
+  );
+};

@@ -32,7 +32,7 @@ Two brand scales (50→900) + neutrals + semantic. **Light is the only reachable
 
 - **Primary — Navy** (`navy.*` in Tailwind; `--rp-color-primary-*`): structure, headings, primary buttons, dark inverted strips.
   - `800 = #0b2b43` (the canonical brand navy), 900 `#061a2a`, 700 `#133456`, 500 `#2d5f8e` … 50 `#f0f5fa`.
-- **Accent — Teal** (`accent.*`; `--rp-color-secondary-*`): links, active state, sparing emphasis. **Not** a background fill.
+- **Accent — Teal** (`accent.*`; `--rp-color-secondary-*`): links, sparing emphasis, and the Admin **Inbox unread count** (when > 0). **Not** a background fill, and **not** the Admin sidebar active row (that is navy wash).
   - `500 = #1f8e8b` (the canonical accent), 600 `#167572` (link hover), 700 `#105d5b` … 50 `#ebf7f6`.
 - **Neutrals:** slate/gray. Body text `#1f2937` (`--rp-text-primary` / `neutral-800`); secondary `neutral-600`; tertiary/muted `neutral-500`; surfaces `neutral-0/50/100`.
 - **Semantic** (Tailwind palette, as used across the app): success **emerald**, warning **amber**, error **rose/red**, info **blue**.
@@ -75,3 +75,4 @@ None of these change the *intended* look — navy `#0b2b43` + teal `#1f8e8b` + I
 |------|----------|-----------|
 | 2026-06-14 | DESIGN.md created (infer + audit mode) | Documented the shipped system (navy `#0b2b43` + teal `#1f8e8b` + Inter + 8px grid + antigravity) as the formal source of truth; flagged 3 adoption drifts to fix forward. Created by `/design-consultation`. |
 | 2026-09-02 | Dark mode honesty; roadmap hero gradient exception; `--rp-bg` = slate-50 | Audit vs shipped UI: dark tokens unused in the SPA entry; employee roadmap hero is the only approved in-app gradient; body `--rp-bg` aligned with `bg-slate-50` (`#f8fafc`). |
+| 2026-09-07 | Admin sidebar active = navy wash; teal marks Inbox count only | Founder cockpit: active row is `bg-navy-50` / `rgba(11,43,67,0.08)` + navy text. Teal is not a row fill. Inbox unread count (when > 0) is the one teal mark. |

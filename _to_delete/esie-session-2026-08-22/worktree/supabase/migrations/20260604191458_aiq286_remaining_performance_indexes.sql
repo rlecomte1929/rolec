@@ -1,0 +1,4 @@
+-- prod-as-oracle stub: this migration was applied directly to prod via MCP
+-- apply_migration (AIQ-286 performance indexes) without a corresponding repo
+-- file. This stub records it in the ledger so the drift check passes.
+-- No-op: the DDL is already live in prod.

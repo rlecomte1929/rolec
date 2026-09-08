@@ -1,0 +1,67 @@
+name: Cluster tiering refresh
+
+# [WS-D] Daily refresh of public.supplier_cluster_cache for cluster-relative
+# supplier tiering. Runs backend/scripts/refresh_supplier_clusters.py, which for
+# each (service_category, country) cell scores + clusters suppliers and writes
+# one fresh cache row; the recommendation engine reads the latest row by
+# computed_at and falls back to absolute thresholds for thin/absent cells.
+#
+# Gating: only runs when `vars.RLS_COVERAGE_DATABASE_URL_SET == 'true'` (same
+# switch the calibration-monthly / rls-coverage jobs use). Until the read-only
+# DATABASE_URL secret is configured the job is a safe no-op, so the schedule
+# never fails on a missing secret.
+
+on:
+  schedule:
+    # 03:00 UTC daily (off-peak).
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      category:
+        description: "Single service category (e.g. banks). Blank = all."
+        required: false
+        default: ""
+      country:
+        description: "Single country ISO-2 (e.g. BE). Blank = all."
+        required: false
+        default: ""
+
+concurrency:
+  group: cluster-tiering-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: Refresh supplier_cluster_cache
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # No-op unless a read-only DATABASE_URL secret is configured for the repo.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      CATEGORY: ${{ github.event.inputs.category || '' }}
+      COUNTRY: ${{ github.event.inputs.country || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Refresh cluster tiering cache
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ -n "${CATEGORY}" ]; then args+=(--category "${CATEGORY}"); fi
+          if [ -n "${COUNTRY}" ]; then args+=(--country "${COUNTRY}"); fi
+          python -m backend.scripts.refresh_supplier_clusters "${args[@]}"

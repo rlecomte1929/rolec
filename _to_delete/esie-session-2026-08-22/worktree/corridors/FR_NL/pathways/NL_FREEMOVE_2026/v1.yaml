@@ -1,0 +1,93 @@
+# Corridor Agent — FR_NL_2026  (France → Netherlands, free movement)
+#
+# REPRESENTATIVE — indicative content, NOT SME-verified. Grounded in the
+# EU free movement (TFEU Art. 45; Directive 2004/38/EC) framework. An EU/EEA/EFTA national needs NO visa and NO salary floor;
+# the journey is the administrative registration sequence. Confirm details with
+# the destination authority before any authoritative use.
+
+corridor_agent:
+  corridor_id: FR_NL_2026
+  version: "2026.01"
+  petitioning_party: EMPLOYEE
+  origin_country_iso3: FRA
+  destination_country_iso3: NLD
+  description: >
+    France (EU/EEA/EFTA) national → Netherlands under free movement.
+    No visa or residence-permit gate; the pathway models the administrative
+    registration sequence.
+
+  applicable_rules:
+    - legal_reference: "TFEU Art. 45"
+      rule_id: EU_TFEU_45
+      summary: "Free movement of workers within the Union."
+    - legal_reference: "Directive 2004/38/EC"
+      rule_id: EU_2004_38
+      summary: "Union citizens' right to move and reside freely."
+    - legal_reference: "Wet BRP (Basisregistratie Personen)"
+      rule_id: NL_WET_BRP
+      summary: "Registration in the Personal Records Database — issues the BSN."
+    - legal_reference: "Zorgverzekeringswet (Zvw)"
+      rule_id: NL_ZVW
+      summary: "Mandatory Dutch health-insurance cover for residents."
+
+  required_documents:
+    - PASSPORT_OR_NATIONAL_ID:employee
+    - PASSPORT_OR_NATIONAL_ID:family.spouse?
+    - EMPLOYMENT_CONTRACT?
+
+  required_data_points:
+    - key: eu_eea_nationality
+      type: bool
+      source: USER_INPUT
+      validations:
+        - "== true"
+
+  # No salary floor applies to free movement.
+  salary_thresholds_eur: {}
+
+  eligibility_logic:
+    branches:
+      - id: BRANCH_FREE_MOVEMENT
+        label: "EU freedom of movement (TFEU Art. 45)"
+        cite: EU_TFEU_45
+        requires_all:
+          - eu_eea_nationality == true
+        verdict_on_pass: ELIGIBLE
+    no_branch_verdict: NOT_ELIGIBLE
+
+  exception_cases: []
+
+  step_graph:
+    - step_id: TRAVEL_TO_NL
+      name: "Travel to the Netherlands (no visa for EU nationals)"
+      # Free movement: the graph roots at arrival, so pre-arrival runway is ~0.
+      arrival_anchor: true
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: []
+
+    - step_id: BSN_REGISTRATION
+      name: "Register at the gemeente (BRP) — obtain BSN"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 5
+      prerequisite_step_ids: [TRAVEL_TO_NL]
+      cite: NL_WET_BRP
+
+    - step_id: HEALTH_INSURANCE_SETUP
+      name: "Take out Dutch health insurance (zorgverzekering)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [BSN_REGISTRATION]
+      cite: NL_ZVW
+
+    - step_id: DIGID
+      name: "Activate DigiD (digital ID for government services)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [BSN_REGISTRATION]
+
+    - step_id: BANK_ACCOUNT
+      name: "Dutch bank account opened (BSN required)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [BSN_REGISTRATION]

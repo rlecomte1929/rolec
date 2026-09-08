@@ -1,0 +1,1446 @@
+diff --git a/backend/app/routers/immigration_intake_consent.py b/backend/app/routers/immigration_intake_consent.py
+index d5e24c4a..99b3f8fb 100644
+--- a/backend/app/routers/immigration_intake_consent.py
++++ b/backend/app/routers/immigration_intake_consent.py
+@@ -159,7 +159,31 @@ def get_immigration_requirements(
+     # Fail closed: an unseeded corridor returns no rows — report it as such
+     # instead of an empty checklist that looks like "nothing required".
+     if not requirements:
++        # DOC-1 corridor fallback (2026-08-22): the immigration_requirements DOCUMENT table
++        # has no rows for some corridors that DO carry verified requirement_items content
++        # (e.g. ES->IE, already served by /api/public/corridor-requirements). Surface that
++        # same corridor content here, clearly marked as the fallback, instead of a bare
++        # "not covered". This never invents a default corridor: corridor_from/corridor_to
++        # are already resolved and non-null here, so the AIQ-832 fail-closed guarantee holds.
++        # Falls through to _uncovered_response when no corridor content exists either.
+         _log_view_access(case_id, hr_user)
++        try:
++            from ..services.corridor_requirements_service import (
++                list_corridor_requirement_items,
++            )
++            from ..services.corridor_requirements_fallback import build_covered_fallback
++            _corridor_items = list_corridor_requirement_items(
++                to=corridor_to, employee_type=employee_type,
++            )
++        except Exception:
++            log.exception(
++                "corridor_requirements fallback failed for %s->%s", corridor_from, corridor_to
++            )
++            _corridor_items = []
++        if _corridor_items:
++            return build_covered_fallback(
++                corridor_from, corridor_to, visa_type, _corridor_items
++            )
+         return _uncovered_response(corridor_from, corridor_to, visa_type)
+ 
+     # Load employee profile if available for risk evaluation
+diff --git a/backend/app/services/corridor_requirements_fallback.py b/backend/app/services/corridor_requirements_fallback.py
+new file mode 100644
+index 00000000..acddd63b
+--- /dev/null
++++ b/backend/app/services/corridor_requirements_fallback.py
+@@ -0,0 +1,79 @@
++"""Pure response-shaping for the DOC-1 corridor-requirements fallback.
++
++Kept dependency-free (stdlib only) so it is unit-testable without the DB/app import
++chain. The DB fetch that feeds it lives in ``corridor_requirements_service.py``; the
++HR ``/api/hr/cases/{id}/immigration-requirements`` endpoint wires the two together.
++
++Why a fallback exists (2026-08-22): the ``immigration_requirements`` document table has
++no rows for some corridors that DO carry verified ``requirement_items`` content (e.g.
++ES->IE, which the public ``/api/public/corridor-requirements`` endpoint already serves).
++Rather than show HR "not covered", we surface that same corridor content here, clearly
++marked as sourced from the corridor requirement set rather than an authored, apostille-
++aware document checklist. No content is invented; this only reshapes rows a human seeded.
++"""
++from __future__ import annotations
++
++from typing import Any, Dict, List, Optional
++
++
++def map_corridor_item(item: Dict[str, Any]) -> Dict[str, Any]:
++    """Map one ``requirement_items`` corridor obligation into the immigration-requirements
++    response item shape. Additive keys (``source_kind``, ``description``, ``non_obvious``,
++    ``timing``, ``sources``, ``*_status``) are ignored by older clients; ``source_kind``
++    lets a caller tell these apart from an authored document checklist.
++    """
++    sources = item.get("sources") or []
++    return {
++        "document_type": item.get("category") or "corridor_requirement",
++        "document_name": item.get("title"),
++        "is_required": True,
++        "freshness_days": None,
++        "requires_apostille": False,
++        "apostille_countries": [],
++        "requires_translation": False,
++        "translation_languages": [],
++        "can_be_prefilled": False,
++        "can_be_ocr_extracted": False,
++        "typical_processing_days": None,
++        "book_early_flag": bool(item.get("non_obvious")),
++        "book_early_reason": item.get("timing"),
++        "success_tips": [],
++        "common_rejection_reasons": [],
++        "form_url": sources[0] if sources else None,
++        # --- additive, corridor-fallback-only fields ---
++        "source_kind": "corridor_requirement",
++        "description": item.get("description"),
++        "non_obvious": bool(item.get("non_obvious")),
++        "timing": item.get("timing"),
++        "sources": sources,
++        "verification_status": item.get("verification_status"),
++        "attestation_status": item.get("attestation_status"),
++    }
++
++
++def build_covered_fallback(
++    corridor_from: Optional[str],
++    corridor_to: Optional[str],
++    visa_type: Optional[str],
++    items: List[Dict[str, Any]],
++) -> Dict[str, Any]:
++    """Build the covered response from corridor obligations. The document ``requirements``
++    array is populated from ``items`` (so the existing HR panel and callers render them),
++    but ``coverage_reason`` / ``is_fallback`` make the provenance explicit. The document
++    checklist metadata (apostille/translation/timeline) is intentionally empty because no
++    authored document checklist exists yet for this corridor.
++    """
++    reqs = [map_corridor_item(it) for it in (items or [])]
++    return {
++        "covered": True,
++        "coverage_reason": "corridor_requirements_fallback",
++        "is_fallback": True,
++        "corridor": f"{corridor_from}→{corridor_to}",
++        "corridor_from": corridor_from,
++        "corridor_to": corridor_to,
++        "visa_type": visa_type,
++        "requirements": reqs,
++        "risk_flags": [],
++        "estimated_timeline_days": None,
++        "document_count": len(reqs),
++    }
+diff --git a/backend/app/services/corridor_requirements_service.py b/backend/app/services/corridor_requirements_service.py
+new file mode 100644
+index 00000000..848935dc
+--- /dev/null
++++ b/backend/app/services/corridor_requirements_service.py
+@@ -0,0 +1,119 @@
++"""Read the verified corridor ``requirement_items`` for an internal (authenticated) caller.
++
++Feeds the DOC-1 fallback (see ``corridor_requirements_fallback.py``). Reuses the SAME
++deterministic seams the public endpoint uses — ``resolve_catalog_country`` +
++``crud.list_requirements`` + ``rules_engine.apply_rules`` — so the HR case immigration
++view and the public ``/api/public/corridor-requirements`` surface stay consistent.
++``public_corridor.py`` is deliberately left untouched.
++
++No PII, no case data, no LLM. Content is only ever what a human seeded into
++``requirement_items``. An empty list means nothing is seeded for the destination.
++"""
++from __future__ import annotations
++
++import json
++from typing import Any, Dict, List, Optional
++
++from .. import crud
++from ..db import SessionLocal
++from .nationality_class import classify  # noqa: F401  (kept for parity / future nationality gating)
++from .requirements_country_key import resolve_catalog_country
++from .rules_engine import apply_rules
++
++_VALID_EMPLOYEE_TYPES = {"STA", "LTA", "PERMANENT"}
++_DEFAULT_EMPLOYEE_TYPE = "PERMANENT"
++_VALID_PURPOSES = {"employment", "other", "study", "family"}
++
++
++def _norm_employee_type(employee_type: Optional[str]) -> str:
++    et = (employee_type or "").strip().upper()
++    return et if et in _VALID_EMPLOYEE_TYPES else _DEFAULT_EMPLOYEE_TYPE
++
++
++def _urls(citations: Any) -> List[str]:
++    out: List[str] = []
++    seen = set()
++    for c in citations or []:
++        if isinstance(c, dict):
++            u = str(c.get("url") or "").strip()
++        elif isinstance(c, str):
++            u = c.strip()
++        else:
++            continue
++        if not u.lower().startswith(("http://", "https://")) or u in seen:
++            continue
++        seen.add(u)
++        out.append(u)
++    return out
++
++
++def _base_items(rows: List[Any]) -> List[Dict[str, Any]]:
++    """Project ORM RequirementItem rows into the dict shape ``apply_rules`` expects.
++    Mirrors ``public_corridor._base_items`` (kept in sync deliberately; that file explains
++    why ``appliesToNationalityClasses`` must be carried)."""
++    return [
++        {
++            "id": item.id,
++            "pillar": item.pillar,
++            "title": item.title,
++            "description": item.description,
++            "severity": item.severity,
++            "owner": item.owner,
++            "requiredFields": json.loads(item.required_fields_json or "[]"),
++            "citations": json.loads(item.citations_json or "[]"),
++            "appliesToAssignmentTypes": (
++                json.loads(item.applies_to_assignment_types_json)
++                if getattr(item, "applies_to_assignment_types_json", None) else None
++            ),
++            "appliesToNationalityClasses": (
++                json.loads(item.applies_to_nationality_classes_json)
++                if getattr(item, "applies_to_nationality_classes_json", None) else None
++            ),
++            "verificationStatus": getattr(item, "verification_status", None),
++            "attestationStatus": getattr(item, "attestation_status", None),
++            "non_obvious": bool(getattr(item, "non_obvious", False)),
++            "timing": getattr(item, "timing", None),
++        }
++        for item in rows
++    ]
++
++
++def list_corridor_requirement_items(
++    to: str,
++    employee_type: Optional[str] = None,
++    purpose: str = "employment",
++    nationality: Optional[str] = None,
++    db_session_factory=SessionLocal,
++) -> List[Dict[str, Any]]:
++    """Verified corridor requirement_items for a destination, filtered by the deterministic
++    rules engine. ``nationality=None`` filters as THIRD_COUNTRY (most demanding; can only
++    over-show), which is the right default for an HR panel that wants the full picture.
++    Empty list => nothing seeded for the destination."""
++    purp = (purpose or "employment").strip().lower()
++    if purp not in _VALID_PURPOSES:
++        purp = "employment"
++    etype = _norm_employee_type(employee_type)
++    dest_catalog = resolve_catalog_country(to)
++    if not dest_catalog:
++        return []
++    draft = {
++        "relocationBasics": {"purpose": purp, "destCountry": to},
++        "assignmentContext": {"assignmentType": etype},
++        "employeeProfile": ({"nationality": nationality} if nationality else {}),
++    }
++    with db_session_factory() as db:
++        base_items = _base_items(crud.list_requirements(db, dest_catalog, purp))
++    _required, expanded, _flags = apply_rules(draft, base_items)
++    out: List[Dict[str, Any]] = []
++    for item in expanded:
++        out.append({
++            "title": item.get("title"),
++            "description": item.get("description"),
++            "category": item.get("pillar"),
++            "non_obvious": bool(item.get("non_obvious")),
++            "timing": item.get("timing"),
++            "sources": _urls(item.get("citations")),
++            "verification_status": item.get("verificationStatus"),
++            "attestation_status": item.get("attestationStatus"),
++        })
++    return out
+diff --git a/backend/app/services/immigration_milestone_seed.py b/backend/app/services/immigration_milestone_seed.py
+new file mode 100644
+index 00000000..ea7609bf
+--- /dev/null
++++ b/backend/app/services/immigration_milestone_seed.py
+@@ -0,0 +1,142 @@
++"""Immigration-milestone templates + idempotent seeder, per corridor (DOC-4).
++
++Gap (2026-08-22): a case's ``immigration_milestones`` stays empty until something creates
++rows, and nothing seeds them from the corridor — so the HR immigration timeline reads empty
++for corridors that ARE otherwise covered. This module holds the ES->IE (Critical Skills
++Employment Permit) milestone timeline and an idempotent seeder.
++
++PROVENANCE. No content is invented. Every milestone and its planning anchor is derived from
++an authored, cited ``requirement_items`` row and the CSEP_2026 pathway sequence
++(``corridors/ES_IE/pathways/CSEP_2026/v1.yaml``). The ``lead_time_days`` are INDICATIVE
++planning offsets (relative to the move date; negative = before) to be confirmed with counsel;
++the SEQUENCE and the statutory anchors (IRP/Stamp 1 registration within 90 days of arrival,
++Immigration Act 2004 s.9) are the load-bearing part.
++
++NOT wired into the case lifecycle here. Call ``seed_case_milestones()`` from the
++immigration-file-open flow, or run ``backend/scripts/seed_case_milestones.py`` to backfill an
++existing case — after the underlying rows are counsel-attested.
++"""
++from __future__ import annotations
++
++import uuid
++from datetime import date, datetime, timedelta
++from typing import Any, Dict, List, Optional, Tuple
++
++# Ordered milestone template. lead_time_days is relative to the move date (day 0);
++# negative = before the move. book_early_alert flags the traps the pathway calls out.
++_ES_IE_CSEP: List[Dict[str, Any]] = [
++    {"milestone_type": "csep_eligibility_confirmed", "book_early_alert": True, "lead_time_days": -112,
++     "basis": "CSEP occupation list + salary threshold (requirement_items)"},
++    {"milestone_type": "employment_permit_granted", "book_early_alert": True, "lead_time_days": -84,
++     "basis": "CSEP eligibility; Employment Permits Act 2024 (indicative ~12wk processing)"},
++    {"milestone_type": "d_visa_lodged", "book_early_alert": True, "lead_time_days": -70,
++     "basis": "Entry visa after permit; up to 3 months before travel (requirement_items)"},
++    {"milestone_type": "dependant_join_family_visas_lodged", "book_early_alert": True, "lead_time_days": -70,
++     "basis": "Dependant Join Family 'D' visa required (flagged for counsel)"},
++    {"milestone_type": "d_visa_granted", "book_early_alert": True, "lead_time_days": -14,
++     "basis": "~8-week visa decision (requirement_items)"},
++    {"milestone_type": "travel_to_ireland", "book_early_alert": False, "lead_time_days": 0,
++     "basis": "CSEP_2026 pathway sequence"},
++    {"milestone_type": "revenue_job_registration_rpn", "book_early_alert": True, "lead_time_days": 1,
++     "basis": "Register job with Revenue immediately to avoid emergency tax (requirement_items)"},
++    {"milestone_type": "ppsn_application", "book_early_alert": False, "lead_time_days": 7,
++     "basis": "PPSN application on/after arrival (requirement_items)"},
++    {"milestone_type": "irp_stamp1_registration", "book_early_alert": True, "lead_time_days": 21,
++     "basis": "IRP/Stamp 1 registration; statutory limit 90 days of arrival (Immigration Act 2004 s.9)"},
++    {"milestone_type": "spouse_stamp1g_registration", "book_early_alert": False, "lead_time_days": 21,
++     "basis": "Spouse Stamp 1G right to work (flagged for counsel)"},
++    {"milestone_type": "irp_card_received", "book_early_alert": False, "lead_time_days": 35,
++     "basis": "IRP card ~10 working days after registration (requirement_items)"},
++]
++
++MILESTONE_TEMPLATES: Dict[Tuple[str, str], List[Dict[str, Any]]] = {
++    ("ES", "IE"): _ES_IE_CSEP,
++}
++
++
++def _norm(cc: Optional[str]) -> str:
++    return (cc or "").strip().upper()
++
++
++def get_template(corridor_from: str, corridor_to: str) -> List[Dict[str, Any]]:
++    """Milestone template for a corridor, or [] when none is defined (fail-closed: an
++    unknown corridor seeds nothing rather than a default set)."""
++    return MILESTONE_TEMPLATES.get((_norm(corridor_from), _norm(corridor_to)), [])
++
++
++def build_milestone_rows(
++    case_id: str,
++    org_id: Optional[str],
++    corridor_from: str,
++    corridor_to: str,
++    move_date: Optional[date] = None,
++    now: Optional[datetime] = None,
++) -> List[Dict[str, Any]]:
++    """Pure: expand the corridor template into insert-ready row dicts. ``target_date`` is
++    ``move_date + lead_time_days`` or None when no move date is known (never fabricate a
++    date). Deterministic given its inputs — the id is derived from the natural key, not
++    random — so a re-run is stable and diffable."""
++    tmpl = get_template(corridor_from, corridor_to)
++    ts = (now or datetime(1970, 1, 1)).isoformat()
++    rows: List[Dict[str, Any]] = []
++    for i, m in enumerate(tmpl):
++        target = (move_date + timedelta(days=m["lead_time_days"])).isoformat() if move_date else None
++        mid = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{case_id}:{m['milestone_type']}"))
++        rows.append({
++            "id": mid,
++            "case_id": case_id,
++            "org_id": org_id,
++            "milestone_type": m["milestone_type"],
++            "status": "pending",
++            "sort_order": i + 1,
++            "target_date": target,
++            "book_early_alert": bool(m["book_early_alert"]),
++            "created_at": ts,
++            "updated_at": ts,
++        })
++    return rows
++
++
++def case_has_milestones(conn: Any, case_id: str) -> bool:
++    from sqlalchemy import text
++    n = conn.execute(
++        text("SELECT COUNT(*) FROM public.immigration_milestones WHERE case_id = :c"),
++        {"c": case_id},
++    ).scalar()
++    return bool(n)
++
++
++def seed_case_milestones(
++    conn: Any,
++    case_id: str,
++    org_id: Optional[str],
++    corridor_from: str,
++    corridor_to: str,
++    move_date: Optional[date] = None,
++    now: Optional[datetime] = None,
++    force: bool = False,
++) -> int:
++    """Insert the corridor milestone set for a case. Idempotent: skips when the case already
++    has milestones (the table has no unique constraint) unless ``force=True``. Never deletes
++    existing rows unless force. Returns the number of rows inserted."""
++    from sqlalchemy import text
++    now = now or datetime.utcnow()
++    rows = build_milestone_rows(case_id, org_id, corridor_from, corridor_to, move_date, now)
++    if not rows:
++        return 0
++    if case_has_milestones(conn, case_id):
++        if not force:
++            return 0
++        conn.execute(text("DELETE FROM public.immigration_milestones WHERE case_id = :c"), {"c": case_id})
++    conn.execute(
++        text("""
++            INSERT INTO public.immigration_milestones
++                (id, case_id, org_id, milestone_type, status, sort_order,
++                 target_date, book_early_alert, created_at, updated_at)
++            VALUES
++                (:id, :case_id, :org_id, :milestone_type, :status, :sort_order,
++                 :target_date, :book_early_alert, :created_at, :updated_at)
++        """),
++        rows,
++    )
++    return len(rows)
+diff --git a/backend/scripts/seed_case_milestones.py b/backend/scripts/seed_case_milestones.py
+new file mode 100644
+index 00000000..6979fb6a
+--- /dev/null
++++ b/backend/scripts/seed_case_milestones.py
+@@ -0,0 +1,61 @@
++#!/usr/bin/env python3
++"""Backfill immigration_milestones for a case from its corridor template (DOC-4).
++
++Dry-run by DEFAULT (prints the rows it would insert, writes nothing). Pass --apply to write.
++Idempotent: an already-seeded case is skipped unless --force.
++
++    python backend/scripts/seed_case_milestones.py --case-id <id> --from ES --to IE \\
++        [--org-id <id>] [--move-date 2026-10-01] [--apply] [--force]
++
++Reads DATABASE_URL via the app db engine. Point it at a throwaway DB first if unsure.
++"""
++from __future__ import annotations
++
++import argparse
++import sys
++from datetime import date, datetime
++from pathlib import Path
++
++REPO_ROOT = Path(__file__).resolve().parent.parent.parent
++sys.path.insert(0, str(REPO_ROOT))
++
++from backend.app.services.immigration_milestone_seed import (  # noqa: E402
++    build_milestone_rows,
++    get_template,
++    seed_case_milestones,
++)
++
++
++def main(argv=None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
++    ap.add_argument("--case-id", required=True)
++    ap.add_argument("--from", dest="corridor_from", required=True)
++    ap.add_argument("--to", dest="corridor_to", required=True)
++    ap.add_argument("--org-id", default=None)
++    ap.add_argument("--move-date", default=None, help="ISO date; target_dates are computed from it")
++    ap.add_argument("--apply", action="store_true")
++    ap.add_argument("--force", action="store_true")
++    args = ap.parse_args(argv)
++
++    if not get_template(args.corridor_from, args.corridor_to):
++        print(f"No milestone template for {args.corridor_from}->{args.corridor_to}. Nothing to do.")
++        return 0
++    move = date.fromisoformat(args.move_date) if args.move_date else None
++    rows = build_milestone_rows(args.case_id, args.org_id, args.corridor_from,
++                                args.corridor_to, move, datetime.utcnow())
++    print(f"{len(rows)} milestone(s) for case {args.case_id} ({args.corridor_from}->{args.corridor_to}):")
++    for r in rows:
++        print(f"  {r['sort_order']:>2}. {r['milestone_type']:<34} target={r['target_date']} book_early={r['book_early_alert']}")
++    if not args.apply:
++        print("\nDRY RUN — no rows written. Re-run with --apply to write.")
++        return 0
++    from backend.database import db  # noqa: E402
++    with db.engine.begin() as conn:
++        n = seed_case_milestones(conn, args.case_id, args.org_id, args.corridor_from,
++                                 args.corridor_to, move, datetime.utcnow(), force=args.force)
++    print(f"\nInserted {n} milestone(s)." if n else "\nNothing inserted (already seeded; use --force to replace).")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/backend/tests/test_corridor_requirements_fallback.py b/backend/tests/test_corridor_requirements_fallback.py
+new file mode 100644
+index 00000000..f2a56699
+--- /dev/null
++++ b/backend/tests/test_corridor_requirements_fallback.py
+@@ -0,0 +1,44 @@
++"""DB-free unit tests for the DOC-1 corridor-requirements fallback shaping."""
++from backend.app.services.corridor_requirements_fallback import (
++    build_covered_fallback,
++    map_corridor_item,
++)
++
++
++def test_map_marks_source_and_maps_fields():
++    m = map_corridor_item({
++        "title": "Entry D visa", "description": "d", "category": "RESIDENCE",
++        "non_obvious": True, "timing": "before travel", "sources": ["https://x"],
++        "verification_status": "representative", "attestation_status": None,
++    })
++    assert m["document_name"] == "Entry D visa"
++    assert m["document_type"] == "RESIDENCE"
++    assert m["source_kind"] == "corridor_requirement"
++    assert m["book_early_flag"] is True
++    assert m["book_early_reason"] == "before travel"
++    assert m["form_url"] == "https://x"
++    assert m["verification_status"] == "representative"
++
++
++def test_map_handles_missing_fields():
++    m = map_corridor_item({"title": "T"})
++    assert m["form_url"] is None
++    assert m["book_early_flag"] is False
++    assert m["sources"] == []
++    assert m["document_type"] == "corridor_requirement"
++
++
++def test_build_covered_fallback_shape():
++    resp = build_covered_fallback("ES", "IE", "join_family", [{"title": "A", "sources": []}])
++    assert resp["covered"] is True
++    assert resp["is_fallback"] is True
++    assert resp["coverage_reason"] == "corridor_requirements_fallback"
++    assert resp["corridor"] == "ES→IE"
++    assert resp["document_count"] == 1
++    assert resp["requirements"][0]["document_name"] == "A"
++
++
++def test_build_covered_fallback_empty():
++    resp = build_covered_fallback("ES", "IE", "x", [])
++    assert resp["document_count"] == 0
++    assert resp["requirements"] == []
+diff --git a/backend/tests/test_immigration_milestone_seed.py b/backend/tests/test_immigration_milestone_seed.py
+new file mode 100644
+index 00000000..68cfe6f5
+--- /dev/null
++++ b/backend/tests/test_immigration_milestone_seed.py
+@@ -0,0 +1,46 @@
++"""DB-free unit tests for the ES->IE immigration milestone seeder (DOC-4)."""
++from datetime import date, datetime
++
++from backend.app.services.immigration_milestone_seed import (
++    build_milestone_rows,
++    get_template,
++)
++
++FIXED_NOW = datetime(2026, 1, 1, 0, 0, 0)
++
++
++def test_es_ie_template_present_and_ordered():
++    tmpl = get_template("ES", "IE")
++    assert tmpl, "ES->IE template must exist"
++    leads = [m["lead_time_days"] for m in tmpl]
++    assert leads == sorted(leads), "lead times must be non-decreasing in intended order"
++    # case-insensitive corridor lookup
++    assert get_template("es", "ie") == tmpl
++
++
++def test_build_rows_count_sort_order_and_determinism():
++    rows = build_milestone_rows("case-1", "org-1", "ES", "IE", None, FIXED_NOW)
++    assert len(rows) == len(get_template("ES", "IE")) == 11
++    assert [r["sort_order"] for r in rows] == list(range(1, len(rows) + 1))
++    assert all(r["case_id"] == "case-1" for r in rows)
++    assert all(r["status"] == "pending" for r in rows)
++    ids = [r["id"] for r in rows]
++    assert len(set(ids)) == len(ids)
++    again = build_milestone_rows("case-1", "org-1", "ES", "IE", None, FIXED_NOW)
++    assert [r["id"] for r in again] == ids  # deterministic
++
++
++def test_target_date_from_move_date_else_null():
++    assert all(r["target_date"] is None
++               for r in build_milestone_rows("c", "o", "ES", "IE", None, FIXED_NOW))
++    move = date(2026, 10, 1)
++    rows = build_milestone_rows("c", "o", "ES", "IE", move, FIXED_NOW)
++    by = {r["milestone_type"]: r for r in rows}
++    assert by["travel_to_ireland"]["target_date"] == move.isoformat()
++    assert by["employment_permit_granted"]["target_date"] < move.isoformat()
++    assert by["irp_stamp1_registration"]["target_date"] > move.isoformat()
++
++
++def test_unknown_corridor_seeds_nothing():
++    assert get_template("XX", "YY") == []
++    assert build_milestone_rows("c", "o", "XX", "YY", None, FIXED_NOW) == []
+diff --git a/docs/esie-review-2026-08-22/01-corridor-facts-audit.md b/docs/esie-review-2026-08-22/01-corridor-facts-audit.md
+new file mode 100644
+index 00000000..10697eab
+--- /dev/null
++++ b/docs/esie-review-2026-08-22/01-corridor-facts-audit.md
+@@ -0,0 +1,148 @@
++# ReloPass corridor-facts — read-only audit — 2026-08-22
++
++**Scope.** Read-only. No writes to any database, no changes to your repo, no production contact. Run against the `rolec` working tree on `main`, which was clean for all corridor-facts inputs — so the gate result reflects the **committed** state, not local edits.
++
++**Bottom line.** The live corridor-facts system is **healthy**: gate **PASS**, provenance test suite **36/36 green**, and **zero drift** from the last saved baseline (`data/corridor-facts/gate-2026-08-19.json`). Separately, the Otto prompt you handed me is **stale for this repo** — it drives a `tools/corridor-facts/` TypeScript pipeline that isn't here, and its task block was never filled in. Detail below.
++
++---
++
++## Two things to know before the numbers
++
++**1. The Otto prompt's task was blank.** Its `<<< TASK >>>` section is still the placeholder ("State the corridor(s), whether live writes are in scope, and what 'done' looks like"). No corridor or outcome was specified — that was meant to be filled in before running.
++
++**2. The pipeline the prompt targets is not in this repo.** The prompt says to read `tools/corridor-facts/README.md`, run `npm test` (157 tests), and drive `npx tsx cli.ts gate/import`. That directory does not exist in the working tree, and `git log --all` shows it was **never committed on any branch**. What `rolec` actually runs is the same idea reimplemented in Python:
++
++| Prompt (TS pipeline, absent) | This repo (Python, live) |
++|---|---|
++| `tools/corridor-facts/gate.ts` | `scripts/check_corridor_facts.py` |
++| `npx tsx cli.ts gate --corridor` | `python scripts/check_corridor_facts.py --root .` |
++| `knowledge-pack-import.mjs` / loader | `scripts/import_otto_facts.py` (dry-run default → `otto_staging`) |
++| `official-sources.ts` allowlist | `scripts/corridor_facts_allowlist.txt` |
++| `requirement_facts` / `requirement_entities` + per-corridor steps | authority-keyed `backend/seeds/facts/*.yaml` packs + `corridors/*/facts.yaml` bindings |
++| 157 vitest tests | `scripts/tests/test_check_corridor_facts.py` (36 tests) + `backend/tests/test_corridor_*.py` |
++
++Because of this, I did **not** follow the prompt literally (every command would have errored) and did **not** invent a task. On your pick, I ran the read-only audit against the tooling that is actually here.
++
++---
++
++## Gate result — PASS (run-date 2026-08-22, max age 365 days)
++
++```
++25 canonical facts across 5 packs (4 active, 17 representative, 4 staged); 21 gate-bearing; 4 corridor bindings
++PASS — every promoted fact carries an official, dated, quoted source.
++```
++
++Exit code 0. Report: `violations: []`, `suppressed: []`, `stale_allowlist: []`.
++
++The four checks the gate enforces (identical in spirit to the prompt's, and it is the sellability-relevant guard): **(a)** official source, **(a2)** publisher jurisdiction matches the pack, **(a3)** binding direction (a destination binding cites the destination's own authority), **(b)** freshness (page's own publication date within the window), **(c)** completeness (url + date + verbatim quote, quote not a stub), **(d)** consistency (dependencies resolve, are acyclic, and never point at a staged row).
++
++### Zero drift vs. the saved baseline
++
++Every field of today's report equals the committed `data/corridor-facts/gate-2026-08-19.json` — only `run_date` differs. No source aged out of the 365-day window in the three days between.
++
++| Field | 2026-08-19 (saved) | 2026-08-22 (today) |
++|---|---|---|
++| canonical_facts | 25 | 25 |
++| gate_bearing | 21 | 21 |
++| active / representative / staged | 4 / 17 / 4 | 4 / 17 / 4 |
++| bindings | 4 | 4 |
++| violations | 0 | 0 |
++| verdict | PASS | PASS |
++
++---
++
++## Per-corridor bindings — all clean
++
++The gate keys facts by the **authority that publishes them** (EU, FR, GB, IE, NO packs) and each corridor **binds** the ones it cites. All four bindings resolve to gate-bearing facts that pass:
++
++| Corridor | Facts bound | Composition | Status |
++|---|---|---|---|
++| **ES_IE** | 9 (all IE, destination-side) | PPS ×2 (active), PAYE ×3, PRSI ×2, tax-residence ×2 (representative) | PASS |
++| **NO_FR** | 8 (4 origin NO/EU social-security, 4 dest FR tax/registration) | all representative | PASS |
++| **FR_NO** | 3 (FR exit_tax origin; NO deposit_cap + lease_terms dest) | 2 active + 1 representative | PASS |
++| **GB_NO** | 2 (GB statutory_residence_test origin; NO deposit_cap dest) | representative + active | PASS |
++
++The other 8 corridor folders (DE_NO, ES_NL, FR_CH, FR_DE, FR_ES, FR_NL, IE_ES, IN_DE) have no fact bindings yet, so they are not gate-bearing.
++
++### Provenance & freshness
++
++Every one of the 21 gate-bearing facts carries a dated official source and a verbatim `evidence_quote` with a `quote_sha256`. Oldest gate-bearing source is `IE:tax_residence` at **271 days** (published 2025-11-24) — comfortably inside the 365-day window. Everything else is fresher (range 30–271 days).
++
++### Staged facts (excluded from the gate — correct, not a failure)
++
++Four facts sit `staged`: no dated official page and/or no verbatim quote yet, so the gate excludes them and they are not sold. None is bound to a corridor. This is the "honest gap left staged" outcome the prompt itself prescribes.
++
++| Fact | Why staged |
++|---|---|
++| `FR:dossier_and_guarantor` | no dated source / quote captured yet |
++| `IE:payslip_catch22` | no dated source / quote captured yet |
++| `NO:bankid_electronic_id_friction` | private operator (BankID) — no authority publishes it (same known gap the Otto docs flag) |
++| `NO:interim_private_health_cover_gap` | no dated source / quote captured yet |
++
++Promoting any of these requires a human to open a dated official page and copy the quote — not something this audit (or any LLM, per the hard rule) may author.
++
++---
++
++## Tests
++
++- **`scripts/tests/test_check_corridor_facts.py` — 36 passed in 0.26s.** This is the gate's meta-suite: each test plants exactly one violation and asserts the gate returns exit 1 and names the responsible check, plus one test asserting the clean fixture passes. It is the faithful analog of the prompt's gate tests, and it is fully green.
++- **`backend/tests/test_corridor_*.py` — not run (out of scope, by design).** These import the app's DB layer, and the repo has a safety guard that **refuses to run them against a non-local database** — it detected the production Supabase URL in `.env` and stopped. Running them faithfully means standing up a local SQLite/Postgres schema plus the full backend dependency set; that is beyond a read-only fact audit and unrelated to the provenance pipeline. I did **not** set `RELOPASS_ALLOW_REMOTE_DB_IN_TESTS=1` (that would point tests at production). The command to run them locally is in Reproduce below.
++
++That DB guard is itself a positive audit signal — the repo actively prevents a test run from touching production, consistent with the prompt's fail-closed / don't-touch-production ethos.
++
++---
++
++## Reconciliation vs. the attached Otto documents
++
++The three attached files describe the **retired/never-committed TypeScript pipeline**, whose model and numbers do **not** map to this repo. This is the main caveat on "reconcile against the docs": they are not a valid baseline for the live system.
++
++| | Attached Otto docs | This repo (live) |
++|---|---|---|
++| Fact model | per-corridor `requirement_facts` + `requirement_entities` steps | authority-keyed jurisdiction packs + corridor bindings |
++| Baseline counts | FR-NO 45 steps/50 facts, GB-NO 23/23, NO-FR 49/47, ES-IE 37/52; statute exemptions | 25 canonical facts total; 4 bindings; no statute-exemption mechanism in this gate |
++| Test count | 157 (vitest) | 36 (gate meta-suite) + DB-bound backend suite |
++| Verdict | all four PASS | PASS (all four bindings clean) |
++| Valid live baseline | — | `gate-2026-08-19.json` == today (zero drift) |
++
++Same philosophy (no fabrication, dry-run default, fail-closed, provenance gate, staging→promotion), different implementation. Treat the attached docs as **history/context for a parallel design**, not as the spec for what's running.
++
++### Unlanded Otto deliverables (context for a future "import" run, not this audit)
++
++Two Otto batches are staged on disk but not landed:
++- `audos-workspace-776786/data/B3-corridor-facts-2026-08-18.jsonl`
++- `audos-workspace-776786/data/ve-ie-entry-family-2026-08-20.jsonl`
++
++The repo's real loader for these is `scripts/import_otto_facts.py` (dry-run by default). That is the "Dry-run an Otto batch" path you didn't pick today.
++
++---
++
++## Reproduce
++
++From the repo root, on your Mac (CI-canonical form):
++
++```bash
++# gate — offline, reads repo files only, writes nothing to any DB
++python scripts/check_corridor_facts.py --root . --run-date "$(date -u +%F)" --json corridor-facts-gate.json
++
++# gate provenance test suite (36 tests)
++python -m pytest scripts/tests/test_check_corridor_facts.py -q
++
++# backend corridor tests — need a LOCAL db; never point at production
++DATABASE_URL=sqlite:///./ci_test.db python -m pytest backend/tests/test_corridor_*.py -q
++```
++
++What I actually ran: the audit executed inside the Cowork Linux VM against your mounted working tree, using the VM's `python3` (which has PyYAML) for the gate and a pip-installed `pytest` for the suite. The gate JSON was written outside your repo tree; nothing in your git status changed.
++
++---
++
++## What I deliberately did NOT do
++
++- No database writes; no `--apply` of any importer; no promotion of any staged fact.
++- No production DB contact; did not override the test suite's remote-DB guard.
++- No changes to the gate, the four checks, the allowlist, or any exclusion rule.
++- Did not author, infer, or "fill in" any requirement, source URL, date, or quote — the four staged facts stay staged.
++- Did not rebuild the absent `tools/corridor-facts/` pipeline, and did not guess a task for the blank prompt.
++
++---
++
++*Read-only audit generated 2026-08-22. Verdict: live corridor-facts gate **PASS**, provenance suite **36/36**, **zero drift** from the 2026-08-19 baseline. The attached Otto prompt describes a different, absent pipeline and had no task specified.*
+diff --git a/docs/esie-review-2026-08-22/02-corridor-forward-plan.md b/docs/esie-review-2026-08-22/02-corridor-forward-plan.md
+new file mode 100644
+index 00000000..cefe46c2
+--- /dev/null
++++ b/docs/esie-review-2026-08-22/02-corridor-forward-plan.md
+@@ -0,0 +1,71 @@
++# ReloPass corridor-facts — recommendations & forward plan
++
++*Full-stack engineer's read, 2026-08-22. Grounded in the read-only audit plus an end-to-end trace of the corridor lifecycle (research → gate → seed → attest → serve).*
++
++---
++
++## The objective, stated plainly
++
++ReloPass wins on **trust**: it serves relocation obligations as *verified, cited, human-attested fact*, not LLM guesses. So the goal is not "more facts" — it's **a small set of corridors that are genuinely sellable end-to-end**, where *sellable* means all three of: provenance-gated ✅, counsel-attested, **and actually served to the customer**.
++
++Your repo makes the near-term objective concrete for me: two design partners, each tied to your two strongest corridors.
++
++- **Andrea → ES→IE.** Your `ReloPass_ES-IE_Andrea_GoLive_Assessment_2026-08-20.md` says she can go live **within a week**, and the blocker is **5 already-built PRs awaiting merge** (vendors done; empty housing/schools recs, disabled geocoding, and `example.com` advisor URLs are *all built but unmerged*).
++- **Denis → NO→FR.** The gap-analysis build spec frames NO→FR as "close the gap between what ReloPass *demos* and what it *does today*, authored against a real validation case."
++
++Everything below is ordered by how directly it moves those two corridors to live.
++
++## Current state — the map (what I verified)
++
++| Layer | State | Evidence |
++|---|---|---|
++| Provenance gate | **PASS**, 36/36 tests green, zero drift | `scripts/check_corridor_facts.py`; audit 2026-08-22 |
++| Gated fact corpus (`backend/seeds/facts/`) | 25 facts, clean & dated — but **17/21 are `representative` (unattested)**, only 4 `active` | pack YAMLs |
++| Fact → served-table bridge (`seed_corridor_facts.py`, path #3) | **Built + tested (PR #1916)** — but `DATA-PATHS.md` still says "not yet built", and it's unclear it's been *applied to prod* | commit `c6f2189b`; `docs/corridors/DATA-PATHS.md` |
++| Served table (`requirement_items`) | Fed by **4 authoring paths, 2 id conventions**; fuzzy-match dedup hazard where they overlap | `docs/corridors/DATA-PATHS.md` (114 prod rows, 2026-08-20) |
++| Serving engine (`public_corridor.py`) | **Destination-only** — origin obligations (exit tax, home-country A1) are structurally dropped; NO shows ~3 items, missing tax-card/police/EEA | router docstring |
++| Attestation | Full system exists (admin-gated promote + tokenized counsel signing), largely **unused so far** | `backend/app/routers/attestation.py` |
++| Coverage | 4 of 12 corridors fact-bound (ES_IE, FR_NO, NO_FR, GB_NO); GB_NO missing its pathway | `corridors/*/` |
++| Knowledge/dev debt | Stale Otto docs describe a phantom `tools/corridor-facts/` TS pipeline; local venvs broken; 148 pending migrations + jammed applier | audit; CLAUDE.md |
++
++**The one-sentence diagnosis:** you have a verified fact corpus and a working gate, but the *last mile* — landing those facts into the served table (#3) and surfacing origin-side obligations — is unfinished or unverified, so the trust you've built isn't yet reaching the customer. And your nearest customer (Andrea) is blocked on merges, not on new code.
++
++## Recommendations, in priority order
++
++**1. Ship Andrea (ES→IE) first — it's a merge problem, not a build problem.** The go-live assessment says the fixes are built. Triage the 5 PRs against your own merge discipline (both required CI checks green; router dual-registration; no back-to-back migration merges), merge the clean ones, and verify live (Render auto-deploys `main`): recs populate, geocoding on, zero `example.com`. This is the highest ROI on the board — days to a real validated corridor.
++
++**2. Verify and finish the fact→serving bridge (path #3).** This is the structural keystone: until `seeds/facts` reliably lands in `requirement_items`, your gate PASS is cosmetic — the verified facts don't render. Confirm ES-IE and NO-FR facts are actually in `requirement_items` (run `seed_corridor_facts.py --apply` in a controlled window if not), add a **served == gated-corpus** regression test, and refresh `DATA-PATHS.md` (the "not built" note is now false).
++
++**3. Ship Denis (NO→FR) — and close the origin-side serving gap.** NO→FR's value *is* the origin obligations (Norwegian exit tax, A1/home social security) that the destination-only engine currently drops. Decide the smallest fix that surfaces origin facts in the roadmap (the `roadmap_corridor_overlay` is the likely home — don't rebuild the engine), then author/attest the rest against Denis's validation case.
++
++**4. Run the attestation drive.** 17/21 facts sit `representative` — nothing is *sellable* until counsel signs. The workflow exists; feed it. I can generate per-corridor attestation packets (fact + quote + source, legal-scope only) and verify the admin promote path so a signature actually flips a row to `active`.
++
++**5. Expand coverage — controlled, quality over count.** Land the two staged Otto batches (`B3-corridor-facts`, `ve-ie-entry-family`) via `import_otto_facts.py` dry-run → source-check → stage (never blind-import); fix GB_NO's missing pathway; add corridors only as gated research arrives.
++
++**6. Pay down the tax on every future pass.** Consolidate the 4 authoring paths (path #4's divergent `ES:IE-ES:*` id convention is the outlier); retire the stale Otto docs and point to `DATA-PATHS.md` + the gate (this drift has already cost whole agent passes, per your own CLAUDE.md); fix the local venvs (a documented `uv` bootstrap so `pytest` runs); and flag the 148-pending migration ledger for the pre-launch data reset (don't touch it now).
++
++## Phased roadmap
++
++| Phase | Work | Effort | Risk | Definition of done |
++|---|---|---|---|---|
++| **0 — Unblock Andrea** | Triage + merge the 5 ES-IE PRs; fix last-mile (recs/geocoding/`example.com`); E2E-verify | S (days) | Prod-affecting — follow merge discipline | ES→IE renders complete live; no `example.com`; go-live checklist green |
++| **1 — Finish bridge #3** | Verify/apply `seed_corridor_facts.py`; served==corpus test; refresh `DATA-PATHS.md` | S–M | Idempotence + fuzzy-match dedup | Gated ES-IE/NO-FR facts served; re-run = 0 changes; doc current |
++| **2 — Ship Denis + origin gap** | Surface origin obligations in NO→FR roadmap; author + attest remaining facts | M | Engine change scope creep | NO→FR renders origin+destination, cited + attested |
++| **3 — Attestation drive** | Packets for the 4 corridors; verify promote flow; drive representative→active | M (process-gated) | Needs counsel availability | ≥1 corridor fully attested → `active` → sellable |
++| **4 — Coverage** | Land 2 staged Otto batches; fix GB_NO pathway; add corridors as researched | M, ongoing | Never blind-import | Each new corridor gate-PASS + provenance-clean before promote |
++| **5 — Debt paydown** | Consolidate authoring paths; retire stale docs; fix venvs; flag migration ledger | M, ongoing | — | One authoring convention; docs match reality; local tests run |
++
++Phases 0 and 1 can run in parallel (both are "finish/verify what exists"). 3 runs alongside 2. 5 is continuous.
++
++## Where I'd start Monday
++
++**Phase 0 + the Phase 1 verification, together.** Concretely, my first session would: (a) read the Andrea go-live assessment in full and pull the actual PR/merge-queue state, produce a triage (merge / hold / needs-fix per PR); and (b) confirm whether the gated ES-IE facts are already in `requirement_items` — if not, that's the single change that connects your verified corpus to Andrea's live corridor. Both are low-build, high-signal, and directly serve the one-week go-live.
++
++## What I'd need from you
++
++- Confirm Andrea (ES→IE) and Denis (NO→FR) are still the two live targets, and which is first. (I'm reading that from repo docs dated 2026-08-20 — correct me if it's moved.)
++- A green light before anything that touches `main`/production (merges, `--apply`, prod DB) — Phases 0–1 are production-affecting; everything up to that point is read-only analysis I can do unattended.
++
++---
++
++*Companion to the read-only audit (`corridor-facts-audit-2026-08-22.md`). This is a recommendation, not executed work — no code changed, nothing merged, no production contact.*
+diff --git a/docs/esie-review-2026-08-22/03-andrea-esie-pr-triage.md b/docs/esie-review-2026-08-22/03-andrea-esie-pr-triage.md
+new file mode 100644
+index 00000000..9f51c38d
+--- /dev/null
++++ b/docs/esie-review-2026-08-22/03-andrea-esie-pr-triage.md
+@@ -0,0 +1,60 @@
++# Andrea (ES→IE) go-live — PR triage, 2026-08-22
++
++*Triage of the "5 already-built PRs" from `ReloPass_ES-IE_Andrea_GoLive_Assessment_2026-08-20.md`, reconciled against the current state of `main`.*
++
++---
++
++## Headline
++
++**The merge bottleneck is already cleared.** All five Wave-1 PRs merged into `main` on 20–21 Aug — within ~24 hours of that assessment being written. On top of that, both Wave-2 "build/load" items (the roadmap, AIQ-1867; the VE→IE entry-visa load, AIQ-2027) are also merged. So the assessment's entire three-part code plan — *merge 5, build 1, load 1* — is **done in code**.
++
++What's left for Andrea is **not merge work**. It's a small set of human-gated / data items, plus a fresh live check to confirm the ~15 merged PRs actually moved her off the AMBER 52% score.
++
++**Recommended next action:** stop treating this as a merge queue. Run the three non-code items below and re-score, rather than re-reviewing PRs that are already in.
++
++## The 5 Wave-1 PRs — all MERGED (no action)
++
++| # | Ticket | What it unlocks for Andrea | PR | Status in `main` |
++|---|---|---|---|---|
++| 1 | AIQ-1879 | `relocationBasics` stops 500ing (corridor write) | #1925 | ✅ merged 08-21 07:22 (`51d38648`) |
++| 2 | AIQ-1746 | Dublin settle-in pack; false "register your residence" line removed | #1913 | ✅ merged 08-20 20:59 (`16026cb7`) |
++| 3 | AIQ-1882 | Dublin neighbourhoods + geocoding (housing/schools/commute) | #1915 | ✅ merged 08-20 20:48 (`6467b613`) |
++| 4 | AIQ-1868 | HR "no verified IE readiness template" flag cleared | #1920 | ✅ merged 08-20 21:10 (`06345963`) |
++| 5 | AIQ-1872 + AIQ-1883 | Ireland-capable advisors; Dublin movers — no Singapore / `example.com` | #1927 | ✅ merged 08-21 07:22 (`32d5abc3`) |
++
++Verdict: **nothing to merge.** These are in `main` and (via Render's auto-deploy of `main`) should be live.
++
++## Wave-2 "still unbuilt" items — now also merged
++
++| Ticket | Assessment status (08-20) | Current state in `main` |
++|---|---|---|
++| **AIQ-1867** — wire the CSEP journey into Andrea's roadmap | "genuinely unbuilt" | ✅ built & merged: #1929 (`0f5752a1`), #1938 (`317ffaf0`), #1940 (`b6dd1bb6`), and #1952 (`f9112c13`, "the corridor journey reaches the screen the employee actually opens"), plus #1958 (CSEP "easy-to-miss" traps) |
++| **AIQ-2027** — load VE→IE entry-visa + family facts | "research delivered; load pending" | ✅ landed as candidates + promotion recorded: #1934 (stage candidates), #1945 (evidence landing), #1942 (record promotion), #1946 (review-page 500 fix), #1948 (endpoint publishes citation URLs only) |
++
++Caveat on AIQ-2027: the assessment flagged **4 of the 9 VE→IE rows for counsel** before approval. The facts are landed as *candidates*; whether counsel has cleared those 4 and they've been promoted to served is a review/attestation gate I can't see from git — confirm it before relying on the VE→IE immigration content.
++
++## What actually remains for Andrea's go-live
++
++None of these is a PR merge; three of the four are human-gated or per-case data, which is why they don't show up as "unmerged code."
++
++1. **Approve the 6 pending Ireland `requirement_items`** (emergency-tax trap, 183-day residency, PRSI, split-year, RPN). Admin `review_status` flip — explicitly a **human gate, do not auto-approve**. This switches on the six highest-value "non-obvious" items that are currently invisible. *(DB/admin action — not visible in git.)*
++2. **Fix Andrea's own case (`6ecadafe`)**: `intake_step=0` and a hardcoded family-of-4 "budgetMonthlySGD" seed profile. She needs intake completed (or pre-filled) and the Singapore/Oslo seed cleared, or she logs into a wrong, empty profile. *(Per-case data — not code.)*
++3. **Confirm the VE→IE candidates are promoted + counsel-cleared** (the 4 flagged rows above). Until then her Venezuelan entry-visa/family branch may still be thin.
++4. **Re-run the live Madrid→Dublin E2E and re-score.** The last result on disk is `t18_results_1787290309969.json` (08-21), which predates or coincides with the final merges. A fresh `scripts/madrid_dublin_runner.mjs` run against `api.relopass.com` is the only way to confirm the merged PRs moved her past **AMBER 52%** and that PLAN/forms/milestones/recommendations/geocode/advisors now pass live.
++
++Non-blocking (per the assessment, and confirmed as design gaps, not Andrea-blockers): uncurated companies still get wrong defaults (a Munich school for a Dublin move), and the raw marketplace endpoint isn't corridor-filtered. Andrea's company "Google" is curated (29 Irish suppliers), so these don't block her.
++
++## Method & limitations (so you can trust or re-check this)
++
++- **Authoritative:** every "merged" claim is `git log origin/main --grep "(#PR)"` against your current `main` (HEAD `850d344b`, 2026-08-22 09:16). Merge timestamps are `git show -s`.
++- **Can't confirm from here:** live CI status and the set of *genuinely open* PRs — this VM has no `gh` CLI and the remote is a local `no-mistakes` mirror. `git branch --no-merged` is unreliable because your squash-merge flow leaves already-merged branches looking unmerged, so I did **not** infer "open PRs" from it.
++- **Assumed, not verified:** merged → deployed (Render auto-deploys `main`). I did not hit `api.relopass.com` or the prod DB — that's items 1–4 above and needs your go-ahead.
++
++## What I can do next (read-only unless you say otherwise)
++
++- Run the live Madrid→Dublin E2E (`scripts/madrid_dublin_runner.mjs`) and give you the fresh score + the exact remaining live failures — this replaces guesswork with the current number.
++- Or check the prod DB read-only for items 1 and 3 (are the 6 IE requirement_items still `pending`? are the VE→IE candidates promoted?) — a read against Supabase, on your go-ahead.
++
++---
++
++*Read-only triage. No PRs merged, no code changed, no production writes. Companion to `corridor-facts-audit-2026-08-22.md` and `corridor-facts-forward-plan-2026-08-22.md`.*
+diff --git a/docs/esie-review-2026-08-22/04-andrea-esie-live-check.md b/docs/esie-review-2026-08-22/04-andrea-esie-live-check.md
+new file mode 100644
+index 00000000..f1409ec6
+--- /dev/null
++++ b/docs/esie-review-2026-08-22/04-andrea-esie-live-check.md
+@@ -0,0 +1,77 @@
++# Andrea (ES→IE) — live check, 2026-08-22
++
++*Live production reads against ReloPass (Supabase `nsvefcvpvwwwhuqyuqmp`) + the public corridor endpoint. All read-only. The write-based E2E runner was **not** run — see the safety note.*
++
++---
++
++## Headline
++
++Andrea's corridor is in far better shape than the 08-20 assessment's **AMBER 52%**. The public endpoint now serves **~29 ES→IE requirements** including her full Venezuelan entry-visa + family branch, and the non-obvious tax items the assessment flagged as "invisible/pending" are now **approved and serving**. The real outstanding item is not content — it's that **none of Ireland's 42 requirement rows is counsel-attested**, including 4 immigration rows that were specifically flagged for lawyer review and are already serving.
++
++## Item 1 — the pending "non-obvious" approvals
++
++**The assessment's specific worry is resolved.** The six items it named (emergency-tax trap, 183-day residency, PRSI, split-year, RPN) are now **approved and live** — they appear in the served corridor payload below. So the admin approval it recommended has effectively happened since 08-20.
++
++**What's pending now is a newer, more granular batch** — 13 rows, all `representative`, none served:
++
++| Count | What they are | Status |
++|---|---|---|
++| 13 pending IE rows | Nationality-split refinements — EU/EEA vs non-EEA variants of Income Tax, USC, PRSI, PPS, IRP, A1 (posted workers), Public Health / ordinary residence, and Work Permission | `review_status='pending'` → not served |
++
++These duplicate/refine already-approved generic rows with an EU/EEA-vs-third-country split. Approving them is a **completeness pass, not an unblock** — Andrea's core content is already live. Lower urgency than the assessment implied. (Admin `review_status` flip, human gate — still do not auto-approve.)
++
++## Item 3 — the VE→IE entry-visa + family load
++
++**Done, approved, and serving.** The AIQ-2027 batch (`ve-ie-entry-family-2026-08-20`, 9 records) landed into `requirement_items` and was promoted to `approved`. Live rows now include:
++
++- Ireland — entry d visa required (Venezuela)
++- Ireland — entry d visa long stay over 90 days
++- Ireland — entry visa apply from country of residence
++- Ireland — entry visa after permit timing
++- Ireland — Spanish residence does not grant Irish entry
++- Ireland — dependant join family d visa required
++- Ireland — CSEP immediate family reunification
++- Ireland — spouse Stamp 1G right to work
++
++This directly closes the 08-20 finding that "Venezuela→Ireland has no entry-visa path and no family/dependant coverage."
++
++**But the counsel gate is open.** All 42 Ireland rows are `attestation_status` = not attested (**0 attested**), and they serve as `verification_status='representative'` (visible, awaiting counsel). The batch flagged **4 rows for lawyer review** — those are among the approved, serving rows. So counsel-flagged immigration content is live before attestation. Whether that's acceptable pre-launch is a **legal/product call for you**; it's the single most important governance item I found.
++
++## Live corridor payload (read-only GET, no auth)
++
++`GET /api/public/corridor-requirements?from=ES&to=IE&employee_type=PERMANENT` → **~29 requirements**, `coverage_note: none`, `waived_for_assignment_type: []`. Highlights served live today:
++
++- **Immigration:** Critical Skills Permit (salary/fee/eligibility/occupation list), General Employment Permit (salary/fee/LMNT), CSEP→Stamp 4, Stamp 1 / IRP registration + card timeline, "Ireland outside Schengen — separate system".
++- **VE entry/family:** the 8 rows above.
++- **Tax/social:** 183-day residence, split-year, RPN drives IT/USC/PRSI, Revenue myAccount to avoid emergency tax, PPSN, PRSI compulsory, combining contributions.
++- **Life:** Dublin rental market realities, EU pet travel.
++
++10 of 29 flagged `non_obvious`. The endpoint is healthy and corridor-appropriate — no Norwegian/Singapore bleed-through.
++
++## Before → now
++
++| Metric | 08-20 assessment | Live 08-22 |
++|---|---|---|
++| IE `requirement_items` approved | 14 | **29** |
++| IE pending | 6 (core non-obvious) | 13 (nationality-split refinements; the core 6 are now approved) |
++| VE→IE entry-visa / family | none | **8 rows approved + serving** |
++| Corridor GET (ES→IE) | EU branch 1 / TC 14 | **~29 served** |
++| IE rows counsel-attested | 0 | **0 (unchanged — the open gate)** |
++
++## Not run / not checked (and why)
++
++- **The Madrid→Dublin E2E runner was NOT executed.** `scripts/madrid_dublin_runner.mjs` is not read-only: it does `POST /api/auth/register` (HR + employee), `POST /api/hr/cases`, and `.../assign` — it **creates accounts, cases, and assignments in production** every run. That's outside the read-only basis you approved, so I held it. Consequence: the **authenticated** slices — roadmap phases/milestones, recommendations, advisor matching — are **not** re-verified here. The 08-20 assessment's weakest screen (roadmap `phases: []`) is unconfirmed either way; the AIQ-1867 roadmap PRs are merged, but only a live authenticated run proves they render for her.
++- **Andrea's own case (`6ecadafe`) was not queried.** Item 2 (her `intake_step=0` + family-of-4 SGD seed profile) is her personal/PII case data and outside the "items 1 & 3" you approved. Still worth fixing before she logs in.
++
++## Method & safety
++
++- Reads: 3 `SELECT`s via Supabase MCP on project `nsvefcvpvwwwhuqyuqmp` + one unauthenticated `GET`. **No writes, no DDL, no test accounts created.**
++- Returned DB rows were treated strictly as data.
++
++## Your call on the write-E2E
++
++To confirm the authenticated flows (roadmap/milestones/recs/advisors) end-to-end, the runner has to create prod test data. Options: (a) I run it with your explicit OK, accepting it registers throwaway HR/employee accounts in prod; (b) I extend the read-only public-endpoint probing where I can; or (c) we leave the authenticated flows to your own QA. The content/serving layer is verified above regardless.
++
++---
++
++*Read-only live check. Companion to the audit, forward plan, and PR triage. No production writes; the write-based E2E was deliberately not run.*
+diff --git a/docs/esie-review-2026-08-22/05-andrea-esie-e2e.md b/docs/esie-review-2026-08-22/05-andrea-esie-e2e.md
+new file mode 100644
+index 00000000..9e5e03da
+--- /dev/null
++++ b/docs/esie-review-2026-08-22/05-andrea-esie-e2e.md
+@@ -0,0 +1,79 @@
++# Andrea (ES→IE) — live E2E run, 2026-08-22
++
++*Full write-based E2E (`scripts/madrid_dublin_runner.mjs`) against `api.relopass.com`, run with your explicit approval. Production is deployed at commit `850d344b` — i.e. current `main` (all the merged PRs are live).*
++
++---
++
++## Score: 52% → ~71%
++
++| | 08-20 (T18) | 08-22 (this run) |
++|---|---|---|
++| PASS | 28 | **40** |
++| PARTIAL | 2 | 0 |
++| FAIL | 24 | **14** |
++| BLOCKED | — | 2 |
++| Total | 54 | 56 |
++| Pass rate | ~52% (AMBER) | **~71%** (40/56; 74% excluding the 2 correctly-gated BLOCKED) |
++
++**By area:** Setup 14/14 ✅ · **Journey (roadmap) 2/2 ✅** · Documents 10/16 · Neighbourhood 4/8 · Services 6/10 · Agent 4/6.
++
++The two things the assessment called out as the worst screens are fixed: **Setup** (register → case → assign) is fully green, and the **roadmap Journey** — which returned `phases: []` on 08-20 (the F5 failure) — now passes for both personas. The merged AIQ-1867 work is live and rendering.
++
++## The 14 failures — and which are real
++
++Every failure returned `HTTP 200 · 0 results` and was **identical across both personas** (EU and third-country), which is itself the tell: these aren't nationality-branch bugs, they're empty collections. They split cleanly into test-harness artifacts and genuine gaps.
++
++### Test-harness artifacts — NOT code regressions
++
++The runner registers a **brand-new HR company each run** ("Google Ireland", fresh id) and a fresh case. Per-company curation and case history therefore don't exist for it — so these zeros are expected, and understate Andrea's real (curated) experience:
++
++| Check | Result | Why it's an artifact |
++|---|---|---|
++| SVC-2 vendors / SVC-4 suppliers | 0 | Vendor curation is **per-company**; the real "Google" (`46fc3db0`) has 29 curated Irish suppliers — this fresh test company has none |
++| AGT-3 providers attachable | 0 | No providers attached to a case created seconds ago |
++| AREA-2 schools | BLOCKED | Correctly gated — the test persona has no school-age dependants |
++
++To measure Andrea's *actual* experience for these, the run would need to target her real curated case (`6ecadafe` / company `46fc3db0`), which the cold-start runner can't do.
++
++### Genuine gaps — worth a ticket
++
++| Check | Result | Read |
++|---|---|---|
++| **DOC-1** case immigration requirements | 0 items | The **public** corridor endpoint serves ~29 IE requirements (from `requirement_items`), but the **case-scoped** immigration view returns 0. The case path reads `immigration_requirements`, which still has **no `*→IE` rows** (135 rows across DE/PT/US/UK/FR only). The rich content and the case-scoped delivery aren't wired to the same source. |
++| **DOC-3** fillable IE forms | 0 forms | No Irish form templates (permit/visa/PPSN) authored yet. |
++| **DOC-4** immigration milestones | 0 milestones | No milestone/deadline timeline seeded for the corridor (assessment: `immigration_milestones = 0`). May also require the immigration file to be opened. |
++| **AREA-3** Dublin address autocomplete | 0 results | Geocode/autocomplete returns nothing. AIQ-1882 priced the neighbourhood bands (that merged), but the address-autocomplete path is still empty — worth confirming the geocoding provider is actually enabled in prod env. |
++
++**The single most useful finding:** the generic/public corridor content is rich (~29 requirements, live), but the **case-scoped immigration surfaces (DOC-1/3/4) are empty** because they read `immigration_requirements` / forms / milestones, which have no IE data — a wiring/content gap between the two representations, not a deployment problem. This is the same "several representations of one obligation that disagree" theme as the `requirement_items` authoring-path fragmentation in the forward plan.
++
++## Deploy confirmation
++
++`GET /health` → `commit: 850d344b` = current `main` HEAD. So every merged PR (the 5 Wave-1 + AIQ-1867 roadmap + AIQ-2027 VE→IE load) is deployed and serving. This closes the "merged but is it live?" question from the triage.
++
++## Test data created in production (as approved)
++
++The run created, under your own plus-subaddressed inbox (unique per run, timestamp `1787387053799`):
++
++- `romain+t18hra_1787387053799@hotmail.com` (HR, persona A) + `romain+t18empa_…` (employee)
++- `romain+t18hrb_1787387053799@hotmail.com` (HR, persona B) + `romain+t18empb_…` (employee)
++- 2 HR cases (one per persona) with assignments, company "Google Ireland".
++
++These are inert test rows. If you want them removed I can look for a cleanup path, but there's no self-service delete exposed to me — likely an admin/DB action on your side.
++
++## Method & safety
++
++- Run from the cloud sandbox (the device VM can't reach `api.relopass.com`); the runner is self-contained (`fs` + native fetch) and writes only to a gitignored `results/` dir in a scratch location — **your repo was not touched**.
++- Full evidence (`t18_evidence_*.json`, ~595 KB, every request/response) is retained in the sandbox if you want any specific response body.
++- run_id / timestamp: `1787387053799` (2026-08-22 08:25 UTC).
++
++## Recommended next steps
++
++1. **Wire the case-scoped immigration view to the IE content** (DOC-1) — decide whether `immigration_requirements` should carry ES→IE, or the case view should read the `requirement_items` corridor content the public endpoint already serves. Highest-impact of the real gaps.
++2. **Author IE forms + milestones** (DOC-3/DOC-4) — or open the immigration file in the flow that seeds them.
++3. **Confirm the geocoding provider is enabled in prod** (AREA-3).
++4. **Re-run against Andrea's real curated case** to confirm vendors/suppliers/providers are non-zero for her (they should be, given company `46fc3db0`'s 29 suppliers).
++5. **Counsel attestation of the ES→IE set** (from the live-check report) remains the actual go-live gate — 0/42 IE rows attested.
++
++---
++
++*Companion to the audit, forward plan, PR triage, and live-check. Write-based E2E run with explicit approval; test accounts are your own plus-subaddresses.*
+diff --git a/docs/esie-review-2026-08-22/06-andrea-esie-gap-remediation.md b/docs/esie-review-2026-08-22/06-andrea-esie-gap-remediation.md
+new file mode 100644
+index 00000000..3de3533e
+--- /dev/null
++++ b/docs/esie-review-2026-08-22/06-andrea-esie-gap-remediation.md
+@@ -0,0 +1,85 @@
++# ES→IE E2E gaps — remediation plan, 2026-08-22
++
++*What the four genuine E2E failures actually are, after reading the handlers, and the exact fix for each. Honest headline up front: three of the four are **content or config, not code bugs** — the endpoints are correct and, in one case, deliberately fail-closed. I did not write throwaway patches for gaps that aren't code, because that would either fabricate legal content or bypass a privacy gate you built on purpose.*
++
++---
++
++## Summary
++
++| Gap | Endpoint | Root cause | Class | Fix owner |
++|---|---|---|---|---|
++| AREA-3 | `GET /api/employee/geocode/autocomplete` | `GEOAPIFY_API_KEY` unset → returns `{disabled:true}` **by design** (DPA gate) | **Config** | You (set env when DPA signed) |
++| DOC-1 | `GET /api/hr/cases/{id}/immigration-requirements` | `immigration_requirements` table has no ES→IE rows; endpoint correctly fails closed | **Content** (+ optional code bridge) | Corridor authoring |
++| DOC-3 | `GET .../immigration/available-forms` | `form_templates` has no IE forms | **Content** (real gov PDFs) | Sourcing + admin CRUD |
++| DOC-4 | `GET .../immigration/milestones` | `immigration_milestones` empty for the case; nothing seeds it | **Content / flow** | Seed from pathway (draft below) |
++
++The common thread — and it's the same finding as the forward plan's #1 item — is that Ireland's verified content lives in **`requirement_items`** (29 rows, serving, powering the DOC-2 checklist that *passes*) and in the **CSEP pathway YAML** (representative, unverified), but the **immigration subsystem tables** (`immigration_requirements`, `form_templates`, `immigration_milestones`) that DOC-1/3/4 read were never populated for ES→IE. The code reads the right tables; the tables are empty.
++
++---
++
++## AREA-3 — geocode autocomplete → **config, not code**
++
++`backend/app/routers/geocoding.py` returns `{"disabled": true, "suggestions": []}` whenever `GEOAPIFY_API_KEY` is unset, and its docstring states the intent: *"no PII leaves the platform until the DPA is signed and the key is configured."* The endpoint is working exactly as designed; the E2E reads it as a failure because it expects results.
++
++**Fix (yours, ~2 minutes, once the Geoapify DPA is in place):** set `GEOAPIFY_API_KEY` in the Render backend service environment. `is_enabled()` flips automatically; no deploy or code change needed. Until the DPA is signed, leaving it unset is the correct posture — the intake UI degrades to a plain address input. I have deliberately **not** written code here: hardcoding a key or removing the `is_enabled()` guard would defeat a privacy control you put in on purpose (AIQ-1607).
++
++*Optional code nicety (low priority):* the E2E check looks for a `results`/`predictions` key, but the endpoint returns `suggestions` + `disabled`. If you want the runner to score this correctly once keyed, that's a one-line change in `scripts/madrid_dublin_runner.mjs`, not in the product.
++
++## DOC-1 — case immigration-requirements → **content (with an optional code bridge)**
++
++`get_immigration_requirements` calls `immigration_requirement_service.get_requirements(corridor_from, corridor_to, visa_type, employee_type)`, which queries the `immigration_requirements` table. That table has DE/PT/US/UK/FR corridors and **no `*→IE`**, so the endpoint returns its structured `_uncovered_response` (`covered:false`, `requirements:[]`). This is intentional fail-closed behaviour (AIQ-832: never emit a silent default corridor).
++
++Note the shape mismatch that matters here: `immigration_requirements` is a **document checklist** (what papers to file, with apostille / translation / processing metadata and `form_url`), whereas `requirement_items` holds **obligations** (rules like "183-day residence"). They are not the same content, so this is genuinely a "populate the document subsystem for ES→IE" task, not a rename.
++
++**Recommended fix — author the ES→IE immigration document requirements** into `immigration_requirements` (via your corridor pipeline / `relopass-corridor-transfer`), covering the CSEP and D-visa document set: passport, in-date employment permit, signed contract / job offer, qualifications (apostilled/translated where required), proof of funds, police clearance, marriage/birth certs for dependants, etc. — each with a citation to the DETE/ISD page. The CSEP pathway's own `Required documents:` section is a starting inventory, but it is marked *representative, not SME-verified* — it must be verified before it becomes gate-bearing content, per your no-fabrication rule. I won't invent this list and commit it as verified.
++
++**Optional interim code bridge (a product decision, not a blind patch):** make `get_immigration_requirements`, when `immigration_requirements` is empty for a *correctly-resolved* corridor that has `requirement_items` content, return that content in a clearly-labelled "corridor requirements" block (covered=true, sourced from requirement_items) instead of a bare "not covered." This unifies the two representations at read time — the forward plan's core recommendation — and gives HR *something* useful today. Caveat: it surfaces obligations in a view designed for documents, so it's a UX judgement call. **Say the word and I'll write it as a real diff + test on a branch** for you to review; I've held off because it changes a fail-closed immigration endpoint's semantics and deserves your explicit yes.
++
++## DOC-3 — available immigration forms → **content (real government PDFs)**
++
++`GET .../immigration/available-forms` reads `form_templates` (admin-managed via `admin_form_templates.py`), which has no IE templates. Forms are **actual fillable government PDFs** (CSEP/GEP application, long-stay 'D' visa application, PPSN application, IRP registration) plus their field maps. These have to be sourced from DETE / ISD / Revenue and loaded through the admin form-template flow. I can't fabricate government forms, and there's no code change that conjures them — this is a sourcing + data-entry task. Lower priority for Andrea than DOC-1/attestation, since the *guidance* (what to file) can be delivered via DOC-1 content before the fillable PDFs exist.
++
++## DOC-4 — immigration milestones → **content/flow (draft below, derived from your verified rows)**
++
++`list_milestones` reads `immigration_milestones WHERE case_id` — empty because nothing seeds a case's timeline. There is a `POST .../milestones` (manual) but no auto-seed from the corridor. Two decisions: (1) the milestone set for the corridor, and (2) whether it auto-seeds when a case's corridor is known or is created on the immigration-file-open step.
++
++Here is a **draft ES→IE (CSEP) milestone timeline**, derived from the CSEP pathway sequence and the timing already verified in your `requirement_items` — i.e. transformed from content you've already sourced, **to be confirmed before seeding**, not invented:
++
++| # | milestone_type | Anchor / lead time | Source basis (already in requirement_items / pathway) |
++|---|---|---|---|
++| 1 | csep_eligibility_confirmed | move − ~16 wks | CSEP occupation list + salary threshold rows |
++| 2 | employment_permit_granted (DETE) | move − ~12 wks | CSEP eligibility row; EPA 2024 |
++| 3 | d_visa_lodged (ISD) | after permit, up to 3 mo pre-travel | "entry visa after permit timing" row |
++| 4 | d_visa_granted | ~8 wks after lodging | "entry visa after permit timing" row (~8-week decision) |
++| 5 | dependant_join_family_visas | parallel with 3–4 | "dependant join family d visa required" (flagged) |
++| 6 | travel_to_ireland | move date | pathway sequence |
++| 7 | irp_stamp1_registration | within 90 days of arrival | "Stamp 1 / IRP registration"; Immigration Act 2004 s.9 |
++| 8 | irp_card_received | ~10 working days after registration | "IRP card — timeline and fee" row |
++| 9 | ppsn_application | on/after arrival | "PPSN" row |
++| 10 | revenue_job_registration_rpn | immediately on starting work | "Register the job with Revenue" row |
++| 11 | spouse_stamp1g_registration | after arrival | "spouse Stamp 1G" row (flagged) |
++
++Every lead time above traces to a row a human already sourced. This is ready to drop into a seeder once you confirm the flow (auto-seed on case corridor assignment is my recommendation) and counsel has attested the underlying rows. **I can turn this into an actual seeder + POST calls once you pick the flow** — that one *is* code I can write safely.
++
++---
++
++## The real go-live gate: counsel attestation
++
++Separate from all four gaps, and more important than any of them: **0 of Ireland's 42 requirement rows is counsel-attested.** The 29 serving rows are all `representative` (visible, awaiting counsel). The **counsel packet is delivered** (`ReloPass_ES-IE_Counsel_Attestation_Packet_2026-08-22.docx`) — 29 rows with official citations, the 4 lawyer-flagged rows leading, an Attest/Amend/Reject box per row. Getting that signed and promoting the rows to `attestation_status='attested'` is what makes ES→IE genuinely *sellable*, and it's the highest-leverage move on the board.
++
++## Recommended order
++
++1. **Send the counsel packet** (done — just forward it). This is the go-live gate and it's ready now.
++2. **Set `GEOAPIFY_API_KEY`** once the DPA is signed — 2 minutes, closes AREA-3.
++3. **Author + verify ES→IE immigration document requirements** into `immigration_requirements` (closes DOC-1 properly; I can scaffold the draft from the pathway for your verification).
++4. **Seed the milestone timeline** above once the flow is chosen — I can write that seeder.
++5. **Source the IE form PDFs** (DOC-3) — lowest urgency; DOC-1 content covers the guidance meanwhile.
++6. *(Optional)* the DOC-1 read-bridge diff, if you want HR to see corridor content in that view before step 3 lands.
++
++## Why I didn't hand you four patches
++
++You built a platform whose entire value is that it never serves unverified content and never bypasses its own gates. Committing invented immigration document lists, fake form templates, or a key that defeats your DPA control would have violated exactly that. The honest, higher-value output is: the code is correct; here's the content/config each gap needs, a verified-derived milestone draft you can seed, the one code change I'll write on your say-so, and the counsel packet that unblocks the actual sale.
++
++---
++
++*Companion to the audit, forward plan, PR triage, live-check, and E2E report. No code changed, no production writes, no fabricated content.*
+diff --git a/docs/esie-review-2026-08-22/ReloPass_ES-IE_Counsel_Attestation_Packet_2026-08-22.docx b/docs/esie-review-2026-08-22/ReloPass_ES-IE_Counsel_Attestation_Packet_2026-08-22.docx
+new file mode 100644
+index 0000000000000000000000000000000000000000..9287e6e549d32e0edc01087027988d1cfb91d498
+GIT binary patch
+literal 18399
+zcmc(HbyQu+((l3DU4uKp{oqdU;O_435Zv9}-6c4|-3jjQ!66U`kGV5*XC~jhZ@u@|
+z*K2L|UW@+KsqU)ouBu(N<v)Od!vcP5BVw4^|9bf255(Ku)z-m?LH@sXf%~(Iu7k0a
+z<G(vX|BKdOx}5RTTL)rr0094=9gS=aovn>+oZh=xTfP4cT9vRa3r36_q#I;+QD3DI
+zMSUK{bX=wW&ab|K-yR2AI?CIV$%U2;;mUuEizV}snX9rn$Hd^>R-c)|wWzWqWT`ce
+z0mGx_jl<1wbH*L5boh=4wiuS0m%rfkr(s?glv{vU&?tBJ(s3n6xWTdKcA}3eZ>X_$
+zO`sg__ae&GruZM)?OT;x+}~rG&)XFG8s?$EBve&G1%_aRoRqqt;-5>Z^O3L?7a2ZO
+z4+Sg-#JE0_bAI3oU5!W1Y6?uAWyvhU@7I=u?!HIrtK38W7GVMsy0bpVnwf~-TTbTx
+z`Jg?CXj}?$JI@L?7Pl#fNTyFRow$EMchd{x&&mCL&N^BJlDDV;0HzHP0Lq_p_V?L3
+z_tv%DZK*$0CC23p0JmJWkDn||U^yho;%DJ%eg&6&f`^P4fS{jYFCkYTm2&YUd=CkC
+z=H1oOj`Xmdnc}_i;Jq0$n`2ZFUP#6xd)C5|#o2d!ENdl+u1*$l_oJ@-`=ResV!suc
+z1HJOodW4PVDFm8%DM=b)m*>^?6Wx+;k5kWF=nxIYW@jq&%TCVE>%%L-!d_++^Pc$2
+zEw9+}%m;%OzHi^^?H|bTOxM@3;9=$NdN|>}crww2pXJWYY|E2rHKXAiNLBdEAS%x)
+zymY~fnpR$yHgwLf=Wo_)1qoS}jxfoIYqjshXB3r57uwa;TnA!ZGQD#`&Gw~h07y-_
+z5qmNx4}gzutT+yoUg#vcd+0?#m&0z8LKO?$hj^0c9&{eWq0tg}7*b*}eHAS7plWEt
+zsYr&z3aO5r(T>6<w_k@?UuQTCNXU%Y7T4Zlo{t$9mb9|)aSdCqBKH7~D9u(YhMl``
+zVv}r<KE<jbOAoedXSh)9zPAEd-WuaR{GpYkuATl|KRY=WqpZ$(c%hJdzGpIbo1%PR
+zG2CDQ8Jv?$J08tLXWNX1=&lng=Zv%NiFI9nQ{Ld)kb8~+>knz;YKz(Ac#(h4tyX~t
+zLC=+J3hS@2PGvqK$g4S<Ie1>BGJ8J}-=$qun3X|(UZXM_wGAG=w+kye;t_piMA_yF
+zv+0705$0B+61?6iPshc(rnTCf(1f;d-s7+re`mjcro2CF;;m94T>v1!n7Py`vf^1^
+z>oIlj3DH8zAm5P7>hW?OkU@<_!R6z{khwG!d)3<eE^G=6jMm=;+h71+f@#-e;P!oV
+zENSa`HuSl0KH4;t;TOiJz$e7N!al2M$SO!NWjONxIqz)=+h-enck7x}J`K7map#9=
+z(mGA@E)2`J6}_%)OQT`x%L{``<)~6bDgj0iAOn#e)rH!JdK)ZRDfL>q=}T$QM{AEq
+z*w^vT=AIWO8RM>St4>KhnT9#9=ln}txGLuT?6NgmyN|~d0SroJ8kpt4l(<nWc6v{O
+zG#>@gJXBR2El&eAH!I8XE`7Db3!Rqowh-H4sD)kzRC(9eV!t<n5KeIsk%uG(jPLIK
+zt6uaxGwNO+d~sHNAV8mr5?ci<6<ON&4eIb=2H_fSB2Ys{H}e2=^aFy-s5!nrpjMas
+zdF+-#%^d4QYQiPyw5oiO@wfXwTTfNy-Z#q^^MZ)sHRiW>RxX{i*2@#|Bj!09ni(Sc
+z-idp?h$L0Y(<wf@dvsN)W9mH|Upe=j)L4aU<Ek$4Ku!nj0>N&Tq3`?1X~E@K`?wU~
+zgT^ZkbAOVI7_gy$zPA+ds%OZ%_yMHTkiN7V4#zM5M1}ZapPE#e%6%LX)<zEI%v|{(
+z&#d7zFSQzaeAs|0ZxHxQ1xtF&8Iqlox?ObHrpM}PU%ircN?{&xHwt=@I$hwR=kRng
+zX&>f6j{+RPj4n+6{G?x|{~oN;7_D+5b*%T^!)AyHreR_Oq};exqBa}ZoUQ+=?EWJ@
+zjw$2MvW8jaW0=g{C>=lcev35&b-ETzqSZzQM|m@05XEs?h1pJee299zX=9JlL26h8
+zTRVTt?IbmLH+;F$6cM#8(sJ9t)QC8AL&y(wk-^P=O*pXiC46adL`zpckS?laH)|7a
+zDk2_K4;K$FHhU!eJZp!>VFUM<^EJ<)Eg;gp=pu-B>6C+(teDKsi@xLNM#*jaZKFKP
+zP&x(RDJfaW6@vQNXS{&3@C0ttlBlOLsViW_^}7lN)D~)?`>_i`%GDRx``<}UTSzyY
+z!dgVny+Whoj3c+O91VFf`Vj+EuVh&`)G1g5Q9+I=U<)&0KRqqp7N536@yU@%kYE|Z
+zrgtADV@7}z9fbx|>M`4|J0!3td0-3d8<8oxK|!<R)JjX@N)SnBm7xaXV}E$3{vN7N
+z$TmKnagHk@&pFr9s5;`aWtd3~|LZ-!TwW4Wq=uCUnb0(LTe)TI2ZUXk7?GbMKcFG8
+zo{<buf~{=msLkYTL?;SRmf}@1Mp@%Yagu<1jW^M|@bm(SAV__vi5G=s>2}2kdeVpT
+zv2*cO@={0mO5Oa3_UM-$LWW^5&)H*T)DadKi*0o@yP?K?_-q0FWz!eJFx2D08v5`_
+z{_jjE3~CVN9e1GxNU;OkTd=x}_BVeJsQe^7OB0M_ZhwVts}PbQ_0gy2d%gdHli~4t
+z!Gx<UIOn;-%}9Czkp6PG@sp(j!Tjgdm55TrSFs`<4y2`TjwyZa@xy{PPQx6)5yYy`
+z)rFV1h0`y|I1=5}kCdL8gOprHJ5Pg#=qc?NQgQU95T!Kgtl>PL+CQ&r+X@VQIx3GS
+zal2~$fIsmL+f6U0m<B<~mQ0_CY#N-xIXIk85H6jL=25}VB{(ciqN<KGyVI#!C@Bm~
+zZH+B;%S27%^vguLVG=w6fLE`4CLOF;lMo`0X5vV6COexDq+ivT7*QQ$H<=CzH${-`
+zy$qAONg=$YK7!XbwXVoByC7-`9F-iTK+APrm9}rY`fDqEA|D?~QeX${_4a1I$Z+u0
+zs*{&JIuJHFH!kviBizjW)HN)$uppLgih{P%YK}6+61;lWi!G2Am;RL%Gy!8GD@zly
+z=i67JmV|d2;UrpAc{UjYhK@pJ$MfPiL+RR~z&J>m5i$@3B3niz*tI;2Z>4L`vOhs-
+zBI>4IANiNs=jIY<?+=cKa%35n_m4Lx<$SgDx2mZwp-K*;1-K+XEiCtFk3Kw9^*euT
+zuU=S2(xEgJ>8Mbh5l@_!6XK_%<)a@BnfbKyaeKHP2lP-+xgGSDgRWvXK<yT;bXc3-
+zBbFV1U0$)IQ4g)O=_#C4G<W%NwYh}yP<*k(Q5n;mP4S0_m=lQ_k{h(ah?@=|mcp?I
+z8DGtbGtnL#I(0aIR1aEND0Ceqv0uC>oC}f(%&)53VVTolQ`5<(p^bS2AW^WrxQ>Vl
+zcog>N>P+SGCGmEsL@i~PD1?G5@tbj;wlX%+;8L;=gtzRaq`Fq>Gs;|Kpta+OVMXoB
+z7rEZ^J33!hFxPlN2&v}%8a40e0dEt@8YRfVS)7xOi<l7%9xg(~cHS*QnvJRF7N0g)
+zMF%#I<N_mr?dU2Y5-nB(%}zLKchm+p^1!@U6uKa}6-9u6Z8VfzF9rjOiE)N?guGTd
+zO_s1*F$edVX_e`suXa4r7h_8f!C_tuW2Gnb2G4IvqMxx2sz0cPDDRy5)Ea~L6~b}`
+z1E=2geK68>wqfj94d|X*Htsu`5*6EVpN0`5@=WNpNHzUdt@P_vJ`eY6kJG^uK2x;T
+z_B9G-Zjhq@SyLckv+$~gI!7D5sCXeks*Aj?DMcOwz=jZ#8KF@99d|yev>wD<-aZr&
+z^@jBq_~B&%CrmKd_AIT^vxTUmMbqy?)*_k?&OHZrYo>PTn-?(o_ZK%3C3V7lBJ;B$
+z)IZiE8rB;+8&nyzB#FCgyr{o6(%sc1>JFqxCuX#3LRm?^--pxr@yP$$S?9{$&O3xm
+z|I)rHSwO(Ng0kkMdZwchA{x$4U-}iQ7~rE@u-00ux0^f!>7vJ{#rAU_?p0F*Y0XmO
+z;{CN`4}G#G<=oR1-m10B&OL2Z$eeDH^m3YdV&sIgfzPyyiLn{uM@dTzxAMM^1iG4x
+z*(cvg6$yO7$kCOg%vRh?@G@Tz1a@o4ag!(W{Jje46zWD$%@~i~vkwdI=J}%A6iM)A
+z&Nw%u$2x7E&NV!wlnmSE5?KWIwV4AXgd)0k$WGN*AZ`hQn>N(Yks8@091-*E+3A1g
+zBxTN-tx4MXYovT$U>&6P2#+d;)IQ$|;2~aVgUJV5@^6}pYAq|8YccL=9OrZ=B8fUk
+zMRuZmhTgx)$8E+LW*V@EGc@(<5)s>Kl@?CBT8d)y+T@n>Oz(3m$OrK_po=x#biZDo
+z<qshu=K?TErPuZgPbOh13TIELox#~d=;rY(gb9Rv^%62%yq6n*t)UMgwkL>nc8u$m
+zp!k%W3wP<rxW^400wf59?vfEk8TLEm3MH|)#z}UngxKMNn^Je1>~+M<Zg4}MG$=V=
+zD^ow0C7{;t2pt)&XYW)asP?ewbwta~xLoUhS!1+0DT+Nrsq9!hEU^NU9&907Y@I`b
+zztRLG$*fH%UvA0w@A-&-(#a5O==AipX2Ux_jpv0l@Gk-A?N0ZUqAWYXHBDkEvM6I>
+z$albofSxU)8%nvsxw@a0_wM4eQVntmzEIKlgXSWyl#KdS`n=aV3SZXG3Dz0pN*b~R
+z<2{VUO_BMeC!#_Q-#pl;X4`870x9{$7!(*OBK=i10bAqE2=@{<T-&k;@2kaSzFXv-
+z{){38GK4;Sh=6!ti9fF5K@^M@jxK!cCsR9jY}0v?NeD(}tLQY0tbgOq=4h9H1Ul_c
+zu4=P=7`mzV-Xj#4JS@Syt+Del*mLIcM8pESH*XmF%T6pgzeDVld>wHJkMySrfw9pC
+z4BTKjX+V*g<0`lF5o?hH!a2)m-}j!}Rp~F_OmaU$=LGodz;!MsaydJce}22(hv+aR
+za*kVt=KKz>!GM`=Kwx_$GS#>?=eTDZ6~%#;Br=Y5;*%JkRevhgPIt~Nw4DgDro==)
+zF%SYSteT})z6yNVImVLv;`TH!$M8XVKB%)c;uh|_QU?P#qW0jaQAi^#BoF?e0dQsI
+z_#7#-y^K9I=w;pG#(oepJgB9rPbU%E0>A{2d4-wb9Jb}sH|7DE^rCMxj<+e-o_FoX
+z#88MZa!X*+add)T+<ad8ejqK%bW)kT^e#dgy}ySBF`tTXLfJ7aShk$oNGC6Y1UZml
+z)}9m|O~{a~&39Q-SOR~gqFSGvDpw8Z@Qc(^ON^?T)CM4%v^2>QgT*CdJ4H~-fu<?y
+zDHH5~_R=4KFU#9CJL58GiBCFuZ4Z6j3(Z4S@!ysU9BXO(SdUUB7P`c_qvRdX53am6
+zG1sTDHbF#ZE|hL<#UV!Do_3lB`)+r~Pz$KP4Fe~q=GMED9XNm{v3H%0S)^IdMUVL{
+zp;%w%^D?#d@)|~A0Hlmz`-JsWbuGAOa$f^}_P&}`p^tY?0@n>5@kFB`Bn{}0;Fc~d
+zrF<vooS)-vL_Qo}g*2{O84kb@6w3e)To}+ip3afseV-|BHmYM?7b@q}UR~x$TFb<&
+zq<jSfOQi-s9Bu9O{SdPq)bF`sxNej_*nDgOvUYM?bc1W+RQ`uFoOYMFRVhn5a-s%O
+zhRJJH6t+d1QTeXz4Nm+(Abz~fyJ)hoWkB_@9&RjqG_^8f@OxBAQiVmki)n<1XoOwE
+zCRviKVxefN<LG_*%96qQhGnVh67(WR4pg91fh~9BIfZ4t#pTMo45F)Q{EehO7Se2-
+ztMTD?sW|S;_`Mrmh<WTpG^=R*pU%UnQ>(ZxsKMokpSzmen|phNvIW&f<a+7-*rPwW
+z#EvjlP5ex?9NkdgeIgJG!=^=g=Fwk;B=kzqmz9f0AEJwNpXqpMvHw96It~VhL<g+B
+z?C$;j!A(o=stOFV@&2O}X*-NQem$;azTMTV+czvREmSz!We;G-<z?@MJRg>q{eu{I
+z+sMjGJ+-#IlZ&^9``Ep(^G4}9l*KkCS!gLJxs9%w+Bw3uU`B}YXE$Rl$K%`rE${fS
+ztI>5+Lt;J)pux;hAr1C|HD_AsB3^ja)!l8@!MSC_0ITT@Y7E%^yck+G9QWKOY<(GV
+zviy{XaRkeQIX-W{Pv=ij33I1&6BaQGfR&qy1R3u12J8y4r>=T{9vnxi(bEgQ6?jLF
+zkFG?+>yb)_FwLdz0~o$@u^w>I&)g|%fEd=S?;G}N+qAJGytr=h`wf9DE|^y6$`Y2b
+zF{g3LQ?k2b?}-L{6MJM@Lblb7@hCGSs#0_bB$!ZWx#~7;6bT?LIzgv%&rNS;$7xvb
+z{Or#x*;7AfW6T5c7Zw<u03n>svtYajw_&(cLlOy!1Kc{e@cIu&h{qCMs5p>>N?vNy
+zmp=!gxEpeKAGb!J<oMjKdlHa--w!s~t=#4`B;3d%nGTrO{gn3+Ya89of%{w3P+tlj
+zrLjY1Dj{Rr^1!L|7PX`+683|!bu`ODo)KjPA!|o`7caY9PHmE=ruHu_)6BHmWh^pT
+zqf8+};a+r>kt07`m)Lw=@)y?xtsa|i2bx{w4g_E#Y5e|>Yzm^Gvko--X`+Iw)vL#a
+zH%yp@Kv?V6y#q4F0-#%3#{RB4VA_B%L)f_Njyqzq^qIG7{H%UCAd7kv`2bV#rE9`g
+zx!YoNyURMEZD|WSMS{zWtg&1XNdcWI3)6bH6O#a0hA;Cjc?-485=<`p-Y2WM1BwG%
+zvXcRQkJ|wA`t!KnZBMBR>1nHEtr4BSghFp7U2q6kH|?k5<f#v7h7Eh@3DQThX5_{f
+zNH%L1DB<E%gn4d(J1C<8M2X)p1<=*{qJ}79+@pv1yNy}Jf#_HA{lamk08vc5>jg<T
+zG<P!QB+0NP5_)rAGU|`|kFEfcoYx<(%j*`MD=Wr$yw%#E>shKj$dwk?4ZuRrwklNy
+z*A-7q%nxTa^Bh*6u~Va{Qhd_pW<-o}xuCA=vA}XaIcySYgL-T$^s*o^0=q8(ePHmv
+zKNxlb#F{}E)2s2kx4j#HU6<c?xVGTJ%SV){8tYDi)I6XBEkxkf7Zw&&GO`{rWVI&y
+z;8YTr`|E!guNl;Q{<-IGddZ7-d0SCcCF58w{-sa?nRaLtXM8sV;`_E(xNqXQ#=)&G
+z)wJLFgM7Cz2oeMk{Zf8QKeyWj47POi!LMG}lWHr^F9dW70Gml~`p_&L$iqz;_kfmq
+zqW6*RytMJt;i5P>uyeP&y9hh6t`%xdOb?rrz{J;i@^ib>;{C$CPDGf`X0{&EX4gL2
+zlSjkE`@Hw*g5-*cB)Q?8FAEhmDXo<cCOqKDw&RG5$SvglIgy7ZbS9JHHS-xmgmAS(
+zNP30-L?h_p4{Vh3^GCPy$)Se<Vm4kFtiWI%;dnhga%@f*NCX&2D!~|2VD^>U;4V&#
+zDIw(48SABV`4ZlSFj7b}@RbVoUN%&s!7`OLWR4F#$unu{^SNLQ6z>$st=3cz9Y-^_
+z;w<#V#%4Ly%GvpOmnziRZ6A3<wQ5WIY-3Eypo|kA+d*P9L^kIH3DfXfU_fD;$Fu5X
+z-J9aaTstK@1%%_y_U?Tyd96hr>biACTt$!o3|w8U`RCxMgq~@1>xP1~%sfbx719-^
+zhm<gpFtQa)Wr=VuD38SenhWFuf?lA-b?Ha}MNIkv9NYQl<%eLtPIByxkUY24J^fjh
+zK*?sgAD%%u0O{pbj}dm8{>(G4Rgczo9)>OOt_Xb@QJma8fP0Ye%6ENc1jn8xv%p;V
+zOOZzOio^KONBPA4xS^`7Gn5cfe3zSPQiK>*;OwPDA8FJkoOy><AgdQJ9154v49K5r
+zZwVYdKj|LG>sWI@Ib}x%WgN=paqcG+QuL0N0+U8Occ(AI7T*5ew!CAKeM{8~RruWx
+z9SIpIa0%!E3ls-~_KX1ZT4&=DQo9vy#r3iXz&6XhmI?Em{RGeTUu6Ydb-TG=zoVd7
+zmqGV}Z^dNvIdPN~wIS8cj~j+#gqn~H0q&V|3NDt;A*Gb4LV7B-`aI}c2j9`qQR|WK
+zpiQvXw|qUTDKD9tP(apGoSliI!H`y9r)Q*uqoQ1P8X`NXhmxU@-@w<w87o}|B8g%8
+z#f4}>WFz6X@{o{Igh9Ya(h&^}0jgw?^niX>fI%>9Bt1gNZZAtx`R?cX?3qZsFDG@(
+zhv067J8|LSG*f`GR5zI05Ucd7hyqz;`6U+NVj((IzBGio+I+4a!wWbX;k#vBL3y{m
+z4W(xY%gm3a&>mIWi<o#w#+*iW<n)a8SYNw_jYIRkXDYh2x?+RH;ef^UN+}($bxZ%y
+zve08{N88#S4L>Byo;qhKuKTd)V7dSKBigz?r~JB}KWCvmZ>i=+9Cg0Y4cqgkTP4eD
+zSoiQ~0d|Z5F#L*Yupl)=km-lDrK*#@bdIhLV?o%tVo)$twsr;1lW~KpW`BT()~<cj
+z5Ze@BvBeP8cIgqb)Qn;dR7EI!UA_>;E@8mNC)OqRS!*D+M3yTx3)6HePs_*$&PX3m
+z<<1HfR^L@)rg37HmNUE3Oim|oU@7a}#iR&0!e@8Rs=iV_Y{Z-bU5$9+6=o5HDMy%{
+z>s%92c}I1;b9n0)&9=uFXj`Dv71clidW<4a${jiJx?E<7Y|mYUR!;Yz4H`Br^tg%e
+zOPH}mCbO4Pm^h6tUYYb44cv^M72*3|dP(AvxUu&}@rOU%d_wB?y$L<BN6aqi+fi00
+zQpyv{@-bs-DH-5<W}*1j26}c=F^r-Bf{05K(JBwlwVeSKq!saLVeoN&gl1@zKf2pj
+zabNo8LV)CbNP0rX2_Agtd1+7wyEVsZ{Pafo75&_kMO9+Du@qL6p?f~nP?dle^z<ck
+z@FKDIw6O9Z3OYKhlWSs7g0gEwo-Qssmhory-X6}z)$u@XDJxS;xFM*Y^AZw~AtW`k
+z7k37AlF8u3{iiU=_LAlkeOe;eS;-9&w?_IRRkLn8X@O9BsO+VS!-=a#uLG^GVgTb_
+zRO)j6J(pwor~o15)k4>Gyl#0|y=thtqc4WdcU|P}27PFF*-MxG!IbRDspW8<`glk>
+zjm6$*BwHx7#{z|JTQD49kJC(%eO_i7pFKb|fLCN8lw8j)XDmcW(cd-}1KH$KjW+xQ
+zjX)xxyH%yDR4d>BoTO@+R9_I+%v+%QNU&oRORT2BFoXlPK1($y6-5>vP>Fnpxv1`9
+zX8|uhUD4|<NMlz9-9wSWuxDVM8|lX<XByiaPe?o_r%{Z|wM%I77HU5@DqZzDUV$D9
+z6U0Tydsol1Sz$4aLMKjNoJ3&8q|#0qUWd#k8suvmjgt(WZ9z3(7(^Z1N&_XlHfsCc
+z>{9JJ(?@2u+W>u*%QWeI@D}YawKr%;pKX~Kjfs6Rh)!>CZ)cXWPX?SJX7a4H!Ddzj
+zM!B8Mh~@;+XO>WmtC_Jq1if2-R!gI3TGFNfqUe$Ac)RZai(pzvcJCm!TvpF^c23r#
+z5@XEBp&2IyFM`ojF69UZJkU=S&R7KMT1YMZ@nn`rWPFown=}18v!0>5F_5m;B`6GU
+zXw~d8C}Ija<yK`#x=GX|D3maFx0P9Vni{pEMV%i|@N<Kj`Rpoe@3rCj)m!>bPzR9@
+zi1YN}d{uZY@>c8Xpgw)d0(3W^yY#toPav3mB!k5FNY7oOenOWP4nJ|SNa?22>sYVi
+zXPU;F<@28kXv!altjC0)RUPSk<#h1QVQw7HQ)Wic-_f(w2xU1n@s+SYR50ADh9!UI
+zBy?!$XXn!*uuWHnjS=ofLwRBvj_z-)d!@v8cQRlrh8F@^<%kSnF7_$NuBWV;uQ|1+
+zUkqc(tAiqlsR9Jvet@|_ek273PqyG8zXN?58N^uJ2BRmnw(hqub&W7KM#A*rs9-}l
+z!;PtfOtzH%Cfs7}AC?3wy8&fvQXIxLiuB$MRPU!}rA2M479IuW*qGXput_}9G8!pt
+zLB6^M1#espExr8V$MACKCxJUK7SsSbC`MGw!25HeGk6h{%Wh7eEqYclFi);wW&-Ru
+zH?eLO&}@{;$Zii7&~;6dlb=f4V@UCyb^uken|ebH`)YlHr(nuuVvXX~@ZA9e?-lqV
+zm(_1jI1S6^YZ%5hh*00YU0~aOjMOSLVsz5Exc`Z{B-h&8LAQ$$TV~2%Oarpe0wKs!
+zcEbBZU;i;7VXR47PlW#<cLsM0P5|c?Ft{9%Fy|<u3t^-YVp(SS5SYdYbrxGW&H|AY
+z$a8k<WD#$n%sn3@9BbpOt#-V)tO=_OpmWwp0f!R9P7J#kpMF>mY+H4ZF9DIl4)2(F
+ze{@bfL(bzo!nCtlma-@d3G+%du1>L}xF{W?fmN{ZfrHFssHdO|c95N!ubXumTe_~Z
+z>4o{oCE$F0!Wm+`6{Q(sg1;iWxUdh$rm8~8Rp3O>c-(1ii;ZyGZp2w4<J2msD#Oz<
+z>-f_P+wRFvifcj!qh6}$4-DA|x(yC*FO+`BCA(;;L~*CjmdzcnB4L&;^zkTLj@diQ
+ztZPt<NoDIyU&%M5e^zOH>l<>Y3EbRy#GGobWZS%U`W}|$f}tb6g5`>yp&6RQV8YA=
+zJL2p2*+ops0|{YD!Alv&J=#F$h%QyikK2H|G<XdnGYEoZxdB5rsEUzzq?F4#(@Spa
+zB%EjGD_x0H&&D)t78unxoiQD{(8$!;0_Ud-_I5(4C^Csay!B2POOb<gEu<t_ip3`?
+zi(B5lXF{$Y!F?5oG5OF)6ul|h*ziNLB0a{H6V8n@4ADN^&R2_V>(j3!<n^Egglj2S
+z!I@A4epODgo}^UBeLLE!#RgiB*=`1gOm+7A#SD+jN(Cp!)3}~J3$oMRcUI;ICHyi=
+z?O~Q7?cBNY{giShK=!mN((?QjdK-`A#`G{Li663<G&)|O^XIWK66SdvTIXnv6a4PI
+zJ!pv8c9($xl=y^^c1zX`w0^6ida3JLc8<AG6ZwHK-r)O%Bp$ex5^YoaJ3A2sLcpml
+zcgQIgpq1!*+woBg+k+1##in@Q)`MHyJ{C=oy|8}+AguCW(EQ9UMG>P4T{B8<UA@T1
+zzV2<4k8Hg%D79(eab<Nq=SBAiD=sJ#-R<h??LY^2+8$)*VJNSKJxb1?@7Z$?aqJ2S
+z`6%5vJ%$l;`7x3hnmMc4N-txNNVye5<UCQ;TE#QifJvCi_IBi}KwbOS9>Y1zbv@71
+zv}w$`vk1T!YJ5+9Lv*3E5M$6K&H(^q>hiD=I*q)$pI?`hhh9zhVyghZl4nMHWd$E%
+zIp1I=On=z)V)?t4J|-X~v*x_G-KD_Xa=Cl4t@=CMPku5O+)Wh71o`k7iu<0&@04VT
+zZx+C3Kf9=NR({LWz%{wZR;NNV&$E+5Ok^Dzx&7vrQ)Sx}?Up_`$C_Py#Tr#&P8eD2
+z9@ZX{ztY9B8knxF(_x50_X3J0F$3!mMcnzWI$AP9S4$_WK|+Ll;P!g~fLC?5HNA#D
+zo`qEjE@g9LV5Y7^`n<<w!ssEp;gLp?Qb?iI7`fTu!)HXOCRNAgQZ4$W7&RK7pp!QD
+zuw0?x-P%YdO9;t14bG;8V(DC&eV-3P@QUB@UDXYRR_;&S%g6AUN-32v(P;Qf?X#32
+zg2m=JW)kw{e#Yv&b1Mh+4kD&kgmT_=TiLBMN8$(x)%~33<Z3a7ARm-5$L+|?F}uW-
+z63ZeXEIMc1U^A0#e;FBIiVxhay^rie8-BJo_?#ShS1PJ@P@hVNc`|n(cfS%0FPI@q
+zu8w1wBzFel&A3ggq)RSw@hy$h(J*Nm7eXb~R2~?xgOfO9ARn2-)V=MoJB~)7`-#zg
+zRX(ou^Kz~!1_gl{S8gKSjkD<(L|TAyQ}ZIpg-wR1B6qaEb#C$oI6)MY!mX6B-|$x{
+zo8(zNQ)ApF6n(P$Vf2zc<55Tw46ZfpQ_o#6mV!(B6qe-TcnF^8)`hcSNAjD^ISDbz
+z_>GnbyA?0iD5e;eNA{%+b<Ihm$H+7a7K%?+>mv^IV5z2pHf_V}x)aR<$IQHz*FWkg
+zTu<hsa0bd#<|`@iW)GyE?w%_VZWhZXldlk4%d{<%PQtL{I^1>!&=@S`I)DV_JFDzG
+z*@{z6@vV2|pY^$N{XChS@sbDKJ)}xJ^Lx=SvP-{@lH~avF&-!(0sS2op6ZJeDe1d*
+zVA6!c*>gx5n8^G~z&?5BMZqekPF33jD7X|dZZvFf4ctERa1=Ovm4V=Wg~?{$<Q8m-
+zL0T>(hB<!93uU?gFk%>)!y$gV#$KMDB>xs~yrl(JF>M0c@6adPe`MPgsi)<jFV+!Q
+zRWU5u|H#Wr?yRMpcOpyY?YT|)#AV#M+i2HqYFpb-#PT5s{G+y|kdySHNBka>WIWW|
+z?mfV~A`Pp|8BKKeS<WO0*lAgWYLe7-C<pZ2c|@DaspRp!2FF*G9WnAWoXlFo1_cJ|
+zYS5tt=~%(@+AErUnb0xJ76hZqlQe1V@;4^89t@dfa(H(XOcLTu$v!mf&V4jSvpsdH
+zt%T>RbD^rwrV|mHqOlalU_Xa^*iMi}ahx62S9~v10V*JdvwwTEudFc^i$$;Y2ql4Y
+z3y}&hDx6h0!BxsXv)wB1%B|Q;sYcSL6(pQyJiS~aH?^Ug&8(i=Ed~t4MN>NfL(U&0
+zHS{dimv==qjyEh;X<-9FxdbJEP-qGUir$2RZZiSID`VWEwa~P8i^gbfK2Xn;ZHVO0
+z3k7h$TY+b7k_MUdlSKUD+Pth58k1he$sGOEkgtt5l1U8&Gt1SiEsxgHgmNG|!j6)T
+zRL*8)=1|(mV<pi^4`4ef$d#$am=Or4_hfG<O`wN{2mQ+Z@sVZ-j(3A;+bOzMfn$Qb
+z7NN`;CdDJc+_+KQ5_i$YfmKbr`MIujc=V@mz~{WeoOe^EEIUi~UnR139d-g~>Nfis
+z*BSAm+h-euVC5wy#DOC_l9+P!Zt=!dlF21~;vE(ZXt%5b(yG+ibE%ilq?MN~^2S_9
+za5%jwdK?3}`@FAPk5E(mK)9cuw2~(hIr7kepmbUiz*MXRy+FNmavElpQ?=X1K=KCT
+zkLj{j4nPEUaZWPmB0<wcoLwgL{E?ndYA|rp=7zS`0<*@#bVct+1VSN-e(Y8<@P|?P
+zt$<{rQxAb52(dAn4%wj!L%u@?h@ty`?@xgL`bzjgNdx})Qp|?MBi#^xQH<vB0R00!
+z6m_4YW2_MJJW70&w&nyo=MQzsaVbl(#$^NlK7qWLAen%SvP9WPA})eXcj24R$?E>5
+zA%r>|jIX<jG|?fjo%?9qIpX(%nJvOZsL~yZS)iF$%3el<;<by3tqRe#AafCREc~Q&
+zT7mdS!buCf@oy<sW2wVkd<&iy2mWi$6n3t7!HkI}$sRFF7hy{^=OTvzTG-ky!y8nh
+zA=S9L)js2JnKP{Dbqv=@YhXFtxy_#T1Xfx0qd2|gi%d5fP=VGmn5h>29}GENDrulC
+zaAv&+$k1>}bH|-K=19F_E_r(&pkGHwy>1-Pi7c4RxZgojrg_GKjJa!_y&@uFU5H~7
+zV6(_J7!ULZxgy?%)B&}>mA++#^lJ$-LC}pyM~Z};Ax}`4QqOLj9Qyu1G8N8)jYX+m
+zyv$pfl%&uT?J<CW4w-#j?i68FTRl4uq^2cv6^}Ts7pLhp;IDlM(26o|12H@50i&;7
+zRPpnd_)fRHk3_OmT->jeY*DFT9Dj$yq;fp^gn31cj+4!v*FDbV>Ke~{t~Q{~>!NZH
+z2rvCb*)x$gvUVS<5enr)5x+a=lVj`M37pP@AMVwRs4E2smMgyFQIV@$337J8WxBhO
+zU|HkxZ`lsZQ^xO|$wovc$L@5jTjK)~v5dbB?Y^uy^hU6uEgNP8(&9)yAoZ&e9OjhB
+z=Op6U349M3FPf%v&w!HF2Y`!f`gP2j9b+lLDYZ#mqDVG=B^M}$8?Oapm+$j<#(Gw_
+zxF`5=kfMkY^3DDxEQ*XnoiQJrl<MSA?H#h(DlTr4D%xxr&Qu&0-WI=i3P0=#Gf7*w
+z7H8vKQ>L0Xo4|OchEMvDNA!li?-T?K*??+P|KaA(o<ZTTkq;rt2^CVM_1y)&)ABh}
+z8Rm>0XIpq$`dCqQ?ac^e?|Ls79wshmQZA*A;FAJeQi6{AtS*z$0_Abm+AVF!Ve@{P
+zi8;P3GbVhSL)HV2uCr~vzcSP<%fGUh$Go*4>-?sjrUj;zCl?3%1u6kMBC)I`Rumdz
+zqinF*QUj_2S>_1Ktx%-m2gB>Tf2KoD4SdW+0|NlK-f|(4{!E8-baJ;ccKj`MbYE3l
+zZj}-Jg;rsMSSB646gm`xCbqcBAeXm2dQOeg#e^sE+v1dL<}E1#Ju9QRr-gTox7XxL
+zsqGYluA%`i>3hb4ymP__D>#K=5^2-Cm+y>x+)ebvAW;B)^q_lCm><_WUVP{dg0Z!V
+zoE;eogFT5<7i)J_t$0hxLPZ9tz0<OV<H6CSdj5(;(dxma4ug>;0_Eg6T+~}~?k?c!
+z=^$Yxsd}w;9Xhu1J(u3{YWRks)i~oHMU3q?wnM2z#6<mB6!In>1T$C&jWY$w0>ee5
+zq&m>`H2PY6z^DddS$YiIEBmp<AQHL1-G|#!tAm2uf?d)82!4k4SfU4HO5~+@^-j!I
+zhQ}}!D5~8MBO~ul6N31c;IEE?4y>Sp5Z8c1S`O}ohbMiMjl0_%y@Ho8^XwdDMm=R8
+zLbhW!H@+)hYs$+jrGg;GN~0-)w`1HT`oNmh>x>n250(s$0g_83I^S8;l*<AED!OUD
+z|5)rOC50u*;E?gM*do!<fZAF#t~Z^izM^7;d3&E^7vcBqeREzfCtdRg@>rC?)91C!
+z@4EgI()XRk{j)B)A~nkS4<o3Z^y;^5!v<fJ4PN`m+6-Tx_8N(2Hc4hK1oAg&W-b&-
+z-ebCvWvV)O<R<1SOI^Z1xD!1J(mwW3Ca!pnyvAnEs0Xw$xej}37+~Dp=+x`h#U`vY
+zjHr876?tMkkPo@wGAh`~lXPX<?eBumm6!}#PJLdTFx2??b;`GuX$UPENA=C}dN><*
+zGxI0CWf8np&~L&NV!*x?KhPhgEg*~<b#-;^Zl)z*p`cDUA{+><Xl;0G95M+RIHlK?
+z#G)E#<_t$(M}c7@9HaF&y|X4!HAjx!l_s3UOL~G*-aqdxy8lMQu8o%Djp0(*>*I#c
+z%z|MIIN8KwlOLo>D5q(}cV?TFlj&@ky3+-T{b1s67|mf)(J40UI{%U0o27gn^20@K
+z^2~C3<_hS#dY!kCn~mA6M{}M--<KsTu^$UM6-HlL=T!t=8)R3Nx^NVCFAAqrK0dgv
+zRz6X@{|WeW{rt~#ZkV_A^Oi|0?_g{9Yo>NDRQ$0y2msIz3iwyn@xQwn+Bz8jw$O^=
+zXJmUB(Svo1j$an6sd|jZse}wj!ayPi+lzVic2_3v0oR~>elbT0O9-jBoj2FFuTT58
+znV5$)Z6tVhI_fNi=9%)KVrpgM77`bj31$Le;x=S8m7j>$Kb0IB6Q5|QK{Zb<Y{`G3
+z>@oCue?sgnROvX_;RZV4jSr31TjZQ>NVOh5uLZopsHKy9k_K}aiE9wUp3jOSOjL9l
+z^*AqAA%X~iWyQXwi~4v!K*D+c+A&SBDN$vo+Lv?0batd#!)@2TKDeqA5&ZMxJ!5BD
+zvs_f7IR&|2au7NfO=WJTps{W1gAwr6&GQRkLYy`p5=N^)pr2tXPg>6yH#)>=H5=%*
+zUx9O0epF1z1SHKjdt8+!B_amb{j4zfMIyL+9!onYy!pyjY0Z4vh`z7)HnC(K?3+^u
+zscR2nsu3{s4P>X{BSfS1qRhi`a@V(XgqdV9GM4=Kx{BUrJGu)6g;qSTk2j-oe~Rz-
+zY;Z#AV-34EnHa$X0H}X%e>Tq62F4ENHm1J`W+LT-%_<{ua1Dvwg}lQaR3Me$Dp62G
+zmtQedF8K;YFP4N<_|&wh>-lHXQ%UYbx<>_~T4V6b!A4G&&1ZBj;iH3Z>X*5NgUsX~
+z(Y1r9a+yDJC5)ka`+8wZE9eo#acxV@qF0rPx;AqtlfW^RK(2wtkv9}61&?!aDk<PA
+z%}|v(p%(y-W+{>;6&oF7DX~|rL?P-_{f))co9tB6P}S%$=?YpDDTewOVNZQmN+UJk
+zxHeGKQCD~RUs;RFz;}gk1o46C<e2?H3=e>l41Na7<QneMcFRC1I))epUVkpyo^ZU_
+zw22w%IFoxutY;F2zm%$Jf3U-JZlN|)r?!|bF19Ltp_e&I(bg(`=+4dk)<!IBF#RR=
+zqdOXzTfwuj0XktFDdCJLKB+#xX@v+fMRS;EXL?o&UX<+H`#ca2_l<)Nj`C?uT%H*A
+z1UZ5+tQVNd35tvN6WNpptKnwhUSq_Lr|=_dheF_<at-(zSl8B+Oz3S%R|zt%9u0P1
+zJJ=F|MO2m4`CHN6h2;A&mNFnpsEDwOj(yj18-tw)`WIs#5E0=a-)U3Y$p_1ik>62w
+z%4O9Ih{)ix4nfVxOu|i;orcETwz9muyfkFI#x^x%zGwgTRB;8Cz_s-36iy*rL#B?>
+zTA6Ws$9dc3wi{`=koWz_x&M_@*$aJ$_bZaF=t~WMN%=dmUBZ(ZhP^HLk~zYYT{tc-
+zqR$~uGeMb|-`nKoqZ#)0B76Cid0Nr$65ei|$alNnTgnGKId;U9<zLwscY6@H$B-~V
+z5*aRu0nJ3~tv7At7fYWN+!!i-lKHqc9{E~cp#Id)|GB+DzUk+Gssede5TAVT_P@zD
+zJ^rm+<o7<m7k$J}Nr5pThv<@zck-;Nh!mPLC?3fa@(D<oxCTtTqxe{5YfBZba<U>E
+zllFWt#vzPZA-q(ky0i1~E2FiBJi4_5-#u=2^XUjdWpV`N3Qk!V^LH&J>oCziqWBAx
+z2m-3q*+S{M4X3bxIFCKThB}5~%FL#7`fEAJOy>DP^R1{1|CKJ&w!o~mNlgz4mv>a7
+zX_P+XG|P5!`P=k$!Vl^;G?<qi6K4(?UnmCz3^Gvy*qLOQ7i}=*_BBh}fC~;>6oY{W
+zi&{tof%&8y)kY44EN!jDaqC!;+c_8nEV@!|*GwtDSTwoO(M9QRTP-Iv0D$&39h$<n
+zHcoGqFuF?acE*m{zpd#el`+{qM&#!tD%Gzob^_2%``x?H_*-CFo(Z@HHO98E&%CF%
+z#1QF<xvj>$EIeozVxxN}>kG@MLaax{kLFC1EOxL>_VcX1K5cl~d#Vj1b0HzAO!EWg
+zT}0O@LLyB7TEkC-_@v~Jv|(fNFbwk*l>(VjLx)0nq;{<NUrBRhY;qH2WR~wvfKAy4
+zgA`q^%Gv8(H&-;W<pVkc5h2xuyx*G+C`Z<wqDkg|U?frVgezUB_8U9*J}fC*sn<w(
+z=;D!wg&7>*rf@|ruuy@1rKfx!8M6tG9R<bZg;D$zGg3<z1sYXeM@Ma^!ydPsd(k2}
+z1kR@5X^qs8*JJiQW(p7T9E>J3E@gFL0JCnkWqtxUD)2DtU>kR2@In2{HzF<)@2|+N
+zP-^<G^_z75y#P}7d*tD>%U!>iNU^xkAus)T5h2f1=MTKaT!q%Nxk&Yg3jwk#Y%YkO
+za$J!-;gE3iMaV+FHrs2uO(O#ncyZW|YI6vXuRd;uG>bt+<xW%NQuaa;xZ$<LWiC!P
+zBUrkj2{nEJZTMw(R&!q^iGLH}-rMz?DE~S&ogJNQt$!0`)}$b8FC%i$c17aysuC7S
+zkvYfCim3CuS#vxy6Cn!v`+G5Pq^;|#z9GxD6y0!y0!|8qp?ZJNk?Sq9*~=r_5IFRB
+zcmxxDAp{;+Cu_$Td`5~8MI%3vzD&i^BvhUP4#flM)=2zLN%uj?D^BhR)z1~;QYT8v
+zrpBt0XGq&aJ&P61w+vjhFC7V{Uqa5x?h*c6z`q|bJI`4w32&_bwm^~pJ_LO`yMOW@
+zcxGJ=7dP98XMdjGhBVTMz{*05_QBJW)E~<3@%#2}(+ehMosfZC>3&^#5ukAoD67F2
+zyt+*SVHz+=7nr+`NcW?<lQKNE9tsmeV8LOMi(RTNix|6FYEV&3s%MXRuFwp>Gl+Is
+z6)=9Hv}g*U3F)+jcm*|DvsC%0`!(+6dH1k(Xs7JkF9XO78;P5ITTWGP+t0sGNE2II
+zCmUO*-+hGn#0lA5M&uz~^6O4#MGy^987@D8HRN?~z%FN0(0QE|WuEPqgnpSex^h@v
+z`>-!2J~ugOOQ)-@Rq-mE3_a*%n#E)&!NSxN)kMBN{B%BX{ZJ-S#oeL)XF-(B8O|xH
+zfF1#4K0*I0cT;!46J#sdvcsn7afYTnM4*!Xh~URknh}We?j)xqlVipP#Fk6KzICQK
+zW;qhsS2-|RctVveR=5@?p7JzL%QMj9WQa$aBzRAw5)LSM^g?@zn9u>TQr8i2L3>WO
+z7RR0F_Yd88^wQWQij?RUfL%-TL)NYjeSJ>=b2;)E3(;asBh{3<t&KXw5FEGYX9uTQ
+z3nicQ)FM--LUC!rLy7Mk2ZCWHv*Vw>D5n?fm@MjoRq}zJeXBnJa+{q=C#1||kFWNh
+zFx+FQ)r}05J&yHTS(;oyT4eK|!*kx3%cFdz>nW#vv6YF=$t)b}+sF^XO6J1sMp=tD
+z7Q|fEGYgq&IEAvs8G<(JE+@KlDe0_>_nxe%Fu$6;C00lCo1RFQ{kBUv*{omlbVUCV
+z!adYNM}!=|D~*I(Y}bM>`Ujd#JTJktAWK#!pG-;s%q(jkZNp2d#}gX!D{H_<WloLn
+z6T1IY-&xn^X6rY#^?bVs-mZUDEB=1K{6h!+b=t^83L=6M!;97kwYi4Bk7Vi_w?Wjq
+z1t6#pAqL4C0K4e4e|9|l?C`m<;ag+Hu(!*k!^YIjmh=x8^5)Uf(>}nv_!^SOq|8Q&
+z;*9KBqbhP2$8xMhGe%T1%Y4VA*)8=`=F^qYInL@U)YdiFKl$XBijL}e)6)1iE&X>@
+zpRtY6zm;?%an)v*2sv1HV27_Kx@~?md@h1erL!V^9V!=lsI;4?`~KkE)eCy^vvMLk
+zM<-KBn(fatrb^qN7D<i0?l8qf%gp3qjQCRKE)b75KlHB>)~pt^-%FblLFeRl{y%Hx
+zcJp}Scmhnx=3F;yKnMos1nB$qXo~|Kymo;$W5F&7@;<`l<2w*A2=mMl%6<~q6YXn-
+zX;ysT8kfCz3eQ#)CIvi785%5`-&IqiBd%`Iw!XJtV@bSO6G<J!^1Lx`i(_S<K4doO
+z7yPV7+@u@|lVco$W0aX)e3;iEAk~a?I@e{2l%vwx+0Y@Nq8ZTMUdi<ZpVg&!WXvq)
+zfUQ3AJG!OCwY|kpW~SA2^^Q;JhcP^0(VbLEf%G40Pb6P86AG{>kFRT+&9;J!qap0T
+zn~l_CMcJ2@w{P~IdNc=_0Jya@&>d^$wv|RX*C#aZvorWeEJ2am)aQ=)e2O30&y?SF
+z8kZA26r`Fez=T{Bq&`z<qR5q;Lr3KAf)Jq39o;IF<4eaD;}E8vuQtwI<lKck$tme&
+z|Cr$ar@a5Jm%miL{$1+-+iEG3Gdi00rk0LxmA?O0OGjfTr#I)~U-6Zq#Pv7t0zOE0
+zVA`9cT`i)gRMUxe;m%-5v>8f|d>NBO!Jlk(Y&9l&w}oFIj#V{Y@QO#gaNu;+cfqI=
+zR)MEdt!`4iSe~=2u54+OpI=2+9TP1Vd{<uCs)D4wvz2hPR54$ei4-vCaG7slE!DLL
+z3|CPPwX6`eo0&JK&)l!BZj$%16TFV-7<T1(mnqMLdc>oL6nAca&pY8BgkGs#8+*jU
+zx+b*b<Rj{YB*|}CFqgdaI3H<`aSEF3*?*#ECQVH#{KI$>dgw@&`a#x7MSq3*Iv3vE
+z4qNj)#nLNTtj8tz_MLWqb1;F1ycbsu)B^~l2Idyi{eGg+#NM-^LEO8UI28L~&cR;G
+ziRCbesEErFshj+kfqiqoh-ScM=3-{Z7WbFwTlYrsHGH+*cD_$dw%21712^NqrmbTL
+z4Fx{-BTyiog9!at>B;hU%?A4&34+c~=N!lx!4{t!QU-@&PcSy}p6U1HAmWSF*%NtF
+z!{_z#4cb}e64hMf<^UOTm?@E;p_2=B5fXJ}%bC6gp-J&cU5h3#+*}|0qIMC%T>S%Y
+z@*I4#E&nagx4`vpmDaz@^Xt094iPrwmZm+YYP{M<j=4t4tn*v9Rk&QgUe;&$+?jS=
+zMRLiMELnf?6SB>Ol*R78IZ4(CQnqAT^#HG=PY_9JDDNNG+<bp@uK5Q!OQ3$GlC-od
+z#su>6HDag;$seEfg3YRYR{}f8tR`wqRrqu!WoMPB%+q}RAk?&KFHOu;ddE&z|BPr5
+z99cj)jrV9}1m@dg4UYjMpWQ<eQ+8)n9;jUo-S)xXt6XBGQ1Vq>D~$r9&MAkY%FsN6
+zLbN8K8>Nsn>F16t&Zo>*^Lu%s8~5oCNS1rwp=?`tJXvVL0$QG>CH6`@1S?0Zwh3WH
+z%^D~K71%hj)wK^(Uc9h6+s1YIdjr$ze~t||^oH2*_*UWLu6%!=*cfTKx|mk}81a^j
+zmV;@JF4Iyo|JZ*%OC#LYRbOMfLM2^wN5H3Bj^9mvRr3;Y5dUn-G)3`DN-!fQ9d`MW
+zMjUo&yM4J;Xd$+LfQA$cKu3``;J)fc8oaj<0G>@xZlg7e*^O>&8|@Va;eaG__L@+O
+z9$~mN3=;>_;YB#<l*&wH4V030ez7L)z;>Pv7_^<!2{Einy1`6Mdi`8|Zms{5v5?v?
+z#`l+k@&C(K^LNSrZ*Mh*=Q;}nZ>lN$7R>#doo3^tq;FvLuMkt#%(_i45jxbRD)Aa^
+zQ(BaH<p$jcmoK~k&?XVYlI^Xp&F`u{Tkb@yV<2C@?t581sM?(kf!80=c4?So;?&4%
+z`c{5_SR69w!x24haypV3unqq1)7+WJ_9Q`9#G8~$v(f(+wT-oam(Vb<^m?jf@{2si
+zi3T;|%vuc+GBa+3I<@Ku1CGJ|)a#{%U1(B1AehIAjPce1-;EE=#$BDw)z+DLkL`pf
+zkCXqEsihri_9;%ilUGnrS)iBu{YRFVa1WXRRdrvm2dK(JkViCmD#t8SE5cxjkut+O
+zU<o!s1?A*xcp9Lvz{Z67kx_NV*f=q&(1a%4U9?L48{~SVKvIr)j3A*_{Op3d2L7qO
+zOOBRn?GNUqX;7^8{~xpGZ&UieA#@N>bijZAoWz@r_SSy$G=6J;d|cwcLw<`F{N8?p
+zkiK1iv+(3U{0aQepPTpt`F4~3C-Co|Q~1{u{YvTAk1+g2$?r{t|HZ=JY5WTR^`*sM
+z@EDpu;D5cs_zV0$Ln^;TY=3XR4S$OMZ!YFvu-^y&YXtXCAOLXxci5lt++X3p1{(i@
+zM>G7v@;}0kf8qZp*KaoNAMH1;-!uOi^7#w%JIlWYhW<nW0E+*{{73Qp8bbLCsL%2r
+z11i7%@~@8jUj*pb{x-*k|90blCGe};{1<_XzZ3YwiT)M+tIzrux|aQq$^M7;@+<!D
+zTmEle&tI*Y^AG%g^MQUP^{Zp@7bz94KS=%EVEq;TcTRq@bN^~$JpbV2??nEiOn)^+
+z|DtsMC#Am|roS@stL5_-yp#72M*e;p{tEx^<EZ2R$2k5@<Ufw%*K_VKM$`oUpk(qE
+q@cZ|v_kZK$pRz3y{0Arhpz;SR5dT_wm~SP7UT+q?jL>gC{(k`1r<q6q
+
+literal 0
+HcmV?d00001
+

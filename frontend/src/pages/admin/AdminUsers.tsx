@@ -8,6 +8,7 @@ import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
 import type { AdminProfile, AdminCompany } from '../../types';
 import { AdminLayout } from './AdminLayout';
+import { useAdminViewingCompany } from '../../features/admin/AdminViewingCompanyContext';
 
 const ROLE_OPTIONS = [
   { value: '', label: 'All roles' },
@@ -21,6 +22,7 @@ export const AdminUsers: React.FC = () => {
   const [searchParams] = useSearchParams();
   const companyIdFromUrl = searchParams.get('company_id')?.trim() ?? '';
   const roleFromUrl = (searchParams.get('role') || '').trim().toLowerCase();
+  const { selectedCompanyId: viewingCompanyId } = useAdminViewingCompany();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   // `query` is only committed to the request on Apply (and was read live by the
@@ -73,7 +75,11 @@ export const AdminUsers: React.FC = () => {
   };
 
   useEffect(() => {
-    if (companyIdFromUrl) setCompanyId(companyIdFromUrl);
+    if (companyIdFromUrl) {
+      setCompanyId(companyIdFromUrl);
+    } else if (viewingCompanyId) {
+      setCompanyId((current) => current || viewingCompanyId);
+    }
     if (roleFromUrl === 'employee' || roleFromUrl === 'emp' || roleFromUrl === 'employee_user') {
       setRoleFilter('employee');
     } else if (roleFromUrl === 'hr') {
@@ -82,7 +88,7 @@ export const AdminUsers: React.FC = () => {
       setRoleFilter('admin');
     }
     // location.key: apply deep links on each navigation; do not overwrite after user clears filters on same visit.
-  }, [location.key, companyIdFromUrl, roleFromUrl]);
+  }, [location.key, companyIdFromUrl, roleFromUrl, viewingCompanyId]);
 
   return (
     <AdminLayout title="People" subtitle="HR and employee logins, filtered by company and role">

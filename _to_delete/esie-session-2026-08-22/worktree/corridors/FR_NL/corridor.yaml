@@ -1,0 +1,28 @@
+# Corridor registry profile — France → Netherlands (free movement).
+#
+# REPRESENTATIVE — indicative content, NOT SME-verified. Authored from the
+# EU free movement (TFEU Art. 45; Directive 2004/38/EC) framework; confirm specifics with the destination authority before
+# any authoritative use. Matches the platform content-provenance model.
+
+corridor:
+  id: "FR_NL"
+  origin_iso: "FR"
+  destination_iso: "NL"
+  display_name: "France → Netherlands"
+  aliases: ["FR→NL", "FR-NL"]
+
+  retrieval:
+    trust_tiers: [1, 2, 3]
+    min_similarity: 0.25
+
+  prompt:
+    task_key: "immigration_answer"
+
+  sla:
+    at_risk_window_days: 30
+    at_risk_pct: 80
+
+  # Eligibility Corridor Agent pathways (REPRESENTATIVE content).
+  pathways:
+    - id: "NL_FREEMOVE_2026"
+      file: "pathways/NL_FREEMOVE_2026/v1.yaml"

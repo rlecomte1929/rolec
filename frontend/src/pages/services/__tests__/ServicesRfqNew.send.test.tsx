@@ -23,6 +23,8 @@ const mockCreateRfq = vi.fn();
 vi.mock('../../../api/client', () => ({
   servicesAPI: {
     createRfq: (...a: unknown[]): unknown => mockCreateRfq(...a),
+    getRfqDraft: (): Promise<{ ok: boolean; message: string; items: unknown[] }> =>
+      Promise.resolve({ ok: true, message: 'Draft from intake.', items: [] }),
   },
 }));
 vi.mock('../../../components/AppShell', () => ({
@@ -67,9 +69,13 @@ describe('ServicesRfqNew send', () => {
     mockCreateRfq.mockResolvedValue({ ok: true, rfq: { id: 'rfq-1', rfq_ref: 'RFQ-1' }, unreachable: [] });
   });
 
-  it('creates a REAL rfq — one item per service, one recipient per supplier', async () => {
+  async function renderReady() {
     render(<MemoryRouter><ServicesRfqNew /></MemoryRouter>);
+    await screen.findByTestId('rfq-draft-message');
+  }
 
+  it('creates a REAL rfq — one item per service, one recipient per supplier', async () => {
+    await renderReady();
     fireEvent.click(await screen.findByRole('button', { name: /send quotation requests/i }));
     await waitFor(() => expect(mockCreateRfq).toHaveBeenCalledTimes(1));
 
@@ -83,6 +89,7 @@ describe('ServicesRfqNew send', () => {
     expect(items.map((i) => i.service_key)).toEqual(['living_areas', 'movers']);
     // ...but stay THREE separate recipients.
     expect(supplierIds).toEqual(['v1', 'v2', 'v3']);
+    expect(mockCreateRfq.mock.calls[0][3]).toBe('Draft from intake.');
 
     expect(await screen.findByTestId('rfq-sent')).toBeInTheDocument();
   });
@@ -95,8 +102,7 @@ describe('ServicesRfqNew send', () => {
       rfq: { id: 'rfq-1', rfq_ref: 'RFQ-1' },
       unreachable: ['Haul Co: no supplier on record'],
     });
-    render(<MemoryRouter><ServicesRfqNew /></MemoryRouter>);
-
+    await renderReady();
     fireEvent.click(await screen.findByRole('button', { name: /send quotation requests/i }));
 
     const warn = await screen.findByTestId('rfq-unreachable');
@@ -120,8 +126,7 @@ describe('ServicesRfqNew send', () => {
       contacted: ['Santa Fe Relocation', 'Transworld Relocation'],
       not_contacted: [],
     });
-    render(<MemoryRouter><ServicesRfqNew /></MemoryRouter>);
-
+    await renderReady();
     fireEvent.click(await screen.findByRole('button', { name: /send quotation requests/i }));
 
     const sent = await screen.findByTestId('rfq-sent');
@@ -143,8 +148,7 @@ describe('ServicesRfqNew send', () => {
       contacted: [],
       not_contacted: [],
     });
-    render(<MemoryRouter><ServicesRfqNew /></MemoryRouter>);
-
+    await renderReady();
     fireEvent.click(await screen.findByRole('button', { name: /send quotation requests/i }));
 
     const sent = await screen.findByTestId('rfq-sent');
@@ -165,8 +169,7 @@ describe('ServicesRfqNew send', () => {
       contacted: ['Move It'],
       not_contacted: [{ supplier: 'Haul Co', reason: 'no contact email on record' }],
     });
-    render(<MemoryRouter><ServicesRfqNew /></MemoryRouter>);
-
+    await renderReady();
     fireEvent.click(await screen.findByRole('button', { name: /send quotation requests/i }));
 
     const warn = await screen.findByTestId('rfq-unreachable');

@@ -1,0 +1,99 @@
+# AIQ-1349 — common long-term-only relocation requirements.
+#
+# These apply to LTA (long-term) and PERMANENT assignments only; the requirements
+# engine (rules_engine.apply_rules + applies_to_assignment_types) drops them for
+# STA (short-term) cases. School enrolment is intentionally NOT here — it's
+# generated dynamically (rules_engine) and already STA-suppressed.
+#
+# Source of truth for the long-term-only catalog. Load with:
+#   python backend/scripts/seed_requirements.py --file backend/seeds/requirements/long_term_only.yaml
+# Provenance: these are REPRESENTATIVE (verification_status below) — each description
+# ends "Indicative — confirm with {authority}". Promote to expert_verified after review.
+
+# Which (country, purpose) pairs to seed into — chosen to co-locate with the
+# existing catalog rows so they surface for the same cases.
+#
+# GERMANY was removed from this list: it was declared `[other]` only — the sole country
+# here without `employment` — so every German employment relocation (372 production
+# cases, the biggest corridor) found ZERO rows and was told nothing was required of it.
+# Germany now has its own nationality-scoped catalog in germany.yaml, which owns the
+# same three long-term titles below. Two files must not both write the same rows.
+#
+# NORWAY was removed for the same reason, and a sharper one. Norway is the Phase 1 wedge, and
+# the generic long-term set here is precisely what made it look covered while the three items
+# the wedge is named for — skattekort before first payroll, D-number, police/EEA registration —
+# were missing. It also left every row unscoped by nationality, which asserted the 6-month
+# passport rule at BLOCKER severity against EU/EEA nationals who need only a national identity
+# card. norway.yaml now owns all six titles below, nationality-scoped.
+purposes_by_country:
+  SINGAPORE: [employment, study]
+  "UNITED KINGDOM": [employment, other]
+  "UNITED STATES": [employment, family, other]
+
+requirements:
+  - key: residence_registration
+    pillar: RESIDENCE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: [LTA, PERMANENT]
+    verification_status: representative
+    countries:
+      GERMANY:
+        title: "Residence registration (Anmeldung)"
+        description: "Register your home address at the local Bürgeramt, typically within 14 days of moving in; the confirmation (Meldebescheinigung) is needed for banking, tax ID and more. Indicative — confirm with the local Bürgeramt."
+      NORWAY:
+        title: "Residence registration (folkeregister)"
+        description: "Report your move to the National Population Register / Tax Administration (Skatteetaten) and obtain a national ID or D-number. Indicative — confirm with Skatteetaten."
+      SINGAPORE:
+        title: "Long-term pass registration (ICA)"
+        description: "Complete registration and formalities for the relevant long-term pass with the Immigration & Checkpoints Authority. Indicative — confirm with ICA."
+      "UNITED KINGDOM":
+        title: "Residence permit / eVisa activation"
+        description: "Collect your Biometric Residence Permit or activate your eVisa with UK Visas & Immigration after arrival. Indicative — confirm with UKVI."
+      "UNITED STATES":
+        title: "State residency registration"
+        description: "Establish state residency (e.g. state ID / driver's license and address registration) in your destination state. Indicative — confirm with the destination state authority."
+  - key: long_term_housing
+    pillar: HOUSING
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: [LTA, PERMANENT]
+    verification_status: representative
+    countries:
+      GERMANY:
+        title: "Long-term rental contract (Mietvertrag)"
+        description: "Secure a long-term rental contract; the lease is commonly required for residence registration and opening utilities. Indicative — confirm with your housing provider."
+      NORWAY:
+        title: "Long-term housing contract"
+        description: "Secure a long-term (typically 12-month+) housing contract at the destination. Indicative — confirm with your housing provider."
+      SINGAPORE:
+        title: "Tenancy agreement (12-month+)"
+        description: "Sign a long-term tenancy agreement (commonly 12 months or more) and ensure it is properly stamped. Indicative — confirm with IRAS / your agent."
+      "UNITED KINGDOM":
+        title: "Long-term tenancy agreement (AST)"
+        description: "Secure a long-term Assured Shorthold Tenancy; landlords run Right to Rent checks. Indicative — confirm with your letting agent."
+      "UNITED STATES":
+        title: "Long-term lease agreement"
+        description: "Secure a long-term residential lease at the destination. Indicative — confirm with your housing provider."
+  - key: social_security_registration
+    pillar: SOCIAL_SECURITY
+    severity: WARN
+    owner: HR
+    applies_to_assignment_types: [LTA, PERMANENT]
+    verification_status: representative
+    countries:
+      GERMANY:
+        title: "Social security registration (Sozialversicherung)"
+        description: "Register for German social security; the employer typically initiates this and a social security number is issued. Indicative — confirm with the relevant Krankenkasse / authority."
+      NORWAY:
+        title: "National Insurance registration (folketrygden)"
+        description: "Register for the Norwegian National Insurance Scheme. Indicative — confirm with NAV / Skatteetaten."
+      SINGAPORE:
+        title: "Tax reference registration (IRAS)"
+        description: "Obtain a tax reference and confirm any contribution obligations (note CPF generally does not apply to foreign employees). Indicative — confirm with IRAS."
+      "UNITED KINGDOM":
+        title: "National Insurance number registration"
+        description: "Apply for a National Insurance number to work and pay contributions. Indicative — confirm with HMRC / DWP."
+      "UNITED STATES":
+        title: "Social Security Number (SSN) registration"
+        description: "Apply for a Social Security Number at the Social Security Administration. Indicative — confirm with the SSA."

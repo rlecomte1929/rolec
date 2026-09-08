@@ -1,0 +1,455 @@
+# autofix-validate.yml — DEV-LOOP-2D
+# ─────────────────────────────────────────────────────────────────────────────
+# Runs on every push to autofix/* branches.
+# On E2E pass  → squash-merges to main (Render then auto-deploys both services on the push).
+# On E2E fail  → leaves branch open, updates Notion task to 'Human Review'.
+# Post-merge   → confirms the merged SHA is live (poll /health for RENDER_GIT_COMMIT), then runs
+#                a read-only prod canary. Canary FAIL on a confirmed-live deploy → auto-revert +
+#                Human Review. Deploy unconfirmed → Human Review, NO revert. Canary PASS → Done.
+#
+# Secrets required (Settings → Secrets):
+#   NOTION_API_KEY    — Notion integration secret
+#   CRON_SECRET       — bearer for POST /api/crons/autopilot-canary
+#   GH_PAT            — GitHub PAT with repo + pull_requests scope (for squash-merge)
+#
+# Variables required (Settings → Variables):
+#   RELOPASS_STAGING_URL  — Staging URL for E2E smoke tests
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Autofix Validate & Deploy
+
+on:
+  push:
+    branches:
+      - 'autofix/**'
+
+# Prevent two runs for the same branch from conflicting
+concurrency:
+  group: autofix-validate-${{ github.ref }}
+  cancel-in-progress: false   # Must complete cleanly; cancel would leave Notion stale
+
+env:
+  NOTION_VERSION: '2022-06-28'
+
+jobs:
+  # ── E2E Validation ───────────────────────────────────────────────────────────
+  validate:
+    name: E2E Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      pr_number:  ${{ steps.find_pr.outputs.pr_number }}
+      notion_url: ${{ steps.extract_notion.outputs.notion_url }}
+      notion_id:  ${{ steps.extract_notion.outputs.notion_id }}
+      bug_title:  ${{ steps.extract_notion.outputs.bug_title }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Quick safety gate before spending 15 min on E2E
+      - name: Verify blocklist (changed files must not be in protected paths)
+        run: |
+          git fetch origin main --depth=2
+          CHANGED=$(git diff --name-only origin/main HEAD 2>/dev/null || echo "")
+          echo "Changed files: $CHANGED"
+          # Inline node check — fast, no extra deps
+          node --input-type=module << 'JSEOF'
+          import { readFileSync } from 'fs';
+          const changed = process.env.CHANGED_FILES?.split('\n').filter(Boolean) ?? [];
+          const BLOCKED = [
+            /\/auth\//i, /^auth\//i, /\/token/i, /\/session/i, /\/billing/i,
+            /\/payment/i, /\/stripe/i, /\/webhook/i, /\/migration/i, /\/schema/i,
+            /\/password/i, /\/secret/i, /\/pii/i, /\/gdpr/i, /\/\.env/i,
+            /\/deploy/i, /\/\.github\//i, /\/encrypt/i
+          ];
+          const blocked = changed.filter(f => BLOCKED.some(p => p.test(f)));
+          if (blocked.length) {
+            console.error('BLOCKED FILES:', blocked);
+            process.exit(1);
+          }
+          console.log('All changed files safe:', changed.join(', ') || '(none)');
+          JSEOF
+        env:
+          CHANGED_FILES: ${{ env.CHANGED_FILES }}
+
+      # Run the E2E smoke suite against staging
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Run E2E smoke tests
+        id: e2e
+        run: |
+          npx playwright test \
+            --project=chromium \
+            --reporter=html \
+            2>&1 | tee e2e-output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+        working-directory: frontend
+        env:
+          BASE_URL: ${{ vars.RELOPASS_STAGING_URL || 'https://app.relopass.com' }}
+        continue-on-error: true
+
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report-${{ github.sha }}
+          path: frontend/playwright-report/
+          retention-days: 14
+
+      # Find the draft PR opened by autofix-pipeline (DEV-LOOP-2C)
+      - name: Find associated PR
+        id: find_pr
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${branch}`,
+              state: 'open',
+            });
+            if (prs.data.length === 0) {
+              core.warning(`No open PR found for branch ${branch}`);
+              return;
+            }
+            const pr = prs.data[0];
+            core.setOutput('pr_number', pr.number);
+            core.setOutput('pr_title', pr.title);
+            core.setOutput('pr_body', pr.body ?? '');
+            core.info(`Found PR #${pr.number}: ${pr.title}`);
+
+      # Extract Notion URL and task ID from the PR body (set by autofix-pipeline)
+      # Safety: PR title / body are attacker-controlled inputs. Use env: bindings
+      # rather than ${{ ... }} expansion inside the shell script to defuse
+      # injection (e.g. a PR titled `fix: '$(rm -rf /)'` would otherwise execute).
+      # See: https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/
+      - name: Extract Notion metadata from PR
+        id: extract_notion
+        env:
+          PR_BODY: ${{ steps.find_pr.outputs.pr_body }}
+          PR_TITLE: ${{ steps.find_pr.outputs.pr_title }}
+          BRANCH: ${{ github.ref }}
+        run: |
+          # Notion URL appears as: **Notion:** https://www.notion.so/...
+          NOTION_URL=$(echo "$PR_BODY" | grep -oP 'https://www\.notion\.so/\S+' | head -1 | tr -d "'")
+          # Bug title from PR title: "fix: My Bug Title"
+          BUG_TITLE="${PR_TITLE#fix: }"
+          # Notion page ID from branch name: autofix/bug-{16-char-id}
+          NOTION_BRANCH_ID=$(echo "$BRANCH" | grep -oP '(?<=autofix/bug-)[a-f0-9]+' | head -1)
+          {
+            echo "notion_url=$NOTION_URL"
+            echo "notion_id=$NOTION_BRANCH_ID"
+            echo "bug_title=$BUG_TITLE"
+          } >> "$GITHUB_OUTPUT"
+          echo "Notion URL: $NOTION_URL"
+          echo "Notion branch ID: $NOTION_BRANCH_ID"
+          echo "Bug title: $BUG_TITLE"
+
+      # Fail the job if E2E tests failed (deferred so we could upload report first)
+      - name: Assert E2E passed
+        if: steps.e2e.outputs.exit_code != '0'
+        run: |
+          echo "E2E tests failed (exit code ${{ steps.e2e.outputs.exit_code }})"
+          exit 1
+
+  # ── Per-night merge cap (autopilot governance) ───────────────────────────────
+  # Counts autofix PRs already merged today and blocks the auto-merge job once the
+  # nightly cap is hit (var AUTOPILOT_MAX_MERGES_PER_NIGHT, default 15). Keeps CI/Render
+  # build fanout bounded even if many fixes queue up.
+  merge-gate:
+    name: Nightly merge cap
+    needs: [validate]
+    if: success()
+    runs-on: ubuntu-latest
+    outputs:
+      allowed: ${{ steps.cap.outputs.allowed }}
+    steps:
+      - name: Count today's autofix merges
+        id: cap
+        uses: actions/github-script@v9
+        env:
+          CAP: ${{ vars.AUTOPILOT_MAX_MERGES_PER_NIGHT }}
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const cap = parseInt(process.env.CAP || '15', 10);
+            const today = new Date().toISOString().slice(0, 10);
+            const { owner, repo } = context.repo;
+            const q = `repo:${owner}/${repo} is:pr is:merged merged:>=${today} autofix in:title`;
+            const res = await github.rest.search.issuesAndPullRequests({ q, per_page: 1 });
+            const merged = res.data.total_count;
+            const allowed = merged < cap;
+            core.info(`autofix merges today=${merged} cap=${cap} allowed=${allowed}`);
+            core.setOutput('allowed', allowed ? 'true' : 'false');
+
+  # ── Auto-merge and Deploy ────────────────────────────────────────────────────
+  auto-merge:
+    name: Squash-merge & Deploy
+    needs: [validate, merge-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Skip when the nightly merge cap is hit, or when AUTOPILOT_BATCH_MERGE is on (then the
+    # draft PR is left for a human/batch merge instead of auto-merging per-fix).
+    if: success() && needs.merge-gate.outputs.allowed == 'true' && vars.AUTOPILOT_BATCH_MERGE != 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      # Convert draft PR to ready and squash-merge
+      - name: Squash-merge PR to main
+        id: merge
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = parseInt('${{ needs.validate.outputs.pr_number }}');
+            const bugTitle = '${{ needs.validate.outputs.bug_title }}';
+            const notionId = '${{ needs.validate.outputs.notion_id }}';
+            const notionUrl = '${{ needs.validate.outputs.notion_url }}';
+
+            if (!prNumber) {
+              core.warning('No PR number found — attempting direct merge via push');
+              return;
+            }
+
+            // Mark PR as ready (convert from draft)
+            try {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                draft: false,
+              });
+            } catch (e) {
+              core.info(`Could not un-draft PR (may not be draft): ${e.message}`);
+            }
+
+            // Squash merge with the specified commit message format
+            const result = await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              merge_method: 'squash',
+              commit_title: `autofix: ${bugTitle} [#${notionId}]`,
+              commit_message: [
+                `Auto-merged by ReloPass autofix-pipeline after E2E validation pass.`,
+                ``,
+                `Notion: ${notionUrl}`,
+                `Branch: ${context.ref.replace('refs/heads/', '')}`,
+                `Validated: ${new Date().toISOString()}`,
+              ].join('\n'),
+            });
+
+            core.setOutput('merge_sha', result.data.sha);
+            core.setOutput('merged', 'true');
+            core.info(`Squash-merged: ${result.data.sha}`);
+
+      # Prod is deployed by Render's own auto-deploy-on-merge (no Vercel). We can't poll the
+      # Render API from CI (no RENDER_API_KEY secret), so we confirm the deploy by polling
+      # /health for the merged SHA — the backend exposes it from RENDER_GIT_COMMIT — then run
+      # the read-only prod canary. Outputs: deployed (SHA confirmed live) + passed (canary ok).
+      - name: Wait for Render deploy + prod canary
+        id: canary
+        env:
+          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
+          API_BASE: https://api.relopass.com
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -uo pipefail
+          deployed=false
+          for i in $(seq 1 30); do   # up to 30 × 20s = 10 min for Render to go live
+            commit=$(curl -sf "$API_BASE/health" | python3 -c "import sys,json;print(json.load(sys.stdin).get('commit',''))" 2>/dev/null || echo "")
+            echo "poll $i: live=$commit want=$MERGE_SHA"
+            [ "$commit" = "$MERGE_SHA" ] && { deployed=true; break; }
+            sleep 20
+          done
+          echo "deployed=$deployed" >> "$GITHUB_OUTPUT"
+          if [ "$deployed" != true ]; then
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            echo "Render deploy of ${MERGE_SHA:0:7} not confirmed within timeout — handing to human (NO revert)."
+            exit 0
+          fi
+          resp=$(curl -sf -X POST "$API_BASE/api/crons/autopilot-canary" \
+            -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" \
+            -d '{"failing_requests":[]}' 2>/dev/null || echo '{"passed":false}')
+          echo "canary: $resp"
+          passed=$(echo "$resp" | python3 -c "import sys,json;print(str(json.load(sys.stdin).get('passed',False)).lower())" 2>/dev/null || echo false)
+          echo "passed=$passed" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      # Rollback ONLY when the deploy was confirmed live but the prod canary FAILED. We never
+      # revert on an unconfirmed deploy — that would revert good code just because /health
+      # hadn't surfaced the SHA yet; those go to Human Review instead.
+      - name: Rollback on failed canary
+        if: steps.canary.outputs.deployed == 'true' && steps.canary.outputs.passed != 'true' && steps.merge.outputs.merged == 'true'
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const mergeSha = '${{ steps.merge.outputs.merge_sha }}';
+            const { owner, repo } = context.repo;
+
+            // Get the commit to revert
+            const commit = await github.rest.git.getCommit({ owner, repo, commit_sha: mergeSha });
+            const parentSha = commit.data.parents[0]?.sha;
+
+            if (!parentSha) {
+              core.error('Cannot revert — no parent commit found');
+              return;
+            }
+
+            // Get parent tree
+            const parent = await github.rest.git.getCommit({ owner, repo, commit_sha: parentSha });
+
+            // Create revert commit (restores parent tree)
+            const revertCommit = await github.rest.git.createCommit({
+              owner, repo,
+              message: `revert: autofix canary failed — reverting ${mergeSha.slice(0, 7)}\n\nRevert of "${commit.data.message.split('\n')[0]}" due to a failed post-deploy prod canary.`,
+              tree: parent.data.tree.sha,
+              parents: [mergeSha],
+            });
+
+            // Update main branch to point to revert commit
+            await github.rest.git.updateRef({
+              owner, repo,
+              ref: 'heads/main',
+              sha: revertCommit.data.sha,
+            });
+
+            core.warning(`Rolled back: main now at ${revertCommit.data.sha}`);
+
+      # Update Notion on success — canary passed → Done + Final Validation Result = Passed.
+      - name: Update Notion → Done (canary passed)
+        if: steps.canary.outputs.passed == 'true'
+        env:
+          NOTION_URL: ${{ needs.validate.outputs.notion_url }}
+          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
+        run: |
+          if [ -z "$NOTION_URL" ]; then exit 0; fi
+          PAGE_ID=$(echo "$NOTION_URL" | grep -oP '[a-f0-9]{32}' | head -1)
+          if [ -z "$PAGE_ID" ]; then exit 0; fi
+          export NOTE="Auto-fix merged + deployed to Render; post-deploy prod canary PASSED. Merge SHA: ${MERGE_SHA:0:7}"
+          curl -s -X PATCH "https://api.notion.com/v1/pages/$PAGE_ID" \
+            -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
+            -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
+            -H "Content-Type: application/json" \
+            -d "$(python3 -c "import json,os;print(json.dumps({'properties':{'Status':{'select':{'name':'Done'}},'Final Validation Result':{'select':{'name':'Passed'}},'Execution Notes':{'rich_text':[{'type':'text','text':{'content':os.environ['NOTE']}}]}}}))")"
+
+      # Canary failed OR deploy unconfirmed → Human Review + Final Validation Result = Failed.
+      - name: Update Notion → Human Review (canary not passed)
+        if: steps.canary.outputs.passed != 'true'
+        env:
+          NOTION_URL: ${{ needs.validate.outputs.notion_url }}
+          DEPLOYED: ${{ steps.canary.outputs.deployed }}
+        run: |
+          if [ -z "$NOTION_URL" ]; then exit 0; fi
+          PAGE_ID=$(echo "$NOTION_URL" | grep -oP '[a-f0-9]{32}' | head -1)
+          if [ -z "$PAGE_ID" ]; then exit 0; fi
+          if [ "$DEPLOYED" = "true" ]; then
+            export NOTE="E2E passed but the post-deploy prod canary FAILED. Merge was auto-reverted on main. Manual review required."
+          else
+            export NOTE="E2E passed and merged, but the Render deploy could not be confirmed in time. NOT reverted — verify prod manually."
+          fi
+          curl -s -X PATCH "https://api.notion.com/v1/pages/$PAGE_ID" \
+            -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
+            -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
+            -H "Content-Type: application/json" \
+            -d "$(python3 -c "import json,os;print(json.dumps({'properties':{'Status':{'select':{'name':'Human Review'}},'Final Validation Result':{'select':{'name':'Failed'}},'Execution Notes':{'rich_text':[{'type':'text','text':{'content':os.environ['NOTE']}}]}}}))")"
+
+      # Record CI-side funnel events so the autopilot metrics dashboard sees merged/done/reverted.
+      - name: Emit autopilot funnel event
+        if: always() && steps.merge.outputs.merged == 'true'
+        env:
+          API_BASE: https://api.relopass.com
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          PASSED: ${{ steps.canary.outputs.passed }}
+          NOTION_ID: ${{ needs.validate.outputs.notion_id }}
+        run: |
+          set -uo pipefail
+          emit() { curl -s -o /dev/null -X POST "$API_BASE/api/crons/autopilot-event" \
+            -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" \
+            -d "{\"event_type\":\"$1\",\"entity_id\":\"$NOTION_ID\"}" || true; }
+          emit "autopilot.merged"
+          if [ "$PASSED" = "true" ]; then emit "autopilot.task_done"; else emit "autopilot.reverted"; fi
+
+      - name: Fail workflow if canary did not pass
+        if: steps.canary.outputs.passed != 'true'
+        run: |
+          echo "Post-deploy prod canary did not pass — reverted if the deploy was confirmed; otherwise left for human review."
+          exit 1
+
+  # ── Notify on E2E Failure ────────────────────────────────────────────────────
+  notify-failure:
+    name: Notify E2E Failure
+    needs: [validate]
+    runs-on: ubuntu-latest
+    if: failure()
+
+    steps:
+      - name: Update Notion task → Human Review
+        run: |
+          NOTION_URL="${{ needs.validate.outputs.notion_url }}"
+          if [ -z "$NOTION_URL" ]; then
+            echo "No Notion URL found — skipping Notion update"
+            exit 0
+          fi
+          PAGE_ID=$(echo "$NOTION_URL" | grep -oP '[a-f0-9]{32}' | head -1)
+          if [ -z "$PAGE_ID" ]; then
+            echo "Could not extract page ID from: $NOTION_URL"
+            exit 0
+          fi
+
+          BRANCH="${{ github.ref }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          curl -s -X PATCH "https://api.notion.com/v1/pages/$PAGE_ID" \
+            -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
+            -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"properties\": {
+                \"Status\": {\"select\": {\"name\": \"Human Review\"}},
+                \"Execution Notes\": {\"rich_text\": [{\"type\": \"text\", \"text\": {\"content\": \"E2E validation FAILED on branch ${BRANCH}. Branch left open for manual review. CI run: ${RUN_URL}\"}}]}
+              }
+            }"
+
+          echo "Notion task updated to Human Review"
+
+      - name: Add failure comment to PR
+        if: needs.validate.outputs.pr_number != ''
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = parseInt('${{ needs.validate.outputs.pr_number }}');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: [
+                '## ❌ Autofix E2E Validation Failed',
+                '',
+                'The automated E2E test suite did not pass for this auto-fix.',
+                'This branch has been left open for **manual review**.',
+                '',
+                `**CI run:** ${runUrl}`,
+                '',
+                'The Notion task has been updated to **Human Review** status.',
+              ].join('\n'),
+            });

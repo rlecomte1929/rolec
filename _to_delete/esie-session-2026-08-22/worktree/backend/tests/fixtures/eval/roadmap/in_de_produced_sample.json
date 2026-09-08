@@ -1,0 +1,10 @@
+[
+  {
+    "corridor": "IN_DE",
+    "steps": [
+      {"order": 1, "title": "Apply for the EU Blue Card visa at the German mission in India"},
+      {"order": 2, "title": "Register your address (Anmeldung) at the Bürgeramt"},
+      {"order": 3, "title": "Open a German bank account"}
+    ]
+  }
+]

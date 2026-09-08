@@ -1,0 +1,50 @@
+# Corridor registry profile — France → Norway (I-3 Stage 1).
+#
+# Canonical id matches immigration_corpus_chunks.corridor ('FR_NO'). This file is
+# the single declarative source for the corridor's cross-cutting config; Stage 1
+# uses the `retrieval` block. Later stages add prompt / intake / sla sections and
+# a `pathways:` list pointing at the eligibility Corridor Agent files.
+#
+# Stage-1 values intentionally mirror the retriever's current defaults
+# (all trust tiers, IMMIGRATION_MIN_SIMILARITY=0.25) so wiring the seam changes
+# no rankings — corridors can later tighten scope (e.g. drop tier 3).
+
+corridor:
+  id: "FR_NO"
+  origin_iso: "FR"
+  destination_iso: "NO"   # quoted — bare NO is a YAML boolean (Norway problem)
+  display_name: "France → Norway"
+  aliases: ["FR→NO", "FR-NO"]
+
+  retrieval:
+    # Trust tiers to include in retrieval (1 = official, 2 = secondary, 3 = other).
+    trust_tiers: [1, 2, 3]
+    # Cosine similarity floor for the quality gate.
+    min_similarity: 0.25
+
+  # I-3 Stage 2: prompt selection. task_key names the prompt_registry task whose
+  # active version the immigration answer engine uses; until a version is
+  # registered for this key the engine falls back to its module SYSTEM_PROMPT, so
+  # this is inert (no behaviour change) until a corridor prompt is published.
+  prompt:
+    task_key: "immigration_answer"
+
+  # I-3 Stage 3: intake follow-ups. Uncomment + drop a corridor-specific
+  # question set at corridors/FR_NO/<questions_file> to override the global
+  # interview_questions.json for this corridor. Omitted today → FR_NO uses the
+  # global set (no behaviour change), matching the Stage-1/2 fallback pattern.
+  # intake:
+  #   questions_file: "interview_questions.json"
+
+  # I-3 Stage 4: HR command-center timeline-SLA tunables. Values mirror the
+  # sla_rules defaults (30-day at-risk window, 80% completion), so wiring the
+  # seam changes no SLA verdicts — a slower corridor can later widen its window.
+  sla:
+    at_risk_window_days: 30
+    at_risk_pct: 80
+
+  # Eligibility Corridor Agent pathways (resolved relative to this directory).
+  # EEA free-movement pathway — REPRESENTATIVE content, not SME-verified.
+  pathways:
+    - id: "EEA_FREEDOM_2026"
+      file: "pathways/EEA_FREEDOM_2026/v1.yaml"

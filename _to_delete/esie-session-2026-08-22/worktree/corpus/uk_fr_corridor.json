@@ -1,0 +1,437 @@
+{
+  "schema_version": "1.0.0",
+  "corridor": {
+    "from": "UK",
+    "to": "FR",
+    "from_country_name": "United Kingdom",
+    "to_country_name": "France",
+    "classification": "non_eea_to_eea",
+    "description": "Post-Brexit, British nationals are third-country nationals for French immigration (transition period ended 1 January 2021). The standard route for salaried employment is a long-stay visa serving as a residence permit (VLS-TS) under the Salarié or Passeport-Talent scheme, followed by an online ANEF validation within 3 months of arrival. British nationals retain Schengen short-stay exemption (90 days / 180-day period) for tourism/business, but any stay >90 days or with paid work requires a long-stay visa."
+  },
+  "fetched_at": "2026-06-04",
+  "next_review_due": "2026-12-04",
+  "primary_sources": [
+    {
+      "url": "https://france-visas.gouv.fr/en/brexit",
+      "tier": 1,
+      "title": "British citizen — France-Visas (Brexit landing)"
+    },
+    {
+      "url": "https://france-visas.gouv.fr/en/royaume-uni",
+      "tier": 1,
+      "title": "Royaume-Uni — France-Visas (UK-specific)"
+    },
+    {
+      "url": "https://www.france-visas.gouv.fr/en/visa-de-long-sejour",
+      "tier": 1,
+      "title": "Long-stay visa — France-Visas"
+    },
+    {
+      "url": "https://www.service-public.fr/particuliers/vosdroits/F16162?lang=en",
+      "tier": 1,
+      "title": "Long-stay visa (3 months to 1 year) — Service-Public.fr"
+    },
+    {
+      "url": "https://france-visas.gouv.fr/web/france-visas/passeport-talents",
+      "tier": 1,
+      "title": "Passeport Talents — France-Visas"
+    },
+    {
+      "url": "https://www.service-public.fr/particuliers/vosdroits/F16922",
+      "tier": 1,
+      "title": "Passeport talent: multi-year residence card — Service-Public.fr"
+    },
+    {
+      "url": "https://administration-etrangers-en-france.interieur.gouv.fr/",
+      "tier": 1,
+      "title": "ANEF — Administration Numérique des Étrangers en France"
+    },
+    {
+      "url": "https://www.gov.uk/get-document-legalised",
+      "tier": 1,
+      "title": "Get your document legalised — GOV.UK (FCDO Apostille)"
+    }
+  ],
+  "pathways": [
+    {
+      "visa_type": "long_stay_visa",
+      "scheme_name_native": "VLS-TS Salarié",
+      "scheme_name_en": "Long-stay visa serving as residence permit — Salaried Employee",
+      "employee_types": [
+        "salaried_employee",
+        "temporary_worker"
+      ],
+      "duration_months": 12,
+      "renewable": true,
+      "renewal_path": "multi_year_residence_card",
+      "eligibility": {
+        "salary_min_eur_annual": 22650,
+        "salary_basis": "SMIC",
+        "contract_type": [
+          "CDI",
+          "CDD_3_months_or_more"
+        ],
+        "qualification_required": false,
+        "employer_must_obtain_work_authorization": true,
+        "brexit_transitional_protections": false,
+        "brexit_note": "Withdrawal Agreement only protects British nationals already legally resident in France before 31 December 2020. New arrivals (post-Brexit) follow the standard third-country VLS-TS process."
+      },
+      "typical_processing_days_low": 15,
+      "typical_processing_days_high": 45,
+      "post_arrival_validation_required": true,
+      "post_arrival_validation_window_days": 90,
+      "post_arrival_tax_eur": 200,
+      "source_url": "https://www.service-public.fr/particuliers/vosdroits/F16162?lang=en",
+      "source_tier": 1
+    },
+    {
+      "visa_type": "passeport_talent",
+      "scheme_name_native": "Passeport Talent — Salarié Qualifié",
+      "scheme_name_en": "Talent Passport — Qualified Employee",
+      "employee_types": [
+        "qualified_employee",
+        "researcher",
+        "innovator",
+        "intra_company_transferee"
+      ],
+      "duration_months": 48,
+      "renewable": true,
+      "renewal_path": "renewable_multi_year_card",
+      "eligibility": {
+        "salary_min_eur_annual": 43243,
+        "salary_min_note": "Equal to or greater than €43,243 gross annual (2× legal minimum wage). Some Passeport Talent sub-categories use 1.5× the average annual gross reference salary (€59,373 per the August 2025 ministerial decree).",
+        "contract_type": [
+          "CDI",
+          "CDD_3_months_or_more"
+        ],
+        "qualification_required": true,
+        "qualification_level_min": "master_or_equivalent",
+        "employer_must_obtain_work_authorization": false
+      },
+      "typical_processing_days_low": 15,
+      "typical_processing_days_high": 45,
+      "post_arrival_validation_required": true,
+      "post_arrival_validation_window_days": 90,
+      "post_arrival_tax_eur": 200,
+      "source_url": "https://www.service-public.fr/particuliers/vosdroits/F16922",
+      "source_tier": 1,
+      "secondary_sources": [
+        "https://france-visas.gouv.fr/web/france-visas/passeport-talents",
+        "https://www.service-public.fr/particuliers/vosdroits/F35495/3_1_1_5_0_1?lang=en"
+      ]
+    }
+  ],
+  "required_documents": [
+    {
+      "id": "uk_fr_lsv_passport",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "long_stay_visa",
+      "employee_type": "any",
+      "document_type": "passport",
+      "document_name": "Valid British Passport",
+      "is_required": true,
+      "is_conditional": false,
+      "freshness_days": null,
+      "validity_min_days_after_visa_expiry": 90,
+      "requires_apostille": false,
+      "requires_translation": false,
+      "can_be_prefilled": true,
+      "can_be_ocr_extracted": true,
+      "vault_field_mapping": "identity.passport.number",
+      "typical_processing_days": 0,
+      "source_url": "https://www.france-visas.gouv.fr/en/visa-de-long-sejour",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_lsv_photos",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "long_stay_visa",
+      "employee_type": "any",
+      "document_type": "biometric_photos",
+      "document_name": "ICAO-compliant identity photographs (×3)",
+      "is_required": true,
+      "freshness_days": 180,
+      "requires_apostille": false,
+      "requires_translation": false,
+      "typical_processing_days": 1,
+      "source_url": "https://www.france-visas.gouv.fr/en/visa-de-long-sejour",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_lsv_form_15615",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "long_stay_visa",
+      "employee_type": "salaried_employee",
+      "document_type": "application_form",
+      "document_name": "Long-stay visa application — Salarié (Cerfa 15615*01)",
+      "is_required": true,
+      "form_url": "https://france-visas.gouv.fr/documents/d/france-visas/cerfa_15615-01_salarie",
+      "form_version": "15615*01",
+      "requires_apostille": false,
+      "requires_translation": false,
+      "source_url": "https://france-visas.gouv.fr/en/activite-salariee",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_lsv_work_authorization",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "long_stay_visa",
+      "employee_type": "salaried_employee",
+      "document_type": "work_authorization",
+      "document_name": "Work authorization issued by the DGEF (employer-initiated, prior to arrival)",
+      "is_required": true,
+      "is_conditional": true,
+      "condition_expression": "visa_type == 'long_stay_visa' AND employee_type IN ('salaried_employee','temporary_worker')",
+      "typical_processing_days": 14,
+      "book_early_flag": true,
+      "book_early_reason": "DGEF processes employer applications in 14 days typically; visa appointment cannot be booked before authorization issues.",
+      "source_url": "https://www.service-public.fr/particuliers/vosdroits/F35602/1_0?lang=en",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_lsv_employment_contract",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "long_stay_visa",
+      "employee_type": "salaried_employee",
+      "document_type": "employment_contract",
+      "document_name": "Signed employment contract (CDI or CDD ≥3 months)",
+      "is_required": true,
+      "freshness_days": 180,
+      "requires_apostille": false,
+      "requires_translation": false,
+      "translation_languages": [],
+      "source_url": "https://www.service-public.fr/particuliers/vosdroits/F35602/1_0?lang=en",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_lsv_proof_of_accommodation",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "long_stay_visa",
+      "employee_type": "any",
+      "document_type": "proof_of_accommodation",
+      "document_name": "Proof of accommodation in France (lease, hotel reservation ≥3 months, or attestation d'hébergement)",
+      "is_required": true,
+      "freshness_days": 90,
+      "source_url": "https://www.france-visas.gouv.fr/en/visa-de-long-sejour",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_lsv_financial_means",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "long_stay_visa",
+      "employee_type": "any",
+      "document_type": "financial_means",
+      "document_name": "Proof of sufficient financial means (employment contract usually satisfies; otherwise bank statements covering 3 months)",
+      "is_required": true,
+      "freshness_days": 90,
+      "source_url": "https://www.france-visas.gouv.fr/en/visa-de-long-sejour",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_lsv_health_insurance",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "long_stay_visa",
+      "employee_type": "any",
+      "document_type": "health_insurance",
+      "document_name": "Health insurance covering the full visa validity period (post-Brexit, EHIC/GHIC does not exempt long-stay residents — separate cover required)",
+      "is_required": true,
+      "source_url": "https://www.france-visas.gouv.fr/en/visa-de-long-sejour",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_pt_form_15614",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "passeport_talent",
+      "employee_type": "qualified_employee",
+      "document_type": "employer_attestation",
+      "document_name": "Employer attestation — Passeport Talent (Cerfa 15614*02)",
+      "is_required": true,
+      "form_url": "https://france-visas.gouv.fr/documents/d/france-visas/cerfa_15614-02",
+      "form_version": "15614*02",
+      "requires_apostille": false,
+      "source_url": "https://france-visas.gouv.fr/en/talents-internationaux-et-attractivite-economique",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_pt_diploma",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "passeport_talent",
+      "employee_type": "qualified_employee",
+      "document_type": "degree_certificate",
+      "document_name": "Master's degree or equivalent (FCDO-apostilled + sworn French translation)",
+      "is_required": true,
+      "requires_apostille": true,
+      "apostille_countries": [
+        "GB"
+      ],
+      "apostille_issuer": "Foreign_Commonwealth_Development_Office",
+      "apostille_issuer_url": "https://www.gov.uk/get-document-legalised",
+      "apostille_variants": [
+        "paper_apostille",
+        "e_apostille"
+      ],
+      "requires_translation": true,
+      "translation_languages": [
+        "fr"
+      ],
+      "typical_processing_days": 14,
+      "book_early_flag": true,
+      "book_early_reason": "FCDO standard apostille service takes 2 working days; postal turnaround adds ~5 days. Sworn French translation adds 1-2 weeks. e-Apostille is faster (same-day for notary/solicitor-signed digital docs).",
+      "source_url": "https://www.service-public.fr/particuliers/vosdroits/F16922",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_pt_employment_contract",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "passeport_talent",
+      "employee_type": "qualified_employee",
+      "document_type": "employment_contract",
+      "document_name": "Employment contract — CDI or CDD ≥3 months, gross annual salary ≥ €43,243",
+      "is_required": true,
+      "freshness_days": 180,
+      "requires_apostille": false,
+      "requires_translation": true,
+      "translation_languages": [
+        "fr"
+      ],
+      "source_url": "https://www.service-public.fr/particuliers/vosdroits/F16922",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_pt_civil_status",
+      "corridor_from": "UK",
+      "corridor_to": "FR",
+      "visa_type": "passeport_talent",
+      "employee_type": "qualified_employee",
+      "document_type": "civil_status_document",
+      "document_name": "Birth certificate (FCDO-apostilled + sworn French translation); marriage certificate if accompanied by spouse",
+      "is_required": true,
+      "requires_apostille": true,
+      "apostille_countries": [
+        "GB"
+      ],
+      "apostille_issuer": "Foreign_Commonwealth_Development_Office",
+      "apostille_issuer_url": "https://www.gov.uk/get-document-legalised",
+      "requires_translation": true,
+      "translation_languages": [
+        "fr"
+      ],
+      "typical_processing_days": 14,
+      "source_url": "https://www.service-public.fr/particuliers/vosdroits/F35495/3_1_1_5_0_1?lang=en",
+      "source_tier": 1
+    }
+  ],
+  "post_arrival_steps": [
+    {
+      "id": "uk_fr_anef_validation",
+      "order": 1,
+      "name": "ANEF online VLS-TS validation",
+      "applies_to_visa_types": [
+        "long_stay_visa",
+        "passeport_talent"
+      ],
+      "deadline_days_after_arrival": 90,
+      "deadline_basis": "Failure to validate within 90 days invalidates legal residence and triggers a fine.",
+      "fee_eur": 200,
+      "fee_label": "Timbre fiscal — visa tax",
+      "where": "https://administration-etrangers-en-france.interieur.gouv.fr/",
+      "instructions_url": "https://www.service-public.fr/particuliers/vosdroits/F16162?lang=en",
+      "source_url": "https://www.service-public.fr/particuliers/vosdroits/F16162?lang=en",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_anef_address_declaration",
+      "order": 2,
+      "name": "Address declaration in ANEF",
+      "applies_to_visa_types": [
+        "long_stay_visa",
+        "passeport_talent"
+      ],
+      "deadline_days_after_arrival": 90,
+      "fee_eur": 0,
+      "source_url": "https://administration-etrangers-en-france.interieur.gouv.fr/",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_medical_visit",
+      "order": 3,
+      "name": "Medical visit (OFII — for specific categories)",
+      "applies_to_visa_types": [
+        "long_stay_visa"
+      ],
+      "is_conditional": true,
+      "condition_expression": "specific_categories_only_check_ofii",
+      "deadline_days_after_arrival": 90,
+      "fee_eur": 0,
+      "source_url": "https://www.france-visas.gouv.fr/en/votre-arrivee-en-france",
+      "source_tier": 1
+    },
+    {
+      "id": "uk_fr_residence_card_renewal",
+      "order": 4,
+      "name": "Apply for renewal — multi-year residence card",
+      "applies_to_visa_types": [
+        "long_stay_visa"
+      ],
+      "deadline_days_after_arrival": 305,
+      "deadline_basis": "Apply 2 months before VLS-TS expiry (i.e. ~305 days after arrival for a 1-year VLS-TS).",
+      "source_url": "https://www.service-public.fr/particuliers/vosdroits/F35495/3_1_1_5_0_1?lang=en",
+      "source_tier": 1
+    }
+  ],
+  "path_classifier_rules": [
+    {
+      "rule_id": "uk_fr_default_to_lsv",
+      "if": {
+        "nationality": "GB",
+        "destination": "FR",
+        "intent": "salaried_employment"
+      },
+      "then": {
+        "pathway": "LONG_STAY_VISA",
+        "visa_type": "long_stay_visa"
+      },
+      "rationale": "Post-Brexit, British nationals are non-EEA; salaried employment in France requires VLS-TS by default. Withdrawal Agreement only protects pre-2021 residents."
+    },
+    {
+      "rule_id": "uk_fr_upgrade_to_passeport_talent",
+      "if": {
+        "nationality": "GB",
+        "destination": "FR",
+        "intent": "salaried_employment",
+        "qualification": "master_or_equivalent",
+        "salary_eur_annual": {
+          ">=": 43243
+        }
+      },
+      "then": {
+        "pathway": "LONG_STAY_VISA",
+        "visa_type": "passeport_talent"
+      },
+      "rationale": "Qualified employees with salary ≥ €43,243 are eligible for the multi-year Passeport Talent, strongly preferred over annual VLS-TS renewals."
+    }
+  ],
+  "known_gaps": [
+    "Salary thresholds reflect 2026 schedule; ministerial decree updates annually — re-verify at next_review_due.",
+    "OFII medical visit applicability is category-dependent; this corpus marks it conditional but does not encode the full category list.",
+    "Withdrawal Agreement protections (pre-2021 UK residents in France) are out of scope — they follow a different track (Article 50 TUE residence permit) and need a separate corpus file.",
+    "Family reunification (visa C — accompanying spouse / children) is not included; covered separately by the family-reunification corpus.",
+    "Short-stay Schengen exemption (90/180) is referenced in the corridor description but not encoded as a pathway (out of scope: this corpus is long-stay only)."
+  ],
+  "supersedes_db_seed": {
+    "note": "Existing public.immigration_requirements rows for (UK, FR, long_stay_visa) were seeded by relopass_team (5 rows, partial). This corpus refreshes UK->FR to the full 2026 document set (8 long_stay_visa + 4 passeport_talent) sourced from france-visas.gouv.fr / service-public.fr.",
+    "row_count_before": 5,
+    "row_count_after_target": 12
+  }
+}

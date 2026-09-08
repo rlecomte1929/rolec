@@ -1,0 +1,36 @@
+{
+  "_meta": "SYNTHETIC grounding-judge calibration set (WS-C). 25 labeled cases (answer + chunks + gold grounding verdict) used by backend/eval/run_judge_calibration.py to measure judge-vs-label agreement and Cohen's kappa. Gold verdicts curated under the support-based groundedness policy (2026-06-30; policy by Romain, AI-applied per case) and treated as ground truth; see audit/admin/34-judge-calibration-curation.md.",
+  "verification_status": "verified",
+  "policy": "support-based",
+  "reviewed_by": "romain (policy); ai-applied",
+  "kappa_warn_below": 0.6,
+  "cases": [
+    {"id": "C-01", "gold": "grounded", "answer": "The monthly housing allowance cap is EUR 2,500 per month.", "chunks": [{"text": "The monthly housing allowance cap is EUR 2,500 per month for a standard relocating employee."}]},
+    {"id": "C-02", "gold": "grounded", "answer": "The policy covers two home-leave trips per year for the assignee.", "chunks": [{"text": "The policy covers two home-leave trips per year for the assignee in economy class."}]},
+    {"id": "C-03", "gold": "grounded", "answer": "International school tuition is covered up to EUR 20,000 per child per year.", "chunks": [{"text": "The policy covers international school tuition up to EUR 20,000 per child per year against invoices."}]},
+    {"id": "C-04", "gold": "grounded", "answer": "A household goods shipment of up to 40 cubic metres by sea freight is covered.", "chunks": [{"text": "The policy covers a household goods shipment of up to 40 cubic metres by sea freight."}]},
+    {"id": "C-05", "gold": "grounded", "answer": "Serviced temporary accommodation is provided for up to 30 days on arrival.", "chunks": [{"text": "Serviced temporary accommodation is provided for up to 30 days on arrival before the lease starts."}]},
+    {"id": "C-06", "gold": "grounded", "answer": "A cost-of-living allowance is paid when the host location index exceeds the home index.", "chunks": [{"text": "A cost-of-living allowance (COLA) is paid when the host location index exceeds the home index."}]},
+    {"id": "C-07", "gold": "grounded", "answer": "Under tax equalization the assignee pays a hypothetical home-country tax.", "chunks": [{"text": "Under tax equalization the assignee pays a hypothetical home-country tax and the company covers actual taxes."}]},
+    {"id": "C-08", "gold": "grounded", "answer": "The spousal career support allowance is EUR 5,000 for job-search costs.", "chunks": [{"text": "The policy provides a spousal career support allowance of EUR 5,000 for job-search and accreditation costs."}]},
+    {"id": "C-09", "gold": "grounded", "answer": "International health insurance covers the assignee and dependants.", "chunks": [{"text": "The company provides international health insurance covering the assignee and dependants for the assignment."}]},
+
+    {"id": "C-10", "gold": "partially_grounded", "answer": "The monthly housing allowance cap is EUR 2,500 per month and includes a furniture rental budget of EUR 500.", "chunks": [{"text": "The monthly housing allowance cap is EUR 2,500 per month for a standard relocating employee."}]},
+    {"id": "C-11", "gold": "partially_grounded", "answer": "The policy covers two home-leave trips per year and unlimited weekend trips.", "chunks": [{"text": "The policy covers two home-leave trips per year for the assignee."}]},
+    {"id": "C-12", "gold": "partially_grounded", "answer": "School tuition is covered up to EUR 20,000 per child and university fees are also reimbursed.", "chunks": [{"text": "The policy covers international school tuition up to EUR 20,000 per child per year."}]},
+    {"id": "C-13", "gold": "partially_grounded", "answer": "A household goods shipment of 40 cubic metres is covered and a new car is provided.", "chunks": [{"text": "The policy covers a household goods shipment of up to 40 cubic metres by sea freight."}]},
+    {"id": "C-14", "gold": "partially_grounded", "answer": "Temporary accommodation is provided for 30 days and a personal chef is included.", "chunks": [{"text": "Serviced temporary accommodation is provided for up to 30 days on arrival."}]},
+    {"id": "C-15", "gold": "partially_grounded", "answer": "A cost-of-living allowance is paid and a guaranteed annual bonus of 20 percent applies.", "chunks": [{"text": "A cost-of-living allowance is paid when the host location index exceeds the home index."}]},
+    {"id": "C-16", "gold": "partially_grounded", "answer": "Tax equalization applies and the company also pays your mortgage at home.", "chunks": [{"text": "Under tax equalization the assignee pays a hypothetical home-country tax and the company covers actual taxes."}]},
+    {"id": "C-17", "gold": "partially_grounded", "answer": "The spousal support allowance is EUR 5,000 and the spouse gets a guaranteed local job.", "chunks": [{"text": "The policy provides a spousal career support allowance of EUR 5,000 for job-search costs."}]},
+
+    {"id": "C-18", "gold": "ungrounded", "answer": "Employees receive a company yacht and a private island retreat every quarter.", "chunks": [{"text": "The monthly housing allowance cap is EUR 2,500 per month for a standard relocating employee."}]},
+    {"id": "C-19", "gold": "ungrounded", "answer": "The relocation package includes lifetime first-class travel for the entire extended family.", "chunks": [{"text": "The policy covers two home-leave trips per year in economy class for the assignee."}]},
+    {"id": "C-20", "gold": "ungrounded", "answer": "All children attend Harvard with full scholarships funded by the employer.", "chunks": [{"text": "The policy covers international school tuition up to EUR 20,000 per child per year."}]},
+    {"id": "C-21", "gold": "ungrounded", "answer": "The company ships your entire mansion and pays for a fleet of luxury vehicles.", "chunks": [{"text": "The policy covers a household goods shipment of up to 40 cubic metres by sea freight."}]},
+    {"id": "C-22", "gold": "ungrounded", "answer": "Assignees stay in a five-star presidential suite indefinitely at full company cost.", "chunks": [{"text": "Serviced temporary accommodation is provided for up to 30 days on arrival."}]},
+    {"id": "C-23", "gold": "ungrounded", "answer": "Everyone receives a guaranteed doubling of salary regardless of location.", "chunks": [{"text": "A cost-of-living allowance is paid when the host location index exceeds the home index."}]},
+    {"id": "C-24", "gold": "ungrounded", "answer": "The company pays zero tax for you and gifts you company shares worth millions.", "chunks": [{"text": "Under tax equalization the assignee pays a hypothetical home-country tax."}]},
+    {"id": "C-25", "gold": "ungrounded", "answer": "Your spouse is automatically appointed as a regional director with a corner office.", "chunks": [{"text": "The policy provides a spousal career support allowance of EUR 5,000 for job-search costs."}]}
+  ]
+}

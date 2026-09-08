@@ -49,6 +49,27 @@ export function resolveCaseStage({ status, servicesComplete }: ResolveCaseStageI
   };
 }
 
+export type JourneyMiniStep = 'done' | 'current' | 'upcoming';
+
+/**
+ * Sidebar 3-phase wayfinding. RFQ sent (or any servicesComplete signal) advances
+ * past Services so Roadmap is the current phase — sending quotes must not leave
+ * the employee on "Phase 2 of 3 · Services".
+ */
+export function deriveJourneyMiniSteps(input: {
+  status?: string | null;
+  intakeStep?: number | null;
+  intakeTotalSteps: number;
+  servicesComplete?: boolean;
+}): JourneyMiniStep[] {
+  const intakeDone =
+    isIntakeComplete(input.status) ||
+    (input.intakeTotalSteps > 0 && (input.intakeStep ?? 0) >= input.intakeTotalSteps);
+  if (!intakeDone) return ['current', 'upcoming', 'upcoming'];
+  if (input.servicesComplete) return ['done', 'done', 'current'];
+  return ['done', 'current', 'upcoming'];
+}
+
 export interface CanonicalProgress {
   completed: number;
   total: number;

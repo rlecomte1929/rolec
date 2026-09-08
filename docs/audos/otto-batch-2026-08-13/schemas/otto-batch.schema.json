@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://relopass.local/schemas/otto-batch.schema.json",
+  "title": "Otto batch manifest",
+  "description": "The transfer format for an Otto (Audos) offload batch. A conforming file is self-sufficient: it names every card, where its output must land, how to recover it, which gates it must pass, and how it reintegrates into ReloPass. Hand this file plus the cards/ directory to any operator or agent and the batch is runnable.",
+  "type": "object",
+  "required": ["batch_id", "version", "generated_on", "workspace", "notion", "waves", "cards", "quality_gates", "recovery", "verification"],
+  "additionalProperties": true,
+
+  "properties": {
+    "batch_id": {"type": "string", "pattern": "^OTTO-[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "generated_on": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "generated_by": {"type": "string"},
+    "purpose": {"type": "string"},
+
+    "contract": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "source_of_truth": {"type": "string"},
+        "rules_honoured": {"type": "array", "items": {"type": "string"}},
+        "known_hazards": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+
+    "workspace": {
+      "type": "object",
+      "required": ["sync_dir", "data_dir", "doubled_path"],
+      "additionalProperties": true,
+      "properties": {
+        "repo_root_marker": {"type": "string"},
+        "sync_dir": {"type": "string"},
+        "data_dir": {"type": "string"},
+        "doubled_path": {"type": "string", "description": "The bidirectional sync writes to a DOUBLED prefix. Any recovery that checks only the sensible path will miss the file and conclude the bridge is broken."},
+        "thread_capture_dir": {"type": "string"}
+      }
+    },
+
+    "notion": {
+      "type": "object",
+      "required": ["database_id", "data_source", "status_value_on_handoff"],
+      "additionalProperties": true,
+      "properties": {
+        "database": {"type": "string"},
+        "database_id": {"type": "string"},
+        "data_source": {"type": "string", "pattern": "^collection://"},
+        "status_value_on_handoff": {"type": "string"},
+        "status_value_on_return": {"type": "string"},
+        "status_value_if_refuted": {"type": "string"},
+        "execution_notes_stamp": {"type": "string"}
+      }
+    },
+
+    "how_to_run": {"type": "object", "additionalProperties": true},
+
+    "waves": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["wave", "cards"],
+        "additionalProperties": true,
+        "properties": {
+          "wave": {"type": "integer", "minimum": 1},
+          "name": {"type": "string"},
+          "cards": {"type": "array", "items": {"type": "string", "pattern": "^OTTO-[A-Z]$"}},
+          "rationale": {"type": "string"}
+        }
+      }
+    },
+
+    "cards": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/card"}
+    },
+
+    "quality_gates": {
+      "type": "object",
+      "description": "gate_name -> what it checks and why it exists. Every gate here traces to a measured failure, not a preference.",
+      "additionalProperties": {"type": "string"}
+    },
+
+    "recovery": {
+      "type": "object",
+      "required": ["script", "usage", "sequence"],
+      "additionalProperties": true,
+      "properties": {
+        "script": {"type": "string"},
+        "usage": {"type": "string"},
+        "sequence": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+
+    "verification": {
+      "type": "object",
+      "required": ["script", "usage"],
+      "additionalProperties": true,
+      "properties": {
+        "script": {"type": "string"},
+        "usage": {"type": "string"},
+        "exit_codes": {"type": "object"},
+        "treat_as_untrusted": {"type": "string"}
+      }
+    },
+
+    "status_ledger": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "note": {"type": "string"},
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["card_id", "state"],
+            "additionalProperties": true,
+            "properties": {
+              "card_id": {"type": "string"},
+              "state": {"type": "string", "enum": ["not_sent", "sent", "returned", "verified", "ingested", "failed", "abandoned"]},
+              "sent_on": {"type": ["string", "null"]},
+              "returned_on": {"type": ["string", "null"]},
+              "verified_on": {"type": ["string", "null"]},
+              "notion_updated": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+
+    "deliberately_not_delegated": {
+      "type": "array",
+      "description": "Named on purpose. A batch that does not say what it excluded reads as 'we covered everything' when it did not.",
+      "items": {
+        "type": "object",
+        "required": ["what", "why"],
+        "additionalProperties": false,
+        "properties": {"what": {"type": "string"}, "why": {"type": "string"}}
+      }
+    }
+  },
+
+  "$defs": {
+    "card": {
+      "type": "object",
+      "required": ["card_id", "title", "wave", "kind", "otto_mode", "card_file", "notion_tasks", "outputs", "quality_gates", "reintegration"],
+      "additionalProperties": true,
+      "properties": {
+        "card_id": {"type": "string", "pattern": "^OTTO-[A-Z]$"},
+        "title": {"type": "string"},
+        "wave": {"type": "integer", "minimum": 1},
+        "kind": {
+          "type": "string",
+          "enum": ["research"],
+          "description": "Only 'research'. Contract rule 5: browser QA is measurably unreliable through Otto and belongs in the Playwright Sentinel."
+        },
+        "otto_mode": {
+          "type": "string",
+          "enum": ["chat_only", "chat_plus_one_authorised_write_task"],
+          "description": "Otto in chat cannot write files. A card needing a file must authorise exactly one narrowly-scoped write task, in writing, naming the single path it may touch."
+        },
+        "card_file": {"type": "string", "pattern": "^cards/.+\\.md$"},
+
+        "notion_tasks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["aiq_id", "role"],
+            "additionalProperties": true,
+            "properties": {
+              "aiq_id": {"type": "integer"},
+              "role": {"type": "string", "enum": ["primary", "partial"], "description": "'partial' means the card delivers only part of the task; the task must NOT be marked Done on this card alone."},
+              "priority": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]},
+              "status_before": {"type": "string"},
+              "url": {"type": "string"}
+            }
+          }
+        },
+
+        "informs": {"type": "array", "items": {"type": "integer"}},
+        "scope_note": {"type": "string"},
+
+        "premise": {
+          "type": "object",
+          "description": "The measurement already done, stated in the card so Otto explains rather than re-measures — and so it never has to claim a fact about systems it cannot see.",
+          "required": ["measured_on", "source", "fact"],
+          "additionalProperties": false,
+          "properties": {
+            "measured_on": {"type": "string"},
+            "source": {"type": "string"},
+            "fact": {"type": "string"}
+          }
+        },
+
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["path", "format", "required"],
+            "additionalProperties": true,
+            "properties": {
+              "path": {"type": "string"},
+              "format": {"type": "string", "enum": ["csv", "json", "md"]},
+              "required": {"type": "boolean"},
+              "schema": {"type": "string", "description": "Pointer of the form schemas/otto-outputs.schema.json#/$defs/<name>"},
+              "min_records": {"type": "integer", "minimum": 0},
+              "max_records": {"type": "integer", "minimum": 0},
+              "min_bytes": {"type": "integer", "minimum": 0},
+              "may_be_header_only": {"type": "boolean"},
+              "source": {"type": "string", "enum": ["sync", "thread_capture"]}
+            }
+          }
+        },
+
+        "thread_fallback": {
+          "type": "object",
+          "description": "Because Otto in chat cannot write files, and because a measured convert-only second pass DRIFTED into fresh research, every card emits its data in-thread between explicit markers. Capture it BEFORE authorising a write task; the thread_diff gate compares the two.",
+          "additionalProperties": true,
+          "properties": {
+            "format": {"type": "string", "enum": ["psv", "json", "mixed"]},
+            "begin": {"type": "string"},
+            "end": {"type": "string"},
+            "blocks": {"type": "array"},
+            "capture_as": {"type": "string"},
+            "is_primary": {"type": "boolean"}
+          }
+        },
+
+        "quality_gates": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+
+        "reintegration": {
+          "type": "object",
+          "required": ["owner_agent", "target", "steps", "constraints", "acceptance"],
+          "additionalProperties": true,
+          "properties": {
+            "owner_agent": {"type": "string"},
+            "target": {"type": "string"},
+            "writer": {"type": "string"},
+            "steps": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+            "constraints": {"type": "array", "items": {"type": "string"}},
+            "acceptance": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}

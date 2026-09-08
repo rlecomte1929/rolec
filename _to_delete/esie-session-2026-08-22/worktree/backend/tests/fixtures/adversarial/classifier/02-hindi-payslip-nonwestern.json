@@ -1,0 +1,18 @@
+{
+  "fixture_id": "ADV-CLS-02",
+  "fixture_name": "hindi-payslip-non-western-employer",
+  "adversarial_category": "non_latin_script_ambiguous_layout",
+  "expected_label": "PAYSLIP",
+  "expected_confidence_band": [0.60, 0.79],
+  "escalation_to_gpt4o_expected": true,
+  "document_text": "टाटा कंसल्टेंसी सर्विसेज लिमिटेड\nTATA CONSULTANCY SERVICES LIMITED\nवेतन पर्ची / SALARY SLIP\nमाह: अप्रैल 2025 / Month: April 2025\n\nकर्मचारी कोड / Employee Code: TCS-BLR-04821\nकर्मचारी का नाम / Employee Name: Ananya Krishnamurthy (अनन्या कृष्णमूर्ति)\nपदनाम / Designation: Senior Software Engineer\nविभाग / Department: Digital Services\nस्थान / Location: Bengaluru, Karnataka\n\nआय / EARNINGS:\nमूल वेतन / Basic Salary: ₹85,000\nमकान किराया भत्ता / HRA: ₹34,000\nपरिवहन भत्ता / Transport Allowance: ₹1,600\nविशेष भत्ता / Special Allowance: ₹22,400\nकुल आय / Gross Earnings: ₹1,43,000\n\nकटौतियाँ / DEDUCTIONS:\nभविष्य निधि / PF (12%): ₹10,200\nव्यावसायिक कर / Professional Tax: ₹200\nआयकर / Income Tax (TDS): ₹8,500\nकुल कटौती / Total Deductions: ₹18,900\n\nनिवल वेतन / NET PAY: ₹1,24,100\n\nUAN: 100612348751\nPAN: AKPK8234L\nनियोक्ता PF खाता / Employer PF A/C: MHBAN0126351000000001234\n\nयह वेतन पर्ची कम्प्यूटर द्वारा निर्मित है और हस्ताक्षर की आवश्यकता नहीं है।\nThis is a computer-generated payslip and does not require a signature.",
+  "why_adversarial": "This Indian-format payslip uses a bilingual Devanagari/Latin layout from a major Indian IT employer. The adversarial challenge: (a) the primary script is Devanagari — a classifier trained mainly on Latin-script Western European documents may misclassify it as UNKNOWN; (b) the salary is in Indian Rupees (₹) not Euros/USD — the classifier must recognise INR as a valid payslip currency; (c) the document uses Indian labour-law fields (UAN, PAN, Professional Tax) that differ from European payslips; (d) the bilingual structure might confuse a classifier expecting a mono-language document. Expected label is PAYSLIP but a weak multilingual classifier may emit TAX_RECORD (due to TDS/income tax lines) or UNKNOWN.",
+  "classifier_failure_mode": "Classifier emits TAX_RECORD (confused by TDS/Income Tax deduction lines) or UNKNOWN (Devanagari script not recognised). Both are wrong — the document is clearly headed वेतन पर्ची / SALARY SLIP and has gross/net earnings structure.",
+  "gold_signals_expected": [
+    "SALARY SLIP / वेतन पर्ची bilingual header",
+    "Gross Earnings / Net Pay / Deductions three-section structure",
+    "Employee Code and Designation fields present",
+    "Month/Year pay period reference"
+  ],
+  "notes": "The TDS line (Income Tax deduction) must NOT trigger TAX_RECORD — it is an employee deduction listed within the payslip, not a standalone tax record. The UAN (Universal Account Number) is India's provident fund identifier — a signal that this is employment income documentation."
+}

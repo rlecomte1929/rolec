@@ -1,0 +1,16 @@
+{
+  "name": "04-no-eligibility",
+  "description": "Benefits stated but no eligibility / band / assignment-type info",
+  "policy_meta": {
+    "title": "Octan Corp Relocation Benefits",
+    "version": "1.5",
+    "effective_date": "2026-04-10"
+  },
+  "benefits": [
+    "temporary_housing",
+    "tax_assistance",
+    "settling_in_allowance",
+    "language_training",
+    "visa_support"
+  ]
+}

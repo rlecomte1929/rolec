@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# QG-11 (AIQ-1184): commit-msg gate — reject commit messages that aren't valid
+# Conventional Commits (feat/fix/chore/…: subject). Self-installs via the same
+# core.hooksPath=.githooks mechanism as pre-commit/pre-push
+# (frontend/scripts/install-git-hooks.mjs, QG-7).
+#
+# LOCAL-ONLY by design (QG-11 constraint): never gate CI on commit history — the
+# squash-merge rewrites subjects and appends " (#NNN)" server-side, which this hook
+# never sees. commitlint + its config live in frontend/ (the only workspace that
+# gets `npm ci`), so this runs commitlint from there.
+#
+# Bypass in genuine emergencies with:  git commit --no-verify
+
+set -euo pipefail
+
+# No-op in CI / non-interactive automation (commit messages aren't authored there).
+[ -n "${CI:-}" ] && exit 0
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# git passes the path to the message file as $1, relative to REPO_ROOT — absolutize
+# it before we cd into frontend/.
+MSG_FILE="$1"
+case "$MSG_FILE" in
+  /*) ;;
+  *) MSG_FILE="$REPO_ROOT/$MSG_FILE" ;;
+esac
+
+# A fresh clone/worktree may have no node_modules — degrade gracefully (mirrors the
+# pre-commit guard) instead of hard-erroring with "commitlint: command not found".
+if [ ! -x "$REPO_ROOT/frontend/node_modules/.bin/commitlint" ]; then
+  echo "commit-msg: ⚠️  frontend/node_modules is missing — run 'npm ci' in frontend/ to"
+  echo "commit-msg:     enable Conventional-Commit linting. Skipping for this commit."
+  exit 0
+fi
+
+# Run from frontend/ so commitlint resolves commitlint.config.cjs + config-conventional.
+if ( cd "$REPO_ROOT/frontend" && npx --no-install commitlint --edit "$MSG_FILE" ); then
+  exit 0
+else
+  status=$?
+  echo ""
+  echo "commit-msg: ❌ commit message is not a valid Conventional Commit — commit aborted."
+  echo "            Format: type(scope): subject   e.g.  feat(intake): add pet step"
+  echo "            Types: feat fix chore docs style refactor perf test build ci revert"
+  echo "            Bypass in emergencies with: git commit --no-verify"
+  exit "$status"
+fi

@@ -1,0 +1,46 @@
+{
+  "batch_id": "corridor-harness-abc-redeliver-2026-09-08",
+  "kind": "cursor_artifact",
+  "generated_at": "2026-09-08T08:55:58Z",
+  "pytest": {
+    "command": "./.venv/bin/pytest -q -c backend/pytest.ini --rootdir . scripts/tests/test_corridor_harness.py scripts/tests/test_quote_grounding.py scripts/tests/test_convert_otto_batch.py",
+    "result": "38 passed, 3 skipped",
+    "note": "hashes computed on these exact final bytes after the pytest run"
+  },
+  "files": {
+    "scripts/corridor_harness.py": {
+      "bytes": 38938,
+      "sha256": "bf29ded7d916d5151c19382dbec0335854e444a3ed5f1a17bbfc2bc5b8ee111d"
+    },
+    "scripts/tests/test_corridor_harness.py": {
+      "bytes": 15670,
+      "sha256": "58b5425e5439a6896e5549bd9ad3fdb235274ed1aeabb2eee5847a2ce260a2cb"
+    },
+    "backend/imports/otto/quote_grounding.py": {
+      "bytes": 8961,
+      "sha256": "9a115869719b9afae8f12013aa285c58b4c7a84d72cfa591db5149a70f17219b"
+    },
+    "scripts/tests/test_quote_grounding.py": {
+      "bytes": 8668,
+      "sha256": "0a23e50da6c1064ad00bb5413f409f3eabf8f615c40bbfcd20db9047ca17e8d9"
+    },
+    "scripts/convert_otto_batch.py": {
+      "bytes": 17727,
+      "sha256": "f9960af59b875dcfc5d852c665af25d80073ead95d04d6201663c768e8c04145"
+    },
+    "scripts/tests/test_convert_otto_batch.py": {
+      "bytes": 11896,
+      "sha256": "63105d5989a2cae4364b7f7cda7ee50b58e2ad01a0d1ea8800b2b9bf8d57f617"
+    }
+  },
+  "fixes": {
+    "A": "ToolRunner.supports(script, flag); FakeToolRunner always True; SubprocessToolRunner filesystem-probes and True if absent; stage_3_referee uses ctx.runner.supports; regression test_referee_pause_unreachable_when_verifier_exists_without_report",
+    "B": "unchanged",
+    "C": "code unchanged this pass; sha256 is of the final on-disk bytes"
+  },
+  "do_not": [
+    "commit",
+    "PR"
+  ],
+  "applier": "integrate onto origin/main; graft check_quotes into verify_batch_quotes.py"
+}

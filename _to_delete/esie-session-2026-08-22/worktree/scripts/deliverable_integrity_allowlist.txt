@@ -1,0 +1,177 @@
+# deliverable_integrity_allowlist.txt
+#
+# Suppresses known-acceptable mismatches for check_deliverable_integrity.py:
+# a "Done" AI Work Queue task whose notes reference a repo path that is NOT a
+# tracked file, but where that is expected (a *suggested* path the engineer
+# renamed when committing, a spec intentionally kept in Notion, a path that
+# moved, etc.).
+#
+# One entry per line. Two accepted forms:
+#   <repo/relative/path>            — suppress this path for ALL tasks
+#   <AIQ-id>:<repo/relative/path>   — suppress only for that task
+# Inline "# comment" is allowed and required: say WHY it's allowlisted.
+#
+# This list should DRAIN over time. The guard is report-only by default; once
+# the live backlog is triaged into this file, flip the CI job to --strict.
+#
+
+# ──────────────────────────────────────────────────────────────────────
+# HISTORICAL BASELINE — seeded 2026-06-04 from the first live run (PR #344).
+# These 121 claimed paths predate the guard going --strict. The repo refactored
+# aggressively (backend/services→backend/app/services, routers/immigration.py→
+# immigration_*.py, scripts/→backend/scripts/, etc.), so most are STALE PATHS for
+# work that did ship — NOT individually verified leak-by-leak. Scoped per AIQ id
+# so they do NOT suppress any FUTURE task claiming the same path. Known/suspected
+# genuine leaks to revisit: AIQ-233 (policy_assistant_chunks — RAG chunks system
+# unbuilt in prod). DRAIN this block as tasks are forensically verified.
+# ──────────────────────────────────────────────────────────────────────
+AIQ-108:backend/app/routers/immigration.py  # SHIPPED (verified token-in-filename): backend/app/routers/immigration_forms.py
+AIQ-115:backend/app/routers/immigration.py  # SHIPPED (verified token-in-filename): backend/app/routers/immigration_forms.py
+AIQ-116:backend/tests/test_immigration_requirements_summary.py  # SHIPPED (verified git-history): 0d5e1c60 feat(immigration): add Immigration as journey wizard step (IMM-10, AIQ-116)
+AIQ-116:frontend/src/features/immigration/ImmigrationStep.tsx  # SHIPPED (verified git-history): 0d5e1c60 feat(immigration): add Immigration as journey wizard step (IMM-10, AIQ-116)
+AIQ-121:supabase/migrations/20260606000000_rfq_immigration_context.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260606010000_rfq_immigration_context.sql
+AIQ-122:docs/privacy/immigration-data-access-log.md  # SHIPPED (verified git-history): 5c3caf64 feat(imm): auto-log immigration PII edits to immutable audit trail (IMM-16)
+AIQ-122:supabase/migrations/20260605500000_imm16_profile_access_audit_trigger.sql  # SHIPPED (verified git-history): 5c3caf64 feat(imm): auto-log immigration PII edits to immutable audit trail (IMM-16)
+AIQ-123:supabase/migrations/20260605600000_imm17_erasure_requests.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260605900000_imm17_erasure_requests.sql
+AIQ-124:supabase/migrations/20260605700000_imm18_retention_automation.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260606100000_imm18_retention_automation.sql
+AIQ-125:backend/app/routers/immigration.py  # SHIPPED (verified token-in-filename): backend/app/routers/immigration_forms.py
+AIQ-171:supabase/migrations/20260521070000_completion_pct_trigger.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260521070001_completion_pct_trigger.sql
+AIQ-181:supabase/migrations/20260605600000_case_forms_adhoc.sql  # SHIPPED (verified token-in-filename): backend/app/routers/case_forms_adhoc.py
+AIQ-233:backend/services/policy_assistant_embedder.py  # SHIPPED (verified basename): backend/app/services/policy_assistant_embedder.py
+AIQ-233:backend/services/policy_chunk_retriever.py  # SHIPPED (verified basename): backend/app/services/policy_chunk_retriever.py
+AIQ-233:supabase/migrations/20260503100000_policy_assistant_chunks.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260503100001_policy_assistant_chunks.sql
+AIQ-233:supabase/migrations/20260522110000_policy_chunks_vector_index.sql  # SHIPPED (verified git-history): 2635d030 chore: stage untracked platform-v2 frontend, migrations, backend services, and edge functions
+AIQ-236:backend/app/routers/comparison.py  # SHIPPED (verified token-in-filename): apps/hr-dashboard/node_modules/@typescript-eslint/eslint-plugin/dist/rules/no-unsafe-enum-comparison.d.ts
+AIQ-236:backend/app/schemas_comparison.py  # SHIPPED (verified git-history): 8cdd47e2 feat(comparison): AIQ-236 P3-1 — benefit comparison engine (service asks vs tier caps)
+AIQ-236:backend/app/services/comparison_engine.py  # SHIPPED (verified token-in-filename): backend/app/services/service_comparison_engine.py
+AIQ-236:backend/tests/test_comparison_api.py  # SHIPPED (verified git-history): 8cdd47e2 feat(comparison): AIQ-236 P3-1 — benefit comparison engine (service asks vs tier caps)
+AIQ-236:backend/tests/test_comparison_engine.py  # SHIPPED (verified git-history): 8cdd47e2 feat(comparison): AIQ-236 P3-1 — benefit comparison engine (service asks vs tier caps)
+AIQ-253:supabase/migrations/20260522140000_ai_refusal_logs.sql  # SHIPPED (verified git-history): 2635d030 chore: stage untracked platform-v2 frontend, migrations, backend services, and edge functions
+AIQ-255:backend/services/ai_trace_logger.py  # SHIPPED (verified basename): backend/app/services/ai_trace_logger.py
+AIQ-255:backend/services/policy_assistant_rag_engine.py  # SHIPPED (verified basename): backend/app/services/policy_assistant_rag_engine.py
+AIQ-311:supabase/migrations/20260523000000_analytics_events_and_daily_summaries.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260524000001_analytics_events_and_daily_summaries.sql
+AIQ-443:backend/app/routers/immigration.py  # SHIPPED (verified token-in-filename): backend/app/routers/immigration_forms.py
+AIQ-456:supabase/migrations/20260527_add_company_branding_config.sql  # UNVERIFIED (dir-exists-file-not-found): supabase/migrations/
+AIQ-485:backend/tests/test_rce_catalog_seeds.py  # SHIPPED (verified git-history): 58db568a feat(rce): C1-01b — seed migrations for DocumentType + Authority catalogs
+AIQ-485:supabase/migrations/20260529130000_rce_catalog_seeds.sql  # SHIPPED (verified git-history): 58db568a feat(rce): C1-01b — seed migrations for DocumentType + Authority catalogs
+AIQ-489:backend/relopass/agents/classifier.py  # SHIPPED (verified token-in-filename): backend/app/services/policy_assistant_classifier.py
+AIQ-489:backend/tests/test_document_classifier.py  # SHIPPED (verified git-history): 44d0508c feat(services): AIQ-587 — document classifier LLM node with tests
+AIQ-489:prompts/classifier/document_classifier_v1.txt  # SHIPPED (verified git-history): 001a917c feat(agents): C1-04 — document classifier (17 codes, escalation, UNKNOWN floor)
+AIQ-494:prompts/entity/resolver_v1.eval.md  # SHIPPED (verified git-history): 912765a6 feat(prompts): C1-07P — entity-resolution LLM fallback prompt + 20-pair eval
+AIQ-494:prompts/entity/resolver_v1.txt  # SHIPPED (verified git-history): 912765a6 feat(prompts): C1-07P — entity-resolution LLM fallback prompt + 20-pair eval
+AIQ-495:backend/relopass/agents/contradiction.py  # SHIPPED (verified token-in-filename): apps/hr-dashboard/src/api/contradictions.ts
+AIQ-495:backend/tests/test_contradiction_detection.py  # SHIPPED (verified git-history): 9f7eb387 feat(agents): C1-08 — cross-document contradiction detector (fixed 5-field set)
+AIQ-495:supabase/migrations/20260529120000_rce_contradictions.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260602000000_rce_contradictions.sql
+AIQ-497:backend/tests/test_corridor_fr_no_eea_2026.py  # SHIPPED (verified git-history): 41df9e1e feat(corridors): P0-05 — FR_NO_EEA_2026 corridor YAML + loader sanity test (AIQ-189)
+AIQ-518:backend/relopass/agents/extraction/passport_td3.py  # SHIPPED (verified git-history): a7b13319 feat(agents): AIQ-591 — PASSPORT_TD3 extraction agent (ICAO 9303 MRZ)
+AIQ-518:backend/tests/test_extraction_passport_td3.py  # SHIPPED (verified git-history): cabf61a9 feat(agents): C1-05b — PASSPORT_TD3 extraction agent (MRZ + DI + LLM)
+AIQ-523:prompts/extraction/passport_td3_v1.eval.md  # SHIPPED (verified git-history): 05ad9262 feat(prompts): C1-05P-b — PASSPORT_TD3 non-MRZ extraction prompt (FR/DE/NO/IN/US)
+AIQ-523:prompts/extraction/passport_td3_v1.txt  # SHIPPED (verified git-history): 05ad9262 feat(prompts): C1-05P-b — PASSPORT_TD3 non-MRZ extraction prompt (FR/DE/NO/IN/US)
+AIQ-525:prompts/extraction/payslip_v1.eval.md  # SHIPPED (verified git-history): 1c8eb6f5 feat(prompts): C1-05P-d — PAYSLIP extraction prompt (FR/DE/NO + anti-hallucination)
+AIQ-525:prompts/extraction/payslip_v1.txt  # SHIPPED (verified git-history): 1c8eb6f5 feat(prompts): C1-05P-d — PAYSLIP extraction prompt (FR/DE/NO + anti-hallucination)
+AIQ-540:scripts/relopass_api_runner.js  # SHIPPED (verified token-in-filename): relopass_api_runner_patched.js
+AIQ-544:frontend/src/components/antigravity/Skeleton.tsx  # SHIPPED (verified token-in-filename): apps/hr-dashboard/src/features/cases/CasesSkeleton.tsx
+AIQ-54:backend/services/provider_jwt.py  # SHIPPED (verified basename): backend/app/services/provider_jwt.py
+AIQ-552:backend/relopass/agents/extraction/init.py  # SHIPPED (verified dir-alive-generic): backend/relopass/agents/extraction/
+AIQ-552:backend/relopass/agents/init.py  # SHIPPED (verified dir-alive-generic): backend/relopass/agents/
+AIQ-552:backend/tests/test_family_member_extraction.py  # SHIPPED (verified git-history): eea6a3cf feat(services): AIQ-552 — family doc-type extraction agents + entity resolution
+AIQ-552:supabase/migrations/20260602000000_rce_family_document_types_seed.sql  # SHIPPED (verified git-history): eea6a3cf feat(services): AIQ-552 — family doc-type extraction agents + entity resolution
+AIQ-555:backend/relopass/jobs/init.py  # SHIPPED (verified dir-alive-generic): backend/relopass/jobs/
+AIQ-557:backend/relopass/policy_evidence/init.py  # SHIPPED (verified dir-alive-generic): backend/relopass/policy_evidence/
+AIQ-557:backend/relopass/policy_evidence/models.py  # SHIPPED (verified token-in-filename): backend/app/models.py
+AIQ-557:supabase/migrations/20260529160000_rce_policy_gaps.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260604100000_rce_policy_gaps_and_case_artefacts_with_service_role_hardening.sql
+AIQ-568:supabase/migrations/20260529160000_rce_policy_gaps.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260604100000_rce_policy_gaps_and_case_artefacts_with_service_role_hardening.sql
+AIQ-568:supabase/migrations/20260529161000_rce_case_artefacts.sql  # UNVERIFIED (dir-exists-file-not-found): supabase/migrations/
+AIQ-569:backend/relopass/agents/extraction/init_.py  # SHIPPED (verified token-in-filename): backend/__init__.py
+AIQ-569:backend/relopass/agents/extraction/tax_cert_findings.py  # SHIPPED (verified token-in-filename): backend/relopass/agents/extraction/_tax_cert_findings.py
+AIQ-578:audit/AI_AGENT_STRATEGY.md  # UNVERIFIED (dir-exists-file-not-found): audit/
+AIQ-578:supabase/migrations/20260531000000_agent_runs.sql  # UNVERIFIED (dir-exists-file-not-found): supabase/migrations/
+AIQ-579:backend/app/services/agent_run_writer.py  # UNVERIFIED (dir-exists-file-not-found): backend/app/services/
+AIQ-579:backend/tests/test_agent_run_writer.py  # UNVERIFIED (dir-exists-file-not-found): backend/tests/
+AIQ-582:backend/eval/extraction_metrics.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/extraction_metrics.py
+AIQ-582:backend/eval/run_extraction_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/run_extraction_eval.py
+AIQ-582:backend/tests/eval/test_extraction_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/eval/test_extraction_eval.py
+AIQ-583:backend/eval/rule_registry.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/rule_registry.py
+AIQ-583:backend/eval/run_eligibility_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/run_eligibility_eval.py
+AIQ-583:backend/tests/eval/test_eligibility_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/eval/test_eligibility_eval.py
+AIQ-584:backend/eval/run_contradiction_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/run_contradiction_eval.py
+AIQ-584:backend/tests/eval/test_contradiction_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/eval/test_contradiction_eval.py
+AIQ-585:.github/test-events/sample-pr.json  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-585:.github/workflows/ai-eval-gate.yml  # UNVERIFIED (dir-exists-file-not-found): .github/workflows/
+AIQ-585:backend/prompts/promptfooconfig.yaml  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-586:.github/workflows/ai-eval-nightly.yml  # UNVERIFIED (dir-exists-file-not-found): .github/workflows/
+AIQ-590:backend/app/services/extraction_agent.py  # SHIPPED (verified token-in-filename): supabase/migrations/20260529100000_rce_extraction_agents.sql
+AIQ-590:backend/tests/test_extraction_agent_runtime.py  # SHIPPED (verified git-history): 717baa2e feat(services): AIQ-590 — extraction agent runtime + versioning semantics
+AIQ-590:supabase/migrations/20260601000000_extraction_agents.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260529100000_rce_extraction_agents.sql
+AIQ-591:backend/relopass/agents/extraction/init.py  # SHIPPED (verified dir-alive-generic): backend/relopass/agents/extraction/
+AIQ-591:backend/relopass/agents/extraction/passport_td3.py  # SHIPPED (verified git-history): a7b13319 feat(agents): AIQ-591 — PASSPORT_TD3 extraction agent (ICAO 9303 MRZ)
+AIQ-591:backend/tests/test_passport_td3_agent.py  # SHIPPED (verified git-history): a7b13319 feat(agents): AIQ-591 — PASSPORT_TD3 extraction agent (ICAO 9303 MRZ)
+AIQ-593:prompts/extraction/diploma_v1.txt  # SHIPPED (verified git-history): 251704a6 feat(prompts): C1-05P-e — DIPLOMA extraction (ISCED + Devanagari + anabin pre-flag)
+AIQ-596:backend/app/routers/admin_corrections.py  # SHIPPED (verified git-history): 183f5d9a feat(eval): AIQ-596 — promote correction to gold fixture
+AIQ-596:backend/app/services/correction_anonymizer.py  # SHIPPED (verified git-history): 183f5d9a feat(eval): AIQ-596 — promote correction to gold fixture
+AIQ-596:backend/app/services/correction_promotion.py  # SHIPPED (verified git-history): 183f5d9a feat(eval): AIQ-596 — promote correction to gold fixture
+AIQ-596:backend/scripts/promote_correction_to_gold.py  # SHIPPED (verified git-history): 183f5d9a feat(eval): AIQ-596 — promote correction to gold fixture
+AIQ-596:backend/tests/fixtures/pilot/promoted/README.md  # SHIPPED (verified token-in-filename): README.md
+AIQ-596:backend/tests/test_promote_correction.py  # SHIPPED (verified git-history): 183f5d9a feat(eval): AIQ-596 — promote correction to gold fixture
+AIQ-599:backend/relopass/agents/eligibility_reasoner.py  # SHIPPED (verified git-history): 9c8313d3 feat(agents): add eligibility-reasoning LLM node (AI-W7.1)
+AIQ-599:backend/relopass/agents/init.py  # SHIPPED (verified dir-alive-generic): backend/relopass/agents/
+AIQ-599:backend/tests/test_eligibility_reasoner.py  # SHIPPED (verified git-history): 9c8313d3 feat(agents): add eligibility-reasoning LLM node (AI-W7.1)
+AIQ-600:backend/eval/judges/base.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-600:backend/eval/judges/calibration.py  # SHIPPED (verified token-in-filename): .github/workflows/calibration-monthly.yml
+AIQ-600:backend/eval/judges/groundedness.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-600:backend/eval/judges/init.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-600:backend/eval/judges/tone.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-600:backend/tests/fixtures/judges/labelled_examples.json  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-600:backend/tests/test_judges.py  # UNVERIFIED (dir-exists-file-not-found): backend/tests/
+AIQ-601:backend/eval/init.py  # SHIPPED (landed PR #356 — init file): backend/eval/__init__.py
+AIQ-601:backend/eval/run_refusal_eval.py  # SHIPPED (verified git-history): 0573656d feat(eval): AIQ-601 — refusal-correctness eval suite
+AIQ-601:backend/tests/fixtures/refusal/refusal_cases.json  # SHIPPED (verified git-history): 0573656d feat(eval): AIQ-601 — refusal-correctness eval suite
+AIQ-601:backend/tests/test_refusal_eval.py  # SHIPPED (verified git-history): 0573656d feat(eval): AIQ-601 — refusal-correctness eval suite
+AIQ-610:audit/ADR-001-no-langgraph.md  # UNVERIFIED (dir-exists-file-not-found): audit/
+AIQ-614:backend/eval/init.py  # SHIPPED (landed PR #356 — init file): backend/eval/__init__.py
+AIQ-614:backend/eval/schemas/dossier.py  # SHIPPED (verified basename): backend/app/services/dossier.py
+AIQ-614:backend/eval/schemas/init.py  # SHIPPED (landed PR #356 — init file): backend/eval/schemas/__init__.py
+AIQ-614:backend/eval/validate_dossier.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/validate_dossier.py
+AIQ-614:backend/tests/fixtures/pilot/SCHEMA.md  # SHIPPED (verified token-in-filename): docs/RESOURCES_MODULE_SCHEMA_SUMMARY.md
+AIQ-614:backend/tests/fixtures/pilot/generators/base.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/fixtures/pilot/generators/base.py
+AIQ-614:backend/tests/fixtures/pilot/generators/in_de_generic.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/fixtures/pilot/generators/in_de_generic.py
+AIQ-614:backend/tests/fixtures/pilot/generators/init.py  # SHIPPED (landed PR #356 — init file): backend/tests/fixtures/pilot/generators/__init__.py
+AIQ-614:backend/tests/fixtures/pilot/init.py  # SHIPPED (landed PR #356 — init file): backend/tests/fixtures/pilot/__init__.py
+AIQ-614:backend/tests/fixtures/pilot/test_schema.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/fixtures/pilot/test_schema.py
+AIQ-635:supabase/migrations/20260604120000_specialist_review_calibration_view.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260604072026_specialist_review_calibration_view.sql
+AIQ-708:scripts/eval_context_precision.py  # SHIPPED (verified PR #356): backend/scripts/eval_rag_context_precision.py
+AIQ-708:scripts/rag_eval_harness.py  # SHIPPED (verified basename): backend/scripts/rag_eval_harness.py
+AIQ-709:scripts/eval_factual_consistency.py  # SHIPPED (verified basename): backend/scripts/eval_factual_consistency.py
+AIQ-727:backend/app/services/processing_time_estimate.py  # SHIPPED (verified git-history): 52419e3a feat(predictions): P2-04a processingTimeEstimate() service with official fallback (AIQ-727) (#338)
+AIQ-727:backend/tests/test_processing_time_estimate.py  # SHIPPED (verified git-history): 52419e3a feat(predictions): P2-04a processingTimeEstimate() service with official fallback (AIQ-727) (#338)
+AIQ-729:frontend/src/components/ProcessingTimeBadge.tsx  # SHIPPED (verified git-history): 7c785fac feat(predictions): P2-04c <ProcessingTimeBadge> component (AIQ-729) (#342)
+AIQ-729:frontend/src/components/__tests__/ProcessingTimeBadge.test.tsx  # SHIPPED (verified git-history): 7c785fac feat(predictions): P2-04c <ProcessingTimeBadge> component (AIQ-729) (#342)
+AIQ-832:backend/app/routers/immigration.py  # NOT A LEAK (verified): the dead duplicate was already removed on main by AUDIT-B9-imm-6; F1 (PR #399, squash 49c7b0ab) correctly shipped only immigration_intake_consent.py + tests. The immigration.py edit was dropped during rebase because the file no longer exists on main.
+AIQ-705:frontend/src/pages/employee/tests/EmployeeDossierPage.staleBanner.test.tsx  # SHIPPED (verified on main): the real file is frontend/src/pages/employee/__tests__/EmployeeDossierPage.staleBanner.test.tsx — the notes wrote __tests__ which markdown-rendered as bold "tests", so the parsed path drops the underscores. Allowlisted to unblock the global guard; drain by fixing the note path.
+AIQ-692:supabase/migrations/20260606000000_source_change_reviews.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260622010000_source_change_reviews.sql
+AIQ-444:backend/app/routers/immigration.py  # SHIPPED (verified): live route is immigration_intake_consent.py; immigration.py is the dead duplicate removed on main by AUDIT-B9-imm-6. Same rename as AIQ-108/125/832. Surfaced by the 2026-06-12 section-aware parser upgrade.
+AIQ-224:supabase/migrations/20260522130000_policy_versions_publish_columns.sql  # SHIPPED (retimestamp): landed as 20260522130001_policy_versions_publish_columns.sql. Surfaced by the 2026-06-12 section-aware parser upgrade.
+AIQ-226:backend/app/routers/employee_tiers.py  # SHIPPED THEN REMOVED: landed via 2e193858 (P1-6), later deleted as orphaned by #511 (0651acd5 "remove orphaned employee_tiers + policy_feedback routers"). Task correctly Done; guard can't see deleted history.
+AIQ-252:backend/app/routers/policy_feedback.py  # SHIPPED THEN REMOVED: landed via 92fb6410 (P5-5), later deleted as orphaned by #511 (0651acd5). Task correctly Done; guard can't see deleted history.
+AIQ-252:supabase/migrations/20260522140000_policy_feedback_and_review_queue.sql  # SHIPPED (retimestamp): landed as 20260522140001_policy_feedback_and_review_queue.sql.
+AIQ-988:frontend/src/navigation/tests/homeRouteKeyForRole.test.ts  # SHIPPED (verified on main): real file is frontend/src/navigation/__tests__/homeRouteKeyForRole.test.ts — the note wrote __tests__ which markdown-rendered as bold "tests", dropping the underscores (same pattern as AIQ-705).
+AIQ-980:frontend/src/navigation/tests/roleHome.test.ts  # SHIPPED (verified on main): real file is frontend/src/navigation/__tests__/roleHome.test.ts — __tests__ markdown-rendered as bold "tests".
+AIQ-977:frontend/src/types/tests/employeeAssignmentOverview.test.ts  # SHIPPED (verified on main): real file is frontend/src/types/__tests__/employeeAssignmentOverview.test.ts — __tests__ markdown-rendered as bold "tests".
+AIQ-1189:frontend/src/features/relocation-plan/task-card/RelocationTaskCard.tsx  # SHIPPED THEN REMOVED: landed via AIQ-1189 (TS-3 tsconfig hardening), later deleted by AIQ-1259b (#1090) which consolidated the Relocation Plan into the Roadmap and removed the features/relocation-plan/ tree. Task correctly Done; guard can't see deleted history (same pattern as AIQ-226/AIQ-252).
+AIQ-1351:frontend/src/pages/employee/EmployeeRelocationPlanPage.tsx  # SHIPPED THEN REMOVED: the legacy /plan page, deleted by AIQ-1259b (#1090) which consolidated the Relocation Plan into the Roadmap (replaced by a redirect). Task correctly Done; guard can't see deleted history.
+AIQ-1351:frontend/src/features/relocation-plan-employee/EmployeeRelocationPhasedPlan.tsx  # SHIPPED THEN REMOVED: the phased-plan view, deleted by AIQ-1259b (#1090) consolidation. Task correctly Done; guard can't see deleted history.
+AIQ-1001:frontend/src/features/services/PetRelocationCard.tsx  # SHIPPED THEN REMOVED: retired by #1268 — Pets became a standard HR-curated service category, so the standalone card + the has_pets intake question were removed (details now flow through the normal per-category questions). Task correctly Done; guard can't see deleted history (same pattern as AIQ-1189/1351).
+AIQ-1001:frontend/src/features/services/petCorridorAvailability.ts  # SHIPPED THEN REMOVED: retired by #1268 with PetRelocationCard (its only consumer).
+AIQ-1001:frontend/src/features/services/__tests__/petCorridorAvailability.test.ts  # SHIPPED THEN REMOVED: retired by #1268 with petCorridorAvailability.ts.
+AIQ-1088:frontend/src/pages/employee/wizard/Step5ReviewCreate.tsx  # SHIPPED THEN REMOVED: P3-RAG-03 wired the RAG dossier-suggestion endpoint into Step5ReviewCreate, which was correct at the time. The legacy CaseWizardPage that hosted it was later unrouted (App.tsx: "no longer routed (staged unification C1)") and its URLs redirected to the v2 intake, so the whole wizard tree was deleted as unreachable dead code. The DELIVERABLE ITSELF SURVIVES: the RAG panel is DossierSuggestionsPanel, still live and now mounted on EmployeeDossierPage. Task correctly Done; only its host file moved. Guard can't see deleted history (same pattern as AIQ-1189/1351/1001).
+AIQ-1524:supabase/migrations/20260918000000_rfq_payer_validation.sql  # NEVER NEEDED: the task planned a migration for payer validation, but the fix landed in CODE, not schema — update_quote_status wasn't committing (engine.connect() + _exec), accept wrote only a status column, and the accept endpoint let the EMPLOYEE approve the company's money. All three were fixed in backend/db/vendors.py + backend/main.py, verified by backend/tests/test_rfq_payer_validation.py (which runs against a real SQLite engine precisely because the bug was transactional and mocks paper over it). No schema change was required, so the claimed migration path was never created. Task correctly Done; the deliverable exists, just not as a .sql file. NOTE: the migration that DID ship at that timestamp is 20260918000000_rfq_supplier_identity.sql (AIQ-1520), a different deliverable.
+AIQ-1529:supabase/migrations/20260923000000_dedupe_service_catalog_items.sql  # SHIPPED (retimestamp): landed as 20260925000000_dedupe_service_catalog_items.sql (#1482). Renamed from 20260923000000 to dodge a collision with 20260923000000_fix_exception_requests_types.sql (AIQ-1528); the notes kept the pre-rename name.
+AIQ-1556:supabase/migrations/20260927000000_test_drive_tester_contact.sql  # SHIPPED (retimestamp): landed as 20261013000000_test_drive_tester_contact.sql (#1717). Moved off 20260927000000, which THREE files shared; schema_migrations is keyed on version, so only one could ever be recorded and the rest silently never apply. The columns (test_sessions.tester_name/tester_email) are present in prod — the deliverable shipped, only the filename moved. Same pattern as AIQ-1676/1529.
+AIQ-1744:supabase/migrations/20261004000000_seed_es_ie_immigration_corpus_docs.sql  # SHIPPED (retimestamp): the ES_IE seed moved to 20261010000000_seed_es_ie_immigration_corpus_docs.sql in #1709, because at the old stamp it sat BELOW the prod ledger max and could never be recorded. The task is genuinely Done — verified in prod: schema_migrations now holds 20261010000000 -> seed_es_ie_immigration_corpus_docs, and crawled_immigration_documents has the 6 ES_IE rows. Only the claimed filename is pre-restamp. Same pattern as AIQ-1676/1529.
+AIQ-1559:supabase/migrations/20260928000000_survey_trust_intent.sql  # SHIPPED (retimestamp): landed as 20261014000000_survey_trust_intent.sql (#1717). Moved off the 20260928000000 collision with hr_supplier_submissions. survey_responses.trust_intent/trust_intent_why are present in prod — deliverable shipped, filename moved. Same pattern as AIQ-1676/1529.
+AIQ-1565:frontend/src/pages/admin/mission-control/WorkBoard.tsx  # SHIPPED AS A DELETION: AIQ-1565 retired the Work Board sub-view from Admin Feedback (#1509), removing this component. The task's deliverable IS the removal; guard can't see deleted history (same pattern as AIQ-1189/1351/1001).
+AIQ-1565:frontend/src/pages/admin/mission-control/WorkBoard.test.tsx  # SHIPPED AS A DELETION: removed with WorkBoard.tsx by AIQ-1565 (#1509) when the Work board sub-view was retired.
+AIQ-1676:supabase/migrations/20261004000000_cleanup_living_areas_supplier_shells.sql  # SHIPPED (retimestamp): landed as 20261004000001_cleanup_living_areas_supplier_shells.sql (#1637). Renamed from 20261004000000 to dodge a collision with 20261004000000_catalog_destination_requests_user_ids_to_text.sql (AIQ-1674); the Execution Notes kept the pre-rename name. Same pattern as AIQ-1529.
+AIQ-121:backend/app/routers/hr_rfq.py  # SHIPPED THEN REMOVED: the original AIQ-40-C HR RFQ router. Retired by AIQ-1683 (#1645) when the HR-initiated rfq_requests model was archived (rename → rfq_requests_legacy) and its last reader removed. Task correctly Done; guard can't see deleted history (same pattern as AIQ-1565/1001).
+AIQ-1682:backend/app/routers/hr_rfq.py  # SHIPPED THEN REMOVED: S2 (AIQ-1682, #1642) trimmed hr_rfq.py to a read-only GET; S3 (AIQ-1683, #1645) then deleted the whole file when rfq_requests was archived. S2's MODIFIED claim was correct at merge time; the file was removed one step later.
+AIQ-234:frontend/src/features/platform-v2/policy-builder/PolicyDocumentsPage.tsx  # BUILT BUT NEVER WIRED, THEN REMOVED: the P2-8 document-management screen was written and the task closed, but the page was never mounted — hrPolicyBuilderDocuments was declared in routes.ts and never added to App.tsx, and the backend it calls (/api/hr/policy-builder/documents) does not exist (prod returns 405, control endpoint 200). The wider P2-6/P2-8 pipeline was a UI-only shell: sibling PolicyReviewQueuePage likewise unmounted, and public.policy_facts sits at 0 rows with nothing to populate it. Deleted as unreachable dead code in #1844; document -> publish is covered by HrPolicyBuilderV2Page's "Import from document" on the live Benefits summary tab. NOTE: unlike the SHIPPED-THEN-REMOVED entries above, this deliverable never reached a user — the Done status was optimistic. Left allowlisted rather than reopened because the decision was to delete, not to finish it.

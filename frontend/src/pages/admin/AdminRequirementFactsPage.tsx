@@ -65,7 +65,7 @@ export const AdminRequirementFactsPage: React.FC = () => {
   return (
     <AdminLayout
       title="Requirement facts"
-      subtitle="Review LLM-extracted requirement facts before they enter the knowledge base."
+      subtitle="LLM extracts into requirement_fact_candidates. Approving a row here does not publish anything employees or HR see. The served catalog is Country requirements (requirement_items)."
     >
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 

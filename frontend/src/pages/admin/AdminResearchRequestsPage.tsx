@@ -90,13 +90,11 @@ export const AdminResearchRequestsPage: React.FC = () => {
     s === 'completed' ? 'success' : s === 'rejected' ? 'error' : s === 'in_progress' ? 'info' : 'warning';
 
   return (
-    <AdminLayout>
+    <AdminLayout
+      title="Research requests"
+      subtitle="Customer-requested immigration research. Approve to start curation; complete (after the curation review is resolved) to publish and notify the requester."
+    >
       <div className="space-y-4">
-        <h1 className="text-lg font-semibold text-[#0b2b43]">Research requests</h1>
-        <p className="text-sm text-[#64748b]">
-          Customer-requested immigration research. Approve to start curation; complete (after the
-          curation review is resolved) to publish and notify the requester.
-        </p>
 
         {error && <Alert variant="error">{error}</Alert>}
         {info && <Alert variant="success">{info}</Alert>}

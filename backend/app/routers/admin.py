@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 import os
@@ -13,6 +14,12 @@ from ...database import db, Database
 from .. import crud, schemas, models
 from ..services.research import run_country_research
 from ..services import requirements_builder
+from ..services.requirements_country_key import (
+    admin_country_group_key,
+    catalog_lookup_keys,
+    display_country_name,
+    resolve_catalog_country,
+)
 from ..services.official_ingest_service import ingest_url_to_knowledge_doc
 from ..services.audit_log_service import (
     ACTION_INSERT,
@@ -81,33 +88,65 @@ def require_admin(authorization: Optional[str] = Header(None)) -> dict:
 
 @router.get("/countries", response_model=schemas.CountryListDTO)
 def list_countries(user: dict = Depends(require_admin)):
+    """One row per country, full English name, ISO merged with catalog aliases.
+
+    `country_profiles` and `requirement_items` historically used both ISO-2 (`SG`, `EC`)
+    and catalog names (`SINGAPORE`, `ECUADOR`). Listing them separately made Singapore
+    appear twice and hid Ecuador's pending items behind a zero published count.
+    """
     with SessionLocal() as db:
         profiles = crud.list_country_profiles(db)
+        profiles_by_code = {p.country_code: p for p in profiles}
+        codes = {p.country_code for p in profiles}
+        codes.update(crud.distinct_requirement_country_codes(db))
+
+        grouped: Dict[str, List[str]] = defaultdict(list)
+        for code in codes:
+            key = admin_country_group_key(code)
+            if not key:
+                continue
+            grouped[key].append(code)
+
         items = []
-        for profile in profiles:
-            sources = crud.list_sources(db, profile.country_code)
-            requirements = crud.list_requirements(db, profile.country_code)
-            top_domains = list({source.publisher_domain for source in sources})[:3]
+        for _group, aliases in grouped.items():
+            canonical = resolve_catalog_country(aliases[0])
+            profile = (
+                profiles_by_code.get(canonical)
+                or next((profiles_by_code[a] for a in aliases if a in profiles_by_code), None)
+            )
+            counts = crud.requirement_status_counts(db, canonical)
+            published = counts.get("approved", 0)
+            pending = counts.get("pending", 0)
+            total = sum(counts.values())
+            sources = crud.list_sources(db, canonical)
+            top_domains = list({source.publisher_domain for source in sources if source.publisher_domain})[:3]
+            iso = admin_country_group_key(canonical)
             items.append(
                 schemas.CountryListItemDTO(
-                    countryCode=profile.country_code,
-                    lastUpdatedAt=profile.last_updated_at,
-                    requirementsCount=len(requirements),
-                    confidenceScore=profile.confidence_score,
+                    countryCode=canonical,
+                    countryName=display_country_name(canonical),
+                    isoCode=iso if len(iso) == 2 else None,
+                    lastUpdatedAt=profile.last_updated_at if profile else None,
+                    requirementsCount=total,
+                    publishedCount=published,
+                    pendingCount=pending,
+                    confidenceScore=profile.confidence_score if profile else None,
                     topDomains=top_domains,
                 )
             )
+        items.sort(key=lambda row: (row.countryName or row.countryCode).lower())
         return schemas.CountryListDTO(countries=items)
 
 
 @router.get("/countries/{country_code}", response_model=schemas.CountryProfileDTO)
 def get_country(country_code: str, user: dict = Depends(require_admin)):
+    code = country_code.strip().upper()
     with SessionLocal() as db:
-        profile = crud.get_country_profile(db, country_code.upper())
-        if not profile:
+        profile = crud.get_country_profile(db, code)
+        requirements = crud.list_requirements(db, code, include_unapproved=True)
+        if not profile and not requirements:
             raise HTTPException(status_code=404, detail="Country not found")
-        sources = crud.list_sources(db, profile.country_code)
-        requirements = crud.list_requirements(db, profile.country_code)
+        sources = crud.list_sources(db, code)
         groups = {}
         for item in requirements:
             groups.setdefault(item.pillar, []).append(
@@ -118,16 +157,16 @@ def get_country(country_code: str, user: dict = Depends(require_admin)):
                     description=item.description,
                     severity=item.severity,
                     owner=item.owner,
-                    requiredFields=json.loads(item.required_fields_json),
+                    requiredFields=json.loads(item.required_fields_json) if item.required_fields_json else [],
                     statusForCase="NEEDS_REVIEW",
                     citations=[],
                 )
             )
 
         return schemas.CountryProfileDTO(
-            countryCode=profile.country_code,
-            lastUpdatedAt=profile.last_updated_at,
-            confidenceScore=profile.confidence_score,
+            countryCode=profile.country_code if profile else resolve_catalog_country(code),
+            lastUpdatedAt=profile.last_updated_at if profile else None,
+            confidenceScore=profile.confidence_score if profile else None,
             sources=[schemas.SourceRecordDTO(
                 id=source.id,
                 url=source.url,
@@ -237,7 +276,7 @@ def list_country_requirements(country_code: str, user: dict = Depends(require_ad
     order = {"pending": 0, "rejected": 1, "approved": 2}
     dtos.sort(key=lambda d: (order.get(d.reviewStatus, 9), d.purpose, d.title))
     return schemas.AdminRequirementListDTO(
-        countryCode=code,
+        countryCode=resolve_catalog_country(code),
         pendingCount=sum(1 for d in dtos if d.reviewStatus == "pending"),
         items=dtos,
     )
@@ -266,7 +305,7 @@ def review_country_requirement(
     actor = user.get("id") or user.get("sub") or user.get("email")
     with SessionLocal() as db:
         item = db.get(models.RequirementItem, requirement_id)
-        if item is None or (item.country_code or "").upper() != country_code.strip().upper():
+        if item is None or (item.country_code or "").upper() not in set(catalog_lookup_keys(country_code)):
             raise HTTPException(status_code=404, detail="Requirement not found for this country")
         before = item.review_status
         item.review_status = status
@@ -289,6 +328,74 @@ def review_country_requirement(
         new_value={"review_status": status, "title": dto.title, "country": dto.id},
     )
     return dto
+
+
+_BATCH_REVIEW_LIMIT = 100
+
+
+@router.post(
+    "/countries/{country_code}/requirements/review-batch",
+    response_model=schemas.AdminRequirementBatchReviewDTO,
+)
+def review_country_requirements_batch(
+    country_code: str,
+    body: schemas.AdminRequirementBatchReviewRequest,
+    user: dict = Depends(require_admin),
+):
+    """Publish or withhold many requirements in one decision.
+
+    Same gate as the single-item review: only `approved` is served. Ids that do not
+    belong to this country (including ISO vs catalog-name aliases) are 404, not skipped.
+    """
+    status = (body.status or "").strip().lower()
+    if status not in _REVIEW_STATUSES:
+        raise HTTPException(status_code=422, detail=f"status must be one of {sorted(_REVIEW_STATUSES)}")
+    ids = [i.strip() for i in (body.ids or []) if i and i.strip()]
+    if not ids:
+        raise HTTPException(status_code=422, detail="ids must not be empty")
+    if len(ids) > _BATCH_REVIEW_LIMIT:
+        raise HTTPException(
+            status_code=422,
+            detail=f"ids must contain at most {_BATCH_REVIEW_LIMIT} requirement ids",
+        )
+
+    actor = user.get("id") or user.get("sub") or user.get("email")
+    allowed = set(catalog_lookup_keys(country_code))
+    dtos: List[schemas.AdminRequirementReviewDTO] = []
+    with SessionLocal() as db:
+        items = (
+            db.query(models.RequirementItem)
+            .filter(models.RequirementItem.id.in_(ids))
+            .all()
+        )
+        found = {item.id: item for item in items}
+        missing = [rid for rid in ids if rid not in found]
+        if missing:
+            raise HTTPException(status_code=404, detail="Requirement not found for this country")
+        for item in items:
+            if (item.country_code or "").upper() not in allowed:
+                raise HTTPException(status_code=404, detail="Requirement not found for this country")
+        now = datetime.utcnow()
+        for rid in ids:
+            item = found[rid]
+            before = item.review_status
+            item.review_status = status
+            item.reviewed_by = str(actor) if actor else None
+            item.reviewed_at = now
+            _audit_postgres(
+                entity_type="requirement_item",
+                entity_id=rid,
+                action_type=ACTION_UPDATE,
+                actor_id=actor,
+                old_value={"review_status": before},
+                new_value={"review_status": status, "title": item.title},
+            )
+        db.commit()
+        for rid in ids:
+            db.refresh(found[rid])
+        source_map = {record.id: record for record in crud.list_sources(db, country_code.strip().upper())}
+        dtos = [_review_dto(found[rid], source_map) for rid in ids]
+    return schemas.AdminRequirementBatchReviewDTO(items=dtos)
 
 
 @router.post("/countries/{country_code}/research/rerun")

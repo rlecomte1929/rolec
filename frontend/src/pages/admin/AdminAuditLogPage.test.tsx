@@ -6,6 +6,14 @@ vi.mock("../../api/client", () => ({
     get: vi.fn(),
   },
 }));
+vi.mock("./AdminLayout", () => ({
+  AdminLayout: ({ title, children }: { title?: string; children: React.ReactNode }) => (
+    <div>
+      {title ? <h1>{title}</h1> : null}
+      {children}
+    </div>
+  ),
+}));
 import apiClient from "../../api/client";
 import AdminAuditLogPage from "./AdminAuditLogPage";
 
@@ -19,7 +27,7 @@ describe("AdminAuditLogPage", () => {
   it("renders heading", async () => {
     mockGet.mockResolvedValue({ data: { items: [], limit: 50, offset: 0 } });
     render(<AdminAuditLogPage />);
-    expect(screen.getByText("Platform Audit Log")).toBeDefined();
+    expect(screen.getByText("Audit log")).toBeDefined();
     await waitFor(() => expect(screen.getByText("No audit log entries.")).toBeDefined());
   });
 

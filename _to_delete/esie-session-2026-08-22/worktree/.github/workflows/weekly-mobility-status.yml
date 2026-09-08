@@ -1,0 +1,59 @@
+name: Weekly mobility status
+
+# [AIQ-1237] Calls POST /api/crons/weekly-mobility-status every Monday morning.
+# Finds overdue relocation steps (case_milestones past their due date, not
+# done/skipped) on active cases, groups them by HR owner, and emails each HR
+# owner a digest. The "Mobility Autopilot" weekly status agent, in-repo.
+#
+# Gated behind `vars.WEEKLY_MOBILITY_CRON_ENABLED` so this is a no-op until the
+# secrets/vars are configured. Required config to enable:
+#   vars.WEEKLY_MOBILITY_CRON_ENABLED = 'true'
+#   vars.WEEKLY_MOBILITY_API_BASE     = https://api.relopass.com
+#   secrets.CRON_SECRET               = (reused — same value the API checks)
+#
+# Test first with workflow_dispatch (manual run) before relying on the schedule.
+
+on:
+  schedule:
+    # 08:00 UTC every Monday.
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-mobility-status
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  weekly-mobility-status:
+    name: Weekly mobility status check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No-op unless explicitly enabled via repo vars.
+    if: ${{ vars.WEEKLY_MOBILITY_CRON_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      API_BASE: ${{ vars.WEEKLY_MOBILITY_API_BASE }}   # e.g. https://api.relopass.com
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: POST /api/crons/weekly-mobility-status
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "API_BASE or CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${API_BASE}/api/crons/weekly-mobility-status")
+          echo "$response"
+          {
+            echo "## Weekly mobility status run"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

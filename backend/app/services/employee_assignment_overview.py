@@ -103,6 +103,13 @@ def build_employee_assignment_overview(
         )
     pending_ids = [str(x) for x in (r.get("assignment_id") for r in pending_rows) if x]
     invite_map: Dict[str, List[str]] = {}
+    rfq_cases: set = set()
+    try:
+        cids = [str(r.get("case_id")) for r in linked_rows if r.get("case_id")]
+        if cids:
+            rfq_cases = db.case_ids_with_rfqs(cids, request_id=request_id)
+    except Exception as e:
+        log.warning("case_ids_with_rfqs failed request_id=%s: %s", request_id, e, exc_info=True)
     try:
         invite_map = db.map_claim_invite_statuses_by_assignments(pending_ids, request_id=request_id)
     except Exception as e:
@@ -140,6 +147,7 @@ def build_employee_assignment_overview(
                 "intake_step": _json_scalar(r.get("intake_step")),
                 "intake_total_steps": _json_scalar(r.get("intake_total_steps")),
                 "intake_updated_at": _json_scalar(r.get("intake_updated_at")),
+                "has_rfq": _json_scalar(r.get("case_id")) in rfq_cases,
             }
         )
 

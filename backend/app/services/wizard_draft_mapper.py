@@ -185,10 +185,12 @@ def extract_profile_from_wizard_draft(draft: Dict[str, Any]) -> Dict[str, Any]:
     if has_spouse is None:
         # Wizard fallback: infer from maritalStatus
         ms = (fm_wiz.get("maritalStatus") or "").lower()
-        if ms in ("married", "partnered", "civil_union"):
+        if ms in ("married", "partnered", "civil_union", "partner", "partner_kids"):
             has_spouse = True
-        elif ms in ("single", "divorced", "widowed"):
+        elif ms in ("single", "divorced", "widowed", "solo", "kids_only"):
             has_spouse = False
+        elif isinstance(fm_wiz.get("spouse"), dict) and (fm_wiz.get("spouse") or {}).get("fullName"):
+            has_spouse = True
 
     child_count = _int_or_none(fam_orch.get("childCount"))
     if child_count is None:

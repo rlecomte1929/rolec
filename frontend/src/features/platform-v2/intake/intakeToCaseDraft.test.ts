@@ -61,13 +61,28 @@ describe('intakeToCaseDraft', () => {
       ] as unknown as IntakeData['members'],
     }));
     expect(withDeps.relocationBasics?.hasDependents).toBe(true);
+    expect(withDeps.familyMembers?.maritalStatus).toBe('partner_kids');
     expect(withDeps.familyMembers?.spouse).toMatchObject({ fullName: 'Priya', wantsToWork: true });
-    expect(withDeps.familyMembers?.children).toEqual([{ dateOfBirth: '2018-04-01', relationship: 'child' }]);
+    expect(withDeps.familyMembers?.children?.[0]).toMatchObject({ dateOfBirth: '2018-04-01', relationship: 'child' });
+  });
+
+  it('maps child names and commute minutes', () => {
+    const d = intakeToCaseDraft(makeIntake({
+      commute_mins: 30,
+      members: [
+        { id: 'self', kind: 'self' },
+        { id: 'c', kind: 'child', name: 'Bob', dob: '2020-01-01' },
+      ] as unknown as IntakeData['members'],
+    }));
+    expect(d.familyMembers?.maritalStatus).toBe('kids_only');
+    expect(d.familyMembers?.children?.[0]).toMatchObject({ fullName: 'Bob', dateOfBirth: '2020-01-01' });
+    expect(d.assignmentContext?.commuteMins).toBe(30);
   });
 
   it('hasDependents is false and spouse undefined when solo', () => {
     const solo = intakeToCaseDraft(makeIntake({ members: [{ id: 'self', kind: 'self' }] as unknown as IntakeData['members'] }));
     expect(solo.relocationBasics?.hasDependents).toBe(false);
+    expect(solo.familyMembers?.maritalStatus).toBe('solo');
     expect(solo.familyMembers?.spouse).toBeUndefined();
     expect(solo.familyMembers?.children).toEqual([]);
   });

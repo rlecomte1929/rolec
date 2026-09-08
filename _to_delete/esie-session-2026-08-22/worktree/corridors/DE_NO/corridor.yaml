@@ -1,0 +1,28 @@
+# Corridor registry profile — Germany → Norway (free movement).
+#
+# REPRESENTATIVE — indicative content, NOT SME-verified. Authored from the
+# EEA free movement (EEA Agreement Art. 28; Utlendingsloven ch. 13) framework; confirm specifics with the destination authority before
+# any authoritative use. Matches the platform content-provenance model.
+
+corridor:
+  id: "DE_NO"
+  origin_iso: "DE"
+  destination_iso: "NO"
+  display_name: "Germany → Norway"
+  aliases: ["DE→NO", "DE-NO"]
+
+  retrieval:
+    trust_tiers: [1, 2, 3]
+    min_similarity: 0.25
+
+  prompt:
+    task_key: "immigration_answer"
+
+  sla:
+    at_risk_window_days: 30
+    at_risk_pct: 80
+
+  # Eligibility Corridor Agent pathways (REPRESENTATIVE content).
+  pathways:
+    - id: "EEA_FREEDOM_2026"
+      file: "pathways/EEA_FREEDOM_2026/v1.yaml"

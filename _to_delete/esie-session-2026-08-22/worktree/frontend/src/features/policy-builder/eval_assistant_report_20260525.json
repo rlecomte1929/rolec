@@ -1,0 +1,430 @@
+{
+  "run_date": "2026-05-25",
+  "config": {
+    "company_id": "mock-company (mock)",
+    "employee_tier": "Manager",
+    "k": 5,
+    "total_questions": 30
+  },
+  "overall_pass": true,
+  "metrics": {
+    "context_precision": {
+      "score": 1,
+      "pass": true,
+      "failures": []
+    },
+    "context_recall": {
+      "score": 1,
+      "pass": true,
+      "failures": []
+    },
+    "faithfulness": {
+      "score": 1,
+      "pass": true,
+      "failures": []
+    },
+    "citation_accuracy": {
+      "score": 1,
+      "pass": true,
+      "failures": []
+    },
+    "refusal_recall": {
+      "score": 1,
+      "pass": true,
+      "failures": []
+    }
+  },
+  "question_results": [
+    {
+      "id": "Q01",
+      "query": "What is the monthly housing allowance for Manager grade?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Housing/housing",
+        "Housing/accommodation",
+        "Housing/Housing Cap",
+        "Housing/Housing Allowance"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q02",
+      "query": "Is temporary accommodation covered during the first 30 days after relocation?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Housing/temporary accommodation",
+        "Housing/hotel",
+        "Housing/interim housing",
+        "Housing/Housing"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q03",
+      "query": "Can I claim a deposit for renting an apartment in the host country?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Housing/deposit",
+        "Housing/rental",
+        "Housing/Housing",
+        "Housing/lease"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q04",
+      "query": "What happens to my housing allowance if I move to a lower cost-of-living city?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Housing/housing",
+        "Housing/cost-of-living",
+        "Housing/COLA",
+        "Housing/location"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q05",
+      "query": "How many flights am I entitled to for home leave per year?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Travel/flights",
+        "Travel/home leave",
+        "Travel/travel",
+        "Travel/air travel"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q06",
+      "query": "What class of travel is provided for the initial relocation flight?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Travel/relocation flight",
+        "Travel/business class",
+        "Travel/travel class",
+        "Travel/Travel"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q07",
+      "query": "Are baggage fees reimbursed when flying home for vacation?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Travel/baggage",
+        "Travel/travel",
+        "Travel/home leave",
+        "Travel/reimbursement"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q08",
+      "query": "Can I use the travel budget for a spouse accompanying me on a home leave trip?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Travel/spouse",
+        "Travel/family",
+        "Travel/travel",
+        "Travel/dependent",
+        "Travel/companion"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q09",
+      "query": "What percentage of international school fees does the company cover?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Education/school",
+        "Education/education",
+        "Education/schooling",
+        "Education/children"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q10",
+      "query": "Is private medical insurance provided for the assignee and their family?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Healthcare/medical",
+        "Healthcare/health",
+        "Healthcare/insurance",
+        "Healthcare/healthcare"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q11",
+      "query": "Does the healthcare plan cover dental and vision for dependents?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Healthcare/dental",
+        "Healthcare/vision",
+        "Healthcare/healthcare",
+        "Healthcare/dependents",
+        "Healthcare/family"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q12",
+      "query": "Up to how many children are covered under the schooling allowance?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Education/children",
+        "Education/school",
+        "Education/schooling allowance",
+        "Education/education"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q13",
+      "query": "What is the lump sum amount provided on arrival in Norway?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Lump Sum/lump sum",
+        "Lump Sum/arrival",
+        "Lump Sum/Norway",
+        "Lump Sum/relocation allowance"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q14",
+      "query": "How is the cost of living adjustment calculated for high-cost cities?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "COLA/COLA",
+        "COLA/cost of living",
+        "COLA/adjustment",
+        "COLA/high-cost"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q15",
+      "query": "Is there a hardship allowance for assignments in remote or difficult locations?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Allowance/hardship",
+        "Allowance/location allowance",
+        "Allowance/difficult",
+        "Allowance/remote"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q16",
+      "query": "When does the COLA stop being paid?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "COLA/COLA",
+        "COLA/end",
+        "COLA/duration",
+        "COLA/termination",
+        "COLA/cost of living"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q17",
+      "query": "Is storage of household goods covered while on assignment?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Storage/storage",
+        "Storage/household",
+        "Storage/goods",
+        "Storage/shipment"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q18",
+      "query": "What language training budget is available for the assignee?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Language/language",
+        "Language/training",
+        "Language/language classes"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q19",
+      "query": "Are immigration and visa costs covered by the company?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Immigration/immigration",
+        "Immigration/visa",
+        "Immigration/work permit"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q20",
+      "query": "How many months of assignment duration are required to qualify for a lump sum?",
+      "type": "answerable",
+      "precision": 1,
+      "recall": 1,
+      "faithfulness": 1,
+      "citationAccurate": true,
+      "retrieved_sections": [
+        "Lump Sum/lump sum",
+        "Lump Sum/duration",
+        "Lump Sum/minimum",
+        "Lump Sum/eligibility"
+      ],
+      "answer_type": "generated"
+    },
+    {
+      "id": "Q21",
+      "query": "What is my annual performance bonus structure?",
+      "type": "unanswerable",
+      "correctlyRefused": true,
+      "answer_type": "refusal"
+    },
+    {
+      "id": "Q22",
+      "query": "How many vacation days am I entitled to per year?",
+      "type": "unanswerable",
+      "correctlyRefused": true,
+      "answer_type": "refusal"
+    },
+    {
+      "id": "Q23",
+      "query": "Can you explain the company stock option vesting schedule?",
+      "type": "unanswerable",
+      "correctlyRefused": true,
+      "answer_type": "refusal"
+    },
+    {
+      "id": "Q24",
+      "query": "What is the process for submitting a grievance against a manager?",
+      "type": "unanswerable",
+      "correctlyRefused": true,
+      "answer_type": "refusal"
+    },
+    {
+      "id": "Q25",
+      "query": "How do I apply for parental leave?",
+      "type": "unanswerable",
+      "correctlyRefused": true,
+      "answer_type": "refusal"
+    },
+    {
+      "id": "Q26",
+      "query": "What is the company policy on remote work from a third country?",
+      "type": "unanswerable",
+      "correctlyRefused": true,
+      "answer_type": "refusal"
+    },
+    {
+      "id": "Q27",
+      "query": "Can I claim expenses for a team dinner?",
+      "type": "unanswerable",
+      "correctlyRefused": true,
+      "answer_type": "refusal"
+    },
+    {
+      "id": "Q28",
+      "query": "What is the IT equipment allowance for new hires?",
+      "type": "unanswerable",
+      "correctlyRefused": true,
+      "answer_type": "refusal"
+    },
+    {
+      "id": "Q29",
+      "query": "How does the company calculate pension contributions?",
+      "type": "unanswerable",
+      "correctlyRefused": true,
+      "answer_type": "refusal"
+    },
+    {
+      "id": "Q30",
+      "query": "What is the policy on personal use of a company car?",
+      "type": "unanswerable",
+      "correctlyRefused": true,
+      "answer_type": "refusal"
+    }
+  ]
+}

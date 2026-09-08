@@ -1,0 +1,49 @@
+/**
+ * Phase 1: Supabase sign-in after backend login.
+ * Establishes Supabase session so tokens auto-refresh for feedback/review/RPC.
+ */
+
+import { logger } from '../lib/logger';
+import { supabase } from './supabase';
+
+/**
+ * Sign in to Supabase with email/password.
+ * Call after backend login succeeds so Supabase session exists and auto-refreshes.
+ * Non-blocking: if user doesn't exist in Supabase, we still allow app use (backend login worked).
+ */
+export async function signInSupabase(email: string, password: string): Promise<{ ok: boolean; error?: string }> {
+  const e = (email || '').trim();
+  if (!e || !password) return { ok: false, error: 'Email and password required' };
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({ email: e, password });
+    if (error) {
+      if (import.meta.env.DEV) {
+        logger.warn('[Supabase sign-in]', error.message, '(Backend login succeeded; Supabase features may need VITE_SUPABASE_ACCESS_TOKEN fallback)');
+      }
+      return { ok: false, error: error.message };
+    }
+    if (import.meta.env.DEV && data?.session) {
+      logger.debug('[Supabase sign-in] Session established; tokens will auto-refresh');
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : undefined;
+    if (import.meta.env.DEV) {
+      logger.warn('[Supabase sign-in]', msg);
+    }
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * Sign out from Supabase. Call on logout to clear Supabase session.
+ */
+export async function signOutSupabase(): Promise<void> {
+  try {
+    await supabase.auth.signOut();
+  } catch (err) {
+    if (import.meta.env.DEV) {
+      logger.warn('[Supabase sign-out]', err);
+    }
+  }
+}

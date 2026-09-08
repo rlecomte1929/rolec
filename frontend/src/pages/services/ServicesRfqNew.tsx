@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { EmployeeScopedAssignmentPicker } from '../../components/employee/EmployeeScopedAssignmentPicker';
@@ -68,6 +68,8 @@ export const ServicesRfqNew: React.FC = () => {
   // always read back from the response, because with supplier dispatch off nobody is emailed.
   const [contacted, setContacted] = useState<string[]>([]);
   const [notContacted, setNotContacted] = useState<Array<{ supplier: string; reason: string }>>([]);
+  const [draftMessage, setDraftMessage] = useState('');
+  const [draftLoading, setDraftLoading] = useState(false);
   // [AIQ-1521 follow-up] What a mover needs to price a job and we CANNOT know from the case.
   // The route, the date and the household come from the case server-side — the employee is never
   // asked to re-type what we already hold. This is only the gap.
@@ -91,6 +93,31 @@ export const ServicesRfqNew: React.FC = () => {
     }
     return items;
   }, [recommendations, shortlist]);
+
+  useEffect(() => {
+    if (!assignmentId || shortlisted.length === 0) return;
+    let cancelled = false;
+    setDraftLoading(true);
+    const services = Array.from(new Set(shortlisted.map(({ service }) => service)));
+    servicesAPI
+      .getRfqDraft(assignmentId, services)
+      .then((res) => {
+        if (!cancelled && res.message) setDraftMessage(res.message);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDraftMessage(
+            'Please quote for the services below. Route, household and dates come from the employee intake.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDraftLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId, shortlisted]);
 
   const handleSend = async () => {
     if (!assignmentId || sending || sent || shortlisted.length === 0) return;
@@ -130,7 +157,7 @@ export const ServicesRfqNew: React.FC = () => {
       });
       const supplierIds = Array.from(new Set(shortlisted.map(({ vendor }) => vendor.item_id)));
 
-      const res = await servicesAPI.createRfq(assignmentId, items, supplierIds);
+      const res = await servicesAPI.createRfq(assignmentId, items, supplierIds, draftMessage.trim() || undefined);
       // Tell the employee plainly if a supplier they chose could not be reached, rather than
       // silently sending to fewer suppliers than they picked.
       setUnreachable(res.unreachable ?? []);
@@ -227,6 +254,25 @@ export const ServicesRfqNew: React.FC = () => {
       </div>
 
       <RfqWorkflowDiagram />
+
+      <div className="mt-6 mb-6 rounded-lg border border-[#e2e8f0] bg-white p-4">
+        <p className="text-sm font-semibold text-[#0b2b43]">Message to providers</p>
+        <p className="mb-2 text-xs text-[#64748b] leading-relaxed">
+          ReloPass drafted this from your intake (route, household size, children&apos;s ages, dates).
+          Review it, edit if needed, then send. Providers do not see names of family members.
+        </p>
+        {draftLoading ? (
+          <p className="text-sm text-[#64748b]">Preparing draft…</p>
+        ) : (
+          <textarea
+            data-testid="rfq-draft-message"
+            value={draftMessage}
+            onChange={(e) => setDraftMessage(e.target.value)}
+            rows={12}
+            className="w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm text-[#0b2b43] font-normal leading-relaxed"
+          />
+        )}
+      </div>
 
       <p className="text-sm font-medium text-[#0b2b43] mt-8 mb-3">Your shortlisted vendors</p>
       {/* [AIQ-1515] Used to read "These are the providers your requests will go to." — nothing

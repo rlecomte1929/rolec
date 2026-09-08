@@ -1,0 +1,440 @@
+# Corridor Agent — NO_FR_RETURNING_EEA_2026 (Norway → France, returning EU/EEA citizen)
+#
+# ⚠️ AUTHORING — informational, source-verification pending. NOT counsel-assured.
+# France is the binding regulatory jurisdiction (Loi 71-1130). Nothing in this file
+# may be rendered as legal advice in ReloPass's own voice. The corridor stays
+# `authoring` until counsel closes the five PENDING questions below.
+#
+# CONTENT AUTHORITY: ReloPass_Fixture_NO-FR.md is canonical. Where an external
+# draft contradicted it, the fixture wins. One correction is load-bearing and is
+# called out inline at A3: Norwegian tax residence does NOT end on the physical
+# move.
+#
+# PROFILE: a French national (also NO/SE) who has ALREADY departed Norway, remains
+# on his Norwegian employer's payroll, and is self-relocating to Paris with no HR
+# and no employer relocation support.
+#
+# Note what this pathway is NOT: it is not an immigration pathway. For this profile
+# immigration is the one thing that is genuinely nothing-to-do — and saying so, out
+# loud and with a reason, is a requirement (see C2/C3/C6), not an omission.
+#
+# Schema-versioning: bump `version` when any rule reference or step ordering
+# changes; earlier vN.yaml files coexist so historical cases keep their ruleset.
+
+corridor_agent:
+  corridor_id: NO_FR_RETURNING_EEA_2026
+  version: "2026.01"
+  petitioning_party: EMPLOYEE
+  origin_country_iso3: NOR
+  destination_country_iso3: FRA
+  description: >
+    French (EU/EEA) national returning from Norway to France while remaining on a
+    Norwegian payroll. No visa, permit, or residence registration applies. The real
+    work is Norwegian exit admin, the social-security switchover to France, light
+    French establishment, and the EEA-but-not-EU-customs-union traps on household
+    goods and vehicles.
+
+  applicable_rules:
+    - legal_reference: "Directive 2004/38/EC"
+      rule_id: EU_FREE_MOVEMENT
+      summary: "Free movement and residence for EU citizens and their families."
+    - legal_reference: "Regulation (EC) 883/2004 Art. 11(3)(a)"
+      rule_id: EU_883_ART11
+      summary: >
+        Lex loci laboris — a person is subject to the social-security legislation of
+        the single Member State where the work is performed.
+    - legal_reference: "Regulation (EC) 987/2009 Art. 21"
+      rule_id: EU_987_ART21
+      summary: >
+        An employer with no place of business in the competent State may agree with
+        the employee that the employee discharges the employer's contribution
+        obligations — the employer's liability itself is not extinguished.
+    - legal_reference: "CGI art. 4 B"
+      rule_id: FR_CGI_4B
+      summary: "French tax residence — worldwide income becomes taxable in France."
+    - legal_reference: "Skatteetaten — emigration / tax residence"
+      rule_id: NO_TAX_EMIGRATION
+      summary: >
+        Norwegian tax residence ends only on a strict emigration test, NOT on the
+        physical move.
+    - legal_reference: "Folkeregisterloven — reporting a move abroad"
+      rule_id: NO_FOLKEREG_MOVE
+      summary: "A move abroad must be reported to the National Population Register."
+
+  required_documents:
+    - PASSPORT_OR_NATIONAL_ID:employee
+    - EMPLOYMENT_CONTRACT
+    - PROOF_OF_ADDRESS_FR
+    - PROOF_OF_PRIOR_NO_RESIDENCE
+
+  required_data_points:
+    - key: eu_eea_nationality
+      type: bool
+      source: USER_INPUT
+      validations:
+        - "== true"
+    - key: departure_date_from_no
+      type: date
+      source: USER_INPUT
+    - key: remains_on_foreign_payroll
+      type: bool
+      source: USER_INPUT
+    - key: employer_engaged
+      type: bool
+      source: USER_INPUT
+    - key: no_residence_years
+      type: int
+      source: USER_INPUT
+
+  salary_thresholds_eur: {}
+
+  eligibility_logic:
+    branches:
+      - id: BRANCH_RETURNING_EU_CITIZEN
+        label: "French/EU national — right of entry and residence (Dir. 2004/38)"
+        cite: EU_FREE_MOVEMENT
+        requires_all:
+          - eu_eea_nationality == true
+        verdict_on_pass: ELIGIBLE
+    no_branch_verdict: NOT_ELIGIBLE
+
+  exception_cases:
+    - id: WORKS_PARTLY_IN_NORWAY
+      condition: "no_work_share_pct >= 25"
+      cite: EU_883_ART11
+      action: SURFACE_AS_ALTERNATE_PATHWAY
+      hint: >
+        Working 25% or more in Norway too re-opens the applicable-legislation test
+        under Reg. 883/2004 Art. 13 (residence-state vs employer-seat). The
+        France-only conclusion below no longer holds unchanged.
+
+  step_graph:
+
+    # ---- Anchor -------------------------------------------------------------
+    # Departure has ALREADY happened. Pinning it as a completed step on its real
+    # past date is what lets every window below be measured retrospectively — and
+    # therefore what lets an already-missed deadline report as red_late rather
+    # than as a comfortable future date.
+    - step_id: A0_DEPART_NO
+      name: "Depart Norway"
+      # This corridor has no separate "arrive in France" step: a returning citizen
+      # needs no visa, permit or registration (C2_IMMIGRATION_RIGHT_OF_RETURN), so
+      # departure IS the move event and the pre-arrival runway is legitimately zero.
+      arrival_anchor: true
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: []
+
+    # ---- Phase A — Norwegian exit admin -------------------------------------
+
+    # The sequencing trap: deregistering can disable BankID, and BankID is what
+    # you need to file the exit-year return remotely from France. Do it in the
+    # wrong order and you lock yourself out of your own tax affairs.
+    - step_id: A2_PRESERVE_BANKID
+      name: "Preserve BankID before deregistration disables it"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 3
+      prerequisite_step_ids: [A0_DEPART_NO]
+      non_obvious: true
+      advice_boundary: information_only
+      assertion: HARD
+
+    - step_id: A1_FOLKEREGISTER
+      name: "Report the move abroad to Folkeregisteret (Skatteetaten)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: [A0_DEPART_NO, A2_PRESERVE_BANKID]
+      # WINDOW PENDING SOURCE VERIFICATION — the DUTY to report is verified
+      # (fixture §2, HARD); the exact 8-day window is not. Encoded so the
+      # retrospective flag works; the corridor's `authoring` banner carries the
+      # caveat. Confirm against Skatteetaten before this corridor is assured.
+      time_window_relative_to: A0_DEPART_NO
+      time_window_min_days: 0
+      time_window_max_days: 8
+      cite: NO_FOLKEREG_MOVE
+      assertion: HARD
+      deadline_trigger:
+        tag: "relopass-deadline-folkeregister-move-abroad-no"
+        label: "Report your move abroad to Folkeregisteret"
+        channel: "email"
+        # An 8-day window. 5 days' notice is most of it, deliberately: this is the
+        # step whose miss is unrecoverable and invisible until a Norwegian tax
+        # assessment arrives months later.
+        lead_days: 5
+        # A Norwegian exit obligation, in a corridor bound for France.
+        jurisdiction: "NOR"
+
+    # THE CORRECTION. An external draft implied Norwegian tax residence ceases at
+    # departure. It does not: emigration is a strict test, and for someone resident
+    # 10+ years Norway can retain taxing rights for up to three income years. This
+    # is exactly the kind of thing a mover assumes away — hence non_obvious — and
+    # his personal status is a determination for a professional, not for us.
+    - step_id: A3_NO_TAX_RESIDENCE
+      name: "Norwegian tax residence does not end on the physical move"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      non_obvious: true
+      advice_boundary: route_to_professional
+      cite: NO_TAX_EMIGRATION
+      assertion: HARD
+
+    - step_id: A4_EXIT_YEAR_RETURN
+      name: "Exit-year tax return and final settlement (skattekort)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 30
+      # Depends on BankID only — that is the real blocker (you cannot file
+      # remotely without it). A3 is a determination, not a task, so gating on it
+      # would block this step forever.
+      prerequisite_step_ids: [A2_PRESERVE_BANKID]
+      assertion: HARD
+
+    - step_id: A5_FOLKETRYGDEN_EXIT
+      name: "Exit Norwegian National Insurance (folketrygden)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [A0_DEPART_NO]
+      # Non-obvious because it is counter-intuitive: you leave folketrygden even
+      # though you keep the Norwegian employer. Membership follows where you WORK,
+      # not who pays you.
+      non_obvious: true
+      cite: EU_883_ART11
+      assertion: HARD
+
+    - step_id: A6_HELFO_EHIC
+      name: "End HELFO cover and handle the EHIC"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [A5_FOLKETRYGDEN_EXIT]
+      assertion: HARD
+
+    - step_id: A7_PRESERVE_PENSION
+      name: "Preserve accrued Norwegian pension rights"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      # The corridor states no deadline here, so the engine invents none.
+      assertion: HARD
+
+    - step_id: A8_NOTIFY_NAV
+      name: "Notify NAV of any active benefits (barnetrygd etc.)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [A0_DEPART_NO]
+      assertion: HARD
+
+    # Closing every Norwegian account before the exit-year settlement clears is a
+    # classic self-inflicted wound: the refund has nowhere to land.
+    - step_id: A9_BANKING_UTILITIES
+      name: "Wind down Norwegian banking and utilities — but keep one account open"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [A0_DEPART_NO]
+      non_obvious: true
+      assertion: HARD
+
+    # ---- Phase B — cross-border employment & social security -----------------
+
+    # The hinge of the whole case. Permanent relocation is not a posting, so there
+    # is no A1 posting exemption: the place-of-work rule applies and the competent
+    # State is FRANCE — despite the Norwegian employer, the Norwegian payroll and
+    # the Norwegian nationality.
+    - step_id: B1_APPLICABLE_LEGISLATION
+      name: "Applicable social-security legislation is FRANCE (not Norway)"
+      responsible_party: BOTH
+      expected_duration_days: 21
+      prerequisite_step_ids: [A0_DEPART_NO]
+      non_obvious: true
+      advice_boundary: information_only
+      cite: EU_883_ART11
+      assertion: HARD
+
+    - step_id: B2_A1_FROM_FRANCE
+      name: "The A1 certificate is issued by FRANCE (URSSAF), not by Norway"
+      responsible_party: BOTH
+      expected_duration_days: 30
+      prerequisite_step_ids: [A0_DEPART_NO]
+      non_obvious: true
+      cite: EU_883_ART11
+      assertion: HARD
+
+    # Authored EMPLOYER. With no employer engaged this resolves at read time to
+    # EMPLOYER_ABSENT: still surfaced, still theirs — and never a checkbox on the
+    # employee's list. The employee cannot register their employer with URSSAF.
+    - step_id: B3_EMPLOYER_URSSAF
+      name: "Norwegian employer must register with URSSAF (or delegate under Art. 21)"
+      responsible_party: EMPLOYER
+      expected_duration_days: 45
+      prerequisite_step_ids: [A0_DEPART_NO]
+      non_obvious: true
+      advice_boundary: route_to_professional
+      cite: EU_987_ART21
+      assertion: HARD
+
+    - step_id: B4_PE_RISK
+      name: "Permanent-establishment exposure in France for the Norwegian employer"
+      responsible_party: EMPLOYER
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      non_obvious: true
+      advice_boundary: route_to_professional
+      assertion: PENDING
+
+    - step_id: B5_GOVERNING_LABOUR_LAW
+      name: "Which country's employment law governs work performed in France"
+      responsible_party: BOTH
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      non_obvious: true
+      advice_boundary: route_to_professional
+      assertion: PENDING
+
+    - step_id: B6_PAS_SETUP
+      name: "French withholding (prélèvement à la source) once B1/B3 resolve"
+      responsible_party: BOTH
+      expected_duration_days: 21
+      prerequisite_step_ids: [B3_EMPLOYER_URSSAF]
+      assertion: HARD
+
+    # ---- Phase C — French establishment (light — returning citizen) ----------
+
+    # Gating dependency. Living at his parents' temporarily means the ordinary
+    # proof-of-address artefacts don't exist, and nearly everything downstream
+    # (CPAM, bank, carte grise) demands one.
+    - step_id: C0_JUSTIFICATIF_DOMICILE
+      name: "Establish proof of address (attestation d'hébergement)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [A0_DEPART_NO]
+      non_obvious: true
+      assertion: HARD
+
+    - step_id: C1_CPAM
+      name: "Register with CPAM for health cover and the carte vitale"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 30
+      prerequisite_step_ids: [A6_HELFO_EHIC, C0_JUSTIFICATIF_DOMICILE]
+      # The coverage-gap trap: HELFO cover ends (A6) before CPAM cover begins.
+      # Sequenced badly, the employee is uninsured in between.
+      non_obvious: true
+      time_window_relative_to: A0_DEPART_NO
+      time_window_min_days: 0
+      time_window_max_days: 90
+      assertion: HARD
+      deadline_trigger:
+        tag: "relopass-deadline-cpam-registration-fr"
+        label: "CPAM registration for French health cover"
+        channel: "email"
+        lead_days: 30
+
+    # --- The stated nothing-to-do items. These are NOT omissions. A correct
+    # --- answer of "none" must be spoken, with its reason, or the screen reads
+    # --- as broken and the mover is left wondering what we didn't check.
+
+    - step_id: C2_IMMIGRATION_RIGHT_OF_RETURN
+      name: "No visa, permit, or immigration registration required"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      outcome_type: nothing_to_do
+      cite: EU_FREE_MOVEMENT
+      assertion: HARD
+
+    - step_id: C3_POPULATION_REGISTRATION
+      name: "No population registration required — France has no citizen address registry"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      outcome_type: nothing_to_do
+      assertion: HARD
+
+    - step_id: C6_D_NUMBER_NOT_APPLICABLE
+      name: "No D-number closure required — he holds a fødselsnummer, not a D-number"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      outcome_type: nothing_to_do
+      assertion: HARD
+
+    - step_id: C4_FRENCH_TAX_REGISTRATION
+      name: "Declare arrival, obtain numéro fiscal, file the first French return"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 30
+      prerequisite_step_ids: [A0_DEPART_NO]
+      cite: FR_CGI_4B
+      assertion: HARD
+
+    - step_id: C5_FRENCH_BANK_ACCOUNT
+      name: "Open a French bank account (salary, CPAM reimbursements)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [C0_JUSTIFICATIF_DOMICILE]
+      assertion: HARD
+
+    # ---- Phase D — household goods & vehicle (the EEA-not-EU customs trap) ----
+
+    # Norway is in the EEA but NOT in the EU customs union. Goods moving NO->FR are
+    # therefore a customs IMPORT, not an intra-EU move — which almost nobody
+    # expects, and which makes the Phase A exit paperwork the evidence that
+    # unlocks the relief.
+    - step_id: D1_HOUSEHOLD_GOODS
+      name: "Household-goods import with transfer-of-residence relief (franchise de déménagement)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 30
+      prerequisite_step_ids: [A1_FOLKEREGISTER, A3_NO_TAX_RESIDENCE]
+      non_obvious: true
+      assertion: HARD
+
+    - step_id: D2_VEHICLE_IMPORT
+      name: "Vehicle import — customs clearance, quitus fiscal, COC, then carte grise"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 45
+      prerequisite_step_ids: [C0_JUSTIFICATIF_DOMICILE, D1_HOUSEHOLD_GOODS]
+      non_obvious: true
+      assertion: HARD
+
+    # ---- The five open counsel questions (ReloPass_Fixture_NO-FR.md §0) -------
+    # Each MUST surface as pending_verification / route-to-lawyer and MUST NOT
+    # appear anywhere as asserted substantive content. Two-sided: present-as-
+    # pending AND absent-as-fact. Each converts to a HARD row only when counsel
+    # closes it.
+
+    - step_id: Q1_TREATY_ART15_ALLOCATION
+      name: "Open question: FR–NO treaty Art. 15 allocation of employment income"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      advice_boundary: route_to_professional
+      assertion: PENDING
+
+    - step_id: Q2_NO_SOURCE_TAXATION
+      name: "Open question: Norwegian source-taxation of income earned while in France"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      advice_boundary: route_to_professional
+      assertion: PENDING
+
+    - step_id: Q3_NO_COVERAGE_CLOSURE
+      name: "Open question: is an active Norwegian coverage-closure step required?"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      advice_boundary: route_to_professional
+      assertion: PENDING
+
+    - step_id: Q4_URSSAF_MECHANICS
+      name: "Open question: URSSAF firmes-étrangères mechanics and Art. 21 acceptance"
+      responsible_party: EMPLOYER
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      advice_boundary: route_to_professional
+      assertion: PENDING
+
+    - step_id: Q5_PUMA_VS_WORKER_AFFILIATION
+      name: "Open question: PUMa three-month wait vs immediate worker affiliation"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: [A0_DEPART_NO]
+      advice_boundary: route_to_professional
+      assertion: PENDING

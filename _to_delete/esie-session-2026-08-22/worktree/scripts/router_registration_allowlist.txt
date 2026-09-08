@@ -1,0 +1,53 @@
+# router_registration_allowlist.txt
+# Grandfathered modular-only routers — registered in backend/app/main.py but NOT
+# in backend/main.py (the prod entrypoint). Render boots `uvicorn backend.main:app`
+# and does NOT serve the modular app, so a router registered only in app/main.py
+# returns 405 in production (the recurring CLAUDE.md footgun). The guard
+# (scripts/check_router_registrations.py) fails on any NEW modular-only router not
+# listed here. One identity per line; '#' comments ignored.
+#
+# This list should DRAIN over time, not grow.
+#
+# Seeded 2026-06-01 from main @ a19291d7 with 21 entries. Drained 2026-06-03: 18 of
+# those 21 are now registered in backend/main.py (PR #235 restored 17 routers plus
+# follow-ups — advisors, marketplace, hr_analytics, relocation_profile, the policy_*
+# family, recommendations, and the relocation routes). Removing them tightens the
+# guard so it now catches a regression on any of those 18, instead of silently
+# grandfathering them. Verified via `python3 scripts/check_router_registrations.py`
+# (AST diff): exactly these 3 identities remain modular-only on main.
+#
+# Remaining triage (all OFF the MVP customer critical path — DE/FR/GB HR+employee flow):
+#   routers.ab_tests.router — /api/ab-tests/promote,/rollback. Reachable from the
+#     ADMIN-only AdminAbTestsPage (/admin/ab-tests); these two POSTs 405 in prod.
+#     Admin-internal, not customer-facing. Register in backend/main.py when the
+#     admin A/B dashboard is exercised.
+#   routers.pets.router — /api/cases/{id}/pets CRUD. frontend/src/api/pets.ts exists
+#     but is imported by no page today, so the 405 is latent (no live caller).
+#   routers.support.router — /api/support/ticket,/reply,/triage,/webhooks/support-email.
+#     No frontend caller; support is manual (Romain) for MVP. Latent.
+routers.ab_tests.router
+routers.pets.router
+routers.support.router
+#
+# Neither-registered routers — in neither entrypoint (new check added in
+# chore/router-guard-neither-entrypoint). The guard would flag these without
+# allowlist entries; they are grandfathered here with explicit justification.
+# This section should DRAIN as held PRs merge and dead code is removed.
+#
+#   routers.provider_portal.router — GET/PATCH /api/provider/... (4 routes).
+#     Live page (ProviderPortal.tsx at /provider/portal) calls these on mount,
+#     shipping a live 404. Fix is in HELD PR #1216 (dual-registration).
+#     TEMP: remove this line once #1216 (provider_portal dual-registration) merges.
+routers.provider_portal.router  # TEMP: remove once #1216 (provider_portal dual-registration) merges
+#
+#   routers.cases.router — dead code. 3,548-line legacy router with 35 routes,
+#     unwired in both entrypoints. Live /api/cases routes are served by
+#     cases_read.py / cases_write.py / cases_admin.py (all dual-registered).
+#     Documented in CLAUDE.md memory: "cases.py router is dead code".
+routers.cases.router  # DEAD CODE: live routes in cases_read/write/admin.py; cases.py is unwired
+#
+#   routers.hr_policies.router — dead code. Uses relocation_policies table (orphan;
+#     no migration on main). The live policy system is policy_config (dual-registered).
+#     Documented in CLAUDE.md memory: "Policy Builder wired to policy_config;
+#     relocation_policies=ORPHAN, legacy hr_policies".
+routers.hr_policies.router  # DEAD CODE: uses orphan relocation_policies table; live system is policy_config

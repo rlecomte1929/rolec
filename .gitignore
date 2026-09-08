@@ -123,3 +123,4 @@ _probe.db
 # They stay reproducible — MANIFEST.json is committed and carries both URLs and
 # sha256s; data/workspace-db-export/<date>/README.md documents the re-fetch.
 data/workspace-db-export/*/_pii/
+.gstack/

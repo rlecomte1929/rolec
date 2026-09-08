@@ -42,6 +42,7 @@ import {
   Rocket,
   Megaphone,
   MessageCircleQuestion,
+  Link2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -101,7 +102,10 @@ export const NAV_ICONS = {
   'workflow-analytics': Workflow,
   'resources-cms': BookOpen,
   'form-templates': FileText,
+  'admin-policies': GitBranch,
   'policy-versions': GitBranch,
+  'admin-people': UserRound,
+  'admin-suppliers': Link2,
   'country-requirements': Globe2,
   'requirement-facts': ListChecks,
   'auth-page-design': Palette,

@@ -58,7 +58,7 @@ export const AdminCompanyDetail: React.FC = () => {
 
   if (loading && !company) {
     return (
-      <AdminLayout title="Company Detail" subtitle="-">
+      <AdminLayout title="Company" subtitle="Loading…">
         <div className="py-8 text-center text-[#6b7280]">Loading...</div>
       </AdminLayout>
     );
@@ -66,7 +66,7 @@ export const AdminCompanyDetail: React.FC = () => {
 
   if (error || !company) {
     return (
-      <AdminLayout title="Company Detail" subtitle="-">
+      <AdminLayout title="Company" subtitle="Not found">
         <Card padding="lg">
           <div className="text-[#7a2a2a] font-medium">{error || 'Company not found.'}</div>
           <p className="text-sm text-[#6b7280] mt-1">
@@ -103,7 +103,7 @@ export const AdminCompanyDetail: React.FC = () => {
   ];
 
   return (
-    <AdminLayout title="Company Detail" subtitle={company.name}>
+    <AdminLayout title={company.name} subtitle="Company hub — people, assignments, and policy for this tenant">
       {/* Tabs */}
       <div className="mb-5 flex flex-wrap items-center gap-1.5 border-b border-slate-200 pb-3">
         {tabs.map((t) => {
@@ -331,7 +331,7 @@ export const AdminCompanyDetail: React.FC = () => {
             to={`${buildRoute('adminPolicies')}?company_id=${encodeURIComponent(company.id)}`}
             className="text-sm text-[#0b2b43] underline"
           >
-            Open Policy Workspace
+            Policy workspace
           </Link>
         </div>
         {policies.length === 0 ? (
@@ -380,13 +380,13 @@ export const AdminCompanyDetail: React.FC = () => {
         <h3 className="text-sm font-semibold text-[#0b2b43] mb-3">Quick actions</h3>
         <div className="flex flex-wrap gap-2">
           <Link to={`${buildRoute('adminPeople')}?company_id=${encodeURIComponent(company.id)}`}>
-            <Button variant="outline" size="sm">People (company filter)</Button>
+            <Button variant="outline" size="sm">People</Button>
           </Link>
           <Link to={`${buildRoute('adminAssignments')}?company_id=${encodeURIComponent(company.id)}`}>
             <Button variant="outline" size="sm">Assignments</Button>
           </Link>
           <Link to={`${buildRoute('adminPolicies')}?company_id=${encodeURIComponent(company.id)}`}>
-            <Button variant="outline" size="sm">Policy Workspace</Button>
+            <Button variant="outline" size="sm">Policy workspace</Button>
           </Link>
           <Link to={buildRoute('adminCompanies')}>
             <Button variant="outline" size="sm">Edit company (Companies list)</Button>

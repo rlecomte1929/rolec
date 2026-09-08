@@ -81,3 +81,16 @@ export async function reviewCountryRequirement(
     { headers: adminHeaders() }
   );
 }
+
+/** Publish or withhold many requirements in one request. */
+export async function reviewCountryRequirementsBatch(
+  countryCode: string,
+  ids: string[],
+  status: Exclude<ReviewStatus, 'pending'>
+): Promise<{ items: AdminRequirementReview[] }> {
+  return apiPost(
+    `/api/admin/countries/${countryCode}/requirements/review-batch`,
+    { ids, status },
+    { headers: adminHeaders() }
+  );
+}

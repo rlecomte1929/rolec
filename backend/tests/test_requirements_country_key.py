@@ -5,6 +5,9 @@ None on unrecognised input so callers can fail closed (the AIQ-1349 silent-miss
 guard, acted on in 1473c).
 """
 from backend.app.services.requirements_country_key import (
+    admin_country_group_key,
+    catalog_lookup_keys,
+    display_country_name,
     iso_to_catalog_name,
     normalize_corridor_code,
     resolve_catalog_country,
@@ -156,3 +159,23 @@ def test_every_corridor_destination_resolves():
         f"records can never be served: {unresolvable}. Add the ISO to _ISO_TO_CATALOG_NAME "
         "in backend/app/services/requirements_country_key.py."
     )
+
+
+def test_ecuador_is_covered():
+    assert to_iso("EC") == "EC"
+    assert to_iso("Ecuador") == "EC"
+    assert iso_to_catalog_name("EC") == "ECUADOR"
+    assert resolve_catalog_country("EC") == "ECUADOR"
+    assert set(catalog_lookup_keys("EC")) >= {"EC", "ECUADOR"}
+    assert set(catalog_lookup_keys("ECUADOR")) >= {"EC", "ECUADOR"}
+
+
+def test_admin_aliases_merge_iso_and_catalog_name_not_unrelated_countries():
+    assert admin_country_group_key("SG") == admin_country_group_key("SINGAPORE") == "SG"
+    assert admin_country_group_key("EC") == admin_country_group_key("ECUADOR") == "EC"
+    # DE is Germany; DK is Denmark. They must not collapse into one admin row.
+    assert admin_country_group_key("DE") == "DE"
+    assert admin_country_group_key("DENMARK") == "DK"
+    assert display_country_name("DE") == "Germany"
+    assert display_country_name("DK") == "Denmark"
+    assert display_country_name("SG") == "Singapore"

@@ -1,0 +1,437 @@
+"""
+[AIQ-1788] Declarative catalogue of accreditation registries, per corridor x category.
+
+WHY A CATALOGUE AND NOT SCRAPERS
+--------------------------------
+The task brief assumed every registry here is scrapable and specified per-source HTML
+parsers. A reconnaissance pass over these exact registries on 2026-08-10 found that is
+only partly true: the German IVD directory is login-gated, FNAIM has no public search,
+and BRAV was unreachable. That is not a parser bug to work around — the brief's own rule
+is "if a registry has no usable public listing, record that in the run report rather than
+silently substituting a weaker source."
+
+So each source declares HOW it can be acquired (`Acquisition`), and an unusable one is a
+first-class recorded fact rather than an empty result somebody has to re-investigate. The
+knowledge that IVD is login-gated cost a research pass to obtain; losing it would mean
+paying for it again.
+
+WHY TIERING MATTERS MORE THAN COVERAGE
+--------------------------------------
+The moat is provenance. An HR buyer's security review asks where supplier data came from,
+and "FIDI FAIM registry, entry #1234, verified 2026-08-xx, evidence URL attached" is an
+answer a scraped listing cannot give. Hence `tier`:
+
+  1 — accreditation registry or public/government register (FIDI FAIM, BaFin,
+      Finanstilsynet, a national bar, a chamber of commerce)
+  2 — recognised industry association member list
+  3 — the provider's own website
+
+Tier 3 is never sufficient on its own. `ingestable_sources()` enforces that rather than
+leaving it to each caller to remember.
+
+FORBIDDEN, and not negotiable: Google Maps scraping (breaches Google's ToS, which surfaces
+in exactly the enterprise security review this data exists to satisfy) and consumer review
+aggregators as a primary source.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Dict, List, Optional, Tuple
+
+# The two corridors in scope. Must match corridor_coverage_targets.corridor EXACTLY —
+# verified 2026-08-10: 20 rows, 0 unmapped against supplier_service_categories.
+CORRIDORS: Tuple[str, ...] = ("FR-DE", "FR-NO")
+
+# The five categories with live suppliers today. rmc / dsp / healthcare_ipmi /
+# language_cultural are deliberately OUT of scope for this run: zero suppliers and weaker
+# public registries. They need their own task, not a weaker source here.
+CATEGORIES: Tuple[str, ...] = (
+    "movers",
+    "housing_agencies",
+    "legal_admin",
+    "tax_finance",
+    "banks",
+)
+
+
+class Acquisition(str, Enum):
+    """How a source's listing can actually be obtained."""
+
+    #: A public listing that can be fetched and parsed programmatically.
+    HTTP_LISTING = "http_listing"
+    #: A public registry that answers per-entity lookups but has no listable index.
+    #: Usable to VERIFY a candidate found elsewhere; not to enumerate candidates.
+    HTTP_LOOKUP = "http_lookup"
+    #: Publicly readable by a human but not automatable (JS-gated, captcha, no index).
+    #: Candidates come from a recorded research pass, each row carrying its own evidence
+    #: URL so the manual spot-check in the Validation Criteria still works.
+    MANUAL_EVIDENCED = "manual_evidenced"
+    #: Confirmed NOT publicly usable. Kept so the run report can say why, and so nobody
+    #: silently substitutes a weaker source for this pair.
+    UNAVAILABLE = "unavailable"
+
+
+@dataclass(frozen=True)
+class RegistrySource:
+    name: str
+    base_url: str
+    tier: int
+    acquisition: Acquisition
+    corridors: Tuple[str, ...]
+    categories: Tuple[str, ...]
+    #: Required when acquisition is UNAVAILABLE — the run report prints it verbatim.
+    unavailable_reason: Optional[str] = None
+    #: Regex an evidence URL must match to count as a record for ONE entity.
+    #:
+    #: The domain says who PUBLISHED a page; this says the page is about the candidate rather
+    #: than about the register. Without it, `advokatforeningen.no/.../search-for-members/` and
+    #: `portal.mvp.bafin.de/database/InstInfo/` are tier-1 evidence for anybody at all — a
+    #: search form evidences nobody. Both of those were live in the first real harvest.
+    #:
+    #: It checks SHAPE, not existence: nothing in this pipeline fetches the URL, so an invented
+    #: deep link still passes. The existence check is the human at /admin/vetting-queue, which
+    #: is why promotion writes accreditations with status='claimed'. Do not describe this as
+    #: provenance being verified.
+    entry_url_pattern: Optional[str] = None
+    notes: str = ""
+
+    def __post_init__(self) -> None:
+        if self.tier not in (1, 2, 3):
+            raise ValueError(f"{self.name}: tier must be 1..3 (DB CHECK), got {self.tier}")
+        if self.acquisition is Acquisition.UNAVAILABLE and not self.unavailable_reason:
+            raise ValueError(f"{self.name}: UNAVAILABLE sources must state a reason")
+        for c in self.corridors:
+            if c not in CORRIDORS:
+                raise ValueError(f"{self.name}: unknown corridor {c!r}")
+        for c in self.categories:
+            if c not in CATEGORIES:
+                raise ValueError(f"{self.name}: unknown category {c!r}")
+        # Last, so a source with several problems still reports the more basic one first.
+        # Mandatory rather than opt-in: an unguarded ingestable source is exactly how the
+        # search-page hole appeared, and the next domain someone adds would reopen it.
+        if (
+            self.tier < 3
+            and self.acquisition is not Acquisition.UNAVAILABLE
+            and not self.entry_url_pattern
+        ):
+            raise ValueError(
+                f"{self.name}: an ingestable registry must declare entry_url_pattern — "
+                "otherwise its own search page counts as evidence for every candidate"
+            )
+
+
+# ── The catalogue ────────────────────────────────────────────────────────────
+# Acquisition modes reflect a reconnaissance pass on 2026-08-10. Re-verify before
+# assuming a source still behaves this way; registries redesign without notice, and a
+# source that silently stops listing is indistinguishable from a category with no members.
+SOURCES: Tuple[RegistrySource, ...] = (
+    # ── movers — the highest-yield structured sources in the project ──────────
+    RegistrySource(
+        name="FIDI FAIM member directory",
+        # Re-verified 2026-08-13 (Stage 9 Phase 0). The old base_url `/find-mover` now 404s,
+        # which is what made this source look MANUAL_EVIDENCED. It is not: the country-scoped
+        # index below is live and lists a per-entity detail link for every affiliate
+        # (France, country=101, returns 11). Promoted to HTTP_LISTING accordingly — this is
+        # exactly the drift the module docstring warns about, where a source that stopped
+        # listing is indistinguishable from a category with no members.
+        base_url="https://www.fidi.org/find-fidi-affiliate",
+        tier=1,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=CORRIDORS,
+        categories=("movers",),
+        entry_url_pattern=r"/find-fidi-affiliate/[^/]",
+        notes=(
+            "FAIM is the strongest accreditation in this category: audited, numbered, and "
+            "renewed every 3 years — so accreditation_expiry is meaningful here and must be "
+            "captured. Recon 2026-08-10 yielded 11 FR-DE and 4 FR-NO affiliates."
+        ),
+    ),
+    RegistrySource(
+        name="IAM member directory",
+        base_url="https://www.iamovers.org/Members",
+        tier=1,
+        acquisition=Acquisition.UNAVAILABLE,
+        corridors=CORRIDORS,
+        categories=("movers",),
+        unavailable_reason=(
+            "The member directory has moved to the IAMX platform on a separate domain "
+            "(mobilityex.com); no per-entity URL was confirmed under iamovers.org "
+            "(probed 2026-08-12). Marked unavailable rather than left ingestable, because "
+            "without a confirmed entry-URL shape any iamovers.org page would count as "
+            "evidence for any candidate. No harvest row cites it today."
+        ),
+    ),
+    # ── housing_agencies ─────────────────────────────────────────────────────
+    RegistrySource(
+        name="Finanstilsynet — estate agency register (NO)",
+        base_url="https://www.finanstilsynet.no/en/registers/",
+        tier=1,
+        acquisition=Acquisition.HTTP_LOOKUP,
+        corridors=("FR-NO",),
+        categories=("housing_agencies", "tax_finance", "banks"),
+        entry_url_pattern=r"[?&]id=\d+",
+        notes=(
+            "One register serving three categories: estate agencies, state-authorised "
+            "auditors, and licensed banks. Per-entity lookup, no listable index."
+        ),
+    ),
+    RegistrySource(
+        name="IVD — Immobilienverband Deutschland directory",
+        base_url="https://ivd.net/",
+        tier=1,
+        acquisition=Acquisition.UNAVAILABLE,
+        corridors=("FR-DE",),
+        categories=("housing_agencies",),
+        unavailable_reason=(
+            "Member directory is login-gated (recon 2026-08-10). Requires a direct "
+            "membership enquiry to info@ivd.net — a human step, not a parser change."
+        ),
+    ),
+    RegistrySource(
+        name="FNAIM (FR)",
+        base_url="https://www.fnaim.fr/",
+        tier=1,
+        acquisition=Acquisition.UNAVAILABLE,
+        corridors=("FR-DE",),
+        categories=("housing_agencies",),
+        unavailable_reason="No public member search (recon 2026-08-10).",
+    ),
+    # ── legal_admin (immigration) ────────────────────────────────────────────
+    RegistrySource(
+        name="Rechtsanwaltskammer (RAK) + Partnerschaftsregister (DE)",
+        # Corrected 2026-08-12: rechtsanwaltsregister.org is a redirector, not the register.
+        # It 301s to bea-brak.de and then to bravsearch.bea-brak.de/bravsearch.
+        base_url="https://bravsearch.bea-brak.de/bravsearch/",
+        tier=1,
+        acquisition=Acquisition.UNAVAILABLE,
+        corridors=("FR-DE",),
+        categories=("legal_admin",),
+        unavailable_reason=(
+            "The official register (BRAV) is reachable but is a form search; no stable "
+            "per-entity URL was confirmed (probed 2026-08-12). Usable by a human, not "
+            "linkable as evidence — so a row citing it cannot be spot-checked, which is the "
+            "whole point of the source_url. Filter to firms publishing Ausländerrecht / "
+            "immigration practice areas when checking by hand."
+        ),
+    ),
+    # BRAV had its own entry here until 2026-08-12, marked UNAVAILABLE with
+    # "Unreachable during recon 2026-08-10". Two things were wrong: it resolves fine (it moved
+    # to bea-brak.de), and BRAV *is* the bundesweites amtliches Anwaltsverzeichnis — the same
+    # register as the RAK entry above, under its formal name. Two names for one register meant
+    # the duplicate was unreachable from any URL, because _DOMAIN_TO_SOURCE mapped the domain
+    # to the RAK entry. Merged into it rather than left as dead weight.
+    RegistrySource(
+        name="Advokatforeningen + Brønnøysund register (NO)",
+        base_url="https://www.advokatenhjelperdeg.no/",
+        tier=1,
+        acquisition=Acquisition.MANUAL_EVIDENCED,
+        corridors=("FR-NO",),
+        categories=("legal_admin",),
+        # brreg  -> /nb/oppslag/enheter/917334110
+        # advokatguiden -> /advokat/22051-thomas-reinholdt
+        # The association's own /search-for-members/ page matches NEITHER, which is the point:
+        # one harvest row cited it and was being counted as registry-evidenced.
+        entry_url_pattern=r"/oppslag/enheter/\d+|/advokat/\d+",
+        notes="Brønnøysund org numbers give a second, government-issued identifier.",
+    ),
+    # ── cross-category membership + entity confirmation ──────────────────────
+    #
+    # Added 2026-08-11 from the first real harvest (Card C): three of its evidence domains
+    # had no source here, so honest rows had nowhere to map. Modelling a source you actually
+    # used is the only way `validate()`'s tier rule can mean anything.
+    RegistrySource(
+        name="EuRA member directory",
+        base_url="https://www.eura-relocation.com/members/",
+        tier=1,
+        acquisition=Acquisition.MANUAL_EVIDENCED,
+        corridors=("FR-NO",),
+        categories=("movers", "housing_agencies"),
+        entry_url_pattern=r"/members/[^/]",
+        notes="European Relocation Association. Membership is audited (EuRA Global Quality "
+              "Seal), so it evidences standing — but it is an association, not a statutory "
+              "register, and carries no licence number. Scoped to FR-NO deliberately: it is "
+              "the only corridor the harvest actually sourced from it, and widening it to "
+              "FR-DE would make FR-DE housing_agencies look ingestable when recon proved it "
+              "is not (IVD login-gated, FNAIM no public search). Zero rows there is the "
+              "correct answer, and a test pins it.",
+    ),
+    RegistrySource(
+        name="Official public business register (DE)",
+        base_url="https://www.hamburg.de/branchenbuch/",
+        tier=2,
+        acquisition=Acquisition.MANUAL_EVIDENCED,
+        corridors=("FR-DE",),
+        categories=("legal_admin", "tax_finance"),
+        # /branchenbuch/hamburg/eintrag/10824243/ — the directory root is not an entry.
+        entry_url_pattern=r"/branchenbuch/.+/eintrag/\d+",
+        notes="City/state business directories confirm the ENTITY exists and is registered. "
+              "They do not evidence professional accreditation — a chamber roll does. Tier 2 "
+              "so it stages at reduced confidence and never poses as a bar or StBK listing.",
+    ),
+    RegistrySource(
+        name="Self-declared (provider site / non-registry reference)",
+        base_url="",
+        tier=3,
+        acquisition=Acquisition.MANUAL_EVIDENCED,
+        corridors=("FR-DE", "FR-NO"),
+        categories=CATEGORIES,
+        notes="NOT a registry. Exists so a row whose only evidence is the provider's own "
+              "Impressum, marketing site, or a Wikidata entry can be MODELLED honestly — at "
+              "which point validate() rejects it on the tier-3 rule instead of letting it "
+              "through wearing a registry's name. The rejects are the re-sourcing worklist.",
+    ),
+    # ── FR origin — entity register, NOT professional accreditation ──────────
+    #
+    # [AIQ-1827] Added after the four FR anchors the brief named turned out to be
+    # unusable on 2026-08-12: CCI fichier national 403, FIDI find-mover 404, and both the
+    # CNB annuaire and the OEC tableau are JS-driven with no listable index. That left
+    # FR-NO's origin half with zero sources and zero suppliers.
+    #
+    # recherche-entreprises.api.gouv.fr (INSEE SIRENE + RNE) IS enumerable: free, no auth,
+    # filterable by NAF activity code and postcode, and it answered for all four categories
+    # (69.10Z avocats, 49.42Z demenagement, 68.31Z agences immobilieres, 69.20Z
+    # experts-comptables) scoped to Paris.
+    #
+    # TIER 2, and the distinction is the whole point. SIRENE proves a company is REGISTERED
+    # and what activity it SELF-DECLARED at registration. It does not evidence bar
+    # membership, a carte T, or a place on the Ordre's tableau — those are the tier-1 claims,
+    # and conflating them is exactly the defect found in the Den Norske Advokatforening rows,
+    # where a Bronnoysund organisation number was sitting under a bar's name. Rows sourced
+    # here stage at reduced confidence and must never be written `verified`.
+    RegistrySource(
+        name="INSEE SIRENE / recherche-entreprises (FR)",
+        base_url="https://recherche-entreprises.api.gouv.fr/search",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("FR-NO",),
+        categories=("legal_admin", "movers", "housing_agencies", "tax_finance"),
+        # One entity per SIREN: annuaire-entreprises.data.gouv.fr/entreprise/<9 digits>.
+        entry_url_pattern=r"^https://annuaire-entreprises\.data\.gouv\.fr/entreprise/\d{9}$",
+        notes=(
+            "Entity confirmation only: registered company + self-declared NAF activity. "
+            "Enumerable by activite_principale + code_postal. Scoped to FR-NO deliberately "
+            "\u2014 that is the only corridor sourced from it; widening it to FR-DE would make "
+            "FR-DE look covered by a source no one has run there. The per-entity evidence "
+            "page at annuaire-entreprises.data.gouv.fr is a JS shell (212 bytes to a fetch), "
+            "so it is human-checkable but cannot self-verify \u2014 which is consistent with "
+            "tier 2: these rows stay `claimed`."
+        ),
+    ),
+    # ── tax_finance ──────────────────────────────────────────────────────────
+    RegistrySource(
+        name="Bundessteuerberaterkammer / regional StBK (DE)",
+        # Corrected 2026-08-12: bstbk.de is the federal chamber's CORPORATE site, not the
+        # register. The official one is the amtliches Steuerberaterverzeichnis, below.
+        base_url="https://steuerberaterverzeichnis.berufs-org.de/",
+        tier=1,
+        acquisition=Acquisition.UNAVAILABLE,
+        corridors=("FR-DE",),
+        categories=("tax_finance",),
+        unavailable_reason=(
+            "The amtliches Steuerberaterverzeichnis is a form search; no stable per-entity "
+            "URL was confirmed (probed 2026-08-12). A human can verify a Steuerberater "
+            "there, but the result is not linkable, so it cannot serve as a source_url. "
+            "Until a per-entity URL shape is confirmed, FR-DE tax_finance rows have no "
+            "ingestable registry — which is the honest answer, not a reason to accept the "
+            "firms' own Impressum pages."
+        ),
+    ),
+    # ── banks ────────────────────────────────────────────────────────────────
+    RegistrySource(
+        name="BaFin institute register (DE)",
+        base_url="https://portal.mvp.bafin.de/database/InstInfo/",
+        tier=1,
+        acquisition=Acquisition.HTTP_LOOKUP,
+        corridors=("FR-DE",),
+        categories=("banks", "tax_finance"),
+        # Two shapes, both verified 2026-08-12:
+        #   institutDetails.do?cmd=loadInstitutAction&institutId=118938  (HTTP 200, public,
+        #     lists the institution's authorisations with dates — the real licence evidence)
+        #   kontenvergleich.bafin.de/en/account/678272c6                 (one harvest row)
+        # The bare /database/InstInfo/ search form matches neither, by design.
+        entry_url_pattern=r"institutId=\d+|/account/\w+",
+        notes=(
+            "Confirms the legal entity and licence. Banks are not accredited in the "
+            "BRAIN-3C sense, so entity confirmation is all this proves — see "
+            "confidence_for()."
+        ),
+    ),
+)
+
+
+# ── Policy helpers — encode the rules once, not at every call site ───────────
+
+def sources_for(corridor: str, category: str) -> List[RegistrySource]:
+    """Every declared source for a pair, including UNAVAILABLE ones.
+
+    Unavailable sources are returned deliberately: the run report has to be able to say
+    "this pair produced nothing and here is which registry refused", which is a different
+    and far more actionable statement than "0 candidates".
+    """
+    return [
+        s for s in SOURCES
+        if corridor in s.corridors and category in s.categories
+    ]
+
+
+def ingestable_sources(corridor: str, category: str) -> List[RegistrySource]:
+    """Sources a candidate may actually be ingested from.
+
+    Excludes UNAVAILABLE (nothing to read) and tier 3 (never sufficient alone).
+    """
+    return [
+        s for s in sources_for(corridor, category)
+        if s.acquisition is not Acquisition.UNAVAILABLE and s.tier < 3
+    ]
+
+
+def unavailable_reasons(corridor: str, category: str) -> Dict[str, str]:
+    """{source_name: reason} for the run report."""
+    return {
+        s.name: s.unavailable_reason or "unspecified"
+        for s in sources_for(corridor, category)
+        if s.acquisition is Acquisition.UNAVAILABLE
+    }
+
+
+def confidence_for(tier: int, has_accreditation_number: bool, has_expiry: bool,
+                   category: str) -> float:
+    """Confidence for a harvested row. Never returns 1.0.
+
+    1.0 is reserved for a human who has verified the entry — a harvest establishes that a
+    registry lists the company, which is membership, not fitness. Conflating the two is
+    how a staged candidate quietly becomes a recommended supplier.
+
+    Banks cap at 0.5: they are licensed, not accredited, so the register confirms the
+    entity exists and nothing about corporate relocation capability.
+    """
+    if category == "banks":
+        return 0.5
+    if tier >= 2:
+        return 0.5
+    if has_accreditation_number and has_expiry:
+        return 0.9
+    if has_accreditation_number:
+        return 0.7
+    return 0.6
+
+
+def effective_tier(category: str, declared_tier: int) -> int:
+    """Banks are entity-confirmation only, so they never score better than tier 2.
+
+    `max`, not a flat 2. The original `return 2 if category == "banks"` was written to
+    DOWNGRADE a tier-1 bank register (a BaFin listing proves the institute is authorised, not
+    that it is a good relocation banking partner) — but it also silently UPGRADED tier 3 to 2,
+    which is the opposite of the intent and defeats the tier-3 rule in `validate()`.
+
+    Measured on the first real harvest: three bank rows whose only evidence was the bank's own
+    site — one of them a **Wikidata** entry — passed validation because of this. Every other
+    self-declared row in the same file was correctly rejected. Fixed 2026-08-11 (AIQ-1788).
+    """
+    return max(2, declared_tier) if category == "banks" else declared_tier
+
+
+def pairs_in_scope() -> List[Tuple[str, str]]:
+    """The 10 (corridor, category) pairs this run covers."""
+    return [(c, cat) for c in CORRIDORS for cat in CATEGORIES]

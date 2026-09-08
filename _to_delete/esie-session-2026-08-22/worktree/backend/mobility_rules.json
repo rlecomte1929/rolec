@@ -1,0 +1,15 @@
+{
+  "maxHousingBudgetByJobLevel": {
+    "L1": 5000,
+    "L2": 7000,
+    "L3": 10000
+  },
+  "minLeadTimeDays": 30,
+  "requiredDocs": [
+    "Passport scans",
+    "Employment letter"
+  ],
+  "spouseWorkIntentExtraDocs": [
+    "Spouse resume"
+  ]
+}

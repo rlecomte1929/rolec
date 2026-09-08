@@ -1,9 +1,11 @@
 import json
 from datetime import datetime, date
 from typing import Any, Dict, List, Optional
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from . import models
+from .services.requirements_country_key import catalog_lookup_keys
 
 
 def get_case(db: Session, case_id: str) -> Optional[models.Case]:
@@ -80,7 +82,14 @@ def list_country_profiles(db: Session, limit: int = _DEFAULT_LIST_LIMIT, offset:
 
 
 def get_country_profile(db: Session, country_code: str) -> Optional[models.CountryProfile]:
-    return db.query(models.CountryProfile).filter(models.CountryProfile.country_code == country_code).first()
+    keys = catalog_lookup_keys(country_code)
+    if not keys:
+        return None
+    return (
+        db.query(models.CountryProfile)
+        .filter(models.CountryProfile.country_code.in_(keys))
+        .first()
+    )
 
 
 def upsert_country_profile(db: Session, payload: Dict[str, Any]) -> models.CountryProfile:
@@ -111,9 +120,10 @@ def create_source_record(db: Session, payload: Dict[str, Any]) -> models.SourceR
 
 
 def list_sources(db: Session, country_code: str, limit: int = _DEFAULT_LIST_LIMIT, offset: int = 0) -> List[models.SourceRecord]:
+    keys = catalog_lookup_keys(country_code) or [country_code]
     return (
         db.query(models.SourceRecord)
-        .filter(models.SourceRecord.country_code == country_code)
+        .filter(models.SourceRecord.country_code.in_(keys))
         .order_by(models.SourceRecord.id.desc())
         .offset(max(0, offset))
         .limit(max(1, min(limit, 1000)))
@@ -314,7 +324,10 @@ def list_requirements(
     `include_unapproved=True` is for the admin review surface, which must obviously see the
     rows it is being asked to approve.
     """
-    query = db.query(models.RequirementItem).filter(models.RequirementItem.country_code == country_code)
+    keys = catalog_lookup_keys(country_code) or ([country_code] if country_code else [])
+    if not keys:
+        return []
+    query = db.query(models.RequirementItem).filter(models.RequirementItem.country_code.in_(keys))
     if purpose:
         query = query.filter(models.RequirementItem.purpose == purpose)
     if not include_unapproved:
@@ -325,6 +338,24 @@ def list_requirements(
         .limit(max(1, min(limit, 1000)))
         .all()
     )
+
+
+def distinct_requirement_country_codes(db: Session) -> List[str]:
+    rows = db.query(models.RequirementItem.country_code).distinct().all()
+    return [code for (code,) in rows if code]
+
+
+def requirement_status_counts(db: Session, country_code: str) -> Dict[str, int]:
+    keys = catalog_lookup_keys(country_code) or ([country_code] if country_code else [])
+    if not keys:
+        return {}
+    rows = (
+        db.query(models.RequirementItem.review_status, func.count())
+        .filter(models.RequirementItem.country_code.in_(keys))
+        .group_by(models.RequirementItem.review_status)
+        .all()
+    )
+    return {str(status or ""): int(n) for status, n in rows}
 
 
 def create_snapshot(db: Session, payload: Dict[str, Any]) -> models.CaseRequirementsSnapshot:

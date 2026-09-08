@@ -1,0 +1,5 @@
+corridor,service_category,company_name,country_code,city_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry,verification_method,confidence,notes
+ES-IE,housing_agencies,Example Lettings Ltd,IE,Dublin,https://example-lettings.ie,PSRA,https://www.psr.ie/register/entity/004321,Property Services Regulatory Authority,004321,2027,public_registry,high,
+ES-IE,movers,Dodgy Movers,IE,Dublin,https://dodgymovers.ie,Google Maps listing,https://www.google.com/maps/place/dodgy-movers,IAM,IE-99,,registry_lookup,high,
+ES-IE,legal_admin,Some Solicitors LLP,IE,Dublin,https://somesolicitors.ie,own site,https://somesolicitors.ie/about,Law Society of Ireland,914 450 133,2030,public_registry,high,
+ES-IE,relocation,Bad Category Co,IE,Cork,,x,https://www.lawsociety.ie/find-a-solicitor/,Law Society of Ireland,,,directory_listing,low,

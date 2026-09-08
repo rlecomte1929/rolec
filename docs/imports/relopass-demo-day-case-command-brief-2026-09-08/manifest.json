@@ -1,0 +1,35 @@
+{
+  "manifest_version": "1.0",
+  "asset_id": "relopass-demoday-2026w38-launch-brief",
+  "title": "ReloPass Demo Day launch-asset brief - manifest",
+  "generated": "2026-09-07",
+  "generated_by": "Otto (workspace 776786)",
+  "demo_day_week_of": "2026-09-14",
+  "source": {
+    "repo": "rlecomte1929/rolec",
+    "branch": "fix/td-qa-services-batch-0719",
+    "branch_tip_tree_sha": "5b5cc32842ebdb114fdcec99f4a267aaa282fe32",
+    "note": "branch_tip_tree_sha is the git TREE sha at the branch tip (git/trees/<branch>), not a commit sha."
+  },
+  "artifacts": [
+    {
+      "role": "launch_asset_brief",
+      "filename": "relopass-demoday-launch-brief.ndjson",
+      "content_type": "application/x-ndjson",
+      "records": 23,
+      "bytes": 8769,
+      "sha256": "db7ff6e658213df51d10b06d0eaf9e9d9868a7c84ef3d9f7e6a906b954c386ec",
+      "gcs_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788825247748_mshqn6ei.ndjson",
+      "media_id": "3b7dece2-2fd8-4ae5-b899-1d0cec63a317"
+    }
+  ],
+  "integrity_note": "Verify with: curl -s <gcs_url> | sha256sum  -> must equal the sha256 above.",
+  "guardrails_applied": [
+    "true-to-shipped only",
+    "every claim cited to an opened source file",
+    "no ads spend",
+    "no invented compliance claims (no 'EU AI Act Ready')",
+    "no fabricated metrics",
+    "Concierge = vendor tag only, not a product"
+  ]
+}

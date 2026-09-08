@@ -1,0 +1,57 @@
+name: Case-health scan
+
+# [AIQ-378b] Calls POST /api/crons/case-health-scan once a day. Flags active
+# immigration cases past their expected milestone date and raises one deduped HR
+# alert per behind-schedule case (proactive "next morning" notification).
+#
+# Gated behind `vars.CASE_HEALTH_CRON_ENABLED` so this is a no-op until the
+# secrets/vars are configured AND the team starts the AIQ-378 epic (post-pilot).
+# Required config to enable:
+#   vars.CASE_HEALTH_CRON_ENABLED = 'true'
+#   vars.CASE_HEALTH_API_BASE     = https://api.relopass.com
+#   secrets.CRON_SECRET           = (reused — same value the API checks)
+
+on:
+  schedule:
+    # 04:30 UTC every day (a bit after the crawl scheduler at 03:00).
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: case-health-scan
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  case-health-scan:
+    name: Nightly case-health scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No-op unless explicitly enabled via repo vars (post-pilot).
+    if: ${{ vars.CASE_HEALTH_CRON_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      API_BASE: ${{ vars.CASE_HEALTH_API_BASE }}   # e.g. https://api.relopass.com
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: POST /api/crons/case-health-scan
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "API_BASE or CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${API_BASE}/api/crons/case-health-scan")
+          echo "$response"
+          {
+            echo "## Case-health scan run"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

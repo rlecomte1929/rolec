@@ -1,0 +1,32 @@
+[
+  {
+    "id": "2026-05-27-estimate-review",
+    "date": "2026-05-27",
+    "title": "HR Estimate Review",
+    "description": "View per-category policy caps on the new /hr/cases/:caseId/estimate page. Linked from each case's Budget overview in the Command Center."
+  },
+  {
+    "id": "2026-05-26-llm-policy-extraction",
+    "date": "2026-05-26",
+    "title": "LLM-assisted policy extraction",
+    "description": "Upload an HR policy PDF or DOCX and let Claude pull out benefits side-by-side with the regex baseline. HR reviews and confirms before any data is saved."
+  },
+  {
+    "id": "2026-05-26-country-expansion",
+    "date": "2026-05-26",
+    "title": "Destination coverage expanded to 25 countries",
+    "description": "Added France, Netherlands, Spain, Portugal, Belgium, Sweden, Denmark, Ireland, Poland, Mexico, and China to the destination picker."
+  },
+  {
+    "id": "2026-05-26-employee-cases-fix",
+    "date": "2026-05-26",
+    "title": "Employee case fetch fixed",
+    "description": "GET /api/cases now returns 200 with the employee's assigned cases instead of 404. The Employee Portal loads case data again."
+  },
+  {
+    "id": "2026-05-26-breadcrumbs",
+    "date": "2026-05-26",
+    "title": "Consistent breadcrumbs across the platform",
+    "description": "All 11 audited pages now show a 3-segment breadcrumb (ReloPass / Section / Page) inline above the H1."
+  }
+]

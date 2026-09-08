@@ -1,0 +1,14 @@
+{
+  "name": "case-command-rule-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Test harness for the Case Command deterministic rule engine. Scoped to this directory on purpose: audos-workspace-776786 is an Audos-published artifact folder with no build tooling, and rule-engine.ts is pure dependency-free TypeScript. Keeping the harness here means it never touches the frontend bundle budget, the frontend vitest run, or CI.",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}

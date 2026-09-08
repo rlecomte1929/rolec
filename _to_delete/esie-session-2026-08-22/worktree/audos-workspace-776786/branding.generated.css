@@ -1,0 +1,54 @@
+:root {
+  --space-brand-primary: #2a93e0;
+  --space-brand-highlight: #38c6de;
+  --space-brand-contrast: #38c6de;
+  --space-brand-primary-50: #e9f4fc;
+  --space-brand-primary-100: #d3e9fa;
+  --space-brand-primary-200: #a9d3f4;
+  --space-brand-primary-500: #3a9ee4;
+  --space-brand-primary-600: #2a93e0;
+  --space-brand-primary-700: #1f7bc0;
+  --space-brand-primary-900: #14568a;
+  --space-brand-highlight-50: #e8fbfd;
+  --space-brand-highlight-100: #d1f6fa;
+  --space-brand-highlight-200: #a6ecf3;
+  --space-brand-highlight-500: #45cfe4;
+  --space-brand-highlight-600: #38c6de;
+  --space-brand-highlight-700: #2aa6bd;
+  --space-brand-highlight-900: #1d7c8e;
+  --space-surface-page: #0b1620;
+  --space-surface-page-alt: #0f1e2a;
+  --space-surface-gradient-from: #0b1620;
+  --space-surface-gradient-via: #10212e;
+  --space-surface-gradient-to: #0a2733;
+  --space-surface-card: #142430;
+  --space-surface-card-hover: #1a2e3c;
+  --space-surface-panel: #172935;
+  --space-surface-panel-strong: #1d3242;
+  --space-surface-muted: #0f1c26;
+  --space-surface-accent-soft: #123642;
+  --space-border-default: #24384a;
+  --space-border-strong: #33506a;
+  --space-text-primary: #eaf2f8;
+  --space-text-secondary: #a7c2d3;
+  --space-text-brand: #ffffff;
+  --space-text-accent: #38c6de;
+  --space-text-muted: #7f9bad;
+  --space-text-on-primary: #111827;
+  --space-text-on-highlight: #062028;
+  --space-text-on-contrast: #062028;
+  --space-semantic-success: #16a34a;
+  --space-semantic-warning: #d97706;
+  --space-semantic-danger: #dc2626;
+  --space-shell-button-text: #111827;
+  --space-shell-accent-button-text: #062028;
+  --space-shell-dock-text: #111827;
+  --space-shell-icon: #38c6de;
+  --space-shell-shadow: #071019;
+  --space-shell-shadow-strong: #041a26;
+}
+
+body {
+  color: var(--space-text-primary);
+  background: var(--space-surface-page);
+}

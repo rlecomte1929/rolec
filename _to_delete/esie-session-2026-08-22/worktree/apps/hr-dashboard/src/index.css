@@ -1,0 +1,56 @@
+/*
+ * apps/hr-dashboard global styles.
+ *
+ * The C1-11D design tokens live at design/system/tokens.css (root of repo).
+ * We import them here so every page in this app gets --rp-* custom props
+ * without any per-route boilerplate. Tailwind utility classes hand them off
+ * via the theme.extend block in tailwind.config.js.
+ */
+
+@import '../../../design/system/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--rp-font-family-sans, 'Inter', system-ui, sans-serif);
+  color: var(--rp-text-primary);
+  background-color: var(--rp-surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Keyboard-only focus ring uses the design system's dedicated focus shadow
+ * token (the C1-11D README mandates this over the default outline). */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--rp-shadow-focus);
+}
+
+/* C1-11e bbox-highlight flash. 200ms fade-in / 400ms hold / 200ms fade-out
+ * per the design brief, using the design-system motion tokens for easing. */
+@keyframes rp-bbox-flash {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-bbox-flash {
+  animation: rp-bbox-flash 800ms var(--rp-easing-out, ease-out) 1;
+}

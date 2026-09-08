@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "corridor": "IN_DE",
+    "verification_status": "representative",
+    "note": "Synthetic dossier. Indian (non-EU) national relocating to Germany on a long-term assignment — German skilled-worker residence permit (AufenthG §18b). A future Blue Card regime (AufenthG §18g) would refine this. Needs human curation against live German immigration rules.",
+    "source": "WS-B seed corpus (deterministic regime router)"
+  },
+  "profile": {
+    "nationality": "Indian",
+    "origin_country": "India",
+    "destination_country": "Germany",
+    "contract_type": "lta"
+  },
+  "eligibility_verdict": {
+    "outcome_set": [
+      "ELIGIBLE_BLUE_CARD"
+    ],
+    "citations": [
+      "EU_DIR_2021_1883",
+      "DE_AUFENTHG_18G:2026"
+    ]
+  }
+}

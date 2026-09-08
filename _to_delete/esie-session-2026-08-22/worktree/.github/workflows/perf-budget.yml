@@ -1,0 +1,169 @@
+name: Perf budget (authed latency)
+
+# [AIQ-1014/PERF-4] Scheduled authenticated-latency budget gate. Runs the PERF-1
+# harness (scripts/perf_authed_harness.py) against prod and:
+#   - surfaces the *aspirational* 2s/3s p95/max breaches as ::warning:: (for trend),
+#   - hard-FAILS (notifies) only on a *regression* ceiling (p95 > 3s or max > 5s)
+#     or a persona login outage — so it's green at today's warm baseline
+#     (~0.6-2.8s, see docs/performance/authed_audit_2026-06.md) but catches real
+#     regressions and outages.
+#
+# [AIQ-2038] Three changes, because the gate had become decoration: 5 failures and
+# 3 passes in the 8 runs to 2026-08-21, which trains everyone to ignore it.
+#   1. WARM FIRST. `rolec-eu` is on Render's `free` plan and spins down after ~15
+#      min idle. A free instance is not slow for one request after waking, it is
+#      slow for a while — cold imports, unfilled pool, cold query plans. The
+#      harness only discards ONE request per endpoint as `cold`, so boot slowness
+#      leaked into the "warm" numbers it asserts on.
+#   2. SAY WHICH FAILURE IT IS. An asleep instance and a shipped N+1 both showed
+#      up as the same red X, so neither could be acted on. Waking now WARNS;
+#      only an already-warm breach can FAIL.
+#   3. CONFIRM BEFORE FAILING. A breach is re-measured once in the same run and
+#      fails only if it repeats. Measured 2026-08-21: of five breaching endpoints,
+#      four were environmental (hr/command-center/cases 7939ms in CI vs 953ms
+#      warm) and one was real (employee/assignments/overview, over ceiling while
+#      warm). Confirming separates them without waiting for the next cron.
+#
+# NOT run on PRs: it needs prod + costs metered Actions minutes. Scheduled a few
+# times a day during business hours + manual dispatch.
+#
+# Credentials: the harness defaults to the shared demo accounts (already in the
+# script). To override (e.g. after a demo-cred rotation), add repo secrets
+# PERF_ADMIN_PW / PERF_HR_PW / PERF_EMP_PW via the GitHub web UI (gh secret set
+# from a no-TTY shell silently stores EMPTY). The run step only exports them when
+# non-empty, so an unset secret falls back to the harness default rather than
+# clobbering it with "".
+
+on:
+  schedule:
+    # 08:00, 13:00, 17:00 UTC, Mon-Fri — ~3 runs/day, low metered-minute cost.
+    - cron: "0 8,13,17 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      p95_regression_ms:
+        description: "Hard-fail if any warm p95 exceeds this (ms)."
+        default: "3000"
+        required: false
+      max_regression_ms:
+        description: "Hard-fail if any warm max exceeds this (ms)."
+        default: "5000"
+        required: false
+      samples:
+        description: "Warm samples per endpoint."
+        default: "6"
+        required: false
+
+concurrency:
+  group: perf-budget
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  budget:
+    name: Authed latency budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Wake and warm the instance
+        id: warm
+        # The instance may have been asleep for hours. Poll /health until it answers
+        # quickly and consistently, and record whether we had to wake it — that flag is
+        # what lets the evaluator tell infrastructure from a regression.
+        run: |
+          set -uo pipefail
+          BASE="https://api.relopass.com"
+          first=""; fast=0; asleep=false
+          for _ in $(seq 1 45); do
+            ms=$(curl -s -o /dev/null -w '%{time_total}' --max-time 30 "$BASE/health" || echo "30")
+            ms=$(python3 -c "print(int(float('$ms')*1000))")
+            [ -z "$first" ] && first=$ms && echo "first /health: ${ms}ms"
+            if [ "$ms" -lt 500 ]; then fast=$((fast+1)); else fast=0; fi
+            [ "$fast" -ge 3 ] && break
+            sleep 2
+          done
+          # >3s on the first touch means it was spun down (warm /health is ~50-250ms).
+          [ "$first" -gt 3000 ] && asleep=true
+          echo "was_asleep=$asleep" >> "$GITHUB_OUTPUT"
+          echo "first_ms=$first"   >> "$GITHUB_OUTPUT"
+          echo "Warm-up done: first=${first}ms, consecutive_fast=$fast, was_asleep=$asleep"
+
+      - name: Run authed latency harness
+        env:
+          SAMPLES: ${{ github.event.inputs.samples || '6' }}
+          SECRET_ADMIN_PW: ${{ secrets.PERF_ADMIN_PW }}
+          SECRET_HR_PW: ${{ secrets.PERF_HR_PW }}
+          SECRET_EMP_PW: ${{ secrets.PERF_EMP_PW }}
+        run: |
+          set -euo pipefail
+          # Only export creds when the secret is actually set — otherwise leave
+          # unset so the harness uses its baked-in demo defaults (never "").
+          [ -n "${SECRET_ADMIN_PW:-}" ] && export PERF_ADMIN_PW="$SECRET_ADMIN_PW"
+          [ -n "${SECRET_HR_PW:-}" ] && export PERF_HR_PW="$SECRET_HR_PW"
+          [ -n "${SECRET_EMP_PW:-}" ] && export PERF_EMP_PW="$SECRET_EMP_PW"
+          python3 scripts/perf_authed_harness.py \
+            --json --samples "$SAMPLES" --delay-ms 600 \
+            > perf.json
+          echo "Harness run complete."
+
+      - name: Detect breaches (first pass)
+        id: detect
+        env:
+          REG_P95: ${{ github.event.inputs.p95_regression_ms || '3000' }}
+          REG_MAX: ${{ github.event.inputs.max_regression_ms || '5000' }}
+        run: |
+          set -uo pipefail
+          # Detection only — this must not fail the job, because a single breach on a shared
+          # free instance is not yet evidence of anything. It sets `breached` so the next
+          # step knows whether a second measurement is worth the minutes.
+          python3 scripts/perf_budget_verdict.py perf.json \
+            --regression-p95 "$REG_P95" --regression-max "$REG_MAX" \
+            --github-output "$GITHUB_OUTPUT" || true
+
+      - name: Re-measure to confirm (only when warm and only when something breached)
+        if: steps.detect.outputs.breached == 'true' && steps.warm.outputs.was_asleep != 'true'
+        env:
+          SAMPLES: ${{ github.event.inputs.samples || '6' }}
+          SECRET_ADMIN_PW: ${{ secrets.PERF_ADMIN_PW }}
+          SECRET_HR_PW: ${{ secrets.PERF_HR_PW }}
+          SECRET_EMP_PW: ${{ secrets.PERF_EMP_PW }}
+        run: |
+          set -euo pipefail
+          [ -n "${SECRET_ADMIN_PW:-}" ] && export PERF_ADMIN_PW="$SECRET_ADMIN_PW"
+          [ -n "${SECRET_HR_PW:-}" ] && export PERF_HR_PW="$SECRET_HR_PW"
+          [ -n "${SECRET_EMP_PW:-}" ] && export PERF_EMP_PW="$SECRET_EMP_PW"
+          python3 scripts/perf_authed_harness.py \
+            --json --samples "$SAMPLES" --delay-ms 600 \
+            > perf-confirm.json
+          echo "Confirmation run complete."
+
+      - name: Verdict (warn aspirational, fail only on a confirmed warm regression)
+        env:
+          REG_P95: ${{ github.event.inputs.p95_regression_ms || '3000' }}
+          REG_MAX: ${{ github.event.inputs.max_regression_ms || '5000' }}
+          WAS_ASLEEP: ${{ steps.warm.outputs.was_asleep }}
+        run: |
+          set -uo pipefail
+          ARGS=""
+          [ -f perf-confirm.json ] && ARGS="--confirm perf-confirm.json"
+          [ "$WAS_ASLEEP" = "true" ] && ARGS="$ARGS --was-asleep"
+          # shellcheck disable=SC2086
+          python3 scripts/perf_budget_verdict.py perf.json $ARGS \
+            --regression-p95 "$REG_P95" --regression-max "$REG_MAX"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: perf-budget-${{ github.run_id }}
+          path: |
+            perf.json
+            perf-confirm.json
+          retention-days: 30

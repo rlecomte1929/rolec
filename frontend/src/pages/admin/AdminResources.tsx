@@ -111,7 +111,7 @@ export const AdminResources: React.FC = () => {
 
   if (role !== 'ADMIN') {
     return (
-      <AdminLayout title="Resources" subtitle="Restricted">
+      <AdminLayout title="Resources CMS" subtitle="Restricted">
         <Card padding="lg">You do not have access to the Resources CMS. Admin only.</Card>
       </AdminLayout>
     );
@@ -127,7 +127,7 @@ export const AdminResources: React.FC = () => {
 
   if (view === 'list') {
     return (
-      <AdminLayout title="Resources" subtitle="Country content: housing, schools, movers, events">
+      <AdminLayout title="Resources CMS" subtitle="Country content: housing, schools, movers, events">
         <div className="mb-4">
           <Link to={buildRoute('adminResources')} className="text-sm text-[#0b2b43] hover:underline">← Back to Resources</Link>
         </div>
@@ -208,7 +208,7 @@ export const AdminResources: React.FC = () => {
   }
 
   return (
-    <AdminLayout title="Resources" subtitle="Country content: housing, schools, movers, events">
+    <AdminLayout title="Resources CMS" subtitle="Country content: housing, schools, movers, events">
       <div className="space-y-6">
         {countsError && (
           <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">

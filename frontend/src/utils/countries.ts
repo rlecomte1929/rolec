@@ -35,6 +35,7 @@ const DESTINATION_COUNTRIES_BY_CODE: CountryOption[] = [
   { code: 'CZ', name: 'Czech Republic', cities: ['Brno', 'České Budějovice', 'Hradec Králové', 'Liberec', 'Olomouc', 'Ostrava', 'Pardubice', 'Pilsen', 'Prague', 'Ústí nad Labem'] },
   { code: 'DE', name: 'Germany', cities: ['Berlin', 'Bremen', 'Cologne', 'Dortmund', 'Dresden', 'Duisburg', 'Düsseldorf', 'Essen', 'Frankfurt', 'Hamburg', 'Hannover', 'Leipzig', 'Munich', 'Nuremberg', 'Stuttgart'] },
   { code: 'DK', name: 'Denmark', cities: ['Aalborg', 'Aarhus', 'Copenhagen', 'Esbjerg', 'Frederiksberg', 'Gentofte', 'Gladsaxe', 'Kolding', 'Odense', 'Randers'] },
+  { code: 'EC', name: 'Ecuador', cities: ['Cuenca', 'Guayaquil', 'Manta', 'Quito'] },
   { code: 'ES', name: 'Spain', cities: ['Barcelona', 'Bilbao', 'Las Palmas', 'Madrid', 'Málaga', 'Murcia', 'Palma', 'Seville', 'Valencia', 'Zaragoza'] },
   { code: 'FI', name: 'Finland', cities: ['Espoo', 'Helsinki', 'Jyväskylä', 'Kuopio', 'Lahti', 'Oulu', 'Pori', 'Tampere', 'Turku', 'Vantaa'] },
   { code: 'FR', name: 'France', cities: ['Bordeaux', 'Grenoble', 'Lille', 'Lyon', 'Marseille', 'Montpellier', 'Nantes', 'Nice', 'Paris', 'Reims', 'Rennes', 'Saint-Étienne', 'Strasbourg', 'Toulon', 'Toulouse'] },
@@ -83,6 +84,16 @@ export function getCountryName(codeOrName: string | null | undefined): string {
   if (!v) return '';
   const byCode = DESTINATION_COUNTRIES.find((c) => c.code.toLowerCase() === v.toLowerCase());
   if (byCode) return byCode.name;
+  const byName = DESTINATION_COUNTRIES.find((c) => c.name.toLowerCase() === v.toLowerCase());
+  if (byName) return byName.name;
+  // Catalog keys are stored as FULL UPPERCASE names (`SINGAPORE`, `UNITED KINGDOM`).
+  if (v.length > 2 && /^[A-Z0-9][A-Z0-9\s]+$/.test(v)) {
+    return v
+      .toLowerCase()
+      .split(/\s+/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
   return v;
 }
 

@@ -1,0 +1,123 @@
+/**
+ * platform-v2 feature flags.
+ *
+ * Each ported screen has its own flag. Convention follows the existing
+ * `frontend/src/featureFlags.ts` (build-time env var, only the literal string
+ * `'true'` enables) but adds a localStorage override so flags can be flipped
+ * in the browser without a rebuild — essential for dogfooding and side-by-side
+ * QA.
+ *
+ * Resolution order (first wins):
+ *   1. localStorage[`platform_v2_<key>`] — `'on'` / `'off'`
+ *   2. import.meta.env[`VITE_PLATFORM_V2_<KEY>`] — `'true'` = on
+ *   3. default false
+ *
+ * To enable a flag for one user / one session, open DevTools console:
+ *   localStorage.setItem('platform_v2_companies', 'on')
+ * To clear:
+ *   localStorage.removeItem('platform_v2_companies')
+ *
+ * To enable a flag for an environment, set the env var in Render (or
+ * `.env.local` for dev). Once a flag is default-on for everyone, delete it
+ * here AND delete the legacy code path it gated.
+ */
+
+export type V2FlagKey =
+  // Phase 0 proof — read-only admin screen
+  | 'companies'
+  // Resizable + drag-reorder columns on Companies V2 table (additive — see
+  // features/platform-v2/data-table/ for the primitive)
+  | 'companies_resizable'
+  // Phase 1 — HR command center surface
+  | 'mobility_control'
+  // Resizable + drag-reorder columns on Provider Grid V2
+  | 'provider_grid_resizable'
+  | 'company_profile'
+  | 'inbox'
+  | 'employee_policy'
+  // Phase 2 — policy stack (gated behind canonical-benefits decision)
+  | 'policy_builder'
+  | 'policy_reality'
+  | 'exceptions'
+  // Phase 3 — employee intake redesign
+  | 'intake_detailed'
+  | 'profile_rich'
+  // Phase 4 — new schema work
+  | 'requirements_discovery'
+  | 'roadmap_tracks'
+  // Phase 5 — admin polish
+  | 'admin_overview'
+  | 'review_queue'
+  | 'ops_analytics'
+  // HR-side backlog of pending employee tasks (own company only)
+  | 'hr_backlog';
+
+const LS_PREFIX = 'platform_v2_';
+const ENV_PREFIX = 'VITE_PLATFORM_V2_';
+
+const ENV: Record<string, string | undefined> = (import.meta.env ?? {});
+
+function readEnv(key: V2FlagKey): boolean {
+  const raw = ENV[ENV_PREFIX + key.toUpperCase()];
+  return typeof raw === 'string' && raw.trim().toLowerCase() === 'true';
+}
+
+function readLocalStorage(key: V2FlagKey): boolean | null {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  try {
+    const raw = window.localStorage.getItem(LS_PREFIX + key);
+    if (raw === 'on') return true;
+    if (raw === 'off') return false;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * [AIQ-759] Flags that default ON for everyone — no env var or localStorage
+ * needed. A per-session localStorage `'off'` override still wins (so it can be
+ * disabled for QA), and the legacy code path it gated stays as a one-release
+ * fallback. `companies_resizable` ships the resize + drag-reorder + persisted-
+ * layout admin companies table (CompaniesV2Table) as the default; the legacy
+ * hand-written <table> branch in CompaniesV2.tsx remains the fallback.
+ */
+const DEFAULT_ON: ReadonlyArray<V2FlagKey> = ['companies_resizable'];
+
+export function isV2FlagOn(key: V2FlagKey): boolean {
+  const ls = readLocalStorage(key);
+  if (ls !== null) return ls;
+  if (readEnv(key)) return true;
+  return DEFAULT_ON.includes(key);
+}
+
+export function setV2FlagOverride(key: V2FlagKey, value: boolean | null): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    if (value === null) window.localStorage.removeItem(LS_PREFIX + key);
+    else window.localStorage.setItem(LS_PREFIX + key, value ? 'on' : 'off');
+  } catch {
+    /* ignore */
+  }
+}
+
+export const V2_FLAGS: ReadonlyArray<V2FlagKey> = [
+  'companies',
+  'companies_resizable',
+  'mobility_control',
+  'provider_grid_resizable',
+  'company_profile',
+  'inbox',
+  'employee_policy',
+  'policy_builder',
+  'policy_reality',
+  'exceptions',
+  'intake_detailed',
+  'profile_rich',
+  'requirements_discovery',
+  'roadmap_tracks',
+  'admin_overview',
+  'review_queue',
+  'ops_analytics',
+  'hr_backlog',
+];

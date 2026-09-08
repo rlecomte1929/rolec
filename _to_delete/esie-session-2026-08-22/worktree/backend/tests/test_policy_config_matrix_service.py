@@ -1,0 +1,690 @@
+"""
+Unit tests for PolicyConfigMatrixService (Compensation & Allowance) with an in-memory mock DB.
+
+Covers draft save validation, publish gate, employee/caps filtering, company scoping, and compare wiring.
+DB uniqueness (one published / one draft) is enforced in SQL migrations — we assert the atomic publish call here.
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+import unittest
+from unittest import mock
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+from backend.app.services.policy_config_matrix_service import (  # noqa: E402
+    CONFIG_KEY,
+    PolicyConfigMatrixService,
+    compute_targeting_signature,
+)
+
+
+def _dec(val_err: ValueError) -> dict:
+    return json.loads(str(val_err))
+
+
+class _StatefulPolicyDb:
+    """Minimal fake DB for PolicyConfigMatrixService tests."""
+
+    def __init__(self) -> None:
+        self.company_id = "co-test"
+        self.pc_id = "pc-test"
+        self._benefits: dict[str, list[dict]] = {}
+        self._version_meta: dict[str, dict] = {}
+        self.draft_id: str | None = None
+        self.published_id: str | None = None
+        self.publish_atomic_calls: list[str] = []
+        self.audit_rows: list[dict] = []
+        self._bid_seq = 0
+        # AIQ-873: extraction-import fakes.
+        self._extracted: dict[str, list[dict]] = {}
+        self._policy_company: dict[str, str] = {}
+        # E1b (AIQ-929): policy_documents extraction lineage.
+        self._document_company: dict[str, str] = {}
+
+    def seed_extracted(
+        self,
+        policy_id: str,
+        benefits: list[dict],
+        *,
+        company_id: str | None = None,
+        lineage: str = "company_policy",
+    ) -> None:
+        """Register an extracted policy (policy_extracted_benefits rows) for import
+        tests. ``lineage='document'`` registers the id in policy_documents only
+        (the canonical E1b path), so it resolves via get_policy_document and NOT
+        get_company_policy.
+        """
+        cid = company_id or self.company_id
+        if lineage == "document":
+            self._document_company[policy_id] = cid
+        else:
+            self._policy_company[policy_id] = cid
+        self._extracted[policy_id] = list(benefits)
+
+    def get_company_policy(self, policy_id: str) -> dict | None:
+        cid = self._policy_company.get(policy_id)
+        if cid is None:
+            return None
+        return {"id": policy_id, "company_id": cid}
+
+    def get_policy_document(self, policy_id: str, request_id: str | None = None) -> dict | None:
+        cid = self._document_company.get(policy_id)
+        if cid is None:
+            return None
+        return {"id": policy_id, "company_id": cid}
+
+    def list_policy_benefits(self, policy_id: str) -> list[dict]:
+        return list(self._extracted.get(policy_id, []))
+
+    def ensure_policy_config(self, company_id: str, config_key: str) -> dict:
+        return {"id": self.pc_id, "company_id": company_id, "config_key": config_key}
+
+    def get_policy_config_draft_for_config(self, pid: str) -> dict | None:
+        if not self.draft_id:
+            return None
+        return self._version_row(self.draft_id)
+
+    def get_latest_published_policy_config_version(self, company_id: str, config_key: str) -> dict | None:
+        if not self.published_id:
+            return None
+        return self._version_row(self.published_id)
+
+    def get_policy_config_version_row(self, vid: str) -> dict | None:
+        return self._version_row(vid)
+
+    def list_policy_config_benefits(self, vid: str) -> list[dict]:
+        return list(self._benefits.get(str(vid), []))
+
+    def max_policy_config_version_number(self, pid: str) -> int:
+        return 0
+
+    def insert_policy_config_version(self, pid, vernum, status, eff, created_by=None) -> str:
+        vid = f"v-{status}-{vernum}"
+        self._version_meta[vid] = {
+            "id": vid,
+            "policy_config_id": pid,
+            "version_number": vernum,
+            "status": status,
+            "effective_date": eff,
+            "published_at": None,
+        }
+        self._benefits[vid] = []
+        if status == "draft":
+            self.draft_id = vid
+        if status == "published":
+            self.published_id = vid
+        return vid
+
+    def insert_policy_config_benefit_row(self, row: dict) -> str:
+        vid = str(row["policy_config_version_id"])
+        self._bid_seq += 1
+        bid = str(row.get("id") or f"ben-{self._bid_seq}")
+        stored = dict(row)
+        stored["id"] = bid
+        self._benefits.setdefault(vid, []).append(stored)
+        return bid
+
+    def insert_policy_config_benefit_audit_row(self, row: dict) -> None:
+        self.audit_rows.append(dict(row))
+
+    def delete_policy_config_benefits_for_version(self, vid: str) -> None:
+        self._benefits[str(vid)] = []
+
+    def get_policy_config_version_with_config(self, vid: str) -> dict | None:
+        vm = self._version_meta.get(str(vid))
+        if not vm:
+            return None
+        return {**vm, "_company_id": self.company_id, "_config_key": CONFIG_KEY}
+
+    def publish_policy_config_version_atomic(self, vid: str) -> None:
+        self.publish_atomic_calls.append(str(vid))
+        vid = str(vid)
+        m = self._version_meta[vid]
+        if self.published_id and self.published_id != vid:
+            old = self._version_meta.get(self.published_id)
+            if old:
+                old["status"] = "archived"
+        m["status"] = "published"
+        m["published_at"] = "2025-03-01T00:00:00"
+        self.published_id = vid
+        self.draft_id = None
+
+    def update_policy_config_version_effective_date(self, vid: str, ed: str, only_if_draft: bool = True) -> None:
+        self._version_meta[str(vid)]["effective_date"] = ed[:10]
+
+    def _version_row(self, vid: str | None) -> dict | None:
+        if not vid:
+            return None
+        return self._version_meta.get(str(vid))
+
+
+class PolicyConfigMatrixServiceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.db = _StatefulPolicyDb()
+        self.svc = PolicyConfigMatrixService(self.db)
+
+    def test_put_draft_save_updates_benefits_and_effective_date(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-01-01")
+        body = {
+            "policy_version": vid,
+            "effective_date": "2025-06-15",
+            "categories": [
+                {
+                    "category_key": "tax_payroll",
+                    "benefits": [
+                        {
+                            "benefit_key": "tax_equalisation",
+                            "benefit_label": "Tax equalisation",
+                            "covered": True,
+                            "value_type": "text",
+                            "unit_frequency": "one_time",
+                            "notes": "Programme applies per policy letter.",
+                        }
+                    ],
+                }
+            ],
+        }
+        self.svc.put_draft(self.db.company_id, body)
+        self.assertEqual(self.db._version_meta[vid]["effective_date"], "2025-06-15")
+        bens = self.db.list_policy_config_benefits(vid)
+        self.assertEqual(len(bens), 1)
+        self.assertEqual(bens[0]["benefit_key"], "tax_equalisation")
+
+    def _manual_body(self, vid: str, amount: float) -> dict:
+        return {
+            "policy_version": vid,
+            "effective_date": "2025-06-15",
+            "categories": [
+                {
+                    "category_key": "compensation_allowances",
+                    "benefits": [
+                        {
+                            "benefit_key": "cola",
+                            "benefit_label": "COLA",
+                            "covered": True,
+                            "value_type": "currency",
+                            "amount_value": amount,
+                            "currency_code": "USD",
+                            "unit_frequency": "monthly",
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def test_put_draft_stamps_manual_hr_provenance(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-01-01")
+        self.svc.put_draft(self.db.company_id, self._manual_body(vid, 1000), changed_by="user-1")
+        bens = self.db.list_policy_config_benefits(vid)
+        self.assertEqual(len(bens), 1)
+        self.assertEqual(bens[0]["source"], "manual_hr")
+        self.assertIs(bens[0]["auto_generated"], False)
+
+    def test_put_draft_writes_audit_row_on_new_benefit(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-01-01")
+        self.svc.put_draft(self.db.company_id, self._manual_body(vid, 1000), changed_by="user-1")
+        self.assertEqual(len(self.db.audit_rows), 1)
+        a = self.db.audit_rows[0]
+        self.assertEqual(a["action"], "insert")
+        self.assertIsNone(a["old_value"])
+        self.assertEqual(a["new_value"]["amount_value"], 1000)
+        self.assertEqual(a["changed_by"], "user-1")
+        self.assertEqual(a["source"], "manual_hr")
+        self.assertEqual(str(a["policy_config_version_id"]), vid)
+
+    def test_put_draft_audit_captures_old_value_on_update(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-01-01")
+        self.svc.put_draft(self.db.company_id, self._manual_body(vid, 1000), changed_by="user-1")
+        self.db.audit_rows.clear()
+        self.svc.put_draft(self.db.company_id, self._manual_body(vid, 2000), changed_by="user-2")
+        self.assertEqual(len(self.db.audit_rows), 1)
+        a = self.db.audit_rows[0]
+        self.assertEqual(a["action"], "update")
+        self.assertEqual(a["old_value"]["amount_value"], 1000)
+        self.assertEqual(a["new_value"]["amount_value"], 2000)
+        self.assertEqual(a["changed_by"], "user-2")
+
+    def test_put_draft_uses_batched_replace_when_available(self) -> None:
+        # AIQ-1070: when the DB exposes replace_policy_config_benefits, put_draft
+        # must use it (one atomic batched write) instead of the per-row loop, and
+        # each audit row must reference its benefit's pre-generated id.
+        class _BatchDb(_StatefulPolicyDb):
+            def __init__(self) -> None:
+                super().__init__()
+                self.replace_calls: list = []
+
+            def replace_policy_config_benefits(self, vid, rows, audit_rows=None):
+                self.replace_calls.append(
+                    (str(vid), [dict(r) for r in rows], [dict(a) for a in (audit_rows or [])])
+                )
+                self._benefits[str(vid)] = []
+                for row in rows:
+                    self._bid_seq += 1
+                    stored = dict(row)
+                    stored["id"] = str(row.get("id") or f"ben-{self._bid_seq}")
+                    self._benefits.setdefault(str(vid), []).append(stored)
+                for a in (audit_rows or []):
+                    self.audit_rows.append(dict(a))
+
+        db = _BatchDb()
+        svc = PolicyConfigMatrixService(db)
+        vid = db.insert_policy_config_version(db.pc_id, 1, "draft", "2025-01-01")
+        svc.put_draft(db.company_id, self._manual_body(vid, 1500), changed_by="user-9")
+        self.assertEqual(len(db.replace_calls), 1)  # one atomic batched call, not a per-row loop
+        _v, rows, arows = db.replace_calls[0]
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0].get("id"))
+        self.assertEqual(arows[0]["benefit_id"], rows[0]["id"])
+        self.assertEqual(db.list_policy_config_benefits(vid)[0]["source"], "manual_hr")
+
+    def test_validate_put_body_rejects_missing_policy_version(self) -> None:
+        with self.assertRaises(ValueError) as ctx:
+            self.svc.validate_put_body({"effective_date": "2025-01-01", "categories": [{"category_key": "tax_payroll", "benefits": []}]})
+        d = _dec(ctx.exception)
+        self.assertEqual(d["code"], "validation_error")
+        self.assertTrue(any(e["field"] == "policy_version" for e in d["errors"]))
+
+    def test_validate_put_body_rejects_currency_amount_without_currency_code(self) -> None:
+        body = {
+            "policy_version": "v1",
+            "effective_date": "2025-01-01",
+            "categories": [
+                {
+                    "category_key": "compensation_allowances",
+                    "benefits": [
+                        {
+                            "benefit_key": "cola",
+                            "benefit_label": "COLA",
+                            "covered": True,
+                            "value_type": "currency",
+                            "amount_value": 500,
+                            "unit_frequency": "monthly",
+                        }
+                    ],
+                }
+            ],
+        }
+        with self.assertRaises(ValueError) as ctx:
+            self.svc.validate_put_body(body)
+        d = _dec(ctx.exception)
+        self.assertTrue(any("currency_code" in str(e.get("message", "")).lower() for e in d["errors"]))
+
+    def test_put_draft_wrong_company_raises(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-01-01")
+        body = {
+            "policy_version": vid,
+            "effective_date": "2025-02-01",
+            "categories": [
+                {
+                    "category_key": "tax_payroll",
+                    "benefits": [
+                        {
+                            "benefit_key": "tax_equalisation",
+                            "benefit_label": "Tax equalisation",
+                            "covered": False,
+                            "value_type": "none",
+                            "unit_frequency": "one_time",
+                        }
+                    ],
+                }
+            ],
+        }
+
+        real = self.db.get_policy_config_version_with_config
+
+        def _wrong_company(v: str):
+            m = self.db._version_meta.get(str(v))
+            if not m:
+                return None
+            return {**m, "_company_id": "intruder-corp", "_config_key": CONFIG_KEY}
+
+        self.db.get_policy_config_version_with_config = _wrong_company  # type: ignore[method-assign]
+        try:
+            with self.assertRaises(KeyError) as ctx:
+                self.svc.put_draft(self.db.company_id, body)
+            self.assertEqual(str(ctx.exception), "'draft_not_found'")
+        finally:
+            self.db.get_policy_config_version_with_config = real  # type: ignore[method-assign]
+
+    def test_apply_template_marks_rows_template_default(self) -> None:
+        self.svc.apply_template_to_draft(self.db.company_id, template_key="standard", created_by="u1")
+        bens = self.db.list_policy_config_benefits(self.db.draft_id)
+        self.assertGreater(len(bens), 0)
+        self.assertTrue(all(b.get("source") == "template_default" for b in bens))
+        self.assertTrue(all(b.get("auto_generated") for b in bens))
+
+    def test_ensure_draft_seed_rows_marked_seeded(self) -> None:
+        self.svc.ensure_draft(self.db.company_id, created_by="u1")
+        bens = self.db.list_policy_config_benefits(self.db.draft_id)
+        self.assertGreater(len(bens), 0)
+        self.assertTrue(all(b.get("source") == "seeded" for b in bens))
+
+    def test_ensure_draft_clone_preserves_source(self) -> None:
+        pub_vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "published", "2025-01-01")
+        self.db.insert_policy_config_benefit_row(
+            {
+                "policy_config_version_id": pub_vid, "benefit_key": "cola", "benefit_label": "COLA",
+                "category": "compensation_allowances", "covered": True, "value_type": "currency",
+                "amount_value": 1000, "currency_code": "USD", "unit_frequency": "monthly",
+                "targeting_signature": "global", "source": "manual_hr", "auto_generated": False,
+            }
+        )
+        self.svc.ensure_draft(self.db.company_id, created_by="u1")
+        bens = self.db.list_policy_config_benefits(self.db.draft_id)
+        cola = next(b for b in bens if b["benefit_key"] == "cola")
+        self.assertEqual(cola["source"], "manual_hr")
+
+    def test_publish_requires_effective_date(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "")
+        self.db._version_meta[vid]["effective_date"] = None
+        with self.assertRaises(ValueError) as ctx:
+            self.svc.publish_draft(self.db.company_id, policy_version_id=vid, created_by=None)
+        d = _dec(ctx.exception)
+        self.assertTrue(any(e["field"] == "effective_date" for e in d["errors"]))
+
+    def test_publish_calls_atomic_and_returns_published_payload(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-04-01")
+        self.db.insert_policy_config_benefit_row(
+            {
+                "policy_config_version_id": vid,
+                "benefit_key": "mobility_premium",
+                "benefit_label": "Mobility premium",
+                "category": "compensation_allowances",
+                "covered": True,
+                "value_type": "currency",
+                "amount_value": 1000,
+                "currency_code": "USD",
+                "unit_frequency": "monthly",
+                "cap_rule_json": {},
+                "conditions_json": {},
+                "assignment_types": [],
+                "family_statuses": [],
+                "targeting_signature": compute_targeting_signature([], []),
+                "is_active": True,
+                "display_order": 0,
+            }
+        )
+        out = self.svc.publish_draft(self.db.company_id, policy_version_id=vid, created_by="u1")
+        self.assertEqual(self.db.publish_atomic_calls, [vid])
+        self.assertEqual(out.get("status"), "published")
+        self.assertEqual(out.get("source"), "published")
+
+    def _seed_publishable(self) -> str:
+        """Insert a draft version + one benefit row so publish_draft can run. Returns vid."""
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-04-01")
+        self.db.insert_policy_config_benefit_row(
+            {
+                "policy_config_version_id": vid,
+                "benefit_key": "mobility_premium",
+                "benefit_label": "Mobility premium",
+                "category": "compensation_allowances",
+                "covered": True,
+                "value_type": "currency",
+                "amount_value": 1000,
+                "currency_code": "USD",
+                "unit_frequency": "monthly",
+                "cap_rule_json": {},
+                "conditions_json": {},
+                "assignment_types": [],
+                "family_statuses": [],
+                "targeting_signature": compute_targeting_signature([], []),
+                "is_active": True,
+                "display_order": 0,
+            }
+        )
+        return vid
+
+    def test_publish_defers_reindex_when_hook_provided(self) -> None:
+        # AIQ-1642: with a defer hook the RAG re-index leaves the request path — the hook
+        # is called with the company id, and index_company_policy is NOT run inline (that
+        # blocking OpenAI call + chunk-insert loop is what made publish take 20-40s).
+        vid = self._seed_publishable()
+        hook = mock.Mock()
+        with mock.patch(
+            "backend.app.services.policy_chunk_indexer.index_company_policy"
+        ) as m_index:
+            self.svc.publish_draft(
+                self.db.company_id, policy_version_id=vid, created_by="u1", defer_reindex=hook
+            )
+        m_index.assert_not_called()
+        hook.assert_called_once_with(self.db.company_id)
+        self.assertEqual(self.db.publish_atomic_calls, [vid])
+
+    def test_publish_reindexes_inline_without_hook(self) -> None:
+        # Backward compat: callers that don't defer (test-drive provisioning, other code)
+        # still get the inline re-index.
+        vid = self._seed_publishable()
+        with mock.patch(
+            "backend.app.services.policy_chunk_indexer.index_company_policy"
+        ) as m_index:
+            self.svc.publish_draft(self.db.company_id, policy_version_id=vid, created_by="u1")
+        m_index.assert_called_once_with(self.db.company_id)
+
+    def test_publish_records_duration_ms(self) -> None:
+        # AIQ-1642: the on-request-path publish duration is emitted so <5s is measurable.
+        vid = self._seed_publishable()
+        with mock.patch("backend.app.services.policy_chunk_indexer.index_company_policy"), \
+                mock.patch("backend.app.services.analytics_service.emit_event") as m_emit:
+            self.svc.publish_draft(self.db.company_id, policy_version_id=vid, created_by="u1")
+        pub_calls = [c for c in m_emit.call_args_list if c.args and c.args[0] == "policy_published"]
+        self.assertEqual(len(pub_calls), 1)
+        self.assertIn("duration_ms", pub_calls[0].kwargs)
+        self.assertIsNotNone(pub_calls[0].kwargs["duration_ms"])
+
+    def test_ensure_draft_reuses_existing_without_second_version_insert(self) -> None:
+        calls = {"n": 0}
+        orig = self.db.insert_policy_config_version
+
+        def wrapped(*a, **k):
+            calls["n"] += 1
+            return orig(*a, **k)
+
+        self.db.insert_policy_config_version = wrapped  # type: ignore[method-assign]
+        self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-01-01")
+        self.assertEqual(calls["n"], 1)
+        self.svc.ensure_draft(self.db.company_id, created_by="u")
+        self.assertEqual(calls["n"], 1)
+        self.svc.ensure_draft(self.db.company_id, created_by="u")
+        self.assertEqual(calls["n"], 1)
+
+    def test_employee_grouped_payload_only_covered_applicable_rows(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "published", "2025-01-01")
+        self.db.published_id = vid
+        rows = [
+            {
+                "benefit_key": "global_row",
+                "benefit_label": "G",
+                "category": "compensation_allowances",
+                "covered": True,
+                "value_type": "none",
+                "assignment_types": [],
+                "family_statuses": [],
+                "is_active": True,
+            },
+            {
+                "benefit_key": "hidden",
+                "benefit_label": "H",
+                "category": "compensation_allowances",
+                "covered": False,
+                "value_type": "none",
+                "assignment_types": [],
+                "family_statuses": [],
+                "is_active": True,
+            },
+            {
+                "benefit_key": "lta_only",
+                "benefit_label": "LTA",
+                "category": "compensation_allowances",
+                "covered": True,
+                "value_type": "none",
+                "assignment_types": ["long_term"],
+                "family_statuses": [],
+                "is_active": True,
+            },
+        ]
+        for r in rows:
+            self.db.insert_policy_config_benefit_row(
+                {
+                    "policy_config_version_id": vid,
+                    **r,
+                    "unit_frequency": "one_time",
+                    "cap_rule_json": {},
+                    "conditions_json": {},
+                    "targeting_signature": compute_targeting_signature(r.get("assignment_types") or [], []),
+                    "display_order": 0,
+                }
+            )
+        payload = self.svc.employee_grouped_payload(
+            self.db.company_id, assignment_type=None, family_status=None
+        )
+        self.assertTrue(payload.get("has_policy_config"))
+        flat = []
+        for c in payload.get("categories") or []:
+            flat.extend(c.get("benefits") or [])
+        keys = {b.get("benefit_key") for b in flat}
+        self.assertIn("global_row", keys)
+        self.assertNotIn("hidden", keys)
+        self.assertNotIn("lta_only", keys)
+
+    def test_caps_payload_normalizes_currency_cap(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "published", "2025-01-01")
+        self.db.published_id = vid
+        self.db.insert_policy_config_benefit_row(
+            {
+                "policy_config_version_id": vid,
+                "benefit_key": "host_housing_cap",
+                "benefit_label": "Housing",
+                "category": "compensation_allowances",
+                "covered": True,
+                "value_type": "currency",
+                "amount_value": 5000,
+                "currency_code": "USD",
+                "unit_frequency": "monthly",
+                "cap_rule_json": {"cap_amount": 3000, "currency": "USD"},
+                "conditions_json": {},
+                "assignment_types": [],
+                "family_statuses": [],
+                "targeting_signature": "global",
+                "is_active": True,
+                "display_order": 0,
+            }
+        )
+        cap = self.svc.caps_payload(self.db.company_id, assignment_type=None, family_status=None, benefit_keys=None)
+        self.assertTrue(cap["metadata"].get("has_published_config"))
+        self.assertTrue(any(c.get("benefit_key") == "host_housing_cap" for c in cap["caps"]))
+        row = next(c for c in cap["caps"] if c.get("benefit_key") == "host_housing_cap")
+        self.assertEqual(row.get("normalized_cap_type"), "currency_amount")
+        self.assertEqual(row.get("normalized_amount"), 3000.0)
+
+    def test_compare_provider_estimates_wires_through(self) -> None:
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "published", "2025-01-01")
+        self.db.published_id = vid
+        self.db.insert_policy_config_benefit_row(
+            {
+                "policy_config_version_id": vid,
+                "benefit_key": "movers",
+                "benefit_label": "Movers",
+                "category": "relocation_assistance",
+                "covered": True,
+                "value_type": "currency",
+                "amount_value": 10000,
+                "currency_code": "USD",
+                "unit_frequency": "one_time",
+                "cap_rule_json": {},
+                "conditions_json": {},
+                "assignment_types": [],
+                "family_statuses": [],
+                "targeting_signature": "global",
+                "is_active": True,
+                "display_order": 0,
+            }
+        )
+        out = self.svc.compare_provider_estimates_to_published_caps(
+            self.db.company_id,
+            assignment_type=None,
+            family_status=None,
+            estimates=[{"benefit_key": "movers", "amount": 50, "currency": "USD"}],
+        )
+        self.assertIn("results", out)
+        self.assertEqual(len(out["results"]), 1)
+        self.assertTrue(out["results"][0].get("matched_cap"))
+
+    # ── AIQ-873: extraction → config-matrix importer ──────────────────────────
+    def test_import_extraction_maps_keys_and_persists_field_confidence(self) -> None:
+        self.db.seed_extracted(
+            "pol-1",
+            [
+                {"benefit_key": "language_training", "eligibility": "All assignees", "limits": "60h B1", "confidence": 0.9},
+                {"benefit_key": "shipment", "eligibility": "Up to 20ft", "limits": None, "confidence": 0.3},
+            ],
+        )
+        out = self.svc.import_extraction_to_draft("pol-1", changed_by="hr-1")
+        self.assertIn("language_training", out["imported"])
+        self.assertIn("shipment_of_goods", out["imported"])  # mapped key
+        rows = {b["benefit_key"]: b for b in self.db.list_policy_config_benefits(out["version_id"])}
+        lt = rows["language_training"]
+        self.assertEqual(lt["source"], "extracted_llm")
+        self.assertTrue(lt["covered"])
+        self.assertEqual(lt["field_confidence"], 0.9)
+        self.assertIn("60h B1", lt["notes"])
+        self.assertEqual(rows["shipment_of_goods"]["field_confidence"], 0.3)
+
+    def test_import_extraction_reports_unmapped_keys(self) -> None:
+        self.db.seed_extracted(
+            "pol-2",
+            [{"benefit_key": "tax_assistance", "eligibility": "x", "limits": "y", "confidence": 0.8}],
+        )
+        out = self.svc.import_extraction_to_draft("pol-2", changed_by="hr-1")
+        self.assertIn("tax_assistance", out["unmapped"])
+        self.assertEqual(out["imported"], [])
+
+    def test_import_extraction_never_clobbers_existing_manual_row(self) -> None:
+        # Seed a draft with a manual_hr language_training row already present.
+        vid = self.db.insert_policy_config_version(self.db.pc_id, 1, "draft", "2025-01-01")
+        self.db.insert_policy_config_benefit_row({
+            "policy_config_version_id": vid, "benefit_key": "language_training",
+            "benefit_label": "Language training", "category": "pre_assignment_support",
+            "covered": True, "source": "manual_hr", "field_confidence": None,
+            "targeting_signature": "global",
+        })
+        self.db.seed_extracted(
+            "pol-3",
+            [{"benefit_key": "language_training", "eligibility": "x", "limits": "y", "confidence": 0.9}],
+        )
+        out = self.svc.import_extraction_to_draft("pol-3", changed_by="hr-1")
+        self.assertIn("language_training", out["skipped_existing"])
+        self.assertNotIn("language_training", out["imported"])
+        rows = [b for b in self.db.list_policy_config_benefits(vid) if b["benefit_key"] == "language_training"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["source"], "manual_hr")  # untouched
+
+    def test_import_extraction_resolves_company_via_policy_document(self) -> None:
+        # E1b (AIQ-929): an extraction keyed by a policy_document id (NOT present in
+        # company_policies) still resolves its company + imports — proving the
+        # doc-first lineage resolution feeds the existing matrix bridge unchanged.
+        self.db.seed_extracted(
+            "doc-1",
+            [{"benefit_key": "language_training", "eligibility": "All", "limits": "60h B1", "confidence": 0.85}],
+            lineage="document",
+        )
+        # The legacy lineage misses this id; only get_policy_document resolves it.
+        self.assertIsNone(self.db.get_company_policy("doc-1"))
+        out = self.svc.import_extraction_to_draft("doc-1", changed_by="hr-1")
+        self.assertIn("language_training", out["imported"])
+        rows = {b["benefit_key"]: b for b in self.db.list_policy_config_benefits(out["version_id"])}
+        lt = rows["language_training"]
+        self.assertEqual(lt["source"], "extracted_llm")
+        self.assertEqual(lt["field_confidence"], 0.85)
+
+    def test_import_extraction_unknown_policy_raises(self) -> None:
+        with self.assertRaises(KeyError):
+            self.svc.import_extraction_to_draft("nope", changed_by="hr-1")
+
+
+if __name__ == "__main__":
+    unittest.main()

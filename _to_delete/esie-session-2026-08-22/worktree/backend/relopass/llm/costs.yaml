@@ -1,0 +1,55 @@
+# C1-13 · LLM cost table
+#
+# USD per 1,000,000 input/output tokens. Source: provider pricing pages as of
+# 2026-05-29. Update this file (and bump the comment) when prices change —
+# every per-call cost calc in router.py reads from here.
+#
+# If a model appears in router.RoutingTable but is not present here, the
+# router emits a LLMRoutingError so the missing price is surfaced fast.
+
+# RETIRED — no task_class routes here anymore (LLM-MODEL-DRIFT/AIQ-1085 moved the
+# last routes to claude-sonnet-4-6). Price kept only for historical cost calcs on
+# old agent_runs rows; safe to drop once those are no longer queried.
+claude-3-7-sonnet:
+  in_per_million: 3.00
+  out_per_million: 15.00
+
+# Claude Sonnet 4.6 — current "sonnet" tier and the FD-2/AIQ-994 benchmark
+# baseline. Every Claude route in the table now names this model. $3/$15.
+claude-sonnet-4-6:
+  in_per_million: 3.00
+  out_per_million: 15.00
+
+# Claude Fable 5 (FD-2/AIQ-994) — 1M context, 128K output. ~3.3x Sonnet's price,
+# which is exactly why the Sonnet→Fable 5 policy-parse switch is benchmark-gated.
+claude-fable-5:
+  in_per_million: 10.00
+  out_per_million: 50.00
+
+# Claude Sonnet 5 (AIQ-1488) — 1M context, 128k output. INTRODUCTORY pricing
+# $2/$10 per 1M input/output, valid through 2026-08-31 — revert to standard pricing
+# after. Wired here so cost calc resolves the moment a route or env flip names it;
+# no task_class routes to it yet (activation is env-gated: RELOPASS_LLM_*_MODEL).
+claude-sonnet-5:
+  in_per_million: 2.00
+  out_per_million: 10.00
+
+# Claude Haiku 4.5 — cheap tier used by the AIQ-1414 coordinator's rolling-summary
+# folds. $1/$5. (Alias, not date-suffixed, so router.usd_cost resolves it.)
+claude-haiku-4-5:
+  in_per_million: 1.00
+  out_per_million: 5.00
+
+gpt-4o:
+  in_per_million: 2.50
+  out_per_million: 10.00
+
+gpt-4o-mini:
+  in_per_million: 0.15
+  out_per_million: 0.60
+
+# Reserved placeholder — Mistral is wired into the routing table but no
+# task class defaults to it today. Pricing kept for forward-compatibility.
+mistral-large-2:
+  in_per_million: 2.00
+  out_per_million: 6.00

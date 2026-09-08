@@ -35,7 +35,7 @@ gate is exact ISO-2 set membership, so a case reading 'France' resolves visa_typ
 """
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 # Canonical ISO alpha-2 (UPPERCASE) → requirement catalog country_code
 # (FULL UPPERCASE name). The one place this mapping lives.
@@ -62,6 +62,9 @@ _ISO_TO_CATALOG_NAME = {
     # DK is not a corridor profile yet, but the B3 batch stages six Denmark-destination
     # facts and `mappings.resolve()` refuses an entity whose destination has no coverage.
     "DK": "DENMARK",
+    # US→EC (Quito). Items land as country_code='ECUADOR'; destinations are stored as 'EC'.
+    # Without this row, admin `/countries/EC` and the serving path both miss the catalog.
+    "EC": "ECUADOR",
 }
 
 # Non-standard inputs seen in the data that map onto a canonical ISO code.
@@ -173,6 +176,7 @@ _NAME_TO_ISO2: Dict[str, str] = {
     "canada": "CA", "mexico": "MX", "brazil": "BR", "brésil": "BR",
     "argentina": "AR", "chile": "CL", "colombia": "CO", "peru": "PE",
     "uruguay": "UY", "costa rica": "CR", "panama": "PA",
+    "ecuador": "EC", "équateur": "EC",
     # Asia / Pacific
     "japan": "JP", "china": "CN", "south korea": "KR", "korea": "KR",
     "republic of korea": "KR", "north korea": "KP", "india": "IN", "inde": "IN",
@@ -197,6 +201,7 @@ _ALPHA3_TO_ISO2: Dict[str, str] = {
     "aut": "AT", "bel": "BE", "irl": "IE", "prt": "PT", "pol": "PL",
     "jpn": "JP", "chn": "CN", "kor": "KR", "ind": "IN", "sgp": "SG",
     "aus": "AU", "nzl": "NZ", "are": "AE", "sau": "SA", "zaf": "ZA",
+    "ecu": "EC",
 }
 
 
@@ -234,3 +239,47 @@ def to_iso_alpha2(raw: Optional[str]) -> Optional[str]:
     if len(s) == 3 and lower in _ALPHA3_TO_ISO2:
         return _ALPHA3_TO_ISO2[lower]
     return None
+
+
+def catalog_lookup_keys(raw: Optional[str]) -> List[str]:
+    """Every `requirement_items.country_code` spelling that means the same country.
+
+    Catalog rows are stored as FULL UPPERCASE names (`SINGAPORE`, `ECUADOR`);
+    `country_profiles` and some older items use ISO-2 (`SG`, `EC`). Admin list and
+    detail must query both, or Ecuador looks empty when opened from the ISO row.
+    """
+    keys: List[str] = []
+
+    def _add(value: Optional[str]) -> None:
+        if not value:
+            return
+        upper = value.strip().upper()
+        if upper and upper not in keys:
+            keys.append(upper)
+
+    _add(raw)
+    iso = to_iso(raw) or to_iso_alpha2(raw)
+    if iso:
+        _add(iso)
+        _add(iso_to_catalog_name(iso))
+    return keys
+
+
+def display_country_name(raw: Optional[str]) -> str:
+    """English country name for admin tables — never a bare ISO-2 code when we know better."""
+    if not raw or not str(raw).strip():
+        return ""
+    iso = to_iso(raw) or to_iso_alpha2(raw)
+    catalog = iso_to_catalog_name(iso) if iso else None
+    label = catalog or str(raw).strip().upper()
+    return " ".join(part.capitalize() for part in label.replace("_", " ").split())
+
+
+def admin_country_group_key(raw: Optional[str]) -> str:
+    """Merge key for the admin country index: ISO-2 when known, else the raw catalog code."""
+    iso = to_iso(raw) or to_iso_alpha2(raw)
+    if iso:
+        return iso
+    if not raw or not str(raw).strip():
+        return ""
+    return str(raw).strip().upper()

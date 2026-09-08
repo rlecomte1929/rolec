@@ -25,7 +25,7 @@ const AdminFeedback: React.FC = () => {
   const [active, setActive] = useState<'inbox' | 'metrics'>('inbox');
   return (
     <AdminLayout
-      title="Feedback & Work"
+      title="Feedback"
       subtitle="Pilot feedback and the product analytics behind it — one place."
     >
       <Tabs

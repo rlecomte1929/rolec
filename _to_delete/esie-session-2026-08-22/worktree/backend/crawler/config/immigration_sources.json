@@ -1,0 +1,40 @@
+{
+  "FR_NO": {
+    "corridor": "FR→NO",
+    "sources": [
+      {
+        "url": "https://www.udi.no/en/",
+        "trust_tier": 1,
+        "allowed_paths": ["/en/word-definitions/", "/en/want-to-apply/", "/en/have-residence-permit/"],
+        "max_depth": 2,
+        "crawl_interval_days": 14
+      },
+      {
+        "url": "https://www.regjeringen.no/en/",
+        "trust_tier": 1,
+        "allowed_paths": ["/en/topics/immigration/"],
+        "max_depth": 2,
+        "crawl_interval_days": 14
+      }
+    ]
+  },
+  "IN_DE": {
+    "corridor": "IN→DE",
+    "sources": [
+      {
+        "url": "https://www.make-it-in-germany.com/en/",
+        "trust_tier": 1,
+        "allowed_paths": ["/en/visa/", "/en/work/", "/en/living-in-germany/"],
+        "max_depth": 2,
+        "crawl_interval_days": 14
+      },
+      {
+        "url": "https://www.auswaertiges-amt.de/en/",
+        "trust_tier": 1,
+        "allowed_paths": ["/en/visa-service/"],
+        "max_depth": 2,
+        "crawl_interval_days": 14
+      }
+    ]
+  }
+}

@@ -338,3 +338,131 @@ def test_one_url_cited_by_several_facts_appears_once():
 def test_no_citations_is_an_empty_list():
     assert _public_sources(None) == []
     assert _public_sources([]) == []
+
+
+def test_null_scoped_non_eea_irp_is_not_on_the_eea_public_list(monkeypatch):
+    """Live ES→IE leak: IRP copy addressed to Non-EEA nationals, JSON scope NULL."""
+    common = dict(
+        country_code="IRELAND", purpose="employment", severity="WARN", owner="EMPLOYEE",
+        required_fields_json="[]", citations_json="[]",
+        applies_to_assignment_types_json=None, verification_status="corpus_grounded",
+    )
+    rows = [
+        SimpleNamespace(
+            id="irp", pillar="TIMELINE",
+            title="Non-EEA nationals (including employment permit holders) must register with Immigration Service Delivery (ISD)",
+            description="Register within 90 days of arrival.",
+            applies_to_nationality_classes_json=None, **common,
+        ),
+        SimpleNamespace(
+            id="et", pillar="TIMELINE",
+            title="Emergency tax — missing RPN",
+            description="First-time employees register the job with Revenue.",
+            applies_to_nationality_classes_json=None, **common,
+        ),
+    ]
+    monkeypatch.setattr(
+        public_corridor.crud, "list_requirements",
+        lambda db, country, purpose: rows if country == "IRELAND" else [],
+    )
+    resp = client.get(
+        "/api/public/corridor-requirements?from=ES&to=IE&employee_type=LTA&nationality=ES"
+    )
+    assert resp.status_code == 200, resp.text
+    labels = _labels(resp)
+    assert "Emergency tax — missing RPN" in labels
+    assert not any(str(x).startswith("Non-EEA") for x in labels)
+
+
+def test_truncated_title_is_replaced_from_description_on_the_public_list(monkeypatch):
+    common = dict(
+        country_code="IRELAND", purpose="employment", severity="WARN", owner="EMPLOYEE",
+        required_fields_json="[]", citations_json="[]",
+        applies_to_assignment_types_json=None,
+        applies_to_nationality_classes_json=None, verification_status="corpus_grounded",
+    )
+    rows = [
+        SimpleNamespace(
+            id="cut", pillar="TIMELINE",
+            title="Employees who arrive mid-year and have income from both their home country and Ireland in …",
+            description=(
+                "Employees who arrive mid-year and have income from both their home country "
+                "and Ireland in the same tax year may become chargeable persons."
+            ),
+            **common,
+        ),
+    ]
+    monkeypatch.setattr(
+        public_corridor.crud, "list_requirements",
+        lambda db, country, purpose: rows if country == "IRELAND" else [],
+    )
+    resp = client.get(
+        "/api/public/corridor-requirements?from=ES&to=IE&employee_type=LTA&nationality=VE"
+    )
+    assert resp.status_code == 200, resp.text
+    label = next(iter(_labels(resp)))
+    assert "…" not in label
+    assert "chargeable persons" in label
+
+
+def test_generic_30_day_lead_is_absent_for_singapore_third_country(monkeypatch):
+    common = dict(
+        country_code="SINGAPORE", purpose="employment", severity="WARN", owner="HR",
+        required_fields_json="[]", citations_json="[]",
+        applies_to_assignment_types_json=None, verification_status="representative",
+    )
+    rows = [
+        SimpleNamespace(
+            id="lead", pillar="TIMELINE",
+            title="Minimum lead time",
+            description="Submit documents at least 30 days before start date.",
+            applies_to_nationality_classes_json=None, **common,
+        ),
+        SimpleNamespace(
+            id="ep", pillar="EMPLOYMENT",
+            title="Employment Pass (EP)",
+            description="Employer files with MOM.",
+            applies_to_nationality_classes_json='["THIRD_COUNTRY"]', **common,
+        ),
+    ]
+    monkeypatch.setattr(
+        public_corridor.crud, "list_requirements",
+        lambda db, country, purpose: rows if country == "SINGAPORE" else [],
+    )
+    resp = client.get(
+        "/api/public/corridor-requirements?from=FR&to=SG&employee_type=LTA&nationality=FR"
+    )
+    assert resp.status_code == 200, resp.text
+    labels = _labels(resp)
+    assert "Employment Pass (EP)" in labels
+    assert "Minimum lead time" not in labels
+
+
+def test_own_national_confirmation_exposes_a_source_url(monkeypatch):
+    common = dict(
+        country_code="FRANCE", purpose="employment", severity="WARN", owner="EMPLOYEE",
+        required_fields_json="[]", citations_json="[]",
+        applies_to_assignment_types_json=None, verification_status="representative",
+    )
+    rows = [
+        SimpleNamespace(
+            id="visa", pillar="RESIDENCE",
+            title="Long-stay visa",
+            description="Third-country visa",
+            applies_to_nationality_classes_json='["THIRD_COUNTRY"]', **common,
+        ),
+    ]
+    monkeypatch.setattr(
+        public_corridor.crud, "list_requirements",
+        lambda db, country, purpose: rows if country == "FRANCE" else [],
+    )
+    resp = client.get(
+        "/api/public/corridor-requirements?from=NO&to=FR&employee_type=LTA&nationality=FR"
+    )
+    assert resp.status_code == 200, resp.text
+    conf = next(
+        r for r in resp.json()["requirements"]
+        if r["label"] == "No visa or residence permit required"
+    )
+    assert conf["source"]
+    assert conf["source"][0].startswith("https://europa.eu/")

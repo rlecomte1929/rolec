@@ -1,0 +1,286 @@
+/**
+ * Sprint C — citation chip parser tests for the Policy Assistant.
+ *
+ * Covers:
+ *  - extractChunkIdsInOrder: dedup + order preservation
+ *  - formatAnswerWithCitations: chips for known chunks, muted superscript
+ *    for unknown ids, bold span preservation, click-to-scroll wiring
+ *  - scrollToSourceRef: locates a `data-policy-source-ref` row and adds
+ *    the highlight class
+ */
+import '@testing-library/jest-dom/vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+
+import {
+  extractChunkIdsInOrder,
+  formatAnswerWithCitations,
+  isCitationDeepLinkAvailable,
+  referenceToElementId,
+  scrollToPolicyReference,
+  scrollToSourceRef,
+} from '../policyAssistantCitations';
+import type { PolicyAssistantCitedChunk } from '../../../types/policyAssistant';
+
+afterEach(cleanup);
+
+describe('extractChunkIdsInOrder', () => {
+  it('returns ids in citation order, deduped', () => {
+    const text = 'A [chunk:abc] then B [chunk:def] then A again [chunk:abc].';
+    expect(extractChunkIdsInOrder(text)).toEqual(['abc', 'def']);
+  });
+
+  it('returns empty for plain text', () => {
+    expect(extractChunkIdsInOrder('No citations here.')).toEqual([]);
+  });
+
+  it('handles uuids with dashes', () => {
+    const text = '[chunk:550e8400-e29b-41d4-a716-446655440000]';
+    expect(extractChunkIdsInOrder(text)).toEqual([
+      '550e8400-e29b-41d4-a716-446655440000',
+    ]);
+  });
+});
+
+describe('formatAnswerWithCitations', () => {
+  const chunks: PolicyAssistantCitedChunk[] = [
+    {
+      id: 'ch-1',
+      source_type: 'matrix_benefit',
+      source_ref: 'policy_config_benefits.b-housing',
+      chunk_text: 'Housing allowance: USD 4,500 per month.',
+    },
+    {
+      id: 'ch-2',
+      source_type: 'matrix_benefit',
+      source_ref: 'policy_config_benefits.b-shipment',
+      chunk_text: 'Household goods shipment: USD 12,000 one time.',
+    },
+  ];
+
+  it('renders one clickable chip per known citation, indexed in order', () => {
+    render(
+      <div>
+        {formatAnswerWithCitations(
+          'Housing covers USD 4500 [chunk:ch-1]. Shipment is USD 12000 [chunk:ch-2].',
+          chunks
+        )}
+      </div>
+    );
+    const chips = screen.getAllByTestId('policy-citation-chip');
+    expect(chips).toHaveLength(2);
+    expect(chips[0]).toHaveTextContent('[1]');
+    expect(chips[1]).toHaveTextContent('[2]');
+    expect(chips[0]).toHaveAttribute('data-source-ref', 'policy_config_benefits.b-housing');
+    expect(chips[1]).toHaveAttribute('data-source-ref', 'policy_config_benefits.b-shipment');
+  });
+
+  it('reuses the same index when a chunk id appears multiple times', () => {
+    render(
+      <div>
+        {formatAnswerWithCitations(
+          'See [chunk:ch-1] and again [chunk:ch-1].',
+          chunks
+        )}
+      </div>
+    );
+    const chips = screen.getAllByTestId('policy-citation-chip');
+    expect(chips).toHaveLength(2);
+    expect(chips[0]).toHaveTextContent('[1]');
+    expect(chips[1]).toHaveTextContent('[1]'); // same chunk → same index
+  });
+
+  it('falls back to muted superscript when chunk metadata is missing', () => {
+    const { container } = render(
+      <div>
+        {formatAnswerWithCitations('Without metadata [chunk:unknown123].', undefined)}
+      </div>
+    );
+    expect(screen.queryByTestId('policy-citation-chip')).toBeNull();
+    expect(container.querySelector('sup')).not.toBeNull();
+    expect(container.textContent).toContain('[1]');
+  });
+
+  it('preserves bold spans (**text**) in non-citation segments', () => {
+    render(
+      <div>
+        {formatAnswerWithCitations('The **housing** cap is USD 4500 [chunk:ch-1].', chunks)}
+      </div>
+    );
+    expect(screen.getByText('housing').tagName).toBe('STRONG');
+    expect(screen.getByTestId('policy-citation-chip')).toBeInTheDocument();
+  });
+
+  it('invokes onActivate with the chunk when chip is clicked', () => {
+    const onActivate = vi.fn();
+    render(
+      <div>
+        {formatAnswerWithCitations('Click me [chunk:ch-1].', chunks, onActivate)}
+      </div>
+    );
+    fireEvent.click(screen.getByTestId('policy-citation-chip'));
+    expect(onActivate).toHaveBeenCalledTimes(1);
+    expect(onActivate.mock.calls[0][0].id).toBe('ch-1');
+  });
+});
+
+describe('scrollToSourceRef', () => {
+  let row: HTMLElement;
+  let scrollSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    row = document.createElement('div');
+    row.setAttribute('data-policy-source-ref', 'policy_config_benefits.b-housing');
+    document.body.appendChild(row);
+    // jsdom doesn't implement scrollIntoView; stub it.
+    scrollSpy = vi.fn();
+    row.scrollIntoView = scrollSpy as unknown as typeof row.scrollIntoView;
+  });
+
+  afterEach(() => {
+    document.body.removeChild(row);
+  });
+
+  it('scrolls to and highlights the matching row', () => {
+    expect(scrollToSourceRef('policy_config_benefits.b-housing')).toBe(true);
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    expect(row.classList.contains('policy-source-highlight')).toBe(true);
+  });
+
+  it('returns false when the row is not present', () => {
+    expect(scrollToSourceRef('policy_config_benefits.does-not-exist')).toBe(false);
+  });
+
+  it('clicking a chip with no onActivate scrolls to the source row', () => {
+    const chunk: PolicyAssistantCitedChunk = {
+      id: 'ch-h',
+      source_type: 'matrix_benefit',
+      source_ref: 'policy_config_benefits.b-housing',
+      chunk_text: 'Housing.',
+    };
+    render(
+      <div>{formatAnswerWithCitations('See [chunk:ch-h].', [chunk])}</div>
+    );
+    fireEvent.click(screen.getByTestId('policy-citation-chip'));
+    expect(scrollSpy).toHaveBeenCalled();
+  });
+});
+
+describe('referenceToElementId', () => {
+  it('slugifies snake_case benefit keys', () => {
+    expect(referenceToElementId('shipment_allowance')).toBe('policy-clause-shipment-allowance');
+  });
+
+  it('slugifies dotted reference paths', () => {
+    expect(referenceToElementId('policy_matrix.long_term.housing')).toBe(
+      'policy-clause-policy-matrix-long-term-housing'
+    );
+  });
+
+  it('falls back to "unknown" for empty/whitespace input', () => {
+    expect(referenceToElementId('')).toBe('policy-clause-unknown');
+    expect(referenceToElementId('   ')).toBe('policy-clause-unknown');
+  });
+
+  it('strips leading/trailing punctuation runs', () => {
+    expect(referenceToElementId('--shipment--')).toBe('policy-clause-shipment');
+  });
+});
+
+describe('scrollToPolicyReference', () => {
+  let row: HTMLElement;
+  let attrRow: HTMLElement;
+  let scrollSpyId: ReturnType<typeof vi.fn>;
+  let scrollSpyAttr: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    // First lookup path: id matches referenceToElementId(ref)
+    row = document.createElement('div');
+    row.id = referenceToElementId('shipment_allowance');
+    document.body.appendChild(row);
+    scrollSpyId = vi.fn();
+    row.scrollIntoView = scrollSpyId as unknown as typeof row.scrollIntoView;
+
+    // Second lookup path: data-policy-reference attribute matches the
+    // raw ref. Used when callers can't put a clean id on the element.
+    attrRow = document.createElement('div');
+    attrRow.setAttribute('data-policy-reference', 'temporary_housing');
+    document.body.appendChild(attrRow);
+    scrollSpyAttr = vi.fn();
+    attrRow.scrollIntoView = scrollSpyAttr as unknown as typeof attrRow.scrollIntoView;
+  });
+
+  afterEach(() => {
+    document.body.removeChild(row);
+    document.body.removeChild(attrRow);
+  });
+
+  it('scrolls to the id-anchor first', () => {
+    expect(scrollToPolicyReference('shipment_allowance')).toBe(true);
+    expect(scrollSpyId).toHaveBeenCalledTimes(1);
+    expect(row.classList.contains('policy-source-highlight')).toBe(true);
+  });
+
+  it('falls back to data-policy-reference attribute when id misses', () => {
+    expect(scrollToPolicyReference('temporary_housing')).toBe(true);
+    expect(scrollSpyAttr).toHaveBeenCalledTimes(1);
+    expect(attrRow.classList.contains('policy-source-highlight')).toBe(true);
+  });
+
+  it('returns false for empty reference', () => {
+    expect(scrollToPolicyReference('')).toBe(false);
+    expect(scrollToPolicyReference('   ')).toBe(false);
+  });
+
+  it('returns false when no element matches', () => {
+    expect(scrollToPolicyReference('does_not_exist')).toBe(false);
+  });
+});
+
+describe('isCitationDeepLinkAvailable', () => {
+  let originalMatchMedia: typeof window.matchMedia | undefined;
+
+  beforeEach(() => {
+    originalMatchMedia = window.matchMedia;
+  });
+
+  afterEach(() => {
+    if (originalMatchMedia) {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
+
+  it('returns true on lg+ viewports', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: (q: string) => ({
+        matches: q.includes('1024px'),
+        media: q,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+    expect(isCitationDeepLinkAvailable()).toBe(true);
+  });
+
+  it('returns false below lg (mobile bottom-sheet covers the page)', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: (q: string) => ({
+        matches: false,
+        media: q,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+    expect(isCitationDeepLinkAvailable()).toBe(false);
+  });
+});

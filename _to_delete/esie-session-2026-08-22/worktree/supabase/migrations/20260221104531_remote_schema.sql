@@ -1,0 +1,3 @@
+-- Placeholder migration file.
+-- This version exists in remote migration history and must exist locally.
+-- No-op.

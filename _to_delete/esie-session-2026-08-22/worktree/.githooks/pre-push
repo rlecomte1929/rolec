@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# Pre-push hook: run the frontend production build before allowing a push.
+#
+# Render auto-deploys `main` on every push, so a broken build on main is a
+# user-visible deploy failure. Catching it locally avoids the round-trip.
+#
+# Activate (one-time, per clone):
+#   git config core.hooksPath .githooks
+#
+# Bypass in genuine emergencies with:
+#   git push --no-verify
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# Detect whether this push touches the frontend. Stdin gives us
+# "<local_ref> <local_sha> <remote_ref> <remote_sha>" lines.
+need_build=0
+touches_workflow=0
+zero="0000000000000000000000000000000000000000"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "${local_sha:-}" ] && continue
+  # Deletion — nothing to build.
+  if [ "$local_sha" = "$zero" ]; then
+    continue
+  fi
+  # Determine the commit range being pushed. Resolve it to a real
+  # "<base>..<tip>" so `git diff` reports the commits' OWN changes — never a
+  # bare single sha, which `git diff` interprets as "tip vs working tree" and
+  # at push time (clean tree == tip) yields an empty diff → silent skip. That
+  # bug (AIQ-550) let a frontend change ship without a build.
+  range=""
+  if [ "$remote_sha" != "$zero" ] && git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+    # Updating an existing remote branch — diff what we're adding on top of it.
+    range="$remote_sha..$local_sha"
+  elif base=$(git merge-base "$local_sha" origin/main 2>/dev/null); then
+    # New branch — diff against where it forked from main.
+    range="$base..$local_sha"
+  fi
+
+  if [ -z "$range" ]; then
+    # Range is undeterminable (new branch and origin/main is unavailable, or the
+    # remote sha isn't a local object). We can't tell what's in the push, so
+    # build to be safe rather than silently skip.
+    echo "pre-push: ⚠️  cannot determine push range — building to be safe (see AIQ-550)."
+    need_build=1
+    continue
+  fi
+
+  changed=$(git diff --name-only "$range" 2>/dev/null || true)
+  if printf '%s\n' "$changed" | grep -qE '^frontend/'; then
+    need_build=1
+  fi
+  if printf '%s\n' "$changed" | grep -qE '^\.github/workflows/'; then
+    touches_workflow=1
+  fi
+done
+
+# Heads-up: pushing a workflow-file change needs the GitHub `workflow` token
+# scope, which the default OAuth token in some environments lacks. Warn (don't
+# block) so the remote rejection is anticipated. See docs/ci/editing-workflows.md.
+if [ "$touches_workflow" -eq 1 ]; then
+  echo "pre-push: ⚠️  this push edits .github/workflows/* — that needs the GitHub 'workflow' token scope."
+  echo "pre-push:     if the push is rejected ('without workflow scope'), run:"
+  echo "pre-push:         gh auth refresh -h github.com -s workflow"
+  echo "pre-push:     and keep workflow edits in a separate commit from product code."
+fi
+
+if [ "$need_build" -eq 0 ]; then
+  echo "pre-push: no frontend changes detected — skipping build."
+  exit 0
+fi
+
+if [ ! -d frontend ]; then
+  echo "pre-push: frontend/ not found — skipping."
+  exit 0
+fi
+
+# QG-7: a fresh clone / worktree has no node_modules, so `npm run build` would
+# hard-error with "tsc: command not found" and abort the push. Degrade
+# gracefully with a clear instruction instead of blocking.
+if [ ! -x frontend/node_modules/.bin/tsc ]; then
+  echo "pre-push: ⚠️  frontend/node_modules is missing — run 'npm ci' in frontend/ to"
+  echo "pre-push:     enable the pre-push build check. Skipping the build for this push."
+  exit 0
+fi
+
+# Warn when the local Node MAJOR differs from .nvmrc.
+#
+# This hook exists to stop a broken build reaching `main`. On 2026-08-11 it did the
+# opposite: it passed a build that CI then rejected. `npm run build` ran on the local
+# Node (26) while CI and production both use .nvmrc — and the build had just gained an
+# SSR prerender step whose dependency graph is Node-version-sensitive
+# (@supabase/realtime-js throws at import time without a global WebSocket, which Node 22
+# added and 20 lacks). Commit d2b1f282 is the record.
+#
+# Render reads .nvmrc too, so a green build here says nothing about the runtime that
+# actually ships.
+#
+# MAJOR only, and a NOTICE not a failure. Patch differences do not change semantics, and
+# hard-failing on a version mismatch would get this hook turned off by anyone running a
+# newer Node for good reasons — which costs more than the warning buys.
+node_version_notice() {
+  [ -f .nvmrc ] || return 0
+  command -v node >/dev/null 2>&1 || return 0
+
+  local want have
+  want="$(tr -d ' \t\r\n' < .nvmrc)"
+  have="$(node -v 2>/dev/null | sed 's/^v//')"
+  [ -n "$want" ] && [ -n "$have" ] || return 0
+
+  # Compare majors only.
+  if [ "${want%%.*}" != "${have%%.*}" ]; then
+    echo ""
+    echo "pre-push: ⚠️  Node major mismatch — this build proves less than it looks."
+    echo "pre-push:     local:  v${have}"
+    echo "pre-push:     .nvmrc: ${want}   (used by CI and by the Render production build)"
+    echo "pre-push:     A build that passes here can still fail there: that is exactly how"
+    echo "pre-push:     d2b1f282 happened. If CI fails on something that works locally,"
+    echo "pre-push:     suspect this first. Match it with: nvm use"
+    echo ""
+  fi
+}
+
+node_version_notice
+
+echo "pre-push: running frontend production build (npm run build)…"
+if ( cd frontend && npm run build ); then
+  echo "pre-push: ✅ build passed (on local Node $(node -v 2>/dev/null || echo '?'))."
+  exit 0
+else
+  status=$?
+  echo ""
+  echo "pre-push: ❌ frontend build FAILED — push aborted."
+  echo "          Fix the build, or bypass with: git push --no-verify"
+  exit "$status"
+fi

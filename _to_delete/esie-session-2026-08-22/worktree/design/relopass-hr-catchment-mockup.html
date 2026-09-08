@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReloPass — HR Vendor Catchment (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy-900:#061a2a; --navy-800:#0b2b43; --navy-700:#133456; --navy-500:#2d5f8e; --navy-50:#f0f5fa;
+  --accent-700:#105d5b; --accent-600:#167572; --accent-500:#1f8e8b; --accent-50:#ebf7f6;
+  --text:#1f2937; --text-2:#475569; --text-3:#64748b;
+  --surface:#ffffff; --surface-1:#f8fafc; --surface-2:#f1f5f9; --border:#e2e8f0; --border-2:#cbd5e1;
+  --emerald-600:#059669; --emerald-50:#ecfdf5; --amber-600:#d97706; --amber-50:#fffbeb;
+  --blue-600:#2563eb; --blue-50:#eff6ff; --rose-600:#e11d48;
+  --r-sm:4px; --r-md:8px; --r-lg:12px; --r-xl:16px;
+  --s1:8px; --s2:16px; --s3:24px; --s4:32px; --s6:48px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  font-size:14px; line-height:1.6; color:var(--text); background:var(--surface-1);
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:'JetBrains Mono',Consolas,monospace}
+
+/* ---------- mockup-only strip ---------- */
+.demo{
+  background:var(--navy-900); color:#cbd5e1; padding:10px var(--s3);
+  display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; font-size:12px;
+}
+.demo b{color:#fff;font-weight:600}
+.demo-seg{display:flex;background:rgba(255,255,255,.08);border-radius:var(--r-md);padding:3px;gap:2px}
+.demo-seg button{
+  font:inherit;font-size:12px;color:#cbd5e1;background:none;border:0;padding:5px 12px;
+  border-radius:var(--r-sm);cursor:pointer;transition:.15s;
+}
+.demo-seg button:hover{color:#fff}
+.demo-seg button[aria-pressed=true]{background:var(--accent-500);color:#fff;font-weight:500}
+
+/* ---------- shell ---------- */
+.wrap{max-width:1120px;margin:0 auto;padding:var(--s4) var(--s3) var(--s6)}
+.page-head{margin-bottom:var(--s3)}
+.page-head h1{font-size:24px;font-weight:600;color:var(--navy-800);letter-spacing:-.01em}
+.page-head p{color:var(--text-2);margin-top:4px;font-size:14px}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+
+/* ---------- corridor bar ---------- */
+.corridor{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s2);
+  padding:var(--s2) var(--s3);background:var(--navy-800);color:#fff;flex-wrap:wrap;
+}
+.corridor-route{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500}
+.corridor-route .arrow{color:#7dd3d0;font-size:15px}
+.corridor-route .city{color:#94a3b8;font-weight:400;font-size:14px}
+.corridor-meta{font-size:12px;color:#94a3b8}
+.corridor-meta b{color:#e2e8f0;font-weight:600}
+
+/* ---------- tabs ---------- */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);background:var(--surface);overflow-x:auto}
+.tabs button{
+  font:inherit;font-size:13px;font-weight:500;color:var(--text-3);background:none;border:0;
+  padding:14px var(--s2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s;
+}
+.tabs button:hover{color:var(--navy-700)}
+.tabs button[aria-selected=true]{color:var(--accent-600);border-bottom-color:var(--accent-500)}
+.tabs .pill{
+  display:inline-block;margin-left:6px;font-size:11px;font-weight:600;padding:1px 6px;
+  border-radius:999px;background:var(--surface-2);color:var(--text-3);
+}
+.tabs button[aria-selected=true] .pill{background:var(--accent-50);color:var(--accent-700)}
+
+.body{padding:var(--s3)}
+
+/* ---------- explainer ---------- */
+.explain{
+  display:flex;gap:12px;background:var(--navy-50);border:1px solid #dbe7f2;
+  border-radius:var(--r-md);padding:14px var(--s2);margin-bottom:var(--s3);
+}
+.explain .ico{color:var(--navy-500);flex-shrink:0;margin-top:1px}
+.explain-txt{font-size:13px;color:var(--text-2);line-height:1.65}
+.explain-txt strong{color:var(--navy-800);font-weight:600}
+.explain .why{
+  background:none;border:0;font:inherit;font-size:13px;color:var(--accent-600);
+  text-decoration:underline;cursor:pointer;padding:0;margin-left:4px;
+}
+.explain .x{background:none;border:0;color:var(--text-3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;margin-left:auto;align-self:flex-start}
+
+/* ---------- catchment ---------- */
+.catch{border:1px solid var(--border);border-radius:var(--r-md);padding:var(--s2);margin-bottom:var(--s3);background:var(--surface-1)}
+.catch-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.catch-label{font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;
+  font-size:13px;font-weight:500;border:1px solid transparent;
+}
+.chip .flag{font-size:15px;line-height:1}
+.chip-base{background:var(--navy-800);color:#fff}
+.chip-base .sub{font-size:11px;color:#94a3b8;font-weight:400}
+.chip-ext{background:var(--accent-50);color:var(--accent-700);border-color:#a7d8d6}
+.chip-ext .sub{font-size:11px;color:var(--accent-600);font-weight:400}
+.chip-ext .rm{background:none;border:0;color:var(--accent-600);cursor:pointer;font-size:15px;line-height:1;padding:0 0 0 2px;opacity:.7}
+.chip-ext .rm:hover{opacity:1}
+.btn-add{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;
+  font:inherit;font-size:13px;font-weight:500;color:var(--accent-600);background:var(--surface);
+  border:1px dashed var(--border-2);cursor:pointer;transition:.15s;
+}
+.btn-add:hover{border-color:var(--accent-500);background:var(--accent-50)}
+
+.picker{border-top:1px solid var(--border);margin-top:12px;padding-top:12px}
+.picker-label{font-size:12px;color:var(--text-3);margin-bottom:8px}
+.picker-grid{display:flex;flex-wrap:wrap;gap:8px}
+.cbtn{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:var(--r-md);
+  font:inherit;font-size:13px;background:var(--surface);border:1px solid var(--border);
+  cursor:pointer;color:var(--text);transition:.15s;
+}
+.cbtn:hover:not(:disabled){border-color:var(--accent-500);background:var(--accent-50)}
+.cbtn .n{font-size:11px;font-weight:600;color:var(--text-3);font-family:'JetBrains Mono',monospace}
+.cbtn:disabled{opacity:.45;cursor:not-allowed}
+.cbtn:disabled .n{color:var(--rose-600)}
+
+.apply-all{display:flex;align-items:center;gap:9px;margin-top:12px;font-size:13px;color:var(--text-2);cursor:pointer}
+.apply-all input{width:16px;height:16px;accent-color:var(--accent-500);cursor:pointer}
+.apply-all .hint{font-size:12px;color:var(--text-3)}
+.resolved{font-size:11px;color:var(--text-3);margin-top:8px}
+.resolved code{font-family:'JetBrains Mono',monospace;background:var(--surface-2);padding:1px 5px;border-radius:var(--r-sm);font-size:11px}
+
+/* ---------- counter ---------- */
+.counter{display:flex;align-items:center;justify-content:space-between;gap:var(--s2);margin-bottom:12px;flex-wrap:wrap}
+.counter-n{font-size:14px;font-weight:600;color:var(--navy-800)}
+.counter-n span{font-weight:400;color:var(--text-3)}
+.meter{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-3)}
+.dots{display:flex;gap:4px}
+.dot{width:8px;height:8px;border-radius:999px;background:var(--border-2)}
+.dot.on{background:var(--accent-500)}
+.dot.over{background:var(--amber-600)}
+
+/* ---------- vendor rows ---------- */
+.vlist{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden}
+.vrow{display:flex;align-items:center;gap:14px;padding:14px var(--s2);border-bottom:1px solid var(--border);background:var(--surface);transition:.12s}
+.vrow:last-child{border-bottom:0}
+.vrow:hover{background:var(--surface-1)}
+.vrow input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent-500);cursor:pointer;flex-shrink:0}
+.vmain{flex:1;min-width:0}
+.vname{font-size:14px;font-weight:500;color:var(--navy-800);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.vmeta{display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;font-size:12px;color:var(--text-3)}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:var(--r-sm);letter-spacing:.01em}
+.b-ext{background:var(--accent-50);color:var(--accent-700)}
+.b-nbr{background:var(--surface-2);color:var(--text-3);font-weight:500}
+.b-acc{background:var(--blue-50);color:var(--blue-600)}
+.b-reach{background:var(--emerald-50);color:var(--emerald-600)}
+.b-warn{background:var(--amber-50);color:var(--amber-600)}
+.vrate{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-2);flex-shrink:0}
+.add-own{
+  display:block;width:100%;text-align:left;padding:14px var(--s2);background:var(--surface-1);
+  border:0;border-top:1px solid var(--border);font:inherit;font-size:13px;font-weight:500;
+  color:var(--accent-600);cursor:pointer;
+}
+.add-own:hover{background:var(--accent-50)}
+
+/* ---------- empty ---------- */
+.empty{text-align:center;padding:var(--s6) var(--s3);border:1px dashed var(--border-2);border-radius:var(--r-md);background:var(--surface-1)}
+.empty h3{font-size:16px;font-weight:600;color:var(--navy-800);margin-bottom:6px}
+.empty p{font-size:13px;color:var(--text-2);max-width:460px;margin:0 auto var(--s3)}
+.empty-acts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:9px 16px;border-radius:var(--r-md);cursor:pointer;border:1px solid transparent;transition:.15s}
+.btn-primary{background:var(--navy-800);color:#fff}
+.btn-primary:hover{background:var(--navy-700)}
+.btn-outline{background:var(--surface);color:var(--navy-800);border-color:var(--border-2)}
+.btn-outline:hover{border-color:var(--navy-500)}
+.btn-ghost{background:none;color:var(--accent-600)}
+.btn-ghost:hover{background:var(--accent-50)}
+
+/* ---------- employee preview ---------- */
+.emp{margin-top:var(--s3);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:var(--surface)}
+.emp-h{padding:12px var(--s2);background:var(--surface-2);font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border)}
+.emp-b{padding:var(--s2)}
+.emp-card{border:1px solid var(--border);border-radius:var(--r-md);padding:14px var(--s2)}
+.emp-card .n{font-size:14px;font-weight:600;color:var(--navy-800)}
+.emp-card .l{font-size:12px;color:var(--text-3);margin-top:2px}
+.emp-card .why{font-size:12px;color:var(--accent-700);background:var(--accent-50);display:inline-block;padding:4px 10px;border-radius:var(--r-sm);margin-top:10px}
+
+/* ---------- modal ---------- */
+.ov{position:fixed;inset:0;background:rgba(6,26,42,.55);display:none;align-items:center;justify-content:center;padding:var(--s2);z-index:50}
+.ov.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--r-lg);max-width:460px;width:100%;box-shadow:0 20px 50px rgba(6,26,42,.25)}
+.modal-h{padding:var(--s3) var(--s3) var(--s2)}
+.modal-h h2{font-size:17px;font-weight:600;color:var(--navy-800)}
+.modal-h p{font-size:13px;color:var(--text-2);margin-top:4px}
+.modal-b{padding:0 var(--s3) var(--s2)}
+.opt{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:8px;cursor:pointer;font-size:13px;transition:.15s}
+.opt:hover{border-color:var(--accent-500);background:var(--accent-50)}
+.opt input{accent-color:var(--accent-500);margin-top:2px;cursor:pointer}
+.opt.sel{border-color:var(--accent-500);background:var(--accent-50)}
+.modal textarea{width:100%;font:inherit;font-size:13px;padding:10px;border:1px solid var(--border);border-radius:var(--r-md);resize:vertical;min-height:64px;margin-top:4px}
+.modal textarea:focus{outline:2px solid var(--accent-500);outline-offset:-1px;border-color:transparent}
+.modal-f{display:flex;justify-content:flex-end;gap:10px;padding:var(--s2) var(--s3) var(--s3);border-top:1px solid var(--border)}
+
+.note{margin-top:var(--s3);font-size:12px;color:var(--text-3);line-height:1.7}
+.note b{color:var(--text-2)}
+@media(max-width:640px){.wrap{padding:var(--s2)}.body{padding:var(--s2)}}
+</style>
+</head>
+<body>
+
+<div class="demo">
+  <b>Mockup</b> — not live. Preview state:
+  <div class="demo-seg" id="stateSeg">
+    <button data-state="default" aria-pressed="true">Default (neighbours on)</button>
+    <button data-state="nbroff" aria-pressed="false">Neighbours off</button>
+    <button data-state="extended" aria-pressed="false">HR extension</button>
+    <button data-state="empty" aria-pressed="false">No coverage yet</button>
+  </div>
+  <span style="margin-left:auto;opacity:.7">Design tokens per DESIGN.md — navy #0b2b43 · teal #1f8e8b · Inter · 8px grid</span>
+</div>
+
+<div class="wrap">
+  <div class="page-head">
+    <h1>Vendor curation</h1>
+    <p>Choose which providers your employees can request quotes from.</p>
+  </div>
+
+  <div class="card">
+    <div class="corridor">
+      <div class="corridor-route">
+        <span>🇫🇷 France</span><span class="arrow">→</span><span>🇳🇴 Norway</span>
+        <span class="city">· Oslo</span>
+      </div>
+      <div class="corridor-meta"><b>176</b> employees on this route</div>
+    </div>
+
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="body" id="body"></div>
+  </div>
+
+  <div class="emp" id="empPreview" hidden>
+    <div class="emp-h">What the employee sees</div>
+    <div class="emp-b"><div class="emp-card" id="empCard"></div></div>
+  </div>
+
+  <p class="note">
+    <b>Neighbours are on by default</b> for origin-sourced categories, so the Strasbourg case works with zero HR
+    action. Two guards keep that from becoming noise: short-sea and cross-bloc pairs are excluded via
+    <code>country_adjacency.default_included</code>, and <b>a neighbour with zero eligible providers is never
+    rendered at all</b> — Belgium, Italy and Luxembourg are absent above, not greyed out.
+    <br><br>
+    <b>Three tiers resolve the catchment:</b> corridor override → company policy → system default.
+    <b>“Apply to all routes”</b> writes the company policy, so the choice is made once rather than per corridor —
+    including the opt-out, for a company that wants origin-country providers only.
+    Counts everywhere reflect the <i>full</i> eligibility check — in catchment <i>and</i> able to reach the
+    destination — not just providers present in that country.
+  </p>
+</div>
+
+<div class="ov" id="ov">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="modal-h">
+      <h2 id="mTitle">Why add <span id="mCountry">Germany</span>?</h2>
+      <p>This is recorded on every vendor you approve from there, so the choice reads as deliberate in the audit trail.</p>
+    </div>
+    <div class="modal-b" id="mOpts"></div>
+    <div class="modal-f">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="mConfirm">Add country</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const REASONS = [
+  ['border_employees','Employees are based near the border'],
+  ['pricing_availability','Better pricing or availability'],
+  ['existing_relationship','We already work with a provider there'],
+  ['insufficient_local_coverage','Not enough coverage in France'],
+  ['other','Other']
+];
+const REASON_LABEL = Object.fromEntries(REASONS);
+
+const CATS = {
+  movers:{label:'Movers', side:'origin', anchor:'FR', anchorName:'France',
+    why:'International moves are quoted by the origin agent, who surveys and packs at origin and arranges delivery through their destination network.',
+    // DEFAULT-INCLUDED neighbours: land border, same bloc, AND ≥1 eligible vendor.
+    // BE / IT / LU are land neighbours with 0 eligible movers — never rendered.
+    neighbours:[
+      {code:'DE',name:'Germany',flag:'🇩🇪',n:2},
+      {code:'ES',name:'Spain',flag:'🇪🇸',n:1},
+      {code:'CH',name:'Switzerland',flag:'🇨🇭',n:1}],
+    // Available via "+ Add country" — excluded from the default for a stated reason
+    addable:[
+      {code:'GB',name:'United Kingdom',flag:'🇬🇧',n:3,ex:'short sea crossing'},
+      {code:'NL',name:'Netherlands',flag:'🇳🇱',n:2,ex:'not adjacent'},
+      {code:'PT',name:'Portugal',flag:'🇵🇹',n:0,ex:'not adjacent'},
+      {code:'AT',name:'Austria',flag:'🇦🇹',n:1,ex:'not adjacent'}],
+    vendors:[
+      {n:'AGS Déménagement International',c:'FR',f:'🇫🇷',city:'Paris',acc:'FIDI FAIM',reach:1,r:4.6,sel:1},
+      {n:'Demeco',c:'FR',f:'🇫🇷',city:'Lyon',acc:'IAM',reach:1,r:4.3,sel:1},
+      {n:'Grospiron International',c:'FR',f:'🇫🇷',city:'Paris',acc:'FIDI FAIM',reach:1,r:4.5,sel:1},
+      {n:'Déménagements Delahaye',c:'FR',f:'🇫🇷',city:'—',acc:null,reach:0,r:4.1,sel:0},
+      {n:'Hasenkamp',c:'DE',f:'🇩🇪',city:'Cologne',acc:'FIDI FAIM',reach:1,r:4.7,sel:1},
+      {n:'Kühne Relocation',c:'DE',f:'🇩🇪',city:'Hamburg',acc:'OMNI',reach:1,r:4.4,sel:0},
+      {n:'Mudanzas Iberia',c:'ES',f:'🇪🇸',city:'Barcelona',acc:'IAM',reach:1,r:4.2,sel:0},
+      {n:'Harsch The Art of Moving',c:'CH',f:'🇨🇭',city:'Geneva',acc:'FIDI FAIM',reach:1,r:4.8,sel:0},
+      {n:'Britannia Movers',c:'GB',f:'🇬🇧',city:'London',acc:'FIDI FAIM',reach:1,r:4.4,sel:0}]},
+  housing:{label:'Housing', side:'destination', anchor:'NO', anchorName:'Norway',
+    why:'Temporary accommodation and rental search happen at the destination — there is nothing to let until the employee arrives.',
+    neighbours:[], vendors:[
+      {n:'Oslo Serviced Living',c:'NO',f:'🇳🇴',city:'Oslo',acc:null,reach:1,r:4.5,sel:1},
+      {n:'Nordic Stay Apartments',c:'NO',f:'🇳🇴',city:'Oslo',acc:null,reach:1,r:4.2,sel:1},
+      {n:'Frogner Rental Partners',c:'NO',f:'🇳🇴',city:'Oslo',acc:null,reach:1,r:4.4,sel:1},
+      {n:'Oslo Home Finders',c:'NO',f:'🇳🇴',city:'Oslo',acc:null,reach:1,r:4.0,sel:0}]},
+  schools:{label:'Schools', side:'destination', anchor:'NO', anchorName:'Norway',
+    why:'School search is destination work — the places are in Oslo.',
+    neighbours:[], vendors:[
+      {n:'Oslo International School',c:'NO',f:'🇳🇴',city:'Bærum',acc:null,reach:1,r:4.6,sel:1},
+      {n:'The British School of Oslo',c:'NO',f:'🇳🇴',city:'Oslo',acc:null,reach:1,r:4.4,sel:1},
+      {n:'Lycée Français René Cassin',c:'NO',f:'🇳🇴',city:'Oslo',acc:null,reach:1,r:4.5,sel:1}]},
+  banks:{label:'Banking', side:'destination', anchor:'NO', anchorName:'Norway',
+    why:'The account is opened in the destination jurisdiction.',
+    neighbours:[], vendors:[
+      {n:'DNB Bank',c:'NO',f:'🇳🇴',city:'—',acc:null,reach:1,r:4.1,sel:1},
+      {n:'Nordea Norway',c:'NO',f:'🇳🇴',city:'—',acc:null,reach:1,r:4.0,sel:1},
+      {n:'SpareBank 1',c:'NO',f:'🇳🇴',city:'—',acc:null,reach:1,r:3.9,sel:0}]},
+  tax:{label:'Tax', side:'both', anchor:'FR', anchorName:'France and Norway',
+    why:'Exit tax and de-registration at origin, arrival tax and shadow payroll at destination — genuinely two engagements.',
+    neighbours:[], vendors:[
+      {n:'Skattekonsulentene AS',c:'NO',f:'🇳🇴',city:'Oslo',acc:null,reach:1,r:4.2,sel:1},
+      {n:'Deloitte Norway',c:'NO',f:'🇳🇴',city:'Oslo',acc:null,reach:1,r:4.3,sel:1}]}
+};
+
+let state='default', cat='movers';
+let extended={};        // cat -> [{code,name,flag,reason}]  — HR additions beyond the default
+let applyAll={}, nbrOn={};
+let sel={};
+Object.entries(CATS).forEach(([k,v])=>{
+  sel[k]=v.vendors.map(x=>!!x.sel); extended[k]=[]; applyAll[k]=false; nbrOn[k]=true;  // default TRUE
+});
+
+const $=s=>document.querySelector(s);
+
+document.querySelectorAll('#stateSeg button').forEach(b=>b.onclick=()=>{
+  state=b.dataset.state; cat='movers';
+  document.querySelectorAll('#stateSeg button').forEach(x=>x.setAttribute('aria-pressed', x===b));
+  extended.movers=[]; applyAll.movers=false; nbrOn.movers=true;
+  sel.movers=[true,true,true,false,true,false,false,false,false];
+  if(state==='nbroff'){ nbrOn.movers=false; applyAll.movers=true;
+    sel.movers=[true,true,true,false,false,false,false,false,false]; }
+  if(state==='extended'){ extended.movers=[{code:'GB',name:'United Kingdom',flag:'🇬🇧',reason:'existing_relationship'}];
+    applyAll.movers=true; sel.movers=[true,true,false,false,true,false,false,false,true]; }
+  render();
+});
+
+/** Countries in the default (base) catchment: origin + default-included neighbours
+ *  that have ≥1 eligible vendor. Neighbours with zero are never in this list. */
+function baseCountries(){
+  const c=CATS[cat], out=[{code:c.anchor,name:c.anchorName,flag:c.side==='destination'?'🇳🇴':'🇫🇷',role:'origin'}];
+  if(c.side==='destination') out[0]={code:'NO',name:'Norway',flag:'🇳🇴',role:'destination'};
+  if(cat==='tax') out.push({code:'NO',name:'Norway',flag:'🇳🇴',role:'destination'});
+  if(c.side==='origin' && nbrOn[cat]) (c.neighbours||[]).filter(n=>n.n>0)
+    .forEach(n=>out.push({...n,role:'neighbour'}));
+  return out;
+}
+function isBaseNeighbour(code){ return baseCountries().some(b=>b.code===code && b.role==='neighbour'); }
+
+function visibleVendors(){
+  const allow=new Set([...baseCountries().map(b=>b.code), ...extended[cat].map(e=>e.code)]);
+  return CATS[cat].vendors.map((v,i)=>({...v,_i:i})).filter(v=>allow.has(v.c));
+}
+
+function render(){
+  // tabs
+  const cur=cat;
+  $('#tabs').innerHTML = Object.entries(CATS).map(([k,v])=>{
+    let n=0;
+    if(!(state==='empty'&&k==='movers')){
+      const saved=cat; cat=k; n=visibleVendors().length; cat=saved;
+    }
+    return `<button role="tab" aria-selected="${k===cur}" onclick="setCat('${k}')">${v.label}<span class="pill">${n}</span></button>`;
+  }).join('');
+
+  const c=CATS[cat];
+  const sideTxt = c.side==='origin' ? `the country your employees are moving <strong>from</strong>`
+                : c.side==='destination' ? `the country your employees are moving <strong>to</strong>`
+                : `<strong>both</strong> ends of the move`;
+
+  let html = `<div class="explain">
+      <span class="ico">ⓘ</span>
+      <span class="explain-txt"><strong>${c.label} are sourced from ${c.anchorName}</strong> — ${sideTxt}.
+      ${c.why}<button class="why">Why?</button></span>
+      <button class="x" title="Dismiss">✕</button>
+    </div>`;
+
+  // catchment — only for origin-anchored categories
+  if(c.side==='origin'){
+    const chips = baseCountries().map(b=>`<span class="chip chip-base"><span class="flag">${b.flag}</span>${b.name}
+        <span class="sub">${b.role==='neighbour'?'neighbour':'origin'}</span></span>`).join('')
+      + extended[cat].map(e=>`<span class="chip chip-ext"><span class="flag">${e.flag}</span>${e.name}
+          <span class="sub">· ${REASON_LABEL[e.reason].toLowerCase()}</span>
+          <button class="rm" title="Remove" onclick="removeCountry('${e.code}')">✕</button></span>`).join('');
+    const hidden = (c.neighbours||[]).filter(n=>n.n===0);
+    const avail = (c.addable||[]).filter(n=>!extended[cat].some(e=>e.code===n.code));
+    html += `<div class="catch">
+      <div class="catch-head">
+        <span class="catch-label">Vendors from</span>${chips}
+        <button class="btn-add" onclick="togglePicker()">+ Add country</button>
+      </div>
+      <label class="apply-all" style="margin-top:4px">
+        <input type="checkbox" ${nbrOn[cat]?'checked':''} onchange="nbrOn['${cat}']=this.checked;render()">
+        <span>Include neighbouring countries<span class="hint"> — providers that can collect from your employees' address in ${c.anchorName}</span></span>
+      </label>
+      <div class="picker" id="picker" ${extended[cat].length?'':'hidden'}>
+        <div class="picker-label">Add a country outside the default — the number shows verified providers that can reach Oslo</div>
+        <div class="picker-grid">${avail.map(n=>`
+          <button class="cbtn" ${n.n===0?`disabled title="No verified movers in ${n.name} yet"`:''} onclick="openModal('${n.code}')">
+            <span>${n.flag}</span>${n.name}<span class="n">${n.n}</span></button>`).join('')}</div>
+        <div class="picker-label" style="margin-top:10px">Excluded from the default: ${avail.map(n=>`${n.name} (${n.ex})`).join(' · ')}</div>
+        <label class="apply-all">
+          <input type="checkbox" ${applyAll[cat]?'checked':''} onchange="applyAll['${cat}']=this.checked;render()">
+          <span>Apply to all routes for ${c.label}<span class="hint"> — sets your company default instead of just this route</span></span>
+        </label>
+      </div>
+      <div class="resolved">Resolved from <code>${applyAll[cat]?'company_policy':(extended[cat].length?'corridor_override':'system_default')}</code>${
+        hidden.length?` · not shown: ${hidden.map(h=>h.name).join(', ')} <span title="Land neighbours with no verified movers that can reach Oslo — a country chip that yields nothing implies coverage that isn't there">(no eligible providers)</span>`:''}</div>
+      </div>`;
+  }
+
+  if(state==='empty' && cat==='movers'){
+    html += `<div class="empty">
+        <h3>No verified movers in France or its neighbours yet</h3>
+        <p>4 French movers are awaiting verification. We'll notify you when they're ready — in the meantime you have three options.</p>
+        <div class="empty-acts">
+          <button class="btn btn-primary">Request coverage for France</button>
+          <button class="btn btn-outline">Add a provider we work with</button>
+          <button class="btn btn-ghost" onclick="togglePicker(true)">Look further afield</button>
+        </div></div>`;
+    $('#body').innerHTML=html; $('#empPreview').hidden=true; return;
+  }
+
+  const vis=visibleVendors(), n=vis.filter(v=>sel[cat][v._i]).length;
+  const dots=[0,1,2,3,4].map(i=>`<span class="dot ${n>5&&i<5?'over':(i<n?'on':'')}"></span>`).join('');
+  html += `<div class="counter">
+      <div class="counter-n">${n} of ${vis.length} <span>selected</span></div>
+      <div class="meter"><div class="dots">${dots}</div>
+        ${n>5?'More than 5 can slow the quote process':'3–5 recommended for a good RFQ'}</div></div>`;
+
+  html += `<div class="vlist">` + vis.map(v=>{
+    const ext = extended[cat].find(e=>e.code===v.c);
+    const nbr = isBaseNeighbour(v.c);
+    return `<div class="vrow">
+      <input type="checkbox" ${sel[cat][v._i]?'checked':''} onchange="toggle(${v._i})">
+      <div class="vmain">
+        <div class="vname">${v.n}${ext?'<span class="badge b-ext">extended</span>'
+          :nbr?'<span class="badge b-nbr">neighbouring country</span>':''}</div>
+        <div class="vmeta">
+          <span>${v.f} ${v.city}</span>
+          ${v.acc?`<span class="badge b-acc">${v.acc}</span>`:''}
+          ${v.reach?`<span class="badge b-reach">✓ Reaches Norway</span>`:`<span class="badge b-warn">⚠ No reach evidence</span>`}
+        </div></div>
+      <div class="vrate">★ ${v.r}</div></div>`;
+  }).join('') + `<button class="add-own">+ Add a provider we already work with</button></div>`;
+
+  $('#body').innerHTML=html;
+
+  // Employee-facing provenance: two variants. Never attribute a default-catchment
+  // neighbour to "your HR team" — HR never touched it, and small lies in provenance
+  // copy are what erode trust in a recommendation surface.
+  const extSel = vis.find(v=>sel[cat][v._i] && extended[cat].some(e=>e.code===v.c));
+  const nbrSel = vis.find(v=>sel[cat][v._i] && isBaseNeighbour(v.c));
+  const pick = extSel || nbrSel;
+  if(pick){
+    const e = extended[cat].find(x=>x.code===pick.c);
+    const country = (CATS[cat].neighbours||[]).concat(CATS[cat].addable||[]).find(x=>x.code===pick.c);
+    $('#empCard').innerHTML=`<div class="n">${pick.n}</div>
+      <div class="l">${pick.city}, ${country?country.name:''} · ★ ${pick.r}</div>
+      <div class="why">${e
+        ? `Added by your HR team — ${REASON_LABEL[e.reason].toLowerCase()}`
+        : `Neighbouring country — can collect from your address in ${CATS[cat].anchorName}`}</div>`;
+    $('#empPreview').hidden=false;
+  } else $('#empPreview').hidden=true;
+}
+
+function setCat(k){cat=k;render()}
+function toggle(i){sel[cat][i]=!sel[cat][i];render()}
+function togglePicker(force){const p=$('#picker'); if(p) p.hidden = force?false:!p.hidden;}
+function removeCountry(code){extended[cat]=extended[cat].filter(e=>e.code!==code);render()}
+
+let pending=null, pendingReason='border_employees';
+function openModal(code){
+  pending=(CATS[cat].addable||[]).find(n=>n.code===code); pendingReason='border_employees';
+  $('#mCountry').textContent=pending.name;
+  $('#mOpts').innerHTML=REASONS.map(([v,l],i)=>`
+    <label class="opt ${i===0?'sel':''}" onclick="pickReason('${v}',this)">
+      <input type="radio" name="rsn" ${i===0?'checked':''}> <span>${v==='insufficient_local_coverage'?l.replace('France',CATS[cat].anchorName):l}</span></label>`).join('')
+    + `<textarea id="mText" placeholder="Add detail (optional — required if you choose Other)"></textarea>`;
+  $('#ov').classList.add('open');
+}
+function pickReason(v,el){pendingReason=v;document.querySelectorAll('.opt').forEach(o=>o.classList.remove('sel'));el.classList.add('sel');el.querySelector('input').checked=true}
+function closeModal(){$('#ov').classList.remove('open')}
+$('#mConfirm').onclick=()=>{
+  if(pendingReason==='other' && !$('#mText').value.trim()){ $('#mText').focus(); $('#mText').style.borderColor='#e11d48'; return; }
+  extended[cat].push({code:pending.code,name:pending.name,flag:pending.flag,reason:pendingReason});
+  closeModal(); if(state==='empty')state='default';
+  document.querySelectorAll('#stateSeg button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.state===state));
+  render();
+};
+$('#ov').onclick=e=>{if(e.target===$('#ov'))closeModal()};
+render();
+</script>
+</body>
+</html>

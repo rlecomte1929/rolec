@@ -1,0 +1,25 @@
+{
+  "tableName": "case_addons",
+  "sqlName": "app_case_addons",
+  "module": "app",
+  "displayName": "Case Add-ons",
+  "description": "Scaffold for v1 per-category add-on purchases on a relocation case (movers, immigration lawyers, tax advisors, schools, pets). No UI or logic wired yet \u2014 created empty per the Stripe integration v0 spec. addon_type: 'movers' | 'immigration_lawyers' | 'tax_advisors' | 'schools' | 'pets'. payment_status: 'unpaid' | 'pending' | 'paid' | 'refunded'.",
+  "columns": [
+    { "name": "id", "type": "serial", "nullable": false, "primaryKey": true },
+    { "name": "case_id", "type": "integer", "nullable": true, "description": "FK to relocation_cases.id" },
+    { "name": "case_access_id", "type": "integer", "nullable": true, "description": "FK to case_access.id (the paid roadmap unlock this add-on belongs to)" },
+    { "name": "addon_type", "type": "text", "nullable": true, "description": "'movers' | 'immigration_lawyers' | 'tax_advisors' | 'schools' | 'pets'" },
+    { "name": "stripe_session_id", "type": "text", "nullable": true },
+    { "name": "payment_status", "type": "text", "nullable": false, "defaultValue": "'unpaid'" },
+    { "name": "paid_at", "type": "timestamp", "nullable": true },
+    { "name": "created_at", "type": "timestamp", "nullable": false, "defaultValue": "NOW()" },
+    { "name": "session_id", "type": "text", "nullable": true },
+    { "name": "updated_at", "type": "timestamp", "nullable": false, "defaultValue": "NOW()" }
+  ],
+  "foreignKeys": [
+    { "column": "case_id", "onDelete": "SET NULL", "referencesTable": "relocation_cases", "referencesColumn": "id" },
+    { "column": "case_access_id", "onDelete": "SET NULL", "referencesTable": "case_access", "referencesColumn": "id" }
+  ],
+  "createdAt": "2026-07-18T14:29:13.622Z",
+  "createdBy": "audos-code"
+}

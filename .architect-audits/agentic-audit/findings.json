@@ -1,0 +1,394 @@
+{
+  "skillVersion": "1.0.0",
+  "runStartedAt": "2026-06-25T00:00:00Z",
+  "runFinishedAt": "2026-06-25T00:00:00Z",
+  "projectShape": "hybrid-monorepo",
+  "aiSurfaceDetected": true,
+  "thresholds": {
+    "instructionMinLines": 25,
+    "instructionMaxLines": 400,
+    "permissionBroadness": 5,
+    "contextCoverage": 60
+  },
+  "snapshot": {
+    "agenticInstructionFiles": [
+      {
+        "path": "CLAUDE.md",
+        "lines": 301,
+        "lastModified": "2026-06-14",
+        "toolFamily": "claude",
+        "primary": true
+      },
+      {
+        "path": "backend/CLAUDE.md",
+        "lines": 51,
+        "lastModified": "2026-05-26",
+        "toolFamily": "claude",
+        "primary": false
+      }
+    ],
+    "agenticInstructionLineTotal": 352,
+    "claudeDirPresent": true,
+    "settingsJson": {
+      "present": true,
+      "valid": true,
+      "topLevelKeys": [
+        "enabledPlugins"
+      ],
+      "permissionAllowCount": 0,
+      "permissionDenyCount": 0
+    },
+    "settingsLocalJson": {
+      "present": true,
+      "valid": true,
+      "gitignored": false,
+      "tracked": true,
+      "permissionAllowCount": 21,
+      "permissionDenyCount": 0
+    },
+    "hookCounts": {
+      "PreToolUse": 0,
+      "PostToolUse": 0,
+      "Stop": 0,
+      "Notification": 0
+    },
+    "mcpServerCount": 0,
+    "statusLineSet": false,
+    "modelOverrideSet": false
+  },
+  "summary": {
+    "projectContextCoverage": {
+      "present": 5,
+      "partial": 3,
+      "missing": 0,
+      "violation": 0
+    },
+    "operationalGuidanceAndConventions": {
+      "present": 3,
+      "partial": 3,
+      "missing": 0,
+      "violation": 0
+    },
+    "claudeCodeSettingsHygiene": {
+      "present": 4,
+      "partial": 1,
+      "missing": 0,
+      "violation": 1
+    },
+    "multiAgentConsistencyAndDrift": {
+      "present": 6,
+      "partial": 0,
+      "missing": 0,
+      "violation": 1
+    }
+  },
+  "checks": [
+    {
+      "layer": "project-context-coverage",
+      "check": "primary-instruction-file-present",
+      "status": "present",
+      "evidence": [
+        "CLAUDE.md"
+      ],
+      "totalCount": 1,
+      "expectation": "A primary agentic instruction file exists.",
+      "gap": null
+    },
+    {
+      "layer": "project-context-coverage",
+      "check": "primary-instruction-file-substantive",
+      "status": "present",
+      "evidence": [
+        "CLAUDE.md:301 lines"
+      ],
+      "totalCount": 1,
+      "expectation": ">= 25 lines with structure.",
+      "gap": null
+    },
+    {
+      "layer": "project-context-coverage",
+      "check": "primary-instruction-file-not-bloated",
+      "status": "present",
+      "evidence": [
+        "CLAUDE.md:301 lines <= 400"
+      ],
+      "totalCount": 1,
+      "expectation": "<= 400 lines.",
+      "gap": null
+    },
+    {
+      "layer": "project-context-coverage",
+      "check": "project-purpose-documented",
+      "status": "partial",
+      "evidence": [
+        "CLAUDE.md opens at '## Commands'"
+      ],
+      "totalCount": 1,
+      "expectation": "States what the project is and who it is for.",
+      "gap": "No prose purpose statement; only inferable from architecture/personas.",
+      "remediation": "Add a one-paragraph purpose statement at the top of CLAUDE.md."
+    },
+    {
+      "layer": "project-context-coverage",
+      "check": "tech-stack-documented",
+      "status": "present",
+      "evidence": [
+        "CLAUDE.md"
+      ],
+      "totalCount": 1,
+      "expectation": "Names framework/language/runtime.",
+      "gap": null
+    },
+    {
+      "layer": "project-context-coverage",
+      "check": "architectural-mental-model-documented",
+      "status": "present",
+      "evidence": [
+        "CLAUDE.md: Repo Layout + dual-layer pattern"
+      ],
+      "totalCount": 1,
+      "expectation": "Brief architectural orientation.",
+      "gap": null
+    },
+    {
+      "layer": "project-context-coverage",
+      "check": "domain-glossary-present",
+      "status": "partial",
+      "evidence": [
+        "corridors, dossier, roadmap, RLS tenant-scoping, intake wizard, policy_config used without definition"
+      ],
+      "totalCount": 1,
+      "expectation": "Glossary or link where heavy domain terminology exists.",
+      "gap": "No glossary section or link.",
+      "remediation": "Add a short glossary or link one in CLAUDE.md."
+    },
+    {
+      "layer": "project-context-coverage",
+      "check": "links-to-canonical-human-docs",
+      "status": "partial",
+      "evidence": [
+        "DESIGN.md, MIGRATION_PLAN.md, REMEDIATION_PLAN.md linked; README.md not linked"
+      ],
+      "totalCount": 1,
+      "expectation": "Points at README/ARCHITECTURE/CONTRIBUTING when present.",
+      "gap": "README.md exists but is not linked; CONTRIBUTING/ARCHITECTURE absent.",
+      "remediation": "Add a pointer to README.md."
+    },
+    {
+      "layer": "operational-guidance-and-conventions",
+      "check": "build-test-run-commands-documented",
+      "status": "present",
+      "evidence": [
+        "CLAUDE.md ## Commands"
+      ],
+      "totalCount": 1,
+      "expectation": "Install/dev/test/build documented.",
+      "gap": null
+    },
+    {
+      "layer": "operational-guidance-and-conventions",
+      "check": "code-style-naming-conventions-documented",
+      "status": "partial",
+      "evidence": [
+        "strict tsc, antigravity-first, navy/accent Tailwind"
+      ],
+      "totalCount": 1,
+      "expectation": "Naming/import-order/formatting conventions.",
+      "gap": "No naming/import-order/abbreviations policy.",
+      "remediation": "Add a short conventions block."
+    },
+    {
+      "layer": "operational-guidance-and-conventions",
+      "check": "commit-branching-conventions-documented",
+      "status": "present",
+      "evidence": [
+        "audit/stage-N branch convention; feature-branch->PR->CI workflow"
+      ],
+      "totalCount": 1,
+      "expectation": "Commit/branch conventions.",
+      "gap": null
+    },
+    {
+      "layer": "operational-guidance-and-conventions",
+      "check": "testing-philosophy-documented",
+      "status": "partial",
+      "evidence": [
+        "names vitest/pytest + tsc gate"
+      ],
+      "totalCount": 1,
+      "expectation": "States testing philosophy.",
+      "gap": "No behaviour-over-implementation / query-priority / snapshot policy.",
+      "remediation": "Add a short testing-philosophy note."
+    },
+    {
+      "layer": "operational-guidance-and-conventions",
+      "check": "do-and-dont-guidance-present",
+      "status": "present",
+      "evidence": [
+        "register routers in BOTH apps; never apply schema via MCP; Karpathy guidelines"
+      ],
+      "totalCount": 1,
+      "expectation": "Positive and negative agent guidance.",
+      "gap": null
+    },
+    {
+      "layer": "operational-guidance-and-conventions",
+      "check": "tone-response-style-guidance-present",
+      "status": "partial",
+      "evidence": [
+        "AI surface present; data-handling rules only"
+      ],
+      "totalCount": 1,
+      "expectation": "Response-style/persona for user-facing AI features.",
+      "gap": "PII/data-handling rules present but no response-style/persona/tone guidance.",
+      "remediation": "Add a tone/persona note for Policy Assistant + AI features."
+    },
+    {
+      "layer": "claude-code-settings-hygiene",
+      "check": "settings-json-valid-json",
+      "status": "present",
+      "evidence": [
+        ".claude/settings.json"
+      ],
+      "totalCount": 1,
+      "expectation": "Parses as JSON.",
+      "gap": null
+    },
+    {
+      "layer": "claude-code-settings-hygiene",
+      "check": "settings-local-json-gitignored",
+      "status": "violation",
+      "evidence": [
+        ".claude/settings.local.json tracked; .gitignore ignores only .claude/worktrees/"
+      ],
+      "totalCount": 1,
+      "expectation": "settings.local.json gitignored, not committed.",
+      "gap": "File is git-tracked and not gitignored; local overrides leak; future inline secret would be committed.",
+      "remediation": "ALREADY ADDRESSED IN-FLIGHT in PR #858 (chore/gitignore-settings-local): adds .claude/settings.local.json to .gitignore and untracks it. Stands until that PR merges."
+    },
+    {
+      "layer": "claude-code-settings-hygiene",
+      "check": "no-secrets-in-settings-json",
+      "status": "present",
+      "evidence": [
+        ".claude/settings.json"
+      ],
+      "totalCount": 0,
+      "expectation": "No secret-shaped values.",
+      "gap": null
+    },
+    {
+      "layer": "claude-code-settings-hygiene",
+      "check": "no-secrets-in-settings-local-json",
+      "status": "present",
+      "evidence": [
+        "21 allow-entries + Notion MCP UUIDs scanned"
+      ],
+      "totalCount": 0,
+      "expectation": "No secret-shaped values.",
+      "gap": null
+    },
+    {
+      "layer": "claude-code-settings-hygiene",
+      "check": "permissions-appropriately-scoped",
+      "status": "present",
+      "evidence": [
+        "21 allow-entries; 0 match-all broad patterns; broadest=Bash(git add *)/Bash(git commit -m ' *)/Bash(npx tsc *)"
+      ],
+      "totalCount": 0,
+      "expectation": "<= 5 broad match-all patterns.",
+      "gap": null
+    },
+    {
+      "layer": "claude-code-settings-hygiene",
+      "check": "permissions-deny-non-empty",
+      "status": "partial",
+      "evidence": [
+        "deployable project; no permissions.deny in either file"
+      ],
+      "totalCount": 1,
+      "expectation": "Deny-list forbids destructive commands in deployed projects.",
+      "gap": "No deny-list; no guardrail vs rm -rf /, git push --force, destructive DB ops.",
+      "remediation": "Add a permissions.deny block to settings.json."
+    },
+    {
+      "layer": "multi-agent-consistency-and-drift",
+      "check": "single-source-of-truth",
+      "status": "present",
+      "evidence": [
+        "backend/CLAUDE.md: 'Supplements the root CLAUDE.md'"
+      ],
+      "totalCount": 2,
+      "expectation": "One source of truth; others reference it.",
+      "gap": null
+    },
+    {
+      "layer": "multi-agent-consistency-and-drift",
+      "check": "tech-stack-mentions-match-deps",
+      "status": "present",
+      "evidence": [
+        "frontend/package.json + backend/requirements.txt"
+      ],
+      "totalCount": 0,
+      "expectation": "Mentioned frameworks appear in deps.",
+      "gap": null
+    },
+    {
+      "layer": "multi-agent-consistency-and-drift",
+      "check": "commands-match-package-scripts",
+      "status": "present",
+      "evidence": [
+        "npm run dev/build resolve via root->frontend"
+      ],
+      "totalCount": 0,
+      "expectation": "Commands reference existing scripts.",
+      "gap": null
+    },
+    {
+      "layer": "multi-agent-consistency-and-drift",
+      "check": "cross-references-resolve",
+      "status": "present",
+      "evidence": [
+        "11/11 referenced paths exist"
+      ],
+      "totalCount": 0,
+      "expectation": "Internal references resolve.",
+      "gap": null
+    },
+    {
+      "layer": "multi-agent-consistency-and-drift",
+      "check": "no-retired-model-identifiers",
+      "status": "present",
+      "evidence": [
+        "no retired ids; no model ids in CLAUDE.md"
+      ],
+      "totalCount": 0,
+      "expectation": "No retired model ids.",
+      "gap": null
+    },
+    {
+      "layer": "multi-agent-consistency-and-drift",
+      "check": "instruction-file-freshness",
+      "status": "present",
+      "evidence": [
+        "CLAUDE.md modified 2026-06-14; latest commit 2026-06-19"
+      ],
+      "totalCount": 0,
+      "expectation": "At least one instruction file modified within 180 days.",
+      "gap": null
+    },
+    {
+      "layer": "multi-agent-consistency-and-drift",
+      "check": "process-drift-main-push-migration-workflow",
+      "status": "violation",
+      "evidence": [
+        "CLAUDE.md lines 132,180",
+        "no migration-apply workflow in .github/workflows/"
+      ],
+      "totalCount": 1,
+      "expectation": "Described processes reflect repo reality.",
+      "gap": "CLAUDE.md claims a 'main-push migration workflow' auto-applies migrations to prod on merge; no such workflow exists (ci.yml is PR-only/validate-only). Migrations are applied manually / via MCP apply_migration. Agents following this assume prod schema is updated when it is not.",
+      "remediation": "Reword lines 132 & 180 to the real manual/MCP apply process, or build the workflow the docs promise."
+    }
+  ]
+}

@@ -1,0 +1,192 @@
+# AIQ-1349 — requirement seed for the Netherlands. verification_status: corpus_grounded.
+#
+# CORPUS-GROUNDED against corpus/us_nl_corridor.json (Highly Skilled Migrant /
+# kennismigrant + EU Blue Card route for non-EEA nationals), citing tier-1 official
+# sources (ind.nl, government.nl, belastingdienst.nl). Most steps apply to any stay
+# > ~4 months (incl. short assignments), so they are universal; only permanent
+# residence / extension is long-term-only. NOT yet human-expert-verified.
+#
+# SCOPE: non-EEA (e.g. US) salaried route. EEA/EU nationals have free movement.
+#
+# That scope line sat here as a COMMENT while nothing enforced it, so an EU citizen
+# moving to the Netherlands was served the full IND Highly-Skilled-Migrant /
+# EU-Blue-Card permit track — the same bug france.yaml had. The file-level default
+# below makes the scope executable.
+#
+# Unlike France, this catalog is NOT wholly permit-framed. Three steps are
+# genuinely universal and stay that way (explicit `applies_to_nationality_classes:
+# null`), because an EU citizen needs them just as much as anyone:
+#   - gemeente / BRP registration + BSN  (anyone staying > 4 months)
+#   - Dutch statutory health insurance   (anyone living or working here)
+#   - the 30% ruling                     (recruited from abroad; nationality-blind)
+# Suppressing those would be a different lie from the one we are fixing.
+#
+# The permit-framed steps stay THIRD_COUNTRY, and the two pillars that would
+# otherwise go empty for an EU national (IDENTITY, EMPLOYMENT) get EU-scoped
+# counterparts at the bottom of this file. An empty pillar reads as a broken
+# screen — or as "we didn't check".
+#
+# Reload (idempotent): python backend/scripts/seed_requirements.py --file backend/seeds/requirements/netherlands.yaml
+
+verification_status: corpus_grounded
+source_scope: "US->NL corpus (non-EEA highly-skilled-migrant route); EEA nationals exempt"
+default_applies_to_nationality_classes: [THIRD_COUNTRY]
+purposes_by_country:
+  NETHERLANDS: [employment, other]
+
+requirements:
+  - key: passport
+    pillar: IDENTITY
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    confidence: high
+    requires_expert_review: false
+    citations: ["https://ind.nl/en/residence-permits/work/highly-skilled-migrant"]
+    countries:
+      NETHERLANDS:
+        title: "Valid passport"
+        description: "A valid passport is the primary identity document for the residence-permit application. Indicative — confirm with the IND."
+  - key: residence_permit
+    pillar: RESIDENCE
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    confidence: high
+    requires_expert_review: true
+    citations: ["https://ind.nl/en/residence-permits/work/highly-skilled-migrant", "https://ind.nl/en/residence-permits/work/eu-blue-card"]
+    countries:
+      NETHERLANDS:
+        title: "Residence permit (Highly Skilled Migrant / EU Blue Card)"
+        description: "Non-EEA nationals need a work residence permit: Highly Skilled Migrant (kennismigrant, via an IND-recognised sponsor) or EU Blue Card. Indicative — confirm with the IND."
+  - key: employment_contract_recognised_sponsor
+    pillar: EMPLOYMENT
+    severity: WARN
+    owner: HR
+    applies_to_assignment_types: null
+    confidence: high
+    requires_expert_review: true
+    citations: ["https://ind.nl/en/residence-permits/work/highly-skilled-migrant", "https://ind.nl/en/recognition-as-a-sponsor"]
+    countries:
+      NETHERLANDS:
+        title: "Employment contract with an IND-recognised sponsor"
+        description: "A contract with an IND-recognised sponsor meeting the salary threshold; the employer files the application. Indicative — confirm with the IND."
+  - key: collect_residence_permit
+    pillar: RESIDENCE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    confidence: high
+    requires_expert_review: false
+    citations: ["https://ind.nl/en/how-to-collect-your-residence-document"]
+    countries:
+      NETHERLANDS:
+        title: "Collect residence permit from the IND"
+        description: "After approval, collect the residence document from the IND by appointment. Indicative — confirm with the IND."
+  - key: gemeente_registration_bsn
+    pillar: RESIDENCE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    # Universal: everyone staying over 4 months registers in the BRP and gets a
+    # BSN, EU citizens included. Nothing about this is permit-dependent — it is
+    # what unlocks payroll, a bank account and health insurance.
+    applies_to_nationality_classes: null
+    confidence: high
+    requires_expert_review: false
+    citations: ["https://www.government.nl/topics/personal-data/citizen-service-number-bsn"]
+    countries:
+      NETHERLANDS:
+        title: "Municipality registration + BSN (gemeente / BRP)"
+        description: "Register at the local municipality (gemeente) in the BRP to obtain a citizen service number (BSN); register within 5 days if staying over 4 months. Indicative — confirm with the gemeente."
+  - key: health_insurance
+    pillar: HEALTHCARE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    # Universal: statutory Dutch basic health insurance is mandatory for anyone who
+    # lives or works here. Not a permit condition — an EU citizen owes it too.
+    applies_to_nationality_classes: null
+    confidence: high
+    requires_expert_review: false
+    citations: ["https://www.government.nl/topics/health-insurance"]
+    countries:
+      NETHERLANDS:
+        title: "Dutch health insurance (zorgverzekering)"
+        description: "Take out statutory Dutch basic health insurance, typically within 4 months of becoming insurable. Indicative — confirm on government.nl."
+  - key: thirty_percent_ruling
+    pillar: SOCIAL_SECURITY
+    severity: INFO
+    owner: HR
+    applies_to_assignment_types: null
+    # Universal: eligibility for the 30% ruling turns on being recruited from
+    # abroad (the 150km rule), not on nationality or on holding a permit. An EU
+    # national can claim it — hiding it from them would cost them money.
+    applies_to_nationality_classes: null
+    confidence: medium
+    requires_expert_review: true
+    citations: ["https://www.belastingdienst.nl/wps/wcm/connect/en/individuals/individuals"]
+    countries:
+      NETHERLANDS:
+        title: "30% ruling application (tax)"
+        description: "If eligible, the employer applies for the 30% ruling within 4 months of the employment start to receive it from the first month. Indicative — confirm with the Belastingdienst."
+  # ── The genuinely long-term-only step (skipped for short assignments) ──
+  - key: permanent_residence_or_extension
+    pillar: RESIDENCE
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: [LTA, PERMANENT]
+    confidence: medium
+    requires_expert_review: true
+    citations: ["https://ind.nl/en/residence-permits/permanent-residence"]
+    countries:
+      NETHERLANDS:
+        title: "Permanent residence / permit extension"
+        description: "If staying beyond the initial permit term, apply to extend the permit or for permanent residence / EU long-term resident status. Indicative — confirm with the IND."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # EU/EEA + own-national establishment steps.
+  #
+  # The permit track above is framed around the IND file ("for the residence-permit
+  # application", "the employer files the application"), so it is correctly scoped
+  # THIRD_COUNTRY — serving it to a Dutch or EU citizen would tell them to prepare
+  # for a permit they will never apply for.
+  #
+  # But gemeente/BSN, health insurance and the 30% ruling above are universal and
+  # stay, so an EU national already has RESIDENCE, HEALTHCARE and SOCIAL_SECURITY
+  # covered. Only IDENTITY and EMPLOYMENT would go empty. These two fill them.
+  #
+  # Deliberately conservative, and flagged: verification_status is overridden to
+  # `representative` because — unlike the IND track above — this is hand-authored,
+  # not drawn from the us_nl corpus. Raise it only when a qualified reviewer signs
+  # it off. The right of residence itself is stated by rules_engine's nothing_to_do
+  # confirmation, not duplicated here.
+  # ─────────────────────────────────────────────────────────────────────────────
+  - key: eu_identity_document
+    pillar: IDENTITY
+    severity: BLOCKER
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    verification_status: representative
+    confidence: medium
+    requires_expert_review: true
+    citations: ["https://europa.eu/youreurope/citizens/", "https://www.government.nl/topics/personal-data/citizen-service-number-bsn"]
+    countries:
+      NETHERLANDS:
+        title: "Valid passport or national identity card"
+        description: "As an EU/EEA national you may enter and live in the Netherlands on a valid national identity card or passport — no IND residence permit is involved. You will need it to register at the gemeente and collect your BSN. Indicative — confirm with your consulate or government.nl."
+  - key: eu_employment_contract
+    pillar: EMPLOYMENT
+    severity: WARN
+    owner: EMPLOYEE
+    applies_to_assignment_types: null
+    applies_to_nationality_classes: [OWN_NATIONAL, EU_EEA]
+    verification_status: representative
+    confidence: medium
+    requires_expert_review: true
+    citations: ["https://www.government.nl/topics/employment-contract-and-cao"]
+    countries:
+      NETHERLANDS:
+        title: "Signed Dutch employment contract"
+        description: "Your signed Dutch contract. Your employer does NOT need to be an IND-recognised sponsor and files no permit application for you — but the contract is still what unlocks payroll, the 30% ruling, a bank account and a landlord's dossier check. Indicative — confirm with your employer."

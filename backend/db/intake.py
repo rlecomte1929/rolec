@@ -71,6 +71,7 @@ class IntakeMixin:
         # case exists (FK case_dependents.case_id -> public.cases).
         canonical = str(assignment.get("canonical_case_id") or cid).strip()
         self._sync_case_dependents_from_draft(canonical, draft)
+        self._sync_wizard_household_columns(cid, draft)
         st = (assignment.get("status") or "").strip().lower()
         if st not in ("created", "assigned"):
             return
@@ -78,6 +79,35 @@ class IntakeMixin:
         if not any((str(basics.get(k) or "").strip()) for k in ("destCountry", "destCity", "originCountry", "originCity")):
             return
         self.update_assignment_status(assignment["id"], "awaiting_intake")
+
+    def _sync_wizard_household_columns(self, case_id: str, draft: Dict[str, Any]) -> None:
+        """Keep wizard_cases.has_spouse / child_count aligned with the family draft.
+
+        Those columns are not on the SQLAlchemy Case model, so PATCH never wrote them.
+        HR/command-center and some immigration gates still read the denormalized pair.
+        """
+        cid = (case_id or "").strip()
+        if not cid:
+            return
+        try:
+            from ..app.services.household_from_draft import wizard_family_columns
+            has_spouse, child_count = wizard_family_columns(draft)
+        except Exception:
+            log.exception("wizard household derive failed case=%s", cid)
+            return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "UPDATE wizard_cases SET has_spouse = :hs, child_count = :cc "
+                        "WHERE CAST(id AS TEXT) = :cid"
+                    ),
+                    {"hs": has_spouse, "cc": child_count, "cid": cid},
+                )
+        except Exception:
+            # SQLite fixtures often omit the S4 columns — do not fail the PATCH.
+            log.warning("wizard_cases household columns not updated case=%s", cid, exc_info=True)
+
 
     def seed_dossier_questions_if_missing(self) -> None:
         """

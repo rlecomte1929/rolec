@@ -1,0 +1,290 @@
+# C1-09 · Corridor Agent IN_DE_BLUECARD_2026
+#
+# Architecture Report §4.1 direct implementation. 2026 thresholds verified
+# in R-01 dossier and grounded in BGBl. 2025 I Nr. 278 (the annual
+# Bundesanzeiger ordinance that publishes the EU Blue Card salary floor).
+#
+# Schema-versioning: bump `version` when any rule reference, threshold or
+# step ordering changes. Earlier YAML files coexist (v1.yaml, v2.yaml,
+# v3.yaml …) so historical cases keep their captured ruleset.
+#
+# When the C1-05 evaluator lands, this file is the input that drives the
+# Priya Sharma fixture (C1-17) and the pilot demo (C1-18).
+
+corridor_agent:
+  corridor_id: IN_DE_BLUECARD_2026
+  version: "2026.01"
+  petitioning_party: EMPLOYEE  # PF-1 addition
+  origin_country_iso3: IND
+  destination_country_iso3: DEU
+  description: >
+    Indian national → German EU Blue Card (§18g AufenthG). Standard path
+    with a degree (Branch A) or §18g(2) IT-specialist path without a
+    degree but with qualifying experience (Branch B).
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Applicable rules
+  # ─────────────────────────────────────────────────────────────────────
+  applicable_rules:
+    - legal_reference: "AufenthG §18g"
+      rule_id: DE_AUFENTHG_18G
+      summary: "General EU Blue Card requirements for qualified employment."
+    - legal_reference: "AufenthG §18g (2)"
+      rule_id: DE_AUFENTHG_18G_2
+      summary: "Blue Card without recognised degree for IT specialists with ≥3y experience in the past 7y."
+    - legal_reference: "AufenthG §18b"
+      rule_id: DE_AUFENTHG_18B
+      summary: "Skilled-worker residence permit (used as alternate pathway for over-45 / lower salary cases)."
+    - legal_reference: "AufenthG §18 (2) Nr. 5"
+      rule_id: DE_AUFENTHG_18_2_5
+      summary: "Skilled worker over 45 — additional pension/income requirement."
+    - legal_reference: "AufenthG §82"
+      rule_id: DE_AUFENTHG_82
+      summary: "Cooperation and notification obligations on the foreign national."
+    - legal_reference: "AufenthG §27 / §30"
+      rule_id: DE_AUFENTHG_FAMILY
+      summary: "Family reunification — spouse residence permit and immediate full work rights."
+    - legal_reference: "BeschV §6"
+      rule_id: DE_BESCHV_6
+      summary: "Ordinance on Employment of Foreigners — qualifying occupations."
+    - legal_reference: "Directive (EU) 2021/1883"
+      rule_id: EU_2021_1883
+      summary: "EU Blue Card Directive (recast). Floor harmonisation across Member States."
+    - legal_reference: "BGBl. 2025 I Nr. 278 (2026 thresholds)"
+      rule_id: DE_AUFENTHG_18G_SALARY
+      summary: "2026 salary thresholds — €50,700 general / €45,934.20 shortage / recent graduate / qualifying IT."
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Required documents (per documents.expected_fields shape from C1-01b)
+  # ─────────────────────────────────────────────────────────────────────
+  required_documents:
+    - PASSPORT_TD3:employee
+    - PASSPORT_TD3:family.spouse?
+    - PASSPORT_TD3:family.children.*
+    - EMPLOYMENT_CONTRACT
+    - DIPLOMA_BACHELOR | DIPLOMA_MASTER | IT_EXPERIENCE_PORTFOLIO
+    - ANABIN_EVIDENCE | ZAB_STATEMENT_OF_COMPARABILITY
+    - MARRIAGE_CERT?
+    - BIRTH_CERT:family.children.*
+    - HEALTH_INSURANCE_PROOF
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Required data points
+  # ─────────────────────────────────────────────────────────────────────
+  required_data_points:
+    - key: gross_salary_annual
+      type: money
+      source: USER_INPUT
+      validations:
+        - ">= corridor.salary_threshold"
+        - "guaranteed_fixed_only"
+    - key: salary_threshold_eur
+      type: money
+      source: EXTERNAL_LOOKUP   # PF-1 pattern — sourced from rule_versions.body
+      lookup: DE_AUFENTHG_18G_SALARY.current
+    - key: position_isco_2008
+      type: enum_isco
+      source: USER_INPUT
+    - key: contract_duration_months
+      type: int
+      validations:
+        - ">= 6"
+    - key: qualification_recognized_in_anabin
+      type: bool
+      source: EXTERNAL_LOOKUP
+      lookup: anabin.{institution_name}
+    - key: applicant_age_years
+      type: int
+      source: USER_INPUT
+    - key: has_health_insurance
+      type: bool
+      source: USER_INPUT
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Salary thresholds (2026, from BGBl. 2025 I Nr. 278)
+  # ─────────────────────────────────────────────────────────────────────
+  salary_thresholds_eur:
+    general: 50700.00
+    shortage_or_recent_graduate_or_it: 45934.20
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Eligibility logic (executable by C1-05 runtime)
+  # ─────────────────────────────────────────────────────────────────────
+  eligibility_logic:
+    branches:
+      - id: BRANCH_A
+        label: "Standard EU Blue Card (§18g)"
+        cite: DE_AUFENTHG_18G
+        requires_all:
+          - qualification_recognized_in_anabin == true
+          - contract_duration_months >= 6
+          - gross_salary_annual >= salary_thresholds_eur.general
+        verdict_on_pass: ELIGIBLE
+      - id: BRANCH_A_SHORTAGE
+        label: "Blue Card — shortage / recent-graduate / IT (§18g + 2026 reduced threshold)"
+        cite: DE_AUFENTHG_18G_SALARY
+        requires_all:
+          - qualification_recognized_in_anabin == true
+          - contract_duration_months >= 6
+          - gross_salary_annual >= salary_thresholds_eur.shortage_or_recent_graduate_or_it
+          - position_in_shortage_occupation == true
+        verdict_on_pass: ELIGIBLE
+      - id: BRANCH_B
+        label: "Blue Card without degree — IT specialist (§18g(2))"
+        cite: DE_AUFENTHG_18G_2
+        requires_all:
+          - it_experience_years_last_7 >= 3
+          - position_isco_2008 in ['2511','2512','2513','2514','2519','2521','2522','2523','2529','2531','2532']  # ISCO IT codes
+          - contract_duration_months >= 6
+          - gross_salary_annual >= salary_thresholds_eur.shortage_or_recent_graduate_or_it
+        verdict_on_pass: ELIGIBLE
+      - id: ALT_SKILLED_WORKER
+        label: "Skilled worker permit (§18b) — alternate pathway when Blue Card thresholds not met"
+        cite: DE_AUFENTHG_18B
+        requires_all:
+          - qualification_recognized_in_anabin == true
+          - contract_duration_months >= 6
+          - gross_salary_annual < salary_thresholds_eur.general
+        verdict_on_pass: ALTERNATE_PATHWAY
+        annotation: "Lower salary floor than Blue Card; longer residence accumulation for PR."
+    no_branch_verdict: NOT_ELIGIBLE
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Exception cases — surface as alternate pathways, never silently block
+  # ─────────────────────────────────────────────────────────────────────
+  exception_cases:
+    - id: OVER_45_INCOME_RULE
+      condition: "applicant_age_years > 45 AND gross_salary_annual < salary_thresholds_eur.general"
+      cite: DE_AUFENTHG_18_2_5
+      action: SURFACE_AS_ALTERNATE_PATHWAY
+      hint: "Skilled-worker permit (§18b) requires additional pension/old-age provision."
+    - id: REGULATED_PROFESSION
+      condition: "position_isco_2008 in regulated_profession_list"
+      cite: BQFG_LAENDERSPEZIFISCH
+      action: HOLD_CASE
+      hint: "Berufsanerkennung required before residence permit can issue."
+    - id: FAMILY_REUNIFICATION
+      condition: "case.has_family_relocating == true"
+      cite: DE_AUFENTHG_FAMILY
+      action: SPAWN_FAMILY_CASE
+      hint: "Spouse residence permit + immediate work rights, no German language pre-test."
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Step graph — 14 steps from ZAB statement → Anmeldung → Aufenthaltstitel
+  # ─────────────────────────────────────────────────────────────────────
+  step_graph:
+    - step_id: ZAB_STATEMENT
+      name: "ZAB Statement of Comparability (if anabin H+ not available)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 60
+      prerequisite_step_ids: []
+      time_window_relative_to: null
+      time_window_min_days: null
+      time_window_max_days: null
+      conditional_on: "qualification_recognized_in_anabin == false"
+
+    - step_id: EMPLOYMENT_CONTRACT_SIGNED
+      name: "EU Blue Card-compliant employment contract signed"
+      responsible_party: EMPLOYER
+      expected_duration_days: 14
+      prerequisite_step_ids: []
+
+    - step_id: PRE_DECISION_BA
+      name: "Bundesagentur für Arbeit pre-approval (§39 AufenthG, if required)"
+      responsible_party: EMPLOYER
+      expected_duration_days: 14
+      prerequisite_step_ids: [EMPLOYMENT_CONTRACT_SIGNED]
+      conditional_on: "salary < shortage_or_recent_graduate_or_it_threshold"
+
+    - step_id: VISA_APPLICATION
+      name: "D-visa application at German mission in Bangalore/Mumbai/Delhi/Chennai/Kolkata"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 90
+      prerequisite_step_ids: [EMPLOYMENT_CONTRACT_SIGNED, ZAB_STATEMENT]
+
+    - step_id: VISA_GRANTED
+      name: "D-visa granted (entry permit)"
+      responsible_party: AUTHORITY_DE_MISSION_IN
+      expected_duration_days: 7
+      prerequisite_step_ids: [VISA_APPLICATION]
+
+    - step_id: TRAVEL_TO_DE
+      name: "Travel to Germany on D-visa"
+      # ZAB statement + D-visa must complete before travel — the pre-arrival runway.
+      arrival_anchor: true
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: [VISA_GRANTED]
+
+    - step_id: ANMELDUNG
+      name: "Anmeldung (registration of address) — Munich KVR"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: [TRAVEL_TO_DE]
+      time_window_relative_to: TRAVEL_TO_DE
+      time_window_min_days: 0
+      time_window_max_days: 14
+      deadline_trigger:
+        tag: "relopass-deadline-anmeldung-de"
+        label: "Anmeldung — German address registration"
+        channel: "email"
+        lead_days: 7
+
+    - step_id: HEALTH_INSURANCE_SETUP
+      name: "Health insurance (statutory or private) enrolment"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 5
+      prerequisite_step_ids: [TRAVEL_TO_DE]
+
+    - step_id: BANK_ACCOUNT
+      name: "German bank account opened (Anmeldung required)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [ANMELDUNG]
+
+    - step_id: BIOMETRICS_APPOINTMENT
+      name: "Biometrics appointment booked at Bürgerbüro / Ausländerbehörde"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 21
+      prerequisite_step_ids: [ANMELDUNG]
+      time_window_relative_to: ANMELDUNG
+      time_window_min_days: 0
+      time_window_max_days: 60
+      deadline_trigger:
+        tag: "relopass-deadline-biometrics-appointment-de"
+        label: "Biometrics appointment for the Blue Card"
+        channel: "email"
+        lead_days: 14
+
+    - step_id: AUFENTHALTSTITEL_APPLICATION
+      name: "Aufenthaltstitel (residence-permit) application submitted"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: [BIOMETRICS_APPOINTMENT, HEALTH_INSURANCE_SETUP]
+
+    - step_id: AUFENTHALTSTITEL_DECISION
+      name: "Aufenthaltstitel decision issued"
+      responsible_party: AUTHORITY_DE_AUSLAENDERBEHOERDE
+      expected_duration_days: 42
+      prerequisite_step_ids: [AUFENTHALTSTITEL_APPLICATION]
+
+    - step_id: BLUE_CARD_COLLECTION
+      name: "Blue Card (eAT) collected"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [AUFENTHALTSTITEL_DECISION]
+      time_window_relative_to: AUFENTHALTSTITEL_DECISION
+      time_window_min_days: 0
+      time_window_max_days: 30
+      deadline_trigger:
+        tag: "relopass-deadline-blue-card-collection-de"
+        label: "Blue Card collection"
+        channel: "email"
+        lead_days: 14
+
+    - step_id: NOTIFICATION_82_AUFENTHG
+      name: "§82 AufenthG notifications set up (employer changes / address changes / family events)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: [BLUE_CARD_COLLECTION]
+      cite: DE_AUFENTHG_82

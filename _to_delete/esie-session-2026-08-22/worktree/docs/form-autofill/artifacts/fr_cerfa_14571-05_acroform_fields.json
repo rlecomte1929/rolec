@@ -1,0 +1,871 @@
+{
+  "url": "https://france-visas.gouv.fr/documents/d/france-visas/ls_14571-05_fr_09",
+  "count": 172,
+  "fields": [
+    {
+      "name": "applicantSurname",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantSurnameAtBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantFirstname",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantDateOfBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantPlaceOfBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantCountryOfBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantNationality",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantNationalityAtBirth",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "applicantGenderM",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "applicantGenderF",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantGenderOther",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "applicantMaritalCEL",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "applicantMaritalMAR",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "applicantMaritalSEP",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "applicantMaritalDIV",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "applicantMaritalVEU",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "applicantMaritalAUT",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantMaritalOther",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental1AddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental1AddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental1AddressL3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental1AddressL4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental1AddressL5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental1AddressL6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental2AddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental2AddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental2AddressL3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental2AddressL4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental2AddressL5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "parental2AddressL6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantIdCardNumber",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "travelDocTypePD",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "travelDocTypePOF",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "travelDocTypePO",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "travelDocTypePSV",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "travelDocTypePSP",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "travelDocTypeAUT",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "travelDocTypeOther",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "travelDocNumber",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "travelDocDateOfIssue",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "travelDocValidUntil",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "travelDocCountries",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantAddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantAddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantEmail",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantPhone",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantResidencePermitNumber",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantResidencePermitDateOfIssue",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantResidencePermitValidUntil",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantOccupation",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantOccupationAddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantOccupationAddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantOccupationAddressL3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicantOccupationAddressL4",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "purposeTRAV",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "purposeETUD",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "purposeSTAG",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "purposeMARI",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "purposeMEDI",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "purposeETAM",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "purposeVISI",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "purposeVRET",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "purposePRIS",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "purposeAUTR",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "purposeOther",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "applicantPhoto_af_image",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "modificationDate",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicationNumberPart1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicationNumberPart2",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "applicationNumberCB1_af_image",
+      "ft": null,
+      "maxLen": null
+    },
+    {
+      "name": "host1AddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "host1AddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "host1AddressL3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "host2AddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "host2AddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "host2AddressL3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "placeOfApplicationAddressL3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily1Relationship",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "placeOfApplicationAddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "host3AddressL3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily1FirstNames",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "host3AddressL1",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "stayBound13",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily1DateOfBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "placeOfApplicationAddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily2Relationship",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily2FirstNames",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily2DateOfBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily2Nationality",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "beginningDate",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily3FirstNames",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily3DateOfBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily3Nationality",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "stayBound12",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily1Nationality",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "stayBound11",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily3Relationship",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily5FirstNames",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily5Relationship",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily4Relationship",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily9Relationship",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily8Nationality",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "fundingType",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily5Nationality",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily6DateOfBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily9DateOfBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily4Nationality",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily6Nationality",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "studyFalse",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "studyTrue",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "studyAddressL4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily6Relationship",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily9Nationality",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "studyAddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily6FirstNames",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily8FirstNames",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily9FirstNames",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily4DateOfBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily5DateOfBirth",
+      "ft": null,
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily7Relationship",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily4FirstNames",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily8DateOfBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily7DateOfBirth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "studyAddressL3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "studyAddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily7FirstNames",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily7Nationality",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "companionFamily8Relationship",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "studyAddressL5",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "frenchSponsorTrue",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "otherSponsorAddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "otherSponsorAddressL2",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "frenchSponsorFalse",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "otherSponsorAddressL3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "otherSponsorAddressL4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily1AddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily2AddressL4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily1AddressL4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily3AddressL5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "otherSponsorAddressL6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily3AddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily1AddressL3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily3AddressL4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily1AddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily1AddressL5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily2AddressL3",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamilyTrue",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily2AddressL5",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "previousStayTrue",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "previousStay1Info",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily2AddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "previousStay2AddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "previousStay3Info",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamilyFalse",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily2AddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily3AddressL3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "previousStay2AddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "previousStay1AddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "previousStay3AddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "otherSponsorAddressL9",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "previousStay3AddressL2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "townAndDateTime",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "applicationNumberCB2_af_image",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "previousStay1AddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "residentFamily3AddressL1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "previousStay2Info",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "previousStayFalse",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "otherSponsorAddressL8",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "otherSponsorAddressL7",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "otherSponsorAddressL5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "applicationNumber",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "host3AddressL2",
+      "ft": null,
+      "maxLen": null
+    }
+  ],
+  "_provenance": {
+    "extracted": "2026-08-10",
+    "method": "fetched inside a real browser session (France-Visas returns HTTP 403 to curl regardless of headers or cookies), then every non-/ObjStm and /ObjStm FlateDecode stream inflated via DecompressionStream and scanned for /T field titles",
+    "note": "field type is read from the nearest /FT after each /T; 3 entries resolve to null because their /FT sits on a parent field node, not the widget"
+  }
+}

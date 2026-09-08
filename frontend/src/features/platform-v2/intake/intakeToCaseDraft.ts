@@ -33,13 +33,22 @@ export function intakeToCaseDraft(data: IntakeData): Partial<CaseDraftDTO> {
       email: data.email || undefined,
     },
     familyMembers: {
+      maritalStatus: partner && childMembers.length
+        ? 'partner_kids'
+        : partner
+          ? 'partner'
+          : childMembers.length
+            ? 'kids_only'
+            : 'solo',
       spouse: partner
         ? {
             fullName: partner.name || undefined,
+            dateOfBirth: partner.dob || undefined,
             wantsToWork: partner.needs_work_permit?.toLowerCase() === 'yes' || undefined,
           }
         : undefined,
       children: childMembers.map((c) => ({
+        fullName: c.name || undefined,
         dateOfBirth: c.dob || undefined,
         relationship: 'child',
       })),
@@ -58,6 +67,7 @@ export function intakeToCaseDraft(data: IntakeData): Partial<CaseDraftDTO> {
         data.expected_duration_months != null ? Number(data.expected_duration_months) : undefined,
       // AIQ-1603: single-select commute preference → public.cases.commute_preference.
       commutePreference: data.commute_preference || undefined,
+      commuteMins: Number.isFinite(Number(data.commute_mins)) ? Number(data.commute_mins) : undefined,
     },
   };
 }

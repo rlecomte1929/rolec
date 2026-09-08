@@ -1,0 +1,96 @@
+name: agent-dispatch
+
+# Mission Control P3c — multi-file coding agent. GREENFIELD + INERT.
+#
+# Dispatched (workflow_dispatch) with an APPROVED plan (work_item_planner output) as
+# the prompt. `claude-code-action` makes the multi-file edits + tests on an `autofix/*`
+# branch, which then triggers the EXISTING autofix-validate.yml (blocklist → Playwright
+# E2E → squash-merge → deploy → auto-revert) — the same proven safety loop the nightly
+# autofix runs.
+#
+# It is gated OFF via `vars.AGENT_DISPATCH_ENABLED` and cannot run until all of:
+#   1. `vars.AGENT_DISPATCH_ENABLED = 'true'` is set in repo settings,
+#   2. an `ANTHROPIC_API_KEY` repo secret exists (mirror eval-llm-reports.yml),
+#   3. GitHub Actions billing is restored,
+#   4. (for the edge-fn trigger) the vault GITHUB_TOKEN carries `actions:write`.
+# See docs/mission-control-agent-dispatch.md. The action version + input names below
+# are a best-effort pin and MUST be verified with a no-op dry run before enabling.
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Approved plan (work_item_planner output) used as the agent prompt"
+        required: true
+        type: string
+      work_item_id:
+        description: "Mission Control work_item id (drives the branch name + run callback)"
+        required: true
+        type: string
+      branch:
+        description: "Target autofix/* branch (must match autofix/** so autofix-validate.yml fires)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    # INERT until explicitly enabled (repo Settings → Variables → AGENT_DISPATCH_ENABLED=true).
+    if: ${{ vars.AGENT_DISPATCH_ENABLED == 'true' }}
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Untrusted workflow_dispatch inputs are passed via env (never inlined into the
+      # shell as ${{ }}) to avoid command injection, and the branch is sanitised.
+      - name: Compute agent branch
+        id: branch
+        env:
+          WORK_ITEM_ID: ${{ inputs.work_item_id }}
+          BRANCH_INPUT: ${{ inputs.branch }}
+        run: |
+          B="$BRANCH_INPUT"
+          if [ -z "$B" ]; then
+            ID=$(printf '%s' "$WORK_ITEM_ID" | tr -cd 'a-f0-9' | cut -c1-16)
+            B="autofix/bug-${ID}"
+          fi
+          # Hard guard: only autofix/* branches (so autofix-validate.yml fires) and a
+          # restricted charset — rejects anything that could be shell/ref-injected.
+          if ! printf '%s' "$B" | grep -Eq '^autofix/[A-Za-z0-9._/-]+$'; then
+            echo "Invalid branch '$B' — must be autofix/<safe-name>"; exit 1
+          fi
+          echo "name=$B" >> "$GITHUB_OUTPUT"
+
+      - name: Create branch
+        env:
+          BRANCH_NAME: ${{ steps.branch.outputs.name }}
+        run: git checkout -b "$BRANCH_NAME"
+
+      - name: Run claude-code-action (multi-file edits + tests)
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ inputs.prompt }}
+
+      - name: Push agent branch (triggers autofix-validate.yml)
+        env:
+          BRANCH_NAME: ${{ steps.branch.outputs.name }}
+          WORK_ITEM_ID: ${{ inputs.work_item_id }}
+        run: |
+          git config user.name "relopass-agent"
+          git config user.email "agent@relopass.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes produced by the agent — nothing to push."
+          else
+            git commit -m "agent: ${WORK_ITEM_ID} — automated multi-file change"
+            git push origin "$BRANCH_NAME"
+          fi

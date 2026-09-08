@@ -174,7 +174,7 @@ export const AdminReviewQueuePage: React.FC = () => {
 
   return (
     <AdminReviewQueueLayout
-      title="Review Queue"
+      title="Review queue"
       subtitle="Staged items, changes, stale content"
     >
       <div className="space-y-4">

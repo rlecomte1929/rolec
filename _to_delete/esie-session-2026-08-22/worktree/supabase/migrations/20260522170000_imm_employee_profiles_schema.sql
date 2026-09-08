@@ -1,0 +1,22 @@
+-- =============================================================================
+-- IMM-01 · Fix: employee_profiles full schema — SUPERSEDED / NO-OP
+-- =============================================================================
+-- This migration renamed the Feb-2026 legacy employee_profiles aside and created
+-- the full IMM-01 schema. On a fresh `supabase db reset` it ran AFTER
+-- 20260518120000_immigration_core_tables.sql (4 days earlier in filename order),
+-- which already failed there — and even with that fixed, A and this file BOTH
+-- `ALTER TABLE employee_profiles RENAME TO legacy_employee_profiles` + recreate,
+-- so they conflict on a clean replay (only one can do the rename).
+--
+-- Resolution (drift entry 13): the canonical, replay-safe rename + recreate of
+-- employee_profiles (matching this file's exact prod shape — 51 columns, the
+-- updated_at trigger, COMMENTs, indexes, RLS + 6 policies) now lives in
+-- 20260604400000_employee_profiles_replay_safe.sql, which also rebuilds the
+-- data_access_log_employee_select policy that 20260518120000 had to disable.
+--
+-- This file is intentionally a no-op so a fresh replay walks past this timestamp
+-- cleanly. On prod this migration already applied; making it a no-op changes
+-- nothing there (employee_profiles + legacy_employee_profiles already exist in
+-- their final shapes).
+-- See audit/migration-drift-definitive-2026-06-02.md § reverse-drift entry 13.
+-- =============================================================================

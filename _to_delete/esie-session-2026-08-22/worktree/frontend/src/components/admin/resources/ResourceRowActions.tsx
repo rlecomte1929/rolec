@@ -1,0 +1,153 @@
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Button } from '../../antigravity';
+import { buildRoute } from '../../../navigation/routes';
+
+type ResourceRowActionsProps = {
+  resourceId: string;
+  status?: string;
+  onAction: (action: string, notes?: string) => Promise<void>;
+  disabled?: boolean;
+};
+
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  draft: ['submit'],
+  in_review: ['approve'],
+  approved: ['publish'],
+  published: ['unpublish', 'archive'],
+  archived: ['restore'],
+};
+
+export const ResourceRowActions: React.FC<ResourceRowActionsProps> = ({
+  resourceId,
+  status = 'draft',
+  onAction,
+  disabled,
+}) => {
+  const [working, setWorking] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approveNotes, setApproveNotes] = useState('');
+  const actions = VALID_TRANSITIONS[status] || [];
+
+  const handle = async (action: string, notes?: string) => {
+    if (action === 'approve') {
+      setShowApproveModal(true);
+      return;
+    }
+    setWorking(true);
+    try {
+      await onAction(action, notes);
+    } finally {
+      setWorking(false);
+      setShowApproveModal(false);
+      setApproveNotes('');
+    }
+  };
+
+  const confirmApprove = () => handle('approve', approveNotes || undefined);
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      <Link to={buildRoute('adminResourcesEdit', { id: resourceId })} className="text-[#0b2b43] text-xs hover:underline">
+        Edit
+      </Link>
+      <Link
+        to={`${buildRoute('adminResourcesEdit', { id: resourceId })}?preview=1`}
+        className="text-slate-500 text-xs hover:underline ml-1"
+      >
+        Preview
+      </Link>
+      {actions.includes('submit') && (
+        <Button unstyled
+          type="button"
+          onClick={() => handle('submit')}
+          disabled={disabled || working}
+          className="text-xs text-amber-700 hover:underline disabled:opacity-50"
+        >
+          Submit
+        </Button>
+      )}
+      {actions.includes('approve') && (
+        <Button unstyled
+          type="button"
+          onClick={() => setShowApproveModal(true)}
+          disabled={disabled || working}
+          className="text-xs text-blue-700 hover:underline disabled:opacity-50"
+        >
+          Approve
+        </Button>
+      )}
+      {actions.includes('publish') && (
+        <Button unstyled
+          type="button"
+          onClick={() => handle('publish')}
+          disabled={disabled || working}
+          className="text-xs text-green-700 hover:underline disabled:opacity-50"
+        >
+          Publish
+        </Button>
+      )}
+      {actions.includes('unpublish') && (
+        <Button unstyled
+          type="button"
+          onClick={() => handle('unpublish')}
+          disabled={disabled || working}
+          className="text-xs text-slate-600 hover:underline disabled:opacity-50"
+        >
+          Unpublish
+        </Button>
+      )}
+      {actions.includes('archive') && (
+        <Button unstyled
+          type="button"
+          onClick={() => handle('archive')}
+          disabled={disabled || working}
+          className="text-xs text-slate-600 hover:underline disabled:opacity-50"
+        >
+          Archive
+        </Button>
+      )}
+      {actions.includes('restore') && (
+        <Button unstyled
+          type="button"
+          onClick={() => handle('restore')}
+          disabled={disabled || working}
+          className="text-xs text-blue-700 hover:underline disabled:opacity-50"
+        >
+          Restore
+        </Button>
+      )}
+
+      {showApproveModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowApproveModal(false); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowApproveModal(false); }}
+          role="button"
+          tabIndex={-1}
+          aria-label="Close approve dialog"
+        >
+          <div className="bg-white rounded-lg shadow-lg p-4 max-w-md w-full mx-4">
+            <h4 className="font-semibold mb-2">Approve resource</h4>
+            <label htmlFor="approve-review-notes" className="block text-sm text-slate-600 mb-2">Review notes (optional)</label>
+            <textarea
+              id="approve-review-notes"
+              value={approveNotes}
+              onChange={(e) => setApproveNotes(e.target.value)}
+              rows={2}
+              className="w-full border border-slate-200 rounded px-2 py-1 text-sm mb-4"
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={confirmApprove} disabled={working}>
+                {working ? 'Approving…' : 'Approve'}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => setShowApproveModal(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

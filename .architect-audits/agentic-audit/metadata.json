@@ -1,0 +1,48 @@
+{
+  "skillVersion": "1.0.0",
+  "skill": "agentic-audit",
+  "runAt": "2026-06-25",
+  "graphifyRevision": null,
+  "noGraphify": true,
+  "projectShape": "hybrid-monorepo",
+  "aiSurfaceDetected": true,
+  "aiSurfaceEvidence": [
+    "backend/requirements.txt: openai==1.51.2",
+    "backend/requirements.txt: anthropic==0.39.0"
+  ],
+  "thresholds": {
+    "instructionMinLines": 25,
+    "instructionMaxLines": 400,
+    "permissionBroadness": 5,
+    "contextCoverage": 60
+  },
+  "detectedAgenticInstructionFiles": [
+    {
+      "path": "CLAUDE.md",
+      "lines": 301,
+      "lastModified": "2026-06-14",
+      "toolFamily": "claude",
+      "primary": true
+    },
+    {
+      "path": "backend/CLAUDE.md",
+      "lines": 51,
+      "lastModified": "2026-05-26",
+      "toolFamily": "claude",
+      "primary": false
+    }
+  ],
+  "outOfScopeExcluded": [
+    "~/.claude/* (home dir)",
+    ".claude/worktrees/**/CLAUDE.md (~30 stale worktree copies)"
+  ],
+  "settingsFiles": {
+    ".claude/settings.json": "present/valid",
+    ".claude/settings.local.json": "present/valid/tracked/not-gitignored"
+  },
+  "inFlightFix": {
+    "finding": "settings-local-json-gitignored",
+    "branch": "chore/gitignore-settings-local",
+    "pr": 858
+  }
+}

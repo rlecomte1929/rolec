@@ -1,0 +1,132 @@
+# Corridor Agent — FR_NO_EEA_2026  (France → Norway, EEA free movement)
+#
+# REPRESENTATIVE — indicative content, NOT SME-verified. Grounded in the EEA
+# free-movement framework (EEA Agreement Art. 28) and its Norwegian transposition
+# (Utlendingsloven ch. 13 — EEA registration). A French (EU/EEA) national needs
+# NO residence permit to live and work in Norway, but must complete the EEA
+# registration scheme with the police if staying beyond three months. Confirm
+# details with the destination authority before any authoritative use.
+#
+# Schema-versioning: bump `version` when any rule reference or step ordering
+# changes; earlier vN.yaml files coexist so historical cases keep their ruleset.
+
+corridor_agent:
+  corridor_id: FR_NO_EEA_2026
+  version: "2026.01"
+  petitioning_party: EMPLOYEE
+  origin_country_iso3: FRA
+  destination_country_iso3: NOR
+  description: >
+    French (EEA) national → Norway under EEA freedom of movement
+    (EEA Agreement Art. 28; Utlendingsloven ch. 13). No residence permit
+    required; the journey is the EEA registration sequence (police EEA
+    registration, national-registry D-number/personnummer, tax card, health).
+
+  applicable_rules:
+    - legal_reference: "EEA Agreement Art. 28"
+      rule_id: EEA_ART_28
+      summary: "Free movement of workers within the EEA — right to take and hold employment."
+    - legal_reference: "Utlendingsloven §109"
+      rule_id: NO_UTL_109
+      summary: "Scope of the EEA chapter — right of residence for EEA nationals."
+    - legal_reference: "Utlendingsloven §110"
+      rule_id: NO_UTL_110
+      summary: "Right of residence beyond three months for EEA workers; registration duty."
+    - legal_reference: "Utlendingsloven §117 (registreringsbevis)"
+      rule_id: NO_UTL_117
+      summary: "EEA registration certificate issued by the police on registration."
+    - legal_reference: "Folkeregisterloven §4-1"
+      rule_id: NO_FOLKEREG_4_1
+      summary: "Registration in the National Population Register (D-number / personnummer)."
+
+  required_documents:
+    - PASSPORT_OR_NATIONAL_ID:employee
+    - PASSPORT_OR_NATIONAL_ID:family.spouse?
+    - EMPLOYMENT_CONTRACT
+    - TENANCY_OR_ADDRESS_PROOF
+    - MARRIAGE_CERT?
+
+  required_data_points:
+    - key: eu_eea_nationality
+      type: bool
+      source: USER_INPUT
+      validations:
+        - "== true"
+    - key: intended_stay_months
+      type: int
+      source: USER_INPUT
+    - key: has_employment_contract
+      type: bool
+      source: USER_INPUT
+
+  # No salary floor applies to EEA free movement.
+  salary_thresholds_eur: {}
+
+  eligibility_logic:
+    branches:
+      - id: BRANCH_EEA_FREE_MOVEMENT
+        label: "EEA freedom of movement (EEA Agreement Art. 28)"
+        cite: EEA_ART_28
+        requires_all:
+          - eu_eea_nationality == true
+        verdict_on_pass: ELIGIBLE
+    no_branch_verdict: NOT_ELIGIBLE
+
+  exception_cases:
+    - id: STAY_UNDER_3_MONTHS
+      condition: "intended_stay_months < 3"
+      cite: NO_UTL_110
+      action: SURFACE_AS_ALTERNATE_PATHWAY
+      hint: "Under three months no EEA registration is required — only address/tax basics."
+
+  # Step graph — EEA registration sequence (no visa, no residence permit).
+  step_graph:
+    - step_id: TRAVEL_TO_NO
+      name: "Travel to Norway (no visa required for EEA nationals)"
+      # Free movement: the graph roots at arrival, so pre-arrival runway is ~0.
+      arrival_anchor: true
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: []
+
+    - step_id: EEA_POLICE_REGISTRATION
+      name: "EEA registration with the police (registreringsbevis)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [TRAVEL_TO_NO]
+      time_window_relative_to: TRAVEL_TO_NO
+      time_window_min_days: 0
+      time_window_max_days: 90
+      cite: NO_UTL_110
+      deadline_trigger:
+        tag: "relopass-deadline-eea-police-registration-no"
+        label: "EEA police registration in Norway"
+        channel: "email"
+        # 90-day statutory window; open the alert with a third of it left, which
+        # is comfortably more than the police appointment lead time.
+        lead_days: 30
+
+    - step_id: NATIONAL_REGISTRY
+      name: "Register with the tax office — D-number / personnummer (Folkeregister)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 21
+      prerequisite_step_ids: [EEA_POLICE_REGISTRATION]
+      cite: NO_FOLKEREG_4_1
+
+    - step_id: TAX_DEDUCTION_CARD
+      name: "Tax deduction card (skattekort) issued"
+      responsible_party: AUTHORITY_NO_SKATTEETATEN
+      expected_duration_days: 7
+      prerequisite_step_ids: [NATIONAL_REGISTRY]
+
+    - step_id: HEALTH_REGISTRATION
+      name: "Public health registration (HELFO / fastlege assignment)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [NATIONAL_REGISTRY]
+
+    - step_id: BANK_ACCOUNT
+      name: "Norwegian bank account opened (requires D-number/personnummer)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 10
+      prerequisite_step_ids: [NATIONAL_REGISTRY]

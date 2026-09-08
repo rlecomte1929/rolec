@@ -1,0 +1,682 @@
+{
+  "run_id": "T18_MADRID_DUBLIN_1787290309969",
+  "generated_at": "2026-08-21T05:31:49.969Z",
+  "scenario": "T18 — Madrid → Dublin, Amazon → Google, permanent local hire, agent-supported",
+  "personas": [
+    {
+      "key": "A",
+      "name": "Lucía Fernández",
+      "nationality": "Spanish (EU/EEA)"
+    },
+    {
+      "key": "B",
+      "name": "Priya Raghavan",
+      "nationality": "Indian (third country, resident in Spain)"
+    }
+  ],
+  "totals": {
+    "PASS": 28,
+    "PARTIAL": 2,
+    "FAIL": 24,
+    "BLOCKED": 0,
+    "INFO": 0
+  },
+  "by_area": {
+    "Documents": {
+      "total": 16,
+      "pass": 8,
+      "partial": 2,
+      "fail": 6,
+      "blocked": 0
+    },
+    "Setup": {
+      "total": 12,
+      "pass": 10,
+      "partial": 0,
+      "fail": 2,
+      "blocked": 0
+    },
+    "Journey": {
+      "total": 2,
+      "pass": 0,
+      "partial": 0,
+      "fail": 2,
+      "blocked": 0
+    },
+    "Neighbourhood": {
+      "total": 8,
+      "pass": 2,
+      "partial": 0,
+      "fail": 6,
+      "blocked": 0
+    },
+    "Services": {
+      "total": 10,
+      "pass": 4,
+      "partial": 0,
+      "fail": 6,
+      "blocked": 0
+    },
+    "Agent": {
+      "total": 6,
+      "pass": 4,
+      "partial": 0,
+      "fail": 2,
+      "blocked": 0
+    }
+  },
+  "results": [
+    {
+      "id": "PUB-PERMANENT",
+      "persona": "A",
+      "area": "Documents",
+      "title": "Public ES→IE requirements (PERMANENT)",
+      "expected": "≥5 requirements, nationality_class set",
+      "actual": "200 · 1 reqs · class=EU_EEA",
+      "verdict": "PARTIAL",
+      "ms": 377,
+      "note": ""
+    },
+    {
+      "id": "PUB-LTA",
+      "persona": "A",
+      "area": "Documents",
+      "title": "Public ES→IE requirements (LTA)",
+      "expected": "≥5 requirements, nationality_class set",
+      "actual": "200 · 1 reqs · class=EU_EEA",
+      "verdict": "PARTIAL",
+      "ms": 201,
+      "note": ""
+    },
+    {
+      "id": "AUTH-1",
+      "persona": "A",
+      "area": "Setup",
+      "title": "HR registers (Google Ireland)",
+      "expected": "200 + token",
+      "actual": "200/token=true",
+      "verdict": "PASS",
+      "ms": 1972,
+      "note": ""
+    },
+    {
+      "id": "AUTH-2",
+      "persona": "A",
+      "area": "Setup",
+      "title": "Employee registers (Lucía Fernández)",
+      "expected": "200 + token",
+      "actual": "200/token=true",
+      "verdict": "PASS",
+      "ms": 1723,
+      "note": ""
+    },
+    {
+      "id": "CASE-1",
+      "persona": "A",
+      "area": "Setup",
+      "title": "HR creates the relocation case",
+      "expected": "200 + caseId",
+      "actual": "200/id=7001c9e7",
+      "verdict": "PASS",
+      "ms": 1207,
+      "note": ""
+    },
+    {
+      "id": "CASE-2",
+      "persona": "A",
+      "area": "Setup",
+      "title": "Save Madrid→Dublin detail + nationality onto case",
+      "expected": "200, values persisted",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 2619,
+      "note": "{\"id\":\"7001c9e7-3c9d-42b5-83df-e78447f8de1a\",\"status\":\"created\",\"draft\":{\"relocationBasics\":{\"originCountry\":\"ES\",\"originCity\":\"Madrid\",\"destCountry\":\"IE\",\"dest"
+    },
+    {
+      "id": "CASE-3",
+      "persona": "A",
+      "area": "Setup",
+      "title": "Round-trip: destination + nationality readable",
+      "expected": "Dublin/IE + nationality",
+      "actual": "dest=/ nat=null",
+      "verdict": "FAIL",
+      "ms": 738,
+      "note": "nationality not surfaced on case read — immigration branching cannot key off it"
+    },
+    {
+      "id": "CASE-4",
+      "persona": "A",
+      "area": "Setup",
+      "title": "Assign case to employee",
+      "expected": "<3s, assignment created",
+      "actual": "200/1599ms/aid=3d6c9a3e",
+      "verdict": "PASS",
+      "ms": 1599,
+      "note": ""
+    },
+    {
+      "id": "DOC-1",
+      "persona": "A",
+      "area": "Documents",
+      "title": "HR view: immigration requirements for this case",
+      "expected": "≥5 IE-specific requirements",
+      "actual": "200 · 0 items",
+      "verdict": "FAIL",
+      "ms": 1531,
+      "note": "{\"covered\":false,\"coverage_reason\":\"corridor_not_supported\",\"corridor\":\"ES→IE\",\"corridor_from\":\"ES\",\"corridor_to\":\"IE\",\"visa_type\":null,\"requirements\":[],\"risk_flags\":[],\"estimated_timeline_days\":null"
+    },
+    {
+      "id": "DOC-2",
+      "persona": "A",
+      "area": "Documents",
+      "title": "Case requirements checklist",
+      "expected": "non-empty checklist",
+      "actual": "200 · 1 items",
+      "verdict": "PASS",
+      "ms": 2947,
+      "note": "{\"caseId\":\"7001c9e7-3c9d-42b5-83df-e78447f8de1a\",\"destCountry\":\"IRELAND\",\"purpose\":\"employment\",\"computedAt\":\"2026-08-21T05:32:05.790337\",\"requirements\":[{\"id\":\"immigration_nothing_to_do\",\"pillar\":\"RE"
+    },
+    {
+      "id": "DOC-3",
+      "persona": "A",
+      "area": "Documents",
+      "title": "Fillable Irish forms available (permit/visa/PPSN)",
+      "expected": "≥1 IE form template",
+      "actual": "200 · 0 forms",
+      "verdict": "FAIL",
+      "ms": 1571,
+      "note": "{\"corridor_to\":\"IE\",\"visa_type\":null,\"forms\":[]}"
+    },
+    {
+      "id": "DOC-4",
+      "persona": "A",
+      "area": "Documents",
+      "title": "Immigration milestones / deadline timeline",
+      "expected": "milestones seeded for corridor",
+      "actual": "200 · 0 milestones",
+      "verdict": "FAIL",
+      "ms": 1614,
+      "note": "{\"milestones\":[]}"
+    },
+    {
+      "id": "DOC-5",
+      "persona": "A",
+      "area": "Documents",
+      "title": "Employee view: what SHE is told to file",
+      "expected": "her own document list",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 2058,
+      "note": "{\"state\":\"no_permit_required\",\"immigration_case\":null,\"case_id\":\"7001c9e7-3c9d-42b5-83df-e78447f8de1a\",\"nationality_class\":\"EU_EEA\",\"destination_country\":\"IE\",\"headline\":\"You do not need a work permit or visa for this move\",\"detail\":\"You have freedom of movement to this destination, so there is no p"
+    },
+    {
+      "id": "DOC-6",
+      "persona": "A",
+      "area": "Documents",
+      "title": "Employee immigration snapshot (status at a glance)",
+      "expected": "populated snapshot",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 1709,
+      "note": "{\"covered\":false,\"corridor_from\":\"ES\",\"corridor_to\":\"IE\",\"visa_type\":null,\"risk_flags\":[],\"checklist_summary\":{\"total\":0,\"required\":0,\"conditional\":0}}"
+    },
+    {
+      "id": "PLAN-1",
+      "persona": "A",
+      "area": "Journey",
+      "title": "Full relocation plan (the journey she sees)",
+      "expected": "phases + tasks generated",
+      "actual": "200 · 0 phases / 0 tasks",
+      "verdict": "FAIL",
+      "ms": 2623,
+      "note": "{\"case_id\":\"7001c9e7-3c9d-42b5-83df-e78447f8de1a\",\"assignment_id\":\"3d6c9a3e-afba-4936-b923-b82a2e55d7d3\",\"role\":\"employee\",\"summary\":{\"total_tasks\":0,\"completed_tasks\":0,\"in_progress_tasks\":0,\"blocked_tasks\":0,\"overdue_tasks\":0,\"due_soon_tasks\":0,\"completion_ratio\":0},\"next_action\":null,\"phases\":[],"
+    },
+    {
+      "id": "AREA-1",
+      "persona": "A",
+      "area": "Neighbourhood",
+      "title": "Dublin area / housing recommendations",
+      "expected": "≥3 real Dublin options",
+      "actual": "200 · 0 items",
+      "verdict": "FAIL",
+      "ms": 571,
+      "note": "[]"
+    },
+    {
+      "id": "AREA-2",
+      "persona": "A",
+      "area": "Neighbourhood",
+      "title": "Dublin schools recommendations",
+      "expected": "≥3 real Dublin options",
+      "actual": "200 · 0 items",
+      "verdict": "FAIL",
+      "ms": 595,
+      "note": "[]"
+    },
+    {
+      "id": "AREA-3",
+      "persona": "A",
+      "area": "Neighbourhood",
+      "title": "Address autocomplete for Dublin (commute setup)",
+      "expected": "Dublin results returned",
+      "actual": "200 · 0 results",
+      "verdict": "FAIL",
+      "ms": 1026,
+      "note": "{\"disabled\":true,\"suggestions\":[]}"
+    },
+    {
+      "id": "AREA-4",
+      "persona": "A",
+      "area": "Neighbourhood",
+      "title": "Ireland/Dublin present in destination catalog",
+      "expected": "Ireland selectable",
+      "actual": "200 · 334 dests · IE=true",
+      "verdict": "PASS",
+      "ms": 1210,
+      "note": "[{\"city\":\"Buenos Aires\",\"country\":\"Argentina\",\"approved_by\":null,\"approved_at\":\"2026-08-12T23:37:09.335965+00:00\",\"notes\":\"geo-expansion 2026-08-12 (global high-value hubs)\"},{\"city\":\"Córdoba\",\"country\":\"Argentina\",\"approved_by\":null,\"approved_at\":\"2026-08-12T23:37:09.335965+00:00\",\"notes\":\"geo-expa"
+    },
+    {
+      "id": "SVC-1",
+      "persona": "A",
+      "area": "Services",
+      "title": "Services state for the case",
+      "expected": "200 + service list",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 1881,
+      "note": "{\"case_id\":\"7001c9e7-3c9d-42b5-83df-e78447f8de1a\",\"organization_id\":\"3ff2c496-8a9a-4f26-9092-a4c78a46a4ae\",\"state\":{},\"updated_at\":\"\",\"updated_by_user_id\":null}"
+    },
+    {
+      "id": "SVC-2",
+      "persona": "A",
+      "area": "Services",
+      "title": "Vendors available for Dublin (bank, movers, health, utilities)",
+      "expected": "≥3 IE vendors",
+      "actual": "200 · 0 vendors",
+      "verdict": "FAIL",
+      "ms": 1825,
+      "note": "[]"
+    },
+    {
+      "id": "SVC-3",
+      "persona": "A",
+      "area": "Services",
+      "title": "Employee: services she can pick",
+      "expected": "200 + selectable services",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 720,
+      "note": "{\"assignment_id\":\"3d6c9a3e-afba-4936-b923-b82a2e55d7d3\",\"case_id\":\"7001c9e7-3c9d-42b5-83df-e78447f8de1a\",\"services\":[]}"
+    },
+    {
+      "id": "SVC-4",
+      "persona": "A",
+      "area": "Services",
+      "title": "Marketplace: real suppliers serving Dublin",
+      "expected": "≥3 suppliers with IE coverage",
+      "actual": "200 · 0 suppliers",
+      "verdict": "FAIL",
+      "ms": 2705,
+      "note": "{\"assignment_id\":\"3d6c9a3e-afba-4936-b923-b82a2e55d7d3\",\"corridor\":\"ES→IE\",\"vendors\":[{\"id\":\"s-mu2\",\"name\":\"Munich International School (MIS)\",\"service_category\":\"schools\",\"logo_initials\":\"MI\",\"rating\":4.8,\"rating_count\":102,\"price_display\":null,\"sla_display\":null,\"description\":null,\"website\":null,\""
+    },
+    {
+      "id": "SVC-5",
+      "persona": "A",
+      "area": "Services",
+      "title": "Country resource pack for Ireland",
+      "expected": "≥5 Irish resources",
+      "actual": "200 · 0 resources",
+      "verdict": "FAIL",
+      "ms": 1386,
+      "note": "{\"profile\":{\"destination_country\":\"IE\",\"destination_city\":\"Dublin\",\"country_code\":\"IE\",\"visa_type\":null,\"arrival_date\":\"2026-10-01\",\"family_status\":\"single\",\"number_of_children\":0,\"children_ages\":[],\"spouse_working\":false,\"relocation_type\":\"permanent\",\"housing_status\":null,\"transport_needs\":null,\"la"
+    },
+    {
+      "id": "AGT-1",
+      "persona": "A",
+      "area": "Agent",
+      "title": "Match a relocation advisor for ES→IE",
+      "expected": "≥1 advisor matched",
+      "actual": "200 · 1 advisors",
+      "verdict": "PASS",
+      "ms": 1104,
+      "note": "{\"origin_country\":\"ES\",\"destination_country\":\"IE\",\"advisors\":[{\"id\":\"adv-global-immigration-001\",\"name\":\"Helena Morrow\",\"firm\":\"Global Immigration Partners\",\"title\":\"Senior Immigration Counsel\",\"specialisms\":[\"EU work permits\",\"intra-company transfers\",\"family visas\"],\"languages\":[\"en\",\"fr\",\"de\"],\"r"
+    },
+    {
+      "id": "AGT-2",
+      "persona": "A",
+      "area": "Agent",
+      "title": "Coordinator session on the case (agent workspace)",
+      "expected": "200 + session",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 1838,
+      "note": "{\"case_id\":\"7001c9e7-3c9d-42b5-83df-e78447f8de1a\",\"rolling_summary\":\"\",\"recent_turns\":[],\"model\":\"\",\"status\":\"none\"}"
+    },
+    {
+      "id": "AGT-3",
+      "persona": "A",
+      "area": "Agent",
+      "title": "Providers/agents attachable to her case",
+      "expected": "≥1 provider",
+      "actual": "200 · 0 providers",
+      "verdict": "FAIL",
+      "ms": 1888,
+      "note": "{\"providers\":[]}"
+    },
+    {
+      "id": "PUB-PERMANENT",
+      "persona": "B",
+      "area": "Documents",
+      "title": "Public ES→IE requirements (PERMANENT)",
+      "expected": "≥5 requirements, nationality_class set",
+      "actual": "200 · 14 reqs · class=THIRD_COUNTRY",
+      "verdict": "PASS",
+      "ms": 169,
+      "note": ""
+    },
+    {
+      "id": "PUB-LTA",
+      "persona": "B",
+      "area": "Documents",
+      "title": "Public ES→IE requirements (LTA)",
+      "expected": "≥5 requirements, nationality_class set",
+      "actual": "200 · 14 reqs · class=THIRD_COUNTRY",
+      "verdict": "PASS",
+      "ms": 268,
+      "note": ""
+    },
+    {
+      "id": "AUTH-1",
+      "persona": "B",
+      "area": "Setup",
+      "title": "HR registers (Google Ireland)",
+      "expected": "200 + token",
+      "actual": "200/token=true",
+      "verdict": "PASS",
+      "ms": 1809,
+      "note": ""
+    },
+    {
+      "id": "AUTH-2",
+      "persona": "B",
+      "area": "Setup",
+      "title": "Employee registers (Priya Raghavan)",
+      "expected": "200 + token",
+      "actual": "200/token=true",
+      "verdict": "PASS",
+      "ms": 1798,
+      "note": ""
+    },
+    {
+      "id": "CASE-1",
+      "persona": "B",
+      "area": "Setup",
+      "title": "HR creates the relocation case",
+      "expected": "200 + caseId",
+      "actual": "200/id=8aa38905",
+      "verdict": "PASS",
+      "ms": 1251,
+      "note": ""
+    },
+    {
+      "id": "CASE-2",
+      "persona": "B",
+      "area": "Setup",
+      "title": "Save Madrid→Dublin detail + nationality onto case",
+      "expected": "200, values persisted",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 2493,
+      "note": "{\"id\":\"8aa38905-0118-41fd-ab46-8eab10815785\",\"status\":\"created\",\"draft\":{\"relocationBasics\":{\"originCountry\":\"ES\",\"originCity\":\"Madrid\",\"destCountry\":\"IE\",\"dest"
+    },
+    {
+      "id": "CASE-3",
+      "persona": "B",
+      "area": "Setup",
+      "title": "Round-trip: destination + nationality readable",
+      "expected": "Dublin/IE + nationality",
+      "actual": "dest=/ nat=null",
+      "verdict": "FAIL",
+      "ms": 760,
+      "note": "nationality not surfaced on case read — immigration branching cannot key off it"
+    },
+    {
+      "id": "CASE-4",
+      "persona": "B",
+      "area": "Setup",
+      "title": "Assign case to employee",
+      "expected": "<3s, assignment created",
+      "actual": "200/1939ms/aid=7f8214e2",
+      "verdict": "PASS",
+      "ms": 1939,
+      "note": ""
+    },
+    {
+      "id": "DOC-1",
+      "persona": "B",
+      "area": "Documents",
+      "title": "HR view: immigration requirements for this case",
+      "expected": "≥5 IE-specific requirements",
+      "actual": "200 · 0 items",
+      "verdict": "FAIL",
+      "ms": 1955,
+      "note": "{\"covered\":false,\"coverage_reason\":\"corridor_not_supported\",\"corridor\":\"ES→IE\",\"corridor_from\":\"ES\",\"corridor_to\":\"IE\",\"visa_type\":null,\"requirements\":[],\"risk_flags\":[],\"estimated_timeline_days\":null"
+    },
+    {
+      "id": "DOC-2",
+      "persona": "B",
+      "area": "Documents",
+      "title": "Case requirements checklist",
+      "expected": "non-empty checklist",
+      "actual": "200 · 14 items",
+      "verdict": "PASS",
+      "ms": 1174,
+      "note": "{\"caseId\":\"8aa38905-0118-41fd-ab46-8eab10815785\",\"destCountry\":\"IRELAND\",\"purpose\":\"employment\",\"computedAt\":\"2026-08-21T05:32:47.971370\",\"requirements\":[{\"id\":\"ecf6c3bb-632f-5d5a-860c-c8e17ed4e51b\",\""
+    },
+    {
+      "id": "DOC-3",
+      "persona": "B",
+      "area": "Documents",
+      "title": "Fillable Irish forms available (permit/visa/PPSN)",
+      "expected": "≥1 IE form template",
+      "actual": "200 · 0 forms",
+      "verdict": "FAIL",
+      "ms": 1567,
+      "note": "{\"corridor_to\":\"IE\",\"visa_type\":null,\"forms\":[]}"
+    },
+    {
+      "id": "DOC-4",
+      "persona": "B",
+      "area": "Documents",
+      "title": "Immigration milestones / deadline timeline",
+      "expected": "milestones seeded for corridor",
+      "actual": "200 · 0 milestones",
+      "verdict": "FAIL",
+      "ms": 1537,
+      "note": "{\"milestones\":[]}"
+    },
+    {
+      "id": "DOC-5",
+      "persona": "B",
+      "area": "Documents",
+      "title": "Employee view: what SHE is told to file",
+      "expected": "her own document list",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 2014,
+      "note": "{\"state\":\"awaiting_hr\",\"immigration_case\":null,\"case_id\":\"8aa38905-0118-41fd-ab46-8eab10815785\",\"nationality_class\":\"THIRD_COUNTRY\",\"destination_country\":\"IE\",\"headline\":\"Your immigration file has not been opened yet\",\"detail\":\"This move needs a permit, and your HR team opens the file that tracks it"
+    },
+    {
+      "id": "DOC-6",
+      "persona": "B",
+      "area": "Documents",
+      "title": "Employee immigration snapshot (status at a glance)",
+      "expected": "populated snapshot",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 1650,
+      "note": "{\"covered\":false,\"corridor_from\":\"ES\",\"corridor_to\":\"IE\",\"visa_type\":null,\"risk_flags\":[],\"checklist_summary\":{\"total\":0,\"required\":0,\"conditional\":0}}"
+    },
+    {
+      "id": "PLAN-1",
+      "persona": "B",
+      "area": "Journey",
+      "title": "Full relocation plan (the journey she sees)",
+      "expected": "phases + tasks generated",
+      "actual": "200 · 0 phases / 0 tasks",
+      "verdict": "FAIL",
+      "ms": 2665,
+      "note": "{\"case_id\":\"8aa38905-0118-41fd-ab46-8eab10815785\",\"assignment_id\":\"7f8214e2-31f9-4ec8-8491-42bd80185876\",\"role\":\"employee\",\"summary\":{\"total_tasks\":0,\"completed_tasks\":0,\"in_progress_tasks\":0,\"blocked_tasks\":0,\"overdue_tasks\":0,\"due_soon_tasks\":0,\"completion_ratio\":0},\"next_action\":null,\"phases\":[],"
+    },
+    {
+      "id": "AREA-1",
+      "persona": "B",
+      "area": "Neighbourhood",
+      "title": "Dublin area / housing recommendations",
+      "expected": "≥3 real Dublin options",
+      "actual": "200 · 0 items",
+      "verdict": "FAIL",
+      "ms": 652,
+      "note": "[]"
+    },
+    {
+      "id": "AREA-2",
+      "persona": "B",
+      "area": "Neighbourhood",
+      "title": "Dublin schools recommendations",
+      "expected": "≥3 real Dublin options",
+      "actual": "200 · 0 items",
+      "verdict": "FAIL",
+      "ms": 557,
+      "note": "[]"
+    },
+    {
+      "id": "AREA-3",
+      "persona": "B",
+      "area": "Neighbourhood",
+      "title": "Address autocomplete for Dublin (commute setup)",
+      "expected": "Dublin results returned",
+      "actual": "200 · 0 results",
+      "verdict": "FAIL",
+      "ms": 1029,
+      "note": "{\"disabled\":true,\"suggestions\":[]}"
+    },
+    {
+      "id": "AREA-4",
+      "persona": "B",
+      "area": "Neighbourhood",
+      "title": "Ireland/Dublin present in destination catalog",
+      "expected": "Ireland selectable",
+      "actual": "200 · 334 dests · IE=true",
+      "verdict": "PASS",
+      "ms": 1234,
+      "note": "[{\"city\":\"Buenos Aires\",\"country\":\"Argentina\",\"approved_by\":null,\"approved_at\":\"2026-08-12T23:37:09.335965+00:00\",\"notes\":\"geo-expansion 2026-08-12 (global high-value hubs)\"},{\"city\":\"Córdoba\",\"country\":\"Argentina\",\"approved_by\":null,\"approved_at\":\"2026-08-12T23:37:09.335965+00:00\",\"notes\":\"geo-expa"
+    },
+    {
+      "id": "SVC-1",
+      "persona": "B",
+      "area": "Services",
+      "title": "Services state for the case",
+      "expected": "200 + service list",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 1892,
+      "note": "{\"case_id\":\"8aa38905-0118-41fd-ab46-8eab10815785\",\"organization_id\":\"9c970579-09f3-427b-8afd-cb0711c1c00e\",\"state\":{},\"updated_at\":\"\",\"updated_by_user_id\":null}"
+    },
+    {
+      "id": "SVC-2",
+      "persona": "B",
+      "area": "Services",
+      "title": "Vendors available for Dublin (bank, movers, health, utilities)",
+      "expected": "≥3 IE vendors",
+      "actual": "200 · 0 vendors",
+      "verdict": "FAIL",
+      "ms": 1880,
+      "note": "[]"
+    },
+    {
+      "id": "SVC-3",
+      "persona": "B",
+      "area": "Services",
+      "title": "Employee: services she can pick",
+      "expected": "200 + selectable services",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 755,
+      "note": "{\"assignment_id\":\"7f8214e2-31f9-4ec8-8491-42bd80185876\",\"case_id\":\"8aa38905-0118-41fd-ab46-8eab10815785\",\"services\":[]}"
+    },
+    {
+      "id": "SVC-4",
+      "persona": "B",
+      "area": "Services",
+      "title": "Marketplace: real suppliers serving Dublin",
+      "expected": "≥3 suppliers with IE coverage",
+      "actual": "200 · 0 suppliers",
+      "verdict": "FAIL",
+      "ms": 2320,
+      "note": "{\"assignment_id\":\"7f8214e2-31f9-4ec8-8491-42bd80185876\",\"corridor\":\"ES→IE\",\"vendors\":[{\"id\":\"s-mu2\",\"name\":\"Munich International School (MIS)\",\"service_category\":\"schools\",\"logo_initials\":\"MI\",\"rating\":4.8,\"rating_count\":102,\"price_display\":null,\"sla_display\":null,\"description\":null,\"website\":null,\""
+    },
+    {
+      "id": "SVC-5",
+      "persona": "B",
+      "area": "Services",
+      "title": "Country resource pack for Ireland",
+      "expected": "≥5 Irish resources",
+      "actual": "200 · 0 resources",
+      "verdict": "FAIL",
+      "ms": 1396,
+      "note": "{\"profile\":{\"destination_country\":\"IE\",\"destination_city\":\"Dublin\",\"country_code\":\"IE\",\"visa_type\":null,\"arrival_date\":\"2026-10-01\",\"family_status\":\"single\",\"number_of_children\":0,\"children_ages\":[],\"spouse_working\":false,\"relocation_type\":\"permanent\",\"housing_status\":null,\"transport_needs\":null,\"la"
+    },
+    {
+      "id": "AGT-1",
+      "persona": "B",
+      "area": "Agent",
+      "title": "Match a relocation advisor for ES→IE",
+      "expected": "≥1 advisor matched",
+      "actual": "200 · 1 advisors",
+      "verdict": "PASS",
+      "ms": 1224,
+      "note": "{\"origin_country\":\"ES\",\"destination_country\":\"IE\",\"advisors\":[{\"id\":\"adv-global-immigration-001\",\"name\":\"Helena Morrow\",\"firm\":\"Global Immigration Partners\",\"title\":\"Senior Immigration Counsel\",\"specialisms\":[\"EU work permits\",\"intra-company transfers\",\"family visas\"],\"languages\":[\"en\",\"fr\",\"de\"],\"r"
+    },
+    {
+      "id": "AGT-2",
+      "persona": "B",
+      "area": "Agent",
+      "title": "Coordinator session on the case (agent workspace)",
+      "expected": "200 + session",
+      "actual": "200",
+      "verdict": "PASS",
+      "ms": 1767,
+      "note": "{\"case_id\":\"8aa38905-0118-41fd-ab46-8eab10815785\",\"rolling_summary\":\"\",\"recent_turns\":[],\"model\":\"\",\"status\":\"none\"}"
+    },
+    {
+      "id": "AGT-3",
+      "persona": "B",
+      "area": "Agent",
+      "title": "Providers/agents attachable to her case",
+      "expected": "≥1 provider",
+      "actual": "200 · 0 providers",
+      "verdict": "FAIL",
+      "ms": 1922,
+      "note": "{\"providers\":[]}"
+    }
+  ],
+  "context": {
+    "A": {
+      "caseId": "7001c9e7-3c9d-42b5-83df-e78447f8de1a",
+      "assignmentId": "3d6c9a3e-afba-4936-b923-b82a2e55d7d3",
+      "hrTok": "090f8c65-edbf-4c35-91bc-41c19796ab5d",
+      "empTok": "bfa83541-24c5-4419-9ad4-292aa7be5672",
+      "hrEmail": "romain+t18hra_1787290309969@hotmail.com",
+      "empEmail": "romain+t18empa_1787290309969@hotmail.com"
+    },
+    "B": {
+      "caseId": "8aa38905-0118-41fd-ab46-8eab10815785",
+      "assignmentId": "7f8214e2-31f9-4ec8-8491-42bd80185876",
+      "hrTok": "ff5dfaaf-e61e-4eee-a46e-e8036f0f2f06",
+      "empTok": "9ecf7366-88dc-4f53-9ed9-e17c164e5281",
+      "hrEmail": "romain+t18hrb_1787290309969@hotmail.com",
+      "empEmail": "romain+t18empb_1787290309969@hotmail.com"
+    }
+  }
+}

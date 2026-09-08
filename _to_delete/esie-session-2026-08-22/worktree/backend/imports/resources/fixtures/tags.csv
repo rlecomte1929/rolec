@@ -1,0 +1,14 @@
+key,label,tag_group
+family_friendly,Family-friendly,family_type
+free,Free,free_paid
+paid,Paid,free_paid
+indoor,Indoor,indoor_outdoor
+outdoor,Outdoor,indoor_outdoor
+weekend,Weekend,weekday_weekend
+cinema,Cinema,interest
+concert,Concert,interest
+museum,Museum,interest
+networking,Networking,interest
+family_activity,Family activity,interest
+low_budget,Low budget,budget
+mid_budget,Mid budget,budget

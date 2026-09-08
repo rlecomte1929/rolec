@@ -1,0 +1,37 @@
+{
+  "_fixture_metadata": {
+    "stem": "fr_02_dgfip_joint",
+    "country": "FRA",
+    "subtype": "avis_imposition",
+    "scenario": "joint filing (mariés), 2.5 parts, co-declarant née-name carve-out feeds C1-08",
+    "reference_date": "2026-05-29",
+    "authored_by": "C2-02b (notion-task-executor, Cowork, 2026-05-29)",
+    "notes": "Mirrors FR Exemplar 2 in tax_cert_fr_v1.txt"
+  },
+  "is_avis_imposition": true,
+  "is_avis_imposition_reason": null,
+  "issuing_country_iso3": "FRA",
+  "issuing_authority": "Direction générale des Finances publiques",
+  "issuing_authority_normalized": "FR_DGFIP",
+  "issuing_office": null,
+  "tax_year": 2024,
+  "issue_year": 2025,
+  "tax_assessment_year": 2025,
+  "tax_id": "9876543210987",
+  "holder_name": "JEAN-PAUL MARTIN",
+  "co_declarant_name": "SOPHIE MARTIN née BONNET",
+  "residence_country_iso3": "FRA",
+  "foyer_address": "47 avenue Foch, 13008 MARSEILLE",
+  "gross_income_annual": "118460.00",
+  "gross_income_annual_confidence": "high",
+  "net_taxable_income_annual": "102340.00",
+  "total_tax_annual": "15280.00",
+  "currency_iso3": "EUR",
+  "number_of_parts": 2.5,
+  "household_size": 3,
+  "is_joint_filing": true,
+  "findings": [
+    { "severity": "INFO", "code": "JOINT_FILING_DETECTED" }
+  ],
+  "agent_confidence": "high"
+}

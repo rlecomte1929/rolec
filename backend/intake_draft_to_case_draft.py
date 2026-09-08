@@ -30,6 +30,8 @@ RECOGNISED_INTAKE_KEYS: frozenset = frozenset({
     "full_name", "job_title", "members", "nationality", "office_address",
     "origin_city", "origin_country", "passport_country", "passport_expiry",
     "purpose", "salary_band", "second_nationality", "target_date",
+    "assignment_type", "expected_duration_months", "commute_preference",
+    "commute_mins",
 })
 
 # The canonical camelCase-nested CaseDraftDTO sections. A draft carrying these
@@ -122,19 +124,43 @@ def intake_draft_to_case_draft(data: Optional[Dict[str, Any]]) -> Dict[str, Any]
         }
     )
 
+    has_partner = partner is not None
     family_members: Dict[str, Any] = {
+        "maritalStatus": (
+            "partner_kids" if has_partner and children
+            else "partner" if has_partner
+            else "kids_only" if children
+            else "solo"
+        ),
         "children": [
-            _drop_none({"dateOfBirth": _s(c.get("dob")), "relationship": "child"})
+            _drop_none({
+                "fullName": _s(c.get("name")),
+                "dateOfBirth": _s(c.get("dob")),
+                "relationship": "child",
+            })
             for c in children
         ],
     }
     if partner is not None:
+        permit = str(partner.get("needs_work_permit") or "").strip().lower()
         family_members["spouse"] = _drop_none(
             {
                 "fullName": _s(partner.get("name")),
-                "wantsToWork": True if partner.get("needs_work_permit") == "yes" else None,
+                "dateOfBirth": _s(partner.get("dob")),
+                "wantsToWork": True if permit == "yes" else None,
             }
         )
+
+    commute_raw = data.get("commute_mins")
+    try:
+        commute_mins = int(commute_raw) if commute_raw is not None and str(commute_raw).strip() != "" else None
+    except (TypeError, ValueError):
+        commute_mins = None
+    duration_raw = data.get("expected_duration_months")
+    try:
+        duration_months = int(duration_raw) if duration_raw is not None and str(duration_raw).strip() != "" else None
+    except (TypeError, ValueError):
+        duration_months = None
 
     assignment_context = _drop_none(
         {
@@ -143,6 +169,10 @@ def intake_draft_to_case_draft(data: Optional[Dict[str, Any]]) -> Dict[str, Any]
             "contractStartDate": _s(data.get("contract_start")),
             "salaryBand": _s(data.get("salary_band")),
             "workLocation": _s(data.get("office_address")),
+            "assignmentType": _s(data.get("assignment_type")),
+            "expectedDurationMonths": duration_months,
+            "commutePreference": _s(data.get("commute_preference")),
+            "commuteMins": commute_mins,
         }
     )
 

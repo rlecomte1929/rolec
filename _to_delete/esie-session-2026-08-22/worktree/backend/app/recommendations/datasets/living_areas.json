@@ -1,0 +1,1152 @@
+[
+  {
+    "item_id": "la-1",
+    "name": "Tiong Bahru",
+    "city": "Singapore",
+    "avg_rent_2br": 2800,
+    "avg_rent_3br": 3800,
+    "typical_sqm_range": [
+      65,
+      95
+    ],
+    "commute_to_work_minutes_estimate": 18,
+    "tags": {
+      "safety": 9,
+      "nightlife": 7,
+      "quiet": 8,
+      "green": 7
+    },
+    "rating": 4.5,
+    "rating_count": 120,
+    "availability_level": "high",
+    "next_available_days": 14,
+    "confidence": 92,
+    "lat": 1.286179,
+    "lng": 103.827225
+  },
+  {
+    "item_id": "la-2",
+    "name": "East Coast",
+    "city": "Singapore",
+    "avg_rent_2br": 3200,
+    "avg_rent_3br": 4500,
+    "typical_sqm_range": [
+      80,
+      120
+    ],
+    "commute_to_work_minutes_estimate": 25,
+    "tags": {
+      "safety": 9,
+      "nightlife": 5,
+      "quiet": 9,
+      "green": 9
+    },
+    "rating": 4.7,
+    "rating_count": 89,
+    "availability_level": "medium",
+    "next_available_days": 30,
+    "confidence": 88,
+    "lat": 1.299679,
+    "lng": 103.908685
+  },
+  {
+    "item_id": "la-3",
+    "name": "Holland Village",
+    "city": "Singapore",
+    "avg_rent_2br": 3500,
+    "avg_rent_3br": 5200,
+    "typical_sqm_range": [
+      75,
+      110
+    ],
+    "commute_to_work_minutes_estimate": 15,
+    "tags": {
+      "safety": 9,
+      "nightlife": 8,
+      "quiet": 6,
+      "green": 8
+    },
+    "rating": 4.6,
+    "rating_count": 156,
+    "availability_level": "low",
+    "next_available_days": 45,
+    "confidence": 95,
+    "lat": 1.311722,
+    "lng": 103.79608
+  },
+  {
+    "item_id": "la-4",
+    "name": "River Valley",
+    "city": "Singapore",
+    "avg_rent_2br": 4200,
+    "avg_rent_3br": 6000,
+    "typical_sqm_range": [
+      70,
+      100
+    ],
+    "commute_to_work_minutes_estimate": 12,
+    "tags": {
+      "safety": 9,
+      "nightlife": 8,
+      "quiet": 5,
+      "green": 6
+    },
+    "rating": 4.4,
+    "rating_count": 67,
+    "availability_level": "medium",
+    "next_available_days": 21,
+    "confidence": 90,
+    "lat": 1.298331,
+    "lng": 103.835707
+  },
+  {
+    "item_id": "la-5",
+    "name": "Bukit Timah",
+    "city": "Singapore",
+    "avg_rent_2br": 3800,
+    "avg_rent_3br": 5500,
+    "typical_sqm_range": [
+      85,
+      130
+    ],
+    "commute_to_work_minutes_estimate": 22,
+    "tags": {
+      "safety": 10,
+      "nightlife": 4,
+      "quiet": 9,
+      "green": 9
+    },
+    "rating": 4.8,
+    "rating_count": 134,
+    "availability_level": "low",
+    "next_available_days": 60,
+    "confidence": 93,
+    "lat": 1.327868,
+    "lng": 103.793553
+  },
+  {
+    "item_id": "la-6",
+    "name": "Novena",
+    "city": "Singapore",
+    "avg_rent_2br": 3000,
+    "avg_rent_3br": 4200,
+    "typical_sqm_range": [
+      68,
+      98
+    ],
+    "commute_to_work_minutes_estimate": 14,
+    "tags": {
+      "safety": 9,
+      "nightlife": 5,
+      "quiet": 8,
+      "green": 6
+    },
+    "rating": 4.3,
+    "rating_count": 98,
+    "availability_level": "high",
+    "next_available_days": 10,
+    "confidence": 91,
+    "lat": 1.326984,
+    "lng": 103.835309
+  },
+  {
+    "item_id": "la-7",
+    "name": "Serangoon",
+    "city": "Singapore",
+    "avg_rent_2br": 2600,
+    "avg_rent_3br": 3600,
+    "typical_sqm_range": [
+      70,
+      105
+    ],
+    "commute_to_work_minutes_estimate": 28,
+    "tags": {
+      "safety": 8,
+      "nightlife": 6,
+      "quiet": 7,
+      "green": 7
+    },
+    "rating": 4.2,
+    "rating_count": 112,
+    "availability_level": "high",
+    "next_available_days": 7,
+    "confidence": 87,
+    "lat": 1.351692,
+    "lng": 103.870885
+  },
+  {
+    "item_id": "la-8",
+    "name": "Robertson Quay",
+    "city": "Singapore",
+    "avg_rent_2br": 4500,
+    "avg_rent_3br": 6500,
+    "typical_sqm_range": [
+      72,
+      100
+    ],
+    "commute_to_work_minutes_estimate": 10,
+    "tags": {
+      "safety": 9,
+      "nightlife": 9,
+      "quiet": 4,
+      "green": 5
+    },
+    "rating": 4.5,
+    "rating_count": 78,
+    "availability_level": "scarce",
+    "next_available_days": 90,
+    "confidence": 89,
+    "lat": 1.291286,
+    "lng": 103.837064
+  },
+  {
+    "item_id": "la-9",
+    "name": "Katong",
+    "city": "Singapore",
+    "avg_rent_2br": 3100,
+    "avg_rent_3br": 4400,
+    "typical_sqm_range": [
+      75,
+      115
+    ],
+    "commute_to_work_minutes_estimate": 22,
+    "tags": {
+      "safety": 9,
+      "nightlife": 6,
+      "quiet": 8,
+      "green": 7
+    },
+    "rating": 4.6,
+    "rating_count": 95,
+    "availability_level": "medium",
+    "next_available_days": 25,
+    "confidence": 94,
+    "lat": 1.307265,
+    "lng": 103.902335
+  },
+  {
+    "item_id": "la-10",
+    "name": "Toa Payoh",
+    "city": "Singapore",
+    "avg_rent_2br": 2400,
+    "avg_rent_3br": 3400,
+    "typical_sqm_range": [
+      65,
+      95
+    ],
+    "commute_to_work_minutes_estimate": 20,
+    "tags": {
+      "safety": 8,
+      "nightlife": 5,
+      "quiet": 7,
+      "green": 6
+    },
+    "rating": 4.1,
+    "rating_count": 145,
+    "availability_level": "high",
+    "next_available_days": 12,
+    "confidence": 86,
+    "lat": 1.335592,
+    "lng": 103.848146
+  },
+  {
+    "item_id": "la-o1",
+    "name": "Frogner",
+    "city": "Oslo",
+    "avg_rent_2br": 2500,
+    "avg_rent_3br": 3800,
+    "typical_sqm_range": [
+      70,
+      100
+    ],
+    "commute_to_work_minutes_estimate": 15,
+    "tags": {
+      "safety": 9,
+      "nightlife": 7,
+      "quiet": 8,
+      "green": 7
+    },
+    "rating": 4.6,
+    "rating_count": 89,
+    "availability_level": "low",
+    "next_available_days": 45,
+    "confidence": 88,
+    "lat": 59.90955,
+    "lng": 10.68822
+  },
+  {
+    "item_id": "la-o2",
+    "name": "Grünerløkka",
+    "city": "Oslo",
+    "avg_rent_2br": 2200,
+    "avg_rent_3br": 3400,
+    "typical_sqm_range": [
+      65,
+      95
+    ],
+    "commute_to_work_minutes_estimate": 12,
+    "tags": {
+      "safety": 8,
+      "nightlife": 9,
+      "quiet": 5,
+      "green": 7
+    },
+    "rating": 4.5,
+    "rating_count": 112,
+    "availability_level": "medium",
+    "next_available_days": 30,
+    "confidence": 85,
+    "lat": 59.925471,
+    "lng": 10.777421
+  },
+  {
+    "item_id": "la-o3",
+    "name": "Bærum",
+    "city": "Oslo",
+    "avg_rent_2br": 2800,
+    "avg_rent_3br": 4200,
+    "typical_sqm_range": [
+      80,
+      120
+    ],
+    "commute_to_work_minutes_estimate": 25,
+    "tags": {
+      "safety": 10,
+      "nightlife": 4,
+      "quiet": 9,
+      "green": 9
+    },
+    "rating": 4.7,
+    "rating_count": 78,
+    "availability_level": "medium",
+    "next_available_days": 21,
+    "confidence": 90,
+    "lat": 59.889626,
+    "lng": 10.597554
+  },
+  {
+    "item_id": "la-o4",
+    "name": "Sentrum",
+    "city": "Oslo",
+    "avg_rent_2br": 3000,
+    "avg_rent_3br": 4500,
+    "typical_sqm_range": [
+      65,
+      90
+    ],
+    "commute_to_work_minutes_estimate": 5,
+    "tags": {
+      "safety": 9,
+      "nightlife": 8,
+      "quiet": 4,
+      "green": 5
+    },
+    "rating": 4.4,
+    "rating_count": 95,
+    "availability_level": "scarce",
+    "next_available_days": 60,
+    "confidence": 87,
+    "lat": 59.90997,
+    "lng": 10.743309
+  },
+  {
+    "item_id": "la-o5",
+    "name": "Sagene",
+    "city": "Oslo",
+    "avg_rent_2br": 2100,
+    "avg_rent_3br": 3200,
+    "typical_sqm_range": [
+      70,
+      100
+    ],
+    "commute_to_work_minutes_estimate": 18,
+    "tags": {
+      "safety": 8,
+      "nightlife": 6,
+      "quiet": 8,
+      "green": 8
+    },
+    "rating": 4.3,
+    "rating_count": 67,
+    "availability_level": "high",
+    "next_available_days": 14,
+    "confidence": 86,
+    "lat": 59.938273,
+    "lng": 10.765849
+  },
+  {
+    "item_id": "la-sf1",
+    "name": "SOMA",
+    "city": "San Francisco",
+    "avg_rent_2br": 3800,
+    "avg_rent_3br": 5200,
+    "typical_sqm_range": [
+      65,
+      95
+    ],
+    "commute_to_work_minutes_estimate": 12,
+    "tags": {
+      "safety": 7,
+      "nightlife": 8,
+      "quiet": 5,
+      "green": 5
+    },
+    "rating": 4.4,
+    "rating_count": 98,
+    "availability_level": "medium",
+    "next_available_days": 21,
+    "confidence": 88,
+    "lat": 37.780893,
+    "lng": -122.400952
+  },
+  {
+    "item_id": "la-sf2",
+    "name": "Mission District",
+    "city": "San Francisco",
+    "avg_rent_2br": 3400,
+    "avg_rent_3br": 4600,
+    "typical_sqm_range": [
+      70,
+      100
+    ],
+    "commute_to_work_minutes_estimate": 18,
+    "tags": {
+      "safety": 7,
+      "nightlife": 9,
+      "quiet": 5,
+      "green": 6
+    },
+    "rating": 4.5,
+    "rating_count": 112,
+    "availability_level": "low",
+    "next_available_days": 35,
+    "confidence": 85,
+    "lat": 37.752498,
+    "lng": -122.412826
+  },
+  {
+    "item_id": "la-sf3",
+    "name": "Pacific Heights",
+    "city": "San Francisco",
+    "avg_rent_2br": 4500,
+    "avg_rent_3br": 6200,
+    "typical_sqm_range": [
+      80,
+      120
+    ],
+    "commute_to_work_minutes_estimate": 15,
+    "tags": {
+      "safety": 9,
+      "nightlife": 5,
+      "quiet": 9,
+      "green": 8
+    },
+    "rating": 4.7,
+    "rating_count": 76,
+    "availability_level": "scarce",
+    "next_available_days": 45,
+    "confidence": 90,
+    "lat": 37.792717,
+    "lng": -122.435644
+  },
+  {
+    "item_id": "la-sf4",
+    "name": "Noe Valley",
+    "city": "San Francisco",
+    "avg_rent_2br": 3900,
+    "avg_rent_3br": 5400,
+    "typical_sqm_range": [
+      75,
+      110
+    ],
+    "commute_to_work_minutes_estimate": 22,
+    "tags": {
+      "safety": 9,
+      "nightlife": 4,
+      "quiet": 9,
+      "green": 8
+    },
+    "rating": 4.6,
+    "rating_count": 89,
+    "availability_level": "medium",
+    "next_available_days": 28,
+    "confidence": 91,
+    "lat": 37.751591,
+    "lng": -122.432081
+  },
+  {
+    "item_id": "la-sf5",
+    "name": "Marina",
+    "city": "San Francisco",
+    "avg_rent_2br": 4100,
+    "avg_rent_3br": 5600,
+    "typical_sqm_range": [
+      70,
+      100
+    ],
+    "commute_to_work_minutes_estimate": 20,
+    "tags": {
+      "safety": 8,
+      "nightlife": 7,
+      "quiet": 7,
+      "green": 7
+    },
+    "rating": 4.5,
+    "rating_count": 82,
+    "availability_level": "medium",
+    "next_available_days": 25,
+    "confidence": 87,
+    "lat": 37.799793,
+    "lng": -122.435204
+  },
+  {
+    "item_id": "la-ny1",
+    "name": "Upper East Side",
+    "city": "New York",
+    "avg_rent_2br": 4200,
+    "avg_rent_3br": 6200,
+    "typical_sqm_range": [
+      65,
+      100
+    ],
+    "commute_to_work_minutes_estimate": 18,
+    "tags": {
+      "safety": 9,
+      "nightlife": 7,
+      "quiet": 8,
+      "green": 6
+    },
+    "rating": 4.6,
+    "rating_count": 112,
+    "availability_level": "low",
+    "next_available_days": 30,
+    "confidence": 88,
+    "lat": 40.775479,
+    "lng": -73.955023
+  },
+  {
+    "item_id": "la-ny2",
+    "name": "Brooklyn Heights",
+    "city": "New York",
+    "avg_rent_2br": 3600,
+    "avg_rent_3br": 5000,
+    "typical_sqm_range": [
+      70,
+      110
+    ],
+    "commute_to_work_minutes_estimate": 25,
+    "tags": {
+      "safety": 8,
+      "nightlife": 8,
+      "quiet": 8,
+      "green": 7
+    },
+    "rating": 4.5,
+    "rating_count": 98,
+    "availability_level": "medium",
+    "next_available_days": 21,
+    "confidence": 87,
+    "lat": 40.696085,
+    "lng": -73.99503
+  },
+  {
+    "item_id": "la-ny3",
+    "name": "Williamsburg",
+    "city": "New York",
+    "avg_rent_2br": 3800,
+    "avg_rent_3br": 5200,
+    "typical_sqm_range": [
+      65,
+      95
+    ],
+    "commute_to_work_minutes_estimate": 28,
+    "tags": {
+      "safety": 7,
+      "nightlife": 9,
+      "quiet": 5,
+      "green": 5
+    },
+    "rating": 4.4,
+    "rating_count": 134,
+    "availability_level": "high",
+    "next_available_days": 14,
+    "confidence": 85,
+    "lat": 40.714622,
+    "lng": -73.95345
+  },
+  {
+    "item_id": "la-ny4",
+    "name": "Tribeca",
+    "city": "New York",
+    "avg_rent_2br": 5500,
+    "avg_rent_3br": 7800,
+    "typical_sqm_range": [
+      70,
+      120
+    ],
+    "commute_to_work_minutes_estimate": 12,
+    "tags": {
+      "safety": 9,
+      "nightlife": 8,
+      "quiet": 7,
+      "green": 5
+    },
+    "rating": 4.7,
+    "rating_count": 76,
+    "availability_level": "scarce",
+    "next_available_days": 45,
+    "confidence": 90,
+    "lat": 40.71538,
+    "lng": -74.009306
+  },
+  {
+    "item_id": "la-ny5",
+    "name": "Upper West Side",
+    "city": "New York",
+    "avg_rent_2br": 4400,
+    "avg_rent_3br": 6000,
+    "typical_sqm_range": [
+      68,
+      105
+    ],
+    "commute_to_work_minutes_estimate": 20,
+    "tags": {
+      "safety": 9,
+      "nightlife": 6,
+      "quiet": 8,
+      "green": 8
+    },
+    "rating": 4.6,
+    "rating_count": 89,
+    "availability_level": "medium",
+    "next_available_days": 25,
+    "confidence": 91,
+    "lat": 40.787045,
+    "lng": -73.975416
+  },
+  {
+    "item_id": "la-ny6",
+    "name": "Astoria",
+    "city": "New York",
+    "avg_rent_2br": 2800,
+    "avg_rent_3br": 4000,
+    "typical_sqm_range": [
+      70,
+      100
+    ],
+    "commute_to_work_minutes_estimate": 35,
+    "tags": {
+      "safety": 8,
+      "nightlife": 7,
+      "quiet": 7,
+      "green": 7
+    },
+    "rating": 4.3,
+    "rating_count": 102,
+    "availability_level": "high",
+    "next_available_days": 10,
+    "confidence": 86,
+    "lat": 40.772014,
+    "lng": -73.930267
+  },
+  {
+    "item_id": "la-ny7",
+    "name": "Greenwich Village",
+    "city": "New York",
+    "avg_rent_2br": 4800,
+    "avg_rent_3br": 6500,
+    "typical_sqm_range": [
+      65,
+      95
+    ],
+    "commute_to_work_minutes_estimate": 15,
+    "tags": {
+      "safety": 8,
+      "nightlife": 9,
+      "quiet": 5,
+      "green": 6
+    },
+    "rating": 4.5,
+    "rating_count": 95,
+    "availability_level": "low",
+    "next_available_days": 35,
+    "confidence": 88,
+    "lat": 40.733584,
+    "lng": -74.002817
+  },
+  {
+    "item_id": "la-mu1",
+    "name": "Schwabing",
+    "city": "Munich",
+    "avg_rent_2br": 2200,
+    "avg_rent_3br": 2900,
+    "typical_sqm_range": [
+      60,
+      95
+    ],
+    "commute_to_work_minutes_estimate": 18,
+    "tags": {
+      "safety": 9,
+      "nightlife": 8,
+      "quiet": 6,
+      "green": 8
+    },
+    "rating": 4.7,
+    "rating_count": 142,
+    "availability_level": "medium",
+    "next_available_days": 21,
+    "confidence": 92,
+    "lat": 48.168926,
+    "lng": 11.58995
+  },
+  {
+    "item_id": "la-mu2",
+    "name": "Maxvorstadt",
+    "city": "Munich",
+    "avg_rent_2br": 2400,
+    "avg_rent_3br": 3100,
+    "typical_sqm_range": [
+      55,
+      90
+    ],
+    "commute_to_work_minutes_estimate": 14,
+    "tags": {
+      "safety": 9,
+      "nightlife": 8,
+      "quiet": 5,
+      "green": 6
+    },
+    "rating": 4.6,
+    "rating_count": 118,
+    "availability_level": "low",
+    "next_available_days": 35,
+    "confidence": 90,
+    "lat": 48.151092,
+    "lng": 11.562418
+  },
+  {
+    "item_id": "la-mu3",
+    "name": "Bogenhausen",
+    "city": "Munich",
+    "avg_rent_2br": 2300,
+    "avg_rent_3br": 3000,
+    "typical_sqm_range": [
+      70,
+      110
+    ],
+    "commute_to_work_minutes_estimate": 22,
+    "tags": {
+      "safety": 9,
+      "nightlife": 5,
+      "quiet": 9,
+      "green": 9
+    },
+    "rating": 4.7,
+    "rating_count": 96,
+    "availability_level": "medium",
+    "next_available_days": 28,
+    "confidence": 88,
+    "lat": 48.145222,
+    "lng": 11.614977
+  },
+  {
+    "item_id": "la-mu4",
+    "name": "Haidhausen",
+    "city": "Munich",
+    "avg_rent_2br": 2100,
+    "avg_rent_3br": 2750,
+    "typical_sqm_range": [
+      55,
+      85
+    ],
+    "commute_to_work_minutes_estimate": 15,
+    "tags": {
+      "safety": 8,
+      "nightlife": 9,
+      "quiet": 6,
+      "green": 7
+    },
+    "rating": 4.6,
+    "rating_count": 134,
+    "availability_level": "high",
+    "next_available_days": 14,
+    "confidence": 89,
+    "lat": 48.132663,
+    "lng": 11.601122
+  },
+  {
+    "item_id": "la-mu5",
+    "name": "Sendling",
+    "city": "Munich",
+    "avg_rent_2br": 1900,
+    "avg_rent_3br": 2500,
+    "typical_sqm_range": [
+      55,
+      85
+    ],
+    "commute_to_work_minutes_estimate": 20,
+    "tags": {
+      "safety": 8,
+      "nightlife": 6,
+      "quiet": 7,
+      "green": 7
+    },
+    "rating": 4.5,
+    "rating_count": 87,
+    "availability_level": "high",
+    "next_available_days": 10,
+    "confidence": 86,
+    "lat": 48.118012,
+    "lng": 11.539083
+  },
+  {
+    "item_id": "la-mu6",
+    "name": "Pasing",
+    "city": "Munich",
+    "avg_rent_2br": 1700,
+    "avg_rent_3br": 2200,
+    "typical_sqm_range": [
+      60,
+      95
+    ],
+    "commute_to_work_minutes_estimate": 30,
+    "tags": {
+      "safety": 8,
+      "nightlife": 5,
+      "quiet": 8,
+      "green": 8
+    },
+    "rating": 4.4,
+    "rating_count": 72,
+    "availability_level": "high",
+    "next_available_days": 7,
+    "confidence": 84,
+    "lat": 48.147785,
+    "lng": 11.460701
+  },
+  {
+    "item_id": "la-du1",
+    "name": "Dubai Marina",
+    "city": "Dubai",
+    "avg_rent_2br": 11000,
+    "avg_rent_3br": 16000,
+    "typical_sqm_range": [
+      90,
+      140
+    ],
+    "commute_to_work_minutes_estimate": 20,
+    "tags": {
+      "safety": 8,
+      "nightlife": 9,
+      "quiet": 4,
+      "green": 5
+    },
+    "rating": 4.5,
+    "rating_count": 210,
+    "availability_level": "high",
+    "next_available_days": 10,
+    "confidence": 90,
+    "lat": 25.0805,
+    "lng": 55.1403
+  },
+  {
+    "item_id": "la-du2",
+    "name": "Downtown Dubai",
+    "city": "Dubai",
+    "avg_rent_2br": 13000,
+    "avg_rent_3br": 19000,
+    "typical_sqm_range": [
+      95,
+      150
+    ],
+    "commute_to_work_minutes_estimate": 15,
+    "tags": {
+      "safety": 9,
+      "nightlife": 8,
+      "quiet": 4,
+      "green": 6
+    },
+    "rating": 4.6,
+    "rating_count": 260,
+    "availability_level": "medium",
+    "next_available_days": 14,
+    "confidence": 91,
+    "lat": 25.1972,
+    "lng": 55.2744
+  },
+  {
+    "item_id": "la-du3",
+    "name": "Jumeirah",
+    "city": "Dubai",
+    "avg_rent_2br": 12000,
+    "avg_rent_3br": 18000,
+    "typical_sqm_range": [
+      110,
+      180
+    ],
+    "commute_to_work_minutes_estimate": 22,
+    "tags": {
+      "safety": 9,
+      "nightlife": 5,
+      "quiet": 8,
+      "green": 7
+    },
+    "rating": 4.4,
+    "rating_count": 150,
+    "availability_level": "medium",
+    "next_available_days": 21,
+    "confidence": 88,
+    "lat": 25.231,
+    "lng": 55.26
+  },
+  {
+    "item_id": "la-du4",
+    "name": "Arabian Ranches",
+    "city": "Dubai",
+    "avg_rent_2br": 10000,
+    "avg_rent_3br": 14000,
+    "typical_sqm_range": [
+      140,
+      220
+    ],
+    "commute_to_work_minutes_estimate": 30,
+    "tags": {
+      "safety": 9,
+      "nightlife": 3,
+      "quiet": 9,
+      "green": 9
+    },
+    "rating": 4.5,
+    "rating_count": 130,
+    "availability_level": "high",
+    "next_available_days": 18,
+    "confidence": 87,
+    "lat": 25.05,
+    "lng": 55.267
+  },
+  {
+    "item_id": "la-du5",
+    "name": "Dubai Hills Estate",
+    "city": "Dubai",
+    "avg_rent_2br": 11500,
+    "avg_rent_3br": 16500,
+    "typical_sqm_range": [
+      120,
+      190
+    ],
+    "commute_to_work_minutes_estimate": 25,
+    "tags": {
+      "safety": 9,
+      "nightlife": 4,
+      "quiet": 8,
+      "green": 9
+    },
+    "rating": 4.6,
+    "rating_count": 175,
+    "availability_level": "high",
+    "next_available_days": 12,
+    "confidence": 89,
+    "lat": 25.1,
+    "lng": 55.244
+  },
+  {
+    "item_id": "la-ie1",
+    "name": "Grand Canal Dock",
+    "city": "Dublin",
+    "avg_rent_2br": 2609,
+    "typical_sqm_range": [
+      55,
+      85
+    ],
+    "commute_to_work_minutes_estimate": 5,
+    "tags": {
+      "safety": 8,
+      "nightlife": 7,
+      "quiet": 5,
+      "green": 5
+    },
+    "rating_count": 0,
+    "availability_level": "low",
+    "next_available_days": 30,
+    "confidence": 72,
+    "lat": 53.3417,
+    "lng": -6.2377,
+    "daft_sub_region": "City Centre",
+    "rent_basis": "Daft.ie Rental Report Q1 2026 — no separate City Centre figure in the sourced report, so the Dublin-wide 2-bed apartment-size figure (EUR 2,609) is shown. Not a City Centre-specific number."
+  },
+  {
+    "item_id": "la-ie2",
+    "name": "Ranelagh",
+    "city": "Dublin",
+    "avg_rent_2br": 2850,
+    "typical_sqm_range": [
+      60,
+      95
+    ],
+    "commute_to_work_minutes_estimate": 20,
+    "tags": {
+      "safety": 9,
+      "nightlife": 7,
+      "quiet": 7,
+      "green": 7
+    },
+    "rating_count": 0,
+    "availability_level": "low",
+    "next_available_days": 30,
+    "confidence": 72,
+    "lat": 53.3244,
+    "lng": -6.2564,
+    "daft_sub_region": "South City",
+    "rent_basis": "Daft.ie Rental Report Q1 2026 — South City sub-region 2-bed band (EUR 2,850). Daft publishes sub-region bands, not per-neighbourhood figures."
+  },
+  {
+    "item_id": "la-ie3",
+    "name": "Rathmines",
+    "city": "Dublin",
+    "avg_rent_2br": 2850,
+    "typical_sqm_range": [
+      60,
+      100
+    ],
+    "commute_to_work_minutes_estimate": 25,
+    "tags": {
+      "safety": 8,
+      "nightlife": 7,
+      "quiet": 6,
+      "green": 6
+    },
+    "rating_count": 0,
+    "availability_level": "low",
+    "next_available_days": 30,
+    "confidence": 72,
+    "lat": 53.3235,
+    "lng": -6.2657,
+    "daft_sub_region": "South City",
+    "rent_basis": "Daft.ie Rental Report Q1 2026 — South City sub-region 2-bed band (EUR 2,850). Daft publishes sub-region bands, not per-neighbourhood figures."
+  },
+  {
+    "item_id": "la-ie4",
+    "name": "Portobello",
+    "city": "Dublin",
+    "avg_rent_2br": 2850,
+    "typical_sqm_range": [
+      50,
+      80
+    ],
+    "commute_to_work_minutes_estimate": 15,
+    "tags": {
+      "safety": 8,
+      "nightlife": 8,
+      "quiet": 5,
+      "green": 6
+    },
+    "rating_count": 0,
+    "availability_level": "low",
+    "next_available_days": 30,
+    "confidence": 72,
+    "lat": 53.3306,
+    "lng": -6.2664,
+    "daft_sub_region": "South City",
+    "rent_basis": "Daft.ie Rental Report Q1 2026 — South City sub-region 2-bed band (EUR 2,850). Daft publishes sub-region bands, not per-neighbourhood figures."
+  },
+  {
+    "item_id": "la-ie5",
+    "name": "Stoneybatter / Smithfield",
+    "city": "Dublin",
+    "avg_rent_2br": 2444,
+    "typical_sqm_range": [
+      55,
+      90
+    ],
+    "commute_to_work_minutes_estimate": 20,
+    "tags": {
+      "safety": 7,
+      "nightlife": 8,
+      "quiet": 5,
+      "green": 5
+    },
+    "rating_count": 0,
+    "availability_level": "low",
+    "next_available_days": 30,
+    "confidence": 72,
+    "lat": 53.3506,
+    "lng": -6.2861,
+    "daft_sub_region": "North City",
+    "rent_basis": "Daft.ie Rental Report Q1 2026 — North City sub-region 2-bed band (EUR 2,444). Daft publishes sub-region bands, not per-neighbourhood figures."
+  },
+  {
+    "item_id": "la-ie6",
+    "name": "Drumcondra",
+    "city": "Dublin",
+    "avg_rent_2br": 2444,
+    "typical_sqm_range": [
+      60,
+      100
+    ],
+    "commute_to_work_minutes_estimate": 25,
+    "tags": {
+      "safety": 8,
+      "nightlife": 5,
+      "quiet": 8,
+      "green": 7
+    },
+    "rating_count": 0,
+    "availability_level": "low",
+    "next_available_days": 30,
+    "confidence": 72,
+    "lat": 53.3695,
+    "lng": -6.2578,
+    "daft_sub_region": "North City",
+    "rent_basis": "Daft.ie Rental Report Q1 2026 — North City sub-region 2-bed band (EUR 2,444). Daft publishes sub-region bands, not per-neighbourhood figures."
+  },
+  {
+    "item_id": "la-ie7",
+    "name": "Clontarf",
+    "city": "Dublin",
+    "avg_rent_2br": 2444,
+    "typical_sqm_range": [
+      70,
+      110
+    ],
+    "commute_to_work_minutes_estimate": 30,
+    "tags": {
+      "safety": 9,
+      "nightlife": 4,
+      "quiet": 9,
+      "green": 9
+    },
+    "rating_count": 0,
+    "availability_level": "low",
+    "next_available_days": 30,
+    "confidence": 72,
+    "lat": 53.3634,
+    "lng": -6.2124,
+    "daft_sub_region": "North City",
+    "rent_basis": "Daft.ie Rental Report Q1 2026 — North City sub-region 2-bed band (EUR 2,444). Daft publishes sub-region bands, not per-neighbourhood figures."
+  },
+  {
+    "item_id": "la-ie8",
+    "name": "Dun Laoghaire",
+    "city": "Dublin",
+    "avg_rent_2br": 2609,
+    "typical_sqm_range": [
+      70,
+      110
+    ],
+    "commute_to_work_minutes_estimate": 35,
+    "tags": {
+      "safety": 9,
+      "nightlife": 5,
+      "quiet": 8,
+      "green": 8
+    },
+    "rating_count": 0,
+    "availability_level": "low",
+    "next_available_days": 30,
+    "confidence": 72,
+    "lat": 53.2942,
+    "lng": -6.135,
+    "daft_sub_region": "South County",
+    "rent_basis": "Daft.ie Rental Report Q1 2026 — no separate South County figure in the sourced report, so the Dublin-wide 2-bed apartment-size figure (EUR 2,609) is shown. Not a South County-specific number."
+  }
+]

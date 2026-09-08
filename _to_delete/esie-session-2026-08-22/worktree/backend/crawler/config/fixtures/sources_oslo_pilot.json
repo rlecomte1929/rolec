@@ -1,0 +1,41 @@
+{
+  "sources": [
+    {
+      "source_name": "oslo_kommune_newcomer",
+      "base_url": "https://www.oslo.kommune.no/english/",
+      "country_code": "NO",
+      "country_name": "Norway",
+      "city_name": "Oslo",
+      "source_type": "official",
+      "trust_tier": "T0",
+      "content_domain": "admin_essentials",
+      "crawl_strategy": "single_page",
+      "allowed_paths": ["/english/"],
+      "notes": "Oslo city newcomer / relocation guidance"
+    },
+    {
+      "source_name": "ruter_transport",
+      "base_url": "https://ruter.no/en/",
+      "country_code": "NO",
+      "country_name": "Norway",
+      "city_name": "Oslo",
+      "source_type": "institutional",
+      "trust_tier": "T0",
+      "content_domain": "transport",
+      "crawl_strategy": "single_page",
+      "notes": "Oslo public transport operator"
+    },
+    {
+      "source_name": "visitoslo_events",
+      "base_url": "https://www.visitoslo.com/en/",
+      "country_code": "NO",
+      "country_name": "Norway",
+      "city_name": "Oslo",
+      "source_type": "official",
+      "trust_tier": "T0",
+      "content_domain": "events",
+      "crawl_strategy": "single_page",
+      "notes": "Official Oslo tourism and events"
+    }
+  ]
+}

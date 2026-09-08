@@ -1,0 +1,972 @@
+[
+  {
+    "item_id": "s-1",
+    "name": "Tanglin Trust School",
+    "city": "Singapore",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 9,
+    "seats_availability_level": "scarce",
+    "waitlist_weeks": 52,
+    "application_deadline": "2025-01-15",
+    "commute_minutes_estimate": 20,
+    "rating": 4.8,
+    "rating_count": 89,
+    "confidence": 95,
+    "lat": 1.297401,
+    "lng": 103.792468
+  },
+  {
+    "item_id": "s-2",
+    "name": "UWCSEA East",
+    "city": "Singapore",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      4,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 10,
+    "seats_availability_level": "low",
+    "waitlist_weeks": 26,
+    "application_deadline": "2025-02-28",
+    "commute_minutes_estimate": 25,
+    "rating": 4.9,
+    "rating_count": 67,
+    "confidence": 93,
+    "lat": 1.358623,
+    "lng": 103.931478
+  },
+  {
+    "item_id": "s-3",
+    "name": "Chatsworth International",
+    "city": "Singapore",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      16
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "medium",
+    "quality_score": 7,
+    "extracurricular_score": 7,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 12,
+    "application_deadline": "2025-03-15",
+    "commute_minutes_estimate": 18,
+    "rating": 4.4,
+    "rating_count": 112,
+    "confidence": 90,
+    "lat": 1.345148,
+    "lng": 103.791856
+  },
+  {
+    "item_id": "s-4",
+    "name": "ISS International",
+    "city": "Singapore",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      4,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "medium",
+    "quality_score": 7,
+    "extracurricular_score": 8,
+    "seats_availability_level": "high",
+    "waitlist_weeks": 4,
+    "application_deadline": "2025-04-30",
+    "commute_minutes_estimate": 22,
+    "rating": 4.5,
+    "rating_count": 78,
+    "confidence": 88,
+    "lat": 1.302096,
+    "lng": 103.830851
+  },
+  {
+    "item_id": "s-5",
+    "name": "Australian International School",
+    "city": "Singapore",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      2,
+      17
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 8,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 16,
+    "application_deadline": "2025-02-15",
+    "commute_minutes_estimate": 28,
+    "rating": 4.6,
+    "rating_count": 95,
+    "confidence": 91,
+    "lat": 1.348198,
+    "lng": 103.859443
+  },
+  {
+    "item_id": "s-6",
+    "name": "GEMS World Academy",
+    "city": "Singapore",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 9,
+    "seats_availability_level": "low",
+    "waitlist_weeks": 20,
+    "application_deadline": "2025-01-31",
+    "commute_minutes_estimate": 30,
+    "rating": 4.7,
+    "rating_count": 54,
+    "confidence": 92,
+    "lat": 1.423612,
+    "lng": 103.850715
+  },
+  {
+    "item_id": "s-7",
+    "name": "NPS International",
+    "city": "Singapore",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      16
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "medium",
+    "quality_score": 6,
+    "extracurricular_score": 6,
+    "seats_availability_level": "high",
+    "waitlist_weeks": 2,
+    "application_deadline": "2025-05-15",
+    "commute_minutes_estimate": 35,
+    "rating": 4.2,
+    "rating_count": 134,
+    "confidence": 86,
+    "lat": 1.307164,
+    "lng": 103.832551
+  },
+  {
+    "item_id": "s-8",
+    "name": "Dover Court Preparatory",
+    "city": "Singapore",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      2,
+      11
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "medium",
+    "quality_score": 7,
+    "extracurricular_score": 7,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 8,
+    "application_deadline": "2025-03-30",
+    "commute_minutes_estimate": 15,
+    "rating": 4.5,
+    "rating_count": 89,
+    "confidence": 89,
+    "lat": 1.3067,
+    "lng": 103.7847
+  },
+  {
+    "item_id": "s-9",
+    "name": "Canadian International School",
+    "city": "Singapore",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en",
+      "zh"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 8,
+    "seats_availability_level": "low",
+    "waitlist_weeks": 24,
+    "application_deadline": "2025-02-28",
+    "commute_minutes_estimate": 25,
+    "rating": 4.6,
+    "rating_count": 72,
+    "confidence": 94,
+    "lat": 1.345641,
+    "lng": 103.727078
+  },
+  {
+    "item_id": "s-10",
+    "name": "Stamford American",
+    "city": "Singapore",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      2,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 9,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 10,
+    "application_deadline": "2025-04-15",
+    "commute_minutes_estimate": 12,
+    "rating": 4.7,
+    "rating_count": 61,
+    "confidence": 90,
+    "lat": 1.337311,
+    "lng": 103.868875
+  },
+  {
+    "item_id": "s-o1",
+    "name": "Oslo International School",
+    "city": "Oslo",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 8,
+    "seats_availability_level": "low",
+    "waitlist_weeks": 16,
+    "application_deadline": "2025-02-28",
+    "commute_minutes_estimate": 20,
+    "rating": 4.5,
+    "rating_count": 45,
+    "confidence": 88,
+    "lat": 59.961674,
+    "lng": 10.692175
+  },
+  {
+    "item_id": "s-o2",
+    "name": "British International School Oslo",
+    "city": "Oslo",
+    "type": "private",
+    "curriculum": "british",
+    "grades_supported": [
+      2,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 9,
+    "seats_availability_level": "scarce",
+    "waitlist_weeks": 24,
+    "application_deadline": "2025-01-15",
+    "commute_minutes_estimate": 25,
+    "rating": 4.7,
+    "rating_count": 38,
+    "confidence": 90,
+    "lat": 59.9139,
+    "lng": 10.736
+  },
+  {
+    "item_id": "s-o3",
+    "name": "Lycée Français René Cassin",
+    "city": "Oslo",
+    "type": "private",
+    "curriculum": "french",
+    "grades_supported": [
+      2,
+      18
+    ],
+    "languages": [
+      "fr",
+      "en"
+    ],
+    "tuition_level": "medium",
+    "quality_score": 7,
+    "extracurricular_score": 7,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 8,
+    "application_deadline": "2025-03-30",
+    "commute_minutes_estimate": 18,
+    "rating": 4.4,
+    "rating_count": 52,
+    "confidence": 85,
+    "lat": 59.921,
+    "lng": 10.68
+  },
+  {
+    "item_id": "s-sf1",
+    "name": "International School of the Peninsula",
+    "city": "San Francisco",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      2,
+      12
+    ],
+    "languages": [
+      "en",
+      "zh"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 8,
+    "seats_availability_level": "low",
+    "waitlist_weeks": 16,
+    "application_deadline": "2025-02-15",
+    "commute_minutes_estimate": 20,
+    "rating": 4.7,
+    "rating_count": 62,
+    "confidence": 91,
+    "lat": 37.428,
+    "lng": -122.145
+  },
+  {
+    "item_id": "s-sf2",
+    "name": "French American International School",
+    "city": "San Francisco",
+    "type": "private",
+    "curriculum": "french",
+    "grades_supported": [
+      1,
+      12
+    ],
+    "languages": [
+      "fr",
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 9,
+    "seats_availability_level": "scarce",
+    "waitlist_weeks": 20,
+    "application_deadline": "2025-01-31",
+    "commute_minutes_estimate": 15,
+    "rating": 4.8,
+    "rating_count": 45,
+    "confidence": 93,
+    "lat": 37.775378,
+    "lng": -122.421605
+  },
+  {
+    "item_id": "s-sf3",
+    "name": "San Francisco Day School",
+    "city": "San Francisco",
+    "type": "private",
+    "curriculum": "american",
+    "grades_supported": [
+      1,
+      8
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 8,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 12,
+    "application_deadline": "2025-03-01",
+    "commute_minutes_estimate": 18,
+    "rating": 4.6,
+    "rating_count": 58,
+    "confidence": 88,
+    "lat": 37.778049,
+    "lng": -122.446475
+  },
+  {
+    "item_id": "s-ny1",
+    "name": "United Nations International School",
+    "city": "New York",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 9,
+    "seats_availability_level": "scarce",
+    "waitlist_weeks": 24,
+    "application_deadline": "2025-01-15",
+    "commute_minutes_estimate": 22,
+    "rating": 4.8,
+    "rating_count": 67,
+    "confidence": 92,
+    "lat": 40.736335,
+    "lng": -73.973388
+  },
+  {
+    "item_id": "s-ny2",
+    "name": "Lycée Français de New York",
+    "city": "New York",
+    "type": "private",
+    "curriculum": "french",
+    "grades_supported": [
+      2,
+      18
+    ],
+    "languages": [
+      "fr",
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 9,
+    "seats_availability_level": "low",
+    "waitlist_weeks": 16,
+    "application_deadline": "2025-02-28",
+    "commute_minutes_estimate": 25,
+    "rating": 4.7,
+    "rating_count": 54,
+    "confidence": 91,
+    "lat": 40.768837,
+    "lng": -73.951372
+  },
+  {
+    "item_id": "s-ny3",
+    "name": "British International School of New York",
+    "city": "New York",
+    "type": "private",
+    "curriculum": "british",
+    "grades_supported": [
+      2,
+      13
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 8,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 12,
+    "application_deadline": "2025-03-15",
+    "commute_minutes_estimate": 28,
+    "rating": 4.6,
+    "rating_count": 48,
+    "confidence": 89,
+    "lat": 40.738,
+    "lng": -73.974
+  },
+  {
+    "item_id": "s-ny4",
+    "name": "Dwight School",
+    "city": "New York",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      2,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 9,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 10,
+    "application_deadline": "2025-04-01",
+    "commute_minutes_estimate": 20,
+    "rating": 4.5,
+    "rating_count": 72,
+    "confidence": 88,
+    "lat": 40.78745,
+    "lng": -73.968048
+  },
+  {
+    "item_id": "s-ny5",
+    "name": "Avenues: The World School",
+    "city": "New York",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      1,
+      12
+    ],
+    "languages": [
+      "en",
+      "zh"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 9,
+    "seats_availability_level": "scarce",
+    "waitlist_weeks": 20,
+    "application_deadline": "2025-01-31",
+    "commute_minutes_estimate": 18,
+    "rating": 4.7,
+    "rating_count": 58,
+    "confidence": 90,
+    "lat": 40.748,
+    "lng": -74.004
+  },
+  {
+    "item_id": "s-mu1",
+    "name": "Bavarian International School (BIS)",
+    "city": "Munich",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 9,
+    "seats_availability_level": "low",
+    "waitlist_weeks": 18,
+    "application_deadline": "2025-02-15",
+    "commute_minutes_estimate": 35,
+    "rating": 4.7,
+    "rating_count": 84,
+    "confidence": 92,
+    "lat": 48.175674,
+    "lng": 11.586078
+  },
+  {
+    "item_id": "s-mu2",
+    "name": "Munich International School (MIS)",
+    "city": "Munich",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 9,
+    "seats_availability_level": "scarce",
+    "waitlist_weeks": 24,
+    "application_deadline": "2025-01-31",
+    "commute_minutes_estimate": 30,
+    "rating": 4.8,
+    "rating_count": 102,
+    "confidence": 93,
+    "lat": 48.178181,
+    "lng": 11.520667
+  },
+  {
+    "item_id": "s-mu3",
+    "name": "European School Munich",
+    "city": "Munich",
+    "type": "public",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en",
+      "de",
+      "fr"
+    ],
+    "tuition_level": "low",
+    "quality_score": 8,
+    "extracurricular_score": 8,
+    "seats_availability_level": "scarce",
+    "waitlist_weeks": 30,
+    "application_deadline": "2025-01-15",
+    "commute_minutes_estimate": 25,
+    "rating": 4.6,
+    "rating_count": 71,
+    "confidence": 90,
+    "lat": 48.096136,
+    "lng": 11.639963
+  },
+  {
+    "item_id": "s-mu4",
+    "name": "Lycée Jean Renoir",
+    "city": "Munich",
+    "type": "private",
+    "curriculum": "french",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "fr",
+      "en"
+    ],
+    "tuition_level": "medium",
+    "quality_score": 8,
+    "extracurricular_score": 7,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 10,
+    "application_deadline": "2025-03-01",
+    "commute_minutes_estimate": 20,
+    "rating": 4.5,
+    "rating_count": 38,
+    "confidence": 88,
+    "lat": 48.124189,
+    "lng": 11.542252
+  },
+  {
+    "item_id": "s-mu5",
+    "name": "Phorms Schule München",
+    "city": "Munich",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en",
+      "de"
+    ],
+    "tuition_level": "medium",
+    "quality_score": 7,
+    "extracurricular_score": 7,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 8,
+    "application_deadline": "2025-03-15",
+    "commute_minutes_estimate": 18,
+    "rating": 4.4,
+    "rating_count": 56,
+    "confidence": 86,
+    "lat": 48.147387,
+    "lng": 11.60121
+  },
+  {
+    "item_id": "s-mu6",
+    "name": "St. George's International (Munich)",
+    "city": "Munich",
+    "type": "private",
+    "curriculum": "british",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 8,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 12,
+    "application_deadline": "2025-02-28",
+    "commute_minutes_estimate": 28,
+    "rating": 4.5,
+    "rating_count": 49,
+    "confidence": 87,
+    "lat": 48.15,
+    "lng": 11.555
+  },
+  {
+    "item_id": "s-du1",
+    "name": "GEMS Wellington International School",
+    "city": "Dubai",
+    "type": "private",
+    "curriculum": "british",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 9,
+    "seats_availability_level": "scarce",
+    "waitlist_weeks": 26,
+    "application_deadline": "2025-01-15",
+    "commute_minutes_estimate": 20,
+    "rating": 4.7,
+    "rating_count": 95,
+    "confidence": 93,
+    "lat": 25.118,
+    "lng": 55.2
+  },
+  {
+    "item_id": "s-du2",
+    "name": "Nord Anglia International School Dubai",
+    "city": "Dubai",
+    "type": "private",
+    "curriculum": "british",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 8,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 12,
+    "application_deadline": "2025-02-01",
+    "commute_minutes_estimate": 25,
+    "rating": 4.6,
+    "rating_count": 80,
+    "confidence": 92,
+    "lat": 25.05,
+    "lng": 55.24
+  },
+  {
+    "item_id": "s-du3",
+    "name": "Dubai British School",
+    "city": "Dubai",
+    "type": "private",
+    "curriculum": "british",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 8,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 10,
+    "application_deadline": "2025-01-20",
+    "commute_minutes_estimate": 22,
+    "rating": 4.5,
+    "rating_count": 70,
+    "confidence": 90,
+    "lat": 25.064,
+    "lng": 55.162
+  },
+  {
+    "item_id": "s-du4",
+    "name": "Jumeirah English Speaking School (JESS)",
+    "city": "Dubai",
+    "type": "private",
+    "curriculum": "british",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 9,
+    "extracurricular_score": 8,
+    "seats_availability_level": "scarce",
+    "waitlist_weeks": 30,
+    "application_deadline": "2025-01-10",
+    "commute_minutes_estimate": 18,
+    "rating": 4.7,
+    "rating_count": 88,
+    "confidence": 92,
+    "lat": 25.213,
+    "lng": 55.254
+  },
+  {
+    "item_id": "s-du5",
+    "name": "Dubai American Academy",
+    "city": "Dubai",
+    "type": "private",
+    "curriculum": "american",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "quality_score": 8,
+    "extracurricular_score": 9,
+    "seats_availability_level": "medium",
+    "waitlist_weeks": 14,
+    "application_deadline": "2025-02-15",
+    "commute_minutes_estimate": 24,
+    "rating": 4.5,
+    "rating_count": 76,
+    "confidence": 90,
+    "lat": 25.103,
+    "lng": 55.172
+  },
+  {
+    "item_id": "s-ie1",
+    "name": "St Andrew's College",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.2996,
+    "lng": -6.1966,
+    "note": "IB World School in Booterstown, south Dublin."
+  },
+  {
+    "item_id": "s-ie2",
+    "name": "Nord Anglia International School Dublin",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.2717,
+    "lng": -6.2003,
+    "note": "International curriculum school in Leopardstown."
+  },
+  {
+    "item_id": "s-ie3",
+    "name": "Lycee Francais d'Irlande",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "french",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "fr",
+      "en"
+    ],
+    "tuition_level": "high",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.2683,
+    "lng": -6.1683,
+    "note": "French national curriculum, Foxrock."
+  },
+  {
+    "item_id": "s-ie4",
+    "name": "St Kilian's Deutsche Schule",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "de",
+      "en"
+    ],
+    "tuition_level": "high",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.3081,
+    "lng": -6.2367,
+    "note": "German-Irish bilingual school in Clonskeagh."
+  },
+  {
+    "item_id": "s-ie5",
+    "name": "The International School of Dublin",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      12
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "high",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.3244,
+    "lng": -6.2564,
+    "note": "IB Primary Years Programme, Ranelagh."
+  },
+  {
+    "item_id": "s-ie6",
+    "name": "Sutton Park School",
+    "city": "Dublin",
+    "type": "private",
+    "curriculum": "international",
+    "grades_supported": [
+      3,
+      18
+    ],
+    "languages": [
+      "en"
+    ],
+    "tuition_level": "medium",
+    "commute_minutes_estimate": 30,
+    "rating_count": 0,
+    "confidence": 70,
+    "lat": 53.3897,
+    "lng": -6.1064,
+    "note": "Co-educational day school on the northside coast."
+  }
+]

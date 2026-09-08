@@ -9,6 +9,11 @@ from ...app.db import SessionLocal
 from ...app import crud
 from .destination_normalizer import normalize_destination_country
 from .guidance_pack_service import build_profile_snapshot
+# Phase 5: scope-aware applies_to matching lives in its own dependency-free module so it can
+# be unit-tested without this DB-backed service. It replaces the old strict-equality matcher,
+# which dropped any fact whose applies_to carried a key the profile snapshot lacked (all of
+# Otto's scope-annotated facts) and hid audience_scope rules from EEA movers.
+from .applies_to_matcher import apply_applies_to as _apply_applies_to
 
 log = logging.getLogger(__name__)
 
@@ -23,15 +28,6 @@ def _safe_parse_case_draft(raw: Optional[str]) -> Dict[str, Any]:
     except (json.JSONDecodeError, TypeError, ValueError):
         log.warning("requirements_sufficiency: invalid draft_json, using empty dict")
         return {}
-
-
-def _apply_applies_to(applies_to: Dict[str, Any], snapshot: Dict[str, Any]) -> bool:
-    if not applies_to:
-        return True
-    for key, value in applies_to.items():
-        if snapshot.get(key) != value:
-            return False
-    return True
 
 
 def _resolve_destination(raw: Optional[str]) -> Optional[str]:
@@ -81,7 +77,8 @@ def compute_requirements_sufficiency(case_id: str, user_id: str) -> Dict[str, An
     required_fields: List[str] = []
     supporting_requirements = []
     for fact in facts:
-        if not _apply_applies_to(fact.get("applies_to") or {}, snapshot):
+        applies_to = fact.get("applies_to") or {}
+        if not _apply_applies_to(applies_to, snapshot):
             continue
         required_fields.extend(fact.get("required_fields") or [])
         supporting_requirements.append({
@@ -89,6 +86,12 @@ def compute_requirements_sufficiency(case_id: str, user_id: str) -> Dict[str, An
             "fact_text": fact.get("fact_text"),
             "source_url": fact.get("source_url"),
             "required_fields": fact.get("required_fields") or [],
+            # Phase 5: carry scope/rendering signals so the serving/UI layer can present a
+            # conditional fact conditionally and flag "easy to miss" traps, rather than
+            # stating every fact as an unconditional requirement.
+            "assertion_mode": applies_to.get("assertion_mode"),
+            "conditional_on": applies_to.get("conditional_on"),
+            "non_obvious": bool(applies_to.get("non_obvious", False)),
         })
     required_fields = list(dict.fromkeys([f for f in required_fields if f]))
     missing_fields = []

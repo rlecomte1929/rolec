@@ -1,0 +1,1066 @@
+name: CI
+
+on:
+  # PRs only. The post-merge push:[main] re-run was ~164 runs/week of pure
+  # duplication — the PR already validated the same commit, and CI does not gate
+  # the Render deploy (it builds on push regardless). Direct pushes to main are
+  # still covered by the local pre-push hook (.githooks/pre-push runs the build).
+  # Re-add `push: { branches: [main] }` here if you want a post-merge safety net.
+  pull_request:
+
+# Cancel in-flight runs when new commits land on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Detect which areas changed so we run only the jobs that matter for this diff.
+  # Most PRs touch a single layer; skipping the others is the bulk of the
+  # Actions-minute savings. No required status checks are configured on this repo,
+  # so a skipped job is safe — it simply does not run (and does not block merge).
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    # dorny/paths-filter lists changed files via the PR Files API on
+    # pull_request events; the repo's default token is contents-read only, which
+    # gave "Resource not accessible by integration". Grant pull-requests: read.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+      hr_dashboard: ${{ steps.filter.outputs.hr_dashboard }}
+      migrations: ${{ steps.filter.outputs.migrations }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+      edge_functions: ${{ steps.filter.outputs.edge_functions }}
+      case_id_writers: ${{ steps.filter.outputs.case_id_writers }}
+      corridor_facts: ${{ steps.filter.outputs.corridor_facts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            # `.nvmrc` is listed under BOTH Node-built apps on purpose. It sets the Node
+            # version for every one of them and for the production Render build, yet it
+            # was in no filter — so a Node bump triggered NOTHING. Changing it to 22.23.2
+            # ran the frontend jobs only by accident, because that commit also touched
+            # frontend/package.json; the HR Dashboard build was skipped, and a Node
+            # upgrade could have shipped without ever building it. Same silent-drift
+            # shape as the four duplicated Node pins this change collapses into one.
+            # Not added to `backend` — that suite is Python and `.nvmrc` cannot affect it.
+            frontend:
+              - 'frontend/**'
+              - '.nvmrc'
+            backend:
+              - 'backend/**'
+              - 'scripts/**'
+            # Corridor fact packs. `corridors/**` was in NO filter, so a change to a
+            # corridor binding triggered nothing at all — the same shape as `.nvmrc` above.
+            # The guard script, its allowlist and parsers.py are listed alongside the data
+            # for the reason the `migrations` filter spells out: a gate whose own config can
+            # change while the gate is skipped reports green on an unchecked tree.
+            # parsers.py is here because check (a) reads its host tables — they ARE this
+            # guard's configuration, even though they live in the importer.
+            corridor_facts:
+              - 'backend/seeds/facts/**'
+              - 'corridors/**'
+              - 'scripts/check_corridor_facts.py'
+              - 'scripts/corridor_facts_allowlist.txt'
+              - 'backend/imports/otto/parsers.py'
+            hr_dashboard:
+              - 'apps/hr-dashboard/**'
+              - '.nvmrc'
+            # This filter gates FIVE jobs: RLS coverage, Storage bucket, Migration ledger
+            # drift, Migration column-read, Migration duplicate-version. It was
+            # `supabase/migrations/**` alone, so **editing a guard or its allowlist did not
+            # re-run that guard** — the config a gate reads could change with the gate
+            # skipped, reporting green.
+            #
+            # Not hypothetical: the 2026-08-11 guard sweep (#1813) rewrote
+            # check_rls_coverage.py AND added two entries to rls_allowlist.txt, and those
+            # jobs ran only because the same PR happened to add two files under
+            # supabase/migrations/. A sweep touching just the scripts would have had all
+            # five SKIPPED. Same shape as `.nvmrc` above, which was in no filter at all.
+            #
+            # `case_id_writers` below already got this right — it lists its own guard script
+            # and baseline next to the migrations glob. This copies that.
+            migrations:
+              - 'supabase/migrations/**'
+              - 'supabase/rls_allowlist.txt'
+              - 'scripts/check_rls_coverage.py'
+              - 'scripts/check_migration_drift.py'
+              - 'scripts/check_column_read_before_apply.py'
+            # AIQ-1731: everything that can WRITE (or orphan) a
+            # case_assignments.canonical_case_id, plus the drift gate's own files.
+            case_id_writers:
+              - 'supabase/migrations/**'
+              - 'supabase/canonical_case_id_baseline.txt'
+              - 'scripts/check_canonical_case_id_drift.py'
+              - 'scripts/seed_demo.sql'
+              - 'scripts/reset_demo.sh'
+              - 'scripts/e2e_purge.py'
+              - 'scripts/fresh_onboarding_teardown.sql'
+              - 'backend/db/cases.py'
+              - 'backend/app/services/unified_assignment_creation.py'
+            workflows:
+              - '.github/workflows/**'
+            edge_functions:
+              - 'supabase/functions/**'
+
+  actionlint:
+    # Catches workflow YAML errors (bad `uses:` refs, secrets.* in job-level
+    # `if:`, broken matrix syntax, etc.) on PRs — before they reach main and
+    # cause the 0-second "workflow file issue" parse failure that blocks every
+    # subsequent push. Background: PR #134.
+    name: Actionlint (workflow YAML)
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run actionlint
+        uses: raven-actions/actionlint@v2
+        with:
+          files: ".github/workflows/*.yml"
+
+  # SEC-FE-7: scan every PR for secret-shaped strings and FAIL on a hit. Not
+  # gated on `changes` — a leaked credential can appear in any diff. Uses the
+  # root .gitleaks.toml allowlist (public Supabase anon key + known false-
+  # positive paths); a service_role key or any other real secret still fails.
+  secrets-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    # gitleaks-action lists the PR's commits via the PR API; the default token is
+    # contents-read only ("Resource not accessible by integration" 403), so grant
+    # pull-requests: read — same reason the `changes` job does.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks needs the PR commit range (base..head) to scan the diff.
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: ${{ github.workspace }}/.gitleaks.toml
+
+  # Frontend build + type-check + lint + unit tests, consolidated into ONE job
+  # (was three: frontend-build / frontend-checks / frontend-unit-tests).
+  # The three separate jobs each did their own checkout + setup-node + `npm ci`,
+  # so a single frontend PR paid for `npm ci` three times. Merging them runs one
+  # install and reuses it across all four checks. Trade-off: the checks now run
+  # sequentially instead of in parallel (slower wall-clock) — acceptable since
+  # the goal here is billed-minutes, not latency. `main` is not branch-protected,
+  # so the old job names were not required status checks.
+  frontend:
+    name: Frontend (build, types, lint, unit)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: License compliance check
+        # QG-12: fail on any production dependency carrying a non-permissive /
+        # unknown license. Allow-list + documented pinned exceptions live in
+        # frontend/scripts/check-licenses.mjs.
+        run: npm run licenses
+
+      - name: Dependency vulnerability audit (production deps)
+        # QG-3: gate on HIGH/CRITICAL vulnerabilities in the *shipped* bundle only
+        # (--omit=dev). Dev-only tooling vulns (vitest/vite majors) are tracked
+        # separately (DEP-5/6) and must not block PRs. Currently 0 prod vulns.
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        # LINT-3 (AIQ-1195) close: lint is now BLOCKING on errors. The large structural
+        # rule-families (no-unsafe-*, no-clickable-div, jsx-a11y, promise-handling) are
+        # demoted to 'warn' in eslint.config.js and tracked as epics (TS type-safety,
+        # accessibility, async-safety), so the warn-backlog doesn't fail the build —
+        # but any ERROR-level violation (Rules of Hooks, no-console, no-unused-vars,
+        # unresolved imports, unused eslint-disable directives) now blocks the PR.
+        # `--max-warnings 0` is intentionally dropped so the tracked warn-backlog passes.
+        run: npx eslint src --ext .ts,.tsx
+        continue-on-error: false
+
+      - name: Build
+        run: npm run build
+
+      - name: Confirm dist/ was produced
+        run: |
+          if [ ! -d dist ] || [ -z "$(ls -A dist)" ]; then
+            echo "::error::frontend/dist was not produced by the build"
+            exit 1
+          fi
+
+      - name: Bundle-size budget
+        # QG-10: fail if a built chunk exceeds its budget (.size-limit.json — set
+        # near the current gzipped sizes + small headroom; ratchet down later).
+        run: npm run size
+
+      - name: Run Vitest unit tests + coverage gate
+        # QG-6: run with coverage so the ratchet thresholds in vite.config.ts
+        # (statements/lines 15%, branches 60%, functions 28%) gate the PR.
+        run: npm run test:coverage
+        env:
+          CI: true
+
+  hr-dashboard-build:
+    # C1-11a: separate Vite app at apps/hr-dashboard/. Mirrors the
+    # frontend-build job's shape (npm ci → build → typecheck → lint) so a
+    # regression in either app surfaces in the same CI lane.
+    name: HR Dashboard build
+    needs: changes
+    if: needs.changes.outputs.hr_dashboard == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/hr-dashboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/hr-dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Confirm dist/ was produced
+        run: |
+          if [ ! -d dist ] || [ -z "$(ls -A dist)" ]; then
+            echo "::error::apps/hr-dashboard/dist was not produced by the build"
+            exit 1
+          fi
+
+  e2e:
+    # QG-5a (AIQ-1178): Playwright E2E smoke against the BUILT app served by
+    # `vite preview` (:4173) — no live backend. The specs are deterministic and
+    # backend-free (route guards are client-side; page data is mocked via
+    # page.route), so this gates PRs. playwright.config.ts builds+serves and
+    # injects throwaway VITE_ vars. This preview+Playwright harness is what QG-9
+    # (axe) and QG-13 (Lighthouse) reuse.
+    name: E2E (Playwright smoke)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: playwright-
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright smoke (builds + previews internally)
+        run: npx playwright test --project=chromium
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+  lighthouse:
+    # QG-13 (AIQ-1186): Lighthouse Core-Web-Vitals budget against the BUILT app
+    # served by `vite preview` (:4173) — the same QG-5 preview the e2e job uses, but
+    # in its OWN job so Lighthouse gets a clean server (Playwright's webServer is
+    # torn down with it, and sharing would pollute perf timings). Fails on CWV/perf
+    # regression per frontend/lighthouserc.json and uploads the Lighthouse JSON for
+    # AP-12's performance-audit (--with-lighthouse-results). Public, backend-free
+    # pages only (/ and /auth — Lighthouse can't mock /api).
+    name: Lighthouse (CWV budget)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (throwaway VITE_ vars — no backend; mirrors playwright.config webServer.env)
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://e2e.placeholder.supabase.co
+          # Spaces are intentional: never a real key, and they keep the value below
+          # gitleaks' generic-api-key heuristic (matches contiguous tokens only).
+          VITE_SUPABASE_ANON_KEY: not a secret e2e placeholder
+          VITE_API_URL: ""
+
+      - name: Run Lighthouse CI (previews the built app + asserts the CWV budget)
+        run: npx lhci autorun
+
+      - name: Upload Lighthouse reports (for AP-12 performance-audit)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lighthouse-reports
+          path: frontend/.lighthouseci/
+          retention-days: 7
+
+  backend-tests:
+    name: Backend tests (deterministic P1 suite)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:///./ci_test.db
+      RELOPASS_DISABLE_RATE_LIMITS: "1"
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      # Catches the dual-layer 405 trap at PR time (audit/dual-layer-audit-followup.md).
+      # Pure stdlib (ast + Path), no extra deps. Reads scripts/router_registration_allowlist.txt
+      # for grandfathered modular-only routers; drains as the modular cutover progresses.
+      # Runs before pytest so a registration miss fails fast.
+      - name: Dual-layer router registration guard
+        run: python scripts/check_router_registrations.py
+
+      # Catches the AUDIT-C1 mixin-extraction NameError class: methods moved into
+      # backend/db/*.py that reference names (Database, helpers, exceptions) never
+      # imported into the extracted module -> NameError 500 at runtime. F821 =
+      # undefined name. This class has shipped to prod twice (_is_sqlite; and
+      # _db_healthcheck's `Database.get_db_info()` -> 500 on GET /api/hr/assignments).
+      - name: Backend db undefined-name guard (ruff F821)
+        run: |
+          pip install ruff
+          ruff check --select F821 backend/db/
+
+      - name: Pytest (full-suite discovery)
+        # QG-2 (AIQ-1176): run the WHOLE backend suite via discovery instead of a
+        # hardcoded ~77-file allowlist, so a new/unlisted test gates automatically
+        # (previously 361 of 438 tests never ran in CI). The `integration` marker
+        # (backend/pytest.ini) tags live-DB/Supabase tests needing real services —
+        # excluded with `-m "not integration"`. Any other env-dependent/flaky test
+        # is opted OUT with its own skip/skipif marker (allowlist SKIPS, never
+        # inclusions). pytest-asyncio (requirements.txt + asyncio_mode=auto in
+        # pytest.ini) lets async tests collect.
+        run: |
+          # Call 1 — full-suite discovery. Env-dependent / import-broken files are in
+          # collect_ignore (backend/tests/conftest.py). The 4 --ignore'd files below
+          # PASS in isolation but leak/collide when run with the whole suite (shared
+          # sqlite state); they keep gating via Call 2 (isolation fix is a follow-up).
+          #
+          # [AIQ-1780] test_case_documents_rce_bridge joined this list rather than
+          # being made suite-safe. It needs the real Database (the root conftest
+          # installs a MagicMock), which means reaching for the same
+          # sys.modules.pop + engine-swap dance test_case_documents_flow uses. Two
+          # rounds of narrowing — deferring the harness import to setUp, restoring
+          # dbmod._engine/_is_sqlite in tearDown — each fixed the module it was
+          # breaking and shifted the collision to another (catalog_promotion →
+          # providers_company_resolution), which is the signature of the shared
+          # `db` singleton rather than of anything this file does wrong. Root-causing
+          # that is the same deferred isolation fix the other three are waiting on.
+          # [AIQ-1852] `not postgres` — that lane needs a real uuid type and a
+          # migration-built schema; sqlite can provide neither. It runs in
+          # backend-tests-postgres below, not here.
+          python -m pytest -q -c backend/pytest.ini --rootdir . \
+            backend/tests scripts/tests \
+            -m "not integration and not policy_assistant_audit and not postgres" \
+            --ignore=backend/tests/test_llm_client_text.py \
+            --ignore=backend/tests/test_policy_propagation.py \
+            --ignore=backend/tests/test_supabase_password_sync.py \
+            --ignore=backend/tests/test_case_documents_rce_bridge.py
+          # Call 2 — the isolation-sensitive previously-gated files, on their own.
+          python -m pytest -q -c backend/pytest.ini --rootdir . \
+            backend/tests/test_llm_client_text.py \
+            backend/tests/test_policy_propagation.py \
+            backend/tests/test_supabase_password_sync.py \
+            backend/tests/test_case_documents_rce_bridge.py
+
+  # [AIQ-1852] The sqlite lane above is evidence about sqlite, not about production.
+  # sqlite has no uuid type, so a model/migration type divergence is invisible to it:
+  # PR #1864 shipped a 500 on every multi-item corridor with 37 green tests, caught only
+  # by a live call and fixed in #1865.
+  #
+  # A `postgres:16` service alone would NOT have caught it. Measured against the pre-fix
+  # commit c35f696b on real Postgres: with the schema built by `Base.metadata.create_all`,
+  # 22/22 passed — `create_all` renders the model, so the table always agrees with the
+  # model that drew it, and a model-vs-migration disagreement cannot exist. Rebuilding the
+  # tables from the migration file made the same commit fail 16. That rebuild is what
+  # backend/tests/postgres/conftest.py does, and it is the load-bearing part of this job.
+  #
+  # Scope is the `postgres` marker, not the whole suite: most of the suite mocks the DB or
+  # assumes sqlite, so running all of it here would be noise. Add to the lane by marking a
+  # test `@pytest.mark.postgres` and, if it needs production DDL, listing its migration in
+  # that conftest's _AUTHORITATIVE_DDL.
+  backend-tests-postgres:
+    name: Backend tests (Postgres 16 parity)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: relopass_test
+        ports:
+          - 5432:5432
+        # Without a healthcheck the steps can start before the server accepts
+        # connections, which reads as a flaky suite rather than a slow container.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/relopass_test
+      RELOPASS_DISABLE_RATE_LIMITS: "1"
+      RELOPASS_QUERY_COUNTER_OFF: "1"
+      # Deliberately NOT setting RELOPASS_ALLOW_REMOTE_DB_IN_TESTS: backend/conftest.py's
+      # AIQ-1777 guard already treats `localhost` as local, so the service container is
+      # allowed on its own merits. Setting the opt-out would switch that guard off for the
+      # whole job and let a future misconfiguration point this suite at a real database.
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Pytest (postgres parity lane)
+        run: |
+          python -m pytest -q -c backend/pytest.ini --rootdir . \
+            backend/tests/postgres -m postgres
+
+  # Supabase Edge Functions are Deno, so neither the Python nor the Node job
+  # covers them: before AIQ-1702 a PR touching ONLY supabase/functions/** ran no
+  # test of its own change (PR #1662 merged exactly that way, with backend-tests
+  # and frontend both "skipping"). That matters most for case-summary, which
+  # builds an LLM prompt from an explicit non-PII whitelist — its
+  # `no PII reaches the prompt` test is the automated half of the GDPR rule in
+  # CLAUDE.md, and until now nothing ran it on a PR.
+  #
+  # `deno test <dir>` discovers every *.test.ts underneath, so a new function's
+  # suite is picked up with no change here. The tests are pure logic (no network,
+  # no DB, no Claude) — remote std imports are fetched by the module loader, so
+  # no --allow-* flags are needed.
+  edge-function-tests:
+    name: Edge Function tests (Deno)
+    needs: changes
+    if: needs.changes.outputs.edge_functions == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          # Pinned, not `latest` — a silent runtime bump must not be able to
+          # change whether the compliance test passes.
+          deno-version: v2.1.4
+
+      - name: Run Edge Function tests
+        run: deno test --no-check=remote supabase/functions/
+
+  route-auth-check:
+    # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
+    # in the FastAPI apps (via AST, no DB required) and assert each one uses an
+    # auth Depends() or is explicitly allowlisted in
+    # scripts/route_auth_allowlist.txt (with a comment). Exit 1 if any unguarded
+    # route is found outside the allowlist. Extended from GET-only to mutations
+    # after a sweep found unauthenticated POST/PATCH handlers (cases_write).
+    name: Route-auth audit
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Run route-auth check
+        run: python scripts/check_route_auth.py --root .
+
+  compliance-claims:
+    # [AIQ-1513] Fail the PR if shipped customer-facing copy makes an EU AI Act status
+    # claim ("EU AI Act Ready", "compliant", "certified") or classifies ReloPass as a
+    # high-risk AI system. docs/compliance/AIQ-1487_eu_ai_act_assessment.md found the
+    # opposite (limited-risk) and warns: "A false or premature compliance claim is
+    # itself a legal liability." relopass.com shipped exactly that badge — plus a
+    # downloadable PDF aimed at procurement — until this guard was added.
+    # Always runs: a claim can reach a user through the SPA, a static asset, marketing,
+    # or published content, so it is not gated on the frontend/backend path filters.
+    name: Compliance claim guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Check for prohibited compliance claims
+        run: python scripts/check_compliance_claims.py
+
+      # The ADS geography rule permits EU ad targeting only while no third-party ad
+      # pixel is installed — a pixel is the one thing that makes EU traffic legally
+      # different (ePrivacy Art. 5(3): storing/accessing information on a device).
+      # Runs in this job because it is the same kind of promise: a sentence in a doc
+      # that is worthless unless something measures it. ADS-4's gate G1 sat ticked
+      # while both landing pages served an empty shell to every crawler, precisely
+      # because nobody ran the check.
+      - name: Check no ungated ad pixel on the public surface
+        run: python scripts/check_ad_pixel_consent.py
+
+      # [AIQ-1795b] A permit/visa template must not be attachable by someone who needs
+      # no permit. RESID-PERMIT-DE sent EU citizens to an Auslaenderbehoerde for a
+      # residence title FreizuegG/EU s 2(4) says they cannot be issued; fixing it by hand
+      # revealed FAM-SPOUSE and FAM-CHILD doing the same with Familiennachzug. Three
+      # instances of one class, all found by eye.
+      #
+      # In THIS job, not behind the supabase/migrations path filter, for the same reason
+      # the compliance guard is unfiltered: the invariant keys off a template's NAME as
+      # well as its rules, so renaming one in any file can create a violation. It needs
+      # no DB and no secret, so it costs nothing to always run.
+      #
+      # Cannot be replaced by test_trigger_condition_vocabulary.py, which scans the same
+      # corpus and passed on all three: that guard validates the condition keys that are
+      # PRESENT, and an OMITTED visa_type is the entire defect.
+      - name: Check form-template honesty (no permit for free-movers)
+        run: python scripts/check_form_template_honesty.py
+
+  corridor-facts:
+    # Provenance guard for customer-visible relocation facts. Every promoted fact in
+    # backend/seeds/facts/ must carry an OFFICIAL source, the publication date that page
+    # states about itself, and a verbatim evidence quote — and its dependencies must resolve
+    # without pointing at anything staged. Twice the evidence was gathered by hand and lost
+    # at the loading boundary (90 items with citations, 27 resolving, per
+    # 20261031000000_frno_source_records.sql; 27 rows reading "Stub content for <url>" per
+    # 20261032000000_remove_fake_evidence.sql). This makes those four checks a build failure.
+    #
+    # Exit 2 (also a failure) means the run itself was invalid — an unparseable pack, or
+    # ZERO facts examined, which must never read as a pass. The same checks are asserted
+    # from pytest by scripts/tests/test_check_corridor_facts.py in the backend-tests job,
+    # where every check is proven to go red against a planted violation.
+    # See backend/seeds/facts/README.md.
+    name: Corridor fact-pack gate
+    needs: changes
+    if: needs.changes.outputs.corridor_facts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      # PyYAML only. The guard is otherwise stdlib; it needs a real YAML parser because the
+      # evidence it protects is multi-line prose with significant punctuation.
+      - name: Install PyYAML
+        run: python -m pip install --quiet "PyYAML>=6.0"
+      # --run-date is passed explicitly so the freshness verdict is reproducible: a rerun of
+      # this commit next month must give the same answer as it does today.
+      - name: Check corridor fact provenance
+        run: |
+          python scripts/check_corridor_facts.py \
+            --root . \
+            --run-date "$(date -u +%F)" \
+            --json corridor-facts-gate.json
+      - name: Upload gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corridor-facts-gate
+          path: corridor-facts-gate.json
+          if-no-files-found: ignore
+
+  serving-llm-isolation:
+    # Trust-architecture guard: the generation/serving split as an ENFORCED invariant.
+    # The deterministic requirement-serving path (requirements_builder, rules_engine,
+    # requirement_evaluation_service, immigration_requirement_service,
+    # hr_policy_resolver) must NEVER be able to reach an LLM call at request time —
+    # transformers belong in the authoring/drafting layer only. The script builds the
+    # full backend import graph via AST (pure stdlib, no deps, catches lazy function-
+    # local imports too) and FAILS with the exact import chain if any serving path can
+    # reach an LLM gateway module or an LLM SDK import. Exit 2 (also a failure) means
+    # the guard itself is misconfigured — a serving root was renamed/deleted without
+    # re-registering it. The same invariant is asserted from pytest by
+    # scripts/tests/test_check_serving_llm_isolation.py in the backend-tests job.
+    # See docs/specs/serving-llm-isolation.md.
+    name: Serving/LLM isolation guard
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Run serving/LLM isolation check
+        run: python scripts/check_serving_llm_isolation.py --root .
+
+  rls-coverage:
+    # AUDIT-A3: lists `public.*` + `rce.*` tables with zero RLS policies and asserts
+    # each one is on the supabase/rls_allowlist.txt allowlist. Drains over time.
+    # Requires DATABASE_URL secret pointing at the live/staging Supabase (read-only).
+    #
+    # SEC-01 (AIQ-1164) — ACTIVATION (founder, one-time). Until both are set this
+    # live-DB audit is SKIPPED, and since the repo has no required status checks a
+    # skipped job does NOT block merge. The diff logic itself is still unit-tested
+    # on every PR via scripts/tests/test_check_rls_coverage.py (proves an RLS-less
+    # table fails), but to make the live gate genuinely block, do:
+    #   1. Create a READ-ONLY Postgres role on the Supabase project (SELECT on
+    #      pg_tables/pg_policies is enough; no app-data access needed).
+    #   2. Repo → Settings → Secrets and variables → Actions:
+    #        - New repository SECRET  RLS_COVERAGE_DATABASE_URL = postgresql://<readonly-role>...
+    #        - New repository VARIABLE RLS_COVERAGE_DATABASE_URL_SET = true
+    #   3. Open a PR touching supabase/migrations/ — this job now runs and fails on
+    #      any policy-less public/rce table not on the allowlist.
+    name: RLS coverage check
+    needs: changes
+    runs-on: ubuntu-latest
+    # GitHub Actions does not allow `secrets.*` in a job-level `if:` — referencing
+    # one here makes the whole workflow fail at parse time with the unhelpful
+    # "workflow file issue" error (0s run, no log). Gate on a repo variable instead:
+    # set `vars.RLS_COVERAGE_DATABASE_URL_SET=true` when the secret is configured.
+    # Only relevant when migrations change.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Run RLS coverage audit
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/check_rls_coverage.py
+
+  storage-bucket-check:
+    # SEC-006: assert no storage bucket holding case/HR/employee documents is
+    # public. A public bucket exposes every object by URL (the anon key ships in
+    # the frontend bundle). Mirrors rls-coverage: needs a read-only DATABASE_URL
+    # secret; gate on a repo variable because secrets.* is not allowed in a
+    # job-level if:.
+    name: Storage bucket visibility check
+    needs: changes
+    runs-on: ubuntu-latest
+    # Only relevant when migrations change.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Run storage bucket visibility check
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/storage_bucket_check.py
+
+  migration-drift:
+    # AIQ-756-PREVENT: fail when prod has an applied migration version with no
+    # matching repo file (`schema_migrations.version` vs supabase/migrations/*.sql).
+    # That mismatch is what makes `db push` / Supabase Preview abort with
+    # "Remote migration versions not found" and red every PR until reconciled —
+    # caused by MCP apply_migration stamping an apply-time version while the file
+    # is committed at a forward timestamp. Catches it at PR time. Mirrors
+    # rls-coverage: read-only DATABASE_URL secret, gated on a repo variable
+    # because secrets.* is not allowed in a job-level if:.
+    name: Migration ledger drift check
+    needs: changes
+    runs-on: ubuntu-latest
+    # Only relevant when migrations change.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need the PR base to work out which migrations this PR ADDS.
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Collect migrations added by this PR
+        id: added
+        run: |
+          # Derive the base from LIVE origin/main, not github.event.pull_request.base.sha.
+          # That field records the base tip when the PR was opened and GitHub never
+          # refreshes it as the base branch moves. HEAD here is the PR *merge ref*
+          # (base + PR), so a three-dot diff from the stale SHA spans every commit merged
+          # to main since — and attributes THEIR migrations to this PR. On 2026-08-19
+          # that failed #1894 with "adds a migration at a version already used on
+          # origin/main: 20261108000000" — a file #1901 had merged minutes earlier and
+          # that #1894 does not contain. The guard written to survive a moving base was
+          # itself reading a stale one.
+          #
+          # No fallback to an empty list. An undeterminable scope means the step cannot
+          # do its job — and an empty --added puts check_migration_drift.py into audit
+          # mode, where the dead and duplicate checks degrade to warnings and it exits 0.
+          # A guard that silently stops checking must go red, not green. Same for a
+          # failing git diff: `|| true` here used to convert it into "this PR added no
+          # migrations".
+          git fetch --quiet origin main
+          BASE_SHA=$(git merge-base origin/main HEAD || true)
+          if [ -z "$BASE_SHA" ]; then
+            echo "::error::No merge base with origin/main — cannot determine which"
+            echo "migrations this PR adds. The dead-version and duplicate-version checks"
+            echo "would silently degrade to warnings. Failing instead. (Needs the full"
+            echo "history: this job must keep actions/checkout fetch-depth: 0.)"
+            exit 1
+          fi
+          # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
+          # version is exactly the mistake this guard exists to catch. For a rename
+          # --name-only prints the destination path, which is the version we check.
+          files=$(git diff --diff-filter=AR --name-only "$BASE_SHA...HEAD" -- supabase/migrations)
+          {
+            echo "files<<__EOF__"
+            echo "$files"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+          echo "Added migrations:"; echo "${files:-(none)}"
+      - name: Run migration-drift check
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+          ADDED: ${{ steps.added.outputs.files }}
+        run: python scripts/check_migration_drift.py --added "$ADDED"
+
+  migration-column-read:
+    # A PR that adds a column AND ships code reading it. Migrations here are applied
+    # OUT OF BAND, so merging the migration does not create the column — Render deploys
+    # the code first and the endpoint 500s. This is not hypothetical: PR #1781 did
+    # exactly that on 2026-08-11 and GET /api/cases/{id}/forms was down for 2h33m
+    # (`column ft.sections does not exist`). CI was green because the backend suite runs
+    # on a SQLite fixture that the same PR edited to add the column.
+    #
+    # Needs no database, so like the duplicate-version check it runs EVERYWHERE and is
+    # deliberately not gated on vars.RLS_COVERAGE_DATABASE_URL_SET. A guard that no-ops
+    # where the secret is missing would have been absent on the PR that caused this.
+    name: Migration column-read check
+    needs: changes
+    runs-on: ubuntu-latest
+    if: ${{ needs.changes.outputs.migrations == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need the PR base to diff against.
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Check for a column read shipped with its own migration
+        run: |
+          # Live origin/main, not pull_request.base.sha — see the duplicate-version job
+          # for why that field goes stale and mis-attributes another PR's migrations.
+          git fetch --quiet origin main
+          BASE_SHA=$(git merge-base origin/main HEAD || true)
+          if [ -z "$BASE_SHA" ]; then
+            echo "::error::No merge base with origin/main — cannot scope this check."
+            exit 1
+          fi
+          python scripts/check_column_read_before_apply.py --base "$BASE_SHA"
+
+  migration-duplicate-versions:
+    # Two migration files sharing a 14-digit version: schema_migrations is keyed on
+    # version, so only one can ever be recorded and the other silently never applies
+    # (this is how source_change_reviews lost its slot and left tables missing in
+    # prod). Needs NO database, so unlike the ledger check above it is deliberately
+    # NOT gated on vars.RLS_COVERAGE_DATABASE_URL_SET — it must run everywhere.
+    name: Migration duplicate-version check
+    needs: changes
+    runs-on: ubuntu-latest
+    if: ${{ needs.changes.outputs.migrations == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Collect migrations added by this PR
+        id: added
+        run: |
+          # Derive the base from LIVE origin/main, not github.event.pull_request.base.sha.
+          # That field records the base tip when the PR was opened and GitHub never
+          # refreshes it as the base branch moves. HEAD here is the PR *merge ref*
+          # (base + PR), so a three-dot diff from the stale SHA spans every commit merged
+          # to main since — and attributes THEIR migrations to this PR. On 2026-08-19
+          # that failed #1894 with "adds a migration at a version already used on
+          # origin/main: 20261108000000" — a file #1901 had merged minutes earlier and
+          # that #1894 does not contain. The guard written to survive a moving base was
+          # itself reading a stale one.
+          #
+          # No fallback to an empty list. An undeterminable scope means the step cannot
+          # do its job — and an empty --added puts check_migration_drift.py into audit
+          # mode, where the dead and duplicate checks degrade to warnings and it exits 0.
+          # A guard that silently stops checking must go red, not green. Same for a
+          # failing git diff: `|| true` here used to convert it into "this PR added no
+          # migrations".
+          git fetch --quiet origin main
+          BASE_SHA=$(git merge-base origin/main HEAD || true)
+          if [ -z "$BASE_SHA" ]; then
+            echo "::error::No merge base with origin/main — cannot determine which"
+            echo "migrations this PR adds. The dead-version and duplicate-version checks"
+            echo "would silently degrade to warnings. Failing instead. (Needs the full"
+            echo "history: this job must keep actions/checkout fetch-depth: 0.)"
+            exit 1
+          fi
+          # AR, not A: git reports a restamp as a RENAME, and restamping to a bad
+          # version is exactly the mistake this guard exists to catch. For a rename
+          # --name-only prints the destination path, which is the version we check.
+          files=$(git diff --diff-filter=AR --name-only "$BASE_SHA...HEAD" -- supabase/migrations)
+          {
+            echo "files<<__EOF__"
+            echo "$files"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+          echo "Added migrations:"; echo "${files:-(none)}"
+      - name: Check for duplicate migration versions
+        env:
+          ADDED: ${{ steps.added.outputs.files }}
+        run: python scripts/check_migration_drift.py --no-db --added "$ADDED"
+      # The check above sees this PR's merge ref, which is only as fresh as the last
+      # CI run. GitHub does NOT re-run a PR when its base moves, so two PRs opened in
+      # parallel can each pick the same "next free" version, both stay green, and the
+      # collision only exists after both merge. That happened on 2026-08-04: #1716,
+      # #1717 and #1718 all landed a migration at 20261011000000. Comparing against
+      # LIVE origin/main catches it while the second PR is still open.
+      - name: Check added versions against live main
+        env:
+          ADDED: ${{ steps.added.outputs.files }}
+        run: |
+          [ -n "$ADDED" ] || { echo "No migrations added — nothing to compare."; exit 0; }
+          git fetch --quiet origin main
+          git ls-tree -r origin/main --name-only supabase/migrations \
+            | xargs -n1 basename | sed 's/_.*//' | sort -u > /tmp/main_versions
+          printf '%s\n' "$ADDED" | sed '/^$/d' \
+            | xargs -n1 basename | sed 's/_.*//' | sort -u > /tmp/added_versions
+          clash=$(comm -12 /tmp/main_versions /tmp/added_versions)
+          if [ -n "$clash" ]; then
+            echo "::error::This PR adds a migration at a version already used on origin/main:"
+            echo "$clash" | awk '{print "  " $0}'
+            echo "schema_migrations is keyed on version — only one file per version can ever"
+            echo "be recorded, so the others silently never apply. Restamp above the current"
+            echo "max on main and re-push."
+            exit 1
+          fi
+          echo "OK — no added version collides with origin/main."
+
+  requirement-provenance:
+    # Trust-architecture guard, data side. requirements_builder serves rows with
+    # review_status='approved'; on 2026-08-20 that was 89 rows, 29 of them with NO
+    # citation, every one marked verification_status='representative' — a status
+    # backend/app/services/disclaimers.py defines as "curated + CITED". They advertised
+    # a provenance they did not have, and a German employee saw 8 requirements of which
+    # 7 cited nothing.
+    #
+    # Unlike the form-template honesty guard, this one queries the DATABASE rather than
+    # parsing migrations, and for the reason that guard gives for doing the opposite:
+    # the authoring surface decides. Exactly ONE migration in the tree inserts into
+    # requirement_items — the rows arrive via scripts/import_otto_facts.py,
+    # ingest_immigration_seed.py, seed_additional_countries.py and operator-run loads.
+    # So a static check would cover almost nothing.
+    #
+    # Gated on the same read-only secret as the RLS-coverage and migration-drift jobs;
+    # a no-op where that secret is not configured. The pure diff logic is unit-tested on
+    # every PR by backend/tests/test_requirement_provenance_guard.py, which proves a new
+    # uncited served row FAILS and a baseline row does not.
+    #
+    # KNOWN LIMIT: prod data also changes out-of-band, which no PR-triggered job sees.
+    # A scheduled run would close that gap and is the natural next step.
+    name: Requirement provenance guard
+    needs: changes
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install --quiet psycopg2-binary==2.9.9
+      - name: Check served requirements carry a citation
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/check_requirement_provenance.py
+
+  canonical-case-id-drift:
+    # AIQ-1731: fail when prod grows a NEW bad case_assignments.canonical_case_id
+    # (NULL/blank, dangling, or duplicate). The column is nullable with no FK and
+    # no UNIQUE, so all three shapes are permitted by the schema.
+    #
+    # AIQ-1730's audit found 51 such rows and returned the verdict "the model is
+    # 1:1, UNIQUE is correct". Cleaning them (AIQ-1731) and enforcing the
+    # constraint (AIQ-1732) are deliberately DEFERRED to the pre-launch data
+    # reset — the cleanup means ~38 cascading deletes of throwaway pre-launch data
+    # for a constraint the resolve_case_ids bridge already substitutes for.
+    #
+    # That deferral is only safe while the stock stays frozen, and nothing was
+    # watching. This is that tripwire: known-bad ids are baselined in
+    # supabase/canonical_case_id_baseline.txt and only NEW offenders fail.
+    #
+    # As of 2026-08-11 that baseline is EMPTY and prod is clean — 818 case_assignments,
+    # all with a non-null canonical, zero null/dangling/duplicate. The 51 rows are gone,
+    # so every violation this job sees is now a new one. It also means an emptied
+    # case_assignments would have read as a clean pass, which e2e_purge.py makes a live
+    # possibility; the script fails on a zero row count for that reason.
+    # The diff logic is unit-tested on every PR via
+    # scripts/tests/test_check_canonical_case_id_drift.py, so the fail path is
+    # covered even where the DB secret is unset.
+    #
+    # Mirrors rls-coverage / migration-drift: read-only DATABASE_URL secret, gated
+    # on a repo variable because secrets.* is not allowed in a job-level if:.
+    name: canonical_case_id drift check
+    needs: changes
+    runs-on: ubuntu-latest
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.case_id_writers == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Run canonical_case_id drift check
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/check_canonical_case_id_drift.py
+
+  deliverable-integrity:
+    # HYGIENE-1: assert that "Done" AI Work Queue tasks' claimed deliverable
+    # files actually exist in the repo. Catches the class where a Cowork task is
+    # closed Done but its file was never merged (C1-04a #290, P3-01c #289).
+    # Needs a Notion read token. secrets.* is not allowed in a job-level if:
+    # (parse-time failure), so gate on a repo variable instead — set
+    # `vars.NOTION_QUEUE_TOKEN_SET=true` once the secret is configured.
+    # Runs report-only (no --strict) until the live backlog is triaged into
+    # scripts/deliverable_integrity_allowlist.txt; then add --strict to gate.
+    name: Deliverable integrity check
+    runs-on: ubuntu-latest
+    if: ${{ vars.NOTION_QUEUE_TOKEN_SET == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Run deliverable-integrity check
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_QUEUE_TOKEN }}
+        # --strict: 121 historical findings baselined into the allowlist on
+        # 2026-06-04 (refactor-stale paths, scoped per AIQ id). The guard now
+        # fails only on NEW Done-tasks-with-missing-deliverables.
+        run: python scripts/check_deliverable_integrity.py --root . --strict
+
+  queue-status-hygiene:
+    # HYGIENE-2: assert that no AI Work Queue task is left "Ready for AI" while a
+    # task it depends on is not yet "Done" (false-ready tasks get re-picked as
+    # "next up" every queue run). Sibling of deliverable-integrity. Same Notion
+    # read token + repo-variable gate. Runs report-only (no --strict) until the
+    # live backlog is triaged into scripts/queue_status_allowlist.txt; then add
+    # --strict to gate. (The parser unit tests run in the backend-tests job.)
+    name: Queue status hygiene
+    runs-on: ubuntu-latest
+    if: ${{ vars.NOTION_QUEUE_TOKEN_SET == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Run queue-status-hygiene check
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_QUEUE_TOKEN }}
+        # --strict: backlog triaged on 2026-06-04 (10 set to Blocked, 5 allowlisted),
+        # first live run is clean. Regressions now fail the build.
+        run: python scripts/check_queue_status_hygiene.py --root . --strict
+

@@ -92,11 +92,13 @@ def test_partner_and_children_derived_from_members():
     ]
     converted = intake_draft_to_case_draft(draft)
     assert converted["relocationBasics"]["hasDependents"] is True
+    assert converted["familyMembers"]["maritalStatus"] == "partner_kids"
     assert converted["familyMembers"]["spouse"]["fullName"] == "Sam Dupont"
     assert converted["familyMembers"]["spouse"]["wantsToWork"] is True
     assert converted["familyMembers"]["children"] == [
         {"dateOfBirth": "2018-05-01", "relationship": "child"}
     ]
+    assert converted["assignmentContext"]["commuteMins"] == 30
 
 
 def test_no_dependents_when_only_self():

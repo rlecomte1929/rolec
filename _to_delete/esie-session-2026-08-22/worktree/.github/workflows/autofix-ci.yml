@@ -1,0 +1,62 @@
+# autofix-ci.yml — DEV-LOOP-2C
+# ─────────────────────────────────────────────────────────────────────────────
+# Autofix-pipeline guardrail. Runs ONLY on autofix/* branches pushed by the
+# auto-fix pipeline, and validates that the changed files are not in a blocked
+# path (lib/autofix-blocklist.ts).
+#
+# Frontend type-check, lint and unit tests now live in ci.yml (which runs on the
+# autofix PR like any other PR), so this workflow no longer duplicates them on
+# every push/PR — that double-run was the main Actions-minute waste.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Autofix CI
+
+on:
+  push:
+    branches:
+      - 'autofix/**'
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: autofix-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+  # ── Autofix-specific validation ─────────────────────────────────────────────
+  validate-autofix:
+    name: Validate autofix change
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check changed files are not in blocked paths
+        run: |
+          # Get list of changed files in this branch vs main.
+          git fetch origin main --depth=1
+          CHANGED_FILES=$(git diff --name-only origin/main HEAD)
+          export CHANGED_FILES
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Run blocklist check via Node inline script
+          node --input-type=module << 'EOF'
+          import { isBlockedPath } from './lib/autofix-blocklist.ts';
+          const files = process.env.CHANGED_FILES?.split('\n').filter(Boolean) ?? [];
+          const blocked = files.filter(isBlockedPath);
+          if (blocked.length > 0) {
+            console.error('❌ BLOCKED FILES DETECTED:');
+            blocked.forEach(f => console.error(`  - ${f}`));
+            process.exit(1);
+          }
+          console.log('✅ All changed files passed blocklist check');
+          EOF

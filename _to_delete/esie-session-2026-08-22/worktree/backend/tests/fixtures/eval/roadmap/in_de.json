@@ -1,0 +1,14 @@
+{
+  "corridor": "IN_DE",
+  "pathway": "BLUECARD_2026",
+  "description": "Expected core steps + ordering for an IN→DE EU Blue Card relocation. Steps are matched against produced roadmap titles by the case-insensitive `match` substring.",
+  "expected_steps": [
+    {"key": "blue_card_visa", "match": "blue card"},
+    {"key": "anmeldung", "match": "register your address"},
+    {"key": "residence_permit", "match": "residence permit"}
+  ],
+  "order": [
+    ["blue_card_visa", "anmeldung"],
+    ["anmeldung", "residence_permit"]
+  ]
+}

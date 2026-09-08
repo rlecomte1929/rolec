@@ -1,0 +1,27 @@
+{
+  "bar_register": {"public_member_search": true, "stable_member_url": false,
+    "example_member_url": "", "membership_number_published": false,
+    "membership_number_name_no": "", "tilsynsradet_register": {"public": true,
+    "url": "https://tilsynsradet.no/advokatregister"}, "advokatguiden_is_official": false,
+    "preferred_anchor": "Tilsynsradet", "label": "VERIFIED"},
+  "rows": [
+    {"n":1,"supplier_name":"Advokatfirmaet Sulland AS","real_bar_membership_confirmed":"NO",
+     "real_entity_evidence_url":"","real_membership_number":"organisation number only",
+     "brreg_entity_confirmed":{"yes":true,"url":"https://virksomhet.brreg.no/nb/oppslag/enheter/914450133"},
+     "recommended_body":"Brønnøysund Enhetsregisteret","label":"VERIFIED"},
+    {"n":2,"supplier_name":"Advokatfirmaet Tveter og Kløvfjell AS","real_bar_membership_confirmed":"YES",
+     "real_entity_evidence_url":"https://www.advokatforeningen.no/en/about-advokatforeningen/search-for-members/",
+     "real_membership_number":"917 334 110","brreg_entity_confirmed":{"yes":true},
+     "recommended_body":"Den Norske Advokatforening","label":"CLAIM"},
+    {"n":3,"supplier_name":"Humlen Advokater AS","real_bar_membership_confirmed":"NO",
+     "real_entity_evidence_url":"","real_membership_number":"",
+     "brreg_entity_confirmed":{"yes":true},"recommended_body":"Brønnøysund Enhetsregisteret","label":"VERIFIED"},
+    {"n":4,"supplier_name":"Reinholdt Advokatfirma AS","real_bar_membership_confirmed":"CANNOT_DETERMINE",
+     "real_entity_evidence_url":"","real_membership_number":"",
+     "brreg_entity_confirmed":{"yes":true},"recommended_body":"Brønnøysund Enhetsregisteret","label":"VERIFIED"}
+  ],
+  "eura": {"exact_register_name":"Expat Relocation AS",
+    "member_url":"https://www.eura-relocation.com/members/expat-relocation-as",
+    "membership_number_published": false, "membership_number":"",
+    "quality_seal_held":"EuRA Quality Seal", "similar_named_entities":[], "label":"VERIFIED"}
+}

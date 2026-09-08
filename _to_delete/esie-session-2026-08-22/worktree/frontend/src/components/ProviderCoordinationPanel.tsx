@@ -1,0 +1,937 @@
+/// <reference types="vite/client" />
+import React, { useCallback, useEffect, useRef, useState } from "react"
+import { Link } from "react-router-dom"
+import { supabase } from "../api/supabase"
+import {
+  assignTask,
+  cancelTask,
+  dispatchCaseRfq,
+  getCaseProviders,
+  getCaseRfqs,
+  updateTask,
+  type CaseProvider,
+  type CaseRfq,
+  type DispatchRfqTargetResult,
+  type ProviderTask,
+} from "../api/hrCoordination"
+import { Input } from './antigravity/Input';
+import { Button } from './antigravity/Button';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function isOverdue(task: ProviderTask): boolean {
+  if (!task.due_date) return false
+  if (task.status === "completed" || task.status === "cancelled") return false
+  return new Date(task.due_date) < new Date(new Date().toDateString())
+}
+
+function typeIcon(type: CaseProvider["type"]): string {
+  switch (type) {
+    case "housing":
+      return "🏠"
+    case "immigration":
+      return "⚖️"
+    case "shipping":
+      return "📦"
+    default:
+      return "🔧"
+  }
+}
+
+function statusLabel(s: ProviderTask["status"]): string {
+  switch (s) {
+    case "pending":
+      return "Pending"
+    case "in_progress":
+      return "In Progress"
+    case "completed":
+      return "Completed"
+    case "cancelled":
+      return "Cancelled"
+    default:
+      return s
+  }
+}
+
+const TASK_STATUS_OPTIONS: ProviderTask["status"][] = [
+  "pending",
+  "in_progress",
+  "completed",
+  "cancelled",
+]
+
+// ---------------------------------------------------------------------------
+// TaskStatusChip — inline dropdown to change status
+// ---------------------------------------------------------------------------
+
+interface TaskStatusChipProps {
+  taskId: string
+  status: ProviderTask["status"]
+  onUpdated: () => void
+}
+
+function TaskStatusChip({ taskId, status, onUpdated }: TaskStatusChipProps) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const chipColor: Record<ProviderTask["status"], string> = {
+    pending: "bg-gray-100 text-gray-700 border-gray-300",
+    in_progress: "bg-blue-100 text-blue-700 border-blue-300",
+    completed: "bg-green-100 text-green-700 border-green-300",
+    cancelled: "bg-red-100 text-red-600 border-red-300",
+  }
+
+  async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const next = e.target.value as ProviderTask["status"]
+    if (next === status) return
+    setSaving(true)
+    setError(null)
+    try {
+      if (next === "cancelled") {
+        await cancelTask(taskId)
+      } else {
+        await updateTask(taskId, { status: next })
+      }
+      onUpdated()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update status")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div>
+      <select
+        value={status}
+        onChange={handleChange}
+        disabled={saving}
+        className={`text-xs font-medium border rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 disabled:opacity-60 ${chipColor[status]}`}
+        aria-label="Change task status"
+      >
+        {TASK_STATUS_OPTIONS.map((s) => (
+          <option key={s} value={s}>
+            {statusLabel(s)}
+          </option>
+        ))}
+      </select>
+      {error && <p className="text-red-500 text-xs mt-0.5">{error}</p>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// TaskCard
+// ---------------------------------------------------------------------------
+
+interface TaskCardProps {
+  task: ProviderTask
+  onUpdated: () => void
+}
+
+function TaskCard({ task, onUpdated }: TaskCardProps) {
+  const overdue = isOverdue(task)
+
+  return (
+    <div
+      className={`bg-white border rounded-lg p-3 flex flex-col gap-2 shadow-sm ${
+        overdue ? "border-l-4 border-l-amber-400" : "border-gray-200"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-medium text-gray-800 leading-snug">{task.title}</p>
+        <TaskStatusChip taskId={task.id} status={task.status} onUpdated={onUpdated} />
+      </div>
+      {task.description && (
+        <p className="text-xs text-gray-500 leading-relaxed">{task.description}</p>
+      )}
+      <div className="flex items-center gap-2 flex-wrap">
+        {task.due_date && (
+          <span
+            className={`text-xs ${
+              overdue ? "text-amber-600 font-semibold" : "text-gray-400"
+            }`}
+          >
+            Due {task.due_date}
+            {overdue && " — overdue"}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ProviderRow
+// ---------------------------------------------------------------------------
+
+interface ProviderRowProps {
+  provider: CaseProvider
+  onUpdated: () => void
+}
+
+function ProviderRow({ provider, onUpdated }: ProviderRowProps) {
+  const [expanded, setExpanded] = useState(true)
+
+  const providerStatusColor: Record<CaseProvider["status"], string> = {
+    active: "bg-green-100 text-green-700",
+    inactive: "bg-gray-100 text-gray-500",
+    suspended: "bg-red-100 text-red-600",
+  }
+
+  const { pending, in_progress, completed, cancelled } = provider.task_counts
+  const total = pending + in_progress + completed + cancelled
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 shadow-sm">
+      {/* Header */}
+      <Button unstyled
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-400"
+        aria-expanded={expanded}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-lg" aria-hidden>
+            {typeIcon(provider.type)}
+          </span>
+          <span className="font-semibold text-gray-800 truncate">{provider.name}</span>
+          <span
+            className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+              providerStatusColor[provider.status]
+            }`}
+          >
+            {provider.status}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 shrink-0 ml-2">
+          {/* Task count summary bar */}
+          {total > 0 && (
+            <div className="hidden sm:flex items-center gap-1 text-xs text-gray-500">
+              {pending > 0 && (
+                <span className="bg-gray-200 text-gray-600 rounded px-1.5 py-0.5">
+                  {pending} pending
+                </span>
+              )}
+              {in_progress > 0 && (
+                <span className="bg-blue-100 text-blue-600 rounded px-1.5 py-0.5">
+                  {in_progress} active
+                </span>
+              )}
+              {completed > 0 && (
+                <span className="bg-green-100 text-green-600 rounded px-1.5 py-0.5">
+                  {completed} done
+                </span>
+              )}
+              {cancelled > 0 && (
+                <span className="bg-red-100 text-red-500 rounded px-1.5 py-0.5">
+                  {cancelled} cancelled
+                </span>
+              )}
+            </div>
+          )}
+          <span className="text-gray-400 text-sm">{expanded ? "▲" : "▼"}</span>
+        </div>
+      </Button>
+
+      {/* Mobile task count bar */}
+      {total > 0 && (
+        <div className="sm:hidden flex flex-wrap items-center gap-1 px-4 pb-2 text-xs text-gray-500">
+          {pending > 0 && (
+            <span className="bg-gray-200 text-gray-600 rounded px-1.5 py-0.5">
+              {pending} pending
+            </span>
+          )}
+          {in_progress > 0 && (
+            <span className="bg-blue-100 text-blue-600 rounded px-1.5 py-0.5">
+              {in_progress} active
+            </span>
+          )}
+          {completed > 0 && (
+            <span className="bg-green-100 text-green-600 rounded px-1.5 py-0.5">
+              {completed} done
+            </span>
+          )}
+          {cancelled > 0 && (
+            <span className="bg-red-100 text-red-500 rounded px-1.5 py-0.5">
+              {cancelled} cancelled
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Collapsible task list */}
+      {expanded && (
+        <div className="px-4 pb-4">
+          {provider.tasks.length === 0 ? (
+            <p className="text-sm text-gray-400 italic py-2">No tasks assigned to this provider.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+              {provider.tasks.map((task: ProviderTask) => (
+                <TaskCard key={task.id} task={task} onUpdated={onUpdated} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// AssignTaskModal
+// ---------------------------------------------------------------------------
+
+interface AssignTaskModalProps {
+  caseId: string
+  providers: CaseProvider[]
+  onClose: () => void
+  onAssigned: () => void
+}
+
+function AssignTaskModal({ caseId, providers, onClose, onAssigned }: AssignTaskModalProps) {
+  const [providerId, setProviderId] = useState(providers[0]?.id ?? "")
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [dueDate, setDueDate] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  // Close on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose()
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [onClose])
+
+  // Close on outside click
+  function handleOverlayClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.target === overlayRef.current) onClose()
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!title.trim()) {
+      setError("Task title is required.")
+      return
+    }
+    if (!providerId) {
+      setError("Please select a provider.")
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+    try {
+      await assignTask(
+        caseId,
+        providerId,
+        title.trim(),
+        description.trim() || undefined,
+        dueDate || undefined
+      )
+      onAssigned()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to assign task.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    // eslint-disable-next-line local/no-clickable-div, jsx-a11y/no-noninteractive-element-interactions -- role="dialog" is the correct ARIA role; backdrop-click + Escape are the standard dismiss interactions
+    <div
+      ref={overlayRef}
+      onClick={handleOverlayClick}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="assign-task-title"
+    >
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 flex flex-col gap-5">
+        <div className="flex items-center justify-between">
+          <h2 id="assign-task-title" className="text-lg font-semibold text-gray-800">
+            Assign Task
+          </h2>
+          <Button unstyled
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none focus:outline-none"
+            aria-label="Close modal"
+          >
+            ×
+          </Button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+          {/* Provider select */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="at-provider" className="text-sm font-medium text-gray-700">
+              Provider <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="at-provider"
+              value={providerId}
+              onChange={(e) => setProviderId(e.target.value)}
+              required
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              {providers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {typeIcon(p.type)} {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Title */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="at-title" className="text-sm font-medium text-gray-700">
+              Task title <span className="text-red-500">*</span>
+            </label>
+            <Input unstyled
+              id="at-title"
+              type="text"
+              value={title}
+              onChange={(v) => setTitle(v)}
+              placeholder="e.g. Confirm lease agreement"
+              required
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+
+          {/* Description */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="at-description" className="text-sm font-medium text-gray-700">
+              Description <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <textarea
+              id="at-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              placeholder="Additional details for the provider…"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+
+          {/* Due date */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="at-due" className="text-sm font-medium text-gray-700">
+              Due date <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <Input unstyled
+              id="at-due"
+              type="date"
+              value={dueDate}
+              onChange={(v) => setDueDate(v)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-3 pt-1">
+            <Button unstyled
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
+            >
+              Cancel
+            </Button>
+            <Button unstyled
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2 text-sm font-medium text-white bg-navy-800 hover:bg-navy-900 disabled:opacity-60 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              {submitting ? "Assigning…" : "Assign Task"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Loading skeleton
+// ---------------------------------------------------------------------------
+
+function ProviderRowSkeleton() {
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 shadow-sm animate-pulse">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="w-7 h-7 bg-gray-200 rounded-full" />
+        <div className="h-4 bg-gray-200 rounded w-32" />
+        <div className="h-4 bg-gray-200 rounded w-16" />
+      </div>
+      <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-white border border-gray-200 rounded-lg p-3 flex flex-col gap-2">
+            <div className="h-3 bg-gray-200 rounded w-3/4" />
+            <div className="h-3 bg-gray-200 rounded w-1/2" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// EmployeeRfqSection — [AIQ-1671] the RFQs the EMPLOYEE submitted for this case,
+// read from the canonical `rfqs` table (AIQ-1669). This is the HR-visible surface that
+// makes the employee's "your HR team can see the providers you picked" true. Read-only
+// here; dispatch to suppliers is AIQ-1670.
+// ---------------------------------------------------------------------------
+
+/**
+ * [AIQ-1743] The supplier magic links produced by the dispatch that just ran.
+ *
+ * Why a separate block instead of a "copy" cell on each recipient row: the dispatch results
+ * are keyed by `recipient_id`, but `rfq.recipients` rows carry only `supplier_id` — the sole
+ * overlapping field is the display name. Joining on a name would, for two suppliers sharing
+ * one, show A's credential on B's row. A wrong bearer token on the wrong supplier is not a
+ * cosmetic bug, so this renders the dispatch's own list and joins nothing.
+ *
+ * These links exist ONLY in this response — `rfq_recipients` stores just a hash — so they are
+ * held in component state and vanish on reload. Deliberately not persisted anywhere.
+ */
+function DispatchedSupplierLinks({ results }: { results: DispatchRfqTargetResult[] }) {
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+  const withLinks = results.filter((r) => r.link)
+
+  if (withLinks.length === 0) return null
+
+  const copy = async (link: string, idx: number) => {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopiedIdx(idx)
+      window.setTimeout(() => setCopiedIdx((c) => (c === idx ? null : c)), 2000)
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+      <div className="text-xs font-medium text-navy-800 mb-2">
+        Supplier links from this dispatch
+      </div>
+      <ul className="flex flex-col gap-1.5">
+        {withLinks.map((r, i) => (
+          <li
+            key={r.recipient_id ?? i}
+            className="flex items-center justify-between gap-2 text-sm"
+          >
+            <span className="text-gray-800 truncate">
+              {r.supplier_name ?? "Provider"}
+            </span>
+            <Button unstyled
+              type="button"
+              onClick={() => copy(r.link as string, i)}
+              className="shrink-0 px-2 py-1 text-xs font-medium rounded-md border border-[#cbd5e1] bg-white hover:bg-[#f1f5f9] text-navy-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              {copiedIdx === i ? "Copied" : "Copy link"}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-gray-500">
+        Shown only right after dispatching — these links are not stored, so they disappear when
+        you reload. Dispatching again issues fresh links and invalidates these. Anyone with a
+        link can submit that supplier&rsquo;s quote, so share it only with that supplier.
+      </p>
+    </div>
+  )
+}
+
+function RfqCard({
+  caseId,
+  rfq,
+  onDispatched,
+}: {
+  caseId: string
+  rfq: CaseRfq
+  onDispatched: () => void
+}) {
+  const [dispatching, setDispatching] = useState(false)
+  const [dispatchError, setDispatchError] = useState<string | null>(null)
+  const [dispatchedCount, setDispatchedCount] = useState<number | null>(null)
+  // [AIQ-1743] Per-recipient results of the dispatch that just ran, carrying the magic links.
+  // Session-only by necessity: the raw token is never persisted server-side.
+  const [dispatchResults, setDispatchResults] = useState<DispatchRfqTargetResult[] | null>(null)
+
+  // [AIQ-1673] The email-suppliers flow is a SEPARATE, explicitly-confirmed action — it emails
+  // real companies, so it must never fire by accident. Inline two-click confirm (no modal).
+  const [emailConfirming, setEmailConfirming] = useState(false)
+  const [emailing, setEmailing] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [emailedCount, setEmailedCount] = useState<number | null>(null)
+  const [emailedTotal, setEmailedTotal] = useState<number | null>(null)
+  const [emailSkipReason, setEmailSkipReason] = useState<string | null>(null)
+
+  // [AIQ-1670] HR-gated dispatch: mint a supplier token for every recipient (reuses the
+  // audited path). send_email stays OFF here — clicking mints the links; it never emails a
+  // real supplier by accident.
+  const handleDispatch = async () => {
+    setDispatching(true)
+    setDispatchError(null)
+    try {
+      const res = await dispatchCaseRfq(caseId, rfq.id)
+      setDispatchedCount(res.dispatched)
+      // [AIQ-1743] Keep the per-recipient results so HR can see and copy each supplier link.
+      // Before this, the response was read for `dispatched` only and the links were discarded.
+      setDispatchResults(res.results ?? null)
+      onDispatched()
+    } catch (err) {
+      setDispatchError(err instanceof Error ? err.message : "Dispatch failed.")
+    } finally {
+      setDispatching(false)
+    }
+  }
+
+  // [AIQ-1673] Second click of the two-step confirm actually emails (send_email=true). With no
+  // RESEND_API_KEY configured the backend no-ops (links returned, nothing sent).
+  const handleSendEmail = async () => {
+    setEmailing(true)
+    setEmailError(null)
+    try {
+      const res = await dispatchCaseRfq(caseId, rfq.id, true)
+      // [AIQ-1677] Report the ACTUAL number emailed (results[].sent === true), not the recipient
+      // count — honest feedback when some are skipped (no verified address, no RESEND key, …).
+      const results = res.results ?? []
+      const sent = results.filter((r) => r.sent).length
+      const total = results.length || res.dispatched
+      const firstSkip = results.find((r) => !r.sent && r.error)?.error ?? null
+      setEmailedCount(sent)
+      setEmailedTotal(total)
+      setEmailSkipReason(sent < total ? firstSkip : null)
+      // [AIQ-1743] The email path mints links too — and when a send is SKIPPED (unverified
+      // address, no RESEND key) the copyable link is the only way HR can still reach that
+      // supplier. Surface them here as well.
+      setDispatchResults(results.length > 0 ? results : null)
+      setEmailConfirming(false)
+      onDispatched()
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "Could not email suppliers.")
+    } finally {
+      setEmailing(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-[#e2e8f0] bg-white p-4">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="font-mono text-xs font-medium text-navy-800">
+          {rfq.rfq_ref ?? rfq.id}
+        </span>
+        <div className="flex items-center gap-2">
+          {rfq.status && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-navy-50 text-navy-700 border border-navy-100">
+              {rfq.status}
+            </span>
+          )}
+          {/* HR-side entry to the quote-review / accept surface (QuoteRfqDetail, /quotes/rfq/:id).
+              HR is the payer, but the only path to it was the employee plan CTA — so from case
+              management HR could see the RFQ (AIQ-1671) but not review/accept the quotes. */}
+          <Link
+            to={`/quotes/rfq/${rfq.id}`}
+            className="text-xs font-medium text-[#2563eb] underline underline-offset-2 hover:text-[#1d4ed8] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-sm"
+          >
+            Review quotes →
+          </Link>
+        </div>
+      </div>
+      {rfq.service_keys.length > 0 && (
+        <div className="text-xs text-gray-500 mb-2">
+          Services: {rfq.service_keys.join(", ")}
+        </div>
+      )}
+      <ul className="divide-y divide-[#f1f5f9] border border-[#f1f5f9] rounded-lg overflow-hidden">
+        {rfq.recipients.map((r, i) => (
+          <li
+            key={r.supplier_id ?? i}
+            className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+          >
+            <span className="text-gray-800 truncate">
+              {r.supplier_name ?? r.supplier_id ?? "Provider"}
+            </span>
+            <span className="text-xs text-gray-500 shrink-0">{r.status ?? "—"}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 flex flex-col gap-2">
+        {/* [AIQ-1670] Mint-only: prepares supplier links, never emails. */}
+        <div className="flex items-center gap-3">
+          <Button unstyled
+            type="button"
+            onClick={handleDispatch}
+            disabled={dispatching}
+            className="px-3 py-1.5 bg-navy-800 hover:bg-navy-900 disabled:opacity-60 text-white text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            {dispatching ? "Dispatching…" : "Dispatch to suppliers"}
+          </Button>
+          {dispatchedCount != null && !dispatchError && (
+            <span className="text-xs text-green-700">
+              ✅ Links prepared for {dispatchedCount} {dispatchedCount === 1 ? "supplier" : "suppliers"}.
+            </span>
+          )}
+          {dispatchError && <span className="text-xs text-red-600">{dispatchError}</span>}
+        </div>
+
+        {/* [AIQ-1673] Email suppliers — a SEPARATE, explicitly-confirmed action (two clicks).
+            Emails real companies, so it is never the default and never auto-fires. */}
+        <div className="flex items-center gap-2">
+          {emailedCount != null && !emailError ? (
+            <span className={`text-xs ${emailedCount > 0 ? "text-green-700" : "text-amber-700"}`}>
+              {/* [AIQ-1677] Honest count: emailed X of N, with the skip reason when some didn't send. */}
+              ✉️ Emailed {emailedCount} of {emailedTotal}{" "}
+              {emailedTotal === 1 ? "supplier" : "suppliers"}
+              {emailedTotal != null && emailedCount < emailedTotal && emailSkipReason
+                ? ` — ${emailedTotal - emailedCount} skipped (${emailSkipReason})`
+                : ""}
+              .
+            </span>
+          ) : emailConfirming ? (
+            <>
+              <Button unstyled
+                type="button"
+                onClick={handleSendEmail}
+                disabled={emailing}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
+              >
+                {emailing
+                  ? "Emailing…"
+                  : `Confirm: email ${rfq.recipients.length} ${rfq.recipients.length === 1 ? "supplier" : "suppliers"}?`}
+              </Button>
+              {!emailing && (
+                <Button unstyled
+                  type="button"
+                  onClick={() => setEmailConfirming(false)}
+                  className="px-2 py-1.5 text-gray-500 hover:text-gray-700 text-xs font-medium"
+                >
+                  Cancel
+                </Button>
+              )}
+            </>
+          ) : (
+            <Button unstyled
+              type="button"
+              onClick={() => setEmailConfirming(true)}
+              className="px-3 py-1.5 border border-[#e2e8f0] hover:bg-gray-50 text-gray-700 text-xs font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              Email suppliers
+            </Button>
+          )}
+          {emailError && <span className="text-xs text-red-600">{emailError}</span>}
+        </div>
+      </div>
+      {/* [AIQ-1743] HR dispatches, so HR must be able to see and relay the link. Before this it
+          surfaced only in the EMPLOYEE's inbox thread (supplier_link_dispatch posts it to
+          quote_messages under the employee's auth id), leaving HR blind to the artifact they
+          are responsible for. */}
+      {dispatchResults && <DispatchedSupplierLinks results={dispatchResults} />}
+    </div>
+  )
+}
+
+function EmployeeRfqSection({
+  caseId,
+  rfqs,
+  onDispatched,
+}: {
+  caseId: string
+  rfqs: CaseRfq[]
+  onDispatched: () => void
+}) {
+  if (rfqs.length === 0) return null
+  return (
+    <div className="mb-6" data-testid="employee-rfqs">
+      <h2 className="text-sm font-semibold text-gray-700 mb-2 px-1">
+        Employee-requested quotes
+      </h2>
+      <div className="flex flex-col gap-3">
+        {rfqs.map((rfq) => (
+          <RfqCard key={rfq.id} caseId={caseId} rfq={rfq} onDispatched={onDispatched} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ProviderCoordinationPanel — main export
+// ---------------------------------------------------------------------------
+
+interface ProviderCoordinationPanelProps {
+  caseId: string
+}
+
+export function ProviderCoordinationPanel({ caseId }: ProviderCoordinationPanelProps) {
+  const [providers, setProviders] = useState<CaseProvider[]>([])
+  const [rfqs, setRfqs] = useState<CaseRfq[]>([])
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [showModal, setShowModal] = useState(false)
+
+  // [AIQ-1671] Best-effort: the employee's canonical RFQs are additive context; a failure
+  // here must never break the provider panel, so it's fetched separately and errors are
+  // swallowed (the section just doesn't render).
+  const fetchRfqs = useCallback(async () => {
+    try {
+      setRfqs(await getCaseRfqs(caseId))
+    } catch {
+      setRfqs([])
+    }
+  }, [caseId])
+
+  const fetchProviders = useCallback(async () => {
+    setFetchError(null)
+    try {
+      const data = await getCaseProviders(caseId)
+      setProviders(data)
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : "Failed to load providers.")
+    } finally {
+      setLoading(false)
+    }
+  }, [caseId])
+
+  // Initial fetch
+  useEffect(() => {
+    setLoading(true)
+    void fetchProviders()
+    void fetchRfqs()
+  }, [fetchProviders, fetchRfqs])
+
+  // Supabase Realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel(`case-providers-${caseId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "provider_tasks",
+          filter: `case_id=eq.${caseId}`,
+        },
+        () => {
+          void fetchProviders()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [caseId, fetchProviders])
+
+  return (
+    <div className="w-full max-w-4xl mx-auto px-0 sm:px-2">
+      {/* Panel header */}
+      <div className="flex items-center justify-between mb-4 px-1">
+        <h1 className="text-xl font-bold text-gray-900">Provider Coordination</h1>
+        {!loading && providers.length > 0 && (
+          <Button unstyled
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-navy-800 hover:bg-navy-900 text-white text-sm font-medium rounded-xl shadow transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            <span aria-hidden>+</span> Assign Task
+          </Button>
+        )}
+      </div>
+
+      {/* [AIQ-1671] Employee's canonical RFQs — shown above providers (and even when no
+          provider tasks exist yet) so HR actually sees the picks the employee submitted.
+          [AIQ-1670] each card carries the HR-gated "Dispatch to suppliers" action. */}
+      <EmployeeRfqSection caseId={caseId} rfqs={rfqs} onDispatched={fetchRfqs} />
+
+      {/* Error state */}
+      {fetchError && (
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">
+          {fetchError}
+          <Button unstyled
+            type="button"
+            onClick={fetchProviders}
+            className="ml-3 underline hover:no-underline font-medium"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Loading skeleton */}
+      {loading && (
+        <div className="flex flex-col gap-4">
+          <ProviderRowSkeleton />
+          <ProviderRowSkeleton />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !fetchError && providers.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <span className="text-4xl mb-3" aria-hidden>
+            📋
+          </span>
+          <p className="text-gray-600 font-medium">No providers assigned yet</p>
+          <p className="text-gray-400 text-sm mt-1">
+            Use &ldquo;Invite Provider&rdquo; to add one, then assign tasks here.
+          </p>
+        </div>
+      )}
+
+      {/* Provider list */}
+      {!loading && providers.length > 0 && (
+        <div className="flex flex-col gap-4">
+          {providers.map((provider) => (
+            <ProviderRow
+              key={provider.id}
+              provider={provider}
+              onUpdated={fetchProviders}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Floating assign button (visible when scrolled down on mobile) */}
+      {!loading && providers.length > 0 && (
+        <div className="fixed bottom-6 right-4 sm:hidden z-40">
+          <Button unstyled
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-1.5 px-5 py-3 bg-navy-800 hover:bg-navy-900 text-white text-sm font-semibold rounded-full shadow-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            <span aria-hidden>+</span> Assign Task
+          </Button>
+        </div>
+      )}
+
+      {/* Assign Task modal */}
+      {showModal && (
+        <AssignTaskModal
+          caseId={caseId}
+          providers={providers}
+          onClose={() => setShowModal(false)}
+          onAssigned={fetchProviders}
+        />
+      )}
+    </div>
+  )
+}
+
+export default ProviderCoordinationPanel
+

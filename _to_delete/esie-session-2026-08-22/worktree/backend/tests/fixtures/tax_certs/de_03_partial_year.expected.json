@@ -1,0 +1,42 @@
+{
+  "_fixture_metadata": {
+    "stem": "de_03_partial_year",
+    "country": "DEU",
+    "subtype": "lohnsteuerbescheinigung",
+    "scenario": "Mid-year hire (Jun-Dec 2024); ÖZTÜRK; tests partial-year finding + Turkish-origin umlaut name; residency mismatch case=NOR fires runtime",
+    "reference_date": "2026-05-29",
+    "authored_by": "C2-02b (notion-task-executor, Cowork, 2026-05-29)",
+    "notes": "Mirrors DE Exemplar 3 in tax_cert_de_v1.txt. Runtime residency_mismatch_finding fires when case.employee.current_residence_country=NOR."
+  },
+  "is_tax_document": true,
+  "is_tax_document_reason": null,
+  "document_subtype": "LOHNSTEUERBESCHEINIGUNG",
+  "issuing_country_iso3": "DEU",
+  "issuing_authority": "Nordic Hydrogen Deutschland GmbH",
+  "issuing_authority_normalized": null,
+  "issuing_office": null,
+  "is_employer_issued": true,
+  "employer_normalized_name": "NORDIC HYDROGEN DEUTSCHLAND",
+  "tax_year": 2024,
+  "bescheinigungszeitraum_start": "2024-06-01",
+  "bescheinigungszeitraum_end": "2024-12-31",
+  "tax_id": "55443322110",
+  "tax_id_etin": null,
+  "holder_name": "Selin ÖZTÜRK",
+  "holder_dob": "1994-01-03",
+  "holder_address": "Hamburger Allee 45, 20146 Hamburg",
+  "residence_country_iso3": "DEU",
+  "gross_income_annual": "41250.00",
+  "gross_income_annual_confidence": "high",
+  "net_taxable_income_annual": null,
+  "total_tax_annual": null,
+  "wage_tax_paid": "6840.00",
+  "solidarity_surcharge": null,
+  "church_tax_paid": null,
+  "social_security_contributions": null,
+  "currency_iso3": "EUR",
+  "findings": [
+    { "severity": "INFO", "code": "PARTIAL_YEAR_BESCHEINIGUNGSZEITRAUM" }
+  ],
+  "agent_confidence": "high"
+}

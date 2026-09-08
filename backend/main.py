@@ -7225,6 +7225,8 @@ class RfqCreatePayload(BaseModel):
     items: List[RfqItemInput]
     vendor_ids: Optional[List[str]] = None
     supplier_ids: Optional[List[str]] = None
+    # Employee-reviewed cover sent to suppliers. If omitted, the server drafts one from intake.
+    message_body: Optional[str] = None
 
 
 class QuoteLineInput(BaseModel):
@@ -9018,6 +9020,15 @@ def _services_case_context(case_id: str) -> "tuple[Dict[str, Any], Optional[str]
         "originCity": basics.get("originCity") or origin_city,
         "originCountry": origin_country or basics.get("originCountry"),
     }
+    try:
+        from .app.services.household_from_draft import household_from_draft
+        hh = household_from_draft(draft)
+        ctx["household_size"] = hh.get("household_size")
+        ctx["dependents_ages"] = hh.get("dependents_ages")
+        ctx["commute_mins"] = hh.get("commute_mins")
+        ctx["child_count"] = hh.get("child_count")
+    except Exception:
+        pass
     # AIQ-1649: fill anything still missing from the relocation_cases row, so a case
     # whose destination lives there (no intake yet) does not falsely read as missing.
     if not all((ctx["destCity"], ctx["destCountry"], ctx["originCity"], ctx["originCountry"])):
@@ -9084,6 +9095,38 @@ def get_services_context(
             if v is not None:
                 saved_flat[k] = v
 
+    # Intake wins over stale services-questionnaire defaults (people=2, child_ages=8).
+    if case_context.get("dependents_ages"):
+        saved_flat["child_ages"] = case_context["dependents_ages"]
+    if case_context.get("household_size"):
+        saved_flat["people"] = case_context["household_size"]
+    if case_context.get("commute_mins") is not None:
+        saved_flat["commute_mins"] = case_context["commute_mins"]
+    if case_context.get("originCity"):
+        saved_flat["origin_city"] = case_context["originCity"]
+
+    try:
+        company_id = db.get_company_id_for_assignment_id(str(assignment["id"])) or ""
+        if company_id:
+            from .app.services.policy_config_matrix_service import PolicyConfigMatrixService
+            bundle = PolicyConfigMatrixService(db).caps_payload(
+                company_id,
+                assignment_type=assignment.get("assignment_type"),
+                family_status=assignment.get("family_status"),
+                benefit_keys=["host_housing_cap"],
+            )
+            for cap in bundle.get("caps") or []:
+                if cap.get("benefit_key") == "host_housing_cap" and cap.get("normalized_amount") is not None:
+                    amount = float(cap["normalized_amount"])
+                    case_context["housing_cap_amount"] = amount
+                    case_context["housing_cap_currency"] = cap.get("currency_code")
+                    saved_flat["budget_max"] = amount
+                    saved_flat["budget_min"] = max(0, int(amount * 0.7))
+                    saved_flat["housing_cap"] = amount
+                    break
+    except Exception:
+        log.warning("services context: housing cap lookup failed case=%s", case_id)
+
     questions = []
     if selected_keys:
         questions = generate_questions(
@@ -9101,6 +9144,9 @@ def get_services_context(
         "answers": saved_rows,
         "questions": questions,
         "selected_services": selected_keys,
+        "derived_answers": {k: saved_flat[k] for k in (
+            "child_ages", "people", "commute_mins", "origin_city", "budget_min", "budget_max",
+        ) if k in saved_flat},
     }
 
 
@@ -9296,6 +9342,37 @@ def upsert_service_answers(
         raise
 
 
+@app.get("/api/rfqs/draft")
+def get_rfq_draft(
+    case_id: str = Query(...),
+    services: Optional[str] = Query(None, description="Comma-separated service keys"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Draft supplier message + structured briefs from intake. Employee reviews before POST /api/rfqs."""
+    assignment = _require_assignment_visibility(case_id, user)
+    effective_case_id = assignment.get("case_id") or case_id
+    try:
+        case_row = db.get_case_by_id(effective_case_id) or {}
+    except Exception:
+        case_row = {}
+    draft: Dict[str, Any] = {}
+    try:
+        with SessionLocal() as session:
+            wc = app_crud.get_case(session, effective_case_id)
+            if wc:
+                draft = json.loads(wc.draft_json or "{}")
+    except Exception:
+        draft = {}
+    keys = [k.strip() for k in (services or "").split(",") if k.strip()]
+    from .app.services.rfq_brief import draft_supplier_message, build_requirements_for_service
+    message = draft_supplier_message(case=case_row, draft=draft, service_keys=keys)
+    items = [
+        {"service_key": k, "requirements": build_requirements_for_service(k, case_row, {}, draft)}
+        for k in keys
+    ]
+    return {"ok": True, "message": message, "items": items}
+
+
 @app.post("/api/rfqs")
 def create_rfq(
     payload: RfqCreatePayload,
@@ -9336,27 +9413,39 @@ def create_rfq(
             detail="; ".join(unreachable) or "No reachable suppliers for this request.",
         )
 
-    # AIQ-1521 follow-up: build the vendor's brief SERVER-SIDE from the case.
-    #
-    # The vendor used to receive the word "movers" plus whatever free text the employee happened
-    # to type — while we already knew the route and the date and sent neither. A vendor who can't
-    # see the route can't quote, and if they don't reply we'd wrongly conclude "suppliers don't
-    # respond" when in fact we asked badly.
-    #
-    # The case is the source of truth for the facts (route, date); the client is only trusted for
-    # what the platform cannot know (property, storage, special items).
+    # AIQ-1521 follow-up: build the vendor's brief SERVER-SIDE from the case + intake.
     try:
         case_row = db.get_case_by_id(effective_case_id) or {}
     except Exception:
         log.warning("create_rfq: could not load case for the brief case_id=%s", effective_case_id)
         case_row = {}
+    draft: Dict[str, Any] = {}
+    try:
+        with SessionLocal() as session:
+            wc = app_crud.get_case(session, effective_case_id)
+            if wc:
+                draft = json.loads(wc.draft_json or "{}")
+    except Exception:
+        draft = {}
+
+    from .app.services.rfq_brief import build_requirements_for_service, draft_supplier_message
+
+    cover = (payload.message_body or "").strip() or None
+    if not cover:
+        cover = draft_supplier_message(
+            case=case_row,
+            draft=draft,
+            service_keys=[i.service_key for i in payload.items],
+        )
 
     enriched_items = []
     for item in payload.items:
         raw = item.model_dump(mode="json")
-        if raw.get("service_key") == "movers":
-            from .app.services.rfq_brief import build_movers_requirements
-            raw["requirements"] = build_movers_requirements(case_row, raw.get("requirements") or {})
+        answers = dict(raw.get("requirements") or {})
+        answers["cover_note"] = cover
+        raw["requirements"] = build_requirements_for_service(
+            str(raw.get("service_key") or ""), case_row, answers, draft,
+        )
         enriched_items.append(raw)
 
     try:

@@ -1,0 +1,149 @@
+- main [active] [ref=f7e287]:
+  - generic [ref=f7e288]:
+    - generic [ref=f7e289]:
+      - navigation "Breadcrumb" [ref=f7e290]:
+        - link "ReloPass" [ref=f7e291] [cursor=pointer]:
+          - /url: /employee/dashboard
+        - generic [ref=f7e292]: /
+        - generic [ref=f7e293]: Service questions
+      - heading "Service questions" [level=1] [ref=f7e294]
+      - paragraph [ref=f7e295]: Refine your provider matches.
+    - generic [ref=f7e316]:
+      - text: Services for your Marseille → Berlin move
+      - generic [ref=f7e317]: · Sep 10, 2026
+    - navigation "Services flow navigation" [ref=f7e296]:
+      - link "Select services" [ref=f7e297] [cursor=pointer]:
+        - /url: /employee/case/7ca01df7-5d37-4709-b72e-4177ef27fb99/services/select
+      - generic [ref=f7e298]: ›
+      - link "Preferences" [ref=f7e299] [cursor=pointer]:
+        - /url: /employee/case/7ca01df7-5d37-4709-b72e-4177ef27fb99/services/questions
+      - generic [ref=f7e300]: ›
+      - link "Recommendations" [ref=f7e301] [cursor=pointer]:
+        - /url: /employee/case/7ca01df7-5d37-4709-b72e-4177ef27fb99/services/recommendations
+      - generic [ref=f7e302]: ›
+      - link "Review & budget" [ref=f7e303] [cursor=pointer]:
+        - /url: /employee/case/7ca01df7-5d37-4709-b72e-4177ef27fb99/services/estimate
+      - generic [ref=f7e304]: ›
+      - link "Request quotes" [ref=f7e305] [cursor=pointer]:
+        - /url: /employee/case/7ca01df7-5d37-4709-b72e-4177ef27fb99/services/rfq/new
+    - generic [ref=f7e306]:
+      - generic [ref=f7e307]:
+        - button "← Change services" [ref=f7e308] [cursor=pointer]
+        - generic [ref=f7e309]: 20 questions
+      - heading "Tell us your preferences" [level=2] [ref=f7e310]
+      - paragraph [ref=f7e311]: We’ll only ask what’s relevant to the services you selected.
+    - generic [ref=f7e318]:
+      - generic [ref=f7e319]:
+        - generic [ref=f7e320]: housing
+        - generic [ref=f7e321]:
+          - generic [ref=f7e322]:
+            - generic [ref=f7e323]: Min monthly budget (EUR)
+            - spinbutton [ref=f7e325]: "2000"
+          - generic [ref=f7e326]:
+            - generic [ref=f7e327]: Max monthly budget (EUR)
+            - spinbutton [ref=f7e329]: "5000"
+          - generic [ref=f7e330]:
+            - generic [ref=f7e331]: Number of bedrooms
+            - spinbutton [ref=f7e333]: "2"
+          - generic [ref=f7e334]:
+            - generic [ref=f7e335]: Minimum sqm
+            - spinbutton [ref=f7e337]: "65"
+          - generic [ref=f7e338]:
+            - generic [ref=f7e339]: Max commute to work (minutes)
+            - spinbutton [ref=f7e341]: "45"
+          - generic [ref=f7e342]:
+            - generic [ref=f7e343]: Preferred way to commute
+            - combobox [ref=f7e345]:
+              - option "Select..." [selected]
+              - option "Bike"
+              - option "Car"
+              - option "Public transit"
+              - option "Walk"
+          - generic [ref=f7e346]:
+            - generic [ref=f7e347]: What matters most in a neighbourhood?
+            - listbox [ref=f7e348]:
+              - option "Safety" [ref=f7e349]
+              - option "Quiet" [ref=f7e350]
+              - option "Green space" [ref=f7e351]
+              - option "Nightlife" [ref=f7e352]
+          - generic [ref=f7e353]:
+            - generic [ref=f7e354]: Type of housing to start with
+            - combobox [ref=f7e356]:
+              - option "Select..." [selected]
+              - option "No preference"
+              - option "Permanent (rental agency)"
+              - option "Temporary (serviced apartments)"
+          - generic [ref=f7e357]:
+            - generic [ref=f7e358]: Neighbourhoods you'd prefer (comma-separated, optional)
+            - textbox "e.g. Frogner, Grünerløkka" [ref=f7e360]
+          - generic [ref=f7e361]:
+            - generic [ref=f7e362]: Neighbourhoods to avoid (comma-separated, optional)
+            - textbox [ref=f7e364]
+      - generic [ref=f7e365]:
+        - generic [ref=f7e366]: schools
+        - generic [ref=f7e367]:
+          - generic [ref=f7e368]:
+            - generic [ref=f7e369]: Children's ages (comma-separated, e.g. 5,8)
+            - textbox [ref=f7e371]: "8"
+          - generic [ref=f7e372]:
+            - generic [ref=f7e373]: School type
+            - combobox [ref=f7e375]:
+              - option "Select..."
+              - option "American"
+              - option "British"
+              - option "Either / No preference"
+              - option "French"
+              - option "German"
+              - option "International" [selected]
+              - option "Private"
+              - option "Public"
+          - generic [ref=f7e376]:
+            - generic [ref=f7e377]: Curriculum preference
+            - combobox [ref=f7e379]:
+              - option "Select..."
+              - option "Either"
+              - option "International (IB, etc.)" [selected]
+              - option "Local"
+          - generic [ref=f7e380]:
+            - generic [ref=f7e381]: School budget level
+            - combobox [ref=f7e383]:
+              - option "Select..."
+              - option "High"
+              - option "Low"
+              - option "Medium" [selected]
+      - generic [ref=f7e384]:
+        - generic [ref=f7e385]: movers
+        - generic [ref=f7e386]:
+          - generic [ref=f7e387]:
+            - generic [ref=f7e388]: Origin city
+            - textbox [ref=f7e390]: Marseille
+          - generic [ref=f7e391]:
+            - generic [ref=f7e392]: Move type
+            - combobox [ref=f7e394]:
+              - option "Select..."
+              - option "Domestic"
+              - option "International" [selected]
+          - generic [ref=f7e395]:
+            - generic [ref=f7e396]: Current accommodation type
+            - combobox [ref=f7e398]:
+              - option "Select..."
+              - option "Apartment" [selected]
+              - option "House"
+              - option "Studio"
+          - generic [ref=f7e399]:
+            - generic [ref=f7e400]: Current bedrooms
+            - spinbutton [ref=f7e402]: "2"
+          - generic [ref=f7e403]:
+            - generic [ref=f7e404]: Number of people moving
+            - spinbutton [ref=f7e406]: "2"
+          - generic [ref=f7e407]:
+            - generic [ref=f7e408]: Packing service
+            - combobox [ref=f7e410]:
+              - option "Select..."
+              - option "Full"
+              - option "Partial" [selected]
+              - option "Self"
+    - generic [ref=f7e312]:
+      - button "Back" [ref=f7e313] [cursor=pointer]
+      - button "Save" [ref=f7e314] [cursor=pointer]
+      - button "Get recommendations" [ref=f7e315] [cursor=pointer]

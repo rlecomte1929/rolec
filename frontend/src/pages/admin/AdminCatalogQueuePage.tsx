@@ -21,6 +21,7 @@ import {
 import type { DestinationRequest } from '../../api/hrCatalog';
 import { AdminLayout } from './AdminLayout';
 import { DiscoverSection } from './DiscoverSection';
+import { CoverageGapsPanel } from '../../components/admin/CoverageGapsPanel';
 
 const STATUS_TABS: { value: 'pending' | 'approved' | 'rejected'; label: string }[] = [
   { value: 'pending', label: 'Pending' },
@@ -65,13 +66,13 @@ export const AdminCatalogQueuePage: React.FC = () => {
       const [t, a, g, c] = await Promise.all([
         listAdminDestinationRequests(tab),
         listAllowlist(),
-        listDemandGaps(),
+        listDemandGaps(200),
         listIntakeCorridors(),
       ]);
       setTickets(t ?? []);
-      setAllowlistState(a);
-      setGaps(g);
-      setCorridors(c);
+      setAllowlistState(a ?? []);
+      setGaps(Array.isArray(g) ? g : []);
+      setCorridors(Array.isArray(c) ? c : []);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load.';
       setError(msg);
@@ -127,25 +128,35 @@ export const AdminCatalogQueuePage: React.FC = () => {
     }
   };
 
-  const fillGap = async (g: DemandGap) => {
-    const key = `${g.category}|${g.city}|${g.country}`;
-    setFillingKey(key);
+  const fillGaps = async (items: DemandGap[]) => {
+    if (items.length === 0) return;
+    setFillingKey('batch');
     setError(null);
     setInfo(null);
-    try {
-      const res = await fillDemandGap(g.category, g.city, g.country);
-      setInfo(
-        res.scraped_count > 0
-          ? `Added ${res.scraped_count} ${g.category} provider${res.scraped_count === 1 ? '' : 's'} for ${g.city}.`
-          : `${g.city} is now allowlisted. The scraper returned nothing yet (it may be disabled or have no API key) — re-run once it's configured.`,
-      );
-      await loadAll();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Could not fill this gap.';
-      setError(msg);
-    } finally {
-      setFillingKey(null);
+    let scraped = 0;
+    let failed = 0;
+    for (const g of items) {
+      try {
+        const res = await fillDemandGap(g.category, g.city, g.country);
+        scraped += res.scraped_count;
+      } catch {
+        failed += 1;
+      }
     }
+    if (failed === 0) {
+      setInfo(
+        scraped > 0
+          ? `Filled ${items.length} gap${items.length === 1 ? '' : 's'} and added ${scraped} provider${scraped === 1 ? '' : 's'}.`
+          : `Allowlisted ${items.length} destination${items.length === 1 ? '' : 's'}. The scraper returned nothing yet — re-run once it is configured.`,
+      );
+    } else {
+      setError(`${failed} of ${items.length} fill${items.length === 1 ? '' : 's'} failed.`);
+      if (scraped > 0) {
+        setInfo(`Added ${scraped} provider${scraped === 1 ? '' : 's'} from the gaps that succeeded.`);
+      }
+    }
+    await loadAll();
+    setFillingKey(null);
   };
 
   // CATALOG-4: pre-warm one uncovered category for an emerging corridor — reuses
@@ -179,7 +190,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
 
   return (
     <AdminLayout
-      title="Catalog destination queue"
+      title="Catalog queue"
       subtitle="HR-opened scrape requests + admin-managed allowlist."
     >
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
@@ -191,43 +202,12 @@ export const AdminCatalogQueuePage: React.FC = () => {
       {/* CATALOG-1: demand-driven worklist — what employees are asking for that
           the catalog can't cover yet. One click allowlists + scrapes it. */}
       <Card padding="lg" className="mb-6">
-        <div className="mb-1 text-lg font-semibold text-[#0b2b43]">Coverage gaps employees are hitting</div>
-        <p className="text-sm text-[#64748b] mb-4">
-          Highest-demand service + destination combos with no catalog coverage yet, across all companies.
-          Filling one allowlists the destination and runs the scraper — no manual search.
-        </p>
-        {gaps.length === 0 ? (
-          <p className="text-sm text-[#94a3b8] py-2">
-            {loading ? 'Loading…' : 'No uncovered demand right now. New gaps appear here as employees hit them.'}
-          </p>
-        ) : (
-          <ul className="divide-y divide-[#e2e8f0] border border-[#e2e8f0] rounded-lg overflow-hidden bg-white">
-            {gaps.map((g) => {
-              const key = `${g.category}|${g.city}|${g.country}`;
-              return (
-                <li key={key} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium text-[#0b2b43]">
-                      <span className="capitalize">{g.category}</span> · {g.city}
-                      {g.country ? `, ${g.country}` : ''}
-                    </div>
-                    <div className="text-sm text-[#64748b]">
-                      {g.demand} request{g.demand === 1 ? '' : 's'} from {g.companies} compan{g.companies === 1 ? 'y' : 'ies'}
-                      {' · last '}{formatDate(g.last_seen_at)}
-                      {g.allowlisted ? ' · already allowlisted' : ''}
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => void fillGap(g)}
-                    disabled={fillingKey === key}
-                  >
-                    {fillingKey === key ? 'Filling…' : 'Allowlist & scrape'}
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <CoverageGapsPanel
+          gaps={gaps}
+          loading={loading}
+          filling={fillingKey !== null}
+          onFill={(items) => void fillGaps(items)}
+        />
       </Card>
 
       {/* CATALOG-4: proactive intake-driven worklist — corridors employees are

@@ -44,7 +44,7 @@ export const AdminStagingDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <AdminLayout title="Staging Review" subtitle="Review extracted candidates before promotion">
+      <AdminLayout title="Staging" subtitle="Review extracted candidates before promotion">
         <div className="py-12 text-center text-slate-500">Loading...</div>
       </AdminLayout>
     );
@@ -52,7 +52,7 @@ export const AdminStagingDashboard: React.FC = () => {
 
   if (error) {
     return (
-      <AdminLayout title="Staging Review" subtitle="Review extracted candidates before promotion">
+      <AdminLayout title="Staging" subtitle="Review extracted candidates before promotion">
         <div className="rounded-lg bg-red-50 p-4 text-red-700">{error}</div>
       </AdminLayout>
     );
@@ -65,7 +65,7 @@ export const AdminStagingDashboard: React.FC = () => {
   const runs = data?.recent_crawl_runs ?? [];
 
   return (
-    <AdminLayout title="Staging Review" subtitle="Review extracted candidates before promotion">
+    <AdminLayout title="Staging" subtitle="Review extracted candidates before promotion">
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Link

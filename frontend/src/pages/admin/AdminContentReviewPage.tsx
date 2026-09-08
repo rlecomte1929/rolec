@@ -177,7 +177,7 @@ export const AdminContentReviewPage: React.FC = () => {
   return (
     <AdminLayout
       title="Content review"
-      subtitle="Requirement facts extracted from official sources, with the evidence behind each one"
+      subtitle="Evidence queue on the legacy requirement_facts table. Approving here does not publish a Country requirements row — see Country requirements for the served catalog."
     >
       {summary && (
         <div className="mb-4 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-4">

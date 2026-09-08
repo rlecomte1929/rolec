@@ -59,6 +59,7 @@ from .. import crud
 from ..db import SessionLocal
 from ..services.disclaimers import IMMIGRATION_DISCLAIMER
 from ..services.nationality_class import classify
+from ..services.requirement_serve_hygiene import display_title
 from ..services.rules_engine import apply_rules
 # AIQ-1473b: single source of truth for ISO → catalog-name mapping. Imported
 # (not duplicated) so this endpoint stays in sync if the catalog naming changes.
@@ -210,7 +211,7 @@ def corridor_requirements(
     requirements = [
         {
             "key": _slug(item.get("title") or item.get("id") or ""),
-            "label": item.get("title"),
+            "label": display_title(item.get("title"), item.get("description")),
             "description": item.get("description"),
             # Carried from the catalog row. Still `null` for an item the ENGINE synthesised
             # (_requirement / _immigration_confirmation) rather than read from the catalog —

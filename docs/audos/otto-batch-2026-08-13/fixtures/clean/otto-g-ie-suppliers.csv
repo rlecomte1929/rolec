@@ -1,0 +1,4 @@
+corridor,service_category,company_name,country_code,city_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry,verification_method,confidence,notes
+ES-IE,housing_agencies,Example Lettings Ltd,IE,Dublin,https://example-lettings.ie,PSRA licensed provider register,https://www.psr.ie/register/entity/004321,Property Services Regulatory Authority,004321,2027,public_registry,high,
+ES-IE,movers,Example Movers Ireland,IE,Dublin,https://examplemovers.ie,FIDI affiliate directory,https://www.fidi.org/find-fidi-affiliate/example-movers-ireland,FIDI Global Alliance / FAIM,IE-1122,,public_registry,medium,
+ES-IE,banks,Example Bank plc,IE,Dublin,https://examplebank.ie,Central Bank of Ireland register,https://registers.centralbank.ie/firm/example-bank-plc,Central Bank of Ireland,C12345,,public_registry,high,

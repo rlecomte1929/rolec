@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isIntakeComplete, resolveCaseStage, deriveCanonicalProgress } from './caseStage';
+import { isIntakeComplete, resolveCaseStage, deriveCanonicalProgress, deriveJourneyMiniSteps } from './caseStage';
 import type { RelocationPlanSummaryDTO } from '../../types/relocationPlanView';
 
 describe('isIntakeComplete', () => {
@@ -29,6 +29,28 @@ describe('resolveCaseStage — the one source of truth for every stepper', () =>
   it('services is only done when the Services flow actually completed (B4)', () => {
     expect(resolveCaseStage({ status: 'submitted', servicesComplete: true }).services).toBe('done');
     expect(resolveCaseStage({ status: 'submitted', servicesComplete: false }).services).toBe('active');
+  });
+
+  it('servicesComplete after RFQ ⇒ Roadmap is the current 3-phase step', () => {
+    expect(
+      deriveJourneyMiniSteps({
+        status: 'submitted',
+        intakeStep: 5,
+        intakeTotalSteps: 5,
+        servicesComplete: true,
+      }),
+    ).toEqual(['done', 'done', 'current']);
+  });
+
+  it('submitted without RFQ stays on Services', () => {
+    expect(
+      deriveJourneyMiniSteps({
+        status: 'submitted',
+        intakeStep: 5,
+        intakeTotalSteps: 5,
+        servicesComplete: false,
+      }),
+    ).toEqual(['done', 'current', 'upcoming']);
   });
 
   it('pre-intake case ⇒ services + roadmap locked', () => {

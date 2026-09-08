@@ -1,0 +1,119 @@
+{
+  "bar_register": {
+    "public_member_search": true,
+    "stable_member_url": false,
+    "example_member_url": "",
+    "membership_number_published": false,
+    "membership_number_name_no": "",
+    "tilsynsradet_register": {
+      "body": "Advokattilsynet (formerly Tilsynsradet for advokatvirksomhet; renamed 2025-01-01)",
+      "public": true,
+      "url": "https://tilsynet.no/register",
+      "registers": [
+        "Advokat- og fullmektigregisteret",
+        "Juristregisteret"
+      ],
+      "example_entity_url": "",
+      "blocker": "javascript_rendered_search"
+    },
+    "advokatguiden_is_official": false,
+    "advokatguiden_operator": "Advokatguiden AS (independent commercial directory) - mirrors Advokattilsynet open data",
+    "preferred_anchor": "Advokattilsynet - it issues the advokatbevilling (statutory right to practise). Advokatforeningen membership is voluntary association membership only.",
+    "label": "VERIFIED"
+  },
+  "rows": [
+    {
+      "n": 1,
+      "supplier_name": "Advokatfirmaet Sulland AS",
+      "real_bar_membership_confirmed": "CANNOT_DETERMINE",
+      "real_entity_evidence_url": "",
+      "real_membership_number": "",
+      "brreg_entity_confirmed": {
+        "confirmed": false,
+        "stored_number_valid": false,
+        "stored_number": "914450133",
+        "stored_number_result": "0 results from data.brreg.no - this organisation number does not exist",
+        "correct_number": "918627995",
+        "correct_name": "ADVOKATFIRMAET SULLAND AS",
+        "url": "https://virksomhet.brreg.no/nb/oppslag/enheter/918627995"
+      },
+      "recommended_body": "Bronnoysund Enhetsregisteret (entity-only) AFTER correcting the organisation number to 918627995",
+      "label": "VERIFIED"
+    },
+    {
+      "n": 2,
+      "supplier_name": "Advokatfirmaet Tveter og Klovfjell AS",
+      "real_bar_membership_confirmed": "CANNOT_DETERMINE",
+      "real_entity_evidence_url": "",
+      "real_membership_number": "organisation number only",
+      "brreg_entity_confirmed": {
+        "confirmed": true,
+        "stored_number_valid": true,
+        "stored_number": "917334110",
+        "registered_name": "ADVOKATFIRMAET TVETER OG KLOVFJELL AS",
+        "url": "https://virksomhet.brreg.no/nb/oppslag/enheter/917334110"
+      },
+      "recommended_body": "Bronnoysund Enhetsregisteret (entity-only); bar claim dropped",
+      "label": "VERIFIED"
+    },
+    {
+      "n": 3,
+      "supplier_name": "Humlen Advokater AS - Felix Olivier Helle",
+      "real_bar_membership_confirmed": "CANNOT_DETERMINE",
+      "real_entity_evidence_url": "",
+      "real_membership_number": "",
+      "brreg_entity_confirmed": {
+        "confirmed": true,
+        "stored_number_valid": true,
+        "stored_number": "915363954",
+        "registered_name": "HUMLEN & HELLE ADVOKATER AS",
+        "name_mismatch": true,
+        "url": "https://virksomhet.brreg.no/nb/oppslag/enheter/915363954"
+      },
+      "recommended_body": "Bronnoysund Enhetsregisteret (entity-only); supplier name must be corrected to Humlen & Helle Advokater AS",
+      "label": "VERIFIED"
+    },
+    {
+      "n": 4,
+      "supplier_name": "Reinholdt Advokatfirma AS - Thomas Reinholdt",
+      "real_bar_membership_confirmed": "CANNOT_DETERMINE",
+      "real_entity_evidence_url": "",
+      "real_membership_number": "",
+      "brreg_entity_confirmed": {
+        "confirmed": true,
+        "stored_number_valid": true,
+        "stored_number": "926162578",
+        "registered_name": "REINHOLDT ADVOKATFIRMA AS",
+        "url": "https://virksomhet.brreg.no/nb/oppslag/enheter/926162578"
+      },
+      "recommended_body": "Bronnoysund Enhetsregisteret (entity-only); bar claim dropped",
+      "label": "VERIFIED"
+    }
+  ],
+  "eura": {
+    "exact_register_name": "Expat Relocation AS",
+    "member_url": "https://www.eura-relocation.com/members/expat-relocation",
+    "egqs_url": "https://www.eura-relocation.com/egqs-qualified-members",
+    "membership_number_published": false,
+    "membership_number": "",
+    "quality_seal_held": "EuRA Global Quality Seal (EGQS), listed since 2012; also Full Member",
+    "similar_named_entities": [
+      "Relocation No. AS",
+      "r2n - Relocate to Norway"
+    ],
+    "label": "VERIFIED"
+  },
+  "_provenance": {
+    "card": "OTTO-I",
+    "batch": "OTTO-2026-08-13",
+    "returned": "2026-08-13",
+    "normalised_by": "operator - key names remapped to schema, markdown-mangled URLs repaired",
+    "independently_reverified": [
+      "914450133 -> 0 results (data.brreg.no) CONFIRMED",
+      "918627995 -> ADVOKATFIRMAET SULLAND AS CONFIRMED",
+      "915363954 -> HUMLEN & HELLE ADVOKATER AS CONFIRMED",
+      "917334110 -> ADVOKATFIRMAET TVETER OG KLOVFJELL AS CONFIRMED",
+      "926162578 -> REINHOLDT ADVOKATFIRMA AS CONFIRMED"
+    ]
+  }
+}

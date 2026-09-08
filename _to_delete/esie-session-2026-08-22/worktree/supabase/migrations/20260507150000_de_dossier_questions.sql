@@ -1,0 +1,18 @@
+-- SUPERSEDED by 20260604300000_de_dossier_questions_corrected.sql (this PR).
+--
+-- Original content INSERTed into evolved columns (destination, category,
+-- options_json, required, applies_if_json) that exist NOWHERE — not on prod,
+-- not in any migration. The version that actually seeded prod's 9 DE rows used
+-- the table's real columns (destination_country, domain, options, is_mandatory,
+-- applies_if); this repo file diverged and was never the thing that applied.
+--
+-- On a fresh `supabase db reset` the original body aborted here with
+-- `column "destination" of relation "dossier_questions" does not exist`
+-- (SQLSTATE 42703) — the root of the multi-day Supabase Preview red.
+--
+-- This file is intentionally a no-op so a fresh replay walks past this
+-- timestamp cleanly. The DE questions are re-seeded with the correct (original)
+-- columns by the replay-safe migration at 20260604300000, ON CONFLICT
+-- (destination_country, question_key, version) DO NOTHING so it's a no-op on
+-- prod (the 9 rows already exist). See
+-- audit/migration-drift-definitive-2026-06-02.md § reverse-drift entry 10.

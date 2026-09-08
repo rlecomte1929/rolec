@@ -1,0 +1,1100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://relopass.local/schemas/otto-outputs.schema.json",
+  "title": "Otto card output schemas",
+  "description": "One $def per Otto card output shape. otto_verify.py resolves a card's outputs[].schema pointer into this file. CSV files are validated row-by-row as objects keyed by the header row; every value arrives as a string, so numeric fields are typed as string with a pattern rather than as number.",
+  "$defs": {
+    "label": {
+      "type": "string",
+      "enum": [
+        "VERIFIED",
+        "CLAIM"
+      ],
+      "description": "VERIFIED = Otto opened the source. CLAIM = Otto inferred it. Unlabelled claims about our repo, database or CDN have been wrong before."
+    },
+    "iso_date": {
+      "type": "string",
+      "pattern": "^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "url_or_empty": {
+      "type": "string",
+      "pattern": "^$|^https?://[^\\s]+$"
+    },
+    "supplier_harvest_row": {
+      "type": "object",
+      "description": "One row of otto-g-ie-suppliers.csv / otto-h-fr-suppliers.csv. Maps onto public.suppliers + public.supplier_service_capabilities via backend/imports/suppliers/executor.py.",
+      "required": [
+        "corridor",
+        "service_category",
+        "company_name",
+        "country_code",
+        "city_name",
+        "website_url",
+        "source_name",
+        "source_url",
+        "accreditation_body",
+        "accreditation_number",
+        "accreditation_expiry",
+        "verification_method",
+        "confidence",
+        "notes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "corridor": {
+          "type": "string",
+          "enum": [
+            "ES-IE",
+            "FR-NO",
+            "FR-DE"
+          ]
+        },
+        "service_category": {
+          "type": "string",
+          "enum": [
+            "housing_agencies",
+            "movers",
+            "banks",
+            "legal_admin",
+            "tax_finance"
+          ],
+          "description": "Database enum value. Any other spelling fails the import."
+        },
+        "company_name": {
+          "type": "string",
+          "minLength": 2
+        },
+        "country_code": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        },
+        "city_name": {
+          "type": "string"
+        },
+        "website_url": {
+          "$ref": "#/$defs/url_or_empty"
+        },
+        "source_name": {
+          "type": "string",
+          "minLength": 2
+        },
+        "source_url": {
+          "type": "string",
+          "pattern": "^https?://[^\\s]+$"
+        },
+        "accreditation_body": {
+          "type": "string",
+          "minLength": 2
+        },
+        "accreditation_number": {
+          "type": "string",
+          "description": "The number THAT BODY issues. EMPTY if the register publishes none. Never a company registration / SIREN / VAT number — see gate no_org_number_as_accreditation."
+        },
+        "accreditation_expiry": {
+          "type": "string",
+          "pattern": "^$|^[0-9]{4}$|^[0-9]{4}-[0-9]{2}$|^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "EMPTY unless the register publishes one. An invented date fails the batch."
+        },
+        "verification_method": {
+          "type": "string",
+          "enum": [
+            "public_registry",
+            "supplier_document",
+            "manual_email",
+            "directory_listing"
+          ],
+          "description": "CHECK-constrained on our side. 'registry_lookup' is NOT legal."
+        },
+        "confidence": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "fr_anchor_assessment": {
+      "type": "object",
+      "description": "One register examined in OTTO-H stage 1. This array is the artefact that closes AIQ-1827's real blocker — a sourcing-route decision with documented options.",
+      "required": [
+        "category",
+        "register_name",
+        "register_domain",
+        "public_list",
+        "stable_entity_url",
+        "number_published",
+        "blocker",
+        "verdict",
+        "why",
+        "label"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": [
+            "legal_admin",
+            "movers",
+            "housing_agencies",
+            "tax_finance"
+          ]
+        },
+        "register_name": {
+          "type": "string",
+          "minLength": 2
+        },
+        "register_domain": {
+          "type": "string",
+          "minLength": 3
+        },
+        "public_list": {
+          "type": "boolean"
+        },
+        "stable_entity_url": {
+          "type": "boolean"
+        },
+        "example_entity_url": {
+          "$ref": "#/$defs/url_or_empty"
+        },
+        "number_published": {
+          "type": "boolean"
+        },
+        "number_name_fr": {
+          "type": "string"
+        },
+        "blocker": {
+          "type": "string",
+          "enum": [
+            "none",
+            "login",
+            "captcha",
+            "post_only",
+            "javascript_rendered",
+            "interactive_table",
+            "no_entity_url",
+            "robots_disallow",
+            "rate_limit",
+            "geo_block",
+            "paid_api",
+            "no_list"
+          ]
+        },
+        "api_or_open_data_url": {
+          "$ref": "#/$defs/url_or_empty"
+        },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "machine_usable",
+            "manual_only",
+            "unusable"
+          ]
+        },
+        "why": {
+          "type": "string",
+          "minLength": 5
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        }
+      }
+    },
+    "no_reconciliation": {
+      "type": "object",
+      "description": "OTTO-I. A single document, not an array.",
+      "required": [
+        "bar_register",
+        "rows",
+        "eura"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "bar_register": {
+          "type": "object",
+          "required": [
+            "public_member_search",
+            "stable_member_url",
+            "tilsynsradet_register",
+            "advokatguiden_is_official",
+            "label"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "public_member_search": {
+              "type": "boolean"
+            },
+            "stable_member_url": {
+              "type": "boolean"
+            },
+            "example_member_url": {
+              "$ref": "#/$defs/url_or_empty"
+            },
+            "membership_number_published": {
+              "type": "boolean"
+            },
+            "membership_number_name_no": {
+              "type": "string"
+            },
+            "tilsynsradet_register": {
+              "type": "object"
+            },
+            "advokatguiden_is_official": {
+              "type": "boolean"
+            },
+            "preferred_anchor": {
+              "type": "string"
+            },
+            "label": {
+              "$ref": "#/$defs/label"
+            }
+          }
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "required": [
+              "n",
+              "supplier_name",
+              "real_bar_membership_confirmed",
+              "real_entity_evidence_url",
+              "real_membership_number",
+              "brreg_entity_confirmed",
+              "recommended_body",
+              "label"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "n": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4
+              },
+              "supplier_name": {
+                "type": "string"
+              },
+              "real_bar_membership_confirmed": {
+                "type": "string",
+                "enum": [
+                  "YES",
+                  "NO",
+                  "CANNOT_DETERMINE"
+                ]
+              },
+              "real_entity_evidence_url": {
+                "$ref": "#/$defs/url_or_empty"
+              },
+              "real_membership_number": {
+                "type": "string"
+              },
+              "brreg_entity_confirmed": {
+                "type": "object"
+              },
+              "recommended_body": {
+                "type": "string",
+                "minLength": 3
+              },
+              "label": {
+                "$ref": "#/$defs/label"
+              }
+            }
+          }
+        },
+        "eura": {
+          "type": "object",
+          "required": [
+            "exact_register_name",
+            "member_url",
+            "membership_number_published",
+            "label"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "exact_register_name": {
+              "type": "string",
+              "minLength": 2
+            },
+            "member_url": {
+              "$ref": "#/$defs/url_or_empty"
+            },
+            "membership_number_published": {
+              "type": "boolean"
+            },
+            "membership_number": {
+              "type": "string"
+            },
+            "quality_seal_held": {
+              "type": "string"
+            },
+            "similar_named_entities": {
+              "type": "array"
+            },
+            "label": {
+              "$ref": "#/$defs/label"
+            }
+          }
+        }
+      }
+    },
+    "dpa_vendor": {
+      "type": "object",
+      "description": "One sub-processor in otto-j-dpa-map.json. Feeds docs/security/PRIV-004_sub-processor_register.md v2.0.",
+      "required": [
+        "vendor",
+        "checked_date",
+        "dpa_mechanism",
+        "dpa_url",
+        "click_path",
+        "plan_gated",
+        "transfer_mechanism",
+        "dpf_certified",
+        "effort",
+        "label"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "vendor": {
+          "type": "string",
+          "enum": [
+            "Supabase",
+            "Render",
+            "Cloudflare",
+            "OpenAI",
+            "Anthropic",
+            "Mistral AI",
+            "Resend",
+            "PostHog",
+            "Geoapify",
+            "Stripe"
+          ]
+        },
+        "checked_date": {
+          "$ref": "#/$defs/iso_date"
+        },
+        "dpa_mechanism": {
+          "type": "string",
+          "enum": [
+            "incorporated_by_reference",
+            "self_serve_click",
+            "request_countersignature",
+            "enterprise_plan_only",
+            "not_published"
+          ]
+        },
+        "dpa_url": {
+          "$ref": "#/$defs/url_or_empty"
+        },
+        "click_path": {
+          "type": "string"
+        },
+        "plan_gated": {
+          "type": "string",
+          "enum": [
+            "YES",
+            "NO",
+            "UNKNOWN"
+          ]
+        },
+        "plan_gated_tier": {
+          "type": "string"
+        },
+        "transfer_mechanism": {
+          "type": "string"
+        },
+        "transfer_quote": {
+          "type": "string"
+        },
+        "dpf_certified": {
+          "type": "string",
+          "enum": [
+            "YES",
+            "NO",
+            "NOT_FOUND"
+          ]
+        },
+        "dpf_listing_url": {
+          "$ref": "#/$defs/url_or_empty"
+        },
+        "subprocessor_list_url": {
+          "$ref": "#/$defs/url_or_empty"
+        },
+        "subprocessor_notification": {
+          "type": "boolean"
+        },
+        "eu_residency_option": {
+          "type": "string"
+        },
+        "eu_residency_requires_migration": {
+          "type": "boolean"
+        },
+        "effort": {
+          "type": "string",
+          "enum": [
+            "none",
+            "minutes",
+            "hours",
+            "days_external"
+          ]
+        },
+        "gotcha": {
+          "type": "string"
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        }
+      }
+    },
+    "leadtime_doc": {
+      "type": "object",
+      "description": "OTTO-K. A single document with 12 steps plus six context answers.",
+      "required": [
+        "steps",
+        "context"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "steps": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "required": [
+              "n",
+              "step",
+              "our_estimate_days",
+              "verdict",
+              "source_url",
+              "checked_date",
+              "label"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "n": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              },
+              "step": {
+                "type": "string"
+              },
+              "our_estimate_days": {
+                "type": [
+                  "integer",
+                  "string",
+                  "null"
+                ]
+              },
+              "statutory_days": {
+                "type": [
+                  "integer",
+                  "string",
+                  "null"
+                ]
+              },
+              "statutory_note": {
+                "type": "string"
+              },
+              "published_current_days": {
+                "type": [
+                  "integer",
+                  "string",
+                  "null"
+                ]
+              },
+              "published_from_date": {
+                "$ref": "#/$defs/iso_date"
+              },
+              "real_wait_note": {
+                "type": "string"
+              },
+              "source_url": {
+                "$ref": "#/$defs/url_or_empty"
+              },
+              "source_quote": {
+                "type": "string"
+              },
+              "checked_date": {
+                "$ref": "#/$defs/iso_date"
+              },
+              "verdict": {
+                "type": "string",
+                "enum": [
+                  "CONFIRMS_OUR_ESTIMATE",
+                  "CORRECTS_IT",
+                  "NO_OFFICIAL_FIGURE"
+                ]
+              },
+              "label": {
+                "$ref": "#/$defs/label"
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "required": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F"
+          ],
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[A-F]$": {
+              "type": "object",
+              "required": [
+                "answer",
+                "source_url",
+                "checked_date",
+                "label"
+              ],
+              "additionalProperties": true,
+              "properties": {
+                "answer": {
+                  "type": "string"
+                },
+                "source_url": {
+                  "$ref": "#/$defs/url_or_empty"
+                },
+                "source_quote": {
+                  "type": "string"
+                },
+                "checked_date": {
+                  "$ref": "#/$defs/iso_date"
+                },
+                "label": {
+                  "$ref": "#/$defs/label"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "evidence_pack": {
+      "type": "object",
+      "description": "OTTO-L. premise_correction is deliberately required — the task's own title may be wrong.",
+      "required": [
+        "premise_correction",
+        "ownership",
+        "timeline",
+        "effect",
+        "competitors",
+        "strongest"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "premise_correction": {
+          "type": "string"
+        },
+        "ownership": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "$ref": "#/$defs/sourced_claim"
+          }
+        },
+        "timeline": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourced_claim"
+          }
+        },
+        "effect": {
+          "type": "object",
+          "required": [
+            "for_",
+            "against",
+            "gaps"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "for_": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/sourced_claim"
+              }
+            },
+            "against": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/sourced_claim"
+              }
+            },
+            "gaps": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "competitors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourced_claim"
+          }
+        },
+        "strongest": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/sourced_claim"
+          }
+        }
+      }
+    },
+    "sourced_claim": {
+      "type": "object",
+      "required": [
+        "source_url",
+        "checked_date",
+        "label"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "source_url": {
+          "$ref": "#/$defs/url_or_empty"
+        },
+        "source_quote": {
+          "type": "string"
+        },
+        "checked_date": {
+          "$ref": "#/$defs/iso_date"
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        },
+        "strength": {
+          "type": "string",
+          "enum": [
+            "strong",
+            "moderate",
+            "weak",
+            ""
+          ]
+        }
+      }
+    },
+    "aeo_demand_doc": {
+      "type": "object",
+      "description": "OTTO-M. The ranking is the content plan.",
+      "required": [
+        "questions",
+        "ranking"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "questions": {
+          "type": "array",
+          "minItems": 10,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "segment",
+              "question",
+              "demand_signal",
+              "current_answer_substance",
+              "relopass_mentioned",
+              "the_omission",
+              "label"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "id": {
+                "type": [
+                  "string",
+                  "integer"
+                ]
+              },
+              "segment": {
+                "type": "string",
+                "enum": [
+                  "BUYER",
+                  "EMPLOYEE"
+                ]
+              },
+              "question": {
+                "type": "string",
+                "minLength": 8
+              },
+              "demand_signal": {
+                "type": "string"
+              },
+              "demand_signal_source": {
+                "type": "string"
+              },
+              "current_answer_substance": {
+                "type": "string"
+              },
+              "domains_cited": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "vendors_named": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "relopass_mentioned": {
+                "type": "boolean"
+              },
+              "answer_quality": {
+                "type": "string"
+              },
+              "official_sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "url",
+                    "quote",
+                    "checked_date"
+                  ],
+                  "additionalProperties": true,
+                  "properties": {
+                    "url": {
+                      "$ref": "#/$defs/url_or_empty"
+                    },
+                    "quote": {
+                      "type": "string"
+                    },
+                    "checked_date": {
+                      "$ref": "#/$defs/iso_date"
+                    }
+                  }
+                }
+              },
+              "the_omission": {
+                "type": "string"
+              },
+              "could_not_source": {
+                "type": "string"
+              },
+              "label": {
+                "$ref": "#/$defs/label"
+              }
+            }
+          }
+        },
+        "ranking": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "required": [
+              "question_id",
+              "rank",
+              "why"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "question_id": {
+                "type": [
+                  "string",
+                  "integer"
+                ]
+              },
+              "rank": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "why": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "corridor_pack": {
+      "type": "object",
+      "description": "OTTO-N. One corridor. provenance MUST be 'representative' — an agent-authored 'verified' would be a fabricated SME sign-off.",
+      "required": [
+        "corridor_code",
+        "route_name",
+        "statutory_refs",
+        "eligibility",
+        "step_graph",
+        "could_not_establish",
+        "checked_date",
+        "provenance",
+        "label"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "corridor_code": {
+          "type": "string",
+          "enum": [
+            "FR_GB",
+            "FR_US",
+            "US_NO"
+          ]
+        },
+        "route_name": {
+          "type": "string",
+          "minLength": 3
+        },
+        "route_identifier": {
+          "type": "string"
+        },
+        "branches": {
+          "type": "array"
+        },
+        "statutory_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "regulation_name",
+              "url"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "regulation_name": {
+                "type": "string"
+              },
+              "article": {
+                "type": "string"
+              },
+              "url": {
+                "$ref": "#/$defs/url_or_empty"
+              }
+            }
+          }
+        },
+        "eligibility": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "sponsorship": {
+              "type": "string"
+            },
+            "salary_threshold": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "amount": {
+                  "type": [
+                    "number",
+                    "string",
+                    "null"
+                  ]
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "effective_date": {
+                  "$ref": "#/$defs/iso_date"
+                },
+                "source_url": {
+                  "$ref": "#/$defs/url_or_empty"
+                }
+              }
+            },
+            "quota": {
+              "type": "string"
+            },
+            "language": {
+              "type": "string"
+            }
+          }
+        },
+        "step_graph": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "object",
+            "required": [
+              "step_id",
+              "name",
+              "responsible_party",
+              "prerequisite_step_ids",
+              "non_obvious"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "step_id": {
+                "type": "string",
+                "pattern": "^[A-Z0-9_]+$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "responsible_party": {
+                "type": "string",
+                "enum": [
+                  "EMPLOYER",
+                  "EMPLOYEE",
+                  "AUTHORITY"
+                ]
+              },
+              "expected_duration_days": {
+                "type": [
+                  "integer",
+                  "string",
+                  "null"
+                ]
+              },
+              "duration_source_url": {
+                "$ref": "#/$defs/url_or_empty"
+              },
+              "cost_amount": {
+                "type": [
+                  "number",
+                  "string",
+                  "null"
+                ]
+              },
+              "cost_currency": {
+                "type": "string"
+              },
+              "cost_source_url": {
+                "$ref": "#/$defs/url_or_empty"
+              },
+              "prerequisite_step_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "non_obvious": {
+                "type": "boolean"
+              },
+              "non_obvious_note": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "fees": {
+          "type": "array"
+        },
+        "could_not_establish": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "checked_date": {
+          "$ref": "#/$defs/iso_date"
+        },
+        "provenance": {
+          "type": "string",
+          "const": "representative"
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        }
+      }
+    },
+    "ie_anchor_assessment": {
+      "type": "object",
+      "description": "One Irish register examined in OTTO-G stage 1. Added in v2 after OTTO-I proved that assuming a register is reachable is what breaks these cards. Decides whether Ireland can be sourced at all.",
+      "required": [
+        "category",
+        "register_name",
+        "register_domain",
+        "public_list",
+        "stable_entity_url",
+        "number_published",
+        "blocker",
+        "verdict",
+        "why",
+        "label"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": [
+            "housing_agencies",
+            "movers",
+            "banks",
+            "legal_admin",
+            "tax_finance"
+          ]
+        },
+        "register_name": {
+          "type": "string",
+          "minLength": 2
+        },
+        "register_domain": {
+          "type": "string",
+          "minLength": 3
+        },
+        "public_list": {
+          "type": "boolean"
+        },
+        "stable_entity_url": {
+          "type": "boolean"
+        },
+        "example_entity_url": {
+          "$ref": "#/$defs/url_or_empty"
+        },
+        "number_published": {
+          "type": "boolean"
+        },
+        "number_name": {
+          "type": "string"
+        },
+        "blocker": {
+          "type": "string",
+          "enum": [
+            "none",
+            "login",
+            "captcha",
+            "post_only",
+            "javascript_rendered",
+            "interactive_table",
+            "no_entity_url",
+            "robots_disallow",
+            "rate_limit",
+            "geo_block",
+            "paid_api",
+            "no_list"
+          ]
+        },
+        "bulk_route_url": {
+          "$ref": "#/$defs/url_or_empty"
+        },
+        "full_list_readable": {
+          "type": "boolean"
+        },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "machine_usable",
+            "manual_only",
+            "unusable"
+          ]
+        },
+        "why": {
+          "type": "string",
+          "minLength": 5
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        }
+      }
+    }
+  }
+}

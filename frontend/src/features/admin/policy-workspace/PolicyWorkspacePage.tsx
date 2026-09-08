@@ -10,6 +10,7 @@ import type { PolicyConfigWorkingPayload } from '../../policy-config/types';
 import { usePolicyConfigWorkspace } from '../../policy-config/usePolicyConfigWorkspace';
 import { validatePolicyConfigForPublish } from '../../policy-config/benefitRowValidation';
 import { buildRoute } from '../../../navigation/routes';
+import { useAdminViewingCompany } from '../AdminViewingCompanyContext';
 import { PolicyWorkspaceIntroCard } from './PolicyWorkspaceIntroCard';
 import { POLICY_WORKSPACE_SUBTITLE, POLICY_WORKSPACE_TITLE } from './PolicyWorkspaceHeader';
 import { PolicyWorkspaceControls } from './PolicyWorkspaceControls';
@@ -30,6 +31,7 @@ function asWorkingPayload(raw: unknown): PolicyConfigWorkingPayload | null {
 export const PolicyWorkspacePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const { selectedCompanyId: viewingCompanyId } = useAdminViewingCompany();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const pcw = usePolicyConfigWorkspace({ mode: 'admin', adminCompanyId: selectedCompanyId || undefined });
   const [draftActionLoading, setDraftActionLoading] = useState(false);
@@ -59,8 +61,14 @@ export const PolicyWorkspacePage: React.FC = () => {
 
   useEffect(() => {
     const cid = searchParams.get('company_id')?.trim();
-    if (cid) setSelectedCompanyId(cid);
-  }, [searchParams]);
+    if (cid) {
+      setSelectedCompanyId(cid);
+      return;
+    }
+    if (viewingCompanyId) {
+      setSelectedCompanyId((current) => current || viewingCompanyId);
+    }
+  }, [searchParams, viewingCompanyId]);
 
   const refreshAll = useCallback(() => {
     if (!selectedCompanyId) return;

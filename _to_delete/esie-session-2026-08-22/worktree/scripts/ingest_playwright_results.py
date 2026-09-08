@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+"""
+Ingest Playwright results into the campaign-scorer schema.
+
+The browser layer (tests/e2e) emits a Playwright JSON report (`_results.json`);
+the API layer (relopass_api_runner_patched.js) emits `test_results.json`. This
+adapter converts the Playwright report into the same `results[]` shape the scorer
+reads (id + status), MERGES it with the API layer, and writes a single
+`results/test_results_<ts>.json` for `campaign_scorer.py` to pick up.
+
+Each test ID comes from the leading `[TAG]` in the Playwright spec title
+(e.g. "[CORE-RLS] ..." -> "CORE-RLS"; "[VND-05/MSG-05] ..." -> "VND-05").
+Only IDs present in scoring_map.json are scored, so keep the two in sync.
+
+Usage:
+    python3 scripts/ingest_playwright_results.py \
+        --pw tests/e2e/test-artifacts/<RUNID>/_results.json \
+        [--api test_results.json] [--out results/test_results_<ts>.json]
+"""
+import argparse
+import glob
+import json
+import os
+import re
+from datetime import datetime, timezone
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+RESULTS_DIR = REPO_ROOT / "results"
+
+# Playwright status -> scorer status
+PW_STATUS = {
+    "passed": "PASS",
+    "failed": "FAIL",
+    "timedOut": "FAIL",
+    "interrupted": "FAIL",
+    "skipped": "SKIP",
+}
+# worst-wins ranking when an ID appears more than once
+# worst-wins ranking when an ID appears more than once. PASS must rank ABOVE SKIP:
+# parse_playwright seeds status to SKIP, so if PASS ranked below it a passing spec
+# would never overwrite the seed and would be silently dropped from the score.
+# ENV (environmental / deploy-window transient) is non-scoring like SKIP but tracked
+# separately; a real PASS or FAIL in another project outranks it.
+RANK = {"FAIL": 3, "WARN": 2, "PARTIAL": 2, "PASS": 1, "ENV": 0, "SKIP": 0}
+
+TAG_RE = re.compile(r"^\s*\[([^\]]+)\]")
+
+
+def _is_environmental(test: dict) -> bool:
+    """True if a Playwright test carries an `environmental` annotation (pushed by the
+    browser/API layer when the backend was mid rolling-restart). Checks both the
+    test-level and per-result annotations (Playwright surfaces both)."""
+    anns = list(test.get("annotations") or [])
+    for r in test.get("results") or []:
+        anns.extend(r.get("annotations") or [])
+    return any((a or {}).get("type") == "environmental" for a in anns)
+
+
+def tag_of(title: str):
+    m = TAG_RE.match(title or "")
+    if not m:
+        return None
+    # "VND-05/MSG-05" -> "VND-05"; "CORE-HR-dashboard" -> as-is
+    return re.split(r"[\s/]+", m.group(1).strip())[0]
+
+
+def walk_specs(node):
+    """Yield every spec dict from a Playwright JSON report (recursive suites)."""
+    if isinstance(node, dict):
+        for spec in node.get("specs", []) or []:
+            yield spec
+        for child in node.get("suites", []) or []:
+            yield from walk_specs(child)
+    elif isinstance(node, list):
+        for item in node:
+            yield from walk_specs(item)
+
+
+def _spec_status(spec: dict) -> str:
+    """Worst status across this spec's tests/projects."""
+    status = "SKIP"
+    for t in spec.get("tests", []) or []:
+        res = (t.get("results") or [{}])
+        pw = res[-1].get("status", "skipped")
+        s = PW_STATUS.get(pw, "FAIL")
+        # A failure caused by a deploy-window backend outage is environmental, not a
+        # bug: reclassify FAIL -> ENV so the scorer never files a P0 for it.
+        if s == "FAIL" and _is_environmental(t):
+            s = "ENV"
+        if RANK[s] >= RANK[status]:
+            status = s
+    return status
+
+
+def parse_playwright(pw_path: Path):
+    """Return (rows, untagged) — the scorable rows, and every spec that had no [TAG].
+
+    `untagged` is returned rather than discarded on purpose. A spec with no tag is
+    invisible to the scorer and therefore to the Notion filer, so if it fails, it fails
+    to nobody. That is not hypothetical: `tests/e2e/tests/public/crawler-surface.spec.ts`
+    ran against production for a day with untagged titles while Cloudflare 403'd three of
+    the crawlers it asserts on, and nothing anywhere went red (AIQ-1804). The caller turns
+    a FAILING untagged spec into a hard error.
+    """
+    data = json.loads(pw_path.read_text(encoding="utf-8"))
+    rows = {}
+    untagged = []
+    roots = data.get("suites", data)
+    for spec in walk_specs({"suites": roots} if isinstance(roots, list) else data):
+        title = spec.get("title", "")
+        status = _spec_status(spec)
+        tid = tag_of(title)
+        if not tid:
+            untagged.append({"title": title.strip(), "status": status})
+            continue
+        prev = rows.get(tid)
+        if prev is None or RANK[status] >= RANK[prev["status"]]:
+            rows[tid] = {"id": tid, "title": title.strip(), "status": status, "source": "browser"}
+    return list(rows.values()), untagged
+
+
+def summarize(results):
+    c = {"total": len(results), "pass": 0, "fail": 0, "warn": 0, "skip": 0, "env": 0}
+    for r in results:
+        s = r.get("status")
+        if s == "PASS":
+            c["pass"] += 1
+        elif s == "FAIL":
+            c["fail"] += 1
+        # BLOCKED falls through to skip. The API runner emits it only for a throttled
+        # or network-failed check and documents it as "excluded from the score
+        # denominator" (relopass_api_runner_patched.js:200-203) — counting it as a
+        # failure here contradicted the runner's own summary line, which reports the
+        # same run as "INCONCLUSIVE (rate-limited)". Matches POINTS["BLOCKED"] = None
+        # in campaign_scorer.py.
+        elif s in ("WARN", "PARTIAL"):
+            c["warn"] += 1
+        elif s == "ENV":
+            c["env"] += 1
+        else:
+            c["skip"] += 1
+    return c
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--pw", required=True, help="Playwright _results.json path")
+    ap.add_argument("--api", default=None, help="API runner test_results.json (optional)")
+    ap.add_argument("--out", default=None, help="output path (default results/test_results_<ts>.json)")
+    ap.add_argument(
+        "--allow-untagged-failures",
+        action="store_true",
+        help="report untagged failing specs but exit 0 anyway (escape hatch; do not use in CI)",
+    )
+    args = ap.parse_args()
+
+    browser, untagged = parse_playwright(Path(args.pw))
+
+    merged = {}  # id -> row ; API layer first, browser overrides/adds
+    api_meta = {}
+    api_path = args.api or (str(REPO_ROOT / "test_results.json") if (REPO_ROOT / "test_results.json").exists() else None)
+    if api_path and os.path.exists(api_path):
+        api = json.loads(Path(api_path).read_text(encoding="utf-8"))
+        api_meta = {k: api.get(k) for k in ("bugs_regression", "scenario_statuses", "performance_snapshot")}
+        for r in api.get("results", []) or []:
+            if r.get("id"):
+                merged[r["id"]] = {**r, "source": r.get("source", "api")}
+    for r in browser:
+        merged[r["id"]] = r
+
+    results = list(merged.values())
+    ts = datetime.now(timezone.utc)
+    out = {
+        "run_date": ts.strftime("%Y-%m-%d"),
+        "run_ts": ts.isoformat(),
+        "runner_version": "e2e-sentinel-1.0",
+        "mode": "API+Browser (E2E Sentinel)",
+        "summary": summarize(results),
+        "results": results,
+        **{k: v for k, v in api_meta.items() if v},
+    }
+    # ENV (deploy-window transients) are non-scoring, like SKIP — exclude from the denominator.
+    _scorable = out["summary"]["total"] - out["summary"]["skip"] - out["summary"].get("env", 0)
+    out["score_pct"] = round(100 * out["summary"]["pass"] / max(1, _scorable))
+
+    RESULTS_DIR.mkdir(exist_ok=True)
+    out_path = Path(args.out) if args.out else RESULTS_DIR / f"test_results_{ts.strftime('%Y-%m-%dT%H-%M')}.json"
+    out_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
+    print(f"✔ merged {len(browser)} browser + {len(merged) - len(browser)} api → {out_path}")
+    print(f"  summary: {out['summary']}")
+
+    return _report_untagged(untagged, allow_failures=args.allow_untagged_failures)
+
+
+def _report_untagged(untagged, *, allow_failures: bool) -> int:
+    """Print every spec the tag filter dropped, and fail if any of them FAILED.
+
+    A passing untagged spec is a gap worth naming but not worth breaking a run over. A
+    FAILING one is different: the test found a real problem and there is no path from
+    here to the scorer, the health band, or the Notion queue. Silence in that case is
+    indistinguishable from success, which is the whole defect class this guards.
+    """
+    if not untagged:
+        return 0
+
+    failing = [u for u in untagged if u["status"] in ("FAIL", "BLOCKED")]
+
+    print(f"\n  {len(untagged)} spec(s) had no [TAG] and are invisible to the scorer:")
+    for u in untagged:
+        print(f"    {u['status']:<5} {u['title']}")
+    print("  Add a leading [TAG] to the spec title AND an entry in scripts/scoring_map.json.")
+
+    if not failing:
+        return 0
+
+    print(
+        f"\n✖ {len(failing)} untagged spec(s) FAILED. A failing test that cannot reach the "
+        "scorer reports to nobody — the run would go green on a real defect.",
+    )
+    if allow_failures:
+        print("  --allow-untagged-failures set; exiting 0 anyway.")
+        return 0
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

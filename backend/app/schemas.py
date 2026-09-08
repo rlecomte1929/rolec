@@ -58,6 +58,7 @@ class AssignmentContextDTO(BaseModel):
     # AIQ-1603: single-select preferred commute mode, validated against a fixed enum so an
     # invalid value is a 422 (not silent bad data). Bridged onto public.cases.commute_preference.
     commutePreference: Optional[str] = None
+    commuteMins: Optional[int] = None
 
     @field_validator("commutePreference")
     @classmethod
@@ -235,10 +236,23 @@ class AdminRequirementReviewRequest(BaseModel):
     status: str  # approved | rejected
 
 
+class AdminRequirementBatchReviewRequest(BaseModel):
+    ids: List[str]
+    status: str  # approved | rejected
+
+
+class AdminRequirementBatchReviewDTO(BaseModel):
+    items: List[AdminRequirementReviewDTO]
+
+
 class CountryListItemDTO(BaseModel):
     countryCode: str
+    countryName: str
+    isoCode: Optional[str] = None
     lastUpdatedAt: Optional[datetime] = None
     requirementsCount: int
+    publishedCount: int = 0
+    pendingCount: int = 0
     confidenceScore: Optional[float] = None
     topDomains: List[str]
 

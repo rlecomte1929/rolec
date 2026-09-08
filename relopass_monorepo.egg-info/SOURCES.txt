@@ -1,0 +1,7 @@
+LICENSE
+README.md
+pyproject.toml
+relopass_monorepo.egg-info/PKG-INFO
+relopass_monorepo.egg-info/SOURCES.txt
+relopass_monorepo.egg-info/dependency_links.txt
+relopass_monorepo.egg-info/top_level.txt

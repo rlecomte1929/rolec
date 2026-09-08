@@ -1,0 +1,127 @@
+# gitleaks config for ReloPass — SEC-FE-7 (AP-02 Layer 4).
+# Used by the `secrets-scan` job in .github/workflows/ci.yml, which scans each
+# PR's commit range and FAILS on a secret-shaped string.
+
+title = "ReloPass gitleaks config"
+
+[extend]
+# Start from gitleaks' built-in rule set (AWS, GCP, Stripe, JWT, generic, …).
+useDefault = true
+
+# Keep this as the singular `[allowlist]` table. The `[[allowlists]]` array form is
+# accepted by gitleaks 8.30 but silently ignored by 8.24.3, which is the version
+# gitleaks-action@v3 installs in CI — the AIQ-1825 slug regex below scanned clean
+# locally and still reported its 8 findings on the runner until this was reverted.
+# Pin any future change against 8.24.3, not against whatever `brew install` gives.
+[allowlist]
+description = "Intentionally-public values and known false positives"
+
+# --- Public Supabase ANON keys -------------------------------------------------
+# The Supabase anon key is public by design — it ships in the frontend bundle and
+# is subject to RLS. It also appears in a few migrations/edge-function calls. The
+# base64 fragment below is `"role":"anon"` inside the JWT payload, so this
+# allowlists ONLY anon JWTs. A SERVICE_ROLE key (`"role":"service_role"`, base64
+# `cm9sZSI6InNlcnZpY2Vfcm9sZSI`) does NOT match and still fails the scan.
+regexes = [
+  '''cm9sZSI6ImFub24''',
+  # Fake token literal in backend/tests/test_campaign_evidence.py — exercises the
+  # log scrubber (_scrub redacts bearer tokens); not a real secret. Surgical match
+  # (this exact string only) so real secrets in test files still fail the scan.
+  '''abcdefghijklmnopqrstuvwxyz123456\.signaturepart''',
+  # [AIQ-1821] Google reCAPTCHA SITE key baked into skatteetaten.no / udi.no pages,
+  # captured verbatim in backend/tests/fixtures/requirement_facts_eval/pages/*.html.
+  # A reCAPTCHA *site* key is public by design — it is rendered into every visitor's
+  # browser; the confidential counterpart is the *secret* key, which is server-side
+  # only and appears nowhere here. Not ours, and not a secret.
+  # Matched on this specific key's prefix rather than allowlisting the fixture
+  # directory, so those snapshots stay scanned for anything that IS a real secret.
+  '''6Ld4-R0bAAAA''',
+  # [AIQ-1821] Same class: the Kindly chat widget's public `data-bot-key` on udi.no.
+  # A client-side widget identifier shipped in the page markup to every visitor.
+  '''746157c0-bb21-4a''',
+  # [AIQ-1825] Immigration fact-seed topic_key/fact_key slugs. Hyphenated identifiers
+  # mixing letters and digits — "h1b-annual-cap-lottery", "hqa-subordinate-art61a",
+  # "skills-in-demand-482-eligibility" — clear the generic-api-key entropy threshold;
+  # eight failed the scan on #1842.
+  #
+  # Matched by SHAPE rather than by a `paths` entry like the two below, and that was
+  # arrived at by measurement. A `paths` entry for the seed directory blinds the
+  # scanner to everything in it: a planted sk_live_ there scanned clean. Adding the
+  # shape under `condition = "AND"` was no better — the control, an identical Stripe
+  # key written both inside and outside the path, was caught only outside. The seed
+  # is machine-generated and grows a file per country batch, so a directory blind
+  # spot would widen with every import.
+  #
+  # This requires the ENTIRE string to be lowercase alphanumerics joined by - or _,
+  # which is the shape of a topic slug and of no credential the rules look for.
+  # Verified on gitleaks 8.24.3 (the CI version): the real 142-fact seed reports 0
+  # findings, and sk_live_ / AKIA / a service_role JWT / ghp_ planted in that same
+  # file still fire as stripe-access-token, generic-api-key, jwt and github-pat.
+  # [AIQ-1852 follow-up] `[-_]+`, not `[-_]`. The corridor batches use a DOUBLED
+  # underscore to separate a fact slug from its nationality-class qualifier —
+  # "es_ie_irish_income_tax_rates_2025_2026__eea",
+  # "no_fr_france_tax_domicile_trigger_cgf_4b__non_eea". The single-separator form
+  # required every `_` to be followed by an alphanumeric, so the empty segment between
+  # the two underscores failed the match and the slug fell through to generic-api-key.
+  # Eight findings on the 2026-08-22 NO-FR/ES-IE curated batches, all of them this shape.
+  #
+  # This does not loosen what a credential may look like: the rule still demands the
+  # WHOLE string be lowercase alphanumerics joined by separators, which already admitted
+  # a long lowercase run before this change and still refuses sk_live_ / AKIA / ghp_ /
+  # JWT (all carry uppercase or `.`). Verified on gitleaks 8.24.3 — the CI version, not
+  # brew's 8.30.1 — in CI's own commit-range mode.
+  #
+  # The 12-char segment cap is borrowed from the country-prefixed rule below, and makes
+  # this rule STRICTER than the one it replaces rather than looser. The old form admitted
+  # "no_fr_averylongsecrettokenvalue1234567890abcdef" — one long run behind a slug-shaped
+  # prefix — and caught its doubled-underscore twin only by accident, via the same bug
+  # that broke the real slugs. Both are refused now. Every real slug in the 2026-08-22
+  # batches passes. The cap is 16, not the neighbouring rule's 12: real slugs in this repo
+  # use words longer than twelve — "b3-no-stavanger-practicalities" (14),
+  # "rf1199_applicability" (13) — and a 12 cap flagged all of them.
+  #
+  # THIS CAP IS LEAD-BEARING, NOT COSMETIC. Without it the rule allowlists any all-lowercase
+  # run behind a slug-shaped prefix, and it was doing exactly that in production: the
+  # uncapped form hid a live `ak_live_…` key committed in
+  # `audos-workspace-776786/published-bundle.html` (on main since 2026-07-01, pushed by
+  # [audos-sync]) and an `lsv2_pt_…` LangSmith token in a local .env. Both fire with the cap
+  # in place. Do not remove it to make a scan pass.
+  '''^[a-z][a-z0-9]{0,15}(?:[-_]+[a-z0-9]{1,16})+$''',
+  # [AIQ-1892] Same class as the AIQ-1825 slugs above, one character different: these
+  # fact_key/topic_key values carry an ISO country-code PREFIX, so they start with a
+  # capital — "DE-ebc-elig-salary-2024", "JP_hsp_eligibility_70_points",
+  # "KR_D8_corporate_investment". The lowercase-anchored regex above requires ^[a-z]
+  # and therefore misses every one of them; 22 fired on the WorkspaceDB export import.
+  #
+  # Deliberately NOT a `paths` entry for the export directory. The AIQ-1825 note above
+  # records why: a path entry blinds the scanner to everything beneath it, and that
+  # directory is 58 MB of machine-generated rows nobody reads by eye — the worst place
+  # in the repo to stop looking for credentials.
+  #
+  # Shape, tightened past the obvious version. `^[A-Z]{2}[-_]...` alone would also
+  # allowlist "AB_supersecret" and "SG_ActualSecretValueHere123", so this additionally
+  # requires at least TWO segments after the prefix and caps each segment at 12 chars:
+  # a topic slug is many short words, a credential is one long run. Measured on
+  # gitleaks 8.24.3 (the CI version, not brew's 8.30.1): the export reports 0 findings,
+  # while sk_live_ / AKIA / ghp_ / a service_role JWT planted in those same files all
+  # still fire — including the adversarial "US_AKIAIOSFODNN7EXAMPLE",
+  # "DE_aVeryLongSecretTokenValue12345" and "GB-4eC39HqLyjWDarjtT1zdp7dc", which are
+  # built to look like country-prefixed slugs and do not match.
+  '''^[A-Z]{2}[-_][A-Za-z0-9]{1,12}(?:[-_][A-Za-z0-9]{1,12}){1,}$''',
+  # [AIQ-1892] Scraped page text in linked_references, not an identifier at all. A video
+  # listing reads "...Token-Based1 min16:40Demystifying..." and generic-api-key fires on
+  # "40Demystifying" because the word Token sits a few characters to its left. Surgical
+  # single-string match, same approach as the test-token literal above, so the rest of
+  # that 6,421-row scraped corpus stays scanned.
+  '''40Demystifying''',
+]
+
+# --- Known false-positive paths ------------------------------------------------
+# Seed-data slugs (e.g. "stable_key": "nl_30pct_ruling") trip the generic-api-key
+# heuristic, and long-form design docs contain prose that looks key-shaped.
+# Neither carries real secrets.
+paths = [
+  '''backend/seed_data/.*\.json''',
+  '''docs/superpowers/.*\.md''',
+]
+

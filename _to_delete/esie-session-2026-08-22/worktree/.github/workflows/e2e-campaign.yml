@@ -1,0 +1,320 @@
+name: E2E Sentinel Campaign
+
+# Runs on every deploy to main (post-deploy smoke, gated on a /health check) and
+# on manual dispatch. The whole job no-ops unless the repo variable
+# E2E_CAMPAIGN_ENABLED == 'true', so merging this file changes nothing until you opt in.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      projects:
+        description: "Playwright projects to run"
+        type: string
+        default: "--project=public --project=provision --project=readiness --project=core --project=write-flow --project=deep --project=r4x-provision --project=run004x"
+
+concurrency:
+  group: e2e-sentinel-campaign
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  campaign:
+    name: Provision → API + Browser → Score
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ vars.E2E_CAMPAIGN_ENABLED == 'true' }}
+    env:
+      RUNID: ci-${{ github.run_id }}-${{ github.run_number }}
+      E2E_API_URL: ${{ vars.E2E_API_URL || 'https://api.relopass.com' }}
+      E2E_APP_URL: ${{ vars.E2E_APP_URL || 'https://relopass.com' }}
+      RELOPASS_E2E_PASSWORD: ${{ secrets.RELOPASS_E2E_PASSWORD }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # [AIQ-1685] Lets the deep journey complete a test-mode roadmap payment (locally-signed
+      # checkout.session.completed) so [DEEP-ROADMAP-API] validates generation for a PAID case
+      # while the paywall (RELOPASS_ROADMAP_PAYWALL_ENABLED) is on. Must equal the value the
+      # backend verifies against; if unset, that check skips cleanly (no false P0).
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # On a deploy, Render takes a few minutes to roll. Wait for the API to be
+      # healthy (and, if the API exposes its commit, for the new SHA) before testing.
+      - name: Wait for deploy / health
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "deploy grace: sleeping ${E2E_DEPLOY_GRACE:-180}s for Render to roll"
+            sleep "${E2E_DEPLOY_GRACE:-180}"
+          fi
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$E2E_API_URL/health" || true)
+            if [ "$code" = "200" ]; then echo "✔ API healthy"; exit 0; fi
+            echo "waiting for API ($code) … $i/30"; sleep 15
+          done
+          echo "✗ API not healthy after timeout"; exit 1
+        env:
+          E2E_DEPLOY_GRACE: ${{ vars.E2E_DEPLOY_GRACE }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      - name: Install harness deps
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: tests/e2e
+        run: npx playwright install --with-deps chromium
+
+      # Provision + browser/lifecycle FIRST, so provisioning gets the fresh
+      # registration rate-limit budget (the API-smoke layer registers accounts too).
+      - name: Browser + lifecycle layer
+        working-directory: tests/e2e
+        continue-on-error: true
+        env:
+          # via env (not inline ${{ }}) to avoid run-command injection from the dispatch input;
+          # falls back to the default project set on a push (no dispatch input present)
+          PROJECTS: ${{ github.event.inputs.projects || '--project=public --project=provision --project=readiness --project=core --project=write-flow --project=deep --project=r4x-provision --project=run004x' }}
+        run: |
+          # shellcheck disable=SC2086  # PROJECTS is several flags; word-splitting is intended
+          npx playwright test $PROJECTS
+
+      # Honest-green gate: if provisioning didn't produce all 3 sessions, the dependent
+      # tests SKIP and the scorer would read a VACUOUS 100% GREEN. Fail loudly instead.
+      - name: Verify provisioning
+        id: gate
+        working-directory: tests/e2e
+        run: |
+          missing=0
+          for f in hr_a emp_a hr_b; do
+            if [ ! -s "playwright/.auth/${f}.json" ]; then echo "missing session: ${f}"; missing=1; fi
+          done
+          if [ ! -s "playwright/.auth/_provisioned.json" ]; then echo "missing _provisioned.json"; missing=1; fi
+          if [ "$missing" = "1" ]; then
+            echo "Provisioning incomplete — NOT a valid run (a 100% score here would be vacuous)."
+            exit 1
+          fi
+          echo "provisioning complete (hr_a, emp_a, hr_b)"
+          # Phase 3 readiness marker: if the company data paths never warmed (deploy
+          # window), mark the run degraded so the scorer treats it as INCONCLUSIVE.
+          ready=$(python3 -c "import json,os;p='playwright/.auth/_ready.json';print(json.load(open(p)).get('ready') if os.path.exists(p) else True)" 2>/dev/null || echo True)
+          if [ "$ready" = "False" ]; then
+            echo "readiness: company data paths NOT warm → run is INCONCLUSIVE (degraded)"
+            echo "degraded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "readiness: data paths warm"
+            echo "degraded=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # API smoke layer runs AFTER provisioning so it doesn't eat provision's rate budget.
+      - name: API smoke layer
+        if: ${{ env.RELOPASS_E2E_PASSWORD != '' }}
+        continue-on-error: true
+        run: node relopass_api_runner_patched.js --api-only || true
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      # Deploy-window hard-gate. The pre-run readiness gate (steps.gate) can't see a Render
+      # rolling-restart that begins DURING the run — that's how a mid-deploy failure (e.g.
+      # [AT1] admin login) gets scored + filed as a false P0 (AIQ-1418 / -1375 / -1386 / -1394 /
+      # -1395). Re-check here and OR the signals; any hit marks the whole run INCONCLUSIVE so the
+      # scorer files nothing. Safe: a real bug re-fails on the next warm run (health 200, no infra
+      # signature → not degraded) and files then — nothing is permanently suppressed.
+      - name: Post-run deploy-window gate
+        id: healthgate
+        env:
+          READINESS_DEGRADED: ${{ steps.gate.outputs.degraded }}
+        run: |
+          reason=""
+          # (a) pre-run readiness already flagged cold data paths
+          if [ "$READINESS_DEGRADED" = "true" ]; then reason="cold-data-paths (readiness)"; fi
+          # (b) post-run /health re-probe — catches a deploy still rolling at test end
+          if [ -z "$reason" ]; then
+            for i in 1 2 3 4 5; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" "$E2E_API_URL/health" || true)
+              echo "post-run /health probe $i → $code"
+              if [ "$code" != "200" ]; then reason="post-run /health=$code"; break; fi
+              sleep 4
+            done
+          fi
+          # (c) retroactive — the API runner recorded a FAILED test with a gateway (502/503/504)
+          #     or network (status 0) response, i.e. the run raced a deploy even if /health has
+          #     since recovered. 4xx / plain 500 are NOT treated as infra (could be real bugs).
+          if [ -z "$reason" ]; then
+            hit=$(python3 scripts/detect_deploy_window.py test_results.json || true)
+            if [ -n "$hit" ]; then reason="infra-signature ($hit)"; fi
+          fi
+          if [ -n "$reason" ]; then
+            echo "::notice::deploy-window detected — run is INCONCLUSIVE, scorer files nothing ($reason)"
+            echo "degraded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend healthy throughout — real failures will file normally"
+            echo "degraded=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Runs to completion and records the verdict; the gate below acts on it.
+      #
+      # This step used to carry `continue-on-error: true` ("Phase 1: known-open bugs keep it
+      # RED; don't fail the job yet"). That mask was the ONLY thing between a red test and a
+      # red run, so no test outcome could fail the campaign — and three crawler assertions
+      # plus [R4X-B] were failing into the void on 2026-08-11 while the run went green.
+      # `scripts/sentinel_baseline.json` removes the reason for the mask: known-open bugs are
+      # named there, everything else fails.
+      #
+      # Both commands must still run even when the first reports a problem — aborting here
+      # would skip scoring AND the Notion sync, which is worse than the silence it replaces.
+      - name: Ingest + score
+        id: score
+        run: |
+          set +e
+          python3 scripts/ingest_playwright_results.py \
+            --pw "tests/e2e/test-artifacts/${RUNID}/_results.json" \
+            ${{ env.RELOPASS_E2E_PASSWORD != '' && '--api test_results.json' || '' }}
+          ingest_rc=$?
+          python3 scripts/campaign_scorer.py --no-prev ${{ steps.healthgate.outputs.degraded == 'true' && '--degraded' || '' }} | tee /tmp/score.txt
+          score_rc=${PIPESTATUS[0]}
+          echo "ingest_rc=$ingest_rc" >> "$GITHUB_OUTPUT"
+          echo "score_rc=$score_rc"   >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## E2E Sentinel — run ${RUNID}"
+            echo '```'
+            sed -e 's/\x1b\[[0-9;]*m//g' /tmp/score.txt 2>/dev/null | grep -E "OVERALL|RED|AMBER|GREEN|NEW FAILURES|REGRESS|•" || echo "(no score output)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report + artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-sentinel-${{ github.run_id }}
+          path: |
+            results/campaign_report_*.json
+            results/test_results_*.json
+            tests/e2e/test-artifacts/${{ env.RUNID }}/_results.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      # Phase 2 confirm-twice: pull the PREVIOUS campaign's failure state so we only
+      # file a P0 for a test that failed twice in a row (a transient rarely does).
+      # Best-effort: missing state → confirm-twice fails open (files normally).
+      - name: Download previous sentinel state
+        if: ${{ always() && vars.E2E_NOTION_SYNC_ENABLED == 'true' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          mkdir -p results
+          # AIQ-1738: only COMPLETED runs have uploaded their sentinel-state artifact, and
+          # the most-recent one may not have it yet (near-simultaneous runs race). So walk
+          # the recent completed runs and take the FIRST that actually yields the artifact,
+          # rather than blindly resolving [0] and giving up. A missing baseline still fails
+          # open for new-task filing, but reopening a Done task stays fail-closed downstream.
+          loaded=""
+          for prev in $(gh run list --workflow=e2e-campaign.yml --branch=main --status=completed --limit=15 \
+              --json databaseId --jq ".[] | .databaseId | tostring" 2>/dev/null | grep -v "^${RUN_ID}$" || true); do
+            if gh run download "$prev" -n sentinel-state -D results/ 2>/dev/null && [ -f results/last_failures.json ]; then
+              mv results/last_failures.json results/prev_failures.json
+              echo "loaded prev sentinel state from run $prev"
+              loaded=1
+              break
+            fi
+          done
+          if [ -z "$loaded" ]; then
+            echo "no prior sentinel-state found in recent completed runs — confirm-twice fails open for new tasks (reopens stay held)"
+          fi
+
+      # Optional: sync P0/P1 failures + regressions into the Notion Work Queue (gated).
+      # Deterministic create-or-update, de-duped by test_id — no LLM.
+      - name: Sync failures to Notion Work Queue
+        if: ${{ always() && vars.E2E_NOTION_SYNC_ENABLED == 'true' }}
+        env:
+          NOTION_QUEUE_TOKEN: ${{ secrets.NOTION_QUEUE_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$NOTION_QUEUE_TOKEN" ]; then echo "NOTION_QUEUE_TOKEN not set — skipping"; exit 0; fi
+          python3 scripts/notion_sync_candidates.py --apply \
+            --confirm-twice results/prev_failures.json \
+            --state-out results/last_failures.json
+
+      # Persist THIS run's failure state for the next run's confirm-twice comparison.
+      - name: Upload sentinel state
+        if: ${{ always() && vars.E2E_NOTION_SYNC_ENABLED == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: sentinel-state
+          path: results/last_failures.json
+          retention-days: 14
+          if-no-files-found: warn
+
+      # Optional Slack ping (gated). Reads the band line from the scorer output via env.
+      - name: Notify Slack
+        if: ${{ always() && vars.E2E_SLACK_ENABLED == 'true' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then echo "SLACK_WEBHOOK_URL not set — skipping"; exit 0; fi
+          band=$(sed -e 's/\x1b\[[0-9;]*m//g' /tmp/score.txt 2>/dev/null | grep -oE "GREEN|AMBER|RED" | head -1 || echo "N/A")
+          python3 - "$band" "$RUN_URL" <<'PY'
+          import json, os, sys, urllib.request
+          band, url = sys.argv[1], sys.argv[2]
+          msg = {"text": f"ReloPass E2E Sentinel: {band} — {url}"}
+          req = urllib.request.Request(os.environ["SLACK_WEBHOOK_URL"], data=json.dumps(msg).encode(),
+                                       headers={"Content-Type": "application/json"})
+          urllib.request.urlopen(req, timeout=15)
+          PY
+
+      # Optional per-run auto-delete of the is_test data this run created (gated).
+      # The report artifact preserves all evidence, so purging keeps the DB lean.
+      #
+      # AIQ-1593: this runs on every push to main. --min-age-hours protects is_test data
+      # younger than N hours so a LIVE test-drive tester (their @probe.test account + case)
+      # is never wiped mid-run by an unrelated merge. Default 24h; override with the
+      # E2E_PURGE_MIN_AGE_HOURS repo var. The manual full teardown (e2e-purge.yml) keeps
+      # the un-guarded purge (no --min-age-hours) for a complete wipe.
+      - name: Auto-delete is_test data
+        if: ${{ always() && vars.E2E_AUTODELETE_ENABLED == 'true' && env.DATABASE_URL != '' }}
+        env:
+          # repo var (admin-controlled), default 24h — passed via env, not inline in run:
+          MIN_AGE_HOURS: ${{ vars.E2E_PURGE_MIN_AGE_HOURS || '24' }}
+        run: |
+          pip install --quiet psycopg2-binary
+          python3 scripts/e2e_purge.py --apply --min-age-hours "$MIN_AGE_HOURS"
+
+      # THE GATE. Deliberately last: every step above — scoring, artifact upload, the Notion
+      # sync, Slack, the purge — must run first, so a red result is fully recorded before the
+      # job is allowed to fail. Failing earlier would suppress the very reporting that makes
+      # the failure actionable.
+      #
+      # Fails when the scorer saw a failure that is NOT in scripts/sentinel_baseline.json, or
+      # when the ingester found a FAILING spec with no [TAG] (invisible to the scorer, so it
+      # would otherwise report to nobody). Known-open bugs live in the baseline and do not
+      # fail the run.
+      - name: Gate — fail on anything not already known-open
+        if: always()
+        env:
+          INGEST_RC: ${{ steps.score.outputs.ingest_rc }}
+          SCORE_RC: ${{ steps.score.outputs.score_rc }}
+        run: |
+          if [ "${SCORE_RC:-0}" != "0" ]; then
+            echo "::error::Campaign has a failure that is not in scripts/sentinel_baseline.json."
+            echo "See the 'Ingest + score' step for which test, and the run artifact for detail."
+          fi
+          if [ "${INGEST_RC:-0}" != "0" ]; then
+            echo "::error::A FAILING spec has no [TAG], so it cannot reach the scorer or Notion."
+            echo "Add a leading [TAG] to its title and an entry in scripts/scoring_map.json."
+          fi
+          [ "${SCORE_RC:-0}" = "0" ] && [ "${INGEST_RC:-0}" = "0" ]

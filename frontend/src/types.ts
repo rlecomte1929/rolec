@@ -438,6 +438,8 @@ export interface AssignmentContextDTO {
   expectedDurationMonths?: number;
   /** AIQ-1603: single-select commute preference (car/public_transport/bike/walk/no_preference). */
   commutePreference?: string;
+  /** Intake commute ceiling (minutes) — reused by housing questions / RFQ. */
+  commuteMins?: number;
 }
 
 export interface CaseDraftDTO {
@@ -531,8 +533,12 @@ export interface CountryProfileDTO {
 export interface CountryListDTO {
   countries: {
     countryCode: string;
+    countryName: string;
+    isoCode?: string | null;
     lastUpdatedAt?: string;
     requirementsCount: number;
+    publishedCount: number;
+    pendingCount: number;
     confidenceScore?: number;
     topDomains: string[];
   }[];

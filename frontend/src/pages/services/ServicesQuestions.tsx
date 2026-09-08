@@ -166,6 +166,7 @@ export const ServicesQuestions: React.FC = () => {
             if (v !== undefined) merged[k] = v;
           }
         }
+        Object.assign(merged, res.derived_answers || {});
         const qs = (res.questions || []) as DynamicQuestion[];
         const withDefaults = { ...merged };
         for (const q of qs) {
