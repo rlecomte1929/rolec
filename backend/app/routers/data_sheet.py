@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 from .. import schemas
@@ -25,6 +25,7 @@ from ..auth_deps import get_current_user
 from ..services.case_service import _assert_case_access
 from ..services.data_sheet_service import build_data_sheet
 from ..services.data_sheet_write_service import apply_field_edit
+from ..services.datasheet_export import build_datasheet_pdf
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 logger = logging.getLogger(__name__)
@@ -64,4 +65,25 @@ def edit_case_datasheet_field(
     return apply_field_edit(
         resolved_case_id, field_id, payload.value, user,
         audience=audience, lang=lang, mode=mode,
+    )
+
+
+@router.get("/{case_id}/datasheet/pdf")
+def get_case_datasheet_pdf(
+    case_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Response:
+    # Export the case's data sheet as a print-grade PDF (render_data_sheet, channel-aware).
+    # The employee's takeaway artifact for corridors with no fillable government form.
+    resolved_case_id = _assert_case_access(user, case_id)
+    pdf_bytes, filename = build_datasheet_pdf(resolved_case_id)
+    if pdf_bytes is None:
+        raise HTTPException(status_code=404, detail="No data sheet available for this case")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+        },
     )

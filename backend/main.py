@@ -194,7 +194,6 @@ from .app.routers import crons as crons_router  # [P4-4]
 from .app.routers import mobility_context as mobility_context_router
 from .app.routers import admin_mobility as admin_mobility_router
 from .app.routers import policy_canonical as policy_canonical_router
-from .app.routers import policy_templates as policy_templates_router
 from .app.routers import hr_coordination as hr_coordination_router
 from .app.routers import prescreening as prescreening_router
 from .app.routers import integrations_personio_webhook as personio_webhook_router
@@ -939,7 +938,6 @@ app.include_router(admin_form_templates_router.router, prefix="/api/admin")
 app.include_router(admin_recommendations_debug_router, prefix="/api/admin")  # [AUDIT-C2.3 restore]
 app.include_router(policy_canonical_router.admin_router, prefix="/api/admin")  # [AUDIT-C2.3 restore]
 app.include_router(policy_canonical_router.read_router, prefix="/api")  # [AUDIT-C2.3 restore]
-app.include_router(policy_templates_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(suppliers_router.router)
 app.include_router(resources_router.router)
 app.include_router(hr_resources_router.router)
