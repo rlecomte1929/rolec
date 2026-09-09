@@ -228,6 +228,24 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("nbs.sk",                        "NBS — Národná banka Slovenska supervised-entities register"),
     ("lb.lt",                         "Lietuvos bankas — financial-market-participants register"),
     ("bank.lv",                       "Latvijas Banka — licensed credit-institutions register"),
+    # Registry-gap wiring 2026-09-09 — NO/DE schools, ES/SE/FI/IT non-movers. Each register was
+    # probed live; names below match the RegistrySource entries exactly (source_for_url keys on name).
+    ("nsr.udir.no",                   "NSR — Nasjonalt skoleregister (Udir, NO)"),
+    ("bildung.berlin.de",             "Schulverzeichnis Berlin (Senatsverwaltung für Bildung)"),
+    ("bildung.hessen.de",             "Hessische Schuldatenbank (Hessisches Kultusministerium)"),
+    ("comunidad.madrid",              "RAIN — Registro de Agentes Inmobiliarios de la Comunidad de Madrid"),
+    ("abogacia.es",                   "Censo General de Letrados (Consejo General de la Abogacía Española)"),
+    ("icac.gob.es",                   "ROAC — Registro Oficial de Auditores de Cuentas (ICAC)"),
+    ("bde.es",                        "Registro de Entidades del Banco de España"),
+    ("fmi.se",                        "Fastighetsmäklarinspektionen (FMI) — register of estate agents (SE)"),
+    ("advokatsamfundet.se",           "Sveriges advokatsamfund — Swedish Bar member register"),
+    ("revisorsinspektionen.se",       "Revisorsinspektionen — Swedish statutory auditor register"),
+    ("fi.se",                         "Finansinspektionen (FI) — company register (SE)"),
+    ("lvv.fi",                        "Välitysliikerekisteri — FI real-estate & letting agency register (Luova)"),
+    ("registroimprese.it",            "Registro Imprese / REA — Camere di Commercio (IT)"),
+    ("consiglionazionaleforense.it",  "Albo Unico Nazionale degli Avvocati (Consiglio Nazionale Forense)"),
+    ("commercialisti.it",             "Albo Unico Nazionale dei Dottori Commercialisti (CNDCEC)"),
+    ("bancaditalia.it",               "Albo delle banche — Banca d'Italia (GIAVA)"),
 )
 
 
