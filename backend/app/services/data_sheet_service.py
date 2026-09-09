@@ -229,7 +229,7 @@ def build_data_sheet(
             if is_consult:
                 # Firewall: never a value, guidance only — even if a value were somehow stored.
                 field_dtos.append(schemas.DataSheetFieldDTO(
-                    factKey=fact_key, label=label, category=category,
+                    fieldId=fid, factKey=fact_key, label=label, category=category,
                     source="consult_professional", value=None,
                     guidance=fd.get("note"),
                     requiresOriginal=bool(fd.get("requires_original", False)),
@@ -243,14 +243,14 @@ def build_data_sheet(
             if value:
                 filled += 1
                 field_dtos.append(schemas.DataSheetFieldDTO(
-                    factKey=fact_key, label=label, category=category,
+                    fieldId=fid, factKey=fact_key, label=label, category=category,
                     source=_SOURCE_MAP.get((sv or {}).get("source"), "intake"),
                     value=value, confidence=(sv or {}).get("ai_confidence"),
                     requiresOriginal=bool(fd.get("requires_original", False)),
                 ))
             else:
                 field_dtos.append(schemas.DataSheetFieldDTO(
-                    factKey=fact_key, label=label, category=category,
+                    fieldId=fid, factKey=fact_key, label=label, category=category,
                     source="needs_input", value=None, hint=fd.get("note"),
                     requiresOriginal=bool(fd.get("requires_original", False)),
                 ))

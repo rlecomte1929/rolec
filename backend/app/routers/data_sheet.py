@@ -15,17 +15,23 @@ prod boots backend.main:app, so a router wired only into the modular app 405s in
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 
 from .. import schemas
 from ..auth_deps import get_current_user
 from ..services.case_service import _assert_case_access
 from ..services.data_sheet_service import build_data_sheet
+from ..services.data_sheet_write_service import apply_field_edit
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 logger = logging.getLogger(__name__)
+
+
+class DataSheetFieldEdit(BaseModel):
+    value: Optional[str] = None
 
 
 @router.get("/{case_id}/datasheet", response_model=schemas.DataSheetDTO)
@@ -40,3 +46,22 @@ def get_case_datasheet(
     # assignment id). Key the read-model on the RETURN VALUE, never the raw param (AIQ-1775).
     resolved_case_id = _assert_case_access(user, case_id)
     return build_data_sheet(resolved_case_id, audience=audience, lang=lang, mode=mode)
+
+
+@router.patch("/{case_id}/datasheet/fields/{field_id}", response_model=schemas.DataSheetDTO)
+def edit_case_datasheet_field(
+    case_id: str,
+    field_id: str,
+    payload: DataSheetFieldEdit,
+    audience: str = "employee",
+    lang: str = "en",
+    mode: str = "full",
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> schemas.DataSheetDTO:
+    # Persist a user's edit (form-local write-back) and return the recomposed sheet.
+    # Consult-professional fields are rejected inside apply_field_edit (422).
+    resolved_case_id = _assert_case_access(user, case_id)
+    return apply_field_edit(
+        resolved_case_id, field_id, payload.value, user,
+        audience=audience, lang=lang, mode=mode,
+    )

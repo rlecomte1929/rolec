@@ -295,6 +295,8 @@ class DataSheetDeadlineDTO(BaseModel):
 
 
 class DataSheetFieldDTO(BaseModel):
+    # The template field id — the address the edit endpoint (PATCH .../fields/{fieldId}) keys on.
+    fieldId: str
     # The governed fact this field references (fact_dictionary). None when the seed does not
     # yet know the field — the field still renders from its own attributes.
     factKey: Optional[str] = None

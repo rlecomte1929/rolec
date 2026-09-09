@@ -19,6 +19,9 @@ import { EmployeeCaseRoadmapPage } from '../EmployeeCaseRoadmapPage';
 import { resolveRoadmapBuildVariant } from '../roadmapBuildVariant';
 
 // ── Stub AppShell ────────────────────────────────────────────────────────────
+// The data sheet is orthogonal to roadmap behaviour and pulls in React Query; stub it so this
+// page test needs no QueryClientProvider. DataSheetView has its own coverage in features/datasheet.
+vi.mock('../../../features/datasheet/DataSheetView', () => ({ DataSheetView: () => null }));
 vi.mock('../../../components/AppShell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="app-shell">{children}</div>
