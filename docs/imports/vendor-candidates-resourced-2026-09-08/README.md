@@ -290,6 +290,26 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   (different websites + the unit type is inline in the name, so distinct `_name_key`) — contrast Berlin
   British School, which folded (shared website + parenthetical unit).
 
+### XX-SE banks (Stockholm) — `vendor-resourced-xx-se-banks-2026-09-09` (landed 2026-09-09) — first capital-first empty vein
+- Source (GCS): `1788966088577_eiycrde7.ndjson` (+ manifest `1788966142028_0268tlqa.json`).
+- Otto manifest: **7 sourced, 4 rejected** — rejects honest: Länsförsäkringar + Danske filial +
+  Collector/Norion (no resolving `details?id=` page → refused to guess); and the Nordea **parent**
+  (id 168253, foreign cross-border "saknas") — Otto correctly sourced the Swedish **filial** (id
+  168257) instead.
+- **Register type = per-entity, SERVER-RENDERED (Finansinspektionen företagsregister, HTTP_LISTING
+  tier 2).** All 7 `source_url`s are the correct `fi.se/.../company-register/details?id=<n>` form
+  (clears the #2191 `entry_url_pattern` gate — the framing fix we caught before dispatch worked).
+  Independently verified all 7 by curl: HTTP 200, bank name + `orgnr` on each page. `orgnr` in
+  `accreditation_number`.
+- **⚠️ Swedbank HELD — national-arm collision.** `_name_key` predictor (pre-apply) flagged Swedbank
+  AB (Sweden, orgnr 502017-7753) colliding with the EXISTING **Lithuanian** `"Swedbank", AB` (source
+  `lb.lt`, capability LT) — the same Santander-class risk. Excluded from the CSV pre-apply to avoid
+  mis-attaching a SE/banks cap onto the Lithuanian entity; evidence preserved in the committed NDJSON;
+  held for a correct re-land. Nordea filial did NOT collide (distinct `_name_key`).
+- Landed: **+6 new suppliers** (SEB, Svenska Handelsbanken, SBAB, ICA Banken, Avanza, Nordea Bank Abp
+  filial i Sverige — SE/banks, pending), 0 mis-attach (post-apply promoted_supplier_id-vs-country
+  check empty). Tripwire: `ssc` `approved` **130 → 130** md5 unchanged; pending 1013 → 1019.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
