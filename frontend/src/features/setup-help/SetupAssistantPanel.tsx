@@ -14,7 +14,9 @@
 import React, { useCallback, useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Circle } from 'lucide-react';
-import { Alert, Button, Card } from '../../components/antigravity';
+import { Alert } from '../../components/antigravity/Alert';
+import { Button } from '../../components/antigravity/Button';
+import { Card } from '../../components/antigravity/Card';
 import { formatRichMessage } from '../../utils/richMessage';
 import { getSetupStatus, askSetupAssistant } from '../../api/setupAssistant';
 import type { SetupStatus, SetupAssistantAnswer } from '../../api/setupAssistant';
