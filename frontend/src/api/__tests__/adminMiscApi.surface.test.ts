@@ -13,7 +13,6 @@ import {
   adminNotificationsAPI as adminNotificationsAPIFromModule,
   adminOpsAnalyticsAPI as adminOpsAnalyticsAPIFromModule,
   adminProspectsAPI as adminProspectsAPIFromModule,
-  adminRecommendationsAPI as adminRecommendationsAPIFromModule,
   adminResourcesAPI as adminResourcesAPIFromModule,
   adminReviewQueueAPI as adminReviewQueueAPIFromModule,
   adminStagingAPI as adminStagingAPIFromModule,
@@ -29,7 +28,6 @@ import {
   adminNotificationsAPI,
   adminOpsAnalyticsAPI,
   adminProspectsAPI,
-  adminRecommendationsAPI,
   adminResourcesAPI,
   adminReviewQueueAPI,
   adminStagingAPI,
@@ -53,8 +51,6 @@ const ADMIN_PROSPECTS_API_METHODS = [
 const ADMIN_LEADS_API_METHODS = ['list', 'get', 'patch', 'stats'] as const;
 
 const LEAD_CAPTURE_API_METHODS = ['submit'] as const;
-
-const ADMIN_RECOMMENDATIONS_API_METHODS = ['getDebug'] as const;
 
 const ADMIN_RESOURCES_API_METHODS = [
   'getCounts',
@@ -231,13 +227,6 @@ describe('admin-misc API cluster surface', () => {
   });
   it('re-exports the same leadCaptureAPI object as adminMiscApi.ts', () => {
     expect(leadCaptureAPI).toBe(leadCaptureAPIFromModule);
-  });
-
-  it('exposes the characterised adminRecommendationsAPI method names', () => {
-    expect(Object.keys(adminRecommendationsAPI).sort()).toEqual([...ADMIN_RECOMMENDATIONS_API_METHODS].sort());
-  });
-  it('re-exports the same adminRecommendationsAPI object as adminMiscApi.ts', () => {
-    expect(adminRecommendationsAPI).toBe(adminRecommendationsAPIFromModule);
   });
 
   it('exposes the characterised adminResourcesAPI method names', () => {
