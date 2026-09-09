@@ -97,6 +97,11 @@ function referencedKeys(): Set<string> {
  * strip but lost the AdminOverviewPage ModuleCards that used to give them a `buildRoute`
  * reference this guard can see — the tab hrefs are built dynamically, so the guard can't
  * count them. Neither is a newly-built dead page; both pre-date this PR on main.
+ *
+ * WS3 Task 3.2: `hrReview` / `hrReviewCase` were only `buildRoute`'d from the orphan
+ * pages `HrCaseReview` / `HrReviewDashboard` (deleted). App.tsx already redirects both
+ * paths to the employee dashboard. PlatformSidebar still points Exceptions at
+ * `r('hrReview')`, which this guard does not match (same `r()` alias as adminOps*).
  */
 const KNOWN_UNREFERENCED = [
   'adminAbTests', 'adminAdmins', 'adminAiQuestions', 'adminAttestations',
@@ -110,7 +115,8 @@ const KNOWN_UNREFERENCED = [
   'caseServicesEstimate', 'caseServicesRecommendations', 'compliance', 'employeeCaseDossierBuild',
   'employeeDocuments', 'employeePolicy', 'employeeRichProfile', 'hrAnalytics',
   'hrCaseDossier', 'hrEmployeeDashboard', 'hrErasureRequests', 'hrPackage',
-  'hrPolicyBuilder', 'hrPolicyDashboard', 'hrPolicyManagement', 'hrVendorCuration',
+  'hrPolicyBuilder', 'hrPolicyDashboard', 'hrPolicyManagement', 'hrReview',
+  'hrReviewCase', 'hrVendorCuration',
   // [AIQ-2189] Reached only from the emailed colleague-invite link — an external entry
   // point, like a magic link — so it has no in-app inbound reference by design.
   'inviteAccept',
