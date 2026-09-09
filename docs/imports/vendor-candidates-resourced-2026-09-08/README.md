@@ -364,6 +364,23 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
 - `_name_key` predictor: all 5 new. Landed: **+5 new suppliers** (IT/housing_agencies, pending), 0
   mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5 unchanged; pending 1030 → 1035.
 
+### XX-IT housing_agencies (Florence real-estate agencies) — `vendor-resourced-xx-it-housing-florence-2026-09-09` (landed 2026-09-09)
+- Source (GCS): `1788984120203_ns5bmvur.ndjson` (+ manifest `1788984168939_dmaxj0i3.json`).
+- Otto manifest: **6 sourced, 4 rejected** — honest rejects: Pitcher & Flaccomio (P.IVA only), Move to
+  Florence (individual concierge), Dreamer RE (3rd-party-only REA + luxury-not-expat), Smart Move
+  (visa consulting, not an agenzia).
+- **PUBLIC_REGISTER (registroimprese.it / REA).** All 6 `source_url`s = wired `registroimprese.it`
+  (0 firm-site); REA province FI (Florence and Abroad FI-357907, Apartments Florence FI-602633,
+  Apartments in Florence/Konnettiamo FI-656840, Apartments Florence Real Estate FI-640122, Tuscan
+  Feeling FI-656381). **Vetter note:** House in Florence (E.T. di Federico Pieri) cites a *Ruolo
+  Agenti Immobiliari* roll number "Nr. 2807 CCIAA Firenze" (not a REA) — still a Firenze CCIAA
+  registration; vetter confirms. Same captcha-walled caveat as Rome/Milan (REA read off firm sites).
+- `_name_key` predictor: all 6 distinct + new — the three "Apartments Florence" variants key
+  distinctly (`apartmentsflorencesrl` / `apartmentsinflorence` / `apartmentsflorencerealestate…`), no
+  false merge. Landed: **+6 new suppliers** (IT/housing_agencies, pending), 0 mis-attach. Tripwire:
+  `ssc` `approved` **130 → 130** md5 unchanged; pending 1035 → 1041. (IT housing now 15: Rome 4 +
+  Milan 5 + Florence 6.)
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
