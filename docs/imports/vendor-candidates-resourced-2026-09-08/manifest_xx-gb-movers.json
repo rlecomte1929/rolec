@@ -1,0 +1,32 @@
+{
+  "batch_id": "vendor-resourced-xx-gb-movers-2026-09-08",
+  "generated_at": "2026-09-09T00:00:00Z",
+  "corridor": "XX-GB",
+  "category": "movers",
+  "total_sourced": 2,
+  "total_rejected": 2,
+  "firms": [
+    {
+      "name": "The Shore Porters Society",
+      "status": "sourced",
+      "register": "FIDI-FAIM",
+      "source_url": "https://www.fidi.org/find-fidi-affiliate/shore-porters-society"
+    },
+    {
+      "name": "Clark & Rose",
+      "status": "sourced",
+      "register": "FIDI-FAIM",
+      "source_url": "https://www.fidi.org/find-fidi-affiliate/clark-rose"
+    },
+    {
+      "name": "Purdie Worldwide",
+      "status": "reject",
+      "reason": "Not found on FIDI or EuRA; confirmed Euromovers member only (internal FAIM audit noted in Euromovers Magazine Apr 2026 but not yet a published FIDI affiliate)"
+    },
+    {
+      "name": "Simpsons International Removals",
+      "status": "reject",
+      "reason": "Not found on FIDI or EuRA; firm is based in Dartford, Kent (not Aberdeen); no qualifying register listing located"
+    }
+  ]
+}

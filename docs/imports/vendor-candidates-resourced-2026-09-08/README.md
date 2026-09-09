@@ -28,6 +28,19 @@ as they arrive. Each sub-batch is landed with the append-only tripwire verified
   Croydon, UK, so the converter keys it to its true country (XX-GB). Kept honest rather than
   forced to Norway; it is a valid FIDI mover regardless. The vetter can note NO-corridor service.
 
+### XX-GB movers (Aberdeen) — `vendor-resourced-xx-gb-movers-2026-09-08` (landed 2026-09-09)
+- Source (GCS): `1788917900665_fz0ta7k4.ndjson` (+ manifest `1788917902083_ivvzb79f.json`).
+- Otto manifest: **2 firms found on FIDI, 2 rejected** (Purdie Worldwide — Euromovers member only,
+  not a published FIDI affiliate; Simpsons International Removals — Dartford/Kent, not Aberdeen, no
+  FIDI/EuRA listing). Honest rejects, not fabricated.
+- **Independently re-verified**: both `source_url`s are FIDI `/find-fidi-affiliate/…` per-entity
+  pages returning HTTP 200 with the firm named (Shore Porters, Clark & Rose) — curled 2026-09-09.
+- Landed: **+2 new suppliers** (The Shore Porters Society, Clark & Rose — GB/movers), +2 pending
+  capabilities, 0 duplicates, 0 rejected. Tripwire: `ssc` `approved` **130 → 130**, unchanged.
+- Label note: `accreditation_body` here is `FIDI-FAIM` (vs `FIDI` on FR-NO) — same register, a
+  cosmetic label variant; the tier gate keys on the `fidi.org` domain, not the label, so it is
+  immaterial. `accreditation_number` NULL on both (FIDI publishes only a FAIM expiry year).
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
