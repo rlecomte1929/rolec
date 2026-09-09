@@ -39,6 +39,24 @@ import { HrWelcomePage } from './HrWelcomePage';
 /** WelcomeStepCard renders a react-router <Link>, so a Router must be in context. */
 const renderPage = () => render(<MemoryRouter><HrWelcomePage /></MemoryRouter>);
 
+/** Consecutive heading levels must not jump by more than 1 (WCAG 1.3.1). */
+function headingLevels(container: HTMLElement): number[] {
+  return Array.from(container.querySelectorAll('h1,h2,h3,h4,h5,h6')).map((h) =>
+    Number(h.tagName[1]),
+  );
+}
+
+function expectNoSkippedHeadingLevel(container: HTMLElement) {
+  const levels = headingLevels(container);
+  expect(levels[0], 'page must open with its h1').toBe(1);
+  for (let i = 1; i < levels.length; i += 1) {
+    expect(
+      levels[i]! - levels[i - 1]!,
+      `heading ${i} (h${levels[i]}) skips a level after h${levels[i - 1]}: ${levels.join(' -> ')}`,
+    ).toBeLessThanOrEqual(1);
+  }
+}
+
 /** Stub the auth store: `email` decides which landing renders. */
 function signedInAs(email: string) {
   mockGetAuthItem.mockImplementation((k: string) =>
@@ -78,6 +96,17 @@ describe('HrWelcomePage — test-drive HR', () => {
     expect(screen.getByText(/optional — the full hr setup/i)).toBeInTheDocument();
   });
 
+  it('nests setup cards as h3 under the optional-setup h2', () => {
+    signedInAs('hr-a1b2@probe.test');
+    const { container } = renderPage();
+    expect(screen.getByRole('heading', { level: 1, name: /open your first relocation case/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /optional — the full hr setup/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /configure your company/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /build your relocation policy/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /curate your provider list/i })).toBeInTheDocument();
+    expectNoSkippedHeadingLevel(container);
+  });
+
   it('treats the e2e runner domain as a test account too', () => {
     signedInAs('hr_run_1784@testco.com');
     renderPage();
@@ -93,6 +122,18 @@ describe('HrWelcomePage — real HR', () => {
     expect(screen.getByRole('heading', { name: /set up your company workspace/i })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /open your first relocation case/i })).toBeNull();
     expect(screen.queryByTestId('hr-welcome-create-case')).toBeNull();
+  });
+
+  it('puts an h2 above the setup cards so h3 titles do not skip a level', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    const { container } = renderPage();
+    expect(screen.getByRole('heading', { level: 1, name: /set up your company workspace/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /how it works/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /configure your company/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /build your relocation policy/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /curate your provider list/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /ready to open your first case/i })).toBeInTheDocument();
+    expectNoSkippedHeadingLevel(container);
   });
 
   it('no email (unknown session) falls back to the real-HR landing', () => {
