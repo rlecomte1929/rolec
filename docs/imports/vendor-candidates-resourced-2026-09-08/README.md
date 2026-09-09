@@ -442,6 +442,34 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1053 → 1058. (IT housing now 28: Rome 4 +
   Milan 5 + Florence 6 + Turin 8 + Naples 5.)
 
+### XX-IT housing_agencies (Bologna real-estate agencies) — `vendor-resourced-xx-it-housing-bologna-2026-09-09` (landed 2026-09-10)
+- Source (GCS): `1788994596099_g90e7swq.ndjson` (+ manifest `1788994597786_dtfzd5iw.json`).
+- Otto manifest: **7 sourced, 8 rejected** — honest rejects: Relocate (consultant, no REA),
+  Engel&Völkers / Coldwell Banker / Malossini / Abitare (P.IVA-only), Giordani / Immobiliare Maggiore
+  (no own-site REA), Felsina (branch-only).
+- **PUBLIC_REGISTER (registroimprese.it / REA).** All 7 `source_url`s = wired `registroimprese.it`
+  (0 firm-site). All REA province **BO**: Mondore BO-513838, InquiliniDOC/Daniele Castagna BO-541703,
+  Casa dei Professionisti BO-425339, Studio Giannerini BO-426997, Realkasa RK Andrea Costa BO-504653,
+  Realkasa RK Azeglio BO-514022, Appartamenti Bologna/Andrea Cerasi BO-495281. Vetter note:
+  Appartamenti Bologna's REA was read from a Google snippet (site fetch-blocked) — vetter confirms on
+  the live site; same captcha-walled register caveat as the other IT/housing cities.
+- **Corridor note:** the records carried `corridor="INTL-IT"` (Otto's mid-run choice for "generic
+  international→Italy"), **harmless** — the converter derives the corridor from `country=IT` → `XX-IT`
+  and ignores the record's corridor field (same as the earlier `xx-SE` case). CSV corridor = XX-IT,
+  country_code IT, correctly scoped.
+- **Two Realkasa offices share `realkasa.it` but BOTH landed** (RK Andrea Costa `vc-5fd19ca1…`, RK
+  Azeglio `vc-c4797a71…`). This refines the [[franchise domain-dedup]] rule: the domain collision is
+  **within this one run**, so the 2nd is staged `status='duplicate'` **but still promoted** — promote()
+  creates by `_name_key` (distinct: `…rkandreacostasrl` vs `…rkazegliosrl`) and `create_supplier`
+  dedups on exact NAME (distinct), so both become separate suppliers. The Naples Coldwell drop was
+  different: that domain was held by a *prior run's* candidate, which `stage()` drops before insert.
+  **Rule of thumb: same-domain firms in the SAME batch both land; a firm whose domain a PRIOR batch
+  already landed is dropped.**
+- `_name_key` predictor: all 7 distinct + new. Landed: **+7 new suppliers** (IT/housing_agencies,
+  pending), 0 mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5
+  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1058 → 1065. (IT housing now 35: Rome 4 +
+  Milan 5 + Florence 6 + Turin 8 + Naples 5 + Bologna 7.)
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
