@@ -25,7 +25,10 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({
   fullWidth = false,
   sort = 'none',
 }, ref) => {
-  const widthClass = fullWidth ? 'w-full' : '';
+  // fullWidth + min-w-0: a <select> sizes to its longest <option> (min-content).
+  // In a CSS grid that overflows the track and paints over the next control —
+  // BUG-260816-BEF6 on /admin/assignments (Company over Employee search).
+  const widthClass = fullWidth ? 'w-full min-w-0 max-w-full' : '';
   const ordered =
     sort === 'label'
       ? [...options].sort((a, b) => a.label.localeCompare(b.label))
