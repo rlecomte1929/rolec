@@ -17,8 +17,25 @@ authored by Otto as ReloPass editorial assessment and are **NOT lawyer-verified*
 | `corridor-content/NO.ndjson` | 10 records | Per-step content: `section`, `step`, `authority`, `field_label`, `fact_key`, `deadline_*`, `responsible_party`, `is_non_obvious` + the `official_guidance/actual_reality/action_required/source` framework. |
 | `corridor-content/DE.ndjson` | 8 records | same, Germany |
 | `corridor-content/FR.ndjson` | 8 records | same, France |
+| `corridor-content/GB.ndjson` | 20 records | same, United Kingdom (post-Brexit third-country: Skilled Worker/BRP-eVisa, NI, HMRC PAYE, NHS/GP, council tax, right-to-rent). Wave 1. |
 
-Record counts reconcile against Otto's informal manifest (NO=10, DE=8, FR=8).
+Record counts reconcile against Otto's informal manifest (NO=10, DE=8, FR=8, GB=20).
+
+## Wave 1 harvest — GB (2026-09-09)
+
+GB was dispatched as a follow-on batch and captured the same way (inline, ART URL-repair). Two
+capture notes specific to GB:
+
+- **One record was re-emitted.** On the first pass Otto drifted off-topic mid-record inside the
+  `NHS GP Registration` row (`fact_key gb.nhs_number`) — an unrelated hallucinated tangent, leaving
+  that record unterminated. The other 19 were complete and valid; the NHS row was **re-emitted
+  cleanly on request** (never hand-filled) to reach 20/20.
+- **`step` is a descriptive string** here (e.g. `"NHS GP Registration"`), not the integer NO/DE/FR
+  use. The renderer orders steps by phase with a stable sort, so `step` type does not affect ordering
+  (`data_sheet_service._build_from_corridor_content`).
+
+Operational note: Otto's process aborts on large multi-file generations in one turn, so countries are
+harvested **one file per request**. `lawyer_verified: false` throughout, as with NO/DE/FR.
 
 ## Capture note (why a repair step was needed)
 
