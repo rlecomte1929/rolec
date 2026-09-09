@@ -78,6 +78,22 @@ describe('DataSheetFieldRow', () => {
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
+  it('readOnly needs_input field shows no input and no Save — a preview cannot be filled', () => {
+    render(
+      <DataSheetFieldRow
+        field={field({ source: 'needs_input', label: 'Address', hint: 'Within 8 days of arrival' })}
+        audience="employee"
+        onSave={vi.fn()}
+        saving={false}
+        readOnly
+      />,
+    );
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Save/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/You'll provide this once the form opens/)).toBeInTheDocument();
+    expect(screen.getByText('Within 8 days of arrival')).toBeInTheDocument();
+  });
+
   it('HR audience surfaces the employer-action note; employee does not', () => {
     const f = field({ source: 'intake', value: 'x', employerActionNote: 'Employer retrieves the tax card.' });
     render(<DataSheetFieldRow field={f} audience="hr" onSave={vi.fn()} saving={false} />);
@@ -125,6 +141,28 @@ describe('DataSheetView', () => {
     expect(screen.getByText(/Skattekort before first payroll/)).toBeInTheDocument();
     expect(screen.getByText('D Number')).toBeInTheDocument();
     expect(screen.getByText('Tax residency status')).toBeInTheDocument();
+  });
+
+  it('preview sheet shows the preview notice and renders fields read-only', () => {
+    mockUseDataSheet.mockReturnValue({
+      data: {
+        ...FIXTURE,
+        preview: true,
+        completionPct: 0,
+        sections: [{
+          stepId: 'DE:immigration.residence', title: 'Ausländerbehörde',
+          authority: null, sourceUrl: 'https://example.gov', processNote: 'Arrival Week',
+          channels: [], order: 0, responsibleParty: null, slaNote: null, deadline: null,
+          fields: [field({ fieldId: 'DE:immigration.residence', source: 'needs_input', label: 'Register residence' })],
+        }],
+      },
+      loading: false, error: null, refetch: vi.fn(), saveField: vi.fn(), saving: false, saveError: null,
+    });
+    render(<DataSheetView caseId="c1" audience="employee" />);
+    expect(screen.getByText('Preview')).toBeInTheDocument();
+    expect(screen.getByText(/guidance preview for FR→NO/)).toBeInTheDocument();
+    // Read-only: no editable input for the needs_input field.
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
   it('shows a "not available yet" message when not covered', () => {

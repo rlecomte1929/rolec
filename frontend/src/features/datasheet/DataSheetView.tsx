@@ -109,6 +109,13 @@ export const DataSheetView: React.FC<Props> = ({ caseId, audience = 'employee' }
         </div>
       </Card>
 
+      {/* Preview notice — corridor-content sheet, not yet a fillable form */}
+      {data.preview && (
+        <Alert variant="info" title="Preview">
+          This is a guidance preview for {data.corridorLabel ?? 'this corridor'} — every step, authority, and deadline you&apos;ll need. The fill-in-your-details version opens once your case is set up.
+        </Alert>
+      )}
+
       {/* Non-obvious traps + hard deadlines */}
       {data.banners.map((b, i) => (
         <Alert key={i} variant="warning" title={b.type === 'warning' ? 'Deadline' : 'Worth knowing'}>
@@ -150,6 +157,7 @@ export const DataSheetView: React.FC<Props> = ({ caseId, audience = 'employee' }
                 audience={audience}
                 onSave={saveField}
                 saving={saving}
+                readOnly={data.preview}
               />
             ))}
           </div>

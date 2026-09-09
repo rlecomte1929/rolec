@@ -31,13 +31,16 @@ interface Props {
   audience: 'employee' | 'hr';
   onSave: (fieldId: string, value: string) => Promise<void>;
   saving: boolean;
+  /** Preview sheets (rendered from corridor-content, no fillable template) show the field
+   *  and its hint but no editable input — there is nowhere to save the value yet. */
+  readOnly?: boolean;
 }
 
-export const DataSheetFieldRow: React.FC<Props> = ({ field, audience, onSave, saving }) => {
+export const DataSheetFieldRow: React.FC<Props> = ({ field, audience, onSave, saving, readOnly = false }) => {
   const isConsult = field.source === 'consult_professional';
   const isNeedsInput = field.source === 'needs_input';
   const badge = !isConsult && !isNeedsInput ? SOURCE_BADGE[field.source] : undefined;
-  const [editing, setEditing] = useState(isNeedsInput);
+  const [editing, setEditing] = useState(isNeedsInput && !readOnly);
   const [draft, setDraft] = useState(field.value ?? '');
 
   const containerCls = isConsult
@@ -76,6 +79,8 @@ export const DataSheetFieldRow: React.FC<Props> = ({ field, audience, onSave, sa
         <p className="text-xs text-amber-700 italic">
           A regulated advisor will determine this — ReloPass won&apos;t pre-fill it.
         </p>
+      ) : readOnly ? (
+        <p className="text-xs text-slate-500 italic">You&apos;ll provide this once the form opens for your case.</p>
       ) : editing ? (
         <div className="flex items-center gap-2">
           <Input

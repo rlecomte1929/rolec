@@ -358,6 +358,9 @@ class DataSheetDTO(BaseModel):
     # False when the case has no data-sheet form yet — the UI says "not available yet",
     # never renders an empty sheet as "nothing to do" (mirrors CaseRequirementsDTO.covered).
     covered: bool = True
+    # True when the sheet is rendered from curated corridor-content rather than an authored,
+    # fillable template — a read-only guidance preview (no per-field value can be captured yet).
+    preview: bool = False
 
 
 class AssignmentType(str, Enum):
