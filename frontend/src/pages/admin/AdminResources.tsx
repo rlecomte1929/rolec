@@ -2,14 +2,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { CountryPicker } from '../../components/location';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
-import { Card, Button, CountryFlag } from '../../components/antigravity';
+import { Card, Button, CountryFlag, Alert } from '../../components/antigravity';
 import { StatusBadge } from '../../components/admin/resources/StatusBadge';
 import { ResourceRowActions } from '../../components/admin/resources/ResourceRowActions';
 import { adminResourcesAPI, adminStagingAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
-import { LoadErrorBanner, loadErrorMessage } from '../../components/LoadErrorBanner';
+import { loadErrorMessage } from '../../components/LoadErrorBanner';
 
 type ResourceItem = {
   id: string;
@@ -31,7 +31,9 @@ export const AdminResources: React.FC = () => {
   const [counts, setCounts] = useState<Record<string, number>>({});
   // Distinguish "counts fetch failed" from "genuinely zero" so we don't render
   // fabricated-looking 0/0/0/0 stat cards when the backend is actually down.
-  const [countsError, setCountsError] = useState(false);
+  const [countsError, setCountsError] = useState<string | null>(null);
+  const [stagingError, setStagingError] = useState<string | null>(null);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [stagingCounts, setStagingCounts] = useState<{ resource_candidates_new?: number; event_candidates_new?: number } | null>(null);
   const [resources, setResources] = useState<ResourceItem[]>([]);
@@ -50,15 +52,32 @@ export const AdminResources: React.FC = () => {
     try {
       const [c, s, cat] = await Promise.all([
         adminResourcesAPI.getCounts()
-          .then((r) => { setCountsError(false); return r; })
-          .catch(() => { setCountsError(true); return null; }),
-        adminStagingAPI.getDashboard().catch(() => null),
-        adminResourcesAPI.listCategories().catch(() => ({ categories: [] })),
+          .then((r) => { setCountsError(null); return r; })
+          .catch((e) => {
+            setCountsError(loadErrorMessage(e, "Couldn't load resource counts."));
+            return null;
+          }),
+        adminStagingAPI.getDashboard()
+          .then((r) => { setStagingError(null); return r; })
+          .catch((e) => {
+            setStagingError(loadErrorMessage(e, "Couldn't load staging counts."));
+            return null;
+          }),
+        adminResourcesAPI.listCategories()
+          .then((r) => { setCategoriesError(null); return r; })
+          .catch((e) => {
+            setCategoriesError(loadErrorMessage(e, "Couldn't load categories."));
+            return { categories: [] };
+          }),
       ]);
       setCounts(c || {});
       setStagingCounts(s || null);
       setCategories((cat?.categories || []) as { id: string; key: string; label: string }[]);
-    } catch {
+    } catch (e) {
+      const msg = loadErrorMessage(e, "Couldn't load resource dashboard.");
+      setCountsError((prev) => prev ?? msg);
+      setStagingError((prev) => prev ?? msg);
+      setCategoriesError((prev) => prev ?? msg);
       setCounts({});
       setStagingCounts(null);
       setCategories([]);
@@ -170,6 +189,16 @@ export const AdminResources: React.FC = () => {
             <Button onClick={loadResources} disabled={listLoading}>{listLoading ? 'Loading…' : 'Apply'}</Button>
             <Link to={buildRoute('adminResourcesNew')}><Button>New Resource</Button></Link>
           </div>
+          {listError && (
+            <div className="mb-3">
+              <Alert variant="error">{listError}</Alert>
+            </div>
+          )}
+          {categoriesError && (
+            <div className="mb-3">
+              <Alert variant="error">{categoriesError}</Alert>
+            </div>
+          )}
           <div className="text-sm text-slate-500 mb-2">{listTotal} resource{listTotal !== 1 ? 's' : ''}</div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -212,13 +241,9 @@ export const AdminResources: React.FC = () => {
   return (
     <AdminLayout title="Resources" subtitle="Country content: housing, schools, movers, events">
       <div className="space-y-6">
-        <LoadErrorBanner message={listError} onRetry={() => void loadResources()} />
-        {countsError && (
-          <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            <span>Couldn&apos;t load resource counts — the figures below may be stale or unavailable.</span>
-            <button type="button" onClick={() => void load()} className="ml-3 shrink-0 rounded-md border border-rose-300 px-2.5 py-1 text-xs font-medium hover:bg-rose-100">Retry</button>
-          </div>
-        )}
+        {countsError && <Alert variant="error">{countsError}</Alert>}
+        {stagingError && <Alert variant="error">{stagingError}</Alert>}
+        {categoriesError && <Alert variant="error">{categoriesError}</Alert>}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Card padding="md" className="bg-green-50">
             <div className="text-xs text-green-700">Resources – Published</div>

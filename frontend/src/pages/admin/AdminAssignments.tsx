@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { Checkbox } from '../../components/antigravity/Checkbox';
-import { Card, Button, Badge, Input, Select } from '../../components/antigravity';
+import { Card, Button, Badge, Input, Select, Alert } from '../../components/antigravity';
 import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
 import type { AdminAssignment, AdminAssignmentDetail, AdminCompany } from '../../types';
@@ -85,6 +85,7 @@ export const AdminAssignments: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteFeedback, setDeleteFeedback] = useState<'idle' | 'deleting' | 'done' | 'error'>('idle');
   const [deleteErrorDetail, setDeleteErrorDetail] = useState<string | null>(null);
+  const [addPeopleError, setAddPeopleError] = useState<string | null>(null);
 
   const assignmentsQuery = useQuery({
     queryKey: ['admin', 'assignments', filters],
@@ -147,6 +148,7 @@ export const AdminAssignments: React.FC = () => {
 
   useEffect(() => {
     if (showAddModal && addForm.company_id) {
+      setAddPeopleError(null);
       adminAPI.listHrUsers(addForm.company_id).then((r) => {
         setHrUsersForAdd(
           r.hr_users.map((h) => ({
@@ -154,7 +156,10 @@ export const AdminAssignments: React.FC = () => {
             label: (h as { name?: string }).name ?? (h as { email?: string }).email ?? h.id,
           }))
         );
-      }).catch(() => setHrUsersForAdd([]));
+      }).catch((e) => {
+        setHrUsersForAdd([]);
+        setAddPeopleError((prev) => prev ?? getApiErrorMessage(e, 'Could not load HR users.'));
+      });
       adminAPI.listEmployees(addForm.company_id).then((r) => {
         setEmployeesForAdd(
           (r.employees || []).map((e) => ({
@@ -162,10 +167,14 @@ export const AdminAssignments: React.FC = () => {
             label: (e as { full_name?: string }).full_name ?? (e as { name?: string }).name ?? (e as { email?: string }).email ?? e.id,
           }))
         );
-      }).catch(() => setEmployeesForAdd([]));
+      }).catch((e) => {
+        setEmployeesForAdd([]);
+        setAddPeopleError((prev) => prev ?? getApiErrorMessage(e, 'Could not load employees.'));
+      });
     } else {
       setHrUsersForAdd([]);
       setEmployeesForAdd([]);
+      setAddPeopleError(null);
     }
   }, [showAddModal, addForm.company_id]);
 
@@ -218,6 +227,13 @@ export const AdminAssignments: React.FC = () => {
       title="Assignments"
       subtitle="Select a company to view and manage assignments"
     >
+      {companiesQuery.isError && (
+        <div className="mb-4">
+          <Alert variant="error">
+            {getApiErrorMessage(companiesQuery.error, 'Could not load companies.')}
+          </Alert>
+        </div>
+      )}
       <Card padding="lg" className="mb-4">
         {/* [BUG-260816-BEF6] "the employee field is overlaping the company name".
             A grid item defaults to min-width:auto, and a <select> takes its intrinsic
@@ -457,7 +473,14 @@ export const AdminAssignments: React.FC = () => {
                 </tbody>
               </table>
             </div>
-            {assignments.length === 0 && !loading && (
+            {assignmentsQuery.isError && (
+              <div className="mb-3">
+                <Alert variant="error">
+                  {getApiErrorMessage(assignmentsQuery.error, 'Could not load assignments.')}
+                </Alert>
+              </div>
+            )}
+            {assignments.length === 0 && !loading && !assignmentsQuery.isError && (
               <div className="py-12 text-center text-[#6b7280] border border-dashed border-[#e5e7eb] rounded-lg bg-[#f9fafb]">
                 <div className="text-sm font-medium">No assignments for selected company</div>
                 <div className="text-xs mt-1">No assignments for this company. Try another company or create from the HR flow.</div>
@@ -479,8 +502,13 @@ export const AdminAssignments: React.FC = () => {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-4">
             <h3 className="text-lg font-semibold text-[#0b2b43] mb-4">Add assignment</h3>
             {createError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-900 whitespace-pre-wrap">
-                {createError}
+              <div className="mb-4">
+                <Alert variant="error">{createError}</Alert>
+              </div>
+            )}
+            {addPeopleError && (
+              <div className="mb-4">
+                <Alert variant="error">{addPeopleError}</Alert>
               </div>
             )}
             {createSuccess && (
@@ -536,7 +564,7 @@ export const AdminAssignments: React.FC = () => {
                 options={[{ value: '', label: 'Select destination' }, ...DESTINATION_COUNTRIES.map((c) => ({ value: c.name, label: c.name }))]}
               />
             </div>
-            {addForm.company_id && !addForm.hr_user_id && (
+            {addForm.company_id && !addForm.hr_user_id && !addPeopleError && (
               <p className="text-sm text-amber-600 mt-2">
                 {hrUsersForAdd.length === 0
                   ? 'No HR users for this company. Add an HR person in the People tab first.'
@@ -605,9 +633,17 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
   const [ovMsg, setOvMsg] = useState<string | null>(null);
   const [unlockBusy, setUnlockBusy] = useState(false);
   const [unlockMsg, setUnlockMsg] = useState<string | null>(null);
+  const [drawerCompaniesError, setDrawerCompaniesError] = useState<string | null>(null);
+  const [drawerHrError, setDrawerHrError] = useState<string | null>(null);
 
   useEffect(() => {
-    adminAPI.listCompanies().then((r) => setCompanies(r.companies ?? [])).catch(() => setCompanies([]));
+    adminAPI.listCompanies().then((r) => {
+      setCompanies(r.companies ?? []);
+      setDrawerCompaniesError(null);
+    }).catch((e) => {
+      setCompanies([]);
+      setDrawerCompaniesError(getApiErrorMessage(e, 'Could not load companies.'));
+    });
   }, []);
 
   useEffect(() => {
@@ -622,9 +658,14 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
           id: (h as { profile_id?: string }).profile_id ?? h.id,
           label: (h as { name?: string }).name ?? (h as { email?: string }).email ?? h.id,
         })));
-      }).catch(() => setHrUsers([]));
+        setDrawerHrError(null);
+      }).catch((e) => {
+        setHrUsers([]);
+        setDrawerHrError(getApiErrorMessage(e, 'Could not load HR users.'));
+      });
     } else {
       setHrUsers([]);
+      setDrawerHrError(null);
     }
   }, [detail?.case_company_id, detail?.hr_company_id]);
 
@@ -743,7 +784,10 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
             <div className="text-sm text-[#6b7280]">Loading…</div>
           )}
           {error && !detail && !loading && (
-            <div className="text-sm text-red-600">Failed to load assignment. It may have been deleted or you may not have access.</div>
+            <Alert variant="error">Failed to load assignment. It may have been deleted or you may not have access.</Alert>
+          )}
+          {(drawerCompaniesError || drawerHrError) && (
+            <Alert variant="error">{drawerCompaniesError || drawerHrError}</Alert>
           )}
           {detail && (
             <>

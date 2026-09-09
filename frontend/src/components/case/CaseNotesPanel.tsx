@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Card, Button } from '../antigravity';
+import { Card, Button, Alert } from '../antigravity';
+import { loadErrorMessage } from '../LoadErrorBanner';
 import { listCaseNotes, addCaseNote, type CaseNote } from '../../api/caseNotes';
 
 /**
@@ -23,9 +24,20 @@ export function CaseNotesPanel({ caseId }: { caseId: string }) {
   useEffect(() => {
     let cancelled = false;
     setNotes(null);
+    setError(null);
     listCaseNotes(caseId)
-      .then((n) => { if (!cancelled) setNotes(n); })
-      .catch(() => { if (!cancelled) setNotes([]); });
+      .then((n) => {
+        if (!cancelled) {
+          setNotes(n);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setNotes([]);
+          setError(loadErrorMessage(e, 'Could not load notes.'));
+        }
+      });
     return () => { cancelled = true; };
   }, [caseId]);
 
@@ -62,7 +74,11 @@ export function CaseNotesPanel({ caseId }: { caseId: string }) {
           className="w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43] focus:border-[#0b2b43] focus:outline-none focus:ring-1 focus:ring-[#0b2b43]"
           disabled={saving}
         />
-        {error && <p role="alert" className="mt-1 text-xs text-[#b91c1c]">{error}</p>}
+        {error && (
+          <div className="mt-2">
+            <Alert variant="error">{error}</Alert>
+          </div>
+        )}
         <div className="mt-2 flex justify-end">
           <Button onClick={submit} disabled={saving || !draft.trim()}>
             {saving ? 'Saving…' : 'Add note'}
@@ -72,9 +88,9 @@ export function CaseNotesPanel({ caseId }: { caseId: string }) {
 
       {notes === null ? (
         <div className="text-sm text-slate-500">Loading notes…</div>
-      ) : notes.length === 0 ? (
+      ) : notes.length === 0 && !error ? (
         <div className="text-sm text-slate-500">No notes yet.</div>
-      ) : (
+      ) : notes.length > 0 ? (
         <ul className="space-y-3">
           {notes.map((n) => (
             <li key={n.id} className="rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
@@ -85,7 +101,7 @@ export function CaseNotesPanel({ caseId }: { caseId: string }) {
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </Card>
   );
 }
