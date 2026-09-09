@@ -1,3 +1,4 @@
+import type { AdminRequirementReview, ReviewStatus } from '../../api/admin';
 import { countryName } from '../../features/policy-config/countryList';
 import type { CountryListDTO } from '../../types';
 
@@ -26,6 +27,19 @@ export function confidenceLevel(score: number | undefined | null): ConfidenceLev
   if (pct >= 75) return 'high';
   if (pct >= 40) return 'medium';
   return 'low';
+}
+
+/**
+ * Profile.confidence_score is a seed placeholder (0.70 / 0.72 / 0.85), not a
+ * measure of catalog quality. An empty destination must not render as High 85%.
+ */
+export function catalogConfidenceScore(
+  score: number | undefined | null,
+  requirementsCount: number,
+): number | undefined {
+  if ((requirementsCount || 0) === 0) return undefined;
+  if (score === undefined || score === null || Number.isNaN(score)) return undefined;
+  return score;
 }
 
 export function isCatalogStale(
@@ -96,6 +110,74 @@ export function filterCatalog(
     const domains = row.topDomains.join(' ').toLowerCase();
     return name.includes(q) || code.includes(q) || domains.includes(q);
   });
+}
+
+export type RequirementStatusFilter = 'all' | ReviewStatus;
+
+const REVIEW_SORT: Record<ReviewStatus, number> = {
+  pending: 0,
+  approved: 1,
+  rejected: 2,
+};
+
+export function displayCatalogLabel(value: string | undefined | null): string {
+  const raw = (value || '').trim();
+  if (!raw) return 'Uncategorised';
+  return raw
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+export function countRequirementStatuses(items: AdminRequirementReview[]) {
+  return {
+    all: items.length,
+    pending: items.filter((item) => item.reviewStatus === 'pending').length,
+    approved: items.filter((item) => item.reviewStatus === 'approved').length,
+    rejected: items.filter((item) => item.reviewStatus === 'rejected').length,
+  };
+}
+
+export function filterRequirements(
+  items: AdminRequirementReview[],
+  query: string,
+  status: RequirementStatusFilter,
+): AdminRequirementReview[] {
+  const q = query.trim().toLowerCase();
+  return items.filter((item) => {
+    if (status !== 'all' && item.reviewStatus !== status) return false;
+    if (!q) return true;
+    const hay = [
+      item.title,
+      item.description,
+      item.pillar,
+      item.purpose,
+      item.owner,
+      item.severity,
+      ...item.citations.map((citation) => citation.title),
+    ]
+      .join(' ')
+      .toLowerCase();
+    return hay.includes(q);
+  });
+}
+
+export function groupRequirementsByPillar(
+  items: AdminRequirementReview[],
+): { pillar: string; items: AdminRequirementReview[] }[] {
+  const sorted = [...items].sort((a, b) => {
+    const byStatus = REVIEW_SORT[a.reviewStatus] - REVIEW_SORT[b.reviewStatus];
+    if (byStatus !== 0) return byStatus;
+    return a.title.localeCompare(b.title, 'en');
+  });
+  const groups = new Map<string, AdminRequirementReview[]>();
+  for (const item of sorted) {
+    const pillar = item.pillar || 'Uncategorised';
+    const list = groups.get(pillar) ?? [];
+    list.push(item);
+    groups.set(pillar, list);
+  }
+  return [...groups.entries()].map(([pillar, grouped]) => ({ pillar, items: grouped }));
 }
 
 export function sortCatalog(rows: CountryListRow[], sort: CatalogSortKey): CountryListRow[] {

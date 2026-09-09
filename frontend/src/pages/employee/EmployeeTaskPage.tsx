@@ -372,9 +372,9 @@ export const EmployeeTaskPage: React.FC = () => {
           <div className="text-center py-16">
             <p className="text-slate-500 text-sm">No tasks yet — your HR team hasn&rsquo;t assigned anything.</p>
             {/* EMP-2: don't dead-end — point the employee back to where they can make progress. */}
-            <p className="mt-2 text-sm">
+            <p className="mt-2 text-sm text-pretty px-4">
               <Link to={buildRoute('employeeDashboard')} className="font-medium text-[#1f8e8b] hover:underline">
-                While you wait, continue your relocation from your dashboard →
+                Continue your relocation
               </Link>
             </p>
           </div>
