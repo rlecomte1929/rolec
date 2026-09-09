@@ -585,10 +585,10 @@ const STATUS_LABELS: Record<ProspectStatus, string> = {
   archived:        'Archived',
 };
 
-const STATUS_MAP: Record<ProspectStatus, string> = {
+export const STATUS_MAP: Record<ProspectStatus, string> = {
   flagged:         'bg-gray-100 text-gray-600',
   message_drafted: 'bg-blue-50 text-blue-700',
-  message_sent:    'bg-indigo-50 text-indigo-700',
+  message_sent:    'bg-navy-50 text-navy-800',
   replied:         'bg-green-50 text-green-700',
   follow_up_sent:  'bg-yellow-50 text-yellow-700',
   converted:       'bg-teal-50 text-teal-700',

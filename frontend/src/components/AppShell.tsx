@@ -305,7 +305,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
               <div className="mb-6">
                 <Breadcrumb section={section} title={title} homeHref={homeHref} parent={parent} className="mb-3" />
                 <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-                {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+                {subtitle && <p className="text-sm text-slate-500 mt-1 text-pretty break-words">{subtitle}</p>}
               </div>
             )}
             {children}
