@@ -21,8 +21,9 @@ authored by Otto as ReloPass editorial assessment and are **NOT lawyer-verified*
 | `corridor-content/ES.ndjson` | 12 records | same, Spain (EU free-mover NIE/empadronamiento vs non-EU visa/TIE, Seguridad Social, NIF/Agencia Tributaria, tarjeta sanitaria). Wave 1. |
 | `corridor-content/CH.ndjson` | 12 records | same, Switzerland (canton permit B/L + EU/EFTA, Gemeinde/Anmeldung, AHV, withholding + cantonal/federal tax, health-insurance window, Pillar 3a). Wave 1. |
 | `corridor-content/IT.ndjson` | 17 records | same, Italy (permesso di soggiorno, codice fiscale, anagrafe residenza, SSN, Agenzia delle Entrate; EU vs non-EU). Wave 1. |
+| `corridor-content/CA.ndjson` | 20 records | same, Canada (work permit LMIA/IMP + Quebec CAQ, SIN, provincial health + wait period, CRA/T1/TD1, CPP/EI, tax-residency, Express Entry PR). Wave 1. |
 
-Record counts reconcile against Otto's informal manifest (NO=10, DE=8, FR=8, GB=20, ES=12, CH=12, IT=17).
+Record counts reconcile against Otto's informal manifest (NO=10, DE=8, FR=8, GB=20, ES=12, CH=12, IT=17, CA=20).
 
 ## Wave 1 harvest — GB (2026-09-09)
 
