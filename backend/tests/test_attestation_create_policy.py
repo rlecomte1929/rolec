@@ -143,6 +143,10 @@ def test_the_database_check_is_still_the_backstop(corridor):
 
     Postgres only: ck_cap_promotion_policy lives in migration 20261120000000, not in the
     model, so on SQLite this would pass vacuously.
+
+    ATT-2.5 / AIQ-2107: that skip is the coverage, not a hole we paper over. The default
+    pytest lane is SQLite. A skipped CHECK test must not be read as "the CHECK is tested."
+    The CI Postgres job is the only place this assertion runs.
     """
     if engine.dialect.name != "postgresql":
         pytest.skip("ck_cap_promotion_policy is a Postgres CHECK; not present on SQLite")
