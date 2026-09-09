@@ -75,37 +75,41 @@ class GetCurrentUserRolesTests(unittest.TestCase):
 
     def _call(self, mock_db, token="Bearer x"):
         from backend.app import auth_deps
+        auth_deps.reset_identity_caches_for_tests()
         with mock.patch.object(auth_deps, "db", mock_db), \
              mock.patch.object(auth_deps, "_resolve_auth_uuid", return_value=None):
             return asyncio.run(auth_deps.get_current_user(request=None, authorization=token))
 
-    def _base_mock(self, user):
+    def _base_mock(self, user, role_rows=None):
         m = mock.MagicMock()
-        m.get_user_by_token.return_value = user
+        payload = dict(user)
+        payload["role_rows"] = list(role_rows or [])
+        m.get_user_context_by_token.return_value = payload
         m.get_admin_session.return_value = None
         m.get_profile_record.return_value = {"role": user.get("role")}
         return m
 
     def test_multi_role_from_junction(self):
-        m = self._base_mock({"id": "u1", "role": "HR", "email": "h@x"})
-        m.get_user_roles.return_value = [
-            {"role": "HR", "is_primary": True}, {"role": "EMPLOYEE", "is_primary": False}
-        ]
+        m = self._base_mock(
+            {"id": "u1", "role": "HR", "email": "h@x"},
+            role_rows=[
+                {"role": "HR", "is_primary": True},
+                {"role": "EMPLOYEE", "is_primary": False},
+            ],
+        )
         u = self._call(m)
         self.assertEqual(set(u["roles"]), {"HR", "EMPLOYEE"})
         self.assertEqual(u["primary_role"], "HR")
         self.assertEqual(u["role"], "HR")  # legacy field kept
 
     def test_legacy_fallback_when_no_junction(self):
-        m = self._base_mock({"id": "u2", "role": "EMPLOYEE", "email": "e@x"})
-        m.get_user_roles.return_value = []
+        m = self._base_mock({"id": "u2", "role": "EMPLOYEE", "email": "e@x"}, role_rows=[])
         u = self._call(m)
         self.assertEqual(u["roles"], ["EMPLOYEE"])
         self.assertEqual(u["primary_role"], "EMPLOYEE")
 
     def test_admin_short_circuit_keeps_admin(self):
-        m = self._base_mock({"id": "a1", "role": "ADMIN", "email": "a@x"})
-        m.get_user_roles.return_value = []
+        m = self._base_mock({"id": "a1", "role": "ADMIN", "email": "a@x"}, role_rows=[])
         u = self._call(m)
         self.assertIn("ADMIN", u["roles"])
         self.assertEqual(u["primary_role"], "ADMIN")

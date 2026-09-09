@@ -2,13 +2,58 @@
 from __future__ import annotations
 
 import os
+import time
 import uuid
+from copy import deepcopy
+from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import Depends, Header, HTTPException, Request
 
 from ..database import db
 from ..schemas import UserRole
+
+# WS2 Task 2.7 — per-process identity cache (TTL approved 30 s, 2026-09-09).
+USER_CONTEXT_CACHE_TTL_S = 30.0
+_user_context_lock = Lock()
+_user_context_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_ensured_profile_ids: set[str] = set()
+
+_CACHE_BYPASS_PREFIXES = ("/api/auth/", "/api/admin/impersonat")
+
+
+def invalidate_user_context_cache(token: Optional[str]) -> None:
+    """Drop the cached identity for ``token`` (logout / impersonation start-stop)."""
+    if not token:
+        return
+    with _user_context_lock:
+        _user_context_cache.pop(token, None)
+
+
+def reset_identity_caches_for_tests() -> None:
+    """Clear TTL cache and write-on-miss set. Tests only."""
+    with _user_context_lock:
+        _user_context_cache.clear()
+        _ensured_profile_ids.clear()
+
+
+def _request_path(request: Optional[Request]) -> str:
+    if request is None:
+        return ""
+    try:
+        path = request.url.path
+        if path:
+            return str(path)
+    except Exception:
+        pass
+    try:
+        return str((request.scope or {}).get("path") or "")
+    except Exception:
+        return ""
+
+
+def _cache_bypassed(path: str) -> bool:
+    return path.startswith(_CACHE_BYPASS_PREFIXES)
 
 def _resolve_auth_uuid(user: Dict[str, Any]) -> Optional[str]:
     """Resolve the caller to a canonical Supabase auth UUID (AUTH-ID-1).
@@ -103,16 +148,41 @@ async def get_current_user(
         }
     # ────────────────────────────────────────────────────────────────────────
 
-    user = db.get_user_by_token(token)
-    if not user:
+    path = _request_path(request)
+    bypass_cache = _cache_bypassed(path)
+    now = time.monotonic()
+    if not bypass_cache:
+        with _user_context_lock:
+            cached = _user_context_cache.get(token)
+        if cached is not None:
+            expires_at, cached_user = cached
+            if expires_at > now:
+                user = deepcopy(cached_user)
+                if request is not None:
+                    try:
+                        request.state.user_id = user.get("id")
+                    except Exception:
+                        pass
+                return user
+
+    user = db.get_user_context_by_token(token)
+    if not isinstance(user, dict) or not user.get("id"):
         raise HTTPException(status_code=401, detail="Invalid token")
-    db.ensure_profile_record(
-        user_id=user["id"],
-        email=user.get("email"),
-        role=user.get("role", UserRole.EMPLOYEE.value),
-        full_name=user.get("name"),
-        company_id=user.get("company"),
-    )
+    user = dict(user)
+    role_rows = list(user.pop("role_rows", None) or [])
+
+    uid = user.get("id")
+    if uid not in _ensured_profile_ids:
+        db.ensure_profile_record(
+            user_id=user["id"],
+            email=user.get("email"),
+            role=user.get("role", UserRole.EMPLOYEE.value),
+            full_name=user.get("name") or user.get("full_name"),
+            company_id=user.get("company") or user.get("company_id"),
+        )
+        if uid:
+            with _user_context_lock:
+                _ensured_profile_ids.add(str(uid))
     if _is_admin_user(user):
         user["role"] = UserRole.ADMIN.value
         user["is_admin"] = True
@@ -125,7 +195,7 @@ async def get_current_user(
     # [AIQ-1353] Expose all roles the user holds (multi-role) alongside the legacy
     # single `role`, with a fallback to it when the user_roles junction is empty.
     user["roles"], user["primary_role"] = derive_roles(
-        db.get_user_roles(user["id"]),
+        role_rows,
         user.get("role", UserRole.EMPLOYEE.value),
         is_admin=bool(user.get("is_admin")),
     )
@@ -134,12 +204,18 @@ async def get_current_user(
             request.state.user_id = user.get("id")
         except Exception:
             pass
+    # Impersonation is never cached: always a live lookup, and a hit is not stored.
     session = db.get_admin_session(token)
     if session and session.get("target_user_id"):
         user["impersonation"] = {
             "target_user_id": session.get("target_user_id"),
             "mode": session.get("mode"),
         }
+        return user
+
+    if not bypass_cache:
+        with _user_context_lock:
+            _user_context_cache[token] = (now + USER_CONTEXT_CACHE_TTL_S, deepcopy(user))
     return user
 
 def _held_roles(user: Dict[str, Any]) -> List[str]:

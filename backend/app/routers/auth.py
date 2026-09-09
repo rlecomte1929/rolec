@@ -50,7 +50,12 @@ from ..services.audit_log_service import (
     ACTION_DELETE,
     ACTOR_HUMAN,
 )
-from ..auth_deps import _is_admin_user, derive_roles, get_current_user
+from ..auth_deps import (
+    _is_admin_user,
+    derive_roles,
+    get_current_user,
+    invalidate_user_context_cache,
+)
 
 log = logging.getLogger(__name__)
 
@@ -780,6 +785,7 @@ def logout(
         if token:
             _logout_user = db.get_user_by_token(token)
             db.delete_session_by_token(token)
+            invalidate_user_context_cache(token)
             log.info("auth_logout legacy_token_invalidated")
             _audit_auth(entity_type="session", entity_id=token[:8] + "***", action_type=ACTION_DELETE)
             if _logout_user:
