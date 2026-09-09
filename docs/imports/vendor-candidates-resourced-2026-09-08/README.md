@@ -397,6 +397,27 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   note: the record's lowercase `xx-SE` corridor is harmless — convert derives the corridor from
   `country=SE` → XX-SE, country_code SE.)
 
+### XX-IT housing_agencies (Turin real-estate agencies) — `vendor-resourced-xx-it-housing-turin-2026-09-09` (landed 2026-09-10)
+- Source (GCS): `1788991408705_yso6051y.ndjson` (+ manifest `1788991411714_5z9l07gq.json`).
+- Otto manifest: **8 sourced, 6 rejected** — sharp province/eligibility rejects: Turin Relocation
+  (self-declares *"non siamo ne broker ne un agenzia immobiliare"* — not a licensed agency), Italia
+  Affitti Torino (franchise page shows Abruzzo parent P.IVA 02241270681, no Turin REA), Habitare
+  Service (Milan HQ, province MI not TO), Urban House Hub (site returned no text, unverifiable),
+  Gruppo Il Sestante (REA 1096606 with no province prefix — could not confirm TO), ItaliaCasa
+  (REA MC 193326 = Macerata, not Turin).
+- **PUBLIC_REGISTER (registroimprese.it / REA).** All 8 `source_url`s = wired `registroimprese.it`
+  (0 firm-site). All 8 REA numbers province **TO**: Italian Property Group TO-1278035, Rubiolo
+  Immobiliare TO 1189434, Studio Gran Madre TO 835822, Chiusano & C. Immobiliare TO 791891, Fasano
+  Immobiliare TO-1214239, SIV Real Estate TO-1236771, Krea Immobiliare TO 1329662, IO Immobiliare
+  Ottaviani TO 1265282. Same vetter note as Rome/Milan/Florence: registroimprese.it is captcha-walled
+  → REA read off each firm's own site → vetter confirms against the live register at
+  `/admin/vetting-queue`.
+- Dedup: 0 existing (a spurious `%siv%` substring hit on `exclusi**v**ere.it` is not a real match —
+  the actual SIV firm `sivtorino.it` is new). `_name_key` predictor: all 8 distinct + new. Landed:
+  **+8 new suppliers** (IT/housing_agencies, pending), 0 mis-attach. Tripwire: `ssc` `approved`
+  **130 → 130** md5 `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1045 → 1053. (IT housing
+  now 23: Rome 4 + Milan 5 + Florence 6 + Turin 8.)
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
