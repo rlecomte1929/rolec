@@ -56,6 +56,32 @@ as they arrive. Each sub-batch is landed with the append-only tripwire verified
   the parent's EuRA membership evidences the Frankfurt office is a vetter judgment at
   `/admin/vetting-queue` — recorded here, not auto-decided.
 
+### XX-IE movers (Dublin) — `vendor-resourced-xx-ie-movers-2026-09-09` (landed 2026-09-09)
+- Source (GCS): `1788940289394_ug4b14d3.ndjson` (+ manifest `1788940293455_itqle5rs.json`).
+- Otto manifest: **4 sourced, 12 rejected** — rejects honest by name: 5 FIDI pages whose address
+  is not Dublin (Farmington Hills MI, Dartford, Brandon, Montreal, Uxbridge), Crown 404, and 6 EuRA
+  members that are DSP/RMC/serviced-apartment providers or Cork/Kinsale-based, not Dublin removal
+  movers. Reported, not fabricated.
+- **Independently re-verified 2026-09-09**: all 4 `source_url`s are FIDI `/find-fidi-affiliate/…`
+  (×3) or EuRA `/members/…` (×1) per-entity pages returning HTTP 200 with the firm named. Guarded
+  against a directory-template false positive with a cross-contamination check — each FIDI page
+  contains ONLY its own firm (Cronin 11/0/0, Irish Relo 0/3/0, Get Cracking 0/0/4), all
+  Dublin/Ireland; FIDI `<title>` = `CRONIN RELOCATIONS IRELAND | FIDI`.
+- **Cronin de-duplicated:** the batch listed the same firm twice — "Cronin Relocations Ireland"
+  (FIDI) and "Cronin Ireland Relocations" (EuRA), same website `ireland-relocations.com` and phone.
+  Kept the FIDI-FAIM row (stronger register for a mover), dropped the EuRA row from the CSV — its
+  evidence is preserved in `src/xx-ie-movers.ndjson`. Moot in the end: Cronin was **already staged
+  + promoted** in prod (`vendor_candidates` ES-IE/movers, dedupe_key `ireland-relocations.com`) from
+  earlier work, so the pipeline skipped it regardless (dry-run: read 3, staged 2).
+- Landed: **+2 new suppliers** (Irish Relo, Get Cracking Relocations — IE/movers), **+2 pending
+  capabilities**, 0 duplicates, 0 tier-gate rejects (Cronin skipped as already-staged). Tripwire:
+  `ssc` `approved` **130 → 130**, md5 `1c4c3899…` unchanged; total pending **982 → 984** (+2).
+  FIDI `source_url` persisted verbatim on both new suppliers.
+- Corridor-label note: the converter maps destination `IE → ES-IE` (its hardcoded corridor) and
+  `_dest_iso_from_corridor` recovers `country_code=IE`, so both capabilities scope to **destination
+  IE** (`coverage_scope_type='country'`) — the label is cosmetic, the scope is Ireland.
+  `accreditation_number` NULL (FIDI publishes only a FAIM expiry year).
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
