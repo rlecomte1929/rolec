@@ -418,6 +418,30 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   **130 → 130** md5 `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1045 → 1053. (IT housing
   now 23: Rome 4 + Milan 5 + Florence 6 + Turin 8.)
 
+### XX-IT housing_agencies (Naples real-estate agencies) — `vendor-resourced-xx-it-housing-naples-2026-09-09` (landed 2026-09-10)
+- Source (GCS): `1788993143006_yd0ghooc.ndjson` (+ manifest `1788993146697_uaw9p2z8.json`).
+- Otto manifest: **6 sourced, 6 rejected** — honest rejects: My Place (Airbnb host, not agency),
+  Edilblu (Capri not Naples), Casagency (REA only in aggregators, not self-published),
+  L'Immobiliare (P.IVA only), Grimaldi/Faggella (no verifiable REA).
+- **PUBLIC_REGISTER (registroimprese.it / REA).** All 6 `source_url`s = wired `registroimprese.it`
+  (0 firm-site). All REA numbers province **NA**: Knight Immobiliare NA-648197, 360° Real Estate/
+  360RES NA-973451, RE/MAX Immobiliari Uniti NA-806141, FGIMMOBILIARE (REPLAT Affiliato Bagnoli)
+  NA-1055730, Erre Emme NA-725632, Coldwell Banker 24RE NA-1562255. Same captcha-walled caveat as
+  Rome/Milan/Florence/Turin (REA read off firm sites; vetter confirms on the live register).
+- `_name_key` predictor: all 6 distinct + new (RE/MAX and Coldwell Banker franchise names key with
+  their local qualifiers — `remaximmobiliariuniti`, `coldwellbanker24re` — so no false merge onto a
+  bare brand). **Landed: +5 new suppliers** (IT/housing_agencies, pending), 0 mis-attach.
+- **⚠ 1 dropped (domain-dedup, not a reject): Coldwell Banker 24RE.** Its registrable domain
+  `coldwellbanker.it` was already staged+promoted by a *different* Coldwell Banker franchisee
+  (`Coldwell Banker Italy — Daisy56 S.r.l.`, id `vc-5d3c6032…`, pending). `stage()` keys on the
+  registrable domain, so the second franchisee on the same corporate domain is treated as
+  already-held and not re-inserted (no candidate row written). It is a genuinely distinct entity
+  (own REA NA-1562255, Naples) but was **not force-landed** — inventing a distinct domain to defeat
+  the dedup would game the gate. A vetter who wants the Naples office can add it as a location on the
+  existing Coldwell Banker supplier. Tripwire: `ssc` `approved` **130 → 130** md5
+  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1053 → 1058. (IT housing now 28: Rome 4 +
+  Milan 5 + Florence 6 + Turin 8 + Naples 5.)
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
