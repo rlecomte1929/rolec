@@ -46,4 +46,15 @@ describe('pathTileSubtitle', () => {
       pathTileSubtitle({ permitLabel: null, requirementCount: 1, destination: 'IRELAND' }),
     ).toBe('1 requirement for this destination — see below.');
   });
+
+  it('does not claim a mapping when the catalog is not ready', () => {
+    expect(
+      pathTileSubtitle({
+        permitLabel: null,
+        requirementCount: 0,
+        destination: 'NORWAY',
+        catalogReady: false,
+      }),
+    ).toBe('This corridor is not ready — the catalog is still under review.');
+  });
 });

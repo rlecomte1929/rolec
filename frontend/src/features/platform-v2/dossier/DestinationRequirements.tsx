@@ -184,7 +184,12 @@ export const DestinationRequirements: React.FC<{
 
       {state === 'ready' && (
         <>
-          <RequirementsCoverageNotice covered={data?.covered} destCountry={data?.destCountry} />
+          <RequirementsCoverageNotice
+            covered={data?.covered}
+            destCountry={data?.destCountry}
+            catalogReady={data?.catalogReady}
+            catalogNotReadyReason={data?.catalogNotReadyReason}
+          />
 
           {data?.staWaived && data.staWaived.length > 0 && (
             <div className="mt-4 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]">

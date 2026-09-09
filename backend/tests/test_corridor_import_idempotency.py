@@ -160,3 +160,24 @@ def test_a_lost_pre_select_race_inserts_zero_rows_and_converges(db):
     assert _row_count(db) == 1
     survivor = db.query(models.RequirementItem).one()
     assert survivor.id == winner.id
+
+
+def test_an_insert_that_omits_review_status_lands_pending_not_approved(db):
+    """ORM default is approved; generators must not publish on insert."""
+    payloads = _norway_payloads()
+    first = dict(payloads[0], last_verified_at=datetime(2026, 8, 15))
+    first.pop("review_status", None)
+    row = crud.create_requirement_item(db, first)
+    assert row.review_status == "pending"
+
+
+def test_a_reimport_does_not_clobber_review_status(db):
+    payloads = _norway_payloads()
+    first = dict(payloads[0], last_verified_at=datetime(2026, 8, 15), review_status="pending")
+    row = crud.create_requirement_item(db, first)
+    row.review_status = "approved"
+    db.commit()
+    crud.create_requirement_item(
+        db, dict(first, description="Wording refresh", review_status="pending")
+    )
+    assert db.query(models.RequirementItem).one().review_status == "approved"

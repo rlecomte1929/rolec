@@ -324,6 +324,18 @@ def test_an_internal_source_record_id_is_dropped():
     assert _public_sources(["1f0e8a2c-0000-4000-8000-000000000001"]) == []
 
 
+def test_a_resolvable_source_record_id_publishes_the_url():
+    record = type("R", (), {
+        "id": "src-udi",
+        "url": "https://www.udi.no/en/",
+        "title": "UDI",
+        "publisher_domain": "www.udi.no",
+        "retrieved_at": None,
+        "snippet": None,
+    })()
+    assert _public_sources(["src-udi"], {record.id: record}) == [record.url]
+
+
 def test_a_bare_url_string_still_publishes():
     url = "https://enterprise.gov.ie/permits/"
     assert _public_sources([url]) == [url]

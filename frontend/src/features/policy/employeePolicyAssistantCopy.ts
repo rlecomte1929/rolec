@@ -1,7 +1,7 @@
 export const EMPLOYEE_POLICY_ASSISTANT_TITLE = 'Ask about your policy';
 
 export const EMPLOYEE_POLICY_ASSISTANT_SUBTITLE =
-  'Questions use your company’s published relocation policy for this assignment.';
+  'The assistant orients you in your company’s published policy. Open the cited source for the actual rule — numbers and legal steps are in that text, not in the chat.';
 
 /** Same as subtitle; used where the sheet chrome repeats context. */
 export const EMPLOYEE_POLICY_ASSISTANT_PANEL_INTRO = EMPLOYEE_POLICY_ASSISTANT_SUBTITLE;

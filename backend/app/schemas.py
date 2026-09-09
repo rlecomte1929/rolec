@@ -234,10 +234,25 @@ class AdminRequirementReviewDTO(BaseModel):
     attestedAt: Optional[datetime] = None
 
 
+class KnowledgeScorecardDTO(BaseModel):
+    """Catalog sufficiency for one destination. Not a McKinsey index; bars live in the scorer."""
+
+    approvedCount: int
+    pendingCount: int
+    rejectedCount: int = 0
+    citationResolvedApproved: int
+    citationResolvePct: float
+    pillarsPresent: List[str] = []
+    lastHumanReviewAt: Optional[datetime] = None
+    catalogReady: bool
+    notReadyReason: Optional[str] = None
+
+
 class AdminRequirementListDTO(BaseModel):
     countryCode: str
     pendingCount: int = 0
     items: List[AdminRequirementReviewDTO] = []
+    scorecard: Optional[KnowledgeScorecardDTO] = None
 
 
 class AdminRequirementReviewRequest(BaseModel):
@@ -250,6 +265,8 @@ class CountryListItemDTO(BaseModel):
     requirementsCount: int
     confidenceScore: Optional[float] = None
     topDomains: List[str]
+    catalogReady: Optional[bool] = None
+    notReadyReason: Optional[str] = None
 
 
 class CountryListDTO(BaseModel):
@@ -280,6 +297,10 @@ class CaseRequirementsDTO(BaseModel):
     # that country, NOT because nothing is required. Lets the UI say so instead
     # of rendering an empty list as "nothing required" (the AIQ-1349 silent-miss).
     covered: bool = True
+    # Sufficiency of the destination catalog (approved + cited + multi-pillar).
+    # Distinct from `covered` (unknown destination / empty approved set).
+    catalogReady: Optional[bool] = None
+    catalogNotReadyReason: Optional[str] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

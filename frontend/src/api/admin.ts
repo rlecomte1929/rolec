@@ -27,6 +27,18 @@ export type VerificationStatus = 'representative' | 'corpus_grounded' | 'expert_
 /** Whether a requirement is served. Only 'approved' reaches employees or the public endpoint. */
 export type ReviewStatus = 'pending' | 'approved' | 'rejected';
 
+export interface KnowledgeScorecard {
+  approvedCount: number;
+  pendingCount: number;
+  rejectedCount: number;
+  citationResolvedApproved: number;
+  citationResolvePct: number;
+  pillarsPresent: string[];
+  lastHumanReviewAt?: string | null;
+  catalogReady: boolean;
+  notReadyReason?: string | null;
+}
+
 /**
  * One resolved citation. `url` is nullable on purpose: `citations_json` holds `source_records`
  * ids and some of them dangle, so the backend surfaces the broken reference rather than
@@ -62,6 +74,7 @@ export interface AdminRequirementList {
   countryCode: string;
   pendingCount: number;
   items: AdminRequirementReview[];
+  scorecard?: KnowledgeScorecard | null;
 }
 
 /** Includes unapproved rows — the whole point of the review surface. */
