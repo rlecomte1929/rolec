@@ -261,6 +261,35 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   Berlin coverage. Tripwire: `ssc` `approved` **130 → 130** md5 unchanged; pending 1000 → 1007.
 - Scope caveat (as with Oslo): country-scoped (DE) though schools are city-local — vetter reconciles.
 
+### XX-DE schools (Frankfurt) — `vendor-resourced-xx-de-frankfurt-schools-2026-09-09` (landed 2026-09-09)
+- Source (GCS): `1788964116130_vivoiagi.ndjson` (+ manifest `1788964117474_vpd6g2f9.json`).
+- Otto manifest: **8 sourced, 2 rejected** — rejects honest: FIS + ISF (the two most famous — but
+  they are *anerkannte Ergänzungsschule*, NOT in the searchable Hessische Schuldatenbank, so Otto
+  refused to invent a school_no).
+- **Register type = per-entity, SERVER-RENDERED (Hessische Schuldatenbank).** `source_url` =
+  `schul-db.bildung.hessen.de/schul_db.html/details/?school_no=<id>` — Otto used the resolvable
+  `/details/?school_no=` format (the `?_do=detail` variant returns the search form). **Confirmed it
+  matches the #2191 Hessen `entry_url_pattern` (`schul_db\.html/details/\?school_no=\d+`) before
+  landing** — all 8 pass the tier gate. Independently curl-verified all 8: HTTP 200, name + own
+  school_no on each page.
+- Landed: **+6 new suppliers** (International Bilingual Montessori, SIS Swiss International School
+  Frankfurt, Europäische Schule RheinMain, accadis International School, ASB Erasmus Gymnasium, ASB
+  Erasmus Grundschule — DE/schools, pending). Frankfurt was previously covered only by Metropolitan;
+  these are net-new Rhein-Main coverage. Tripwire: `ssc` `approved` **130 → 130** md5 unchanged;
+  pending 1007 → 1013.
+- **Metropolitan School Frankfurt — true dup**, correctly skipped (already a prod supplier,
+  `m-school.de`).
+- **⚠️ Phorms Frankfurt HELD — `dedupe_key` false-positive (pipeline limitation).** `dedupe_key` is the
+  **registrable domain** (eTLD+1), so Phorms Frankfurt (`frankfurt.phorms.de` → `phorms.de`) collides
+  with the already-staged Phorms Berlin Mitte (`berlin-mitte.phorms.de` → `phorms.de`) and was
+  skipped at stage — even though it is a **distinct** Frankfurt school (school_no 4383, different
+  city). Not a true duplicate. Its evidence is preserved in the committed NDJSON; it needs a distinct
+  landing (a per-campus dedupe_key refinement for multi-campus chains, or a manual add). Watch this on
+  any chain that runs `<city>.<chain>.<tld>` subdomains (Phorms, SIS, etc.).
+- ASB Erasmus's two units (Gymnasium 4390 + Grundschule 4381) landed as **two distinct suppliers**
+  (different websites + the unit type is inline in the name, so distinct `_name_key`) — contrast Berlin
+  British School, which folded (shared website + parenthetical unit).
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
