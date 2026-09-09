@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/antigravity/Button';
 import { AppShell } from '../components/AppShell';
 import { getAuthItem } from '../utils/demo';
-import { Card } from '../components/antigravity';
+import { Card, TableScroll } from '../components/antigravity';
 import { KPICard } from '../components/command-center/KPICard';
 import { RiskBadge } from '../components/command-center/RiskBadge';
 import { SLABadge } from '../components/command-center/SLABadge';
@@ -85,7 +85,7 @@ export const HrCommandCenter: React.FC = () => {
           <KPICard title="Action Required" value={kpisLoading && kpis == null ? '…' : (kpis?.actionRequiredCount ?? '-')} subtitle="Needs HR attention" />
           <KPICard title="Departing Soon" value={kpisLoading && kpis == null ? '…' : (kpis?.departingSoonCount ?? '-')} subtitle="Next 30 days" />
           <KPICard title="Completed (YTD)" value={kpisLoading && kpis == null ? '…' : (kpis?.completedCount ?? '-')} subtitle="Approved cases" />
-          <KPICard title="At Risk" value={kpisLoading && kpis == null ? '…' : (kpis?.atRiskCount ?? '-')} subtitle="Red" />
+          <KPICard title="At Risk" value={kpisLoading && kpis == null ? '…' : (kpis?.atRiskCount ?? '-')} subtitle="Delayed 5+ days" />
           <KPICard title="Attention Needed" value={kpisLoading && kpis == null ? '…' : (kpis?.attentionNeededCount ?? '-')} subtitle="Yellow" />
           <KPICard title="Overdue Tasks" value={kpisLoading && kpis == null ? '…' : (kpis?.overdueTasksCount ?? '-')} />
           <KPICard title="Budget Overruns" value={kpisLoading && kpis == null ? '…' : (kpis?.budgetOverrunsCount ?? '-')} />
@@ -130,7 +130,7 @@ export const HrCommandCenter: React.FC = () => {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <TableScroll minWidthClass="min-w-[64rem]">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#e2e8f0] text-left text-[#6b7280]">
@@ -174,7 +174,7 @@ export const HrCommandCenter: React.FC = () => {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
           {cases.length >= 25 && (
             <div className="mt-4 flex justify-center gap-2">

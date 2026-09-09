@@ -90,6 +90,10 @@ type HrPolicyPageV2Props = {
 // The /hr/policy landing opens with a status message telling HR whether a
 // policy is established. Driven by the same `hasLivePolicy` signal the rest of
 // the page uses (matrix published OR canonical version published) — no new API.
+export function policyLandingMode(loadError: string | null): 'error' | 'workspace' {
+  return loadError ? 'error' : 'workspace';
+}
+
 const PolicyWelcomeBanner: React.FC<{
   hasLivePolicy: boolean;
   onNavigateToBuilder?: () => void;
@@ -111,7 +115,7 @@ const PolicyWelcomeBanner: React.FC<{
           <h2 className="text-base font-semibold text-[#0b2b43]">
             No relocation policy is set up yet
           </h2>
-          <p className="text-sm text-slate-600 mt-1">
+          <p className="text-sm text-slate-600 mt-1 text-pretty break-words">
             Head to the Policy builder tab to start with a standard baseline, then publish it to
             activate it for every new case.
           </p>
@@ -610,6 +614,17 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId, 
     return <HrNoCompanyOnboarding />;
   }
 
+  if (policyLandingMode(loadError) === 'error') {
+    return (
+      <div className="space-y-3">
+        <Alert variant="error">{loadError}</Alert>
+        <Button size="sm" variant="outline" onClick={() => void load()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <PolicyAssistantDockedShell
       open={assistantOpen}
@@ -626,7 +641,6 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId, 
       )}
     >
     <div className="space-y-6 pb-12">
-      {loadError && <Alert variant="error">{loadError}</Alert>}
       {publishError && <Alert variant="error">{publishError}</Alert>}
 
       {/* AIQ-1600: landing welcome/status message — states whether a policy is

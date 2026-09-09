@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminLayout } from '../AdminLayout';
-import { Alert, Button, Card } from '../../../components/antigravity';
+import { Alert, Button, Card, StatCard } from '../../../components/antigravity';
 import {
   getCoverage,
   type CoverageCountry,
@@ -47,23 +47,6 @@ const LANE_STYLE: Record<Lane, { stripe: string; tag: string; label: string }> =
   gap: { stripe: 'bg-rose-500', tag: 'bg-rose-50 text-rose-700', label: 'Untouched' },
 };
 
-const StatTile: React.FC<{ label: string; value: string | number; sub: string; accent?: boolean }> = ({
-  label,
-  value,
-  sub,
-  accent,
-}) => (
-  <div className={`rounded-xl border p-4 ${accent ? 'border-transparent bg-navy-800' : 'border-slate-200 bg-white'}`}>
-    <div className={`text-[11px] font-semibold uppercase tracking-wider ${accent ? 'text-white/60' : 'text-slate-500'}`}>
-      {label}
-    </div>
-    <div className={`mt-1 font-mono text-2xl font-semibold tabular-nums ${accent ? 'text-white' : 'text-navy-800'}`}>
-      {value}
-    </div>
-    <div className={`mt-0.5 text-xs ${accent ? 'text-white/70' : 'text-slate-500'}`}>{sub}</div>
-  </div>
-);
-
 const GapsView: React.FC<{ data: CoverageSummary }> = ({ data }) => {
   const [sort, setSort] = useState<'focus' | 'az'>('focus');
   const rows = useMemo(() => {
@@ -85,10 +68,10 @@ const GapsView: React.FC<{ data: CoverageSummary }> = ({ data }) => {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile accent label="Not serving yet" value={notServing.length} sub={`of ${data.totals.destinations} destinations`} />
-        <StatTile label="Facts awaiting review" value={fmt(factsPending)} sub="approve to go live" />
-        <StatTile label="Providers to vet" value={fmt(provBacklog)} sub="found, not yet approved" />
-        <StatTile label="Empty service slots" value={emptySlots} sub="serving category with no provider" />
+        <StatCard emphasis label="Not serving yet" value={notServing.length} sub={`of ${data.totals.destinations} destinations`} />
+        <StatCard label="Facts awaiting review" value={fmt(factsPending)} sub="approve to go live" />
+        <StatCard label="Providers to vet" value={fmt(provBacklog)} sub="found, not yet approved" />
+        <StatCard label="Empty service slots" value={emptySlots} sub="serving category with no provider" />
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] text-slate-600">
         <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-accent-500" />Serving <b className="font-mono text-navy-800">{lanes.serve}</b></span>
@@ -211,7 +194,7 @@ export const CoverageDashboardPage: React.FC = () => {
         </div>
       }
     >
-      <Alert variant="info">
+      <Alert variant="info" className="text-pretty">
         Counts come from the live database. Nothing is served to employees until a human approves it in{' '}
         <Link className="font-medium text-accent-600 hover:text-accent-700" to={buildRoute('adminCountries')}>
           Country requirements

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from '../../../components/antigravity';
+import { Card, StatCard } from '../../../components/antigravity';
 import { CountryFlag } from '../../../components/antigravity/CountryFlag';
 import type { CoverageCountry, CoverageSummary } from '../../../api/coverage';
 
@@ -44,23 +44,6 @@ function cellClass(approved: number, pending: number, hatched: boolean): string 
   if (approved >= 2) return `${base} bg-accent-100 text-accent-800`;
   return `${base} bg-accent-50 text-accent-700`;
 }
-
-const StatTile: React.FC<{ label: string; value: string | number; sub: string; accent?: boolean }> = ({
-  label,
-  value,
-  sub,
-  accent,
-}) => (
-  <div className={`rounded-xl border p-4 ${accent ? 'border-transparent bg-navy-800' : 'border-slate-200 bg-white'}`}>
-    <div className={`text-[11px] font-semibold uppercase tracking-wider ${accent ? 'text-white/60' : 'text-slate-500'}`}>
-      {label}
-    </div>
-    <div className={`mt-1 font-mono text-2xl font-semibold tabular-nums ${accent ? 'text-white' : 'text-navy-800'}`}>
-      {value}
-    </div>
-    <div className={`mt-0.5 text-xs ${accent ? 'text-white/70' : 'text-slate-500'}`}>{sub}</div>
-  </div>
-);
 
 export type CoverageLens = 'catalog' | 'suppliers';
 
@@ -111,18 +94,18 @@ export const CoverageMasterGrid: React.FC<Props> = ({ data, lens }) => {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile accent label="Destinations" value={t.destinations} sub="with facts or providers in the database" />
-        <StatTile
+        <StatCard emphasis label="Destinations" value={t.destinations} sub="with facts or providers in the database" />
+        <StatCard
           label="Requirement facts"
           value={fmt(t.facts_total)}
           sub={`${fmt(t.facts_approved)} approved · ${fmt(t.facts_pending)} pending`}
         />
-        <StatTile
+        <StatCard
           label="Provider capabilities"
           value={fmt(t.caps_total)}
           sub={`${fmt(t.caps_approved)} approved · ${fmt(t.suppliers)} suppliers`}
         />
-        <StatTile
+        <StatCard
           label={lens === 'suppliers' ? 'Awaiting vetting' : 'Expert-verified facts'}
           value={lens === 'suppliers' ? fmt(t.caps_pending) : fmt(t.expert_verified)}
           sub={lens === 'suppliers' ? 'capabilities not yet live' : 'highest-confidence served facts'}

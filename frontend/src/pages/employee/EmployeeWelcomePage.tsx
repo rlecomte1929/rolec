@@ -52,6 +52,7 @@ export function EmployeeWelcomePage() {
           description="Once intake is complete, ReloPass generates a step-by-step plan covering admin tasks, housing, immigration, and more."
           href={ROUTE_DEFS.employeeDashboard.path}
           badge="Unlocked after intake"
+          showCta={false}
         />
         <WelcomeStepCard
           step={3}
@@ -59,6 +60,7 @@ export function EmployeeWelcomePage() {
           description="Browse vetted housing, legal, and logistics providers recommended for your destination."
           href="/services"
           badge="Explore anytime"
+          showCta={false}
         />
       </div>
 

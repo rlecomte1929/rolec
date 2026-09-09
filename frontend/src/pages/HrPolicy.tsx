@@ -21,7 +21,6 @@ import { HrPolicyBuilderV2Page } from '../features/platform-v2/policy-builder/Hr
 import { HrExceptionsPage } from '../features/platform-v2/exceptions/HrExceptionsPage';
 import { HrBenefitMixOptimizerPage } from '../features/policy/HrBenefitMixOptimizerPage';
 import { policyConfigMatrixAPI } from '../api/client';
-import { usePolicyPublished } from '../hooks/usePolicyPublished';
 import { isNlPolicyBuilderEnabled } from '../featureFlags';
 import { DescribePolicyPanel } from '../features/policy-config/DescribePolicyPanel';
 import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
@@ -153,7 +152,7 @@ export const HrPolicy: React.FC = () => {
       {/* Tab bar — only shown for HR/Admin (not admin company-scoped view where
           the builder tab doesn't make sense in a read-context) */}
       {!adminCompanyId && (
-        <div className="flex gap-1 mb-4 border-b border-slate-200">
+        <div className="flex gap-1 mb-4 border-b border-slate-200 overflow-x-auto">
           <PolicyTabButton active={activeTab === 'policy'} onClick={() => setTab('policy')}>
             Published policy
           </PolicyTabButton>
@@ -180,13 +179,7 @@ export const HrPolicy: React.FC = () => {
         </div>
       )}
 
-      {/* Guided next-step CTA — points HR to the natural next action.
-          Does not alter the tab content below. (NAV-POL-1)
-          AIQ-1600: only on the 'policy' tab now — the reorganized builder/summary
-          tabs carry their own guidance (starter card / full builder). */}
-      {!adminCompanyId && activeTab === 'policy' && (
-        <PolicyNextStepCta setTab={setTab} />
-      )}
+      {/* Guided next-step lives on HrPolicyPageV2 so a load error does not stack with empty onboarding. */}
 
       <div data-hr-policy-page="v3" id="hr-policy-top">
         {adminCompanyId && (
@@ -231,7 +224,7 @@ function PolicyTabButton({
       type="button"
       onClick={onClick}
       className={[
-        'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+        'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap shrink-0',
         active
           ? 'border-accent-600 text-accent-700'
           : 'border-transparent text-slate-500 hover:text-slate-700',
@@ -293,52 +286,6 @@ function HrPolicyQaTab() {
   // ask box opens off `hasQueryablePolicy` alone. The panel renders its own
   // no-policy guidance when the company has nothing published yet.
   return <HrPolicyAssistantPanel variant="card" hasQueryablePolicy={state.hasLivePolicy} policyId={null} />;
-}
-
-/**
- * Guided next-step CTA for the **Published policy** tab (NAV-POL-1). Nudges HR toward
- * the natural next action without touching the tab content.
- *
- * AIQ-1600 narrowed this to the 'policy' tab only — the builder and summary tabs carry
- * their own guidance. It kept branches for those two tabs anyway, which could no longer
- * render; one of them held a "Review & publish" button pointing at an unmounted route,
- * and it read as a live dead link for as long as it sat here. The component now takes no
- * `activeTab` at all, so the dead branches cannot come back by accident.
- */
-function PolicyNextStepCta({
-  setTab,
-}: {
-  setTab: (tab: 'policy' | 'builder' | 'summary' | 'exceptions' | 'qa') => void;
-}) {
-  // AIQ-1588: the 'policy' tab CTA hard-coded "This is your live, published
-  // policy" even with nothing published. Gate the copy on the canonical
-  // published-state read so a no-policy company sees a get-started nudge.
-  const published = usePolicyPublished();
-  const config: { hint: string; actions: React.ReactNode } = (() => {
-    if (published === true) {
-      return {
-        hint: 'This is your live, published policy. Make changes in the Policy builder.',
-        actions: (
-          <Button size="sm" onClick={() => setTab('builder')}>Edit in Builder</Button>
-        ),
-      };
-    }
-    return {
-      hint: "You don't have a published policy yet. Set one up in the Policy builder to activate it on every new case.",
-      actions: (
-        <Button size="sm" onClick={() => setTab('builder')}>Go to Policy builder</Button>
-      ),
-    };
-  })();
-
-  return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent-100 bg-accent-50/60 px-4 py-2.5">
-      <p className="text-sm text-[#0b2b43] min-w-0">
-        <span className="font-medium">Next step:</span> {config.hint}
-      </p>
-      <div className="flex items-center gap-2 shrink-0">{config.actions}</div>
-    </div>
-  );
 }
 
 function formatDate(val: string | null | undefined): string {
