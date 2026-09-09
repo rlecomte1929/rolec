@@ -381,6 +381,22 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   `ssc` `approved` **130 → 130** md5 unchanged; pending 1035 → 1041. (IT housing now 15: Rome 4 +
   Milan 5 + Florence 6.)
 
+### XX-SE housing_agencies (Stockholm estate agents) — `vendor-resourced-xx-se-housing-stockholm-2026-09-09` (landed 2026-09-09) — first SE/housing vein
+- Source (GCS): `1788986908070_qkymoni4.ndjson` (+ manifest `1788986913359_ulyhqh6r.json`).
+- Otto manifest: **4 sourced, 7 rejected** — honest rejects: agents no longer on the FMI register,
+  Danish co, relocation-consulting with no FMI-registered agent, HR-relo (not a broker), booking
+  platform, furnished-apt manager, one unreachable.
+- **Register type = PUBLIC_REGISTER (Fastighetsmäklarinspektionen / FMI — statutory estate-agent
+  register).** All 4 `source_url`s = wired `fmi.se` (0 firm-site). Individual-registration shape
+  (like abogacia): each agency cites a NAMED agent's FMI registreringsnummer in `accreditation_number`
+  (Residensportalen/Foxen 32848, Estate Fastighetsbyrå/Gergils Brännhult 31950, Victory Stockholm/
+  Magnusson 44637, Quality Living/Öberg 32803); named agent in notes. Otto cross-confirmed each FMI
+  number via maklarupplysning.se / maklarkontroll.se (both pull from the FMI register).
+- `_name_key` predictor: all 4 new. Landed: **+4 new suppliers** (SE/housing_agencies, pending), 0
+  mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5 unchanged; pending 1041 → 1045. (Converter
+  note: the record's lowercase `xx-SE` corridor is harmless — convert derives the corridor from
+  `country=SE` → XX-SE, country_code SE.)
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
