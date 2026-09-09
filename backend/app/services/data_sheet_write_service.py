@@ -15,12 +15,17 @@ Two invariants, enforced here on the write side (the read side enforces them too
 `source='manual'` is set explicitly — `bulk_update_form_fields` leaves it NULL, a known gap; the
 data sheet needs the provenance to render "you entered this."
 
-Scope (Phase 2): form-local write-back to `case_form_field_values`. Cross-FORM propagation via
-the canonical intake store (`cases.intake_data`) is the deliberate fast-follow — the sanctioned
-intake writer is a heavy wizard-patch, so a safe single-field intake writer lands on its own.
+Write-back (Phase 2 + 2b):
+  * **Form-local** — always: the edited value lands in this form's `case_form_field_values`.
+  * **Canonical (cross-form)** — for a value with a `profile.*`/`contract.*`/`banking.*` source,
+    also written back to `cases.intake_data` (`_propagate_to_intake`) so `prefill_engine`
+    re-derives it into every OTHER form on their next prefill. This is the "capture once, reuse
+    everywhere" mechanism; it targets the same intake sub-key `_build_context` reads, additively.
+    A value with no such source (a free-text field) stays form-local.
 """
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Dict, Optional
 
@@ -34,6 +39,66 @@ from .data_sheet_service import build_data_sheet, _as_json
 from ...database import db as main_db
 
 logger = logging.getLogger(__name__)
+
+# prefill_source prefix → the intake_data sub-keys prefill_engine._build_context reads, in
+# priority order. Mirrors that function's `intake.get("profile") or intake.get("employee") …`
+# fallback chain so a write-back lands in the SAME sub-dict it will be read from — writing a
+# fresh "profile" dict when the case actually stores intake under "employee" would shadow it
+# and blank the other fields. profile/contract/banking are the only intake_data-backed contexts;
+# case.* are `cases` columns (never touched here) and family/person live in other tables.
+_INTAKE_SUBKEYS: Dict[str, tuple] = {
+    "profile": ("profile", "employee", "personalDetails"),
+    "contract": ("contract", "employment", "employmentDetails"),
+    "banking": ("banking", "bankDetails"),
+}
+
+
+def _propagate_to_intake(conn, case_id: str, prefill_source: Optional[str], value: Optional[str]) -> None:
+    """Write a confirmed value back to cases.intake_data so it re-derives into every other form
+    on their next prefill (capture once, reuse everywhere). Additive read-modify-write, keyed on
+    the sub-key already in use. No-op for fields without a 2-part profile/contract/banking source.
+    """
+    if not prefill_source or value is None:
+        return
+    parts = prefill_source.split(".")
+    if len(parts) != 2:
+        return
+    prefix, leaf = parts
+    candidates = _INTAKE_SUBKEYS.get(prefix)
+    if not candidates:
+        return
+
+    row = conn.execute(
+        _sql_text(f"SELECT intake_data FROM {_pg_table('cases')} WHERE id = :cid"),
+        {"cid": case_id},
+    ).first()
+    if row is None:
+        return
+    raw = row[0]
+    try:
+        intake = json.loads(raw) if isinstance(raw, str) else (raw or {})
+    except (json.JSONDecodeError, TypeError):
+        return  # don't clobber unparseable intake data
+    if not isinstance(intake, dict):
+        return
+
+    # Same first-truthy selection prefill_engine uses; default to the canonical sub-key.
+    subkey = next((k for k in candidates if intake.get(k)), candidates[0])
+    sub = intake.get(subkey)
+    if not isinstance(sub, dict):
+        sub = {}
+    sub[leaf] = value
+    intake[subkey] = sub
+
+    try:
+        is_pg = main_db.engine.dialect.name == "postgresql"
+    except Exception:
+        is_pg = True
+    cast = "CAST(:doc AS jsonb)" if is_pg else ":doc"
+    conn.execute(
+        _sql_text(f"UPDATE {_pg_table('cases')} SET intake_data = {cast} WHERE id = :cid"),
+        {"doc": json.dumps(intake), "cid": case_id},
+    )
 
 
 def apply_field_edit(
@@ -106,6 +171,12 @@ def apply_field_edit(
             ),
             {"cf": cf_id, "fid": field_id, "val": value, "by": filled_by, "ovr": was_machine},
         )
+
+        # Capture once, reuse everywhere: propagate a source-backed value to the canonical
+        # intake store so it re-derives into every other form on their next prefill. Atomic
+        # with the form-local write above. No-op for fields without a profile/contract/banking
+        # source (e.g. a free-text address), which stay form-local.
+        _propagate_to_intake(conn, case_id, field_def.get("prefill_source"), value)
 
         # Keep the stored completion column in step with what the sheet shows (the dossier
         # surfaces read case_forms.completion_pct). Non-consult fields only, matching the sheet.
