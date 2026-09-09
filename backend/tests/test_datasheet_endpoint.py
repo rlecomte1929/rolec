@@ -206,6 +206,64 @@ class DataSheetEndpoint(unittest.TestCase):
         self.assertFalse(body["covered"])
         self.assertEqual(body["sections"], [])
 
+    # ── the edit / write-back path (Phase 2) ─────────────────────────────────
+
+    def _patch(self, field_id, value, **params):
+        return self.client.patch(
+            f"/api/cases/{self.case_id}/datasheet/fields/{field_id}",
+            params=params, json={"value": value},
+        )
+
+    def _stored_value(self, field_id):
+        with self.engine.begin() as conn:
+            row = conn.execute(text(
+                "SELECT value, source, filled_by, reviewed FROM case_form_field_values "
+                "WHERE case_form_id = :cf AND field_id = :fid"
+            ), {"cf": self.cf_id, "fid": field_id}).mappings().first()
+        return dict(row) if row else None
+
+    def test_edit_needs_input_field_persists(self):
+        # destination_address is the one non-consult needs_input field on the FR→NO sheet.
+        resp = self._patch("norwegian_address", "Storgata 1, 0155 Oslo")
+        self.assertEqual(resp.status_code, 200, resp.text)
+        data = resp.json()
+        by_fact = self._fields_by_fact(data)
+        self.assertEqual(by_fact["destination_address"]["value"], "Storgata 1, 0155 Oslo")
+        # A user-entered value reads as provided (source 'manual' → 'intake'), no longer needs_input.
+        self.assertEqual(by_fact["destination_address"]["source"], "intake")
+        # Completion advanced: all 13 non-consult fields now filled.
+        self.assertEqual(data["needsInputCount"], 0)
+        self.assertEqual(data["completionPct"], 100)
+
+    def test_edit_writes_back_to_the_shared_store(self):
+        # The value must land in case_form_field_values — the store every other surface (the
+        # dossier form card) reads — with manual provenance, not just in the response.
+        self._patch("norwegian_address", "Storgata 1, 0155 Oslo")
+        stored = self._stored_value("norwegian_address")
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored["value"], "Storgata 1, 0155 Oslo")
+        self.assertEqual(stored["source"], "manual")
+        self.assertTrue(stored["reviewed"])
+
+    def test_edit_consult_field_is_rejected(self):
+        for fid in ("tax_residency_status", "a1_determination"):
+            resp = self._patch(fid, "sneaky value")
+            self.assertEqual(resp.status_code, 422, f"{fid}: {resp.text}")
+            self.assertIsNone(self._stored_value(fid), f"{fid} leaked a written value")
+
+    def test_edit_unknown_field_is_404(self):
+        resp = self._patch("not_a_real_field", "x")
+        self.assertEqual(resp.status_code, 404, resp.text)
+
+    def test_edit_overrides_a_prefilled_value(self):
+        # Correcting a prefilled (intake) value is allowed and flips overridden so a later
+        # prefill re-run cannot clobber it.
+        resp = self._patch("employer_name", "Nordisk Teknologi AS (Oslo)")
+        self.assertEqual(resp.status_code, 200, resp.text)
+        stored = self._stored_value("employer_name")
+        self.assertEqual(stored["value"], "Nordisk Teknologi AS (Oslo)")
+        self.assertEqual(stored["source"], "manual")
+
 
 if __name__ == "__main__":
     unittest.main()
