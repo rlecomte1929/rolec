@@ -368,3 +368,71 @@ def test_report_names_every_empty_pair_and_why():
     assert "FR-DE / housing_agencies" in md
     assert "login-gated" in md
     assert "current_verified_count" in md, "the report must state what it did NOT touch"
+
+
+# ── Registry-gap wiring 2026-09-09 ───────────────────────────────────────────
+# The 15 (corridor, category) pairs the vendor re-sourcing brief flagged as having no wired
+# register. Each register was identified and probed live, then wired. These pins prove that,
+# for every pair: it is now ingestable, its evidence domain maps OFF SELF_DECLARED at an
+# ingestable tier, a candidate citing the record/register page passes validate(), and — where
+# the register exposes per-entity pages — the search/listing root is still REJECTED (the gate
+# must keep discriminating a record page from a search form).
+from backend.imports.suppliers.parsers import SELF_DECLARED, source_for_url  # noqa: E402
+
+_WIRED_GAP_PAIRS = [
+    ("FR-NO", "schools",
+     "https://nsr.udir.no/enheter/971845635", "https://nsr.udir.no/enheter"),
+    ("FR-DE", "schools",
+     "https://www.bildung.berlin.de/Schulverzeichnis/Schulportrait.aspx?IDSchulzweig=31353",
+     "https://www.bildung.berlin.de/Schulverzeichnis/SchulListe.aspx"),
+    ("FR-DE", "schools",
+     "https://schul-db.bildung.hessen.de/schul_db.html/details/?school_no=6055",
+     "https://schul-db.bildung.hessen.de/schul_db.html"),
+    ("XX-ES", "housing_agencies",
+     "https://www.comunidad.madrid/vivienda/registro-agentes-inmobiliarios-rain", None),
+    ("XX-ES", "legal_admin",
+     "https://censo.abogacia.es/ecensofront/html/homeColegiados.iface", None),
+    ("XX-ES", "tax_finance", "https://www.icac.gob.es/buscador-roac", None),
+    ("XX-ES", "banks", "https://app.bde.es/rbe_spa/", None),
+    ("XX-SE", "housing_agencies", "https://fmi.se/soktjanster/sok-maklare/", None),
+    ("XX-SE", "legal_admin",
+     "https://www.advokatsamfundet.se/Sok-advokat/Sokresultat/Kontorsdetaljer/?companyid=5615",
+     "https://www.advokatsamfundet.se/Sok-advokat/Sokresultat/?City=Stockholm"),
+    ("XX-SE", "tax_finance",
+     "https://www.revisorsinspektionen.se/link/0df3cdc13e0f4fa38dbf58e7f163ed4f.aspx",
+     "https://www.revisorsinspektionen.se/revisorssok/sokrevisor/"),
+    ("XX-SE", "banks",
+     "https://www.fi.se/en/our-registers/company-register/details?id=1826",
+     "https://www.fi.se/en/our-registers/company-register/"),
+    ("XX-FI", "housing_agencies", "https://vasa.lvv.fi", None),
+    ("XX-IT", "housing_agencies", "https://www.registroimprese.it/", None),
+    ("XX-IT", "legal_admin", "https://www.consiglionazionaleforense.it/ricerca-avvocati", None),
+    ("XX-IT", "tax_finance", "https://commercialisti.it/albo-nazionale/ricerca-iscritti/", None),
+    ("XX-IT", "banks", "https://infostat.bancaditalia.it/GIAVAInquiry-public/ng/banche", None),
+]
+
+
+@pytest.mark.parametrize("corridor,category,entry_url,search_root", _WIRED_GAP_PAIRS)
+def test_registry_gap_pair_now_ingestable_and_maps(corridor, category, entry_url, search_root):
+    assert ingestable_sources(corridor, category), f"{corridor}/{category} still has no register"
+    src = source_for_url(entry_url)
+    assert src.name != SELF_DECLARED, f"{entry_url} did not map to a wired register"
+    assert effective_tier(category, src.tier) in (1, 2)
+    # a candidate citing the record/register page passes validation
+    validate(make(corridor=corridor, service_category=category, source=src, source_url=entry_url,
+                  website_url="https://vendor.example/", accreditation_body="",
+                  accreditation_number="", accreditation_expiry=""))
+
+
+@pytest.mark.parametrize(
+    "corridor,category,entry_url,search_root",
+    [w for w in _WIRED_GAP_PAIRS if w[3] is not None],
+)
+def test_registry_gap_pattern_rejects_search_root(corridor, category, entry_url, search_root):
+    """Where the register exposes per-entity pages, its search/listing root evidences nobody."""
+    src = source_for_url(entry_url)
+    assert src.entry_url_pattern, f"{src.name} should declare an entry_url_pattern"
+    with pytest.raises(HarvestRejected):
+        validate(make(corridor=corridor, service_category=category, source=src,
+                      source_url=search_root, website_url="https://vendor.example/",
+                      accreditation_body="", accreditation_number="", accreditation_expiry=""))
