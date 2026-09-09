@@ -16,9 +16,10 @@ import { Badge } from '../../components/antigravity/Badge';
 import { Button } from '../../components/antigravity/Button';
 import { ProgressBar } from '../../components/antigravity/ProgressBar';
 import { Skeleton } from '../../components/antigravity/Skeleton';
+import { downloadDatasheetPdf, type DataSheetSection } from '../../api/datasheet';
 import { useDataSheet } from './useDataSheet';
 import { DataSheetFieldRow } from './DataSheetFieldRow';
-import type { DataSheetSection } from '../../api/datasheet';
+import { buildDatasheetCsv, downloadDatasheetCsv, datasheetCsvFilename } from './datasheetCsv';
 
 interface Props {
   caseId: string;
@@ -32,6 +33,7 @@ const COPY = {
 
 export const DataSheetView: React.FC<Props> = ({ caseId, audience = 'employee' }) => {
   const [lang, setLang] = useState<'en' | 'local'>('en');
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const { data, loading, error, saveField, saving } = useDataSheet(caseId, { audience, lang });
   const copy = COPY[audience];
 
@@ -59,6 +61,20 @@ export const DataSheetView: React.FC<Props> = ({ caseId, audience = 'employee' }
     );
   }
 
+  const handleExportCsv = () => {
+    downloadDatasheetCsv(buildDatasheetCsv(data), datasheetCsvFilename(data));
+  };
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      await downloadDatasheetPdf(caseId);
+    } catch {
+      /* the browser surfaces a failed download; keep the sheet usable */
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   return (
     <section aria-label={copy.heading} className="space-y-4">
       {/* Header */}
@@ -83,6 +99,13 @@ export const DataSheetView: React.FC<Props> = ({ caseId, audience = 'employee' }
             color="green"
             label={`${data.completionPct}% complete · ${data.needsInputCount} still needed`}
           />
+        </div>
+        {/* Export */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleExportCsv}>Export CSV</Button>
+          <Button size="sm" variant="outline" onClick={handleDownloadPdf} disabled={downloadingPdf}>
+            {downloadingPdf ? 'Preparing…' : 'Download PDF'}
+          </Button>
         </div>
       </Card>
 
