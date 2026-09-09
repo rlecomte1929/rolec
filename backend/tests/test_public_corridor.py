@@ -14,6 +14,8 @@ import json
 import os
 from types import SimpleNamespace
 
+import pytest
+
 os.environ.setdefault("RELOPASS_DISABLE_RATE_LIMITS", "1")
 # App-mounted harness: conftest mocks backend.database, so the query-counter listener
 # can't attach to the mocked engine unless it's disabled.
@@ -25,6 +27,14 @@ from backend.main import app  # noqa: E402
 from backend.app.routers import public_corridor  # noqa: E402
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _stub_sources(monkeypatch):
+    # 82c02e0f added crud.list_sources() (source_records) to the endpoint for citation
+    # parity. Per this module's docstring the tests must NOT depend on the SQLite test DB
+    # being seeded, so stub sources to empty alongside the list_requirements stub.
+    monkeypatch.setattr(public_corridor.crud, "list_sources", lambda db, country: [])
 
 
 def _norway_seed():
@@ -60,7 +70,7 @@ def _norway_seed():
 def _patch_seed(monkeypatch):
     monkeypatch.setattr(
         public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: _norway_seed() if country == "NORWAY" else [],
+        lambda db, country, purpose, include_unapproved=False: _norway_seed() if country == "NORWAY" else [],
     )
 
 
@@ -110,7 +120,7 @@ def test_non_obvious_and_timing_are_carried_from_the_catalog_row(monkeypatch):
     seeded[0].timing = "within 8 days of arrival"
     monkeypatch.setattr(
         public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: seeded if country == "NORWAY" else [],
+        lambda db, country, purpose, include_unapproved=False: seeded if country == "NORWAY" else [],
     )
 
     resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
@@ -138,7 +148,7 @@ def test_a_row_predating_the_columns_degrades_rather_than_raising(monkeypatch):
         assert not hasattr(row, "non_obvious") and not hasattr(row, "timing")
     monkeypatch.setattr(
         public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: bare if country == "NORWAY" else [],
+        lambda db, country, purpose, include_unapproved=False: bare if country == "NORWAY" else [],
     )
 
     resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
@@ -213,7 +223,7 @@ def _two_track_seed():
 def _patch_two_track(monkeypatch):
     monkeypatch.setattr(
         public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: _two_track_seed() if country == "NORWAY" else [],
+        lambda db, country, purpose, include_unapproved=False: _two_track_seed() if country == "NORWAY" else [],
     )
 
 
