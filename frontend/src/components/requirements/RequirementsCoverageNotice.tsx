@@ -4,6 +4,8 @@ interface RequirementsCoverageNoticeProps {
   /** CaseRequirementsDTO.covered — undefined (older backend) is treated as covered. */
   covered?: boolean;
   destCountry?: string;
+  catalogReady?: boolean | null;
+  catalogNotReadyReason?: string | null;
 }
 
 /**
@@ -16,7 +18,24 @@ interface RequirementsCoverageNoticeProps {
 export const RequirementsCoverageNotice: React.FC<RequirementsCoverageNoticeProps> = ({
   covered,
   destCountry,
+  catalogReady,
+  catalogNotReadyReason,
 }) => {
+  if (catalogReady === false) {
+    return (
+      <div
+        role="status"
+        data-testid="catalog-not-ready"
+        className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]"
+      >
+        <div className="text-sm font-semibold text-[#0b2b43] mb-1">This corridor is not ready</div>
+        <div>
+          {catalogNotReadyReason ||
+            'We have no approved, cited requirements to serve. That is a catalog gap, not a finding that nothing is required.'}
+        </div>
+      </div>
+    );
+  }
   if (covered !== false) return null;
   const where = destCountry ? ` for ${destCountry}` : '';
   return (

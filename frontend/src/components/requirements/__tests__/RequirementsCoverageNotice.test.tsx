@@ -23,4 +23,17 @@ describe('RequirementsCoverageNotice (AIQ-1473d)', () => {
     const { container } = render(<RequirementsCoverageNotice destCountry="GERMANY" />);
     expect(container.firstChild).toBeNull();
   });
+
+  it('shows a corridor-not-ready notice when the catalog fails sufficiency', () => {
+    render(
+      <RequirementsCoverageNotice
+        covered
+        destCountry="NORWAY"
+        catalogReady={false}
+        catalogNotReadyReason="This corridor is not ready: approved items do not yet cover more than one requirement pillar."
+      />,
+    );
+    expect(screen.getByTestId('catalog-not-ready')).toBeTruthy();
+    expect(screen.getByText(/more than one requirement pillar/i)).toBeTruthy();
+  });
 });

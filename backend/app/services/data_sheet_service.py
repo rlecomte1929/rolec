@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text as _sql_text
 
 from .. import schemas
-from . import corridor_registry, fact_dictionary
+from . import corridor_content, corridor_registry, fact_dictionary
 from ...database import db as main_db
 from ...relopass.corridors import load_corridor
 
@@ -154,9 +154,6 @@ def build_data_sheet(
             {"cid": case_id},
         ).mappings().first()
 
-        if not form_row:
-            return _empty_sheet(case_id)
-
         value_rows = conn.execute(
             _sql_text(
                 f"""
@@ -166,11 +163,9 @@ def build_data_sheet(
                 """
             ),
             {"cf": form_row["case_form_id"]},
-        ).mappings().all()
+        ).mappings().all() if form_row else []
 
-    stored: Dict[str, Dict[str, Any]] = {str(r["field_id"]): dict(r) for r in value_rows}
-
-    # ── Case-level metadata ───────────────────────────────────────────────────
+    # ── Case-level metadata (needed for both the template sheet and the fallback) ──
     origin = dest = None
     move_date = employee_name = None
     if case_row:
@@ -181,6 +176,18 @@ def build_data_sheet(
         employee_name = (intake.get("profile") or {}).get("legal_full_name")
     corridor = corridor_registry.normalize_corridor_id(f"{origin}_{dest}") if origin and dest else None
     corridor_label = f"{origin}→{dest}" if origin and dest else None
+
+    if not form_row:
+        # No authored data-sheet template for this case. If the destination has curated
+        # corridor content, render a read-only PREVIEW sheet from it; otherwise, not covered.
+        if dest and corridor_content.has_corridor_content(dest):
+            return _build_from_corridor_content(
+                case_id, dest, corridor, corridor_label, move_date, employee_name,
+                audience, lang, mode,
+            )
+        return _empty_sheet(case_id)
+
+    stored: Dict[str, Dict[str, Any]] = {str(r["field_id"]): dict(r) for r in value_rows}
 
     # ── Section metadata (from sections[] when the template carries it) ────────
     sections_meta: Dict[str, Dict[str, Any]] = {
@@ -286,4 +293,152 @@ def build_data_sheet(
         sections=sections,
         consultProfessional=consult,
         covered=True,
+    )
+
+
+# ── Corridor-content fallback (Option A) ──────────────────────────────────────────────────────
+# When a case's destination has no authored data-sheet template, render a read-only PREVIEW from
+# the curated `data/corridor-content/<ISO>.ndjson` corpus: one section per curated step (carrying
+# its authority, official portal, deadline and responsible party), the 4-part non-obvious "moat"
+# banners, and the consult-professional panel. Nothing is fillable — there is no form to write to
+# — so `preview=True` and every step is `needs_input` guidance only.
+
+_PHASE_ORDER = ["PRE_DEPARTURE", "ARRIVAL_WEEK", "FIRST_MONTH", "ONGOING"]
+_PHASE_TITLE = {
+    "PRE_DEPARTURE": "Pre-Departure",
+    "ARRIVAL_WEEK": "Arrival Week",
+    "FIRST_MONTH": "First Month",
+    "ONGOING": "Ongoing Obligations",
+}
+
+
+def _fact_category(fact_key: Optional[str], country_iso: Optional[str]) -> Optional[str]:
+    """Domain segment of a fact_key. Handles both the shared `domain.field` shape and the
+    per-country `{ISO}.domain.field` pattern (skips the leading ISO)."""
+    if not fact_key:
+        return None
+    parts = fact_key.split(".")
+    if len(parts) >= 2 and parts[0].upper() == (country_iso or "").upper():
+        return parts[1]
+    return parts[0] if parts else None
+
+
+def _deadline_date(move_date: Any, offset_days: Any) -> Optional[str]:
+    """ISO date = move date + offset (offset may be negative for pre-departure steps)."""
+    if move_date is None or offset_days is None:
+        return None
+    base = move_date
+    if isinstance(base, str):
+        try:
+            base = _dt.date.fromisoformat(base[:10])
+        except ValueError:
+            return None
+    if isinstance(base, _dt.datetime):
+        base = base.date()
+    if not isinstance(base, _dt.date):
+        return None
+    try:
+        return (base + _dt.timedelta(days=int(offset_days))).isoformat()
+    except (ValueError, TypeError):
+        return None
+
+
+def _build_from_corridor_content(
+    case_id: str,
+    dest: str,
+    corridor: Optional[str],
+    corridor_label: Optional[str],
+    move_date: Any,
+    employee_name: Optional[str],
+    audience: str,
+    lang: str,
+    mode: str,
+) -> schemas.DataSheetDTO:
+    records = corridor_content.load_corridor_content(dest)
+    is_hr = audience == "hr"
+
+    # Non-obvious "moat" banners — the contrast framework (reality + the action it forces).
+    banners: List[schemas.DataSheetBannerDTO] = []
+    for r in records:
+        if not r.get("is_non_obvious"):
+            continue
+        label = (r.get("field_label") or "").strip()
+        reality = (r.get("non_obvious_actual_reality") or "").strip()
+        action = (r.get("non_obvious_action_required") or "").strip()
+        text = " — ".join(p for p in (label, reality) if p)
+        if action:
+            text = f"{text}  What to do: {action}" if text else action
+        if text:
+            banners.append(schemas.DataSheetBannerDTO(type="moat-fact", text=text))
+
+    def _phase_index(section: Any) -> int:
+        try:
+            return _PHASE_ORDER.index(section)
+        except ValueError:
+            return len(_PHASE_ORDER)
+
+    ordered = sorted(records, key=lambda r: (_phase_index(r.get("section")), r.get("step") or 0))
+
+    consult: List[schemas.DataSheetConsultDTO] = []
+    sections: List[schemas.DataSheetSectionDTO] = []
+    total_fillable = 0
+
+    for order, r in enumerate(ordered):
+        task = r.get("field_label") or r.get("fact_key") or "Requirement"
+        fact_key = r.get("fact_key")
+        category = _fact_category(fact_key, dest)
+        is_consult = bool(r.get("consult_professional"))
+        section = r.get("section")
+        local_id = fact_key or f"{section}:{r.get('step')}"
+        fid = f"{(dest or '').upper()}:{local_id}"
+        deadline_iso = _deadline_date(move_date, r.get("deadline_offset_days"))
+        deadline_label = r.get("deadline_label")
+
+        if is_consult:
+            field_dto = schemas.DataSheetFieldDTO(
+                fieldId=fid, factKey=fact_key, label=task, category=category,
+                source="consult_professional", value=None,
+                guidance=r.get("non_obvious_action_required") or deadline_label,
+            )
+            consult.append(schemas.DataSheetConsultDTO(
+                topic=task, reason=r.get("non_obvious_action_required") or r.get("source")))
+            if mode == "sparse":
+                continue  # sparse = only what still needs input; consult items are guidance
+        else:
+            total_fillable += 1
+            action = r.get("non_obvious_action_required") if r.get("is_non_obvious") else None
+            field_dto = schemas.DataSheetFieldDTO(
+                fieldId=fid, factKey=fact_key, label=task, category=category,
+                source="needs_input", value=None, hint=deadline_label,
+                employerActionNote=action if (is_hr and action) else None,
+            )
+
+        # The authority heads the step card; the task is the field. Keeps the official portal
+        # link clickable (section.sourceUrl) — the shape the RP-*-DATASHEET templates use.
+        sections.append(schemas.DataSheetSectionDTO(
+            stepId=fid,
+            title=r.get("authority") or task,
+            sourceUrl=r.get("source_url"),
+            processNote=_PHASE_TITLE.get(section, section),
+            order=order,
+            responsibleParty=(r.get("responsible_party") if is_hr else None),
+            deadline=(schemas.DataSheetDeadlineDTO(date=deadline_iso, isSuggested=True)
+                      if deadline_iso else None),
+            fields=[field_dto],
+        ))
+
+    return schemas.DataSheetDTO(
+        caseRef=case_id,
+        employeeName=employee_name,
+        corridor=corridor,
+        corridorLabel=corridor_label,
+        movementBasis=None,
+        generatedAt=_dt.datetime.now(_dt.timezone.utc),
+        completionPct=0,  # a preview captures nothing — 0% of its fillable steps are done
+        needsInputCount=total_fillable,
+        banners=banners,
+        sections=sections,
+        consultProfessional=consult,
+        covered=True,
+        preview=True,
     )

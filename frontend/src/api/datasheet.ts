@@ -82,6 +82,9 @@ export interface DataSheet {
   consultProfessional: DataSheetConsult[];
   /** False when the case has no data-sheet form yet — render "not available yet", not "done". */
   covered: boolean;
+  /** True when rendered from curated corridor-content (no fillable template yet): a read-only
+   *  guidance preview — fields show what's needed but cannot be saved. */
+  preview?: boolean;
 }
 
 export interface DataSheetQuery {

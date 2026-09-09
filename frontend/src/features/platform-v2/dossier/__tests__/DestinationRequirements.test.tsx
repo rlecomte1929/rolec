@@ -119,4 +119,15 @@ describe('the happy path', () => {
     expect(screen.getByText('IDENTITY')).toBeTruthy();
     expect(screen.getByText('RESIDENCE')).toBeTruthy();
   });
+
+  it('shows that the corridor is not ready when the catalog fails sufficiency', async () => {
+    getRequirements.mockResolvedValue(
+      dto({
+        catalogReady: false,
+        catalogNotReadyReason: 'This corridor is not ready. We have no approved, cited requirements to serve.',
+      }),
+    );
+    render(<DestinationRequirements caseId="c1" />);
+    await waitFor(() => expect(screen.getByTestId('catalog-not-ready')).toBeTruthy());
+  });
 });

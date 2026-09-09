@@ -18,6 +18,7 @@ corridor — most have no requirement records behind them yet.
 | corridor | records | served? | CVR | docs |
 |---|---|---|---|---|
 | IE→ES (Dublin→Madrid) | 25 (15 non-obvious, 2 need counsel) | **no** — all `pending`, migration not applied | none | [`ie-es/`](ie-es/README.md) |
+| FR→NO (knowledge-layer golden) | in-repo seed scored pending-only | **no** — 0 approved | QBR stub | [`fr-no/QBR-knowledge-layer.md`](fr-no/QBR-knowledge-layer.md) |
 
 ## Conventions worth knowing before adding one
 
@@ -32,6 +33,10 @@ The two cannot see each other's rows, because there is no unique index on that n
 (EU free movement into Spain), not `ES_IE` — the reverse corridor models a third-country
 national on an employment permit and its salary floors and visa gates do not apply to a free
 mover. Match the *legal shape*, not the country pair.
+
+**Writers target `requirement_items`, not `requirement_facts` and not imaginary `kg_*` tables.**
+`requirement_facts` is a parallel evidence shape used by some HR/sufficiency reads; new Otto
+and corridor loads promote into `requirement_items` with `review_status='pending'`.
 
 **`requirement_items.review_status` defaults to `'approved'`.** `requirements_builder`
 serves only approved rows, so a load that omits the column publishes unreviewed facts to real

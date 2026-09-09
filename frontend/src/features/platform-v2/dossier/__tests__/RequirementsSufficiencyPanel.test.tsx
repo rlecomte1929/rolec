@@ -225,6 +225,7 @@ describe('states that must never read as "complete"', () => {
 
     const empty = await screen.findByTestId('sufficiency-empty');
     expect(empty).toHaveTextContent(/we don’t yet hold reviewed requirements/i);
+    expect(empty).toHaveTextContent(/this corridor is not ready/i);
     expect(empty).toHaveTextContent(/not.*that nothing is required of you/i);
   });
 

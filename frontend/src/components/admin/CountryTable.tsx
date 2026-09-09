@@ -259,7 +259,15 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
                   onClick={() => onSelect(row.countryCode)}
                   className="grid w-full grid-cols-[minmax(14rem,1.6fr)_8.5rem_7rem_9rem_minmax(10rem,1fr)_1.5rem] gap-4 border-t border-slate-200 px-4 py-3 text-left hover:bg-navy-50"
                 >
-                  <CountryIdentity code={row.countryCode} />
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <CountryIdentity code={row.countryCode} />
+                    {row.catalogReady === true && (
+                      <Badge variant="success" size="sm">Ready</Badge>
+                    )}
+                    {row.catalogReady === false && (
+                      <Badge variant="warning" size="sm">Not ready</Badge>
+                    )}
+                  </div>
                   <div>
                     <div className="text-sm text-navy-800">{updated.relative}</div>
                     <div className="text-xs text-slate-500">{updated.absolute}</div>
@@ -335,7 +343,11 @@ function CountryCard({
     >
       <div className="flex items-start justify-between gap-3">
         <CountryIdentity code={row.countryCode} />
-        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+        <div className="flex items-center gap-2">
+          {row.catalogReady === false && <Badge variant="warning" size="sm">Not ready</Badge>}
+          {row.catalogReady === true && <Badge variant="success" size="sm">Ready</Badge>}
+          <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+        </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <div>

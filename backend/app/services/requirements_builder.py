@@ -11,6 +11,7 @@ from ..db import SessionLocal
 from ..schemas import CaseRequirementsDTO, RequirementItemDTO, SourceRecordDTO
 from . import lawyer_review_gate
 from .disclaimers import DEFAULT_VERIFICATION_STATUS, IMMIGRATION_DISCLAIMER
+from .knowledge_layer_scorecard import NOT_READY_EMPTY, score_requirement_rows
 from .requirements_country_key import resolve_catalog_country, to_iso
 from .requirements_purpose_key import (
     assignment_type_from_purpose,
@@ -155,10 +156,18 @@ def _in_country_move(case_id: str, dest_raw: str, purpose: str) -> CaseRequireme
         verificationStatus=DEFAULT_VERIFICATION_STATUS,
         staWaived=[],
         covered=True,
+        catalogReady=True,
+        catalogNotReadyReason=None,
     )
 
 
-def _not_covered(case_id: str, dest_raw: str, purpose: str) -> CaseRequirementsDTO:
+def _not_covered(
+    case_id: str,
+    dest_raw: str,
+    purpose: str,
+    *,
+    catalog_not_ready_reason: Optional[str] = None,
+) -> CaseRequirementsDTO:
     """AIQ-1473c fail-closed: the destination didn't resolve to a known catalog
     key, so we have no requirements catalogue for it. Return an explicit
     covered=False result with an empty list, rather than querying with a
@@ -174,6 +183,8 @@ def _not_covered(case_id: str, dest_raw: str, purpose: str) -> CaseRequirementsD
         verificationStatus=DEFAULT_VERIFICATION_STATUS,
         staWaived=[],
         covered=False,
+        catalogReady=False,
+        catalogNotReadyReason=catalog_not_ready_reason or NOT_READY_EMPTY,
     )
 
 
@@ -266,7 +277,12 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
         dest_country = resolve_catalog_country(dest_raw)
 
         sources = crud.list_sources(db, dest_country)
-        requirements = crud.list_requirements(db, dest_country, purpose)
+        source_map = {record.id: record for record in sources}
+        catalog_rows = crud.list_requirements(
+            db, dest_country, purpose, include_unapproved=True
+        )
+        requirements = [row for row in catalog_rows if (row.review_status or "approved") == "approved"]
+        scorecard = score_requirement_rows(catalog_rows, source_map)
 
         # AN EMPTY LIST MUST NEVER MAKE A CLAIM.
         #
@@ -294,7 +310,12 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                 "for case %s rather than an empty list that reads as 'nothing required'",
                 dest_country, purpose, case.id,
             )
-            return _not_covered(case.id, dest_raw, purpose)
+            return _not_covered(
+                case.id,
+                dest_raw,
+                purpose,
+                catalog_not_ready_reason=scorecard.not_ready_reason,
+            )
 
         base_items = [
             {
@@ -344,7 +365,6 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
 
         required_fields, expanded, flags = apply_rules(draft, base_items)
 
-        source_map = {record.id: record for record in sources}
         requirement_dtos: List[RequirementItemDTO] = []
 
         for item in expanded:
@@ -401,6 +421,8 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             nationalityWaived=sorted({t for t in (flags.get("nationalityWaived") or []) if t}),
             nationalityClass=flags.get("nationalityClass"),
             covered=True,  # AIQ-1473c: destination resolved to a known catalog key
+            catalogReady=scorecard.catalog_ready,
+            catalogNotReadyReason=scorecard.not_ready_reason,
         )
 
 
