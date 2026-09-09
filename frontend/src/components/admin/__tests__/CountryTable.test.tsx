@@ -137,6 +137,8 @@ describe('CountryTable', () => {
     expect(screen.getByTestId('catalog-stat-empty')).toHaveTextContent('1');
     expect(screen.getAllByText('Germany').length).toBeGreaterThan(0);
     expect(screen.getAllByText('France').length).toBeGreaterThan(0);
+    expect(screen.queryByText('DE')).not.toBeInTheDocument();
+    expect(screen.queryByText('FR')).not.toBeInTheDocument();
   });
 
   it('narrows the list when searching', () => {

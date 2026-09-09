@@ -102,11 +102,11 @@ function DomainChips({ domains }: { domains: string[] }) {
 
 function CountryIdentity({ code }: { code: string }) {
   const name = displayCountryName(code);
+  // Flag + resolved name only. Repeating countryCode next to the label doubled
+  // "CHINA CHINA" because many catalog rows store the English name as
+  // country_code, not ISO-2.
   return (
-    <span className="flex min-w-0 items-center gap-3">
-      <CountryFlag country={code} label={name} className="min-w-0 text-sm font-semibold text-navy-800" />
-      <span className="shrink-0 font-mono text-[11px] uppercase tracking-wide text-slate-500">{code}</span>
-    </span>
+    <CountryFlag country={code} label={name} className="min-w-0 text-sm font-semibold text-navy-800" />
   );
 }
 
