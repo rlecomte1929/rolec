@@ -198,10 +198,9 @@ def test_legacy_template_systems_still_present():
     caps = PolicyTemplateService.get_starter_template_caps()
     assert {"conservative", "standard", "premium"} <= set(caps)
     assert caps["standard"]["home_search"] == 2500  # the cap _LTA_TIER_DEFAULTS lacks
-    # 3. benefits_templates table router still mounted
-    from backend.app.routers import policy_templates as benefits_templates_router
-
-    assert benefits_templates_router.router is not None
+    # 3. benefits_templates table router — RETIRED: the deprecated GET /api/policy/templates
+    #    route was removed once its only frontend caller (policyBuilderAPI, #2224) was deleted.
+    #    The benchmark data it served remains available via PolicyTemplateService.get_benchmark_library().
     # 4. canonical LTA template (35-field tuple)
     from backend.app.services.policy_canonical_lta_template import (
         CANONICAL_LTA_TEMPLATE_FIELDS,

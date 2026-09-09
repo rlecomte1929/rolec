@@ -97,7 +97,6 @@ from .routers import (
     policy_gaps,
     policy_publish,
     policy_summary,
-    policy_templates,
     predictions,
     test_drive,
     rag_roadmap,
@@ -297,7 +296,6 @@ def create_app() -> FastAPI:
     app.include_router(policy_summary.router)
     app.include_router(policy_canonical.admin_router, prefix="/api/admin")
     app.include_router(policy_canonical.read_router, prefix="/api")
-    app.include_router(policy_templates.router)
     app.include_router(admin_settings.router)  # [Task-4] admin AI-governance controls panel
     app.include_router(admin_feedback.router)  # [Task-6] unified feedback console
     app.include_router(admin_admins.router)  # [Task-7] admin lifecycle management

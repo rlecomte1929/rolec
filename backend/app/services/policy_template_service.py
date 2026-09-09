@@ -4,7 +4,10 @@ Unified, versioned HR policy template schema + service (N12 / AIQ-852).
 Historically four uncoordinated template systems existed:
   1. ``POLICY_TEMPLATES`` dict          — policy_config_templates.py (comp/allowance matrix starter)
   2. ``_TIER_CAPS`` dict                — policy_starter_templates.py (5 service caps x 3 tiers)
-  3. ``benefits_templates`` table       — read in routers/policy_templates.py (out-of-band prod table)
+  3. ``benefits_templates`` table       — formerly read by the now-retired routers/policy_templates.py
+                                          (GET /api/policy/templates, removed once its only frontend
+                                          caller was deleted); this service's get_benchmark_library()
+                                          is the surviving reader of that data.
   4. canonical LTA template (35 fields) — policy_canonical_lta_template.py + default_policy_templates
                                           table (snapshot_json) consumed by the W4 gap-fill.
 
