@@ -36,6 +36,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.app import crud, models
+from backend.app.services import research
 
 
 @pytest.fixture()
@@ -92,3 +93,63 @@ class TestCitationsAreNotBlanked:
         crud.create_requirement_item(db, _payload(["https://a.gov"]))
         crud.create_requirement_item(db, _payload(["https://b.gov"]))
         assert db.query(models.RequirementItem).count() == 1
+
+
+class TestReviewStatusIsNotAutoApprovedOrReapproved:
+    """The 2026-09-09 regression: a startup reseed re-approved a demoted requirement.
+
+    `services/research._default_requirements` — re-run on every backend start via
+    `seed_demo_cases` -> `run_country_research(..., {"seed_curated": "true"})` — was the one
+    `create_requirement_item` producer that omitted `review_status`. Because the column
+    DEFAULTS to 'approved' (models.RequirementItem.review_status), a fresh insert served
+    unreviewed stub content, and a reseed that hit the INSERT branch re-approved a row a
+    reviewer had demoted. Migration `20261112000000` §2 demoted the three "Minimum lead time"
+    rows (DE/SG/US) to 'pending'; SINGAPORE's drifted back to 'approved' + no citation and
+    tripped the requirement-provenance guard. Every other producer already lands 'pending'.
+    """
+
+    def _lead_time(self):
+        reqs = research._default_requirements("SINGAPORE", "employment", [])
+        return next(r for r in reqs if r["title"] == "Minimum lead time")
+
+    def test_default_requirements_all_declare_pending(self):
+        """Unit: no auto-research row may rely on the DB's 'approved' default."""
+        reqs = research._default_requirements("SINGAPORE", "employment", [])
+        assert reqs, "expected default requirements to be produced"
+        assert all(r.get("review_status") == "pending" for r in reqs), (
+            "an auto-research requirement omitted review_status and would default to 'approved'"
+        )
+
+    def test_fresh_insert_is_not_auto_approved(self, db):
+        """The regression: a first insert used to fall through to server_default 'approved'."""
+        crud.create_requirement_item(db, self._lead_time())
+        row = db.query(models.RequirementItem).filter_by(title="Minimum lead time").one()
+        assert row.review_status == "pending", (
+            "a freshly-seeded auto-research requirement was published without review"
+        )
+
+    def test_reseed_does_not_reapprove_a_demoted_row(self, db):
+        """The task's exact shape: demote to pending, re-run the seed, stays pending."""
+        crud.create_requirement_item(db, self._lead_time())
+        row = db.query(models.RequirementItem).filter_by(title="Minimum lead time").one()
+        row.review_status = "pending"  # a reviewer / migration 20261112000000 §2 demotes it
+        db.commit()
+        # the startup reseed runs again: a NEW random id, same natural key, no sources found
+        crud.create_requirement_item(db, self._lead_time())
+        row = db.query(models.RequirementItem).filter_by(title="Minimum lead time").one()
+        assert row.review_status == "pending", "a reseed re-approved a reviewer-demoted row"
+        assert db.query(models.RequirementItem).count() == 1
+
+    def test_reseed_preserves_an_approval_and_its_citation(self, db):
+        """Symmetric invariant: an admin approval + curated citation survive the reseed."""
+        crud.create_requirement_item(db, self._lead_time())
+        row = db.query(models.RequirementItem).filter_by(title="Minimum lead time").one()
+        row.review_status = "approved"
+        row.citations_json = json.dumps(["https://www.ica.gov.sg/reside/LTVP/apply"])
+        db.commit()
+        crud.create_requirement_item(db, self._lead_time())  # reseed carries [] citations
+        row = db.query(models.RequirementItem).filter_by(title="Minimum lead time").one()
+        assert row.review_status == "approved", "a reseed un-approved a reviewed row"
+        assert json.loads(row.citations_json) == [
+            "https://www.ica.gov.sg/reside/LTVP/apply"
+        ], "a reseed blanked a curated citation"

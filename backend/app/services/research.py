@@ -137,6 +137,20 @@ def run_country_research(dest_country: str, purpose: str, flags: Dict[str, str])
 
 def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]) -> List[Dict[str, str]]:
     now = datetime.utcnow()
+    # review_status MUST be set explicitly on every row. This is an automated producer:
+    # `seed_demo_cases` re-runs it on every backend start (so every Render deploy) via
+    # `run_country_research(..., {"seed_curated": "true"})`. `requirement_items.review_status`
+    # DEFAULTS to 'approved' at the DB level (models.RequirementItem), so a payload that omits
+    # it publishes unreviewed stub content to real users the instant it is inserted — and it
+    # re-approves a row a reviewer has since demoted whenever the reseed hits the INSERT branch.
+    # That is exactly what happened to SINGAPORE "Minimum lead time" (migration
+    # 20261112000000 §2 demoted all three lead-time rows to 'pending'; this producer minted
+    # it back at 'approved' + no citation, tripping the requirement-provenance guard on
+    # 2026-09-09). Every other create_requirement_item producer already lands 'pending'
+    # (seed_requirements.py, imports/otto/executor.py, scripts/seed_corridor_facts.py);
+    # this one was the outlier. New rows wait for an admin at /admin/countries before serving;
+    # `_apply_requirement_item_update` deliberately never syncs review_status, so a reseed
+    # leaves an already-reviewed row untouched.
     requirements = [
         {
             "id": str(uuid.uuid4()),
@@ -149,6 +163,7 @@ def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]
             "owner": "EMPLOYEE",
             "required_fields_json": json.dumps(["employeeProfile.passportExpiry"]),
             "citations_json": json.dumps(source_ids[:1]),
+            "review_status": "pending",
             "last_verified_at": now,
         },
         {
@@ -162,6 +177,7 @@ def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]
             "owner": "EMPLOYEE",
             "required_fields_json": json.dumps(["assignmentContext.employerName", "assignmentContext.jobTitle"]),
             "citations_json": json.dumps(source_ids[:1]),
+            "review_status": "pending",
             "last_verified_at": now,
         },
         {
@@ -175,6 +191,7 @@ def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]
             "owner": "HR",
             "required_fields_json": json.dumps(["assignmentContext.contractStartDate"]),
             "citations_json": json.dumps(source_ids[:2]),
+            "review_status": "pending",
             "last_verified_at": now,
         },
     ]
