@@ -1,0 +1,31 @@
+{
+  "batch_id": "vendor-resourced-fr-de-movers-2026-09-08",
+  "generated": "2026-09-09",
+  "corridor": "FR-DE",
+  "category": "movers",
+  "total_firms_attempted": 3,
+  "accepted": 1,
+  "rejected": 2,
+  "accepted_firms": [
+    {
+      "name": "Crown Relocations Frankfurt",
+      "register": "EuRA",
+      "source_url": "https://www.eura-relocation.com/members/crown-worldwide-group",
+      "note": "EuRA Full Member under entity 'Crown Worldwide Group'; operates Crown Relocations brand globally including Frankfurt/Dusseldorf"
+    }
+  ],
+  "rejects": [
+    {
+      "name": "Zapf Umzuege",
+      "reason": "Not found on FIDI FAIM directory or EuRA member directory after exhaustive search"
+    },
+    {
+      "name": "Arnold & Hanl Umzugslogistik",
+      "reason": "Not found on FIDI FAIM directory (A-section exhausted) or EuRA member directory"
+    }
+  ],
+  "search_methods": {
+    "FIDI": "Full directory list scraped (A-section exhausted); 15+ slug probes; site searches; No Zapf or Arnold & Hanl entry found",
+    "EuRA": "https://www.eura-relocation.com/our-members/ scraped; site:searches; No Zapf or Arnold & Hanl entry found"
+  }
+}

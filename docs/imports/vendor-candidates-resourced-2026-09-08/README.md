@@ -41,6 +41,21 @@ as they arrive. Each sub-batch is landed with the append-only tripwire verified
   cosmetic label variant; the tier gate keys on the `fidi.org` domain, not the label, so it is
   immaterial. `accreditation_number` NULL on both (FIDI publishes only a FAIM expiry year).
 
+### FR-DE movers (Frankfurt) — `vendor-resourced-fr-de-movers-2026-09-08` (processed 2026-09-09)
+- Source (GCS): `1788921051328_bmh0husu.ndjson` (+ manifest `1788921077900_oz4xrsov.json`).
+- Otto: **1 firm found, 2 rejected** (Zapf Umzüge, Arnold & Hanl — small local German movers,
+  legitimately not FIDI/EuRA members; international-relocation networks don't list local firms —
+  expect similar low yield on other local-mover batches).
+- **NO new supplier landed.** The one firm, **Crown Relocations Frankfurt**, is a DUPLICATE —
+  already a supplier in prod, so the tier gate/dedupe staged 0 (dry-run: staged 0, duplicates 1,
+  rejected 0). No prod write done — nothing new to stage, and re-recording a duplicate adds no
+  queue-visible candidate. The re-sourced EuRA evidence is preserved here in the committed NDJSON.
+- **Vetter caveat (flagged honestly by Otto):** the EuRA `source_url`
+  (`/members/crown-worldwide-group`) is the GLOBAL PARENT (Crown Worldwide Group), not a
+  Frankfurt-specific listing. It clears the shape gate (a real EuRA per-entity page), but whether
+  the parent's EuRA membership evidences the Frankfurt office is a vetter judgment at
+  `/admin/vetting-queue` — recorded here, not auto-decided.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
