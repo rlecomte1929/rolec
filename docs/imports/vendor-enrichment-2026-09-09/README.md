@@ -38,14 +38,24 @@ until a reader is built. Full rationale + per-field consuming surface: the appro
 
 ## Sub-batches
 
-### XX-DE schools (Berlin + Frankfurt) — `synthetic-…` proving run (DISPATCHED 2026-09-09)
-- Target: the **13** Berlin+Frankfurt international schools landed today (see `target_xx-de-schools.csv`),
-  all currently 0% enriched (contact_email/description/city_name/specialization_tags all empty).
-- Otto enrichment thread dispatched via the automation session; NDJSON + manifest awaited on GCS.
-- Applier validated end-to-end read-only against these 13 keys with a synthetic NDJSON (manifest gate,
-  target-key gate, fill-empty, honesty/no-source/not-found branches, 0 overwrites); unit tests in
-  `scripts/tests/test_enrich_suppliers.py` (11 passing).
-- **Landed numbers + tripwire filled in here after the real `--apply`.**
+### XX-DE schools (Berlin + Frankfurt) — `vendor-enrichment-schools-de-2026-09-09` (LANDED 2026-09-09)
+- Target: the **13** Berlin+Frankfurt international schools landed today (`target_xx-de-schools.csv`),
+  all 0% enriched before this run. Source (GCS): `1788967537614_fc9jlxue.ndjson` (+ manifest
+  `1788967548147_b55o0wy8.json`), sha256 `1971ed7e…` (independently re-computed = manifest).
+- Otto status: **8 found / 4 partial / 1 unreachable.** All 13 keys echoed verbatim (gate: keys ⊆
+  target, sha + count OK). Independently re-verified **every one of the 11 returned emails appears on
+  its cited page** (curl) — including 4 whose email is on a sibling domain (ASB Erasmus ×2,
+  Berlin Bilingual, JFK→`jfksberlin.org`): all confirmed on-page, so the multi-domain recovery is
+  honest, not fabricated. IBMS email confirmed on its `/contact` sub-page.
+- Landed: **70 fields filled across 12 schools** (fill-empty, dry-run-reviewed) — 11 contact_email,
+  11 contact_phone, 12 description, 12 languages, 12 specialization_tags, 12 city_name (now precise:
+  Bad Homburg, Bad Vilbel, Frankfurt am Main, Berlin). **0 overwrites.**
+- **Honest skips:** SIS Swiss Frankfurt = `unreachable` (subdomain ECONNREFUSED) → whole row skipped,
+  left empty (not fabricated); accadis = email null (contact-form only, phone/rest filled); Berlin
+  Cosmopolitan = phone null (`/contact` 500'd, email/rest filled).
+- **Append-only tripwire held:** approved-capability count+md5 **130 → 130** `1c4c3899…` unchanged;
+  pending unchanged at 1019 (enrichment adds no rows). First real `enrich_suppliers.py --apply`,
+  proven end-to-end.
 
 ## Honesty (Otto self-applies; the applier re-checks)
 
