@@ -33,12 +33,6 @@ backend/app/routers/rules.py:check_breed
 # Returns public breed-restriction lookup for a destination country.
 # Same reasoning as get_pet_restrictions above.
 
-backend/app/routers/policy_templates.py:get_policy_templates
-# Returns the 3-tier template library (Conservative/Standard/Premium).
-# Seeded from public benchmark data (AIRINC, Mercer, ECA).
-# No company-specific data; used for HR onboarding before policy is created.
-
-
 # ── Non-standard auth — manual JWT extraction via Authorization header ─────────
 # These routes call get_supabase_client_from_header() / _get_client() on the
 # raw Authorization header instead of using FastAPI Depends().
