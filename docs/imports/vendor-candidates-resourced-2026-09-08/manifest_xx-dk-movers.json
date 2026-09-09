@@ -1,0 +1,61 @@
+{
+  "batch_id": "vendor-resourced-xx-dk-movers-2026-09-09",
+  "category": "movers",
+  "city": "Copenhagen",
+  "total_sourced": 2,
+  "total_rejected": 8,
+  "firms": [
+    {
+      "name": "Alfa Mobility Denmark A/S",
+      "status": "sourced",
+      "register": "FIDI",
+      "source_url": "https://www.fidi.org/find-fidi-affiliate/alfa-mobility"
+    },
+    {
+      "name": "Aspire Mobility Group A/S",
+      "status": "sourced",
+      "register": "FIDI",
+      "source_url": "https://www.fidi.org/find-fidi-affiliate/aspire-mobility-group"
+    },
+    {
+      "name": "Inter Express Transport",
+      "status": "reject",
+      "reason": "not found on FIDI or EuRA — multiple slug variations attempted, no verifiable per-entity page"
+    },
+    {
+      "name": "A.J. Mauritzen & Co. A/S",
+      "status": "reject",
+      "reason": "not found on FIDI or EuRA — multiple slug variations attempted, no verifiable per-entity page"
+    },
+    {
+      "name": "Bergen International Movers",
+      "status": "reject",
+      "reason": "FIDI-FAIM registered but address in Türkiye, not Copenhagen metro"
+    },
+    {
+      "name": "Copenhagen Relocations ApS",
+      "status": "reject",
+      "reason": "EuRA member but DSP/Consulting/Immigration categories only — not a removal mover"
+    },
+    {
+      "name": "Deloitte Relocation & Immigration Services",
+      "status": "reject",
+      "reason": "EuRA member but DSP/Immigration categories only — not a removal mover"
+    },
+    {
+      "name": "Gateway to Denmark",
+      "status": "reject",
+      "reason": "EuRA member but DSP/Consulting/Serviced Apartments categories — not a removal mover"
+    },
+    {
+      "name": "GTS Nordic ApS",
+      "status": "reject",
+      "reason": "EuRA member but Relocation Management Company category — not a removal mover"
+    },
+    {
+      "name": "Globas Relocations Europe",
+      "status": "reject",
+      "reason": "FIDI-FAIM registered but address in Germany (Düsseldorf), not Copenhagen metro"
+    }
+  ]
+}

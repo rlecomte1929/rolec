@@ -82,6 +82,29 @@ as they arrive. Each sub-batch is landed with the append-only tripwire verified
   IE** (`coverage_scope_type='country'`) — the label is cosmetic, the scope is Ireland.
   `accreditation_number` NULL (FIDI publishes only a FAIM expiry year).
 
+### XX-DK movers (Copenhagen) — `vendor-resourced-xx-dk-movers-2026-09-09` (processed 2026-09-09)
+- Source (GCS): `1788945180783_bxsm8eca.ndjson` (+ manifest `1788945209670_yslukdgc.json`).
+- Otto manifest: **2 sourced, 8 rejected** — thin but honest market. Rejects by name: 2 with no
+  verifiable per-entity page (Inter Express, A.J. Mauritzen), 2 FIDI-FAIM but wrong country (Bergen
+  = Türkiye, Globas = Düsseldorf DE), 4 EuRA DSP/RMC/serviced-apartment firms (Copenhagen
+  Relocations, Deloitte, Gateway to Denmark, GTS Nordic) — not removal movers.
+- **Independently re-verified 2026-09-09**: both `source_url`s are FIDI per-entity pages, HTTP 200,
+  firm named, no cross-contamination (alfa 14 / aspire 0, and vice versa). Alfa's slug
+  `alfa-mobility` carries no country suffix, so I verified the page body explicitly: it shows
+  `ALFA MOBILITY DENMARK A/S`, Company address **COPENHAGEN, Denmark**, `+45 43 53 06 40`,
+  `info@alfamoving.dk`, FAIM — the Denmark entity, distinct from the Norway/Sweden Alfa offices
+  (whose prod records use their own slugs `alfa-mobility-5` / `alfa-mobility-0`). Aspire page:
+  `ASPIRE MOBILITY GROUP | FIDI`, Rødovre, Denmark.
+- **NO new supplier landed — 100% duplicate.** Both firms are ALREADY in prod as suppliers with
+  `movers`/`DK` capabilities at `pending` (created 2026-08-31 in an earlier XX-DK landing) and
+  already staged as XX-DK/movers candidates. Dry-run: read 2, **staged 0** (both skipped as
+  already-staged), 0 duplicates, 0 rejected. No prod write done. The re-sourced FIDI evidence is
+  preserved in the committed NDJSON — it corroborates the existing records.
+- Tripwire: no write, so `ssc` `approved` **130 → 130** unchanged (pending unchanged at 984).
+- Heads-up: an existing multi-country Alfa set is in prod (Norway `alfa-mobility-5`, Sweden
+  `alfa-mobility-0`, Denmark `alfa-mobility`, + a generic `ALFA MOBILITY`), so the queued
+  **Helsinki (XX-FI)** and **Stockholm (XX-SE)** batches will likely also hit Alfa duplicates.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
