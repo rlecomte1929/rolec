@@ -109,11 +109,19 @@ def test_reseeding_cannot_un_approve_live_content(db):
     assert rows[0].description == "reworded", "the seed's content still lands"
 
 
-def test_a_new_row_defaults_to_approved_when_no_writer_states_otherwise(db):
-    """Existing rows predate the column and must not go dark. The backfill and this default
-    agree: silence means approved; only the writers that produce unreviewed content say
-    'pending'."""
+def test_an_automated_insert_defaults_to_pending_until_a_human_reviews(db):
+    """82c02e0f ("pending-only inserts") reversed the old silence=approved rule for the
+    create_requirement_item funnel. Every caller of that funnel is an automated producer
+    (Otto promote, research stub, YAML that omitted the column), so an insert naming no
+    review_status now defaults to 'pending' and does NOT reach a user until a human approves
+    it. The column's server default stays 'approved' for rows written by other paths and for
+    pre-existing rows; this pins the automated-producer funnel's own default."""
     payload = _payload("Legacy item")
     payload.pop("review_status", None)
     crud.create_requirement_item(db, payload)
-    assert [r.title for r in crud.list_requirements(db, "NORWAY")] == ["Legacy item"]
+    # Not served by default…
+    assert crud.list_requirements(db, "NORWAY") == []
+    # …but visible to the admin review surface, awaiting a human.
+    pending = crud.list_requirements(db, "NORWAY", include_unapproved=True)
+    assert [r.title for r in pending] == ["Legacy item"]
+    assert pending[0].review_status == "pending"
