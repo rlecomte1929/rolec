@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Protocol
+from typing import Dict, List, Protocol, Any
 from urllib.parse import urlparse
 import hashlib
 import uuid
@@ -135,7 +135,7 @@ def run_country_research(dest_country: str, purpose: str, flags: Dict[str, str])
     return {"status": "ok"}
 
 
-def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]) -> List[Dict[str, str]]:
+def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]) -> List[Dict[str, Any]]:
     now = datetime.utcnow()
     requirements = [
         {
@@ -149,6 +149,7 @@ def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]
             "owner": "EMPLOYEE",
             "required_fields_json": json.dumps(["employeeProfile.passportExpiry"]),
             "citations_json": json.dumps(source_ids[:1]),
+            "review_status": "pending",
             "last_verified_at": now,
         },
         {
@@ -162,6 +163,7 @@ def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]
             "owner": "EMPLOYEE",
             "required_fields_json": json.dumps(["assignmentContext.employerName", "assignmentContext.jobTitle"]),
             "citations_json": json.dumps(source_ids[:1]),
+            "review_status": "pending",
             "last_verified_at": now,
         },
         {
@@ -175,6 +177,7 @@ def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]
             "owner": "HR",
             "required_fields_json": json.dumps(["assignmentContext.contractStartDate"]),
             "citations_json": json.dumps(source_ids[:2]),
+            "review_status": "pending",
             "last_verified_at": now,
         },
     ]

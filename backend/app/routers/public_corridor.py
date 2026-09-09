@@ -64,6 +64,8 @@ from ..services.rules_engine import apply_rules
 # AIQ-1473b: single source of truth for ISO → catalog-name mapping. Imported
 # (not duplicated) so this endpoint stays in sync if the catalog naming changes.
 from ..services.requirements_country_key import resolve_catalog_country
+from ..services.knowledge_layer_scorecard import score_requirement_rows
+from ..services.requirements_builder import citation_dtos
 
 router = APIRouter(prefix="/api/public", tags=["public"])
 
@@ -76,38 +78,17 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", (text or "").strip().lower()).strip("_") or "requirement"
 
 
-def _public_sources(citations: Any) -> List[str]:
+def _public_sources(citations: Any, source_map: Optional[Dict[str, Any]] = None) -> List[str]:
     """The citation URLs, and nothing else, for an anonymous caller.
 
-    This endpoint is unauthenticated and answers with `Access-Control-Allow-Origin: *`, and it
-    used to emit `citations_json` RAW. That field is not a list of URLs — it holds three shapes,
-    and two of them carry things an anonymous caller has no business receiving:
-
-    - inline objects from the corridor generators and `otto.mappings._citations_for`, carrying
-      `needs_lawyer_review` and, on the IE→ES rows, a `review_reason` naming exactly which claim
-      we do not trust and why;
-    - bare `source_records` ids, which are internal identifiers and resolve to nothing publicly.
-
-    Both were unreachable only while every object-shaped row sat at `review_status='pending'`.
-    That stopped being true on 2026-08-21 12:02 UTC, when the nine VE→IE rows were approved and
-    `needs_lawyer_review: true` began appearing in the live public payload.
-
-    ALLOWLIST, not denylist. Stripping the two keys we happen to know about fails open the next
-    time a generator adds a third — and `topic_key`/`corridor` were already being published. A
-    citation is a URL to the public; anything that is not one is dropped rather than guessed at.
-
-    The wire type stays `List[str]`: approved string-shaped rows have always emitted a list of
-    strings, and Audos reads this seam. `http`/`https` only, deduped, order preserved.
+    Resolves the same three citation shapes as the employee dossier (`citation_dtos`),
+    then keep only http(s) URLs. Dangling `source_records` ids are dropped, never
+    published. Internal flags on inline objects never leave the URL field.
     """
     out: List[str] = []
     seen = set()
-    for citation in citations or []:
-        if isinstance(citation, dict):
-            url = str(citation.get("url") or "").strip()
-        elif isinstance(citation, str):
-            url = citation.strip()
-        else:
-            continue
+    for dto in citation_dtos(citations or [], source_map or {}):
+        url = (dto.url or "").strip()
         if not url.lower().startswith(("http://", "https://")):
             continue
         if url in seen:
@@ -240,7 +221,11 @@ def corridor_requirements(
     )
 
     with SessionLocal() as db:
-        base_items = _base_items(crud.list_requirements(db, dest_catalog, purp))
+        approved = crud.list_requirements(db, dest_catalog, purp)
+        catalog_rows = crud.list_requirements(db, dest_catalog, purp, include_unapproved=True)
+        source_map = {record.id: record for record in crud.list_sources(db, dest_catalog)}
+        scorecard = score_requirement_rows(catalog_rows, source_map)
+        base_items = _base_items(approved)
 
     _required, expanded, flags = apply_rules(draft, base_items)
 
@@ -260,7 +245,7 @@ def corridor_requirements(
             # or the public corridor page can never badge it. See lawyer_review_gate.
             "legalReviewPending": bool(item.get("legalReviewPending")),
             "category": item.get("pillar"),
-            "source": _public_sources(item.get("citations")),
+            "source": _public_sources(item.get("citations"), source_map),
         }
         for item in expanded
     ]
@@ -277,9 +262,15 @@ def corridor_requirements(
         # caller explain a short/empty list instead of it looking like missing data.
         "waived_for_assignment_type": sorted({t for t in (flags.get("staWaived") or []) if t}),
         "coverage_note": (
-            None if requirements
-            else f"No generic requirements are configured for destination {dest_catalog} + {etype} in the engine yet."
+            scorecard.not_ready_reason
+            if not scorecard.catalog_ready
+            else (
+                None
+                if requirements
+                else f"No generic requirements are configured for destination {dest_catalog} + {etype} in the engine yet."
+            )
         ),
+        "catalog_ready": scorecard.catalog_ready,
         "disclaimer": IMMIGRATION_DISCLAIMER,
         "generated_at": datetime.utcnow().isoformat() + "Z",
     }
