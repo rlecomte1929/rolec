@@ -99,8 +99,9 @@ class HrNotificationCountsTests(unittest.TestCase):
         patcher = mock.patch.object(hr_router.db, "engine", self.engine)
         patcher.start()
         self.addCleanup(patcher.stop)
-        # _caller_company_id falls back to user["company"] when profile lookup
-        # returns no company_id, so stub get_profile_record to return None.
+        # _caller_company_id falls back to user["company"] when HR/profile lookup
+        # returns no company_id. Stub both so a MagicMock db (backend/conftest.py)
+        # cannot supply a truthy fake company_id that would zero the aggregates.
         profile_patcher = mock.patch.object(
             hr_router.db,
             "get_profile_record",
@@ -108,6 +109,13 @@ class HrNotificationCountsTests(unittest.TestCase):
         )
         profile_patcher.start()
         self.addCleanup(profile_patcher.stop)
+        hr_co_patcher = mock.patch.object(
+            hr_router.db,
+            "get_hr_company_id",
+            return_value=None,
+        )
+        hr_co_patcher.start()
+        self.addCleanup(hr_co_patcher.stop)
 
     def _insert_demand(self, company_id, category, city, count=1):
         with self.engine.begin() as conn:
@@ -255,7 +263,14 @@ class AdminNotificationCountsTests(unittest.TestCase):
                 )
         user = {"id": "x", "is_admin": True, "role": "admin"}
         result = admin_router.admin_notification_counts(user)
-        self.assertEqual(result, {"pending_tickets": 2, "allowlisted_destinations": 2})
+        self.assertEqual(
+            result,
+            {
+                "pending_tickets": 2,
+                "allowlisted_destinations": 2,
+                "pending_capabilities": 0,
+            },
+        )
 
 
 if __name__ == "__main__":

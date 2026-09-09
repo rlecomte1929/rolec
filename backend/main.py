@@ -148,6 +148,7 @@ from .app.routers import stripe_webhook as stripe_webhook_router  # Stripe webho
 from .app.routers import auth_page_config as auth_page_config_router  # GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 from .app.routers import requirement_facts as requirement_facts_router  # [AIQ-1091] P4-02 requirement-facts extract
 from .app.routers import admin_content_review as admin_content_review_router  # [AIQ-1821] content review queue
+from .app.routers import coverage as coverage_router  # Admin coverage dashboard (dual-layer registration)
 from .app.routers import admin_candidate_beam as admin_candidate_beam_router  # corridor candidate beam review
 from .app.routers import nlg as nlg_router  # [Parker-J] dual-layer registration (PR #207 §9)
 from .app.routers import predictions as predictions_router  # [Parker-A] dual-layer registration (PR #207 §9)
@@ -822,6 +823,7 @@ app.include_router(stripe_webhook_router.router)  # Stripe webhook Path A — PO
 app.include_router(auth_page_config_router.router)  # Auth Page Design — GET /api/public/auth-page-config (anon), PUT /api/admin/auth-page-config (admin)
 app.include_router(requirement_facts_router.router)  # [AIQ-1091] P4-02 — POST /api/admin/requirement-facts/extract
 app.include_router(admin_content_review_router.router)  # [AIQ-1821] /api/admin/content-review
+app.include_router(coverage_router.router)  # Admin coverage dashboard — /api/admin/coverage — dual-layer registration
 app.include_router(admin_candidate_beam_router.router)  # /api/admin/candidate-beam
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
 app.include_router(rag_roadmap_router.router)  # [P1-01d] /api/internal/rag/generate-roadmap (dual-layer registration)
@@ -6823,7 +6825,8 @@ def list_hr_assignments(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """
-    List HR assignments (summary only). Paginated, server-side filtered. No per-row compliance N+1.
+    List HR assignments (summary only). Paginated, server-side filtered.
+    Latest compliance status is bulk-loaded (one windowed SELECT), not N+1.
     - Auth: HR (or ADMIN).
     - Returns lightweight summary; use GET /api/hr/assignments/{id} for full detail.
     """
@@ -6924,6 +6927,13 @@ def list_hr_assignments(
             except Exception:
                 log.warning("next_open_milestone_deadlines_for_cases failed", exc_info=True)
 
+        reports_by_aid: Dict[str, Any] = {}
+        if aids_for_profiles:
+            try:
+                reports_by_aid = db.get_latest_compliance_reports_by_assignment_ids(aids_for_profiles) or {}
+            except Exception:
+                log.warning("get_latest_compliance_reports_by_assignment_ids failed", exc_info=True)
+
         summaries: List[AssignmentSummary] = []
         for assignment in assignments:
             eff_case = _effective_relocation_case_id(assignment)
@@ -6950,13 +6960,14 @@ def list_hr_assignments(
             # the per-row wizard_cases roundtrip; .strip() is equivalent.
             nk = eff_case.strip() if eff_case else ""
             next_deadline = deadline_by_case.get(nk) if nk else None
+            report = reports_by_aid.get(assignment["id"])
             summaries.append(AssignmentSummary(
                 id=assignment["id"],
                 caseId=case_id,
                 employeeIdentifier=assignment["employee_identifier"],
                 status=AssignmentStatus(normalize_status(assignment["status"])),
                 submittedAt=submitted_at_str,
-                complianceStatus=None,
+                complianceStatus=report["overallStatus"] if report else None,
                 employeeFirstName=assignment.get("employee_first_name"),
                 employeeLastName=assignment.get("employee_last_name"),
                 case=case_meta,

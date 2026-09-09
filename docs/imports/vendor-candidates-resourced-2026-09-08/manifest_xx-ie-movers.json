@@ -1,0 +1,25 @@
+{
+  "batch_id": "vendor-resourced-xx-ie-movers-2026-09-09",
+  "category": "movers",
+  "city": "Dublin",
+  "total_sourced": 4,
+  "total_rejected": 12,
+  "firms": [
+    {"name": "Cronin Relocations Ireland", "status": "sourced", "register": "FIDI-FAIM", "source_url": "https://www.fidi.org/find-fidi-affiliate/cronin-relocations-ireland"},
+    {"name": "Irish Relo", "status": "sourced", "register": "FIDI-FAIM", "source_url": "https://www.fidi.org/find-fidi-affiliate/irish-relo"},
+    {"name": "Get Cracking Relocations", "status": "sourced", "register": "FIDI-FAIM", "source_url": "https://www.fidi.org/find-fidi-affiliate/get-cracking-relocations"},
+    {"name": "Cronin Ireland Relocations", "status": "sourced", "register": "EuRA", "source_url": "https://www.eura-relocation.com/members/cronin-ireland-relocations/"},
+    {"name": "Corrigan International", "status": "reject", "reason": "FIDI page found but address is Farmington Hills, Michigan, USA — not Dublin"},
+    {"name": "Doree Bonner International", "status": "reject", "reason": "FIDI page found but address is Dartford, United Kingdom — not Dublin"},
+    {"name": "Abels Moving Services Ltd", "status": "reject", "reason": "FIDI page found but address is Brandon, United Kingdom — not Dublin"},
+    {"name": "Armstrong International Movers", "status": "reject", "reason": "FIDI page found but address is Montreal, Canada — not Dublin"},
+    {"name": "AGS Global Solutions London", "status": "reject", "reason": "FIDI page found but address is Uxbridge, United Kingdom — not Dublin"},
+    {"name": "Crown Relocations", "status": "reject", "reason": "no FIDI per-entity page found at expected slug; 404"},
+    {"name": "Altair Global Ireland", "status": "reject", "reason": "EuRA member (Dublin) but category is DSP/RMC/Visa — not a removal mover; no per-entity slug resolves"},
+    {"name": "Dublin Moves Made Easy", "status": "reject", "reason": "EuRA per-entity page confirmed but category is Destination Service Provider only — not a removal mover"},
+    {"name": "Dwellworks Ireland", "status": "reject", "reason": "EuRA member (Dublin) but category is DSP/Serviced Apartments — not a removal mover"},
+    {"name": "GW360", "status": "reject", "reason": "EuRA member (Dublin) but Associate Member for DSP services only — not a removal mover"},
+    {"name": "Celtic Relocations", "status": "reject", "reason": "EuRA member but based in Kinsale, Co. Cork — not Dublin"},
+    {"name": "Corporate Care Relocation", "status": "reject", "reason": "EuRA member but based in Cork — not Dublin"}
+  ]
+}

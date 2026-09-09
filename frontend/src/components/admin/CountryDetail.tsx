@@ -1,7 +1,8 @@
 import React from 'react';
 import type { CountryProfileDTO } from '../../types';
 import type { AdminRequirementReview, ReviewStatus } from '../../api/admin';
-import { Card, Button, Badge } from '../antigravity';
+import { Card, Button, Badge, CountryFlag } from '../antigravity';
+import { confidenceLevel, confidencePercent, displayCountryName } from './countryCatalog';
 
 interface CountryDetailProps {
   profile: CountryProfileDTO;
@@ -54,14 +55,29 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
   onRerun,
   onReview,
 }) => {
+  const level = confidenceLevel(profile.confidenceScore);
+  const confidenceVariant = level === 'high' ? 'success' : level === 'medium' ? 'warning' : 'error';
+
   return (
     <div className="space-y-6">
       <Card padding="lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-lg font-semibold text-[#0b2b43]">{profile.countryCode}</div>
-            <div className="text-xs text-[#6b7280]">
-              Last updated: {profile.lastUpdatedAt ? new Date(profile.lastUpdatedAt).toLocaleString('en-US') : '-'}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <CountryFlag
+                country={profile.countryCode}
+                label={displayCountryName(profile.countryCode)}
+                className="text-lg font-semibold text-navy-800"
+              />
+              <span className="font-mono text-xs uppercase tracking-wide text-slate-500">{profile.countryCode}</span>
+              {level !== 'unknown' && (
+                <Badge variant={confidenceVariant} size="sm">
+                  Confidence {confidencePercent(profile.confidenceScore)}%
+                </Badge>
+              )}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              Last updated: {profile.lastUpdatedAt ? new Date(profile.lastUpdatedAt).toLocaleString('en-US') : 'Never'}
             </div>
           </div>
           <Button onClick={onRerun}>Re-run research</Button>

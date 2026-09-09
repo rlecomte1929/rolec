@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { CountryPicker } from '../../components/location';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Input } from '../../components/antigravity/Input';
-import { Card, Button } from '../../components/antigravity';
+import { Card, Button, CountryFlag } from '../../components/antigravity';
 import { StatusBadge } from '../../components/admin/resources/StatusBadge';
 import { ResourceRowActions } from '../../components/admin/resources/ResourceRowActions';
 import { adminResourcesAPI, adminStagingAPI } from '../../api/client';
@@ -191,7 +191,7 @@ export const AdminResources: React.FC = () => {
                         {r.title || 'Untitled'}
                       </Link>
                     </td>
-                    <td className="py-2">{r.country_code || '-'}</td>
+                    <td className="py-2">{r.country_code ? <CountryFlag country={r.country_code} /> : '-'}</td>
                     <td className="py-2">{(r as { city_name?: string }).city_name || '-'}</td>
                     <td className="py-2">{categoryLabel(r.category_id)}</td>
                     <td className="py-2"><StatusBadge status={r.status} /></td>

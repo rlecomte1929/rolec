@@ -31,6 +31,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Combobox } from '../Combobox';
 import { COUNTRY_OPTIONS } from '../../features/policy-config/countryList';
 import { listEmployeeDestinations, type AllowlistedDestination } from '../../api/destinations';
+import { countryFlagEmoji } from '../../lib/countryFlagCode';
+
+function countryOptionLabel(name: string, code?: string): string {
+  const flag = countryFlagEmoji(code || name);
+  return flag ? `${flag} ${name}` : name;
+}
 
 /** Canonical key for comparing two spellings of one place. Mirrors the backend's
  *  `vendor_curation._canon_city` (lowercase, trimmed, diacritics stripped) so the UI and the
@@ -145,7 +151,7 @@ export const CountryPicker: React.FC<{
         >
           <option value="">{placeholder}</option>
           {COUNTRY_OPTIONS.map((c) => (
-            <option key={c.code} value={c.code}>{c.name}</option>
+            <option key={c.code} value={c.code}>{countryOptionLabel(c.name, c.code)}</option>
           ))}
         </select>
       </label>
@@ -171,7 +177,7 @@ export const CountryPicker: React.FC<{
       >
         <option value="">{placeholder}</option>
         {withCurrent.map((c) => (
-          <option key={c} value={c}>{c}</option>
+          <option key={c} value={c}>{countryOptionLabel(c)}</option>
         ))}
       </select>
     </label>

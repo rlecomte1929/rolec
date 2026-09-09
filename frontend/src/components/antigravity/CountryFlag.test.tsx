@@ -15,6 +15,16 @@ describe('CountryFlag', () => {
     const { container } = render(<CountryFlag country="Germany" />);
     expect(container.querySelector('.fi.fi-de')?.getAttribute('aria-hidden')).toBe('true');
   });
+  it('renders Norway for the ISO code NO (not the letters NO)', () => {
+    const { container } = render(<CountryFlag country="NO" />);
+    expect(screen.getByText('Norway')).toBeInTheDocument();
+    expect(container.querySelector('.fi.fi-no')).toBeTruthy();
+  });
+  it('renders a flag for a full name that is not in the old corridor map', () => {
+    const { container } = render(<CountryFlag country="Argentina" />);
+    expect(screen.getByText('Argentina')).toBeInTheDocument();
+    expect(container.querySelector('.fi.fi-ar')).toBeTruthy();
+  });
   it('renders just the label when the country is unknown', () => {
     const { container } = render(<CountryFlag country="Atlantis" />);
     expect(screen.getByText('Atlantis')).toBeInTheDocument();

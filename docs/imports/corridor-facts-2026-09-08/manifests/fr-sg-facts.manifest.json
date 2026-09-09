@@ -1,0 +1,33 @@
+{
+  "batch_id": "fr-sg-facts-2026-09-08",
+  "corridor": "FR->SG",
+  "generated_date": "2026-09-08",
+  "mover_type": "Third-country national (non-EEA from Singapore perspective)",
+  "facts_count": 18,
+  "ndjson_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788915933233_h5ldk9ds.ndjson",
+  "pillars_covered": ["immigration", "residence", "tax", "social_security", "healthcare"],
+  "pillar_fact_counts": {
+    "immigration": 8,
+    "residence": 3,
+    "tax": 1,
+    "social_security": 5,
+    "healthcare": 2
+  },
+  "sources_used": [
+    "mom.gov.sg (Employment Pass eligibility, COMPASS, apply-for-a-pass, key-facts, passes-for-family, notify-mom-of-changes; S Pass eligibility; PEP eligibility; Parliamentary written answer on CPF for EP holders)",
+    "cpf.gov.sg (Skills Development Levy employer obligations)",
+    "moh.gov.sg (MediShield Life scheme)"
+  ],
+  "assumption_corrections": [
+    "Address change: brief assumed 'notify ICA within 28 days'. VERIFIED FALSE — an EP holder's change of residential address must be reported to MOM (not ICA) within 5 days via EP eService (fact fr-sg-res-002).",
+    "Employer medical coverage: brief assumed the employer 'must pay for outpatient treatment'. VERIFIED FALSE for EP holders — MOM leaves medical insurance to the employer's discretion for EP holders; the mandatory medical-insurance rule applies to S Pass / Work Permit holders, not EP (fact fr-sg-hea-002)."
+  ],
+  "gaps": [
+    "TAX (major gap): Every iras.gov.sg individual-income-tax page renders only its fully expanded mega-menu before the platform scraper truncates, so no IRAS body content could be captured verbatim. The following remain UNVERIFIED from a fetched official page and need manual/lawyer verification: non-resident flat 15% vs progressive resident rates (whichever higher); the >183-day tax-residency test; no capital gains tax / no inheritance tax; Form IR8A & Auto-Inclusion Scheme employer filing; IRAS e-filing deadline (18 Apr); Not Ordinarily Resident (NOR) scheme status. Google snippets from iras.gov.sg corroborate the 15%/progressive-higher rule but a snippet is not a fetched-page verbatim quote, so it was omitted per the hard rules. Only one tax fact (EP holders may be liable for income tax) was sourced verbatim, from mom.gov.sg.",
+    "RESIDENCE: Foreign Identification Number (FIN) — no official ica.gov.sg or mom.gov.sg page with a verbatim FIN definition could be fetched (ICA document/FIN URLs returned 404/blocked). Omitted.",
+    "SOCIAL_SECURITY: France–Singapore social security totalization agreement status could not be confirmed from an official source. Omitted (Singapore's CPF is not extended to foreigners regardless, per fact fr-sg-soc-001).",
+    "HEALTHCARE: EP holders paying unsubsidised (B1/A class) rates at public hospitals, and MediSave non-applicability, could not be captured with a verbatim official quote. Omitted.",
+    "IMMIGRATION: Standalone Dependant's Pass key-facts/eligibility page (mom.gov.sg/passes-and-permits/dependant-pass/*) returned 404 at attempted URLs; the family-pass rule was instead sourced verbatim from the EP 'passes-for-family' page."
+  ],
+  "status": "candidate"
+}

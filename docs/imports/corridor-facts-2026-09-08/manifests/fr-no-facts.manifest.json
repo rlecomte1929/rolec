@@ -1,0 +1,38 @@
+{
+  "batch_id": "fr-no-facts-2026-09-08",
+  "corridor": "FR->NO",
+  "generated_date": "2026-09-08",
+  "mover_type": "EEA free-mover (France EU->Norway EEA — Norway is NOT EU)",
+  "facts_count": 27,
+  "ndjson_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788913286460_vgprfszk.ndjson",
+  "pillars_covered": ["immigration", "residence", "tax", "social_security", "healthcare"],
+  "pillar_counts": {
+    "immigration": 5,
+    "residence": 6,
+    "tax": 6,
+    "social_security": 4,
+    "healthcare": 6
+  },
+  "sources_used": [
+    "norway.no (Ministry of Foreign Affairs)",
+    "udi.no (Norwegian Directorate of Immigration)",
+    "skatteetaten.no (Norwegian Tax Administration)",
+    "helsenorge.no / Helfo (Norwegian Directorate of Health)"
+  ],
+  "gaps": [
+    "nav.no English article pages (membership/contributions) returned empty to the scraper (JS-rendered) — National Insurance contribution RATES could not be verbatim-sourced from an official page and were OMITTED rather than invented. National Insurance membership was instead sourced from the official helsenorge.no/Helfo page.",
+    "udi.no article pages (employee-EEA, FAQ) are blocked to the scraper; the udi.no word-definitions page (registration certificate) fetched successfully and the 3-month police-registration threshold was sourced from norway.no (MFA official portal).",
+    "A1 certificate specifics not sourced: A1 is a posting/dual-employment coordination document; a French national hired locally in Norway becomes a Norwegian NI member (fr-no-ss-001) rather than needing an A1, so it was not applicable to this local-hire scope.",
+    "Finnmark allowance / standard deduction for foreign workers not verbatim-sourced from an official page in this batch — OMITTED.",
+    "Employer's duty to register with Skatteetaten / a-melding not verbatim-sourced in this batch — OMITTED (employer-side, secondary to the employee flow)."
+  ],
+  "non_obvious_flags": [
+    "Norway is in the EEA but NOT the EU — free movement applies via the EEA Agreement.",
+    "EEA registration is done with the POLICE (politiet), not the immigration directorate, within 3 months of a >3-month stay.",
+    "The registration certificate is NOT proof of right of residence and never needs renewal (register once).",
+    "D-number (temporary) vs personnummer (permanent national identity number) is a major distinction.",
+    "D-number holders are NOT entitled to a fastlege (GP) — the GP right requires resident registration (personnummer).",
+    "Applying for a tax deduction card auto-enrolls a new arrival in the PAYE flat-tax scheme (25% / 17.4% if NI-exempt) up to NOK 725,050 (2026)."
+  ],
+  "status": "candidate"
+}

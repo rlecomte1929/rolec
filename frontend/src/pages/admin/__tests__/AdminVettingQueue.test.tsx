@@ -108,9 +108,9 @@ describe('AdminVettingQueue — batch approval', () => {
     render(<AdminVettingQueue />);
     await screen.findAllByText('Acme Movers');
 
-    // Filter to country NO (c1, c2), then select all + approve.
-    // Country is the first of the two <select> controls (Country, Type of service).
-    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'NO' } });
+    // Filter to Norway (ISO NO → c1, c2), then select all + approve.
+    fireEvent.click(screen.getByRole('button', { name: 'All countries' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Norway' }));
     fireEvent.click(screen.getByLabelText('Select all'));
     fireEvent.click(screen.getByRole('button', { name: /Approve selected \(2\)/ }));
 
