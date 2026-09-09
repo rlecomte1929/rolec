@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '../../../components/antigravity/Checkbox';
 import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
+import { TableScroll } from '../../../components/antigravity/TableScroll';
 import { adminAPI } from '../../../api/client';
 import { useV2Flag } from '../useV2Flag';
 import type {
@@ -337,6 +338,19 @@ interface FilterState {
   issuesOnly: boolean;
 }
 
+export function companiesEmptyCopy(opts: {
+  loading: boolean;
+  issuesOnly: boolean;
+  anyFilter: boolean;
+}): string {
+  if (opts.loading) return 'Loading companies…';
+  if (opts.issuesOnly) {
+    return 'No registry issues. Clear the Issues only filter to see all companies.';
+  }
+  if (opts.anyFilter) return 'No companies match your filters.';
+  return 'No companies yet.';
+}
+
 const EMPTY_FILTERS: FilterState = {
   search: '',
   status: '',
@@ -624,17 +638,15 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
           onEdit={(c) => setEditTarget(c)}
           onArchive={(c) => void handleArchive(c)}
           onDelete={(c) => handleDelete(c)}
-          emptyState={
-            loading
-              ? 'Loading companies…'
-              : anyFilter
-                ? 'No companies match your filters.'
-                : 'No companies yet.'
-          }
+          emptyState={companiesEmptyCopy({
+            loading,
+            issuesOnly: filters.issuesOnly,
+            anyFilter,
+          })}
         />
       ) : (
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto rounded-xl">
+        <TableScroll className="rounded-xl" minWidthClass="min-w-[64rem]">
           <table className="min-w-full text-[13px]">
             <thead className="bg-slate-50/80 text-left text-[10.5px] font-semibold uppercase tracking-widest text-slate-500">
               <tr>
@@ -662,7 +674,11 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
               {!loading && filtered.length === 0 && (
                 <tr>
                   <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-500">
-                    {anyFilter ? 'No companies match your filters.' : 'No companies yet.'}
+                    {companiesEmptyCopy({
+                      loading,
+                      issuesOnly: filters.issuesOnly,
+                      anyFilter,
+                    })}
                   </td>
                 </tr>
               )}
@@ -736,7 +752,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
                 ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </div>
       )}
 

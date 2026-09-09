@@ -61,6 +61,12 @@ The in-house component library is the first stop for any UI. Use these before re
 **Alert · Badge · Button · Card · Checkbox · Container · FileInput · Input · LoadingButton · ProgressBar · Radio · Select · StalenessBadge.**
 (`Button` variants: primary / secondary / outline / ghost.)
 
+**Select:** `frontend/src/components/antigravity/Select.tsx` keeps **caller order** by default (`sort="none"`). Pass `sort="label"` only for A–Z lists (countries, names). Status and workflow options stay in product order.
+
+**Buttons on repaired surfaces:** primary = navy fill; use `outline` or `ghost` for secondary actions. Do **not** introduce indigo/violet/purple chips. `variant="secondary"` remains a teal fill at existing call sites (do not globally restyle in this epic). New chips use navy / amber / rose / slate.
+
+**Banners:** operational copy wraps (`text-pretty` / no CSS `truncate` on Policy next-step, Coverage alerts, Employee empty-state links). Dense table cells may truncate with a `title`.
+
 ## ⚠️ Drift Audit (2026-06-14) — fix forward, don't reset
 Inferred from the codebase. The *intended* system above is coherent; adoption has drifted:
 
@@ -75,3 +81,4 @@ None of these change the *intended* look — navy `#0b2b43` + teal `#1f8e8b` + I
 |------|----------|-----------|
 | 2026-06-14 | DESIGN.md created (infer + audit mode) | Documented the shipped system (navy `#0b2b43` + teal `#1f8e8b` + Inter + 8px grid + antigravity) as the formal source of truth; flagged 3 adoption drifts to fix forward. Created by `/design-consultation`. |
 | 2026-09-07 | Admin sidebar active = navy wash; teal marks Inbox count only | Founder cockpit: active row is `bg-navy-50` / `rgba(11,43,67,0.08)` + navy text. Teal is not a row fill. Inbox unread count (when > 0) is the one teal mark. |
+| 2026-09-09 | Select default order is product order; no indigo UI classes | Consistency epic: dropdowns no longer auto A–Z; status chips use navy/slate/amber/rose. Teal `secondary` fill left in place (too many call sites). |

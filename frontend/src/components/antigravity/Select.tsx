@@ -12,6 +12,8 @@ interface SelectProps {
   placeholder?: string;
   label?: string;
   fullWidth?: boolean;
+  /** `none` keeps caller order (status/workflow lists). `label` sorts A–Z. */
+  sort?: 'none' | 'label';
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({
@@ -21,8 +23,13 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({
   placeholder,
   label,
   fullWidth = false,
+  sort = 'none',
 }, ref) => {
   const widthClass = fullWidth ? 'w-full' : '';
+  const ordered =
+    sort === 'label'
+      ? [...options].sort((a, b) => a.label.localeCompare(b.label))
+      : options;
 
   return (
     <div className={widthClass}>
@@ -38,7 +45,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({
         className={`px-4 py-2 border border-[#d1d5db] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0b2b43] transition-all bg-white ${widthClass}`}
       >
         {placeholder && <option value="">{placeholder}</option>}
-        {[...options].sort((a, b) => a.label.localeCompare(b.label)).map((option) => (
+        {ordered.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>

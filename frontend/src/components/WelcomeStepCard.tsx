@@ -9,6 +9,8 @@ interface WelcomeStepCardProps {
   href: string; // internal route to navigate to
   badge?: string; // optional label, e.g. "Start here"
   note?: string; // optional footnote below the card
+  /** When false, the card has no Get started link (later welcome steps). */
+  showCta?: boolean;
 }
 
 /**
@@ -16,7 +18,7 @@ interface WelcomeStepCardProps {
  * the "Get started →" link navigates — so reading the card can't trigger an
  * accidental full-card navigation, and the link stays keyboard-accessible.
  */
-export function WelcomeStepCard({ step, title, description, href, badge, note }: WelcomeStepCardProps) {
+export function WelcomeStepCard({ step, title, description, href, badge, note, showCta = true }: WelcomeStepCardProps) {
   return (
     <div>
       <Card className="hover:border-accent-200 transition-colors duration-150">
@@ -35,12 +37,14 @@ export function WelcomeStepCard({ step, title, description, href, badge, note }:
             <h3 className="text-base font-semibold text-navy-800">{title}</h3>
             <p className="text-sm text-slate-600 mt-1">{description}</p>
           </div>
+          {showCta ? (
           <Link
             to={href}
             className="shrink-0 self-center text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
           >
             Get started →
           </Link>
+          ) : null}
         </div>
       </Card>
       {note && <p className="text-sm text-slate-500 mt-2 ml-[52px]">{note}</p>}
