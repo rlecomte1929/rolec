@@ -884,36 +884,28 @@ def hr_notification_counts(
     )
 
     with db.engine.connect() as conn:
-        sums = conn.execute(
+        row = conn.execute(
             _sql(
-                "SELECT COALESCE(SUM(ed.demand_count), 0) AS waiting "
-                "FROM catalog_employee_demand ed "
-                "WHERE ed.company_id = :co AND" + not_curated
+                "SELECT "
+                "  COALESCE(("
+                "    SELECT SUM(ed.demand_count) FROM catalog_employee_demand ed "
+                "    WHERE ed.company_id = :co AND" + not_curated +
+                "  ), 0) AS waiting, "
+                "  (SELECT COUNT(*) FROM ("
+                "    SELECT DISTINCT ed.category, ed.destination_city"
+                "    FROM catalog_employee_demand ed"
+                "    WHERE ed.company_id = :co AND" + not_curated +
+                "  ) sub) AS distinct_pairs, "
+                "  (SELECT COUNT(*) FROM catalog_destination_requests "
+                "   WHERE status = 'pending' AND company_id = :co) AS pending"
             ),
             {"co": company_id},
         ).mappings().first()
-        distinct_count = conn.execute(
-            _sql(
-                "SELECT COUNT(*) FROM ("
-                "  SELECT DISTINCT ed.category, ed.destination_city"
-                "  FROM catalog_employee_demand ed"
-                "  WHERE ed.company_id = :co AND" + not_curated +
-                ") sub"
-            ),
-            {"co": company_id},
-        ).scalar() or 0
-        pending = conn.execute(
-            _sql(
-                "SELECT COUNT(*) FROM catalog_destination_requests "
-                "WHERE status = 'pending' AND company_id = :co"
-            ),
-            {"co": company_id},
-        ).scalar() or 0
 
     return {
-        "employees_waiting": int((sums or {}).get("waiting") or 0),
-        "destinations_with_demand": int(distinct_count),
-        "pending_admin_tickets": int(pending),
+        "employees_waiting": int((row or {}).get("waiting") or 0),
+        "destinations_with_demand": int((row or {}).get("distinct_pairs") or 0),
+        "pending_admin_tickets": int((row or {}).get("pending") or 0),
     }
 
 

@@ -17,6 +17,7 @@ os.environ.setdefault("RELOPASS_DISABLE_RATE_LIMITS", "1")
 from fastapi.testclient import TestClient
 
 import backend.app.auth_deps as auth_deps
+import backend.app.routers.admin_catalog as admin_catalog_mod
 import backend.app.routers.hr_catalog as hr_catalog_mod
 import backend.database as database_mod
 from backend.main import app
@@ -113,6 +114,7 @@ class RecordingCatalogDb:
 def _install(monkeypatch, rec, user):
     monkeypatch.setattr(database_mod, "db", rec)
     monkeypatch.setattr(hr_catalog_mod, "db", rec)
+    monkeypatch.setattr(admin_catalog_mod, "db", rec)
     app.dependency_overrides[auth_deps.get_current_user] = lambda: dict(user)
     return TestClient(app)
 
@@ -132,7 +134,7 @@ def test_hr_notification_counts_sql_round_trips(monkeypatch):
         "pending_admin_tickets": 1,
     }
     # Before: 3 COUNT/SUM executes. After: one SELECT with subselect columns.
-    assert rec.sql_execute_calls == 3, rec.sql_execute_calls
+    assert rec.sql_execute_calls == 1, rec.sql_execute_calls
 
 
 def test_hr_notification_counts_unlinked_user_skips_sql(monkeypatch):
@@ -167,4 +169,4 @@ def test_admin_notification_counts_sql_round_trips(monkeypatch):
         "pending_capabilities": 7,
     }
     # Before: 3 COUNT executes. After: one SELECT with subselect columns.
-    assert rec.sql_execute_calls == 3, rec.sql_execute_calls
+    assert rec.sql_execute_calls == 1, rec.sql_execute_calls

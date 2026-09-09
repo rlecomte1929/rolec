@@ -493,6 +493,42 @@ const SCROLL_KEY = 'platform_sidebar_scroll';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+/** Poll immediately, then every `ms`, but only while the tab is visible. */
+function usePollWhileVisible(enabled: boolean, tick: () => void, ms: number): void {
+  const tickRef = useRef(tick);
+  tickRef.current = tick;
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    let intervalId: number | undefined;
+    const run = () => {
+      if (!cancelled) tickRef.current();
+    };
+    const stop = () => {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+        intervalId = undefined;
+      }
+    };
+    const start = () => {
+      stop();
+      run();
+      intervalId = window.setInterval(run, ms);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') start();
+      else stop();
+    };
+    if (document.visibilityState === 'visible') start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancelled = true;
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [enabled, ms]);
+}
+
 export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
   role,
   companySlot,
@@ -684,31 +720,17 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
   const [inboxUnread, setInboxUnread] = useState<number | null>(null);
   const rank = ROLE_RANK[role];
 
-  useEffect(() => {
-    if (rank < ROLE_RANK.HR) return;
-    let cancelled = false;
-    const fetchHr = () => {
-      void getHrNotificationCounts()
-        .then((c) => { if (!cancelled) setHrNotif(c); })
-        .catch((e) => swallow(e, 'PlatformShellSidebar: HR notification poll'));
-    };
-    fetchHr();
-    const id = window.setInterval(fetchHr, 60_000);
-    return () => { cancelled = true; window.clearInterval(id); };
-  }, [rank]);
+  usePollWhileVisible(rank >= ROLE_RANK.HR, () => {
+    void getHrNotificationCounts()
+      .then((c) => setHrNotif(c))
+      .catch((e) => swallow(e, 'PlatformShellSidebar: HR notification poll'));
+  }, 60_000);
 
-  useEffect(() => {
-    if (rank < ROLE_RANK.ADMIN) return;
-    let cancelled = false;
-    const fetchAdmin = () => {
-      void getAdminNotificationCounts()
-        .then((c) => { if (!cancelled) setAdminNotif(c); })
-        .catch((e) => swallow(e, 'PlatformShellSidebar: admin notification poll'));
-    };
-    fetchAdmin();
-    const id = window.setInterval(fetchAdmin, 60_000);
-    return () => { cancelled = true; window.clearInterval(id); };
-  }, [rank]);
+  usePollWhileVisible(rank >= ROLE_RANK.ADMIN, () => {
+    void getAdminNotificationCounts()
+      .then((c) => setAdminNotif(c))
+      .catch((e) => swallow(e, 'PlatformShellSidebar: admin notification poll'));
+  }, 60_000);
 
   useEffect(() => {
     let cancelled = false;

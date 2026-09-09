@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from ..auth_deps import require_admin
 from ..services import service_catalog
+from ...database import db
 
 router = APIRouter(prefix="/api/admin/catalog", tags=["admin_catalog"])
 logger = logging.getLogger(__name__)
@@ -381,31 +382,34 @@ def admin_notification_counts(
     on the SQLAlchemy pool when polled every minute by the admin shell.
     """
     from sqlalchemy import text as _sql
-    from ...database import db
+
+    combined = (
+        "SELECT "
+        "  (SELECT COUNT(*) FROM catalog_destination_requests "
+        "   WHERE status = 'pending') AS pending_tickets, "
+        "  (SELECT COUNT(*) FROM catalog_destination_allowlist) "
+        "    AS allowlisted_destinations, "
+        "  (SELECT COUNT(*) FROM supplier_service_capabilities "
+        "   WHERE platform_vetting_status = 'pending') AS pending_capabilities"
+    )
+    # GAP 1 column may be missing locally; keep badges alive without it.
+    fallback = (
+        "SELECT "
+        "  (SELECT COUNT(*) FROM catalog_destination_requests "
+        "   WHERE status = 'pending') AS pending_tickets, "
+        "  (SELECT COUNT(*) FROM catalog_destination_allowlist) "
+        "    AS allowlisted_destinations, "
+        "  0 AS pending_capabilities"
+    )
     with db.engine.connect() as conn:
-        pending = conn.execute(
-            _sql(
-                "SELECT COUNT(*) FROM catalog_destination_requests "
-                "WHERE status = 'pending'"
-            )
-        ).scalar() or 0
-        allowlist = conn.execute(
-            _sql("SELECT COUNT(*) FROM catalog_destination_allowlist")
-        ).scalar() or 0
         try:
-            pending_caps = conn.execute(
-                _sql(
-                    "SELECT COUNT(*) FROM supplier_service_capabilities "
-                    "WHERE platform_vetting_status = 'pending'"
-                )
-            ).scalar() or 0
+            row = conn.execute(_sql(combined)).mappings().first()
         except Exception:
-            # Column ships with the GAP 1 migration; degrade gracefully if not yet applied.
-            pending_caps = 0
+            row = conn.execute(_sql(fallback)).mappings().first()
     return {
-        "pending_tickets": int(pending),
-        "allowlisted_destinations": int(allowlist),
-        "pending_capabilities": int(pending_caps),
+        "pending_tickets": int((row or {}).get("pending_tickets") or 0),
+        "allowlisted_destinations": int((row or {}).get("allowlisted_destinations") or 0),
+        "pending_capabilities": int((row or {}).get("pending_capabilities") or 0),
     }
 
 
