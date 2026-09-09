@@ -135,9 +135,23 @@ BODY_POLICIES: Tuple[BodyPolicy, ...] = (
         blocked_reason=(
             "body claims Den Norske Advokatforening but membership_number is a Brønnøysund "
             "organisation number and evidence_url is not a bar member record — company "
-            "registration does not evidence bar membership. Needs re-sourcing against the "
-            "Advokatforening member register, or the body corrected to Brønnøysund."
+            "registration does not evidence bar membership. Needs re-sourcing against "
+            "Advokattilsynet (tilsynet.no/register) or a per-member Advokatforening URL — "
+            "never auto-verify this body from brreg.no or advokatguiden.no."
         ),
+    ),
+    # ENTITY confirmation only. After AIQ-1874 the four former Advokatforening rows name this
+    # body and point at virksomhet.brreg.no. Auto-verify is allowed here because the claim is
+    # "this AS is in Enhetsregisteret", not bar membership. Advokatforening stays blocked.
+    BodyPolicy(
+        match="brønnøysund",
+        auto_verifiable=True,
+        method=METHOD_PUBLIC_REGISTRY,
+    ),
+    BodyPolicy(
+        match="enhetsregisteret",
+        auto_verifiable=True,
+        method=METHOD_PUBLIC_REGISTRY,
     ),
 )
 
