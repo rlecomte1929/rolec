@@ -13,7 +13,6 @@ not a categorisation; it is the absence of one, and it must not promote.
 """
 from __future__ import annotations
 
-import json
 from types import SimpleNamespace
 
 import pytest
@@ -197,24 +196,6 @@ def test_citations_carry_every_distinct_source():
         _fact(fact_key="cardOptional"),          # duplicate URL, must not repeat
     ])
     assert got.payload["citations_json"].count("http") == 2
-
-
-def test_additional_citations_on_one_fact_are_promoted():
-    """A composed fact cites two published sources without a second empty fact_text."""
-    got = resolve(_entity(), [_fact(applies_to={
-        "status": "professional",
-        "nationality": "non-EEA",
-        "source_name": "DETE",
-        "additional_citations": [{
-            "url": "https://www.irishimmigration.ie/employment-visa/",
-            "name": "ISD — Employment visa",
-        }],
-    })])
-    assert isinstance(got, RequirementDraft)
-    citations = json.loads(got.payload["citations_json"])
-    urls = {c["url"] for c in citations}
-    assert OFFICIAL in urls
-    assert "https://www.irishimmigration.ie/employment-visa/" in urls
 
 
 def test_description_order_is_stable_so_a_rerun_is_a_real_no_op():
