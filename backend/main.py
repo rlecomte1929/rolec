@@ -1976,6 +1976,8 @@ def start_impersonation(
     if mode not in ("hr", "employee"):
         raise HTTPException(status_code=400, detail="Invalid impersonation mode")
     db.set_admin_session(token, user["id"], request.targetUserId, mode)
+    from .app.auth_deps import invalidate_user_context_cache
+    invalidate_user_context_cache(token)
     db.log_audit(
         actor_user_id=user["id"],
         action_type="VIEW_AS",
@@ -1996,6 +1998,8 @@ def stop_impersonation(
     if not token:
         raise HTTPException(status_code=401, detail="Missing auth token")
     db.clear_admin_session(token)
+    from .app.auth_deps import invalidate_user_context_cache
+    invalidate_user_context_cache(token)
     db.log_audit(
         actor_user_id=user["id"],
         action_type="VIEW_AS",
