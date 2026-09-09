@@ -2,7 +2,8 @@
 
 **Status:** Draft for review · **Author:** Product + full-stack · **Date:** 2026-09-09
 **Source of requirement:** Audos task **#132277 "Document DataSheet — Country-Agnostic Rebuild"** (APP AGENT / Cursor, Opus 4.8, Complete), plus the `corridor-authoring-guide.md` Otto deliverable.
-**Scope decision (Romain, this session):** the system covers **both** the on-screen agnostic data sheet **and** actual auto-fill of official forms / PDFs from case data.
+**Scope decision (Romain):** the system covers **both** the on-screen agnostic data sheet **and** actual auto-fill of official forms / PDFs from case data.
+**Guiding priorities (Romain, 2026-09-09):** (a) **capture any value a user provides once and reuse it everywhere** — no re-entry, remove non-essential manual steps to build user confidence and save time; (b) make the sheet the mechanism for **information consistency across the whole platform**; (c) always produce a **prepopulated form or equivalent** at the end. These settle the four decisions in §12.
 
 ---
 
@@ -196,7 +197,7 @@ GET /api/cases/{case_id}/datasheet?audience=employee|hr&lang=en|local&mode=full|
   }
 ```
 
-Register in **both** `backend/app/main.py` and `backend/main.py` (the 405 dual-registration rule). Field-value edits reuse the existing `case_form_field_values` write path; a `PATCH .../datasheet/fields/{fieldId}` (or the existing checklist/field endpoints) persists a `needs_input → employee` transition, rejecting consult-professional keys server-side.
+Register in **both** `backend/app/main.py` and `backend/main.py` (the 405 dual-registration rule). Field-value edits reuse the existing `case_form_field_values` write path; a `PATCH .../datasheet/fields/{fieldId}` (or the existing checklist/field endpoints) persists a `needs_input → employee` transition **and writes the confirmed value back to the canonical store (vault / `case_facts`, `source: user_input`) so every other surface that uses that `fact_key` reads the same value** (§7 item 2, write-back), rejecting consult-professional keys server-side.
 
 ### 6.4 Frontend
 
@@ -211,9 +212,9 @@ Register in **both** `backend/app/main.py` and `backend/main.py` (the 405 dual-r
 
 Reuse the existing `form_templates` / `case_forms` / `case_form_field_values` triple. Minimal additive changes:
 
-1. **Field-level consult-professional + join key** on the field model. Either extend `form_templates.fields[]` FieldDefinition with `professional_review_required: bool`, `category: string`, `fact_key: string`, or add a companion `requirement_facts`-style table keyed to templates. Recommendation: extend the jsonb `fields[]` (no migration for existing rows; additive) plus a nullable column for query-time filtering if needed.
-2. **`fact_key` alignment.** Ensure `form_field_mappings.vault_field_path` and the DataSheet `factKey` share one vocabulary so a value captured once fills every step. Document the canonical key list (it already exists implicitly: `passport_number`, `given_names`, `family_name`, `date_of_birth`, `nationality`, `employer_name`, `employer_org_number`, `first_work_day`, `norwegian_address`, …).
-3. **No new PII columns without RLS.** Any new `public` table (if a companion `requirement_facts` table is chosen over jsonb) MUST ship `ALTER TABLE … ENABLE ROW LEVEL SECURITY`, at least one tenant-scoped policy, and `REVOKE ALL … FROM anon` in the same migration (hard gate, `case_milestones` is the canonical pattern). Prefer extending jsonb precisely to avoid a new table.
+1. **Canonical fact dictionary (the governed vocabulary) — DECIDED (§12.2).** Introduce one source-of-truth definition per `fact_key`: `label`, `category`, `professional_review_required: bool`, canonical source path (which vault / `case_facts` field the value is pulled from), and optional `format`/validation. Every `form_templates.fields[]` entry and every DataSheet field *references* a `fact_key` from this dictionary instead of re-declaring its meaning; the jsonb `fields[]` keeps only **form-specific layout** (`pdf_x`/`pdf_y`/`pdf_page`, section, order). The dictionary is **non-PII reference data** (peer to `requirement_items`), so it may ship first as a checked-in seed of the key list in item 2 and be promoted to a small table when query-time filtering is wanted. This is what makes capture-once/fill-everywhere *structural* rather than best-effort, and it is the platform-consistency guarantee: jsonb-only would let `fact_key` strings drift per template (`employer_name` / `employerName` / `company_name`), silently breaking the join.
+2. **`fact_key` vocabulary + write-back to canonical — DECIDED (§12, addition B).** `form_field_mappings.vault_field_path` and the DataSheet `factKey` resolve through the dictionary so a value captured once fills every step. The canonical key list already exists implicitly: `passport_number`, `given_names`, `family_name`, `date_of_birth`, `nationality`, `employer_name`, `employer_org_number`, `first_work_day`, `norwegian_address`, …. **Write-back:** when a user fills or confirms a `needs_input` field on the sheet, the value persists to the canonical store (vault / `case_facts`, `source: user_input`) — **not only** to that form's `case_form_field_values` row — so the next form, the roadmap, and the HR dossier all read the same confirmed value (it renders as `intake` on the next build). The user answers each thing **once, ever**. Consult-professional keys are rejected at this write path.
+3. **No new PII columns without RLS.** Any new `public` table MUST ship `ALTER TABLE … ENABLE ROW LEVEL SECURITY`, at least one tenant-scoped policy, and `REVOKE ALL … FROM anon` in the same migration (hard gate, `case_milestones` is the canonical pattern). The fact dictionary is the only candidate new table and holds **no PII**; keep form-field placement in jsonb so no PII-bearing new table is introduced.
 4. **Migration discipline.** One idempotent migration file, timestamp above **both** the repo max and the prod ledger max; never `supabase db push`; reconcile the ledger after an out-of-band apply.
 
 **Note on `relocation_cases` drift:** the builder's raw-SQL fallback reads `origin_country_code`/`dest_country_code`, which exist only after ALTER `20260728000000`. If unapplied in an env, the fallback silently returns `(None, None)`. The Data Sheet should prefer `wizard_cases` columns + `caseDetails` and treat the corridor as resolved data, not re-derive it.
@@ -266,12 +267,13 @@ Each phase is independently shippable and verifiable. Effort is rough (human-tea
 
 ### Phase 1 — Read-model + serve endpoint (foundation)
 - Build `data_sheet_service.py` composing `requirement_items` + corridor `step_graph` + `case_form_field_values`; `GET /api/cases/{id}/datasheet`; `DataSheetDTO`.
-- Add field-level `professional_review_required` / `category` / `fact_key` to the field model; enforce the firewall server-side.
+- Introduce the **canonical fact dictionary** (seed of the §7 key list) with `professional_review_required` / `category` / canonical source path; every field references a `fact_key`; enforce the consult-professional firewall server-side.
 - **Verify:** golden FR→NO case returns the 5 steps with correct provenance and consult-professional fields blank; isolation-gate + dual-registration checks pass. (~3–4 d / ~½ d)
 
 ### Phase 2 — On-screen Data Sheet UI
 - `features/datasheet/` engine (sections by authority, source badges, banners, sparse mode, EN/local, employee/HR views); mount on employee roadmap + HR dossier.
-- **Verify:** employee sees the sheet for a real case; HR sees responsible-party/SLA columns; non-obvious banners render; `needs_input` edit persists. (~4–5 d / ~1 d)
+- Wire the **write-back** on field edit (§7 item 2): a confirmed `needs_input` value persists to the canonical store, not just the form row.
+- **Verify:** employee sees the sheet for a real case; HR sees responsible-party/SLA columns; non-obvious banners render; a `needs_input` edit persists **and a second form/screen shows the same value without re-entry**. (~4–5 d / ~1 d)
 
 ### Phase 3 — Export
 - Client-side CSV of the sheet; "Download filled PDF" wired to existing fill endpoints; default to `render_data_sheet` for no-AcroForm corridors.
@@ -301,15 +303,25 @@ Phase 1 (read-model) ─┬─► Phase 2 (UI) ─► Phase 3 (export) ─► Ph
 5. CSV exports client-side; filled PDF returns via the existing fill engine for AcroForm corridors and via `render_data_sheet` otherwise.
 6. `scripts/check_serving_llm_isolation.py`, `check_compliance_claims.py`, RLS coverage, and dual-registration checks all pass.
 7. Adding a new corridor is a data-only operation (requirement rows + optional pathway + optional form mapping).
+8. **Capture once, reuse everywhere:** a value a user fills or confirms on the sheet persists to the canonical store and is reflected — unchanged — on every other surface that uses that `fact_key` (next form, roadmap, HR dossier), with no re-entry. Every `fact_key` has exactly one definition in the fact dictionary.
 
 ---
 
-## 12. Decisions needed (open)
+## 12. Decisions (settled 2026-09-09, Romain)
 
-1. **Canonical step source.** Corridor `step_graph` YAML (rich, origin×dest, but only for authored corridors) vs. `requirement_items` pillars (all corridors, dest-only). Recommendation: prefer `step_graph` where present, fall back to pillars. Confirm.
-2. **Field model home.** Extend `form_templates.fields[]` jsonb (no new table, no RLS surface) vs. a companion `requirement_facts` table (cleaner queries, needs RLS). Recommendation: jsonb extension first.
-3. **Consolidation appetite.** Do we retire the four overlapping frontend models in Phase 4, or run the Data Sheet alongside them first? Recommendation: ship alongside (Phases 1–3), then consolidate.
-4. **AI-assist in v1?** Include Phase 5's LLM suggestion now, or ship the deterministic sheet first and add AI-assist once the fill loop is proven? Recommendation: deterministic first.
+All four decisions are made. They follow directly from the guiding priorities at the top of this spec — **capture a value once and reuse it everywhere**, and **one governed vocabulary so information is consistent across the whole platform**. Two of the decisions force a structural addition each (A and B below); both are now baked into §6.3, §7, §10, and §11.
+
+1. **Canonical step source — DECIDED: hybrid, `step_graph`-preferred with `requirement_items` pillar fallback.** Rich origin×dest ordering + deadline triggers where a corridor is authored; the pillar fallback guarantees every corridor still renders a fillable sheet. Coverage is the point — "add a corridor" stays a data-only task. *(Unchanged from the draft recommendation.)*
+
+2. **Field model home — DECIDED: jsonb for placement + a governed fact dictionary for meaning.** *(Upgraded from the draft's jsonb-only.)* Form-specific layout stays in `form_templates.fields[]` jsonb; a **canonical fact dictionary** becomes the single definition each field references. Rationale: jsonb-only lets `fact_key` strings drift per template (`employer_name` / `employerName` / `company_name`), which silently breaks the capture-once join — the exact inconsistency the platform-consistency goal forbids. The dictionary is non-PII reference data, so its gate is light. **→ Structural addition A.** See §7 item 1.
+
+3. **Consolidation appetite — DECIDED: ship the unified read-model alongside first (Phases 1–3), consolidate the four UI models in Phase 4; Phase 4 is committed, not optional.** Data consistency arrives in Phase 1 (one dictionary + one value-of-record store) — that is the part the consistency goal actually turns on, and it is early. UI consistency (folding the four overlapping screens) is sequenced to Phase 4 to de-risk the four live screens, but four shapes for one concept is itself the inconsistency to remove, so it is a destination, not a maybe.
+
+4. **AI-assist in v1 — DECIDED: deterministic first (Phases 1–4), AI-assist in Phase 5.** The deterministic ladder already auto-fills all *structured* already-provided data (the ~80%) with no LLM — that alone delivers the "pull automatically" goal. AI-assist only covers the unstructured long tail (extracting a value from an uploaded letter), carries the isolation + PII-masking + human-review gates, and never touches consult-professional keys — safest added once the fill/review loop is proven.
+
+**Structural addition A — the fact dictionary (from Decision 2).** One source-of-truth definition per `fact_key` (`label`, `category`, `professional_review_required`, canonical source path, format). Captured in §7 item 1; introduced in Phase 1.
+
+**Structural addition B — write-back to the canonical store (the consistency mechanism).** "Auto-fill this form" only becomes "consistency across the platform" if a value a user fills or confirms on the Data Sheet persists back to the canonical store (vault / `case_facts`) as the record of truth — not only to that one form's `case_form_field_values` row. Then the next form, the roadmap, and the HR dossier all read the same confirmed value, and the user answers each thing once, ever. Consult-professional keys are rejected at this write path too. Captured in §6.3 and §7 item 2; wired in Phase 2; asserted by acceptance criterion 8.
 
 ---
 
