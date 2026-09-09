@@ -211,6 +211,30 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   batches (this is the whole reason the vetter gate exists, but a wrong-entity row is worth catching
   at land time).
 
+### XX-IT banks (Milan) — `vendor-resourced-xx-it-banks-2026-09-09` (landed 2026-09-09) — PUBLIC_REGISTER
+- Source (GCS): `1788960997468_obgmzy76.ndjson` (+ manifest `1788961002138_flmz8eit.json`).
+- Otto manifest: **7 sourced, 4 rejected** — rejects honest: Wise/Revolut/N26 (EMI or EU-passported
+  foreign banks, not on the Italian Albo), ING (ABI 03239 could not be confirmed against the register
+  → excluded on honesty-over-volume). Otto also caught its own `+49`→`+39` phone typo on Intesa
+  mid-upload and self-corrected.
+- **Register type = PUBLIC_REGISTER (Banca d'Italia — Albo delle banche).** `source_url` is the Albo
+  register root (`bancaditalia.it/servizi-cittadino/.../albi-elenchi`), shared by all rows; the
+  verifiable key is the **ABI code** in `accreditation_number`. Founder-approved class → pending,
+  vetter confirms. Independently checked: all 7 phones are `+39` (the Intesa self-correction took —
+  0 `+49` in the final NDJSON), ABI codes are the canonical Italian codes (UniCredit 02008, Intesa
+  03069, Banco BPM 05034, FinecoBank 03015, Banca Mediolanum 03062, Deutsche Bank S.p.A. 03104, BNL
+  01005).
+- **Collision re-check — predicted AND confirmed clean (0 mis-attach).** The Santander-class risk was
+  flagged for Deutsche Bank S.p.A. (IT) vs the Madrid "Deutsche Bank, S.A.E." (ES). Computed
+  `_name_key` (from `vendor_harvester`, the exact function promote() uses) for all 7 against every prod
+  supplier: **no matches** — `_name_key` keeps the legal-form token, so `deutschebankspa` ≠
+  `deutschebanksae` (contrast Santander, where ", S.A." + "(Brasil)" both stripped to
+  `bancosantander`). Post-apply, all 7 candidates promoted onto **new IT suppliers** created today (the
+  promoted_supplier_id-vs-country query returned empty). No correction needed.
+- Landed: **+7 new suppliers** (UniCredit, Intesa Sanpaolo, Banco BPM, FinecoBank, Banca Mediolanum,
+  Deutsche Bank S.p.A., BNL — IT/banks, pending). Tripwire: `ssc` `approved` **130 → 130** md5
+  unchanged; pending 993 → 1000.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
