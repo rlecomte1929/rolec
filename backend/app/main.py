@@ -9,6 +9,7 @@ from .routers import (
     admin_ai_unit_economics,
     admin_autopilot_metrics,
     admin_corrections,
+    admin_reconciliation,
     admin_dsar,
     admin_feature_flags,
     admin_exec_overview,
@@ -271,6 +272,7 @@ def create_app() -> FastAPI:
     # [Parker-H] Conjoint (CBC) company-scoped HR/respondent API
     app.include_router(conjoint.router)
     app.include_router(admin_corrections.router)  # [AIQ-554] /api/admin/corrections/by-reason
+    app.include_router(admin_reconciliation.router)  # WS1 1.5 — /api/admin/reconciliation
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(admin_prompts.router, prefix="/api/admin")

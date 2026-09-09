@@ -151,16 +151,6 @@ export const leadCaptureAPI = {
     api.post('/api/public/lead-capture', payload).then((r) => r.data as { id: string; matched_prospect: boolean }),
 };
 
-// Admin recommendations debug (admin only)
-export const adminRecommendationsAPI = {
-  getDebug: async (assignmentId: string, serviceCategory: string) => {
-    const response = await api.get<unknown>('/api/admin/recommendations/debug', {
-      params: { assignment_id: assignmentId, service_category: serviceCategory },
-    });
-    return response.data;
-  },
-};
-
 // Admin Resources CMS API
 export const adminResourcesAPI = {
   getCounts: async (): Promise<Record<string, number>> => api.get<Record<string, number>>('/api/admin/resources/counts').then((r) => r.data),
