@@ -61,7 +61,7 @@ def test_unparseable_expiry_raises_rather_than_guessing(junk):
         ("https://www.finanstilsynet.no/en/finanstilsynets-registry/details/?id=104451",
          "Finanstilsynet — estate agency register (NO)"),
         ("https://virksomhet.brreg.no/nb/oppslag/enheter/917334110",
-         "Advokatforeningen + Brønnøysund register (NO)"),
+         "Brønnøysund Enhetsregisteret (NO)"),
     ],
 )
 def test_registry_is_identified_by_domain(url, expected):
@@ -93,9 +93,9 @@ def test_reads_all_38_rows():
 
 def test_every_row_used_to_be_rejected_and_now_32_pass():
     """Before the dedupe fallback, `website_url` was empty on all 38 rows so every one failed
-    on 'no domain'. Now the only rejects are the six whose evidence is not a registry record.
+    on 'no domain'. Now the only rejects are rows whose evidence is not a registry record.
 
-    The count went 7 -> 9 -> 6 on 2026-08-12, and the route matters more than the number:
+    The count went 7 -> 9 -> 6 on 2026-08-12, then 6 -> 8 on 2026-09-09 (AIQ-1874):
 
     +2  Two rows were passing on a check that only looked at the URL's DOMAIN. BLKR cited its
         own website (`blkr-berlin.de` was mis-allowlisted as the Rechtsanwaltskammer), and
@@ -105,11 +105,13 @@ def test_every_row_used_to_be_rejected_and_now_32_pass():
 
     -3  The three banks were genuinely re-sourced to BaFin institute records.
 
-    The six that remain are honest gaps, not oversights. Their registers (the RAK/BRAV roll and
-    the amtliches Steuerberaterverzeichnis) are form searches with no per-entity URL, so there
-    is nothing linkable to cite; both are marked UNAVAILABLE with that reason. Sulland's only
-    per-entity options were a company register (proves the company exists, not bar admission)
-    and a review aggregator, which `registry_sources.py` forbids as a primary source.
+    +2  Humlen and Reinholdt cited advokatguiden.no. That host was allowlisted as the
+        Advokatforeningen source; it is a commercial directory, not bar or Enhetsregisteret
+        evidence (AIQ-1874). They join the re-sourcing worklist.
+
+    The remaining rejects are honest gaps, not oversights. RAK/BRAV and the amtliches
+    Steuerberaterverzeichnis are form searches with no per-entity URL. Sulland's harvest
+    URL is still the association search form. Advokatguiden is not a register.
     """
     accepted, rejected = [], []
     for cand in read_csv(HARVEST):
@@ -119,7 +121,7 @@ def test_every_row_used_to_be_rejected_and_now_32_pass():
         except HarvestRejected:
             rejected.append(cand)
 
-    assert len(accepted) == 32
+    assert len(accepted) == 30
     assert {c.name for c in rejected} == {
         "Advokatfirmaet Sulland AS",
         "Schlun & Elseven Rechtsanwälte PartG mbB",
@@ -127,6 +129,8 @@ def test_every_row_used_to_be_rejected_and_now_32_pass():
         "EY Tax GmbH Steuerberatungsgesellschaft",
         "Kanzlei Thalmeir — Julian Thalmeir",
         "BLKR Rechtsanwältinnen",
+        "Humlen Advokater AS — Félix Olivier Helle",
+        "Reinholdt Advokatfirma AS — Thomas Reinholdt",
     }, "the reject list IS the re-sourcing worklist — it must match the PROVENANCE doc"
 
 
