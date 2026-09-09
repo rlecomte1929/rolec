@@ -1,0 +1,35 @@
+{
+  "batch_id": "no-fr-facts-2026-09-08",
+  "corridor": "NO->FR",
+  "generated_date": "2026-09-08",
+  "mover_type": "EEA free-mover (Norway is EEA not EU)",
+  "facts_count": 25,
+  "ndjson_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788906818161_9ifm7acw.ndjson",
+  "pillars_covered": ["immigration", "residence", "tax", "social_security", "healthcare"],
+  "facts_per_pillar": {
+    "immigration": 5,
+    "residence": 4,
+    "tax": 7,
+    "social_security": 4,
+    "healthcare": 5
+  },
+  "sources": [
+    "service-public.fr F16003 (Carte de séjour citoyen UE/EEE/Suisse travaillant en France)",
+    "service-public.fr F2653 (Séjour en France de la famille d'un citoyen européen)",
+    "service-public.fr F62 (Comment déterminer son domicile fiscal)",
+    "service-public.fr F1419 (Barème de l'impôt sur le revenu)",
+    "service-public.fr F20739 (Complémentaire santé d'entreprise)",
+    "ameli.fr (La protection universelle maladie - PUMa)",
+    "cleiss.fr (Présentation des règlements européens)",
+    "cleiss.fr (Le régime norvégien de sécurité sociale)"
+  ],
+  "gaps": [
+    "French tax identification number (numéro fiscal / SPI) acquisition process: could not source a working official impots.gouv.fr page (target URLs returned 404 via scraper); omitted rather than invent.",
+    "France-Norway double tax treaty specific provisions: no official impots.gouv.fr/BOFiP page successfully fetched with verbatim text; treaty override principle captured generically (tax-004) but corridor-specific articles remain a gap.",
+    "Numéro de sécurité sociale provisoire/définitif for foreigners and detailed CPAM registration steps: ameli.fr sub-pages returned no text via scraper; PUMa affiliation (form S1106) captured instead.",
+    "Employer URSSAF DPAE (déclaration préalable à l'embauche) verbatim: URSSAF canonical page returned navigation only, no clean quotable body.",
+    "European Health Insurance Card (EHIC) transitional use for new arrivals: not sourced from an official page.",
+    "A1 certificate / posted-worker vs direct-hire distinction: CLEISS detachement pages returned 404 via scraper; coordination framework captured (ss-001..004) but A1 specifics remain a gap."
+  ],
+  "status": "candidate"
+}
