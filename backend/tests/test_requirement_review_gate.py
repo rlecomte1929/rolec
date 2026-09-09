@@ -109,11 +109,27 @@ def test_reseeding_cannot_un_approve_live_content(db):
     assert rows[0].description == "reworded", "the seed's content still lands"
 
 
-def test_a_new_row_defaults_to_approved_when_no_writer_states_otherwise(db):
-    """Existing rows predate the column and must not go dark. The backfill and this default
-    agree: silence means approved; only the writers that produce unreviewed content say
-    'pending'."""
-    payload = _payload("Legacy item")
+
+
+def test_a_new_row_defaults_to_pending_through_the_automated_funnel(db):
+    """AIQ-1473 / 82c02e0f: every caller of crud.create_requirement_item is an automated
+    producer (Otto promote, YAML seed, research stub). The funnel now defaults an omitted
+    review_status to 'pending' so machine-written content waits for a human — it must not be
+    served until reviewed, but is retrievable with include_unapproved for the review queue."""
+    payload = _payload("Machine item")
     payload.pop("review_status", None)
     crud.create_requirement_item(db, payload)
-    assert [r.title for r in crud.list_requirements(db, "NORWAY")] == ["Legacy item"]
+    assert crud.list_requirements(db, "NORWAY") == []  # not served
+    got = crud.list_requirements(db, "NORWAY", include_unapproved=True)
+    assert [r.title for r in got] == ["Machine item"]  # awaiting a human
+
+
+def test_a_legacy_orm_row_without_review_status_is_served(db):
+    """The DB-level 'silence means approved' guarantee still holds for rows that predate the
+    column or are written directly via the ORM (bypassing the automated funnel): the column
+    server_default is 'approved', so such a row is served and does not go dark."""
+    row = _payload("Legacy ORM row")
+    row.pop("review_status", None)
+    db.add(models.RequirementItem(**row))
+    db.commit()
+    assert [r.title for r in crud.list_requirements(db, "NORWAY")] == ["Legacy ORM row"]

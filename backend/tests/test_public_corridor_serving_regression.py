@@ -27,6 +27,7 @@ the ORM-declaration form in this change; see backend/tests/test_column_read_befo
 from __future__ import annotations
 
 import os
+import json
 from datetime import datetime
 
 os.environ.setdefault("RELOPASS_DISABLE_RATE_LIMITS", "1")
@@ -68,7 +69,7 @@ def _row(country: str, pillar: str, title: str) -> models.RequirementItem:
         severity="WARN",
         owner="EMPLOYEE",
         required_fields_json="[]",
-        citations_json="[]",
+        citations_json=json.dumps([f"https://official.example/{country.lower()}/{pillar.lower()}"]),
         review_status="approved",
         verification_status="representative",
         last_verified_at=datetime(2026, 8, 22),
@@ -88,7 +89,10 @@ def seeded_db(monkeypatch):
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    models.Base.metadata.create_all(engine, tables=[models.RequirementItem.__table__])
+    models.Base.metadata.create_all(
+        engine,
+        tables=[models.RequirementItem.__table__, models.SourceRecord.__table__],
+    )
     Session = sessionmaker(bind=engine, future=True)
     with Session() as session:
         for country, items in _SEED.items():

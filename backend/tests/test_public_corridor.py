@@ -60,7 +60,7 @@ def _norway_seed():
 def _patch_seed(monkeypatch):
     monkeypatch.setattr(
         public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: _norway_seed() if country == "NORWAY" else [],
+        lambda db, country, purpose, include_unapproved=False: _norway_seed() if country == "NORWAY" else [],
     )
 
 
@@ -110,7 +110,7 @@ def test_non_obvious_and_timing_are_carried_from_the_catalog_row(monkeypatch):
     seeded[0].timing = "within 8 days of arrival"
     monkeypatch.setattr(
         public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: seeded if country == "NORWAY" else [],
+        lambda db, country, purpose, include_unapproved=False: seeded if country == "NORWAY" else [],
     )
 
     resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
@@ -138,7 +138,7 @@ def test_a_row_predating_the_columns_degrades_rather_than_raising(monkeypatch):
         assert not hasattr(row, "non_obvious") and not hasattr(row, "timing")
     monkeypatch.setattr(
         public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: bare if country == "NORWAY" else [],
+        lambda db, country, purpose, include_unapproved=False: bare if country == "NORWAY" else [],
     )
 
     resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
@@ -213,7 +213,7 @@ def _two_track_seed():
 def _patch_two_track(monkeypatch):
     monkeypatch.setattr(
         public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: _two_track_seed() if country == "NORWAY" else [],
+        lambda db, country, purpose, include_unapproved=False: _two_track_seed() if country == "NORWAY" else [],
     )
 
 
