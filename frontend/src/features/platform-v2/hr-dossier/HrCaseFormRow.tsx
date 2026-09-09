@@ -19,6 +19,12 @@ import type {
   FormEvent,
 } from '../../../api/dossier';
 import { adhocFormsAPI, commentsAPI, eventsAPI, flagAPI } from '../../../api/dossier';
+import { formEditorAPI as formEditor, type FormStatusPatchPayload } from '../../../api/formEditor';
+
+function axiosErrorDetail(e: unknown): string | undefined {
+  const detail = (e as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
+  return typeof detail === 'string' ? detail : undefined;
+}
 
 // ── Status display helpers (shared with CaseFormCard) ────────────────────────
 
@@ -96,7 +102,7 @@ function deadlineChip(deadline: string | null): { tone: string; text: string } |
 // ── HR-specific status transitions ────────────────────────────────────────────
 // 'submitted' and 'rejected' are handled by dedicated modals, not direct clicks.
 
-const HR_STATUS_OPTIONS: Array<{ value: CaseFormStatus; label: string; needsModal?: boolean }> = [
+const HR_STATUS_OPTIONS: Array<{ value: FormStatusPatchPayload['status']; label: string; needsModal?: boolean }> = [
   { value: 'not_started', label: 'Reset to Not started' },
   { value: 'ready',       label: 'Mark Ready' },
   { value: 'submitted',   label: 'Mark Submitted', needsModal: true },
@@ -183,25 +189,19 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
     }
   };
 
-  const handleStatusChange = async (newStatus: string) => {
+  const handleStatusChange = async (newStatus: FormStatusPatchPayload['status']) => {
     setActionLoading(true);
     setStatusError(null);
     try {
-      const resp = await fetch(`/api/cases/${form.case_id}/forms/${form.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: newStatus, note: statusNote.trim() || undefined }),
+      await formEditor.patchStatus(form.case_id, form.id, {
+        status: newStatus,
+        note: statusNote.trim() || undefined,
       });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({})) as { detail?: string };
-        throw new Error(body.detail ?? `Status ${resp.status}`);
-      }
       setStatusNote('');
       onRefresh();
       void loadExpandedData();
     } catch (e) {
-      setStatusError(e instanceof Error ? e.message : 'Failed to update status.');
+      setStatusError(axiosErrorDetail(e) ?? (e instanceof Error ? e.message : 'Failed to update status.'));
     } finally {
       setActionLoading(false);
     }
@@ -251,27 +251,18 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
     setActionLoading(true);
     setSubmitError(null);
     try {
-      const resp = await fetch(`/api/cases/${form.case_id}/forms/${form.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          status: 'submitted',
-          receipt_ref: submitReceiptRef.trim(),
-          note: submitNote.trim() || undefined,
-        }),
+      await formEditor.patchStatus(form.case_id, form.id, {
+        status: 'submitted',
+        receipt_ref: submitReceiptRef.trim(),
+        note: submitNote.trim() || undefined,
       });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({})) as { detail?: string };
-        throw new Error(body.detail ?? `Status ${resp.status}`);
-      }
       setShowSubmitModal(false);
       setSubmitReceiptRef('');
       setSubmitNote('');
       onRefresh();
       void loadExpandedData();
     } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : 'Failed to mark as submitted.');
+      setSubmitError(axiosErrorDetail(e) ?? (e instanceof Error ? e.message : 'Failed to mark as submitted.'));
     } finally {
       setActionLoading(false);
     }
@@ -287,27 +278,16 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
     setActionLoading(true);
     setRejectError(null);
     try {
-      const resp = await fetch(`/api/cases/${form.case_id}/forms/${form.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          status: 'rejected',
-          rejection_reason: rejectReason.trim(),
-          note: rejectReason.trim(),
-        }),
+      await formEditor.patchStatus(form.case_id, form.id, {
+        status: 'rejected',
+        rejection_reason: rejectReason.trim(),
+        note: rejectReason.trim(),
       });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({})) as { detail?: string };
-        throw new Error(body.detail ?? `Status ${resp.status}`);
-      }
-      // If re-open: immediately transition to in_progress so the employee can correct
+      // If re-open: immediately transition to not_started so the employee can correct
       if (reopenForCorrection) {
-        await fetch(`/api/cases/${form.case_id}/forms/${form.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ status: 'not_started', note: 'Re-opened for employee correction' }),
+        await formEditor.patchStatus(form.case_id, form.id, {
+          status: 'not_started',
+          note: 'Re-opened for employee correction',
         });
       }
       setShowRejectModal(false);
@@ -316,7 +296,7 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
       onRefresh();
       void loadExpandedData();
     } catch (e) {
-      setRejectError(e instanceof Error ? e.message : 'Failed to reject form.');
+      setRejectError(axiosErrorDetail(e) ?? (e instanceof Error ? e.message : 'Failed to reject form.'));
     } finally {
       setActionLoading(false);
     }
