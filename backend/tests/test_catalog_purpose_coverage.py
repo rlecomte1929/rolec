@@ -91,7 +91,7 @@ class TestAnEmptyLookupNeverClaimsNothingIsRequired:
         monkeypatch.setattr(rb, "SessionLocal", lambda: _Session())
         monkeypatch.setattr(rb.crud, "get_case", lambda db, cid: _Case())
         monkeypatch.setattr(rb.crud, "list_sources", lambda db, c: [])
-        monkeypatch.setattr(rb.crud, "list_requirements", lambda db, c, p: [])  # the gap
+        monkeypatch.setattr(rb.crud, "list_requirements", lambda db, c, p, include_unapproved=False: [])  # the gap
 
         dto = rb.compute_case_requirements("c1")
 
