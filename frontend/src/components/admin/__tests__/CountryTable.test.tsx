@@ -130,6 +130,11 @@ describe('countryCatalog helpers', () => {
 });
 
 describe('CountryTable', () => {
+  it('scrolls wide catalog columns instead of clipping them', () => {
+    const { container } = render(<CountryTable data={DATA} onSelect={() => undefined} />);
+    expect(container.querySelector('.overflow-x-auto')).toBeTruthy();
+  });
+
   it('renders country names instead of codes-only rows and shows coverage stats', () => {
     render(<CountryTable data={DATA} onSelect={() => undefined} />);
     expect(screen.getByTestId('catalog-stat-countries')).toHaveTextContent('3');

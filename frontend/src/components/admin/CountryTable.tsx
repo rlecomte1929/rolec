@@ -4,6 +4,7 @@ import { Badge } from '../antigravity/Badge';
 import { Button } from '../antigravity/Button';
 import { CountryFlag } from '../antigravity/CountryFlag';
 import { Input } from '../antigravity/Input';
+import { TableScroll } from '../antigravity/TableScroll';
 import type { CountryListDTO } from '../../types';
 import {
   type CatalogAttention,
@@ -218,8 +219,7 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
               <CountryCard key={row.countryCode} row={row} now={now} max={maxRequirements} onSelect={onSelect} />
             ))}
           </div>
-          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 md:block">
-            <div className="min-w-[56rem]">
+          <TableScroll className="hidden rounded-xl border border-slate-200 md:block">
             <div
               className="grid grid-cols-[minmax(14rem,1.6fr)_8.5rem_7rem_9rem_minmax(10rem,1fr)_1.5rem] gap-4 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500"
               role="row"
@@ -254,8 +254,7 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
                 </Button>
               );
             })}
-            </div>
-          </div>
+          </TableScroll>
         </>
       )}
     </div>
