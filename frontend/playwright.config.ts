@@ -41,8 +41,18 @@ const PORTAL_BASE_URL = process.env.E2E_PORTAL_BASE_URL || 'https://relopass.com
 
 export default defineConfig({
   testDir: './e2e',
-  // The live-backend spec can't run against the mocked preview — skip it there.
-  testIgnore: LIVE_TARGET ? [] : ['**/intake-persistence.spec.ts'],
+  // Test selection by mode. NOTE: this MUST live at the top level, not on a project —
+  // a project-level `testIgnore` REPLACES this one rather than merging, which would
+  // un-ignore intake-persistence in preview (a live-only spec) and fail the gate.
+  //   • preview (default): skip the live-only spec AND the opt-in portal specs;
+  //   • live (E2E_BASE_URL): run smoke + intake live, but never the portal specs;
+  //   • portals (E2E_LIVE_PORTALS): nothing to globally ignore — each portal project
+  //     selects its own file via testMatch, and the smoke specs match no project.
+  testIgnore: RUN_PORTALS
+    ? []
+    : LIVE_TARGET
+      ? ['**/portals/**']
+      : ['**/intake-persistence.spec.ts', '**/portals/**'],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,
@@ -68,12 +78,9 @@ export default defineConfig({
       ]
     : [
         // Deterministic default project. PR CI runs exactly this (--project=chromium).
-        // Never picks up the opt-in live-portal specs.
-        {
-          name: 'chromium',
-          testIgnore: ['**/portals/**'],
-          use: { ...devices['Desktop Chrome'] },
-        },
+        // Portal specs are excluded via the top-level testIgnore above (a project-level
+        // testIgnore here would override it and un-ignore intake-persistence).
+        { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
       ],
   // Only spin up a local preview in PREVIEW mode (skip for a live URL or live portals).
   webServer:
