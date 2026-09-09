@@ -23,7 +23,7 @@
  *   if (!result.pass) { serveRawExcerpts(chunks); }
  */
 
-import { logger } from '../../lib/logger';
+import { logger } from '../../src/lib/logger';
 
 // ---------------------------------------------------------------------------
 // Types

@@ -33,11 +33,11 @@
  *   the policy is treated as expired and the POLICY_EXPIRED_MSG is returned.
  */
 
-import { logger } from '../../lib/logger';
+import { logger } from '../../src/lib/logger';
 import { classifyQuery } from './topic_classifier';
 import type { FallbackReason } from './topic_classifier';
-import { retrievePolicy } from './retrieve_policy';
-import type { PolicyChunk } from './retrieve_policy';
+import { retrievePolicy } from '../../src/features/policy-builder/retrieve_policy';
+import type { PolicyChunk } from '../../src/features/policy-builder/retrieve_policy';
 import { runOutputGuardrails } from './output_guardrails';
 import { runGuardrails } from './input_guardrails';
 
@@ -105,7 +105,7 @@ export interface AssistantResponse {
 
  
 async function getSupabase() {
-  const { supabase } = await import('../../lib/supabase');
+  const { supabase } = await import('../../src/lib/supabase');
   return supabase;
 }
 
