@@ -1,0 +1,114 @@
+{
+  "schema_version": "1.0",
+  "generated_date": "2026-09-09",
+  "description": "Canonical export schema for ReloPass DataSheet. Shape is fixed across all corridors. Country-specific content (fact_keys, authorities, deadlines, non-obvious content) populates it — no schema change needed to add a corridor.",
+
+  "employee_type_enum": [
+    "EU_EEA_NATIONAL",
+    "NON_EU_EEA_NATIONAL",
+    "POSTED_WORKER",
+    "REPATRIATION",
+    "THIRD_COUNTRY_NATIONAL"
+  ],
+
+  "responsible_party_enum": ["HR", "EMPLOYEE", "EMPLOYER", "LAWYER", "JOINT"],
+
+  "section_enum": ["PRE_DEPARTURE", "ARRIVAL_WEEK", "FIRST_MONTH", "ONGOING"],
+
+  "csv_columns": [
+    {"col": "case_id",                      "type": "uuid",                    "nullable": false, "description": "ReloPass case UUID"},
+    {"col": "corridor",                     "type": "string",                  "nullable": false, "example": "FR-NO", "description": "Origin ISO→destination ISO"},
+    {"col": "employee_type",                "type": "employee_type_enum",      "nullable": false},
+    {"col": "move_date",                    "type": "ISO8601_date",            "nullable": false, "description": "Anchor date — all deadline_date values compute from this"},
+    {"col": "export_generated_at",          "type": "ISO8601_datetime",        "nullable": false},
+    {"col": "section",                      "type": "section_enum",            "nullable": false},
+    {"col": "step_number",                  "type": "integer",                 "nullable": false, "description": "Ordering within section, 1-indexed"},
+    {"col": "authority",                    "type": "string",                  "nullable": true,  "description": "Government body or institution"},
+    {"col": "form_name",                    "type": "string",                  "nullable": true,  "description": "Form or process name; null for portal-only steps"},
+    {"col": "field_label",                  "type": "string",                  "nullable": false, "description": "Human-readable field or step name"},
+    {"col": "fact_key",                     "type": "string",                  "nullable": false, "description": "Dot-namespaced machine key; country prefix required. E.g. no.d_number.value, de.steuer_id.value, fr.cpam.nir_number"},
+    {"col": "value",                        "type": "string",                  "nullable": true,  "description": "Current value from case_form_field_values; null = not yet captured"},
+    {"col": "source",                       "type": "string",                  "nullable": true,  "description": "Source label: statute reference, official guidance, or 'lawyer-verified [date]'"},
+    {"col": "source_url",                   "type": "string",                  "nullable": true},
+    {"col": "deadline_label",               "type": "string",                  "nullable": true,  "description": "Human-readable: 'Before first paycheck', 'Within 14 days of arrival'"},
+    {"col": "deadline_date",                "type": "ISO8601_date",            "nullable": true,  "description": "Computed: move_date + deadline_offset_days. Null = not date-bound"},
+    {"col": "deadline_offset_days",         "type": "integer",                 "nullable": true,  "description": "Signed offset from move_date. Negative = before move. Null = ongoing/not date-bound"},
+    {"col": "responsible_party",            "type": "responsible_party_enum",  "nullable": false},
+    {"col": "applies_to_employee_types",    "type": "string",                  "nullable": false, "description": "Comma-separated employee_type values. 'ALL' if universal"},
+    {"col": "is_non_obvious",               "type": "boolean",                 "nullable": false, "description": "True = ReloPass moat content. Renders in NonObvious block in PDF export AND in regular section"},
+    {"col": "non_obvious_official_guidance","type": "string",                  "nullable": true,  "description": "What the official guidance says. Required when is_non_obvious=true"},
+    {"col": "non_obvious_actual_reality",   "type": "string",                  "nullable": true,  "description": "What actually happens in practice. Required when is_non_obvious=true"},
+    {"col": "non_obvious_action_required",  "type": "string",                  "nullable": true,  "description": "Concrete action for the HR generalist. Required when is_non_obvious=true"},
+    {"col": "consult_professional",         "type": "boolean",                 "nullable": false, "description": "True = consult-professional firewall fires; value field is withheld from non-professional export view"},
+    {"col": "lawyer_verified",              "type": "boolean",                 "nullable": false, "description": "True = this step has been signed off by a qualified lawyer for this specific corridor"}
+  ],
+
+  "pdf_sheet_layout": {
+    "page_header": {
+      "fields": ["corridor", "employee_type", "move_date", "export_generated_at"],
+      "lawyer_verified_banner": {
+        "when_false": "⚠️ This document pack has not been reviewed by a qualified immigration lawyer. Verify all requirements before taking action.",
+        "when_true": "✓ Corridor requirements reviewed by [lawyer name and bar reference]. Verified [date]."
+      }
+    },
+    "section_order": [
+      {
+        "id": "non_obvious_moat",
+        "title": "Things you didn't know to look for",
+        "subtitle": "Non-obvious requirements surfaced by ReloPass",
+        "filter": "is_non_obvious = true",
+        "position": "always_first_body_section",
+        "render_columns": ["step_number", "field_label", "authority", "non_obvious_official_guidance", "non_obvious_actual_reality", "non_obvious_action_required", "deadline_label", "responsible_party"],
+        "note": "is_non_obvious records ALSO appear in their regular phase section below (with value + deadline but without the contrast block). Do not deduplicate them out of the phase sections."
+      },
+      {
+        "id": "PRE_DEPARTURE",
+        "title": "Pre-Departure",
+        "filter": "section = 'PRE_DEPARTURE'",
+        "render_columns": ["step_number", "authority", "field_label", "value", "source", "deadline_date", "deadline_label", "responsible_party"]
+      },
+      {
+        "id": "ARRIVAL_WEEK",
+        "title": "Arrival Week",
+        "filter": "section = 'ARRIVAL_WEEK'",
+        "render_columns": ["step_number", "authority", "field_label", "value", "source", "deadline_date", "deadline_label", "responsible_party"]
+      },
+      {
+        "id": "FIRST_MONTH",
+        "title": "First Month",
+        "filter": "section = 'FIRST_MONTH'",
+        "render_columns": ["step_number", "authority", "field_label", "value", "source", "deadline_date", "deadline_label", "responsible_party"]
+      },
+      {
+        "id": "ONGOING",
+        "title": "Ongoing Obligations",
+        "filter": "section = 'ONGOING'",
+        "render_columns": ["step_number", "authority", "field_label", "value", "source", "deadline_date", "deadline_label", "responsible_party"]
+      },
+      {
+        "id": "consult_professional",
+        "title": "Consult a Professional",
+        "subtitle": "These items require specialist legal or tax advice. Values are intentionally withheld from this export.",
+        "filter": "consult_professional = true",
+        "position": "always_last_section",
+        "render_columns": ["step_number", "field_label", "authority", "non_obvious_action_required"]
+      }
+    ]
+  },
+
+  "fact_key_conventions": {
+    "country_prefix": "Two-letter ISO code, e.g. no.*, de.*, fr.*",
+    "shared_keys_no_prefix": [
+      "employee.full_name", "employee.nationality", "employee.passport_number",
+      "employee.passport_expiry", "employee.date_of_birth", "employee.eea_status",
+      "employer.company_name", "employer.local_registration_number",
+      "case.move_date", "case.contract_start_date", "case.employee_type"
+    ],
+    "per_country_pattern": "{country_iso}.{domain}.{field_descriptor}",
+    "examples": [
+      "no.d_number.value", "no.d_number.application_submitted_date",
+      "de.steuer_id.value", "de.anmeldung.meldebestaetigung_date",
+      "fr.titre_sejour.anef_reference", "fr.cpam.nir_number"
+    ]
+  }
+}

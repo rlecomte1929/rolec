@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import type { CountryProfileDTO } from '../../types';
-import type { AdminRequirementReview, ReviewStatus } from '../../api/admin';
+import type { AdminRequirementReview, KnowledgeScorecard, ReviewStatus } from '../../api/admin';
 import { Card, Button, Badge, CountryFlag, Input } from '../antigravity';
 import {
   type RequirementStatusFilter,
@@ -10,6 +10,7 @@ import {
   confidencePercent,
   countRequirementStatuses,
   displayCatalogLabel,
+  displayCountryIso,
   displayCountryName,
   filterRequirements,
   groupRequirementsByPillar,
@@ -19,6 +20,7 @@ interface CountryDetailProps {
   profile: CountryProfileDTO;
   requirements: AdminRequirementReview[];
   pendingCount: number;
+  scorecard?: KnowledgeScorecard | null;
   busyId: string | null;
   onRerun: () => void;
   onReview: (requirementId: string, status: Exclude<ReviewStatus, 'pending'>) => void;
@@ -82,15 +84,21 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
   profile,
   requirements,
   pendingCount,
+  scorecard,
   busyId,
   onRerun,
   onReview,
 }) => {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<RequirementStatusFilter>('all');
-  const score = catalogConfidenceScore(profile.confidenceScore, requirements.length);
-  const level = confidenceLevel(score);
+  const evidenceScore = catalogConfidenceScore({
+    confidenceScore: profile.confidenceScore,
+    requirementsCount: requirements.length,
+    topDomains: profile.sources.map((s) => s.publisherDomain).filter(Boolean),
+  });
+  const level = confidenceLevel(evidenceScore);
   const confidenceVariant = level === 'high' ? 'success' : level === 'medium' ? 'warning' : 'error';
+  const iso = displayCountryIso(profile.countryCode);
   const counts = useMemo(() => countRequirementStatuses(requirements), [requirements]);
   const visible = useMemo(
     () => filterRequirements(requirements, query, status),
@@ -109,11 +117,16 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
                 label={displayCountryName(profile.countryCode)}
                 className="text-lg font-semibold text-navy-800"
               />
-              <span className="font-mono text-xs uppercase tracking-wide text-slate-500">{profile.countryCode}</span>
+              {iso && (
+                <span className="font-mono text-xs uppercase tracking-wide text-slate-500">{iso}</span>
+              )}
               {level !== 'unknown' && (
                 <Badge variant={confidenceVariant} size="sm">
-                  Confidence {confidencePercent(score)}%
+                  Confidence {confidencePercent(evidenceScore)}%
                 </Badge>
+              )}
+              {level === 'unknown' && requirements.length === 0 && (
+                <Badge variant="neutral" size="sm">No evidence</Badge>
               )}
             </div>
             <div className="mt-1 text-xs text-slate-500">
@@ -123,6 +136,41 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
           <Button onClick={onRerun}>Re-run research</Button>
         </div>
       </Card>
+
+      {scorecard && (
+        <Card padding="lg">
+          <div data-testid="knowledge-scorecard" className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-navy-800">Catalog sufficiency</span>
+              <Badge variant={scorecard.catalogReady ? 'success' : 'warning'} size="sm">
+                {scorecard.catalogReady ? 'Ready' : 'Not ready'}
+              </Badge>
+            </div>
+            <p className="text-sm text-navy-800">
+              {scorecard.notReadyReason ||
+                'Approved, cited items cover more than one pillar. Publish pending rows only when the source URL resolves.'}
+            </p>
+            <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+              <div>
+                <dt className="text-[11px] uppercase tracking-wide text-slate-500">Approved</dt>
+                <dd className="font-mono text-navy-800">{scorecard.approvedCount}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] uppercase tracking-wide text-slate-500">Pending</dt>
+                <dd className="font-mono text-navy-800">{scorecard.pendingCount}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] uppercase tracking-wide text-slate-500">Citation resolve</dt>
+                <dd className="font-mono text-navy-800">{scorecard.citationResolvePct}%</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] uppercase tracking-wide text-slate-500">Pillars</dt>
+                <dd className="font-mono text-navy-800">{scorecard.pillarsPresent.length}</dd>
+              </div>
+            </dl>
+          </div>
+        </Card>
+      )}
 
       {pendingCount > 0 && (
         <Card padding="lg">

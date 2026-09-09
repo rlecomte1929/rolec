@@ -19,6 +19,7 @@ import { RoadmapPaywallGate } from '../../features/employee-journey/RoadmapPaywa
 import { fetchRoadmapUnlocked } from '../../utils/paymentStatus';
 import { RuleUpdateBanner } from '../../features/platform-v2/roadmap/RuleUpdateBanner';
 import { CorridorAdvisories } from '../../features/platform-v2/roadmap/CorridorAdvisories';
+import { DataSheetView } from '../../features/datasheet/DataSheetView';
 import { useEmployeeRelocationPlanPageData } from '../../features/relocation-plan-employee/useEmployeeRelocationPlanPageData';
 import { useMilestoneCompletion } from '../../features/relocation-plan-employee/useMilestoneCompletion';
 import { useRelocationPlanCtaHandler } from '../../features/relocation-plan-employee/relocationPlanCtaNavigate';
@@ -468,6 +469,11 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
               className="mt-3 rounded-xl border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]"
             >
               {completion.error}
+            </div>
+          )}
+          {caseId && (
+            <div className="mt-6">
+              <DataSheetView caseId={caseId} audience="employee" />
             </div>
           )}
         </div>

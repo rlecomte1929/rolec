@@ -13,6 +13,7 @@ import {
   catalogConfidenceScore,
   confidenceLevel,
   confidencePercent,
+  displayCountryIso,
   displayCountryName,
   filterCatalog,
   formatUpdatedLabel,
@@ -39,11 +40,21 @@ const SORT_OPTIONS: { value: CatalogSortKey; label: string }[] = [
   { value: 'updated', label: 'Last updated' },
 ];
 
-function ConfidenceMark({ score }: { score: number | undefined }) {
+function ConfidenceMark({
+  score,
+  empty,
+}: {
+  score: number | null;
+  empty: boolean;
+}) {
   const level = confidenceLevel(score);
   const pct = confidencePercent(score);
   if (level === 'unknown') {
-    return <Badge variant="neutral" size="sm">No catalog</Badge>;
+    return (
+      <Badge variant="neutral" size="sm">
+        {empty ? 'No evidence' : 'Unknown'}
+      </Badge>
+    );
   }
   const variant = level === 'high' ? 'success' : level === 'medium' ? 'warning' : 'error';
   const label = level === 'high' ? 'High' : level === 'medium' ? 'Medium' : 'Low';
@@ -103,11 +114,15 @@ function DomainChips({ domains }: { domains: string[] }) {
 
 function CountryIdentity({ code }: { code: string }) {
   const name = displayCountryName(code);
-  // Flag + resolved name only. Repeating countryCode next to the label doubled
-  // "CHINA CHINA" because many catalog rows store the English name as
-  // country_code, not ISO-2.
+  const iso = displayCountryIso(code);
   return (
-    <CountryFlag country={code} label={name} className="min-w-0 text-sm font-semibold text-navy-800" />
+    <span className="flex min-w-0 items-center gap-3">
+      {/* Show the English name once; ISO chip is the code, not the name again */}
+      <CountryFlag country={code} label={name} className="min-w-0 text-sm font-semibold text-navy-800" />
+      {iso && (
+        <span className="shrink-0 font-mono text-[11px] uppercase tracking-wide text-slate-500">{iso}</span>
+      )}
+    </span>
   );
 }
 
@@ -202,6 +217,9 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
           </label>
         </div>
       </div>
+      <p className="text-xs text-slate-500">
+        Confidence is shown only when this catalog has recorded requirements and sources.
+      </p>
 
       {rows.length === 0 ? (
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-600">
@@ -241,14 +259,25 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
                   onClick={() => onSelect(row.countryCode)}
                   className="grid w-full grid-cols-[minmax(14rem,1.6fr)_8.5rem_7rem_9rem_minmax(10rem,1fr)_1.5rem] gap-4 border-t border-slate-200 px-4 py-3 text-left hover:bg-navy-50"
                 >
-                  <CountryIdentity code={row.countryCode} />
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <CountryIdentity code={row.countryCode} />
+                    {row.catalogReady === true && (
+                      <Badge variant="success" size="sm">Ready</Badge>
+                    )}
+                    {row.catalogReady === false && (
+                      <Badge variant="warning" size="sm">Not ready</Badge>
+                    )}
+                  </div>
                   <div>
                     <div className="text-sm text-navy-800">{updated.relative}</div>
                     <div className="text-xs text-slate-500">{updated.absolute}</div>
                     {stale && <Badge variant="warning" size="sm">Needs refresh</Badge>}
                   </div>
                   <RequirementCount count={row.requirementsCount} max={maxRequirements} />
-                  <ConfidenceMark score={catalogConfidenceScore(row.confidenceScore, row.requirementsCount)} />
+                  <ConfidenceMark
+                    score={catalogConfidenceScore(row)}
+                    empty={(row.requirementsCount || 0) === 0}
+                  />
                   <DomainChips domains={row.topDomains} />
                   <ChevronRight className="mt-1 h-4 w-4 text-slate-500" aria-hidden="true" />
                 </Button>
@@ -314,7 +343,11 @@ function CountryCard({
     >
       <div className="flex items-start justify-between gap-3">
         <CountryIdentity code={row.countryCode} />
-        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+        <div className="flex items-center gap-2">
+          {row.catalogReady === false && <Badge variant="warning" size="sm">Not ready</Badge>}
+          {row.catalogReady === true && <Badge variant="success" size="sm">Ready</Badge>}
+          <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+        </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <div>
@@ -325,7 +358,10 @@ function CountryCard({
           )}
         </div>
         <RequirementCount count={row.requirementsCount} max={max} />
-        <ConfidenceMark score={catalogConfidenceScore(row.confidenceScore, row.requirementsCount)} />
+        <ConfidenceMark
+          score={catalogConfidenceScore(row)}
+          empty={(row.requirementsCount || 0) === 0}
+        />
         <DomainChips domains={row.topDomains} />
       </div>
     </Button>

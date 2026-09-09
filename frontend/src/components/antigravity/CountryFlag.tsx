@@ -26,7 +26,16 @@ export const CountryFlag: React.FC<CountryFlagProps> = ({
       className={`inline-flex items-center gap-2 min-w-0 ${className}`}
       aria-label={hideLabel ? display : undefined}
     >
-      {code && <span className={`fi fi-${code} rounded-sm shrink-0`} aria-hidden="true" />}
+      {/* fix: BUG-260909-19B5 — keep a flag slot so missing glyphs do not shift the name */}
+      {code ? (
+        <span className={`fi fi-${code} inline-block h-[1em] w-[1.33em] shrink-0 rounded-sm`} aria-hidden="true" />
+      ) : (
+        <span
+          className="inline-block h-[1em] w-[1.33em] shrink-0 rounded-sm bg-slate-100"
+          aria-hidden="true"
+          title="No flag for this country code"
+        />
+      )}
       {!hideLabel && <span className="truncate">{display}</span>}
     </span>
   );

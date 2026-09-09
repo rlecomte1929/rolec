@@ -545,6 +545,7 @@ export const HrAssignmentReview: React.FC = () => {
                         permitLabel,
                         requirementCount,
                         destination: knownDestination,
+                        catalogReady: requirementsDto?.catalogReady,
                       })}
                     </div>
                   </Card>

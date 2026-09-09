@@ -66,6 +66,17 @@ def test_unknown_mover_nationality_fails_open():
     assert apply_applies_to(_nd(), {"nationality": "Wakanda", "destination_country": "IE"}) is True
 
 
+def test_unrecognised_label_fails_open_and_warns(caplog):
+    """Fail-open stays; silence was the AIQ-2037 gap (NO→FR 'EEA/EU/Swiss')."""
+    import logging
+
+    mystery = _nd(nationality="Martian")
+    with caplog.at_level(logging.WARNING, logger="backend.app.services.applies_to_matcher"):
+        assert apply_applies_to(mystery, ANDREA) is True
+        assert apply_applies_to(mystery, SPANIARD) is True
+    assert any("Martian" in rec.getMessage() for rec in caplog.records)
+
+
 # ── metadata keys never filter ───────────────────────────────────────────────
 def test_metadata_keys_do_not_filter():
     heavy = _au(assertion_mode=None, conditional_on=None, non_obvious=True,

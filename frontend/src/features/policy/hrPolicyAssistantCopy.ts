@@ -1,7 +1,7 @@
 export const HR_POLICY_ASSISTANT_TITLE = 'Ask about this policy';
 
 export const HR_POLICY_ASSISTANT_SUBTITLE =
-  'Ask about this policy version, employee-visible rules, and publish impact.';
+  'Ask to find the right clause, then open the source. The workspace text is the fact; the assistant is orientation, not a substitute for the published policy.';
 
 export const HR_POLICY_ASSISTANT_PLACEHOLDER = 'Example: What do employees see for shipment?';
 

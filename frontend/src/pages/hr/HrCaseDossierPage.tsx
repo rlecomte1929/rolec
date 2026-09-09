@@ -34,6 +34,7 @@ import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
 import { HrCaseFormRow } from '../../features/platform-v2/hr-dossier/HrCaseFormRow';
 import { DestinationRequirements } from '../../features/platform-v2/dossier/DestinationRequirements';
 import { ImmigrationFormFill } from '../../features/immigration/ImmigrationFormFill';
+import { DataSheetView } from '../../features/datasheet/DataSheetView';
 import {
   AddDocumentModal,
   type AddDocumentPersonOption,
@@ -182,6 +183,13 @@ export const HrCaseDossierPage: React.FC = () => {
         {/* [AIQ-1855] Pre-fill official immigration forms from the case vault. Renders
             only when the corridor actually has a fillable form. */}
         {caseId && <ImmigrationFormFill caseId={caseId} audience="hr" />}
+
+        {/* Composed Document Data Sheet — one view of steps → fields → provenance. */}
+        {caseId && (
+          <div className="mb-6">
+            <DataSheetView caseId={caseId} audience="hr" />
+          </div>
+        )}
 
         {/* ── Filter tabs ───────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center gap-1 mb-4 border-b border-slate-200">

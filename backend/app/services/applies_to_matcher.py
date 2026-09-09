@@ -19,9 +19,12 @@ gates only when the rule is genuinely `nationality_determined`, comparing CLASS 
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict
 
 from .nationality_class import EU_EEA, THIRD_COUNTRY, classify_best
+
+log = logging.getLogger(__name__)
 
 # The ONLY applies_to keys that gate applicability. Everything else a batch carries is
 # provenance/metadata and must never filter a fact out.
@@ -61,7 +64,15 @@ def nationality_applies(applies_to: Dict[str, Any], snapshot: Dict[str, Any]) ->
         return True
     want_class = _NAT_LABEL_TO_CLASS.get(str(want))
     if want_class is None:
-        return True  # unknown label -> do not hide (caller may log)
+        # Fail OPEN still: suppress only what we positively know does not apply. The warning
+        # is the missing signal from AIQ-2037 — an unrecognised label used to un-gate
+        # nationality_determined rows silently (NO→FR "EEA/EU/Swiss").
+        log.warning(
+            "unrecognised applies_to.nationality label %r — failing open "
+            "(requirement is not hidden)",
+            want,
+        )
+        return True  # unknown label -> do not hide
     mover_class = classify_best(
         (snapshot.get("nationality"), snapshot.get("second_nationality")),
         snapshot.get("destination_country"),
