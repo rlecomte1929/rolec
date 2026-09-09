@@ -382,30 +382,37 @@ def admin_notification_counts(
     """
     from sqlalchemy import text as _sql
     from ...database import db
+
+    combined = (
+        "SELECT "
+        "  (SELECT COUNT(*) FROM catalog_destination_requests "
+        "   WHERE status = 'pending') AS pending_tickets, "
+        "  (SELECT COUNT(*) FROM catalog_destination_allowlist) "
+        "   AS allowlisted_destinations, "
+        "  (SELECT COUNT(*) FROM supplier_service_capabilities "
+        "   WHERE platform_vetting_status = 'pending') AS pending_capabilities"
+    )
+    without_caps = (
+        "SELECT "
+        "  (SELECT COUNT(*) FROM catalog_destination_requests "
+        "   WHERE status = 'pending') AS pending_tickets, "
+        "  (SELECT COUNT(*) FROM catalog_destination_allowlist) "
+        "   AS allowlisted_destinations"
+    )
+
     with db.engine.connect() as conn:
-        pending = conn.execute(
-            _sql(
-                "SELECT COUNT(*) FROM catalog_destination_requests "
-                "WHERE status = 'pending'"
-            )
-        ).scalar() or 0
-        allowlist = conn.execute(
-            _sql("SELECT COUNT(*) FROM catalog_destination_allowlist")
-        ).scalar() or 0
         try:
-            pending_caps = conn.execute(
-                _sql(
-                    "SELECT COUNT(*) FROM supplier_service_capabilities "
-                    "WHERE platform_vetting_status = 'pending'"
-                )
-            ).scalar() or 0
+            row = conn.execute(_sql(combined)).mappings().first() or {}
+            pending_caps = int(row.get("pending_capabilities") or 0)
         except Exception:
-            # Column ships with the GAP 1 migration; degrade gracefully if not yet applied.
+            # Table/column ships with the GAP 1 migration; one fallback round-trip
+            # without that subquery if it is not yet applied.
+            row = conn.execute(_sql(without_caps)).mappings().first() or {}
             pending_caps = 0
     return {
-        "pending_tickets": int(pending),
-        "allowlisted_destinations": int(allowlist),
-        "pending_capabilities": int(pending_caps),
+        "pending_tickets": int(row.get("pending_tickets") or 0),
+        "allowlisted_destinations": int(row.get("allowlisted_destinations") or 0),
+        "pending_capabilities": pending_caps,
     }
 
 

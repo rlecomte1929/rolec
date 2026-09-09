@@ -26,7 +26,8 @@
  *   - `/employee/case/${id}/summary` in EmployeeJourney.tsx (x3) — a route that has never
  *     existed, on the invite-claim and case-link flows, so accepting an HR invite bounced
  *     the employee to their role home.
- *   - `/terms` in AuthScreen.tsx — the "Terms of Service" link on the signup consent line.
+ *   - `/terms` on signup consent — historically on the unreachable platform-v2 AuthScreen;
+ *     the live check is `pages/Auth.tsx`.
  *
  * `${…}` is normalised to a single path segment before matching, so a template target is
  * checked on its literal skeleton and its params are ignored — which is the part that can
@@ -150,11 +151,9 @@ describe('navigate() targets resolve to real routes', () => {
     // [AIQ-2059] The inverse of the assertion this replaces. That one pinned the broken
     // link in place so KNOWN_BROKEN could not become a lie; this one stops the claim
     // coming back while /terms still resolves to nothing.
-    const authScreen = readFileSync(join(SRC, 'features/platform-v2/auth/AuthScreen.tsx'), 'utf8');
-    expect(authScreen).not.toContain('href="/terms"');
-    expect(authScreen).not.toContain('Terms of Service');
-    // The privacy half is a real page and must survive.
-    expect(authScreen).toContain('href="/privacy"');
+    const authPage = readFileSync(join(SRC, 'pages/Auth.tsx'), 'utf8');
+    expect(authPage).not.toContain('href="/terms"');
+    expect(authPage).not.toContain('Terms of Service');
     expect(resolves('/privacy', routePaths)).toBe(true);
   });
 });
