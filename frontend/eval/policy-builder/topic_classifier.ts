@@ -15,7 +15,7 @@
  * 8 hex chars) — never the raw query — for privacy.
  */
 
-import { logger } from '../../lib/logger';
+import { logger } from '../../src/lib/logger';
 
 // ---------------------------------------------------------------------------
 // Public constants — fixed strings, never LLM-generated

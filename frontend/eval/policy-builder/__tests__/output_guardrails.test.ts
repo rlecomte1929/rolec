@@ -18,7 +18,7 @@ import {
   runOutputGuardrails,
   UNIVERSAL_TIERS,
 } from '../output_guardrails';
-import type { PolicyChunk } from '../retrieve_policy';
+import type { PolicyChunk } from '../../../src/features/policy-builder/retrieve_policy';
 
 // ---------------------------------------------------------------------------
 // Test fixtures

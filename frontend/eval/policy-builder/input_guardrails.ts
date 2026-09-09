@@ -9,7 +9,7 @@
  * Audit logging records {session_id, trigger_type, timestamp} — NEVER raw query text.
  */
 
-import { logger } from '../../lib/logger';
+import { logger } from '../../src/lib/logger';
 import { classifyQuery, REJECTION_MSG } from './topic_classifier';
 
 // ---------------------------------------------------------------------------
