@@ -1,0 +1,26 @@
+{
+  "batch_id": "de-facts-blue-card-2026-09-08",
+  "generated_at": "2026-09-08T20:33:25Z",
+  "corridor": "IN->DE",
+  "employee_type": "third_country_professional",
+  "record_count": 21,
+  "sha256_ndjson": "047ad980d4b7f2eb4bf0897468eda3762ff097f4ccb642020c7574130891d5ed",
+  "ndjson_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788899611560_lelbcuf3.ndjson",
+  "manifest_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788899646621_25i81iyp.json",
+  "pillars": [
+    "immigration",
+    "anmeldung",
+    "tax",
+    "social_security",
+    "healthcare"
+  ],
+  "official_hosts": [
+    "make-it-in-germany.com",
+    "bamf.de",
+    "auswaertiges-amt.de",
+    "gesetze-im-internet.de",
+    "arbeitsagentur.de",
+    "bzst.de",
+    "service.berlin.de"
+  ]
+}
