@@ -77,6 +77,9 @@ SERVING_ROOTS: Tuple[str, ...] = (
     "backend.app.services.immigration_requirement_service",
     # deterministic HR policy benefit resolution
     "backend.app.services.hr_policy_resolver",
+    # Document Data Sheet read-model — composes requirement/template/value data into the
+    # customer-facing sheet with no human review in between, so it must stay LLM-free.
+    "backend.app.services.data_sheet_service",
 )
 
 #: Known LLM gateways, matched on the final module segment so a gateway is caught
