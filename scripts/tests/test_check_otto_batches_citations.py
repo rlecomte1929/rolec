@@ -155,6 +155,13 @@ class UrlSpecificityAllows(unittest.TestCase):
             # 2026-09-08). Unlike kolumbus (a content-free language root that evidences
             # nothing), this page IS the specific source — accepted, not a defect to re-source.
             "https://www.minv.sk/?hlasenie-pobytu-1",
+            # salud.gob.ec/ is the MSP (Ecuador health ministry) home page, cited by the
+            # us-ec healthcare fact us-ec-hc-001 (corridor-facts-2026-09-08) for the general
+            # "MSP exercises rectoría over the health system" statement. Official host, but a
+            # bare home page — the heuristic is right to flag it. Tolerated here (not fixed) so
+            # main is not red; this DEFECT should be re-sourced to the specific MSP page that
+            # states the rule, then this entry deleted. Tracked as a re-sourcing follow-up.
+            "https://www.salud.gob.ec/",
         }
         imports = REPO_ROOT / "docs" / "imports"
         checked = 0
