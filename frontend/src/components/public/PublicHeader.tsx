@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '../antigravity/Button';
-import { Container } from '../antigravity';
+import { Container } from '../antigravity/Container';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 

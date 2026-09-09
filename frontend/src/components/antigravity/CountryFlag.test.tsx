@@ -25,6 +25,12 @@ describe('CountryFlag', () => {
     expect(screen.getByText('Argentina')).toBeInTheDocument();
     expect(container.querySelector('.fi.fi-ar')).toBeTruthy();
   });
+  it('applies flag-icons ISO classes for FR/GB without a visible label', () => {
+    const { container, rerender } = render(<CountryFlag country="FR" hideLabel />);
+    expect(container.querySelector('.fi.fi-fr')).toBeTruthy();
+    rerender(<CountryFlag country="GB" hideLabel />);
+    expect(container.querySelector('.fi.fi-gb')).toBeTruthy();
+  });
   it('renders just the label when the country is unknown', () => {
     const { container } = render(<CountryFlag country="Atlantis" />);
     expect(screen.getByText('Atlantis')).toBeInTheDocument();

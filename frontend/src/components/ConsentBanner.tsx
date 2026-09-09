@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Button } from './antigravity';
+import { Button } from './antigravity/Button';
 import { getAnalyticsConsent, grantAnalyticsConsent, revokeAnalyticsConsent } from '../analytics';
 import { useIsAdmin } from '../features/admin/useIsAdmin';
 

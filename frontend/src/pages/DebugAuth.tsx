@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
-import { Card } from '../components/antigravity';
+import { Card } from '../components/antigravity/Card';
 import { getAuthItem } from '../utils/demo';
 
 const DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true';
