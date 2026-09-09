@@ -32,12 +32,20 @@ from backend.imports.otto.parsers import TIER_AUTO
 
 #: `applies_to.nationality` -> `requirement_items.applies_to_nationality_classes_json`.
 #:
-#: Note what is NOT here: `"any"`. NULL in that column means *applies to everyone*, and
-#: `nationality_class.py` exists precisely because serving the non-EEA visa track to a free
+#: Note what is NOT here: `"any"`. For **new immigration content** this importer still
+#: refuses `"any"` and will not default the column to NULL. NULL on
+#: `applies_to_nationality_classes_json` means *applies to everyone*, and
+#: `nationality_class.py` exists precisely because serving a visa/permit track to a free
 #: mover is the bug this codebase keeps re-committing. Otto writes `"any"` on entities like
 #: `schengen_court_sejour` — a short-stay visa an EU citizen does not need at all — so `"any"`
 #: is not a categorisation, it is an absence of one. Categorise or refuse; never default to
 #: "applies to all".
+#:
+#: NULL *is* legitimate on served rows that a human has affirmed as universal **statutory
+#: obligations** (tax residence, PAYE/RPN, PRSI) that turn on presence or employment, not
+#: on nationality. That is a review decision, not an importer default. See
+#: `docs/corridors/ie-nationality-scope.md` (AIQ-2037). Do not copy those six IRELAND
+#: NULLs into a new immigration pathway.
 NATIONALITY_CLASSES: Dict[str, List[str]] = {
     "EU": [OWN_NATIONAL, EU_EEA],
     "EEA": [OWN_NATIONAL, EU_EEA],
