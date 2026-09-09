@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Button, Input } from '../../components/antigravity';
+import { Card, Button, Input, Alert } from '../../components/antigravity';
+import { loadErrorMessage } from '../../components/LoadErrorBanner';
 import { resourcesAPI } from '../../api/client';
 import { getCountryName } from '../../utils/countries';
 import type {
@@ -134,9 +135,10 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
 
   // AIQ-1581: city-level "things to do" feed. Generated on the fly from the
   // (non-personal) city + country via the LLM — replaces the old dead-end
-  // "city items are thin" banner. Fail-soft: empty on any error.
+  // "city items are thin" banner.
   const [cityActivities, setCityActivities] = useState<CityActivity[]>([]);
   const [cityActivitiesLoading, setCityActivitiesLoading] = useState(false);
+  const [cityActivitiesError, setCityActivitiesError] = useState<string | null>(null);
 
   const context = payload?.context ?? null;
   // AIQ-1272: fall back to the resolved full country name when the API didn't
@@ -152,17 +154,25 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
     // Only fetch when we have a city — this feed is city-level by design.
     if (!cityName) {
       setCityActivities([]);
+      setCityActivitiesError(null);
       return;
     }
     let cancelled = false;
     setCityActivitiesLoading(true);
+    setCityActivitiesError(null);
     resourcesAPI
       .getCityActivities(cityName, countryForActivities)
       .then((list) => {
-        if (!cancelled) setCityActivities(list);
+        if (!cancelled) {
+          setCityActivities(list);
+          setCityActivitiesError(null);
+        }
       })
-      .catch(() => {
-        if (!cancelled) setCityActivities([]);
+      .catch((e) => {
+        if (!cancelled) {
+          setCityActivities([]);
+          setCityActivitiesError(loadErrorMessage(e, 'Could not load city activities.'));
+        }
       })
       .finally(() => {
         if (!cancelled) setCityActivitiesLoading(false);
@@ -557,7 +567,7 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
         {/* Things to do — AIQ-1581. City-level activity suggestions replace the
             old "city items are thin" dead-end banner. Only rendered while
             loading or when we actually have suggestions. */}
-        {cityName && (cityActivitiesLoading || cityActivities.length > 0) && (
+        {cityName && (cityActivitiesLoading || cityActivitiesError || cityActivities.length > 0) && (
           <section aria-labelledby="things-to-do-heading">
             <h2
               id="things-to-do-heading"
@@ -579,6 +589,8 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
                   </Card>
                 ))}
               </div>
+            ) : cityActivitiesError ? (
+              <Alert variant="error">{cityActivitiesError}</Alert>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {cityActivities.map((a, i) => (
