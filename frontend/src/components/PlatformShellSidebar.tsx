@@ -154,7 +154,7 @@ const SECTIONS: NavSection[] = [
         id: 'admin-overview',
         group: 'Usage',
         label: 'Home',
-        to: ROUTE_DEFS.adminOverview.path,
+        to: ROUTE_DEFS.adminConsole.path,
         exact: true,
         children: [
           { id: 'executive', label: 'Executive', to: ROUTE_DEFS.adminExecutive.path },

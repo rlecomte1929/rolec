@@ -23,6 +23,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { describe, it, expect } from 'vitest';
+import { ROUTE_DEFS } from './routes';
 
 const SRC = join(__dirname, '..');
 
@@ -94,5 +95,15 @@ describe('every declared route is mounted', () => {
     expect(mounted.has('/hr/cases/:caseId/dossier')).toBe(true); // ROUTE_DEFS form
     expect(mounted.has('/employee/case/:caseId/plan')).toBe(true); // WIZARD_ROUTES form
     expect(mounted.size).toBeGreaterThan(150);
+  });
+
+  it('ROUTE_DEFS paths are unique (no two keys share a path)', () => {
+    const paths = Object.values(ROUTE_DEFS).map((r) => r.path);
+    const duplicates = paths.filter((path, i) => paths.indexOf(path) !== i);
+    expect(
+      duplicates,
+      'Two ROUTE_DEFS keys sharing a path makes one of them dead. Pick one key and ' +
+        'repoint every reference; do not keep an alias that the router cannot distinguish.',
+    ).toEqual([]);
   });
 });

@@ -22,8 +22,8 @@ describe('buildPermissionsMatrix', () => {
     // landing is PUBLIC-only
     expect(byKey.landing).toEqual({ PUBLIC: true, EMPLOYEE: false, HR: false, ADMIN: false });
     // an admin route is ADMIN-only
-    expect(byKey.adminOverview.ADMIN).toBe(true);
-    expect(byKey.adminOverview.EMPLOYEE).toBe(false);
+    expect(byKey.adminConsole.ADMIN).toBe(true);
+    expect(byKey.adminConsole.EMPLOYEE).toBe(false);
   });
 
   it('is sorted by path for stable rendering', () => {
