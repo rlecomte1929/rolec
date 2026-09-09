@@ -155,6 +155,34 @@ gaps (IE was the one this run). **The remaining real yield is the non-movers reg
 (schools / legal / tax / banks / housing) wired in #2191, which are entirely unlanded — the pivot now
 underway (first batch: SE legal via advokatsamfundet per-entity pages).
 
+## Non-movers sub-batches (register pairs from #2191)
+
+### XX-NO schools (Oslo) — `vendor-resourced-xx-no-schools-2026-09-09` (landed 2026-09-09) — FIRST non-movers
+- Source (GCS): `1788951048473_heugp5z4.ndjson` (+ manifest `1788951050007_wu2n3j8o.json`).
+- Otto manifest: **3 sourced, 9 rejected** — all sourced are IB World / English-medium schools active
+  in the Nasjonalt skoleregister (NSR/Udir). Rejects honest: British School of Oslo (closed / in
+  liquidation), Manglerud (IB closed Aug 2026), ISoO (alias of OIS — deduped), + Norwegian/German/
+  French-medium and non-Oslo-metro schools.
+- **Register type = SPA — verified via the machine-readable API, NOT a name-on-page curl.** The stored
+  `source_url` `nsr.udir.no/enheter/<orgnr>` is a JS SPA (HTTP 200 but the name is not in the raw
+  HTML). Independently confirmed each via the NSR data-API `https://data-nsr.udir.no/enhet/<orgnr>`:
+  971845635 → "Oslo International School" (Bærum, ErAktiv=true, ErSkole=true); 915601618 → "Norlights
+  International School Oslo AS" (Oslo, active); 998258383 → "Stiftelsen Asker International School"
+  (Asker, active). The orgnr is carried in `accreditation_number`. General rule for SPA registers:
+  **verify by the machine-readable id/API, not a human-URL curl.**
+- Tier gate: the NSR per-entity register is wired (#2191), so all 3 passed at tier 1 (0 rejects).
+- Landed: **+2 new suppliers** (Norlights International School Oslo, Asker International School). Oslo
+  International School was a dup (already a prod supplier). Net **+3 pending capabilities** (the two
+  new suppliers + one capability added to the existing Oslo International School supplier). Tripwire:
+  `ssc` `approved` **130 → 130**, md5 unchanged; pending 984 → 987.
+- **Vetter caveat — scope:** the converter scopes these at **country** (NO) via the corridor mapping
+  (NO → FR-NO → `country_code=NO`, `coverage_scope_type='country'`). Oslo International School already
+  holds an **approved city-scope** NO/schools capability (created 2026-03-13); this run added a
+  **pending country-scope** one alongside it. International schools are city-local, so the vetter at
+  /admin/vetting-queue may prefer city scope and should reconcile the Oslo double (approved city +
+  pending country). Norlights and Asker likewise landed country-scope. `FR-NO` is the converter's
+  hardcoded NO corridor label; the effective destination scope is NO.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
