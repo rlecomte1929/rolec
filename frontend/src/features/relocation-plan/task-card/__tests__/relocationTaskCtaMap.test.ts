@@ -114,11 +114,11 @@ describe('resolveRelocationTaskCtaTarget', () => {
     });
   });
 
-  it('routes view_details (review) to employee case summary', () => {
+  it('routes view_details (review) to the employee case roadmap (overview)', () => {
     const cta: RelocationPlanCtaDTO = { type: 'view_details', label: 'Review' };
     expect(resolveRelocationTaskCtaTarget(employeeCtx, cta)).toEqual({
       kind: 'internal',
-      to: `/employee/case/${encodeURIComponent('assign-1')}/summary`,
+      to: buildRoute('employeeCaseRoadmap', { caseId: 'assign-1' }),
     });
   });
 
