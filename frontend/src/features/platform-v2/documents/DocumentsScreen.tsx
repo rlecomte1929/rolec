@@ -929,19 +929,10 @@ export function DocumentsScreen({
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-          <Button unstyled
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              padding: '7px 14px', borderRadius: C.radMd,
-              border: `1px solid ${C.border}`, background: C.surface,
-              color: C.textSec, fontSize: '13px', cursor: 'pointer',
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-            </svg>
-            Export all
-          </Button>
+          {/* Removed the "Export all" button — it was styled but had no onClick (a dead
+              control, same class of bug as the header Upload button noted below). There is
+              no bulk-export/download-all endpoint to wire it to; restore it only alongside a
+              real export handler. */}
           {/* There is deliberately no header "Upload" button.
               It sat here with `onClick={() => {}}` and a "future: open upload modal"
               comment — a primary-styled control that did nothing.
