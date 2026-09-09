@@ -14,6 +14,7 @@ import os
 os.environ.setdefault("RELOPASS_QUERY_COUNTER_OFF", "1")
 os.environ.setdefault("RELOPASS_DISABLE_RATE_LIMITS", "1")
 
+from backend.app import auth_deps as auth_deps_mod
 from backend.app.routers import admin_catalog as admin_router
 from backend.app.routers import hr_catalog as hr_router
 from backend import database as database_mod
@@ -101,6 +102,8 @@ def _patch_catalog_db(monkeypatch, rec: RecordingCatalogDb) -> None:
     if loaded is not None:
         monkeypatch.setattr(loaded, "db", rec)
     monkeypatch.setattr(hr_router, "db", rec)
+    # Company resolution now lives on auth_deps.db (shared helper).
+    monkeypatch.setattr(auth_deps_mod, "db", rec)
 
 
 def test_hr_notification_counts_single_execute(monkeypatch):

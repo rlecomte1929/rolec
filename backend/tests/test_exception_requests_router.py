@@ -586,21 +586,23 @@ class ExceptionRequestRouterTests(unittest.TestCase):
 class CallerCompanyResolutionTests(unittest.TestCase):
     """`_caller_company_id` must resolve legacy (non-UUID) ids that have no
     profile.company_id and no `company` token claim — the bug that 403'd the
-    demo HR account. Resolution order: profile → token → hr_users → assignment.
+    demo HR account. Resolution order: hr_users → profile → token → assignment.
     """
 
     def _call(self, user):
         return router_module._caller_company_id(user)
 
     def test_profile_company_id_wins(self):
-        with mock.patch.object(
-            router_module.db, "get_profile_record",
-            return_value={"id": "u", "company_id": "comp-profile"},
-        ):
+        with mock.patch.object(router_module.db, "get_hr_company_id", return_value=None), \
+             mock.patch.object(
+                 router_module.db, "get_profile_record",
+                 return_value={"id": "u", "company_id": "comp-profile"},
+             ):
             self.assertEqual(self._call({"id": "u"}), "comp-profile")
 
     def test_token_company_used_when_no_profile(self):
-        with mock.patch.object(router_module.db, "get_profile_record", return_value=None):
+        with mock.patch.object(router_module.db, "get_hr_company_id", return_value=None), \
+             mock.patch.object(router_module.db, "get_profile_record", return_value=None):
             self.assertEqual(self._call({"id": "u", "company": "comp-token"}), "comp-token")
 
     def test_legacy_hr_resolves_via_hr_users(self):

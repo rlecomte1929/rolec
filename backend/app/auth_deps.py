@@ -1,6 +1,7 @@
 """Shared auth dependencies for routers (avoids circular imports with main)."""
 from __future__ import annotations
 
+import logging
 import os
 import time
 import uuid
@@ -12,6 +13,8 @@ from fastapi import Depends, Header, HTTPException, Request
 
 from ..database import db
 from ..schemas import UserRole
+
+logger = logging.getLogger(__name__)
 
 # WS2 Task 2.7 — per-process identity cache (TTL approved 30 s, 2026-09-09).
 USER_CONTEXT_CACHE_TTL_S = 30.0
@@ -269,6 +272,52 @@ def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = No
     if expected_role and target.get("role") != expected_role.value:
         return user
     return target
+
+def caller_company_id(
+    user: Dict[str, Any],
+    *,
+    required: bool = False,
+    include_case_assignment: bool = False,
+    detail: str = "No company linked to this profile.",
+) -> Optional[str]:
+    """Resolve the caller's own company id (tenant scope).
+
+    Order is hr_users-first (AIQ-862): legacy text HR ids such as
+    ``seed-hr-testingapril`` have no UUID-castable profile, so
+    ``get_profile_record`` is empty and only ``hr_users`` holds the link.
+
+      1. ``db.get_hr_company_id(uid)``
+      2. ``(db.get_profile_record(uid) or {}).get("company_id")``
+      3. ``user.get("company")`` (session claim)
+      4. if ``include_case_assignment``: assignment → company
+
+    ``hr_users`` and assignment lookups are fail-soft: log and continue so a
+    missing table never 500s. Distinct from ``get_org_id_for_hr_user``, which
+    returns ``""`` rather than ``None`` and is a FastAPI dependency.
+    """
+    uid = user.get("id")
+    company_id: Any = None
+    if uid:
+        try:
+            company_id = db.get_hr_company_id(uid)
+        except Exception:
+            logger.warning("caller_company_id: hr_users lookup failed", exc_info=True)
+    if not company_id:
+        profile = db.get_profile_record(uid) if uid else None
+        company_id = (profile or {}).get("company_id") or user.get("company")
+    if not company_id and include_case_assignment and uid:
+        try:
+            assignment = db.get_assignment_for_employee(uid, request_id=None)
+            if assignment:
+                company_id = db.get_company_id_for_assignment_id(str(assignment.get("id")))
+        except Exception:
+            logger.warning("caller_company_id: assignment lookup failed", exc_info=True)
+    if company_id:
+        return str(company_id)
+    if required:
+        raise HTTPException(status_code=403, detail=detail)
+    return None
+
 
 def get_org_id_for_hr_user(user: Dict[str, Any] = Depends(require_admin_or_hr)) -> str:
     """Return the company_id for the current HR / Admin user.

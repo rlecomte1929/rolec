@@ -19,7 +19,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import text
 
-from ..auth_deps import get_current_user
+from ..auth_deps import caller_company_id, get_current_user
 from ...database import db
 from ..services.mistral_ocr_client import mistral_ocr_document
 from ..services.receipt_field_extractor import extract_expense_fields
@@ -39,13 +39,8 @@ _MAX_BYTES = 10 * 1024 * 1024  # 10 MiB, matching the passport-OCR path
 
 
 def _caller_company_id(user: Dict[str, Any]) -> Optional[str]:
-    """Caller's OWN company (tenant) for the persisted row — mirrors ai_decisions._caller_company_id."""
-    uid = user.get("id")
-    profile = db.get_profile_record(uid) if uid else None
-    company_id = (profile or {}).get("company_id") or user.get("company")
-    if not company_id and uid:
-        company_id = db.get_hr_company_id(uid)
-    return str(company_id) if company_id else None
+    """Caller's OWN company (tenant) for the persisted row."""
+    return caller_company_id(user)
 
 
 @router.post("/process")

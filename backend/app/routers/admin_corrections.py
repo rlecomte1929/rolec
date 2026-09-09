@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..auth_deps import require_admin, require_admin_or_hr
+from ..auth_deps import caller_company_id, require_admin, require_admin_or_hr
 from ...database import db
 from ..services.correction_analytics import (
     summarize_by_reason,
@@ -30,16 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def _caller_company_id(user: Dict[str, Any]) -> Optional[str]:
-    # HR↔company links via hr_users for legacy/seed HR (the profiles.company_id
-    # path is empty for those), so resolve hr_users first, then fall back to the
-    # profile / token. Mirrors policy_config._get_hr_company_id (AIQ-871 fix:
-    # the demo HR has no profiles.company_id and was 403'ing on this endpoint).
-    uid = user.get("id")
-    company_id = db.get_hr_company_id(uid) if uid else None
-    if not company_id:
-        profile = db.get_profile_record(uid) if uid else None
-        company_id = (profile or {}).get("company_id") or user.get("company")
-    return str(company_id) if company_id else None
+    return caller_company_id(user)
 
 
 @router.get("/by-reason")
