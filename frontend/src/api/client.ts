@@ -418,7 +418,7 @@ export type {
   AssistantTopicsResponse,
   MarketingFunnel,
 } from './adminMiscApi';
-export { adminProspectsAPI, adminLeadsAPI, leadCaptureAPI, adminRecommendationsAPI, adminResourcesAPI, adminFormTemplatesAPI, adminStagingAPI, adminFreshnessAPI, sourceChangeReviewAPI, adminReviewQueueAPI, adminNotificationsAPI, adminOpsAnalyticsAPI, adminMarketingAnalyticsAPI, adminCollaborationAPI } from './adminMiscApi';
+export { adminProspectsAPI, adminLeadsAPI, leadCaptureAPI, adminResourcesAPI, adminFormTemplatesAPI, adminStagingAPI, adminFreshnessAPI, sourceChangeReviewAPI, adminReviewQueueAPI, adminNotificationsAPI, adminOpsAnalyticsAPI, adminMarketingAnalyticsAPI, adminCollaborationAPI } from './adminMiscApi';
 
 export type {
   RequirementsComputeStatus,
