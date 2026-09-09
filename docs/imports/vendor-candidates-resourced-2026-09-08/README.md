@@ -183,6 +183,34 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   pending country). Norlights and Asker likewise landed country-scope. `FR-NO` is the converter's
   hardcoded NO corridor label; the effective destination scope is NO.
 
+### XX-ES banks (Madrid) — `vendor-resourced-xx-es-banks-2026-09-09` (landed 2026-09-09) — first PUBLIC_REGISTER
+- Source (GCS): `1788955805662_bmioisu7.ndjson` (+ manifest `1788955838735_2j2cx2xs.json`).
+- Otto manifest: **7 sourced, 4 rejected** — rejects honest: Wise (Belgian EMI, not a credit
+  institution), Revolut Bank UAB (Lithuanian EMI), N26 AG (passporting, no BdE código), Openbank
+  (0073 aggregator-cited only, not BdE-confirmed → rejected rather than asserted).
+- **Register type = PUBLIC_REGISTER (search-form, no per-entity URL).** The Banco de España
+  "Registro de Entidades" is a JS app; the `source_url` (`app.bde.es/ren_www/.../Arranque.html`) is
+  the register root, SHARED by all rows — it evidences no single entity, and bde.es bot-walls curl
+  (403), so a source-page name check is impossible. The verifiable key is the **código de entidad**
+  in `accreditation_number`. Per #2191, bde.es is wired as PUBLIC_REGISTER (tier 2); the human vetter
+  confirms each código against the register at /admin/vetting-queue. The 7 códigos are the canonical
+  major Spanish banks (Santander 0049, BBVA 0182, CaixaBank 2100, Sabadell 0081, Bankinter 0128,
+  Deutsche Bank SAE 0019, ING España 1465). Founder approved landing this class to pending
+  (vetter-confirmed) since no independent per-entity verification is possible for search-form registers.
+- Landed: **+6 new suppliers** (BBVA, Banco de Sabadell, CaixaBank, Bankinter, Deutsche Bank S.A.E.,
+  ING Bank N.V. Sucursal en España — ES/banks, pending). Tripwire: `ssc` `approved` **130 → 130** md5
+  unchanged; pending 987 → 993.
+- **⚠️ Santander HELD — promote() name-collision (defect found + corrected).** "Banco Santander, S.A."
+  (código 0049, Spain) was mis-promoted: promote()'s normalized-name matching collapsed it onto the
+  EXISTING "Banco Santander (Brasil) S.A." supplier, attaching an ES/banks código-0049 pending cap to
+  the *Brazilian* entity. Caught immediately; deleted the mis-created pending cap and reset the
+  candidate (`status='pending'`, `promoted_supplier_id=NULL`) — the Brazilian supplier is back to its
+  prior BR+UY caps and the tripwire is unchanged. **Santander (Spain) is held** for a correct re-land
+  once the name-match is handled (a promote() fix, or a manual correct supplier). **Systemic:** any
+  bank whose name normalizes to an existing multinational's name will mis-attach — watch future bank
+  batches (this is the whole reason the vetter gate exists, but a wrong-entity row is worth catching
+  at land time).
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
