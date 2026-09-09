@@ -132,12 +132,17 @@ def main() -> int:
     index_path.write_text(json.dumps(index, indent=2, sort_keys=True) + "\n")
 
     pages = {u: norm((sources_dir / index[u]["file"]).read_text()) for u in urls if u in index}
-    missing, unchecked = [], []
+    missing, unchecked, no_quote = [], [], []
     for r in rows:
         page = pages.get(r["source_url"])
-        if page is None:
+        # No-quote is decided from the row alone (before the page), matching check_quotes: an empty
+        # or missing evidence_quote can never be verbatim-confirmed. Without this it passes silently
+        # because norm("") is a substring of every page — the same hole gating_exit now closes.
+        if not (r.get("evidence_quote") or "").strip():
+            no_quote.append(r["fact_key"])
+        elif page is None:
             unchecked.append(r["fact_key"])
-        elif norm(r["evidence_quote"] or "") not in page:
+        elif norm(r["evidence_quote"]) not in page:
             missing.append(r["fact_key"])
 
     if args.stamp:
@@ -145,15 +150,21 @@ def main() -> int:
         # marks its own quotes confirmed is asserting the thing under test.
         for row in rows:
             page = pages.get(row["source_url"])
+            quote = (row.get("evidence_quote") or "").strip()
+            # A quote-less row is never confirmed — require a non-empty quote, else norm("") in page
+            # would stamp it True.
             row.setdefault("applies_to", {})["quote_verbatim_confirmed"] = bool(
-                page is not None and norm(row["evidence_quote"] or "") in page
+                quote and page is not None and norm(quote) in page
             )
         stream.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
         print(f"stamped quote_verbatim_confirmed on {len(rows)} rows in {stream.name}")
 
-    checked = len(rows) - len(unchecked)
+    checked = len(rows) - len(unchecked) - len(no_quote)
     print(f"{stream.name}: {checked - len(missing)}/{checked} quotes verbatim-present"
+          + (f" ({len(no_quote)} with no quote)" if no_quote else "")
           + (f" ({len(unchecked)} unchecked — source unreachable)" if unchecked else ""))
+    for key in no_quote:
+        print(f"  NO QUOTE: {key}")
     for key in missing:
         print(f"  NOT FOUND: {key}")
     for url in unreachable:
@@ -176,7 +187,8 @@ def main() -> int:
         return quote_grounding.gating_exit(verdicts)
 
     # An unreachable source is not a pass. It is also not a disproof — say which it is.
-    return 1 if (missing or unreachable) else 0
+    # A quote-less row (no_quote) is a defect too: it can never be verbatim-confirmed.
+    return 1 if (missing or unreachable or no_quote) else 0
 
 
 if __name__ == "__main__":
