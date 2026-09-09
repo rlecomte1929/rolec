@@ -36,4 +36,11 @@ describe('countryFlagCode', () => {
     expect(countryFlagCode('Bahrain')).toBe('bh');
     expect(countryFlagCode('Czech Republic')).toBe('cz');
   });
+
+  it('resolves admin catalog keys stored as full uppercase names', () => {
+    expect(countryFlagCode('AUSTRALIA')).toBe('au');
+    expect(countryFlagCode('SAUDI ARABIA')).toBe('sa');
+    expect(countryFlagCode('CZECH REPUBLIC')).toBe('cz');
+    expect(countryFlagCode('UNITED STATES')).toBe('us');
+  });
 });

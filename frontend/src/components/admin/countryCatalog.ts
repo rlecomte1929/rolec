@@ -1,5 +1,6 @@
 import type { AdminRequirementReview, ReviewStatus } from '../../api/admin';
 import { countryName } from '../../features/policy-config/countryList';
+import { countryFlagCode } from '../../lib/countryFlagCode';
 import type { CountryListDTO } from '../../types';
 
 export type CountryListRow = CountryListDTO['countries'][number];
@@ -11,7 +12,14 @@ export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'unknown';
 export const CATALOG_STALE_DAYS = 90;
 
 export function displayCountryName(code: string): string {
+  const iso = countryFlagCode(code);
+  if (iso) return countryName(iso.toUpperCase());
   return countryName(code);
+}
+
+export function displayCountryIso(code: string): string | null {
+  const iso = countryFlagCode(code);
+  return iso ? iso.toUpperCase() : null;
 }
 
 export function confidencePercent(score: number | undefined | null): number | null {
@@ -29,17 +37,19 @@ export function confidenceLevel(score: number | undefined | null): ConfidenceLev
   return 'low';
 }
 
-/**
- * Profile.confidence_score is a seed placeholder (0.70 / 0.72 / 0.85), not a
- * measure of catalog quality. An empty destination must not render as High 85%.
- */
+/** Stored research scores are not catalog quality. Empty rows must not read as High. */
 export function catalogConfidenceScore(
-  score: number | undefined | null,
-  requirementsCount: number,
-): number | undefined {
-  if ((requirementsCount || 0) === 0) return undefined;
-  if (score === undefined || score === null || Number.isNaN(score)) return undefined;
-  return score;
+  row: Pick<CountryListRow, 'confidenceScore' | 'requirementsCount' | 'topDomains'>,
+): number | null {
+  const requirements = row.requirementsCount || 0;
+  const sources = (row.topDomains || []).length;
+  if (requirements <= 0) return null;
+  if (sources <= 0) {
+    const pct = confidencePercent(row.confidenceScore);
+    if (pct === null) return null;
+    return Math.min(row.confidenceScore ?? 0, 0.39);
+  }
+  return row.confidenceScore ?? null;
 }
 
 export function isCatalogStale(
@@ -185,8 +195,8 @@ export function sortCatalog(rows: CountryListRow[], sort: CatalogSortKey): Count
   copy.sort((a, b) => {
     if (sort === 'requirements') return (b.requirementsCount || 0) - (a.requirementsCount || 0);
     if (sort === 'confidence') {
-      const av = a.confidenceScore ?? -1;
-      const bv = b.confidenceScore ?? -1;
+      const av = catalogConfidenceScore(a) ?? -1;
+      const bv = catalogConfidenceScore(b) ?? -1;
       return bv - av;
     }
     if (sort === 'updated') {

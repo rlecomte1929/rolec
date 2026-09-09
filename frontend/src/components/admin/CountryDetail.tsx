@@ -10,6 +10,7 @@ import {
   confidencePercent,
   countRequirementStatuses,
   displayCatalogLabel,
+  displayCountryIso,
   displayCountryName,
   filterRequirements,
   groupRequirementsByPillar,
@@ -88,9 +89,14 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<RequirementStatusFilter>('all');
-  const score = catalogConfidenceScore(profile.confidenceScore, requirements.length);
-  const level = confidenceLevel(score);
+  const evidenceScore = catalogConfidenceScore({
+    confidenceScore: profile.confidenceScore,
+    requirementsCount: requirements.length,
+    topDomains: profile.sources.map((s) => s.publisherDomain).filter(Boolean),
+  });
+  const level = confidenceLevel(evidenceScore);
   const confidenceVariant = level === 'high' ? 'success' : level === 'medium' ? 'warning' : 'error';
+  const iso = displayCountryIso(profile.countryCode);
   const counts = useMemo(() => countRequirementStatuses(requirements), [requirements]);
   const visible = useMemo(
     () => filterRequirements(requirements, query, status),
@@ -109,11 +115,16 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
                 label={displayCountryName(profile.countryCode)}
                 className="text-lg font-semibold text-navy-800"
               />
-              <span className="font-mono text-xs uppercase tracking-wide text-slate-500">{profile.countryCode}</span>
+              {iso && (
+                <span className="font-mono text-xs uppercase tracking-wide text-slate-500">{iso}</span>
+              )}
               {level !== 'unknown' && (
                 <Badge variant={confidenceVariant} size="sm">
-                  Confidence {confidencePercent(score)}%
+                  Confidence {confidencePercent(evidenceScore)}%
                 </Badge>
+              )}
+              {level === 'unknown' && requirements.length === 0 && (
+                <Badge variant="neutral" size="sm">No evidence</Badge>
               )}
             </div>
             <div className="mt-1 text-xs text-slate-500">
