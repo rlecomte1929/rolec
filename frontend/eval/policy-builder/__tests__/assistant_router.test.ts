@@ -15,7 +15,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 // Module mocks — must appear before any import of the mocked modules
 // ---------------------------------------------------------------------------
 
-vi.mock('../../../lib/supabase', () => {
+vi.mock('../../../src/lib/supabase', () => {
   const fromMock = vi.fn();
   return {
     supabase: {
@@ -33,7 +33,7 @@ vi.mock('../topic_classifier', () => ({
     'For other matters, please contact your HR Business Partner directly.',
 }));
 
-vi.mock('../retrieve_policy', () => ({
+vi.mock('../../../src/features/policy-builder/retrieve_policy', () => ({
   retrievePolicy: vi.fn(),
   computeRRF: vi.fn(),
 }));
@@ -58,10 +58,10 @@ import {
   POLICY_MAX_AGE_DAYS,
 } from '../assistant_router';
 import { classifyQuery } from '../topic_classifier';
-import { retrievePolicy } from '../retrieve_policy';
+import { retrievePolicy } from '../../../src/features/policy-builder/retrieve_policy';
 import { checkFaithfulness } from '../faithfulness_checker';
-import { supabase } from '../../../lib/supabase';
-import type { PolicyChunk } from '../retrieve_policy';
+import { supabase } from '../../../src/lib/supabase';
+import type { PolicyChunk } from '../../../src/features/policy-builder/retrieve_policy';
 
 // ---------------------------------------------------------------------------
 // Test fixtures

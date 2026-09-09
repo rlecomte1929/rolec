@@ -14,15 +14,15 @@
  *   - Q21–Q30: Unanswerable — no relevant policy content; must trigger refusal
  *
  * Usage (requires SUPABASE_URL, SUPABASE_ANON_KEY, ANTHROPIC_API_KEY in env):
- *   npx tsx src/features/policy-builder/eval_assistant.ts
- *   npx tsx src/features/policy-builder/eval_assistant.ts --company-id=<id> --tier=Manager
+ *   npx tsx eval/policy-builder/eval_assistant.ts
+ *   npx tsx eval/policy-builder/eval_assistant.ts --company-id=<id> --tier=Manager
  *
  * Output: structured JSON to stdout + human-readable summary to stderr.
  * Exit code 0 = all metrics pass, 1 = one or more metrics fail.
  */
 
-import { retrievePolicy } from './retrieve_policy';
-import type { PolicyChunk } from './retrieve_policy';
+import { retrievePolicy } from '../../src/features/policy-builder/retrieve_policy';
+import type { PolicyChunk } from '../../src/features/policy-builder/retrieve_policy';
 import { checkFaithfulness } from './faithfulness_checker';
 import { generateResponse } from './assistant_router';
 
