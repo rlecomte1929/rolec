@@ -46,7 +46,7 @@ def sql_val(col: str, o: dict) -> str:
 
 
 def main() -> None:
-    records = [json.loads(l) for l in NDJSON.read_text().splitlines() if l.strip()]
+    records = [json.loads(l) for l in NDJSON.read_text(encoding="utf-8").splitlines() if l.strip()]
     sha = hashlib.sha256(NDJSON.read_bytes()).hexdigest()
     rows = []
     for o in records:
@@ -79,7 +79,7 @@ VALUES
 {body}
 ON CONFLICT (id) DO NOTHING;
 """
-    OUT.write_text(header)
+    OUT.write_text(header, encoding="utf-8")
     print(f"wrote {OUT.relative_to(REPO)} ({len(records)} records, sha256 {sha[:12]}...)")
 
 
