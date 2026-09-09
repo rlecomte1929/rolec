@@ -44,3 +44,5 @@ export type { ModalProps } from './Modal';
 export { PageHeader } from './PageHeader';
 export type { Crumb } from './PageHeader';
 export { TableScroll } from './TableScroll';
+export { StatCard } from './StatCard';
+export type { StatCardProps } from './StatCard';
