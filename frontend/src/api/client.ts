@@ -2307,13 +2307,6 @@ export const guidanceAPI = {
   },
 };
 
-export type {
-  PolicyTemplateCategoryOut,
-  PolicyTemplateTierOut,
-  PolicyTemplatesResponse,
-} from './policyBuilderApi';
-export { policyBuilderAPI } from './policyBuilderApi';
-
 export default api;
 
 /**
