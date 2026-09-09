@@ -9,6 +9,7 @@ import {
   type CatalogAttention,
   type CatalogSortKey,
   type CountryListRow,
+  catalogConfidenceScore,
   confidenceLevel,
   confidencePercent,
   displayCountryName,
@@ -41,7 +42,7 @@ function ConfidenceMark({ score }: { score: number | undefined }) {
   const level = confidenceLevel(score);
   const pct = confidencePercent(score);
   if (level === 'unknown') {
-    return <Badge variant="neutral" size="sm">Unknown</Badge>;
+    return <Badge variant="neutral" size="sm">No catalog</Badge>;
   }
   const variant = level === 'high' ? 'success' : level === 'medium' ? 'warning' : 'error';
   const label = level === 'high' ? 'High' : level === 'medium' ? 'Medium' : 'Low';
@@ -247,7 +248,7 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
                     {stale && <Badge variant="warning" size="sm">Needs refresh</Badge>}
                   </div>
                   <RequirementCount count={row.requirementsCount} max={maxRequirements} />
-                  <ConfidenceMark score={row.confidenceScore} />
+                  <ConfidenceMark score={catalogConfidenceScore(row.confidenceScore, row.requirementsCount)} />
                   <DomainChips domains={row.topDomains} />
                   <ChevronRight className="mt-1 h-4 w-4 text-slate-500" aria-hidden="true" />
                 </Button>
@@ -325,7 +326,7 @@ function CountryCard({
           )}
         </div>
         <RequirementCount count={row.requirementsCount} max={max} />
-        <ConfidenceMark score={row.confidenceScore} />
+        <ConfidenceMark score={catalogConfidenceScore(row.confidenceScore, row.requirementsCount)} />
         <DomainChips domains={row.topDomains} />
       </div>
     </Button>

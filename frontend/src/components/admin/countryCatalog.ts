@@ -29,6 +29,19 @@ export function confidenceLevel(score: number | undefined | null): ConfidenceLev
   return 'low';
 }
 
+/**
+ * Profile.confidence_score is a seed placeholder (0.70 / 0.72 / 0.85), not a
+ * measure of catalog quality. An empty destination must not render as High 85%.
+ */
+export function catalogConfidenceScore(
+  score: number | undefined | null,
+  requirementsCount: number,
+): number | undefined {
+  if ((requirementsCount || 0) === 0) return undefined;
+  if (score === undefined || score === null || Number.isNaN(score)) return undefined;
+  return score;
+}
+
 export function isCatalogStale(
   lastUpdatedAt: string | undefined,
   now: Date = new Date(),

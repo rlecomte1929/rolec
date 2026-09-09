@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { CountryTable } from '../CountryTable';
 import type { CountryListDTO } from '../../../types';
 import {
+  catalogConfidenceScore,
   confidenceLevel,
   confidencePercent,
   countRequirementStatuses,
@@ -123,6 +124,8 @@ describe('countryCatalog helpers', () => {
     });
     expect(filterRequirements(grouped.flatMap((g) => g.items), '', 'pending')).toHaveLength(1);
     expect(displayCatalogLabel('THIRD_COUNTRY')).toBe('Third Country');
+    expect(catalogConfidenceScore(0.85, 0)).toBeUndefined();
+    expect(catalogConfidenceScore(0.85, 12)).toBe(0.85);
   });
 });
 
@@ -141,6 +144,13 @@ describe('CountryTable', () => {
     fireEvent.change(screen.getByLabelText('Search country catalogs'), { target: { value: 'norway' } });
     expect(screen.getAllByText('Norway').length).toBeGreaterThan(0);
     expect(screen.queryByText('Germany')).not.toBeInTheDocument();
+  });
+
+  it('does not present a seed confidence percent as catalog quality on empty destinations', () => {
+    render(<CountryTable data={DATA} onSelect={() => undefined} />);
+    expect(screen.getAllByText('No catalog').length).toBeGreaterThan(0);
+    expect(screen.queryByText('20%')).not.toBeInTheDocument();
+    expect(screen.getAllByText('90%').length).toBeGreaterThan(0);
   });
 
   it('filters to empty catalogs when the empty tile is pressed', () => {

@@ -5,6 +5,7 @@ import type { AdminRequirementReview, ReviewStatus } from '../../api/admin';
 import { Card, Button, Badge, CountryFlag, Input } from '../antigravity';
 import {
   type RequirementStatusFilter,
+  catalogConfidenceScore,
   confidenceLevel,
   confidencePercent,
   countRequirementStatuses,
@@ -87,7 +88,8 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<RequirementStatusFilter>('all');
-  const level = confidenceLevel(profile.confidenceScore);
+  const score = catalogConfidenceScore(profile.confidenceScore, requirements.length);
+  const level = confidenceLevel(score);
   const confidenceVariant = level === 'high' ? 'success' : level === 'medium' ? 'warning' : 'error';
   const counts = useMemo(() => countRequirementStatuses(requirements), [requirements]);
   const visible = useMemo(
@@ -110,7 +112,7 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
               <span className="font-mono text-xs uppercase tracking-wide text-slate-500">{profile.countryCode}</span>
               {level !== 'unknown' && (
                 <Badge variant={confidenceVariant} size="sm">
-                  Confidence {confidencePercent(profile.confidenceScore)}%
+                  Confidence {confidencePercent(score)}%
                 </Badge>
               )}
             </div>
