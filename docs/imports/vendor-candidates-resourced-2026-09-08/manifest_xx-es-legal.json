@@ -1,0 +1,89 @@
+{
+  "batch_id": "vendor-resourced-xx-es-legal-2026-09-09",
+  "category": "legal_admin",
+  "city": "Madrid",
+  "total_sourced": 7,
+  "total_rejected": 6,
+  "notes": "abogacia.es census was not directly accessed (bot-walled). All colegiado números were read from: (a) the firm own website team/about pages where the número is published directly, or (b) the APAEM (Asociación Profesional de Abogados de Extranjería de Madrid) member directory at http://apaem.net/asociados/ — an authoritative professional register listing ICAM numbers alongside firm websites. Human vetter should confirm numbers via ICAM register consultation at https://web.icam.es/en/services/register-consultation/. Firms rejected for failing to publish any verifiable colegiado número on their own digital presence.",
+  "firms": [
+    {
+      "name": "PFBernal Abogados (Abogacía Extranjería)",
+      "status": "sourced",
+      "colegiado": "68283",
+      "attorney": "Pedro Fernández Bernal",
+      "source_url": "https://abogaciaextranjeria.es/quienes-somos/"
+    },
+    {
+      "name": "LG Abogado de Extranjería (Lino García)",
+      "status": "sourced",
+      "colegiado": "138891",
+      "attorney": "Lino García Noriega",
+      "source_url": "https://extranjeria.abogado/"
+    },
+    {
+      "name": "MigrationLaw",
+      "status": "sourced",
+      "colegiado": "97778",
+      "attorney": "Carolina Díaz Calderón",
+      "source_url": "https://www.migrationlaw.es/"
+    },
+    {
+      "name": "Iturralde García Abogados",
+      "status": "sourced",
+      "colegiado": "56732",
+      "attorney": "Elena García Cazorla",
+      "source_url": "https://abogadosextranjeria.es/"
+    },
+    {
+      "name": "Lacaci & Delgado Abogados",
+      "status": "sourced",
+      "colegiado": "95851",
+      "attorney": "Carlos Lacaci",
+      "source_url": "http://apaem.net/asociados/"
+    },
+    {
+      "name": "Lexey Abogados",
+      "status": "sourced",
+      "colegiado": "118271",
+      "attorney": "María Yhasir Sandi Rojas",
+      "source_url": "https://lexeyabogados.com/"
+    },
+    {
+      "name": "Ágreda Abogadas",
+      "status": "sourced",
+      "colegiado": "108649",
+      "attorney": "Claudia Ágreda Ramírez",
+      "source_url": "http://apaem.net/asociados/"
+    },
+    {
+      "name": "JD Immigration",
+      "status": "reject",
+      "reason": "no ICAM colegiado número published on website"
+    },
+    {
+      "name": "Sterna Abogados",
+      "status": "reject",
+      "reason": "no ICAM colegiado número published on website"
+    },
+    {
+      "name": "AGM Abogados",
+      "status": "reject",
+      "reason": "no ICAM colegiado número published on attorney profiles"
+    },
+    {
+      "name": "Ceca Magán Abogados",
+      "status": "reject",
+      "reason": "no ICAM colegiado número published on attorney profiles"
+    },
+    {
+      "name": "García de Ceca",
+      "status": "reject",
+      "reason": "no ICAM colegiado número found on firm website"
+    },
+    {
+      "name": "IG Abogados Extranjería",
+      "status": "reject",
+      "reason": "no ICAM colegiado número published on website despite emphasising ICAM membership in content"
+    }
+  ]
+}

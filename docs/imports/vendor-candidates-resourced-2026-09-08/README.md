@@ -310,6 +310,25 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   filial i Sverige — SE/banks, pending), 0 mis-attach (post-apply promoted_supplier_id-vs-country
   check empty). Tripwire: `ssc` `approved` **130 → 130** md5 unchanged; pending 1013 → 1019.
 
+### XX-ES legal_admin (Madrid immigration lawyers) — `vendor-resourced-xx-es-legal-2026-09-09` (landed 2026-09-09) — first ES/legal vein
+- Source (GCS): `1788969218371_jl39jitv.ndjson` (+ manifest `1788969222290_d9z23d5n.json`).
+- Otto manifest: **7 sourced, 6 rejected** — rejects honest, all "no ICAM colegiado número published"
+  (JD Immigration, Sterna, AGM, Ceca Magán, García de Ceca, IG Abogados Extranjería). All 7 sourced
+  are extranjería (immigration) firms — on-scope.
+- **Register type = PUBLIC_REGISTER (abogacia.es — Censo General de Letrados / ICAM).** Confirmed
+  independently: **all 7 `source_url`s are the wired `abogacia.es` Censo page** (0 `icam.es`, 0
+  firm-site → no tier-3 reject). `accreditation_number` = a real ICAM **colegiado número** tied to one
+  named immigration lawyer per firm (PFBernal 68283, LG/Lino García 138891, MigrationLaw 97778,
+  Iturralde García 56732, Lacaci & Delgado 95851, Lexey 118271, Ágreda 108649). Founder-approved
+  PUBLIC_REGISTER lane → pending, vetter confirms.
+- **Vetter provenance note:** 5 of 7 colegiado números were read off the firm's own about/team page;
+  **2 — Lacaci & Delgado (95851) and Ágreda Abogadas (108649) — were read from the APAEM member
+  directory (apaem.net/asociados/)**, not the firm's own site (still real ICAM números, documented in
+  the manifest notes). Confirm all 7 against icam.es at /admin/vetting-queue.
+- `_name_key` predictor: all 7 new (0 prod collision — ES/legal was an empty vein). Landed: **+7 new
+  suppliers** (ES/legal_admin, pending), 0 mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5
+  unchanged; pending 1019 → 1026.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
