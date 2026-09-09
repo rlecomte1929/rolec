@@ -1530,6 +1530,239 @@ SOURCES: Tuple[RegistrySource, ...] = (
         notes="Bank of Latvia (absorbed the FKTK regulator in 2023) — the statutory register of "
               "licensed credit institutions. No per-entity public number; vetter confirms by name.",
     ),
+    # ── Registry-gap wiring 2026-09-09 ──────────────────────────────────────────
+    # The (corridor, category) pairs the vendor re-sourcing brief flagged as having NO wired
+    # register. Each register below was identified AND probed live on 2026-09-09 (per-entity URL
+    # confirmed → HTTP_LISTING/HTTP_LOOKUP with an entry_url_pattern; or a permalink-less statutory
+    # register → PUBLIC_REGISTER tier 2). Banks cap at tier 2 via effective_tier. Everything lands
+    # candidates behind the /admin/vetting-queue human gate. Two honest caveats live in the notes:
+    # ES/housing (RAIN) is a VOLUNTARY regional register, and ES/tax (ICAC ROAC) covers statutory
+    # auditors only. The IT bar register carries a non-commercial-use restriction (notes).
+
+    # Norway (FR-NO) — schools.
+    RegistrySource(
+        name="NSR — Nasjonalt skoleregister (Udir, NO)",
+        base_url="https://nsr.udir.no/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("FR-NO",),
+        categories=("schools",),
+        # /enheter/971845635 — one page per school, keyed on the 9-digit organisasjonsnummer; the
+        # /enheter listing root and ?side=N pages carry no 9-digit id, so they don't match.
+        entry_url_pattern=r"nsr\.udir\.no/enheter/\d{9}",
+        notes="Authoritative national school register run by the Norwegian Directorate for Education "
+              "(Udir), synced daily from Brønnøysund; per-school pages flag 'Godkjent privatskole' "
+              "(approved private school). Tier 2 — confirms the school is state-listed, not an "
+              "accreditation. Verified 2026-09-09 (Oslo International School, org 971845635).",
+    ),
+
+    # Germany (FR-DE) — schools. No national register (Länder competence); each demo state is wired
+    # separately because both expose per-school pages. bildungsserver.de is only a meta-index — NOT used.
+    RegistrySource(
+        name="Schulverzeichnis Berlin (Senatsverwaltung für Bildung)",
+        base_url="https://www.bildung.berlin.de/Schulverzeichnis/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("FR-DE",),
+        categories=("schools",),
+        # Schulportrait.aspx?IDSchulzweig=31353 — one page per school; the SchulListe.aspx index
+        # matches neither, by design.
+        entry_url_pattern=r"Schulportrait\.aspx\?IDSchulzweig=\d+",
+        notes="Official Berlin state school directory (Senatsverwaltung). Enumerable SchulListe.aspx "
+              "index; each school opens a stable Schulportrait page keyed on IDSchulzweig; covers "
+              "public and private/independent schools. Tier 2 (state-listed, not accredited). "
+              "Verified 2026-09-09.",
+    ),
+    RegistrySource(
+        name="Hessische Schuldatenbank (Hessisches Kultusministerium)",
+        base_url="https://schul-db.bildung.hessen.de/schul_db.html",
+        tier=2,
+        acquisition=Acquisition.HTTP_LOOKUP,
+        corridors=("FR-DE",),
+        categories=("schools",),
+        # /schul_db.html/details/?school_no=6055 — stable per-school detail (Dienststellennummer);
+        # discovery is a POST search form, so there is no clean GET listing index (HTTP_LOOKUP).
+        entry_url_pattern=r"schul_db\.html/details/\?school_no=\d+",
+        notes="Authoritative Hesse-wide school database (covers the Frankfurt corridor). Discovery is "
+              "a POST search, but each result is a stable GET detail page keyed on the school_no. "
+              "Tier 2. Verified 2026-09-09 (Schule am Ried, school_no 6055).",
+    ),
+
+    # Spain (XX-ES) — housing/legal/tax/banks. Every register here is a search-form SPA with no
+    # per-entity URL → PUBLIC_REGISTER. Two honest caveats in the notes (RAIN voluntary; ROAC auditors-only).
+    RegistrySource(
+        name="RAIN — Registro de Agentes Inmobiliarios de la Comunidad de Madrid",
+        base_url="https://www.comunidad.madrid/vivienda/registro-agentes-inmobiliarios-rain",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-ES",),
+        categories=("housing_agencies",),
+        notes="CAVEAT: Spain deregulated real-estate agents nationally (RD-Ley 4/2000), so there is no "
+              "national mandatory register. RAIN (Decreto 8/2018) is a PUBLIC but VOLUNTARY regional "
+              "register for agents domiciled in Madrid, published as a flat monthly PDF — it evidences "
+              "registration with the Madrid authority, not a mandatory licence. Best available for the "
+              "Madrid corridor; vetter confirms against the RAIN listing. Verified 2026-09-09.",
+    ),
+    RegistrySource(
+        name="Censo General de Letrados (Consejo General de la Abogacía Española)",
+        base_url="https://censo.abogacia.es/ecensofront/html/homeColegiados.iface",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-ES",),
+        categories=("legal_admin",),
+        notes="National aggregation of every provincial bar's roll of colegiados; colegiación is "
+              "mandatory to practise as an abogado, so this is the authoritative national register. "
+              "Stateful JSF (.iface) search, no per-lawyer URL → PUBLIC_REGISTER; vetter confirms by "
+              "name / número de colegiado. Verified 2026-09-09.",
+    ),
+    RegistrySource(
+        name="ROAC — Registro Oficial de Auditores de Cuentas (ICAC)",
+        base_url="https://www.icac.gob.es/buscador-roac",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-ES",),
+        categories=("tax_finance",),
+        notes="CAVEAT: the ICAC ROAC is the only STATUTORY government register in this category, but it "
+              "covers statutory auditors (auditores de cuentas) only — asesores fiscales / economistas "
+              "are an unregulated profession with no mandatory register (the Consejo General de "
+              "Economistas directory sits behind a Cloudflare bot-wall and could not be verified, so it "
+              "is deliberately NOT wired). A tax vendor that is not a ROAC auditor will still reject — "
+              "honest. Search SPA, no per-entity URL → PUBLIC_REGISTER. Verified 2026-09-09.",
+    ),
+    RegistrySource(
+        name="Registro de Entidades del Banco de España",
+        base_url="https://app.bde.es/rbe_spa/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-ES",),
+        categories=("banks",),
+        notes="Authoritative statutory register of credit institutions supervised by Banco de España / "
+              "ECB. Single-page search, no per-entity URL → PUBLIC_REGISTER. Banks cap at tier 2 "
+              "regardless. Verified 2026-09-09.",
+    ),
+
+    # Sweden (XX-SE) — housing/legal/tax/banks. FMI is search-only (PUBLIC_REGISTER); the Bar, the
+    # auditor inspectorate and FI expose stable per-entity pages (HTTP_LISTING). Revisorsinspektionen
+    # is the one tier-1 register here (a statutory government auditor register).
+    RegistrySource(
+        name="Fastighetsmäklarinspektionen (FMI) — register of estate agents (SE)",
+        base_url="https://fmi.se/soktjanster/sok-maklare/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-SE",),
+        categories=("housing_agencies",),
+        notes="Statutory MANDATORY register — by law every estate/letting agent in Sweden must be "
+              "registered with FMI. Results render as an in-page accordion with no stable per-entity "
+              "URL → PUBLIC_REGISTER; vetter confirms by name/registration. Verified 2026-09-09.",
+    ),
+    RegistrySource(
+        name="Sveriges advokatsamfund — Swedish Bar member register",
+        base_url="https://www.advokatsamfundet.se/Sok-advokat/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("XX-SE",),
+        categories=("legal_admin",),
+        # Kontorsdetaljer?companyid=5615 — one page per member office; the Sokresultat listing is
+        # enumerable. Granularity is per office/firm.
+        entry_url_pattern=r"advokatsamfundet\.se/Sok-advokat/Sokresultat/Kontorsdetaljer/\?companyid=\d+",
+        notes="Recognised national professional-body register; the protected title 'advokat' legally "
+              "requires Bar membership. Enumerable listing with stable per-office pages. Tier 2 "
+              "(membership, entity-level). Verified 2026-09-09.",
+    ),
+    RegistrySource(
+        name="Revisorsinspektionen — Swedish statutory auditor register",
+        base_url="https://www.revisorsinspektionen.se/revisorssok/sokrevisor/",
+        tier=1,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("XX-SE",),
+        categories=("tax_finance",),
+        # /link/<32-hex-guid>.aspx — the canonical per-auditor link (301s to a name-slug page). The
+        # guid form is used deliberately: a slug regex would collide with the register's own sub-pages.
+        entry_url_pattern=r"revisorsinspektionen\.se/link/[0-9a-f]{32}\.aspx",
+        notes="Statutory government register of authorised/approved auditors (a Ministry of Justice "
+              "authority) — tier 1, a genuine accreditation register, fully enumerable with stable "
+              "per-auditor pages. Verified 2026-09-09.",
+    ),
+    RegistrySource(
+        name="Finansinspektionen (FI) — company register (SE)",
+        base_url="https://www.fi.se/en/our-registers/company-register/",
+        tier=2,
+        acquisition=Acquisition.HTTP_LISTING,
+        corridors=("XX-SE",),
+        categories=("banks",),
+        # details?id=1826 — one page per authorised firm; filterable by licence category (banks).
+        entry_url_pattern=r"fi\.se/(?:en/our-registers/company-register|sv/vara-register/foretagsregistret)/details\?id=\d+",
+        notes="Statutory register of firms authorised by FI to offer financial services. Server-rendered "
+              "listing with per-company detail pages. Banks cap at tier 2 regardless. Verified 2026-09-09.",
+    ),
+
+    # Finland (XX-FI) — housing_agencies.
+    RegistrySource(
+        name="Välitysliikerekisteri — FI real-estate & letting agency register (Luova)",
+        base_url="https://vasa.lvv.fi",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-FI",),
+        categories=("housing_agencies",),
+        notes="Statutory MANDATORY register of kiinteistönvälitysliikkeet (LKV) and vuokrahuoneiston "
+              "välitysliikkeet — registration required before operating. Maintained by Lupa- ja "
+              "valvontavirasto (Luova), which took over from AVI on 2026-01-01 (avi.fi pages "
+              "302-redirect to lvv.fi; portal moved to vasa.lvv.fi). Public by law but deliberately "
+              "not fully published (data protection): a y-tunnus-only lookup, no per-entity URL → "
+              "PUBLIC_REGISTER; vetter confirms by y-tunnus. Verified 2026-09-09.",
+    ),
+
+    # Italy (XX-IT) — housing/legal/tax/banks. Every Italian public register is a search-driven app
+    # (Liferay portlet / AJAX / iframe / Angular SPA) with no deep-linkable per-entity URL → all
+    # PUBLIC_REGISTER. The CNF avvocati register carries a non-commercial-use restriction (notes).
+    RegistrySource(
+        name="Registro Imprese / REA — Camere di Commercio (IT)",
+        base_url="https://www.registroimprese.it/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-IT",),
+        categories=("housing_agencies",),
+        notes="Official national business register of the Italian Chambers of Commerce; real-estate "
+              "mediators (ex-ruolo agenti immobiliari) are registered here under ATECO 68.31.00. Free "
+              "search shows name/address/ATECO/PEC; full anagrafica is behind login/paid visura and "
+              "detail URLs are session-bound → PUBLIC_REGISTER; vetter confirms by Numero REA. "
+              "Verified 2026-09-09.",
+    ),
+    RegistrySource(
+        name="Albo Unico Nazionale degli Avvocati (Consiglio Nazionale Forense)",
+        base_url="https://www.consiglionazionaleforense.it/ricerca-avvocati",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-IT",),
+        categories=("legal_admin",),
+        notes="Statutory national bar register (Sistema Informativo Centrale, L. 247/2012). AJAX search, "
+              "profile expands in-page → PUBLIC_REGISTER; vetter confirms on the roll. CAVEAT: the "
+              "register page carries an explicit copyright / personal-non-commercial-use restriction — "
+              "cite it for provenance verification only, never bulk-scrape or reuse for marketing. "
+              "Verified 2026-09-09.",
+    ),
+    RegistrySource(
+        name="Albo Unico Nazionale dei Dottori Commercialisti (CNDCEC)",
+        base_url="https://commercialisti.it/albo-nazionale/ricerca-iscritti/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-IT",),
+        categories=("tax_finance",),
+        notes="Statutory national register (Albo Unico) of dottori commercialisti ed esperti contabili, "
+              "populated by the territorial Ordini. Iframe-embedded AJAX search, results render inline "
+              "→ PUBLIC_REGISTER; vetter confirms by name + Ordine. Verified 2026-09-09.",
+    ),
+    RegistrySource(
+        name="Albo delle banche — Banca d'Italia (GIAVA)",
+        base_url="https://infostat.bancaditalia.it/GIAVAInquiry-public/ng/banche",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("XX-IT",),
+        categories=("banks",),
+        notes="Official supervisory register of the regulator (Banca d'Italia). Angular SPA whose detail "
+              "views carry no entity id in the URL → PUBLIC_REGISTER; vetter confirms by Codice "
+              "Meccanografico. Banks cap at tier 2 regardless. Verified 2026-09-09.",
+    ),
 )
 
 
