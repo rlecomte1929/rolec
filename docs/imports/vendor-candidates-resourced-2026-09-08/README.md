@@ -348,6 +348,22 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   supplier). Landed: **+4 new suppliers** (IT/housing_agencies, pending), 0 mis-attach. Tripwire: `ssc`
   `approved` **130 → 130** md5 unchanged; pending 1026 → 1030.
 
+### XX-IT housing_agencies (Milan real-estate agencies) — `vendor-resourced-xx-it-housing-milan-2026-09-09` (landed 2026-09-09)
+- Source (GCS): `1788982852398_bbu6oi1w.ndjson` (+ manifest `1788982853189_mnk7p34y.json`).
+- Otto manifest: **5 sourced, 8 rejected** — honest rejects: no self-published REA (Milano Relocation,
+  Milanhouses, RossoMattone), national coordinator not a Milan agenzia (Impatria), UK-registered (Casa
+  Londra), Engel & Voelkers (only P.IVA self-published), Bonola (no MI- prefix). Notably **Habitare
+  Service was REJECTED** — its REA MI-1928391 exists on a third-party billing site but is NOT
+  self-published on its own site → correctly rejected per the firm-published rule (no fabrication).
+- **PUBLIC_REGISTER (registroimprese.it / REA).** All 5 `source_url`s = wired `registroimprese.it`
+  (0 firm-site). All 5 REA numbers are province **MI** (Otto respected the MI hint): Housy Milano/Up-Town
+  MI-2106000, Mihouz/Andreoni MI-2719490, Wolf and Wolf MI-2052329, Smith Agency MI-2027818, Welcome
+  Home/Sforza MI-1945017.
+- Same vetter note as Rome: registroimprese.it captcha-walled → REA read off each firm's own site →
+  vetter confirms against the live register.
+- `_name_key` predictor: all 5 new. Landed: **+5 new suppliers** (IT/housing_agencies, pending), 0
+  mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5 unchanged; pending 1030 → 1035.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
