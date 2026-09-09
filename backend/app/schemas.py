@@ -282,6 +282,82 @@ class CaseRequirementsDTO(BaseModel):
     covered: bool = True
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Document Data Sheet (Phase 1) — one composed, corridor-agnostic read-model of
+# the case's data sheet: steps → fields → value + provenance. Deterministic; no
+# LLM on the serve path. See docs/specs/agnostic-datasheet-and-form-fill.md.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DataSheetDeadlineDTO(BaseModel):
+    date: Optional[str] = None
+    isSuggested: bool = False
+    isHard: bool = False
+
+
+class DataSheetFieldDTO(BaseModel):
+    # The governed fact this field references (fact_dictionary). None when the seed does not
+    # yet know the field — the field still renders from its own attributes.
+    factKey: Optional[str] = None
+    label: str
+    category: Optional[str] = None
+    # Where the value came from, exactly one of:
+    #   intake | passport_ocr | prior_form | needs_input | consult_professional | ai
+    # `consult_professional` is the firewall: value is ALWAYS null and only `guidance` renders.
+    source: str
+    value: Optional[str] = None
+    confidence: Optional[float] = None
+    # Prompt for a `needs_input` field.
+    hint: Optional[str] = None
+    # Referral text for a `consult_professional` field (never a value).
+    guidance: Optional[str] = None
+    requiresOriginal: bool = False
+    # HR-view only: what the employer must do for this field.
+    employerActionNote: Optional[str] = None
+
+
+class DataSheetSectionDTO(BaseModel):
+    stepId: str
+    title: Optional[str] = None
+    authority: Optional[str] = None
+    sourceUrl: Optional[str] = None
+    processNote: Optional[str] = None
+    channels: List[str] = []
+    order: int
+    # HR-view annotations (best-effort, from the corridor step-graph).
+    responsibleParty: Optional[str] = None
+    slaNote: Optional[str] = None
+    deadline: Optional[DataSheetDeadlineDTO] = None
+    fields: List[DataSheetFieldDTO] = []
+
+
+class DataSheetBannerDTO(BaseModel):
+    # 'moat-fact' (a non-obvious trap) or 'warning' (a hard deadline).
+    type: str
+    text: str
+
+
+class DataSheetConsultDTO(BaseModel):
+    topic: str
+    reason: Optional[str] = None
+
+
+class DataSheetDTO(BaseModel):
+    caseRef: str
+    employeeName: Optional[str] = None
+    corridor: Optional[str] = None
+    corridorLabel: Optional[str] = None
+    movementBasis: Optional[str] = None
+    generatedAt: datetime
+    completionPct: int = 0
+    needsInputCount: int = 0
+    banners: List[DataSheetBannerDTO] = []
+    sections: List[DataSheetSectionDTO] = []
+    consultProfessional: List[DataSheetConsultDTO] = []
+    # False when the case has no data-sheet form yet — the UI says "not available yet",
+    # never renders an empty sheet as "nothing to do" (mirrors CaseRequirementsDTO.covered).
+    covered: bool = True
+
+
 class AssignmentType(str, Enum):
     LONG_TERM = "long_term"
     SHORT_TERM = "short_term"
