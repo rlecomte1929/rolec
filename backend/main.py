@@ -135,6 +135,7 @@ from .app.services.events_tracker import track as track_event  # FOUNDATION-1C
 from .app.routers import auth as auth_router
 from .app.routers import cases as cases_router  # noqa: F401 — kept for backwards-compat re-exports; router itself no longer wired (AUDIT-B9-cases-6)
 from .app.routers import cases_read as cases_read_router
+from .app.routers import data_sheet as data_sheet_router  # [DataSheet P1] dual-layer registration — GET /api/cases/{id}/datasheet
 from .app.routers import case_requirement_checklist as case_requirement_checklist_router
 from .app.routers import case_integrations as case_integrations_router
 from .app.routers import cases_write as cases_write_router
@@ -193,7 +194,6 @@ from .app.routers import crons as crons_router  # [P4-4]
 from .app.routers import mobility_context as mobility_context_router
 from .app.routers import admin_mobility as admin_mobility_router
 from .app.routers import policy_canonical as policy_canonical_router
-from .app.routers import policy_templates as policy_templates_router
 from .app.routers import hr_coordination as hr_coordination_router
 from .app.routers import prescreening as prescreening_router
 from .app.routers import integrations_personio_webhook as personio_webhook_router
@@ -811,6 +811,7 @@ app.include_router(auth_router.router)  # [AUDIT-C2.3] re-added — auth routes 
 app.include_router(compat_router.router)
 app.include_router(case_requirement_checklist_router.router)
 app.include_router(cases_read_router.router)  # [AUDIT-B9-cases-6] split 1/3 — 20 GET handlers (formerly cases.router)
+app.include_router(data_sheet_router.router)  # [DataSheet P1] composed case data sheet read-model — GET /api/cases/{id}/datasheet
 app.include_router(case_integrations_router.router)  # I-4 — email plan + calendar .ics
 app.include_router(cases_write_router.router)  # [AUDIT-B9-cases-6] split 2/3 — 14 POST/PATCH/PUT mutation handlers
 app.include_router(case_documents_router.router)  # [DOCFLOW P1] case-scoped document upload/status
@@ -937,7 +938,6 @@ app.include_router(admin_form_templates_router.router, prefix="/api/admin")
 app.include_router(admin_recommendations_debug_router, prefix="/api/admin")  # [AUDIT-C2.3 restore]
 app.include_router(policy_canonical_router.admin_router, prefix="/api/admin")  # [AUDIT-C2.3 restore]
 app.include_router(policy_canonical_router.read_router, prefix="/api")  # [AUDIT-C2.3 restore]
-app.include_router(policy_templates_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(suppliers_router.router)
 app.include_router(resources_router.router)
 app.include_router(hr_resources_router.router)

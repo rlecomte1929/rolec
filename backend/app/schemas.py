@@ -234,10 +234,25 @@ class AdminRequirementReviewDTO(BaseModel):
     attestedAt: Optional[datetime] = None
 
 
+class KnowledgeScorecardDTO(BaseModel):
+    """Catalog sufficiency for one destination. Not a McKinsey index; bars live in the scorer."""
+
+    approvedCount: int
+    pendingCount: int
+    rejectedCount: int = 0
+    citationResolvedApproved: int
+    citationResolvePct: float
+    pillarsPresent: List[str] = []
+    lastHumanReviewAt: Optional[datetime] = None
+    catalogReady: bool
+    notReadyReason: Optional[str] = None
+
+
 class AdminRequirementListDTO(BaseModel):
     countryCode: str
     pendingCount: int = 0
     items: List[AdminRequirementReviewDTO] = []
+    scorecard: Optional[KnowledgeScorecardDTO] = None
 
 
 class AdminRequirementReviewRequest(BaseModel):
@@ -250,6 +265,8 @@ class CountryListItemDTO(BaseModel):
     requirementsCount: int
     confidenceScore: Optional[float] = None
     topDomains: List[str]
+    catalogReady: Optional[bool] = None
+    notReadyReason: Optional[str] = None
 
 
 class CountryListDTO(BaseModel):
@@ -280,6 +297,91 @@ class CaseRequirementsDTO(BaseModel):
     # that country, NOT because nothing is required. Lets the UI say so instead
     # of rendering an empty list as "nothing required" (the AIQ-1349 silent-miss).
     covered: bool = True
+    # Sufficiency of the destination catalog (approved + cited + multi-pillar).
+    # Distinct from `covered` (unknown destination / empty approved set).
+    catalogReady: Optional[bool] = None
+    catalogNotReadyReason: Optional[str] = None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Document Data Sheet (Phase 1) — one composed, corridor-agnostic read-model of
+# the case's data sheet: steps → fields → value + provenance. Deterministic; no
+# LLM on the serve path. See docs/specs/agnostic-datasheet-and-form-fill.md.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DataSheetDeadlineDTO(BaseModel):
+    date: Optional[str] = None
+    isSuggested: bool = False
+    isHard: bool = False
+
+
+class DataSheetFieldDTO(BaseModel):
+    # The template field id — the address the edit endpoint (PATCH .../fields/{fieldId}) keys on.
+    fieldId: str
+    # The governed fact this field references (fact_dictionary). None when the seed does not
+    # yet know the field — the field still renders from its own attributes.
+    factKey: Optional[str] = None
+    label: str
+    category: Optional[str] = None
+    # Where the value came from, exactly one of:
+    #   intake | passport_ocr | prior_form | needs_input | consult_professional | ai
+    # `consult_professional` is the firewall: value is ALWAYS null and only `guidance` renders.
+    source: str
+    value: Optional[str] = None
+    confidence: Optional[float] = None
+    # Prompt for a `needs_input` field.
+    hint: Optional[str] = None
+    # Referral text for a `consult_professional` field (never a value).
+    guidance: Optional[str] = None
+    requiresOriginal: bool = False
+    # HR-view only: what the employer must do for this field.
+    employerActionNote: Optional[str] = None
+
+
+class DataSheetSectionDTO(BaseModel):
+    stepId: str
+    title: Optional[str] = None
+    authority: Optional[str] = None
+    sourceUrl: Optional[str] = None
+    processNote: Optional[str] = None
+    channels: List[str] = []
+    order: int
+    # HR-view annotations (best-effort, from the corridor step-graph).
+    responsibleParty: Optional[str] = None
+    slaNote: Optional[str] = None
+    deadline: Optional[DataSheetDeadlineDTO] = None
+    fields: List[DataSheetFieldDTO] = []
+
+
+class DataSheetBannerDTO(BaseModel):
+    # 'moat-fact' (a non-obvious trap) or 'warning' (a hard deadline).
+    type: str
+    text: str
+
+
+class DataSheetConsultDTO(BaseModel):
+    topic: str
+    reason: Optional[str] = None
+
+
+class DataSheetDTO(BaseModel):
+    caseRef: str
+    employeeName: Optional[str] = None
+    corridor: Optional[str] = None
+    corridorLabel: Optional[str] = None
+    movementBasis: Optional[str] = None
+    generatedAt: datetime
+    completionPct: int = 0
+    needsInputCount: int = 0
+    banners: List[DataSheetBannerDTO] = []
+    sections: List[DataSheetSectionDTO] = []
+    consultProfessional: List[DataSheetConsultDTO] = []
+    # False when the case has no data-sheet form yet — the UI says "not available yet",
+    # never renders an empty sheet as "nothing to do" (mirrors CaseRequirementsDTO.covered).
+    covered: bool = True
+    # True when the sheet is rendered from curated corridor-content rather than an authored,
+    # fillable template — a read-only guidance preview (no per-field value can be captured yet).
+    preview: bool = False
 
 
 class AssignmentType(str, Enum):

@@ -20,6 +20,7 @@ from ..services.country_catalog_display import (
 )
 from ..services.research import run_country_research
 from ..services import requirements_builder
+from ..services.knowledge_layer_scorecard import score_requirement_rows
 from ..services.official_ingest_service import ingest_url_to_knowledge_doc
 from ..services import verification_guard
 from ..services import lawyer_review_gate
@@ -103,6 +104,11 @@ def _catalog_evidence(db, country_code: str):
     return sources, requirements
 
 
+def _scorecard_dto(requirements, sources) -> schemas.KnowledgeScorecardDTO:
+    card = score_requirement_rows(requirements, {record.id: record for record in sources})
+    return schemas.KnowledgeScorecardDTO.model_validate(card.as_dict())
+
+
 @router.get("/countries", response_model=schemas.CountryListDTO)
 def list_countries(user: dict = Depends(require_admin)):
     with SessionLocal() as db:
@@ -110,6 +116,7 @@ def list_countries(user: dict = Depends(require_admin)):
         items = []
         for profile in profiles:
             sources, requirements = _catalog_evidence(db, profile.country_code)
+            scorecard = _scorecard_dto(requirements, sources)
             items.append(
                 schemas.CountryListItemDTO(
                     countryCode=profile.country_code,
@@ -121,6 +128,8 @@ def list_countries(user: dict = Depends(require_admin)):
                         len(sources),
                     ),
                     topDomains=unique_domains(source.publisher_domain for source in sources),
+                    catalogReady=scorecard.catalogReady,
+                    notReadyReason=scorecard.notReadyReason,
                 )
             )
         return schemas.CountryListDTO(countries=items)
@@ -265,12 +274,14 @@ def list_country_requirements(country_code: str, user: dict = Depends(require_ad
         # across six countries, and the reviewer would have no link to check.
         source_map = {record.id: record for record in crud.list_sources(db, code)}
         dtos = [_review_dto(i, source_map) for i in items]
+        scorecard = _scorecard_dto(items, source_map.values())
     order = {"pending": 0, "rejected": 1, "approved": 2}
     dtos.sort(key=lambda d: (order.get(d.reviewStatus, 9), d.purpose, d.title))
     return schemas.AdminRequirementListDTO(
         countryCode=code,
         pendingCount=sum(1 for d in dtos if d.reviewStatus == "pending"),
         items=dtos,
+        scorecard=scorecard,
     )
 
 

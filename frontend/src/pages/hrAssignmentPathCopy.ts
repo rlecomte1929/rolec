@@ -20,8 +20,12 @@ export function pathTileSubtitle(input: {
   requirementCount: number;
   /** Empty only when neither intake nor the canonical case row knows the destination. */
   destination: string;
+  catalogReady?: boolean | null;
 }): string {
-  const { permitLabel, requirementCount, destination } = input;
+  const { permitLabel, requirementCount, destination, catalogReady } = input;
+  if (catalogReady === false) {
+    return 'This corridor is not ready — the catalog is still under review.';
+  }
   if (permitLabel) return 'Indicative — confirm with the relevant authority.';
   if (requirementCount > 0) {
     const noun = requirementCount === 1 ? 'requirement' : 'requirements';

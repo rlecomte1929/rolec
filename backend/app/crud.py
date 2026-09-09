@@ -261,7 +261,11 @@ def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.Requ
     if existing:
         return _apply_requirement_item_update(db, existing, payload)
 
-    inserted = _insert_requirement_item_ignore_conflict(db, payload)
+    insert_payload = dict(payload)
+    # Catalog rows default to 'approved' in the ORM/server default. Automated inserts
+    # (Otto, research stub, YAML that omitted the column) must wait for a human.
+    insert_payload.setdefault("review_status", "pending")
+    inserted = _insert_requirement_item_ignore_conflict(db, insert_payload)
     db.commit()
     if inserted:
         item = _find_requirement_item(db, payload)

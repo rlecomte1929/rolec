@@ -48,8 +48,7 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("finanstilsynet.no",     "Finanstilsynet — estate agency register (NO)"),
     ("bafin.de",              "BaFin institute register (DE)"),
     ("advokatforeningen.no",  "Advokatforeningen + Brønnøysund register (NO)"),
-    ("advokatguiden.no",      "Advokatforeningen + Brønnøysund register (NO)"),
-    ("brreg.no",              "Advokatforeningen + Brønnøysund register (NO)"),
+    ("brreg.no",              "Brønnøysund Enhetsregisteret (NO)"),
     ("eura-relocation.com",   "EuRA member directory"),
     # NOTE: blkr-berlin.de was listed here as the "Rechtsanwaltskammer (RAK)" until 2026-08-12.
     # It is the LAW FIRM'S OWN WEBSITE (BLKR Rechtsanwält*innen, Berlin — verified by fetching
