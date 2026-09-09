@@ -235,6 +235,32 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   Deutsche Bank S.p.A., BNL — IT/banks, pending). Tripwire: `ssc` `approved` **130 → 130** md5
   unchanged; pending 993 → 1000.
 
+### XX-DE schools (Berlin) — `vendor-resourced-xx-de-schools-2026-09-09` (landed 2026-09-09)
+- Source (GCS): `1788962235856_iwvdtr4c.ndjson` (+ manifest `1788962239364_gjn08ir3.json`).
+- Otto manifest: **8 sourced, 2 rejected** — rejects honest: BBIS (campus in Kleinmachnow/Brandenburg,
+  not Berlin), SIS Swiss (only a Kita/daycare registration, no school Schulnummer).
+- **Register type = per-entity, SERVER-RENDERED (Berlin Schulportrait).** Each `source_url` is the
+  official `bildung.berlin.de/schulverzeichnis/Schulportrait.aspx?IDSchulzweig=…` per-entity page, and
+  `accreditation_number` is the público Berlin Schulnummer. Unlike the NSR SPA, these render
+  server-side — independently verified all 8 by direct curl: HTTP 200, each page contains its own
+  school name AND its own Schulnummer (JFK 06K01, Metropolitan 01E34, Kant/Berlin International 04P42,
+  British-Sekundarschule 04P40, British-Grundschule 04P39, Phorms Berlin Mitte 01P18, Cosmopolitan
+  01P22, Berlin Bilingual 02P11).
+- `_name_key` predictor: all 7 distinct keys are new (0 prod collision — the existing DE schools are
+  all Munich/Frankfurt, so "Berlin Metropolitan School" ≠ "Metropolitan School Frankfurt" and "Phorms
+  Berlin Mitte" ≠ "Phorms Schule München"; different domains).
+- **Berlin British School folded to one supplier (by design).** Its two registered units — Integrierte
+  Sekundarschule (04P40) and Grundschule (04P39) — share one website (`berlinbritishschool.de`) and one
+  `_name_key`, so the second was website-deduped at stage and capability-deduped at promote
+  ("Duplicate capability: same service/coverage/country/city"). Result: ONE "Berlin British School
+  (Integrierte Sekundarschule)" supplier — the right catalog unit (a family enrols at the institution,
+  not one campus). The Grundschule's Schulnummer 04P39 is preserved in the committed NDJSON; the vetter
+  can note both units / tidy the supplier name.
+- Landed: **+7 new suppliers** (JFK, Berlin Metropolitan, Kant/Berlin International, Berlin British
+  School, Phorms Berlin Mitte, Berlin Cosmopolitan, Berlin Bilingual — DE/schools, pending) — the first
+  Berlin coverage. Tripwire: `ssc` `approved` **130 → 130** md5 unchanged; pending 1000 → 1007.
+- Scope caveat (as with Oslo): country-scoped (DE) though schools are city-local — vetter reconciles.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
