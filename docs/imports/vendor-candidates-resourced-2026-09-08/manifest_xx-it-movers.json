@@ -1,0 +1,82 @@
+{
+  "batch_id": "vendor-resourced-xx-it-movers-2026-09-09",
+  "category": "movers",
+  "city": "Milan",
+  "total_sourced": 3,
+  "total_rejected": 11,
+  "firms": [
+    {
+      "name": "Franzosini International Movers",
+      "status": "sourced",
+      "register": "FIDI",
+      "source_url": "https://www.fidi.org/find-fidi-affiliate/franzosini-international-movers"
+    },
+    {
+      "name": "Bolliger S.p.A.",
+      "status": "sourced",
+      "register": "FIDI",
+      "source_url": "https://www.fidi.org/find-fidi-affiliate/bolliger-spa"
+    },
+    {
+      "name": "FERCAM Removals & Relocation",
+      "status": "sourced",
+      "register": "FIDI",
+      "source_url": "https://www.fidi.org/find-fidi-affiliate/fercam-removals-relocation"
+    },
+    {
+      "name": "V&S by FERCAM",
+      "status": "reject",
+      "reason": "Post-acquisition absorbed entity — FIDI page /vs-fercam now shows the same legal entity, address (Vignate MI), and phone (+39 02 92958950) as FERCAM Removals & Relocation; not a distinct firm"
+    },
+    {
+      "name": "Giovaruscio Moving Group",
+      "status": "reject",
+      "reason": "FIDI-registered address is Rome, Italy — not Milan metro"
+    },
+    {
+      "name": "Bliss Moving & Logistics S.R.L.",
+      "status": "reject",
+      "reason": "FIDI-registered address is Palestrina (Rome) — not Milan metro"
+    },
+    {
+      "name": "Bolliger Roma S.p.A.",
+      "status": "reject",
+      "reason": "FIDI-registered address is Rome, Italy — not Milan metro"
+    },
+    {
+      "name": "Gosselin Mobility Italy S.R.L.",
+      "status": "reject",
+      "reason": "FIDI-registered address is Rome, Italy — not Milan metro"
+    },
+    {
+      "name": "Franzosini International Movers – Naples branch",
+      "status": "reject",
+      "reason": "Separate FIDI listing (/franzosini-international-movers-1) — registered address is Naples, not Milan metro"
+    },
+    {
+      "name": "ARTS SERVICES (American Relocation & Services)",
+      "status": "reject",
+      "reason": "EuRA Milan address confirmed but company is a relocation/immigration/tax consulting DSP — not a removal mover; per strict rules EuRA Household Goods Movement tag alone is insufficient when primary business is DSP/RMC"
+    },
+    {
+      "name": "BLISS Relocation",
+      "status": "reject",
+      "reason": "EuRA-registered address is Palestrina (Rome) — not Milan metro"
+    },
+    {
+      "name": "Vinelli & Scotto (EuRA listing)",
+      "status": "reject",
+      "reason": "EuRA-registered address is Turin (TO), Italy — not Milan metro"
+    },
+    {
+      "name": "Eres Relocation Italy",
+      "status": "reject",
+      "reason": "EuRA category is DSP/Visa & Immigration only — not a removal mover"
+    },
+    {
+      "name": "Italy Furniture Rental S.R.L.",
+      "status": "reject",
+      "reason": "Not a removal mover; furniture rental service — EuRA member page returned 403, category from search results indicates furniture rental"
+    }
+  ]
+}

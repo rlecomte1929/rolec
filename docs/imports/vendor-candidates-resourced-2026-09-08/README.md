@@ -126,6 +126,35 @@ as they arrive. Each sub-batch is landed with the append-only tripwire verified
   Sweden, SBK Moving ×2). Milan (XX-IT) is the one remaining movers batch likely to be genuinely
   new; the higher-yield remaining work is the still-unlanded non-movers register pairs from #2191.
 
+### XX-IT movers (Milan) — `vendor-resourced-xx-it-movers-2026-09-09` (processed 2026-09-09)
+- Source (GCS): `1788946859759_d8gou8ty.ndjson` (+ manifest `1788946909025_n351lk78.json`).
+- Otto manifest: **3 sourced, 11 rejected** — sharp, honest rejects: V&S-by-FERCAM (post-acquisition
+  absorbed entity, same Vignate address/phone as FERCAM), four Rome-metro firms (Giovaruscio, Bliss,
+  Bolliger Roma, Gosselin), the Franzosini **Naples** branch (separate slug `-1`), + EuRA
+  DSP/furniture-rental. Good dedup discipline.
+- **Independently re-verified 2026-09-09**: all 3 `source_url`s are FIDI per-entity pages, HTTP 200,
+  own firm only (contamination 6/7/6, diagonal), Milan-metro confirmed on the page body — Franzosini
+  `20008 INVERUNO` + `franzosini.milano@franzosini.it`, Bolliger `MILAN` + `bolliger@bolligermilano.com`,
+  FERCAM `MILAN` — zero Rome/Naples signals, phones match the NDJSON. Correctly the Milan entities,
+  not the rejected Rome/Naples siblings.
+- **NO new supplier landed — 100% duplicate.** All 3 already in prod as XX-IT/movers suppliers +
+  candidates from the 2026-08-31 landing, under their legal-entity names (`FMN LOGISTICS S.R.L.
+  (Franzosini International Movers)`, `BOLLIGER S.P.A.`, `FERCAM S.P.A. (Fercam Removals & Relocation)`),
+  deduped by website. Dry-run: read 3, **staged 0**, 0 duplicates, 0 rejected. No prod write.
+  Re-sourced FIDI evidence preserved in the committed NDJSON.
+- Tripwire: no write, `ssc` `approved` **130 → 130** unchanged (pending 984).
+
+## Run finding — the movers lane is largely exhausted
+
+Prod already holds `movers` capabilities for **~60 countries**, the bulk landed **2026-08-31** in a
+global movers pass. This re-sourcing run (re-sourcing the 235 tier-3 rejects) added NEW movers only
+for **Dublin (IE, +2 — Irish Relo, Get Cracking)**. Copenhagen (DK), Helsinki (FI) and Milan (IT)
+were each verified-correct but **already in prod**; Stockholm (SE) was skipped as a known dup. So the
+per-city movers batches are hitting a catalog that is already comprehensive except for fresh-market
+gaps (IE was the one this run). **The remaining real yield is the non-movers register pairs**
+(schools / legal / tax / banks / housing) wired in #2191, which are entirely unlanded — the pivot now
+underway (first batch: SE legal via advokatsamfundet per-entity pages).
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
