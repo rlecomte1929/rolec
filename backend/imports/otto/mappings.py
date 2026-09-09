@@ -240,27 +240,58 @@ def _citations_for(facts: Sequence[Any], topic: str) -> List[Dict[str, Any]]:
     A URL cited by several facts yields ONE citation, flagged if ANY of those facts is
     flagged — dropping the flag because a second, unflagged fact shares the source would
     lose it silently.
+
+    Extra URLs ride on `applies_to.additional_citations` (list of `{url, name?}`) when one
+    fact must cite two already-published sources without inventing a second empty `fact_text`
+    the parser would reject. Used by the composed Ireland permit-then-visa lead-time fact.
     """
     ordered: List[Dict[str, Any]] = []
     by_url: Dict[str, Dict[str, Any]] = {}
-    for fact in facts:
-        url = (fact.source_url or "").strip()
-        if not url:
-            continue
-        meta = fact.applies_to or {}
+
+    def _add(url: str, *, name: str = "", corridor: str = "", flagged: bool = False) -> None:
         citation = by_url.get(url)
         if citation is None:
             citation = {"url": url, "topic_key": topic}
-            name = str(meta.get("source_name") or "").strip()
             if name:
                 citation["name"] = name
-            corridor = str(meta.get("corridor") or "").strip()
             if corridor:
                 citation["corridor"] = corridor
             by_url[url] = citation
             ordered.append(citation)
-        if meta.get("needs_lawyer_review"):
+        elif name and not citation.get("name"):
+            citation["name"] = name
+        if flagged:
             citation["needs_lawyer_review"] = True
+
+    for fact in facts:
+        meta = fact.applies_to or {}
+        corridor = str(meta.get("corridor") or "").strip()
+        flagged = bool(meta.get("needs_lawyer_review"))
+        url = (fact.source_url or "").strip()
+        if url:
+            _add(
+                url,
+                name=str(meta.get("source_name") or "").strip(),
+                corridor=corridor,
+                flagged=flagged,
+            )
+        extras = meta.get("additional_citations") or []
+        if isinstance(extras, dict):
+            extras = [extras]
+        for extra in extras:
+            if not isinstance(extra, dict):
+                continue
+            extra_url = str(extra.get("url") or "").strip()
+            if not extra_url:
+                continue
+            extra_name = str(extra.get("name") or "").strip()
+            extra_corridor = str(extra.get("corridor") or corridor).strip()
+            _add(
+                extra_url,
+                name=extra_name,
+                corridor=extra_corridor,
+                flagged=flagged or bool(extra.get("needs_lawyer_review")),
+            )
     return ordered
 
 
