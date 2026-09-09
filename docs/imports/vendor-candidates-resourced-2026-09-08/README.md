@@ -105,6 +105,27 @@ as they arrive. Each sub-batch is landed with the append-only tripwire verified
   `alfa-mobility-0`, Denmark `alfa-mobility`, + a generic `ALFA MOBILITY`), so the queued
   **Helsinki (XX-FI)** and **Stockholm (XX-SE)** batches will likely also hit Alfa duplicates.
 
+### XX-FI movers (Helsinki) — `vendor-resourced-xx-fi-movers-2026-09-09` (processed 2026-09-09)
+- Source (GCS): `1788945768426_eisbb6f0.ndjson` (+ manifest `1788945793441_oqvjw2o8.json`).
+- Otto manifest: **4 sourced, 4 rejected** — rejects honest: 4 EuRA advisory/DSP firms with zero
+  Household Goods Movement tag (Finland Relocation Services, KEY Relocation Finland, KPMG Oy Ab,
+  Vialto Partners) — not removal movers.
+- **Independently re-verified 2026-09-09**: all 4 `source_url`s are FIDI per-entity pages, HTTP 200,
+  firm named, clean cross-contamination matrix (Travelcargo 5 / Niemi 9 / Victor Ek 4 / Alfa 4 —
+  diagonal only), all Finland/Helsinki. Alfa Finland uses slug `alfa-mobility-4` (distinct from DK
+  `alfa-mobility` / NO `-5` / SE `-0`).
+- **NO new supplier landed — 100% duplicate.** All 4 firms are already in prod as XX-FI/movers
+  candidates + suppliers (Travelcargo, Niemi, Victor Ek by name; Alfa Finland deduped by website
+  `alfamoving.com` against the existing XX-FI Alfa) from the 2026-08-31 Nordic landing. Dry-run:
+  read 4, **staged 0**, 0 duplicates, 0 rejected. No prod write. Re-sourced FIDI evidence preserved
+  in the committed NDJSON.
+- Tripwire: no write, `ssc` `approved` **130 → 130** unchanged (pending 984).
+- **Nordic coverage finding:** the 2026-08-31 landing already populated movers capabilities for
+  DK (3), FI (4), SE (3) — plus NO (10). That is why Copenhagen AND Helsinki both returned 0-new,
+  and why **Stockholm (XX-SE) is a near-certain duplicate** (3 XX-SE candidates already staged: Alfa
+  Sweden, SBK Moving ×2). Milan (XX-IT) is the one remaining movers batch likely to be genuinely
+  new; the higher-yield remaining work is the still-unlanded non-movers register pairs from #2191.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
