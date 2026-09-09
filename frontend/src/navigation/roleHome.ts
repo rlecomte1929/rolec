@@ -16,7 +16,7 @@ export function roleHomePath(role?: string | null): string {
     case 'HR':
       return ROUTE_DEFS.hrDashboard.path;
     case 'ADMIN':
-      return ROUTE_DEFS.adminOverview.path;
+      return ROUTE_DEFS.adminConsole.path;
     default:
       return ROUTE_DEFS.landing.path;
   }
