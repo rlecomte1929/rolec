@@ -14,7 +14,7 @@ import json
 import logging
 import uuid
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from ..db_config import DATABASE_URL as _raw_url
 
@@ -269,6 +269,62 @@ class AuditMixin:
                 "WHERE assignment_id = :aid ORDER BY created_at DESC LIMIT 1"
             ), {"aid": assignment_id}).fetchone()
         return json.loads(row._mapping["report_json"]) if row else None
+
+    def get_latest_compliance_reports_by_assignment_ids(
+        self, assignment_ids: Optional[List[str]]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Latest compliance_reports.report_json per assignment_id (one SELECT).
+
+        Same pick as :meth:`get_latest_compliance_report` (ORDER BY created_at DESC).
+        Used by GET /api/hr/assignments so the list does not N+1 the reports table.
+        """
+        ids: List[str] = []
+        seen: set[str] = set()
+        for raw in assignment_ids or []:
+            if raw is None:
+                continue
+            aid = str(raw).strip()
+            if not aid or aid in seen:
+                continue
+            seen.add(aid)
+            ids.append(aid)
+        if not ids:
+            return {}
+
+        ranked = text(
+            """
+            SELECT assignment_id, report_json FROM (
+              SELECT
+                assignment_id,
+                report_json,
+                ROW_NUMBER() OVER (
+                  PARTITION BY assignment_id
+                  ORDER BY created_at DESC
+                ) AS rn
+              FROM compliance_reports
+              WHERE assignment_id IN :aids
+            ) ranked
+            WHERE rn = 1
+            """
+        ).bindparams(bindparam("aids", expanding=True))
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(ranked, {"aids": ids}).fetchall()
+
+        out: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            m = row._mapping
+            aid = m.get("assignment_id")
+            if not aid:
+                continue
+            raw = m.get("report_json")
+            try:
+                parsed = json.loads(raw) if isinstance(raw, str) else (raw or None)
+            except Exception:
+                parsed = None
+            if isinstance(parsed, dict):
+                out[str(aid)] = parsed
+        return out
 
     def save_compliance_run(self, run_id: str, assignment_id: str, report: Dict[str, Any]) -> None:
         with self.engine.begin() as conn:

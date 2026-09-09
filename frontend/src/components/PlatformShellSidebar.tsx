@@ -438,6 +438,30 @@ const JourneyProgressMini: React.FC<{ row: EmployeeLinkedOverviewRow }> = ({ row
   );
 };
 
+/** Poll `run` immediately and every `ms`, but skip ticks while the tab is hidden
+ *  and fire once when `visibilitychange` returns to visible. */
+export function subscribeVisibleInterval(
+  run: () => void,
+  ms: number,
+  onStop?: () => void,
+): () => void {
+  const tick = () => {
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+    run();
+  };
+  tick();
+  const intervalId = window.setInterval(tick, ms);
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') run();
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  return () => {
+    onStop?.();
+    window.clearInterval(intervalId);
+    document.removeEventListener('visibilitychange', onVisibility);
+  };
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface PlatformShellSidebarProps {
@@ -692,9 +716,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
         .then((c) => { if (!cancelled) setHrNotif(c); })
         .catch((e) => swallow(e, 'PlatformShellSidebar: HR notification poll'));
     };
-    fetchHr();
-    const id = window.setInterval(fetchHr, 60_000);
-    return () => { cancelled = true; window.clearInterval(id); };
+    return subscribeVisibleInterval(fetchHr, 60_000, () => { cancelled = true; });
   }, [rank]);
 
   useEffect(() => {
@@ -705,9 +727,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
         .then((c) => { if (!cancelled) setAdminNotif(c); })
         .catch((e) => swallow(e, 'PlatformShellSidebar: admin notification poll'));
     };
-    fetchAdmin();
-    const id = window.setInterval(fetchAdmin, 60_000);
-    return () => { cancelled = true; window.clearInterval(id); };
+    return subscribeVisibleInterval(fetchAdmin, 60_000, () => { cancelled = true; });
   }, [rank]);
 
   useEffect(() => {
