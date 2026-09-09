@@ -9,6 +9,7 @@ import {
   confidencePercent,
   countRequirementStatuses,
   displayCatalogLabel,
+  displayCountryName,
   filterCatalog,
   filterRequirements,
   formatUpdatedLabel,
@@ -124,8 +125,22 @@ describe('countryCatalog helpers', () => {
     });
     expect(filterRequirements(grouped.flatMap((g) => g.items), '', 'pending')).toHaveLength(1);
     expect(displayCatalogLabel('THIRD_COUNTRY')).toBe('Third Country');
-    expect(catalogConfidenceScore(0.85, 0)).toBeUndefined();
-    expect(catalogConfidenceScore(0.85, 12)).toBe(0.85);
+  });
+
+  it('resolves catalog full names to a single English label', () => {
+    expect(displayCountryName('FRANCE')).toBe('France');
+    expect(displayCountryName('AUSTRALIA')).toBe('Australia');
+  });
+
+  it('does not treat an empty catalog as high confidence', () => {
+    expect(
+      catalogConfidenceScore({
+        requirementsCount: 0,
+        confidenceScore: 0.95,
+        topDomains: [],
+      }),
+    ).toBeNull();
+    expect(confidenceLevel(null)).toBe('unknown');
   });
 });
 
@@ -135,15 +150,15 @@ describe('CountryTable', () => {
     expect(container.querySelector('.overflow-x-auto')).toBeTruthy();
   });
 
-  it('renders country names instead of codes-only rows and shows coverage stats', () => {
+  it('renders country names with an ISO chip and coverage stats', () => {
     render(<CountryTable data={DATA} onSelect={() => undefined} />);
     expect(screen.getByTestId('catalog-stat-countries')).toHaveTextContent('3');
     expect(screen.getByTestId('catalog-stat-requirements')).toHaveTextContent('16');
     expect(screen.getByTestId('catalog-stat-empty')).toHaveTextContent('1');
     expect(screen.getAllByText('Germany').length).toBeGreaterThan(0);
     expect(screen.getAllByText('France').length).toBeGreaterThan(0);
-    expect(screen.queryByText('DE')).not.toBeInTheDocument();
-    expect(screen.queryByText('FR')).not.toBeInTheDocument();
+    expect(screen.getAllByText('DE').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('FR').length).toBeGreaterThan(0);
   });
 
   it('narrows the list when searching', () => {
@@ -155,7 +170,7 @@ describe('CountryTable', () => {
 
   it('does not present a seed confidence percent as catalog quality on empty destinations', () => {
     render(<CountryTable data={DATA} onSelect={() => undefined} />);
-    expect(screen.getAllByText('No catalog').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('No evidence').length).toBeGreaterThan(0);
     expect(screen.queryByText('20%')).not.toBeInTheDocument();
     expect(screen.getAllByText('90%').length).toBeGreaterThan(0);
   });
@@ -165,5 +180,29 @@ describe('CountryTable', () => {
     fireEvent.click(screen.getByTestId('catalog-stat-empty'));
     expect(screen.getAllByText('France').length).toBeGreaterThan(0);
     expect(screen.queryByText('Germany')).not.toBeInTheDocument();
+  });
+
+  it('does not repeat the catalog key next to the country name', () => {
+    render(
+      <CountryTable
+        data={{
+          countries: [
+            {
+              countryCode: 'FRANCE',
+              lastUpdatedAt: '2026-08-01T00:00:00Z',
+              requirementsCount: 0,
+              confidenceScore: 0.95,
+              topDomains: [],
+            },
+          ],
+        }}
+        onSelect={() => undefined}
+      />,
+    );
+    expect(screen.getAllByText('France').length).toBeGreaterThan(0);
+    expect(screen.queryByText('FRANCE')).not.toBeInTheDocument();
+    expect(screen.getAllByText('FR').length).toBeGreaterThan(0);
+    expect(screen.queryByText('High')).not.toBeInTheDocument();
+    expect(screen.getAllByText('No evidence').length).toBeGreaterThan(0);
   });
 });
