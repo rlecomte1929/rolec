@@ -25,10 +25,19 @@ stripped; `"S.p.A."` → `"spa"` and `"S.A.E."` → `"sae"` are **not**, so they
 `"Banco Santander, S.A."` and `"Banco Santander (Brasil) S.A."` — **both** reduce to `bancosantander`
 (", S.A." stripped, "(Brasil)" dropped).
 
+**Confirmed second instance (Swedbank, SE-banks land 2026-09-09):** "Swedbank AB" (Sweden) collided
+with an existing **Lithuanian** "Swedbank AB" — both reduce to `swedbank` because `"AB"` (Aktiebolag)
+is in `_LEGAL_FORMS` and strips identically. This is the same class as Santander but via a **shared
+stripped legal-form token** rather than a parenthetical, and it matters because `"AB"` is the common
+company form across **Sweden, Finland, Lithuania, Estonia** — so same-brand Nordic/Baltic bank arms are
+especially collision-prone. It was caught pre-apply and held (see §5).
+
 **The bug fires only when two genuinely different entities produce the SAME `_name_key`** — i.e. when a
 `_LEGAL_FORMS` suffix is stripped *and/or* a distinguishing parenthetical is dropped, leaving identical
-tokens. That is a real but uncommon coincidence, not a per-batch certainty. Treat this as a **correctness
-fix of moderate priority**, not an urgent every-bank blocker — especially given the pre-apply guard in §5.
+tokens. It needs a name coincidence, but it is **not rare**: two confirmed real hits in one week
+(Santander ES→BR; Swedbank SE↔LT), and it struck **1 of 7** banks in the SE batch. Treat this as a
+**correctness fix of moderate-to-high priority** — not an emergency (the §5 pre-apply predictor guards it
+today), but a genuine recurring correctness gap worth scheduling, not deferring indefinitely.
 
 ## 2. Root cause (exact)
 
@@ -88,9 +97,14 @@ this code path. The category+country gate is local to `promote()` and testable i
 
 Add hermetic tests (no real DB — follow `scripts/tests/test_import_supplier_candidates_scope.py` fakes):
 
-1. **FIXES banks:** existing supplier "Banco Santander (Brasil) S.A." (BR capability). Promote candidate
-   "Banco Santander, S.A." country_code=ES, category=banks → a **new supplier** is created (or the row is
-   held/flagged), the capability is **NOT** attached to the BR supplier. `promoted_supplier_id != BR id`.
+1. **FIXES banks (Santander — parenthetical strip):** existing supplier "Banco Santander (Brasil) S.A."
+   (BR capability). Promote candidate "Banco Santander, S.A." country_code=ES, category=banks → a **new
+   supplier** is created (or the row is held/flagged), the capability is **NOT** attached to the BR
+   supplier. `promoted_supplier_id != BR id`.
+1b. **FIXES banks (Swedbank — shared legal-form strip):** existing supplier "Swedbank AB" (LT capability).
+   Promote candidate "Swedbank AB" country_code=SE, category=banks → a **new supplier** (not attached to
+   the LT supplier). This is the real 2026-09-09 case; both names reduce to `swedbank` via the identical
+   `"AB"` strip, so it must be distinguished by country, not name.
 2. **NO movers regression:** existing supplier "Crown Relocations" (a movers supplier). Promote candidate
    "Crown Relocations (Norway)" category=movers → capability **IS** added to the existing Crown supplier
    (one supplier, per-country capabilities). Current behavior unchanged.
@@ -104,7 +118,9 @@ The operator now runs a **pre-apply `_name_key` predictor**: for each candidate,
 `_name_key` and check it against every prod supplier's key *before* promoting; a match is inspected
 (country vs candidate country) and held/corrected if it is a distinct legal entity. This catches real
 collisions **before** they write — no more apply-then-delete — and is what confirmed the Milan-banks
-batch was collision-free. This guard is the reason the code fix is moderate- rather than high-priority.
+batch was collision-free (and it is what caught the Swedbank SE↔LT collision, holding it pre-apply). This
+guard is why the fix is not an emergency; the two confirmed hits (Santander, Swedbank) are why it should
+still be scheduled rather than deferred.
 Keep it until the fix + tests below land; the fix makes `promote()` correct on its own so the predictor
 can then relax to a sanity check.
 
