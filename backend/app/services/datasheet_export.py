@@ -30,10 +30,11 @@ from ...database import db as main_db
 
 logger = logging.getLogger(__name__)
 
-# Export channels — how a country's official deliverable is produced.
-CHANNEL_ACROFORM = "acroform"       # a fillable government AcroForm (form_prefill_service)
-CHANNEL_DATA_SHEET = "data_sheet"   # a print-grade personal data sheet (render_data_sheet)
-CHANNEL_PORTAL_ONLY = "portal_only" # portal-only; the sheet is a carry-along reference
+# Export channels — how a country's official deliverable is produced. Values match Otto's
+# export-channels.json (data/export-channels.json).
+CHANNEL_ACROFORM = "acroform"             # a fillable government AcroForm (form_prefill_service)
+CHANNEL_DATA_SHEET = "render_data_sheet"  # a print-grade personal data sheet (render_data_sheet)
+CHANNEL_PORTAL_ONLY = "portal_only"       # portal-only; the sheet is a carry-along reference
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _DATA_DIR = _REPO_ROOT / "data"
@@ -66,7 +67,7 @@ def _load_export_channels() -> Dict[str, str]:
         for row in doc:
             if isinstance(row, dict):
                 iso = row.get("country_iso") or row.get("iso") or row.get("country")
-                ch = row.get("channel")
+                ch = row.get("export_channel") or row.get("channel")
                 if isinstance(iso, str) and isinstance(ch, str):
                     out[iso.upper()] = ch
     return out
