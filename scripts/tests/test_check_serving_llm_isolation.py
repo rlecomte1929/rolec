@@ -310,13 +310,14 @@ def test_there_is_no_allowlist():
     assert not banned, f"an allowlist-shaped constant appeared in the guard: {banned}"
 
 
-def test_the_five_serving_roots_are_registered():
+def test_the_serving_roots_are_registered():
     assert set(guard.SERVING_ROOTS) == {
         "backend.app.services.requirements_builder",
         "backend.app.services.rules_engine",
         "backend.app.services.requirement_evaluation_service",
         "backend.app.services.immigration_requirement_service",
         "backend.app.services.hr_policy_resolver",
+        "backend.app.services.data_sheet_service",
     }
 
 
