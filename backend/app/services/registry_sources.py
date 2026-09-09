@@ -258,12 +258,24 @@ SOURCES: Tuple[RegistrySource, ...] = (
         acquisition=Acquisition.MANUAL_EVIDENCED,
         corridors=("FR-NO",),
         categories=("legal_admin",),
-        # brreg  -> /nb/oppslag/enheter/917334110
-        # advokatguiden -> /advokat/22051-thomas-reinholdt
-        # The association's own /search-for-members/ page matches NEITHER, which is the point:
-        # one harvest row cited it and was being counted as registry-evidenced.
-        entry_url_pattern=r"/oppslag/enheter/\d+|/advokat/\d+",
-        notes="Brønnøysund org numbers give a second, government-issued identifier.",
+        # Association member pages only. Brønnøysund per-entity URLs belong to the
+        # Enhetsregisteret source below (AIQ-1874) — they must not count as bar evidence.
+        entry_url_pattern=r"/search-for-members/.+",
+        notes="Den Norske Advokatforening membership is voluntary and is not evidenced by "
+              "Enhetsregisteret. Search-form roots are not per-member records. Keep blocked "
+              "in accreditation_hardening BODY_POLICIES.",
+    ),
+    RegistrySource(
+        name="Brønnøysund Enhetsregisteret (NO)",
+        base_url="https://virksomhet.brreg.no/",
+        tier=2,
+        acquisition=Acquisition.MANUAL_EVIDENCED,
+        corridors=("FR-NO",),
+        categories=("legal_admin",),
+        entry_url_pattern=r"/oppslag/enheter/\d+",
+        notes="Tier-2 ENTITY confirmation only. A 9-digit organisation number and a "
+              "virksomhet.brreg.no page prove the AS is registered; they are not a bar "
+              "membership number and not an advokatbevilling.",
     ),
     # ── cross-category membership + entity confirmation ──────────────────────
     #

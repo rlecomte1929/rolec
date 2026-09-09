@@ -50,3 +50,8 @@ load drifts from the artifact it claims to represent.
 **Prove idempotency against real Postgres.** SQLite cannot stand in for `ON CONFLICT` with a
 real unique index. Apply the migration twice inside `BEGIN…ROLLBACK` and assert the row count
 did not double.
+
+**Nationality NULL is not an importer default.** Six approved Irish payroll/tax rows are
+NULL on `applies_to_nationality_classes_json` because they are universal statutory
+obligations. Immigration pathways must stay class-scoped. Decision record:
+[`ie-nationality-scope.md`](ie-nationality-scope.md).

@@ -18,6 +18,7 @@ from backend.app.services.accreditation_hardening import (
     AccreditationRow,
     BODY_POLICIES,
     Capability,
+    METHOD_PUBLIC_REGISTRY,
     NOTE_MARKER,
     LookupResult,
     decide,
@@ -224,6 +225,38 @@ class AdvokatforeningenIsBlockedTests(unittest.TestCase):
         self.assertIsNotNone(pol)
         self.assertFalse(pol.auto_verifiable)
         self.assertTrue(pol.blocked_reason)
+        self.assertIn("brreg", pol.blocked_reason)
+        self.assertIn("advokatguiden", pol.blocked_reason)
+
+
+class BronnoysundEntityConfirmationTests(unittest.TestCase):
+    """After AIQ-1874 the four rows claim Enhetsregisteret, not the bar."""
+
+    def _brreg_row(self, **kw) -> AccreditationRow:
+        return _row(
+            supplier_name="Advokatfirmaet Tveter og Kløvfjell AS",
+            body="Brønnøysund Enhetsregisteret",
+            membership_number="917 334 110",
+            evidence_url="https://virksomhet.brreg.no/nb/oppslag/enheter/917334110",
+            capabilities=(_NO_LEGAL,),
+            **kw,
+        )
+
+    def test_a_brreg_name_match_verifies_entity_not_bar(self) -> None:
+        d = decide(
+            self._brreg_row(),
+            LookupResult(ok=True, http_status=200,
+                         text="ADVOKATFIRMAET TVETER OG KLØVFJELL AS"),
+        )
+        self.assertEqual(d.action, ACTION_VERIFY)
+        self.assertEqual(d.status, "verified")
+        self.assertIn("brønnøysund", d.reason.casefold())
+
+    def test_bronnoysund_policy_is_auto_verifiable(self) -> None:
+        pol = policy_for_body("Brønnøysund Enhetsregisteret")
+        self.assertIsNotNone(pol)
+        self.assertTrue(pol.auto_verifiable)
+        self.assertEqual(pol.method, METHOD_PUBLIC_REGISTRY)
 
 
 class MembershipNumberTests(unittest.TestCase):
