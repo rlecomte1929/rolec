@@ -172,6 +172,7 @@ from .app.routers import admin_work_items as admin_work_items_router  # Mission 
 from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer registration (PR #207 §9)
 from .app.routers import translation as translation_router  # [Parker-I] dual-layer registration (PR #207 §9)
 from .app.routers import admin_corrections as admin_corrections_router  # [AIQ-554] correction analytics
+from .app.routers import admin_reconciliation as admin_reconciliation_router  # WS1 1.5 — /api/admin/reconciliation
 from .app.routers import policy_publish as policy_publish_router  # [P1-4]
 from .app.routers import policy_summary as policy_summary_router  # [P1-5 backend]
 from .app.routers import admin as admin_router
@@ -853,6 +854,7 @@ app.include_router(translation_router.router)  # [Parker-I] PR #207 §9 — dual
 app.include_router(policy_publish_router.router)  # [AUDIT-C2.3 restore] app/main.py not mounted in prod — must register here
 app.include_router(policy_summary_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(admin_corrections_router.router)  # [AIQ-554] GET /api/admin/corrections/by-reason
+app.include_router(admin_reconciliation_router.router)  # WS1 1.5 — /api/admin/reconciliation (before remaining inline /api/admin/*)
 app.include_router(crons_router.router)  # [P4-4] cron endpoints
 app.include_router(exception_requests_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(services_state_router.router)
@@ -3047,119 +3049,8 @@ def get_data_integrity_overview(user: Dict[str, Any] = Depends(require_admin)):
     return data
 
 
-# ---------------------------------------------------------------------------
-# Admin reconciliation (repair missing links; no destructive cleanup)
-# ---------------------------------------------------------------------------
-
-class ReconciliationLinkPersonCompanyRequest(BaseModel):
-    profile_id: str
-    company_id: str
-
-
-class ReconciliationLinkAssignmentCompanyRequest(BaseModel):
-    assignment_id: str
-    company_id: str
-    reason: str
-
-
-class ReconciliationLinkAssignmentPersonRequest(BaseModel):
-    assignment_id: str
-    profile_id: str
-
-
-class ReconciliationLinkPolicyCompanyRequest(BaseModel):
-    policy_id: str
-    company_id: str
-
-
-@app.get("/api/admin/reconciliation/report")
-def get_reconciliation_report(user: Dict[str, Any] = Depends(require_admin)):
-    """Admin: full reconciliation report (companies, people, assignments, policies, missing links)."""
-    data = db.get_reconciliation_report()
-    db.log_audit(user["id"], "READ", "reconciliation_report", None, None, {})
-    return data
-
-
-@app.post("/api/admin/reconciliation/backfill-test-company")
-def admin_backfill_test_company(
-    user: Dict[str, Any] = Depends(require_admin),
-):
-    """
-    One-time non-destructive backfill: link orphan profiles, hr_users, and relocation_cases
-    to the company named exactly 'Test company'. Does not overwrite existing linkage.
-    """
-    result = db.run_admin_reconciliation_backfill_test_company("Test company")
-    db.log_audit(
-        user["id"],
-        "RECONCILIATION_BACKFILL",
-        "reconciliation",
-        None,
-        None,
-        result.get("summary") or {},
-    )
-    return result
-
-
-@app.post("/api/admin/reconciliation/link-person-company")
-def reconciliation_link_person_company(
-    body: ReconciliationLinkPersonCompanyRequest,
-    user: Dict[str, Any] = Depends(require_admin),
-):
-    """Admin: attach a profile (person) to a company. Updates profiles.company_id and employees if present."""
-    if not db.get_profile_record(body.profile_id):
-        raise HTTPException(status_code=404, detail="Profile not found")
-    if not db.get_company(body.company_id):
-        raise HTTPException(status_code=404, detail="Company not found")
-    db.admin_reassign_employee_company(body.profile_id, body.company_id)
-    db.log_audit(user["id"], "RECONCILIATION_LINK_PERSON_COMPANY", "profile", body.profile_id, None, {"company_id": body.company_id})
-    return {"ok": True}
-
-
-@app.post("/api/admin/reconciliation/link-assignment-company")
-def reconciliation_link_assignment_company(
-    body: ReconciliationLinkAssignmentCompanyRequest,
-    user: Dict[str, Any] = Depends(require_admin),
-):
-    """Admin: set assignment's case company (relocation_cases.company_id)."""
-    _require_reason(body.reason)
-    if not db.get_assignment_by_id(body.assignment_id):
-        raise HTTPException(status_code=404, detail="Assignment not found")
-    if not db.get_company(body.company_id):
-        raise HTTPException(status_code=404, detail="Company not found")
-    db.admin_fix_assignment_company_linkage(body.assignment_id, body.company_id)
-    db.log_audit(user["id"], "RECONCILIATION_LINK_ASSIGNMENT_COMPANY", "assignment", body.assignment_id, body.reason, {"company_id": body.company_id})
-    return {"ok": True}
-
-
-@app.post("/api/admin/reconciliation/link-assignment-person")
-def reconciliation_link_assignment_person(
-    body: ReconciliationLinkAssignmentPersonRequest,
-    user: Dict[str, Any] = Depends(require_admin),
-):
-    """Admin: attach a profile (person) as employee to an assignment."""
-    if not db.get_assignment_by_id(body.assignment_id):
-        raise HTTPException(status_code=404, detail="Assignment not found")
-    if not db.get_profile_record(body.profile_id):
-        raise HTTPException(status_code=404, detail="Profile not found")
-    db.attach_employee_to_assignment(body.assignment_id, body.profile_id)
-    db.log_audit(user["id"], "RECONCILIATION_LINK_ASSIGNMENT_PERSON", "assignment", body.assignment_id, None, {"profile_id": body.profile_id})
-    return {"ok": True}
-
-
-@app.post("/api/admin/reconciliation/link-policy-company")
-def reconciliation_link_policy_company(
-    body: ReconciliationLinkPolicyCompanyRequest,
-    user: Dict[str, Any] = Depends(require_admin),
-):
-    """Admin: reassign a company_policy to a company."""
-    if not db.get_company_policy(body.policy_id):
-        raise HTTPException(status_code=404, detail="Policy not found")
-    if not db.get_company(body.company_id):
-        raise HTTPException(status_code=404, detail="Company not found")
-    db.admin_link_policy_company(body.policy_id, body.company_id)
-    db.log_audit(user["id"], "RECONCILIATION_LINK_POLICY_COMPANY", "company_policy", body.policy_id, None, {"company_id": body.company_id})
-    return {"ok": True}
-
+# Admin reconciliation lives in app/routers/admin_reconciliation.py (WS1 1.5).
+# Registered via include_router above remaining inline /api/admin/* handlers.
 
 @debug_route("get", "/api/admin/debug/runtime-database")
 def debug_runtime_database(user: Dict[str, Any] = Depends(require_admin)):
@@ -3247,94 +3138,6 @@ def debug_test_company_graph(user: Dict[str, Any] = Depends(require_admin)):
         "sample_cases": [dict(r._mapping) for r in cases],
         "sample_assignments": [dict(r._mapping) for r in assignments],
         "sample_policies": [dict(r._mapping) for r in policies],
-    }
-
-
-@app.post("/api/admin/reconciliation/rebuild-test-company-graph")
-def rebuild_test_company_graph(user: Dict[str, Any] = Depends(require_admin)):
-    """
-    Admin: full, idempotent rebuild of Test company graph in the current runtime DB.
-    - Reassigns non-admin demo/test users and related seats/cases to the fixed Test company.
-    - Repairs HR/employee seats and case/assignment linkage when recoverable.
-    """
-    TEST_COMPANY_ID = db.TEST_COMPANY_FIXED_ID
-
-    # Simple before snapshot: counts per table for Test company
-    with db.engine.connect() as conn:
-        before_profiles = conn.execute(
-            text("SELECT COUNT(*) AS n FROM profiles WHERE company_id = :cid"),
-            {"cid": TEST_COMPANY_ID},
-        ).fetchone()._mapping["n"]
-        before_hr = conn.execute(
-            text("SELECT COUNT(*) AS n FROM hr_users WHERE company_id = :cid"),
-            {"cid": TEST_COMPANY_ID},
-        ).fetchone()._mapping["n"]
-        before_emp = conn.execute(
-            text("SELECT COUNT(*) AS n FROM employees WHERE company_id = :cid"),
-            {"cid": TEST_COMPANY_ID},
-        ).fetchone()._mapping["n"]
-        before_cases = conn.execute(
-            text("SELECT COUNT(*) AS n FROM relocation_cases WHERE company_id = :cid"),
-            {"cid": TEST_COMPANY_ID},
-        ).fetchone()._mapping["n"]
-        before_policies = conn.execute(
-            text("SELECT COUNT(*) AS n FROM company_policies WHERE company_id = :cid"),
-            {"cid": TEST_COMPANY_ID},
-        ).fetchone()._mapping["n"]
-
-    summary = db.rebuild_test_company_graph()
-
-    with db.engine.connect() as conn:
-        after_profiles = conn.execute(
-            text("SELECT COUNT(*) AS n FROM profiles WHERE company_id = :cid"),
-            {"cid": TEST_COMPANY_ID},
-        ).fetchone()._mapping["n"]
-        after_hr = conn.execute(
-            text("SELECT COUNT(*) AS n FROM hr_users WHERE company_id = :cid"),
-            {"cid": TEST_COMPANY_ID},
-        ).fetchone()._mapping["n"]
-        after_emp = conn.execute(
-            text("SELECT COUNT(*) AS n FROM employees WHERE company_id = :cid"),
-            {"cid": TEST_COMPANY_ID},
-        ).fetchone()._mapping["n"]
-        after_cases = conn.execute(
-            text("SELECT COUNT(*) AS n FROM relocation_cases WHERE company_id = :cid"),
-            {"cid": TEST_COMPANY_ID},
-        ).fetchone()._mapping["n"]
-        after_policies = conn.execute(
-            text("SELECT COUNT(*) AS n FROM company_policies WHERE company_id = :cid"),
-            {"cid": TEST_COMPANY_ID},
-        ).fetchone()._mapping["n"]
-
-    db.log_audit(
-        user["id"],
-        "RECONCILIATION_REBUILD_TEST_COMPANY",
-        "reconciliation",
-        None,
-        None,
-        summary,
-    )
-
-    return {
-        "ok": True,
-        "summary": {
-            "test_company_id": db.TEST_COMPANY_FIXED_ID,
-            **summary,
-        },
-        "before": {
-            "profiles": before_profiles,
-            "hr_users": before_hr,
-            "employees": before_emp,
-            "relocation_cases": before_cases,
-            "policies": before_policies,
-        },
-        "after": {
-            "profiles": after_profiles,
-            "hr_users": after_hr,
-            "employees": after_emp,
-            "relocation_cases": after_cases,
-            "policies": after_policies,
-        },
     }
 
 

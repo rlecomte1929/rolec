@@ -19,9 +19,9 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
+from backend.app.auth_deps import get_current_user  # noqa: E402
 from backend.database import db  # noqa: E402
 from backend.main import app  # noqa: E402
-from backend.main import get_current_user  # noqa: E402
 
 _PREFIX = "/api/admin/reconciliation"
 _ADMIN = {"id": "admin-recon-1", "email": "admin@example.com", "role": "ADMIN", "is_admin": True}
