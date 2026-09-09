@@ -329,6 +329,25 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   suppliers** (ES/legal_admin, pending), 0 mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5
   unchanged; pending 1019 → 1026.
 
+### XX-IT housing_agencies (Rome real-estate agencies) — `vendor-resourced-xx-it-housing-rome-2026-09-09` (landed 2026-09-09) — first vein through the throttle
+- Source (GCS): `1788980836418_vuknxcci.ndjson` (+ manifest `1788980840083_fdjnn0e3.json`).
+- Otto manifest: **4 sourced, 11 rejected** — strong honest rejects: wrong-province REA (Renting
+  Rome=Milan, Agenzia Roma=Padova, Professional Relo=Vimercate/MB), law-firm category mismatch
+  (Boschetti — had a Rome REA but is not an agenzia), US-based (Roma Rentals SPQR), Florence
+  (Lionard), no REA published (Battisti, Easy Living, Great Properties, Impatria, Gabetti franchisor).
+- **Register type = PUBLIC_REGISTER (Registro Imprese / REA — Camere di Commercio).** Confirmed
+  independently: all 4 `source_url`s = the wired `registroimprese.it` (0 firm-site). REA número in
+  `accreditation_number` (Boom Rome/Egidi RM-1710623, Roma Real Estate/Studio Fori RM-919320,
+  Exclusive RE/Christie's/Loyal Immobili 1434347, Coldwell Banker Italy/Daisy56 RM-1388520).
+- **Vetter flags:** (1) Exclusive RE's REA `1434347` is published WITHOUT the `RM-` prefix — confirm
+  it's a Roma CCIAA number against the live Registro Imprese; (2) registroimprese.it is captcha-walled,
+  so REA numbers were read off each firm's OWN site footer/about — vetter confirms each against the
+  live register before pending→verified.
+- `_name_key` predictor: all 4 new (the international brands carry local legal entities — Daisy56,
+  Loyal Immobili, Egidi, Studio Fori — so Coldwell Banker/Christie's don't collide with any bare-brand
+  supplier). Landed: **+4 new suppliers** (IT/housing_agencies, pending), 0 mis-attach. Tripwire: `ssc`
+  `approved` **130 → 130** md5 unchanged; pending 1026 → 1030.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries

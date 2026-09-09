@@ -1,0 +1,27 @@
+{
+  "batch_id": "vendor-resourced-xx-it-housing-rome-2026-09-09",
+  "category": "housing_agencies",
+  "city": "Rome",
+  "country": "IT",
+  "generated": "2026-09-09",
+  "total_sourced": 4,
+  "total_rejected": 11,
+  "notes": "Sourced via automated web research (web_search + web_fetch) on 2026-09-09. REA/ruolo-agenti numbers read verbatim from each firm's published website (footer, About, or Contatti page). Firms without a published REA number were rejected. registroimprese.it is captcha-walled to automated fetch — cited as source_url per brief; human vetter should confirm each REA number against the live Registro Imprese. 15 candidates investigated; 4 sourced, 11 rejected. Honesty over volume.",
+  "firms": [
+    {"name": "Boom Rome — Egidi Immobiliare S.r.l.", "status": "sourced", "rea_number": "RM-1710623", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Roma Real Estate — Studio Fori di Alessandro Mori", "status": "sourced", "rea_number": "RM-919320", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Exclusive RE — Christie's International Real Estate (Loyal Immobili S.r.l.)", "status": "sourced", "rea_number": "1434347", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Coldwell Banker Italy — Daisy56 S.r.l.", "status": "sourced", "rea_number": "RM-1388520", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Renting Rome (Renting Italy S.r.l.)", "status": "reject", "reason": "REA di Milano 2508180 — Milan-registered entity (Via Elia Lombardini 10, Milano); not a Rome agency"},
+    {"name": "Professional Relo", "status": "reject", "reason": "REA 1562937 — based in Vimercate (MB), Milan area; not a Rome-registered agency"},
+    {"name": "Agenzia Roma (AIR Real Estate di Friso Stefania)", "status": "reject", "reason": "Based in Padova (PD), address Prato della Valle 114, 35123 Padova; R.E.A. 397446 is Padova CCIAA, not Rome"},
+    {"name": "Italy Visa Investments / Boschetti Studio Legale", "status": "reject", "reason": "Law firm (studio legale), not a licensed agenzia immobiliare; category mismatch even though REA 1695445 CCIAA Roma is published"},
+    {"name": "Battisti Home", "status": "reject", "reason": "No published REA/ruolo-agenti number on battistihome.it; only P.IVA 16048801001 in footer"},
+    {"name": "Easy Living Rome", "status": "reject", "reason": "No published REA/ruolo-agenti number found on easylivingrome.com after checking homepage and services pages"},
+    {"name": "Roma Rentals SPQR", "status": "reject", "reason": "US-based company headquartered in San Diego, CA; no Italian REA registration"},
+    {"name": "Lionard Luxury Real Estate", "status": "reject", "reason": "No REA number published on lionard.com; Florence-registered (P.I. 01660450477); Rome office but no Rome-specific REA published"},
+    {"name": "Great Properties Real Estate", "status": "reject", "reason": "No REA number published on greatproperties.it; only VAT 14144751006 in footer"},
+    {"name": "Impatria", "status": "reject", "reason": "No REA/ruolo-agenti number found on impatria.com; relocation coordination service, not a licensed agenzia immobiliare"},
+    {"name": "Gabetti franchise network", "status": "reject", "reason": "Main gabetti.it shows franchisor entity only (P.IVA 05952840964, no REA); individual Rome franchises independently registered but no specific Rome franchise website found with published REA"}
+  ]
+}
