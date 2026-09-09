@@ -470,6 +470,25 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1058 → 1065. (IT housing now 35: Rome 4 +
   Milan 5 + Florence 6 + Turin 8 + Naples 5 + Bologna 7.)
 
+### XX-IT housing_agencies (Genoa real-estate agencies) — `vendor-resourced-xx-it-housing-genoa-2026-09-09` (landed 2026-09-10)
+- Source (GCS): `1788996167965_9xi25ne9.ndjson` (+ manifest `1788996171995_nc59d6mg.json`).
+- Otto manifest: **5 sourced, 5 rejected**. Franchise-preference now working: Engel & Völkers Genova
+  rejected (shared `engelvoelkers.com`, no local REA published).
+- **PUBLIC_REGISTER (registroimprese.it / REA).** All 5 `source_url`s = wired `registroimprese.it`
+  (0 firm-site); corridor **XX-IT** explicit (no more INTL-IT drift). REA province **GE**: Genova
+  International/Karolina Loshuk GE-520864, Immobiliare Z.B. GE-377204, Lo Presti Immobiliare GE-514379,
+  Luisa Casareto GE-504866. **Vetter notes:** (a) Studio Immobiliare AG carries a *Ruolo Agenti
+  Immobiliari CCIAA Genova* number (n. 1526 del 26/09/1995), not a REA GE-XXXXXX — a valid Genova CCIAA
+  agent registration (same shape as Florence's "House in Florence"); vetter confirms at CCIAA Genova
+  sezione agenti immobiliari. (b) Luisa Casareto + Immobiliare Z.B. REAs were read from CCIAA data
+  (ufficiocamerale.it), not the firm footer — a standard registroimprese lookup confirms both.
+- Two firms (Studio Immobiliare AG, Luisa Casareto) publish no website → keyed by name (the harvest's
+  documented no-domain fallback), not by domain; both staged + promoted fine.
+- `_name_key` predictor: all 5 distinct + new. Landed: **+5 new suppliers** (IT/housing_agencies,
+  pending), 0 mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5
+  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1065 → 1070. (IT housing now 40: Rome 4 +
+  Milan 5 + Florence 6 + Turin 8 + Naples 5 + Bologna 7 + Genoa 5.)
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
