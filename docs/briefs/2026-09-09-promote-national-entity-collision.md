@@ -2,7 +2,7 @@
 
 **Surface:** vendor-candidate landing pipeline (results tracked on PR #2194).
 **Files:** `backend/imports/suppliers/executor.py` (`promote()`), `backend/app/services/vendor_harvester.py` (`_name_key`).
-**Severity:** correctness / data integrity. Silent mis-attach of a supplier capability to the **wrong legal entity**. Currently caught only by the operator eyeballing each bank land.
+**Severity:** correctness / data integrity — but **narrow** (see §1a) and now guarded by a pre-apply predictor (§5). Silent mis-attach of a supplier capability to the **wrong legal entity** when two names collide after normalization.
 
 ---
 
@@ -14,8 +14,21 @@ capability attached to the Brazilian entity. It was caught, the mis-created pend
 deleted, the candidate reset, and **Santander Spain held** for a correct re-land. Net: the batch
 landed **+6 not +7**.
 
-This will recur on **every bank / multinational batch**: BBVA, Deutsche Bank, ING, HSBC, Citi, etc.
-all have separately-incorporated national arms that share a brand name.
+## 1a. Scope correction — it is NARROWER than "every multinational" (verified 2026-09-09)
+
+The initial worry was that this hits every national arm of a multinational. It does **not**. Verified
+on the Milan-banks land: **"Deutsche Bank S.p.A." (IT) did NOT collide with "Deutsche Bank, S.A.E."
+(ES)**, and all 7 IT banks promoted to new suppliers with zero collisions. The reason is how `_name_key`
+strips legal forms: it removes only tokens in `_LEGAL_FORMS`. `"S.A."` → `"sa"` **is** in that set and is
+stripped; `"S.p.A."` → `"spa"` and `"S.A.E."` → `"sae"` are **not**, so they survive as name tokens:
+`deutschebankspa` ≠ `deutschebanksae`. Santander collided only because its two forms —
+`"Banco Santander, S.A."` and `"Banco Santander (Brasil) S.A."` — **both** reduce to `bancosantander`
+(", S.A." stripped, "(Brasil)" dropped).
+
+**The bug fires only when two genuinely different entities produce the SAME `_name_key`** — i.e. when a
+`_LEGAL_FORMS` suffix is stripped *and/or* a distinguishing parenthetical is dropped, leaving identical
+tokens. That is a real but uncommon coincidence, not a per-batch certainty. Treat this as a **correctness
+fix of moderate priority**, not an urgent every-bank blocker — especially given the pre-apply guard in §5.
 
 ## 2. Root cause (exact)
 
@@ -86,10 +99,14 @@ Add hermetic tests (no real DB — follow `scripts/tests/test_import_supplier_ca
 4. **AGS aside still collapses:** "AGS France (SOFDI – …)" vs "AGS France (SOFDI)", category=movers →
    one supplier. (Protects the original `_name_key` intent.)
 
-## 5. Interim guard (keep until the fix lands)
-The operator's manual per-land check (re-verify `promoted_supplier_id`'s supplier country vs the
-candidate's `country_code` on every bank/multinational batch; correct + flag mis-attaches) stays as the
-belt-and-suspenders. The code fix removes the need for it, but don't drop it before the tests above pass.
+## 5. Interim guard (already in place — keep until the fix lands)
+The operator now runs a **pre-apply `_name_key` predictor**: for each candidate, compute the exact
+`_name_key` and check it against every prod supplier's key *before* promoting; a match is inspected
+(country vs candidate country) and held/corrected if it is a distinct legal entity. This catches real
+collisions **before** they write — no more apply-then-delete — and is what confirmed the Milan-banks
+batch was collision-free. This guard is the reason the code fix is moderate- rather than high-priority.
+Keep it until the fix + tests below land; the fix makes `promote()` correct on its own so the predictor
+can then relax to a sanity check.
 
 ## 6. Scope boundaries (do NOT do)
 - No change to `movers` behavior or to the broader `_name_key` semantics.
