@@ -43,3 +43,4 @@ export type { ModalProps } from './Modal';
 // HEADER-1: one shared page-title block (eyebrow + breadcrumb + title/subtitle + actions).
 export { PageHeader } from './PageHeader';
 export type { Crumb } from './PageHeader';
+export { TableScroll } from './TableScroll';

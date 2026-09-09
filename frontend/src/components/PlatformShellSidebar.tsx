@@ -20,6 +20,11 @@ const SidebarLayoutEditor = React.lazy(() =>
   import('./SidebarLayoutEditor').then((m) => ({ default: m.SidebarLayoutEditor })),
 );
 import {
+  filterSectionsForAdminPath,
+  adminPersonaFromPath,
+  adminPreviewLinks,
+} from './adminNavScope';
+import {
   readSidebarLayouts,
   writeSectionLayout,
   clearSidebarLayouts,
@@ -477,11 +482,17 @@ export interface PlatformShellSidebarProps {
 // ── Collapse persistence ──────────────────────────────────────────────────────
 
 const COLLAPSE_KEY = 'platform_sidebar_collapsed';
+const COLLAPSE_EXPLICIT_KEY = 'platform_sidebar_collapsed_explicit';
 
 function readCollapsed(): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    return window.localStorage.getItem(COLLAPSE_KEY) === '1';
+    const explicit = window.localStorage.getItem(COLLAPSE_EXPLICIT_KEY) === '1';
+    const collapsed = window.localStorage.getItem(COLLAPSE_KEY) === '1';
+    if (window.matchMedia('(min-width: 1280px)').matches && !explicit) {
+      return false;
+    }
+    return collapsed;
   } catch {
     return false;
   }
@@ -805,7 +816,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
     ...s,
     items: applyAdminLayout(s.items, reconcileAdminLayout(s.items, layoutOverrides[s.label] ?? null)),
   }));
-  const visibleSections = effectiveSections
+  const rankedByRole = effectiveSections
     .filter((s) => ROLE_RANK[s.minRole] <= rank)
     .map((s) => {
       // A higher-role user (e.g. HR) inherits lower-persona sections via the rank
@@ -827,6 +838,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
       };
     })
     .filter((s) => s.items.length > 0);
+  const visibleSections = filterSectionsForAdminPath(rankedByRole, location.pathname, role);
 
   return (
     <aside
@@ -849,7 +861,10 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
             <span className="text-slate-500 text-sm">/ Platform</span>
             <Button unstyled
               type="button"
-              onClick={() => setCollapsed(true)}
+              onClick={() => {
+                try { window.localStorage.setItem(COLLAPSE_EXPLICIT_KEY, '1'); } catch { /* ignore */ }
+                setCollapsed(true);
+              }}
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
               className="ml-auto grid h-11 w-11 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
@@ -861,7 +876,10 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
         {collapsed && (
           <Button unstyled
             type="button"
-            onClick={() => setCollapsed(false)}
+            onClick={() => {
+              try { window.localStorage.setItem(COLLAPSE_EXPLICIT_KEY, '1'); } catch { /* ignore */ }
+              setCollapsed(false);
+            }}
             aria-label="Expand sidebar"
             title="Expand sidebar"
             className="grid h-11 w-11 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
@@ -1136,6 +1154,20 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
           </>
         )}
       </nav>
+
+      {role === 'ADMIN' && !collapsed && (
+        <div className="px-3 py-2 border-t border-slate-100 space-y-1">
+          {adminPreviewLinks(adminPersonaFromPath(location.pathname)).map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className="block rounded-md px-2 py-2 text-[12px] font-medium text-navy-800 hover:bg-navy-50 min-h-11"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* User footer */}
       <div ref={accountRef} className="relative px-3 py-3 border-t border-slate-100">
