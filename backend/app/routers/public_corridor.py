@@ -63,6 +63,7 @@ from ..services.nationality_class import classify_best
 from ..services.rules_engine import apply_rules
 # AIQ-1473b: single source of truth for ISO → catalog-name mapping. Imported
 # (not duplicated) so this endpoint stays in sync if the catalog naming changes.
+from ..services.requirements_country_key import resolve_catalog_country
 from ..services.knowledge_layer_scorecard import score_requirement_rows
 from ..services.requirements_builder import citation_dtos
 
