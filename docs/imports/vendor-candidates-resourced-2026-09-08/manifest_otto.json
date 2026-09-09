@@ -1,0 +1,10 @@
+{
+  "batch_id": "vendor-resourced-fr-no-movers-2026-09-08",
+  "corridor": "FR-NO",
+  "category": "movers",
+  "generated_date": "2026-09-08",
+  "firms_found": 4,
+  "firms_rejected": ["NFB International Relocations", "AGS Movers Norway"],
+  "ndjson_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788906918368_362xcyp2.ndjson",
+  "source_registers": ["https://www.fidi.org/find-fidi-affiliate", "https://www.eura-relocation.com/members/"]
+}

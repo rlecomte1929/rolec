@@ -1,0 +1,20 @@
+{
+  "batch_id": "us-ec-facts-2026-09-08",
+  "corridor": "US->EC",
+  "generated_date": "2026-09-08",
+  "mover_type": "Third-country national (non-EEA, non-Andean national)",
+  "facts_count": 22,
+  "ndjson_url": "https://storage.googleapis.com/audos-images/workspace-media/d0c29613-9cb5-4652-9c6a-494eeed352e5/1788912076338_r0top4kk.ndjson",
+  "pillars_covered": ["immigration", "residence", "tax", "social_security", "healthcare"],
+  "gaps": [
+    "Exact IESS contribution rates (commonly cited as employer 11.15% + employee 9.45%) could NOT be confirmed on a scrapable official IESS page; the IESS rate pages are JS/PDF-only. Omitted rather than fabricated.",
+    "Personal income-tax progressive bracket table (fracción básica / marginal rates) not captured verbatim; the SRI impuesto-renta page truncated before the natural-person rate table. Only the 25% corporate rate and the dependency-income base rule were quoted. Omitted specific bracket figures.",
+    "US-Ecuador income tax treaty: no official Ecuadorian (SRI) page found that states there is (or is not) a comprehensive income tax treaty with the US. Widely understood to be none, but not verifiable on an official EC source — omitted.",
+    "US-Ecuador social security totalization agreement: no official IESS page found confirming existence/absence. Omitted rather than asserted.",
+    "Investor/professional visa monetary thresholds not sourced on an official page in this pass.",
+    "Right-to-work-while-visa-pending: no official statement located; not asserted.",
+    "IESS health coverage extending to dependants of an active affiliated worker: the scrapable 'Servicios de Salud' page describes pensionista/beneficiary coverage; active-worker dependant enrolment specifics not quoted verbatim."
+  ],
+  "notes": "All facts sourced from official Ecuadorian government domains (gob.ec official trámites portal, sri.gob.ec, iess.gob.ec, salud.gob.ec). Legal framework cited on official pages is the Ley Orgánica de Movilidad Humana (2023 consolidation) and its Reglamento, plus the Ley de Seguridad Social (art. 73) and Ley del RUC (art. 3). PDF-only official documents (e.g. IESS resolutions, Acuerdo Ministerial 0000070 on medios de vida) were not machine-readable via the scraper and are referenced only where their content also appeared on an HTML page.",
+  "status": "candidate"
+}
