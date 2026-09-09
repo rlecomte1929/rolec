@@ -59,22 +59,25 @@ def test_none_when_truly_unlinked():
         assert _caller_company_id(dict(LEGACY_HR)) is None
 
 
-def test_profile_path_still_wins_for_uuid_hr():
-    # Regression guard: UUID-native HR with a profiles.company_id is unaffected
-    # and never needs the hr_users fallback.
+def test_profile_path_used_when_hr_users_empty():
     uuid_hr = {"id": "11111111-1111-1111-1111-111111111111", "role": "HR"}
     with mock.patch.object(db, "get_profile_record", return_value={"company_id": "company-X"}), \
-         mock.patch.object(db, "get_hr_company_id", return_value="should-not-be-used") as m:
+         mock.patch.object(db, "get_hr_company_id", return_value=None):
         assert _caller_company_id(dict(uuid_hr)) == "company-X"
-    m.assert_not_called()
 
 
-def test_session_company_claim_used_before_hr_users():
+def test_hr_users_wins_over_profile():
+    uuid_hr = {"id": "11111111-1111-1111-1111-111111111111", "role": "HR"}
+    with mock.patch.object(db, "get_profile_record", return_value={"company_id": "company-X"}), \
+         mock.patch.object(db, "get_hr_company_id", return_value="company-A"):
+        assert _caller_company_id(dict(uuid_hr)) == "company-A"
+
+
+def test_session_company_claim_used_when_hr_users_and_profile_empty():
     user = dict(LEGACY_HR, company="company-claim")
     with mock.patch.object(db, "get_profile_record", return_value=None), \
-         mock.patch.object(db, "get_hr_company_id", return_value="should-not-be-used") as m:
+         mock.patch.object(db, "get_hr_company_id", return_value=None):
         assert _caller_company_id(user) == "company-claim"
-    m.assert_not_called()
 
 
 if __name__ == "__main__":

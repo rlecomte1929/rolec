@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
-from ..auth_deps import require_admin_or_hr
+from ..auth_deps import caller_company_id, require_admin_or_hr
 from ...database import db
 from ..db import SessionLocal
 from ..services import service_catalog, vendor_curation
@@ -63,16 +63,11 @@ logger = logging.getLogger(__name__)
 
 
 def _caller_company_id(user: Dict[str, Any]) -> str:
-    uid = user.get("id")
-    # hr_users-first: legacy/text HR ids (e.g. seed-hr-testingapril) have a NULL
-    # profiles.company_id but a valid hr_users row — profiles-only would 403 them.
-    company_id = (db.get_hr_company_id(uid) if uid else None) or (db.get_profile_record(uid) or {}).get("company_id") or user.get("company")
-    if not company_id:
-        raise HTTPException(
-            status_code=403,
-            detail="No company linked to this profile — HR curation needs a tenant.",
-        )
-    return company_id
+    return caller_company_id(
+        user,
+        required=True,
+        detail="No company linked to this profile — HR curation needs a tenant.",
+    )
 
 
 def _caller_company_id_optional(user: Dict[str, Any]) -> Optional[str]:
@@ -81,9 +76,7 @@ def _caller_company_id_optional(user: Dict[str, Any]) -> Optional[str]:
     Used by read-only "dashboard widget" endpoints (notification badges,
     summary counts) that should render gracefully for admins / unlinked
     users rather than 403-ing every HR page load."""
-    uid = user.get("id")
-    company_id = (db.get_hr_company_id(uid) if uid else None) or (db.get_profile_record(uid) or {}).get("company_id") or user.get("company")
-    return str(company_id) if company_id else None
+    return caller_company_id(user)
 
 
 def _is_verified(attributes: Any) -> bool:
