@@ -15,7 +15,6 @@ import {
   buildConversationsFromQuoteThreads,
   conversationFromSummary,
 } from '../features/messages/utils';
-import { MOCK_CONVERSATIONS } from '../features/messages/mockData';
 import type { Conversation } from '../features/messages/types';
 
 export const Messages: React.FC = () => {
@@ -94,10 +93,7 @@ export const Messages: React.FC = () => {
           userName,
           labels
         );
-        let built = [...hrBuilt, ...supplierBuilt];
-        if (built.length === 0 && import.meta.env.DEV) {
-          built = MOCK_CONVERSATIONS;
-        }
+        const built = [...hrBuilt, ...supplierBuilt];
         setConversations(built);
         const aidFromUrl = searchParams.get('assignmentId');
         if (aidFromUrl) {
@@ -186,7 +182,7 @@ export const Messages: React.FC = () => {
         }
       } catch (e: unknown) {
         if (cancelled || axios.isCancel(e)) return;
-        setConversations(import.meta.env.DEV ? MOCK_CONVERSATIONS : []);
+        setConversations([]);
         setListError('Could not load conversations.');
       } finally {
         if (!cancelled) setLoading(false);
