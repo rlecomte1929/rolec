@@ -19,8 +19,9 @@ authored by Otto as ReloPass editorial assessment and are **NOT lawyer-verified*
 | `corridor-content/FR.ndjson` | 8 records | same, France |
 | `corridor-content/GB.ndjson` | 20 records | same, United Kingdom (post-Brexit third-country: Skilled Worker/BRP-eVisa, NI, HMRC PAYE, NHS/GP, council tax, right-to-rent). Wave 1. |
 | `corridor-content/ES.ndjson` | 12 records | same, Spain (EU free-mover NIE/empadronamiento vs non-EU visa/TIE, Seguridad Social, NIF/Agencia Tributaria, tarjeta sanitaria). Wave 1. |
+| `corridor-content/CH.ndjson` | 12 records | same, Switzerland (canton permit B/L + EU/EFTA, Gemeinde/Anmeldung, AHV, withholding + cantonal/federal tax, health-insurance window, Pillar 3a). Wave 1. |
 
-Record counts reconcile against Otto's informal manifest (NO=10, DE=8, FR=8, GB=20, ES=12).
+Record counts reconcile against Otto's informal manifest (NO=10, DE=8, FR=8, GB=20, ES=12, CH=12).
 
 ## Wave 1 harvest — GB (2026-09-09)
 
