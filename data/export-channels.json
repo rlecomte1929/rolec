@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "generated_date": "2026-09-09",
+  "lawyer_verified": false,
+  "note": "All entries are ReloPass editorial assessment. No country in this initial set has standardised fillable government AcroForms appropriate for ReloPass prefill — all three use render_data_sheet. Add acroform_available:true when a verified fillable template is onboarded.",
+  "channels": [
+    {
+      "country_iso": "NO",
+      "country_name": "Norway",
+      "export_channel": "render_data_sheet",
+      "acroform_available": false,
+      "acroform_note": null,
+      "portal_first_steps": ["no.d_number", "no.skattekort", "no.nav_registration", "no.residence_permit_udi"],
+      "in_person_steps": ["no.police_registration", "no.bank_account_opening"],
+      "render_title_template": "{employee_name} — Norway Relocation Document Pack — {corridor} — Move date {move_date}",
+      "government_portals": [
+        {"name": "UDI", "purpose": "immigration, residence/work permit", "url": "https://www.udi.no"},
+        {"name": "Altinn", "purpose": "D-number application, tax forms", "url": "https://www.altinn.no"},
+        {"name": "Skatteetaten", "purpose": "skattekort, D-number verification", "url": "https://www.skatteetaten.no"},
+        {"name": "NAV", "purpose": "social security, benefits registration", "url": "https://www.nav.no"},
+        {"name": "Politiet", "purpose": "police registration (EEA nationals, stays >3 months)", "url": "https://www.politiet.no"}
+      ],
+      "non_obvious_header_flag": "Norway is EEA but NOT EU. Employee type classification and document requirements differ materially from intra-EU moves. Confirm EEA status — not EU status — before filing any applications.",
+      "lawyer_verified": false
+    },
+    {
+      "country_iso": "DE",
+      "country_name": "Germany",
+      "export_channel": "render_data_sheet",
+      "acroform_available": false,
+      "acroform_note": "Anmeldeformular (address registration) is a standardised paper form but filed in person at Bürgeramt; no canonical fillable AcroForm. Ausländerbehörde forms are municipality-specific. No single national AcroForm set suitable for prefill.",
+      "portal_first_steps": [],
+      "in_person_steps": ["de.anmeldung", "de.aufenthaltstitel_application", "de.bank_account_opening"],
+      "render_title_template": "{employee_name} — Germany Relocation Document Pack — {corridor} — Move date {move_date}",
+      "government_portals": [
+        {"name": "BAMF", "purpose": "immigration, integration courses, Fachkräfteeinwanderung", "url": "https://www.bamf.de"},
+        {"name": "Bürgeramt (city-specific)", "purpose": "Anmeldung (address registration within 14 days)", "url": null},
+        {"name": "Bundesagentur für Arbeit", "purpose": "work permit enquiries, employment registration", "url": "https://www.arbeitsagentur.de"},
+        {"name": "Deutsche Rentenversicherung", "purpose": "Sozialversicherungsnummer", "url": "https://www.deutsche-rentenversicherung.de"},
+        {"name": "BZSt / Finanzamt", "purpose": "Steueridentifikationsnummer (issued by post post-Anmeldung)", "url": "https://www.bzst.de"}
+      ],
+      "non_obvious_header_flag": "Anmeldung (address registration) is a hard 14-day legal deadline from taking up residence — fines apply. Steuer-ID arrives by post 2–3 weeks after Anmeldung with no expedite path and must reach the registered address.",
+      "lawyer_verified": false
+    },
+    {
+      "country_iso": "FR",
+      "country_name": "France",
+      "export_channel": "render_data_sheet",
+      "acroform_available": false,
+      "acroform_note": "ANEF is web-portal-only since 2021–2022; no fillable PDF path. OFII validation is in-person. CPAM/CAF/impôts are web portals. No national AcroForm set.",
+      "portal_first_steps": ["fr.titre_sejour_anef", "fr.cpam_registration", "fr.caf_registration", "fr.tax_enrollment"],
+      "in_person_steps": ["fr.ofii_stamp"],
+      "render_title_template": "{employee_name} — France Relocation Document Pack — {corridor} — Move date {move_date}",
+      "government_portals": [
+        {"name": "ANEF", "purpose": "titre de séjour application and renewal", "url": "https://administration-etrangers-en-france.interieur.gouv.fr"},
+        {"name": "OFII", "purpose": "visa validation stamp, contrat d'intégration républicaine", "url": "https://www.ofii.fr"},
+        {"name": "Ameli / CPAM", "purpose": "health insurance and social security affiliation, carte vitale", "url": "https://www.ameli.fr"},
+        {"name": "CAF", "purpose": "family and housing benefits (APL)", "url": "https://www.caf.fr"},
+        {"name": "Impôts.gouv.fr", "purpose": "tax enrollment and annual declarations", "url": "https://www.impots.gouv.fr"}
+      ],
+      "non_obvious_header_flag": "ANEF portal (titre de séjour) replaced in-person prefecture queues but has documented reliability issues — apply minimum 60 days before move date and screenshot every submission confirmation.",
+      "lawyer_verified": false
+    }
+  ]
+}

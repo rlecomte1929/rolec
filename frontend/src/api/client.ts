@@ -1,7 +1,6 @@
 import axios, { type AxiosError } from 'axios';
 import type {
   ApiErrorBody,
-  ServiceContextResult,
   CountryResourcesResult,
   GuidanceGenerateResult,
   ThreadSummariesResult,
@@ -29,7 +28,6 @@ import type {
 import type { AiStep } from '../features/admin/specialist-review/RoadmapStepDiff';
 import type { ReasonCode, ReviewDecision } from '../features/admin/specialist-review/reasonCodes';
 import { signOutSupabase } from './supabaseAuth';
-import type { EmployeeTask, EmployeeTaskListResponse } from './employeeApi';
 
 // VITE_API_URL must be set for every environment:
 //   - Development:  http://localhost:8000         (via frontend/.env.development)
@@ -411,172 +409,8 @@ export type {
 } from './adminApi';
 export { adminAPI } from './adminApi';
 
-
-// Supplier Registry API (admin)
-export const suppliersAPI = {
-  list: async (params?: {
-    status?: string;
-    service_category?: string;
-    country_code?: string;
-    city_name?: string;
-    limit?: number;
-    offset?: number;
-  }) => {
-    const response = await api.get<{ suppliers: unknown[]; total?: number }>('/api/suppliers', { params: params || {} });
-    return response.data;
-  },
-  get: async (supplierId: string) => {
-    const response = await api.get<unknown>(`/api/suppliers/${supplierId}`);
-    return response.data;
-  },
-  listPendingCapabilities: async () => {
-    const response = await api.get<{ capabilities: unknown[]; total?: number }>(
-      '/api/suppliers/capabilities/pending'
-    );
-    return response.data;
-  },
-  search: async (params: {
-    service_category: string;
-    destination_country?: string;
-    destination_city?: string;
-    limit?: number;
-  }) => {
-    const response = await api.get<{ suppliers: unknown[]; total?: number }>('/api/suppliers/search', { params });
-    return response.data;
-  },
-  getCategories: async () => {
-    const response = await api.get<{ categories: unknown[] }>('/api/suppliers/categories');
-    return response.data;
-  },
-  getCountries: async () => {
-    const response = await api.get<{ countries: unknown[] }>('/api/suppliers/countries');
-    return response.data;
-  },
-  create: async (payload: Record<string, unknown>) => {
-    const response = await api.post<unknown>('/api/suppliers', payload);
-    return response.data;
-  },
-  update: async (supplierId: string, payload: Record<string, unknown>) => {
-    const response = await api.patch<unknown>(`/api/suppliers/${supplierId}`, payload);
-    return response.data;
-  },
-  setStatus: async (supplierId: string, status: 'active' | 'inactive' | 'draft') => {
-    const response = await api.patch<unknown>(`/api/suppliers/${supplierId}/status`, { status });
-    return response.data;
-  },
-  addCapability: async (supplierId: string, payload: Record<string, unknown>) => {
-    const response = await api.post<unknown>(`/api/suppliers/${supplierId}/capabilities`, payload);
-    return response.data;
-  },
-  updateCapability: async (
-    supplierId: string,
-    capabilityId: string,
-    payload: Record<string, unknown>
-  ) => {
-    const response = await api.patch<unknown>(
-      `/api/suppliers/${supplierId}/capabilities/${capabilityId}`,
-      payload
-    );
-    return response.data;
-  },
-  removeCapability: async (supplierId: string, capabilityId: string) => {
-    const response = await api.delete<unknown>(
-      `/api/suppliers/${supplierId}/capabilities/${capabilityId}`
-    );
-    return response.data;
-  },
-  approveCapability: async (supplierId: string, capabilityId: string, notes?: string) => {
-    const response = await api.post<unknown>(
-      `/api/suppliers/${supplierId}/capabilities/${capabilityId}/approve`,
-      { notes }
-    );
-    return response.data;
-  },
-  rejectCapability: async (supplierId: string, capabilityId: string, notes: string) => {
-    const response = await api.post<unknown>(
-      `/api/suppliers/${supplierId}/capabilities/${capabilityId}/reject`,
-      { notes }
-    );
-    return response.data;
-  },
-  updateScoring: async (supplierId: string, payload: Record<string, unknown>) => {
-    const response = await api.patch<unknown>(`/api/suppliers/${supplierId}/scoring`, payload);
-    return response.data;
-  },
-  getRankingDebug: async (
-    supplierId: string,
-    params?: { service_category?: string; destination_country?: string; destination_city?: string }
-  ) => {
-    const response = await api.get<unknown>(`/api/suppliers/${supplierId}/ranking-debug`, { params });
-    return response.data;
-  },
-};
-
-// Admin Prompt Registry API (admin only) — Parker Step D
-export type PromptVersion = {
-  id: string;
-  task_key: string;
-  version: number;
-  system_prompt: string;
-  user_template: string | null;
-  model_name: string;
-  temperature: number;
-  max_tokens: number;
-  status: string;
-  created_at?: string;
-  notes?: string | null;
-};
-
-export const promptsAPI = {
-  list: async (): Promise<PromptVersion[]> => {
-    const response = await api.get<PromptVersion[]>('/api/admin/prompts');
-    return response.data;
-  },
-  listForTask: async (taskKey: string): Promise<PromptVersion[]> => {
-    const response = await api.get<PromptVersion[]>(`/api/admin/prompts/${encodeURIComponent(taskKey)}`);
-    return response.data;
-  },
-  create: async (payload: {
-    task_key: string;
-    system_prompt: string;
-    model_name: string;
-    user_template?: string | null;
-    temperature?: number;
-    max_tokens?: number;
-    status?: string;
-    notes?: string | null;
-  }) => {
-    const response = await api.post<unknown>('/api/admin/prompts', payload);
-    return response.data;
-  },
-  promote: async (versionId: string, targetStatus: string) => {
-    const response = await api.post<unknown>(`/api/admin/prompts/${encodeURIComponent(versionId)}/promote`, {
-      target_status: targetStatus,
-    });
-    return response.data;
-  },
-  setCanaryShare: async (taskKey: string, canaryShare: number) => {
-    const response = await api.post<unknown>(`/api/admin/prompts/${encodeURIComponent(taskKey)}/canary-share`, {
-      canary_share: canaryShare,
-    });
-    return response.data;
-  },
-  // Parker Step E — per-version win rates (approvals / verdicts) with Wilson CI.
-  winRates: async (taskKey: string): Promise<Record<string, WinRate>> => {
-    const response = await api.get<Record<string, WinRate>>(`/api/admin/prompts/${encodeURIComponent(taskKey)}/win-rates`);
-    return response.data;
-  },
-};
-
-// Parker Step E — per-version human-feedback win rate, keyed by prompt_version_id.
-export type WinRate = {
-  version_id: string;
-  approvals: number;
-  total: number;
-  win_rate: number;
-  ci_low: number;
-  ci_high: number;
-};
+export type { PromptVersion, WinRate } from './suppliersApi';
+export { suppliersAPI, promptsAPI } from './suppliersApi';
 
 // Admin HR Prospect Pipeline API (admin only)
 export type ProspectSeedItem = {
@@ -1212,308 +1046,20 @@ export type {
 } from './requirementsApi';
 export { requirementsAPI } from './requirementsApi';
 
-/** What POST /api/rfqs actually did.
- *
- *  [AIQ-1521] `contacted` is the list of suppliers whose inbox the request reached. It is EMPTY
- *  when supplier dispatch is turned off — in which case nobody outside ReloPass has seen the
- *  request, and the UI must say so. `not_contacted` gives the honest reason per supplier
- *  (typically: we hold no email address for them). */
-export interface RfqCreateResult {
-  ok: boolean;
-  rfq: { id: string; rfq_ref: string };
-  /** Shortlisted items that resolved to no supplier at all (AIQ-1520). */
-  unreachable: string[];
-  contacted?: string[];
-  not_contacted?: Array<{ supplier: string; reason: string }>;
-}
-
-export const servicesAPI = {
-  /** Combined load: assignment, case context, services, answers, questions in one request. Use instead of 4 separate calls. */
-  getServicesContext: async (
-    assignmentId: string,
-    fallbackServices?: string[]
-  ): Promise<{
-    assignment_id: string;
-    case_id: string;
-    case_context: { destCity?: string; destCountry?: string; originCity?: string; originCountry?: string };
-    /** AIQ-1249d: canonical move date for the services context banner. */
-    target_start_date?: string | null;
-    services: Array<{ service_key: string; selected: boolean | number; [k: string]: unknown }>;
-    answers: Array<{ service_key: string; answers: Record<string, unknown> }>;
-    questions: unknown[];
-    selected_services: string[];
-  }> => {
-    const params: Record<string, string> = { assignment_id: assignmentId };
-    if (fallbackServices?.length) {
-      params.fallback_services = fallbackServices.join(',');
-    }
-    const response = await api.get<ServiceContextResult>('/api/services/context', { params });
-    return response.data;
-  },
-  getServiceAnswers: async (params: { caseId?: string; assignmentId?: string }): Promise<{ case_id: string; answers: unknown[] }> => {
-    const p = params.caseId ? { case_id: params.caseId } : { assignment_id: params.assignmentId };
-    const response = await api.get<{ case_id: string; answers: unknown[] }>('/api/services/answers', { params: p });
-    return response.data;
-  },
-  getServiceQuestions: async (
-    assignmentId: string,
-    fallbackServices?: string[]
-  ): Promise<{ questions: unknown[]; selected_services: string[] }> => {
-    const params: Record<string, string> = { assignment_id: assignmentId };
-    if (fallbackServices?.length) {
-      params.fallback_services = fallbackServices.join(',');
-    }
-    const response = await api.get<{ questions: unknown[]; selected_services: string[] }>('/api/services/questions', { params });
-    return response.data;
-  },
-  saveServiceAnswers: async (
-    caseId: string,
-    items: Array<{ service_key: string; answers: Record<string, unknown> }>,
-    options?: { signal?: AbortSignal }
-  ): Promise<{ ok: boolean }> => {
-    const config = options?.signal ? { signal: options.signal } : {};
-    const response = await api.post<{ ok: boolean }>('/api/services/answers', { case_id: caseId, items }, config);
-    return response.data;
-  },
-  /** Create a real RFQ: one `rfqs` row + one `rfq_recipients` row per supplier.
-   *
-   *  `unreachable` (AIQ-1520) names the suppliers we could NOT reach — a catalog item with no
-   *  supplier on record. The RFQ still goes to everyone who DID resolve; the caller must tell
-   *  the employee who was left out rather than quietly send to fewer suppliers than they chose.
-   *
-   *  `contacted` / `not_contacted` (AIQ-1521) say what actually reached a supplier's inbox. The
-   *  UI copy MUST be driven off these, not assumed: when supplier dispatch is off, `contacted` is
-   *  empty and nobody was emailed — claiming otherwise would be the same lie AIQ-1515 removed. */
-  createRfq: async (
-    caseId: string,
-    items: Array<{ service_key: string; requirements: Record<string, unknown> }>,
-    supplierIds: string[]
-  ): Promise<RfqCreateResult> => {
-    const response = await api.post<RfqCreateResult>(
-      '/api/rfqs',
-      { case_id: caseId, items, supplier_ids: supplierIds },
-    );
-    return response.data;
-  },
-
-  // ---- Task Portal (AIQ-34-B) ----
-
-  /** List all tasks for the current employee (auto-resolves case from linked assignment). */
-  getTasks: async (caseId?: string): Promise<EmployeeTaskListResponse> => {
-    const params: Record<string, string> = {};
-    if (caseId) params.case_id = caseId;
-    const response = await api.get<EmployeeTaskListResponse>('/api/employee/tasks', { params });
-    return response.data;
-  },
-
-  /** Get a single task by ID. */
-  getTask: async (taskId: string): Promise<EmployeeTask> => {
-    const response = await api.get<EmployeeTask>(`/api/employee/tasks/${taskId}`);
-    return response.data;
-  },
-
-  /** Submit a task with optional form data and/or file URL. */
-  submitTask: async (
-    taskId: string,
-    payload: { submission_data?: Record<string, unknown>; file_url?: string }
-  ): Promise<EmployeeTask> => {
-    const response = await api.patch<EmployeeTask>(`/api/employee/tasks/${taskId}`, payload);
-    return response.data;
-  },
-};
-
-/** [AIQ-1516] The 5 categories HR must pick from when overriding the recommendation. */
-export type OverrideReasonCategory =
-  | 'employee_preference'
-  | 'preferred_supplier'
-  | 'negotiated_terms'
-  | 'policy_exception'
-  | 'other';
-
-/** [AIQ-1516] Best-value recommendation. `confidence: 'REFUSED'` (with `refused_reason`) means
- *  ranking would mislead — render the reason, not a pick. Never a bare score. */
-export interface RfqRecommendation {
-  recommended_quote_id: string | null;
-  confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'REFUSED';
-  headline: string;
-  reasons: string[];
-  trade_offs: string[];
-  refused_reason?: string;
-}
-
-export interface PayerView {
-  rfq_id: string;
-  quotes: QuoteDetail[];
-  recommendation: RfqRecommendation;
-}
-
-export const rfqAPI = {
-  listByAssignment: async (assignmentId: string): Promise<{ rfqs: RfqSummary[] }> => {
-    const response = await api.get<{ rfqs: RfqSummary[] }>(`/api/employee/assignments/${assignmentId}/rfqs`);
-    return response.data;
-  },
-  get: async (rfqId: string): Promise<RfqDetail> => {
-    const response = await api.get<RfqDetail>(`/api/rfqs/${rfqId}`);
-    return response.data;
-  },
-  listQuotes: async (
-    rfqId: string,
-    options?: { comparison?: boolean }
-  ): Promise<{ rfq_id: string; quotes: QuoteDetail[] }> => {
-    const params = options?.comparison ? { comparison: '1' } : {};
-    const response = await api.get<{ rfq_id: string; quotes: QuoteDetail[] }>(`/api/rfqs/${rfqId}/quotes`, { params });
-    return response.data;
-  },
-  /** [AIQ-1516] The best-value recommendation for an RFQ's offers. Read-only; grounded only in
-   *  signals that exist (price vs market, quality when reviews suffice) and REFUSES to rank when
-   *  that would mislead (currency mismatch, a single offer). HR still validates via acceptQuote. */
-  getPayerView: async (rfqId: string): Promise<PayerView> => {
-    const response = await api.get<PayerView>(`/api/rfqs/${rfqId}/payer-view`);
-    return response.data;
-  },
-  /** AIQ-1524: HR (the payer) validates the offer the company will pay for. HR-only — an
-   *  employee calling this gets a 403. `reason` is recorded and shown back to the employee,
-   *  and matters most when HR validates something other than what the employee proposed.
-   *  [AIQ-1516] `overrideReasonCategory` is required by the server (422) when HR validates an
-   *  offer other than the recommendation. */
-  acceptQuote: async (
-    rfqId: string,
-    quoteId: string,
-    reason?: string,
-    overrideReasonCategory?: OverrideReasonCategory,
-  ): Promise<{ ok: boolean; quote: QuoteDetail }> => {
-    const body: Record<string, string> = {};
-    if (reason) body.reason = reason;
-    if (overrideReasonCategory) body.override_reason_category = overrideReasonCategory;
-    const response = await api.patch<{ ok: boolean; quote: QuoteDetail }>(
-      `/api/rfqs/${rfqId}/quotes/${quoteId}/accept`,
-      body,
-    );
-    return response.data;
-  },
-  /** AIQ-1524: the EMPLOYEE proposes the offer they want. Commits no spend — HR validates. */
-  proposeQuote: async (rfqId: string, quoteId: string): Promise<{ ok: boolean }> => {
-    const response = await api.patch<{ ok: boolean }>(`/api/rfqs/${rfqId}/quotes/${quoteId}/propose`);
-    return response.data;
-  },
-};
-
-export const vendorAPI = {
-  listRfqs: async (): Promise<{ rfqs: RfqSummary[] }> => {
-    const response = await api.get<{ rfqs: RfqSummary[] }>('/api/vendor/rfqs');
-    return response.data;
-  },
-  getRfq: async (rfqId: string): Promise<RfqDetail> => {
-    const response = await api.get<RfqDetail>(`/api/vendor/rfqs/${rfqId}`);
-    return response.data;
-  },
-  submitQuote: async (
-    rfqId: string,
-    payload: QuoteCreatePayload
-  ): Promise<{ ok: boolean; quote: QuoteDetail }> => {
-    const response = await api.post<{ ok: boolean; quote: QuoteDetail }>(`/api/vendor/rfqs/${rfqId}/quotes`, payload);
-    return response.data;
-  },
-};
-
-export interface RfqSummary {
-  id: string;
-  rfq_ref: string;
-  case_id: string;
-  /** Populated by GET /api/rfqs/{id} when the case is linked to an assignment */
-  assignment_id?: string;
-  status: string;
-  created_at: string;
-  items?: Array<{ service_key: string; requirements: Record<string, unknown> }>;
-  recipients?: Array<{ vendor_id: string; status: string }>;
-}
-
-export interface RfqDetail extends RfqSummary {
-  items: Array<{ service_key: string; requirements: Record<string, unknown> }>;
-  recipients: Array<{ vendor_id: string; status: string }>;
-  /** AIQ-1524: the offer the EMPLOYEE proposed. A proposal — it commits no spend. */
-  preferred_quote_id?: string | null;
-  /** AIQ-1524: the offer HR (the payer) validated. This is the spend approval. */
-  validated_quote_id?: string | null;
-  /** AIQ-1524: why HR validated this offer — surfaced to the employee, and it matters most
-   *  when HR validated something other than what the employee proposed. */
-  validation_reason?: string | null;
-}
-
-export interface QuoteDetail {
-  id: string;
-  rfq_id: string;
-  vendor_id: string;
-  currency: string;
-  total_amount: number;
-  valid_until?: string;
-  status: string;
-  quote_lines?: Array<{ label: string; amount: number }>;
-}
-
-export interface QuoteCreatePayload {
-  total_amount: number;
-  currency: string;
-  valid_until?: string;
-  quote_lines: Array<{ label: string; amount: number }>;
-}
-
-export interface TimelineTaskSummary {
-  total: number;
-  completed: number;
-  overdue: number;
-  due_this_week: number;
-  blocked: number;
-  in_progress: number;
-}
-
-export interface TimelineResponse {
-  case_id: string;
-  assignment_id?: string;
-  milestones: TimelineMilestone[];
-  summary: TimelineTaskSummary;
-}
-
-export const timelineAPI = {
-  getByAssignment: async (
-    assignmentId: string,
-    options?: { ensureDefaults?: boolean; includeLinks?: boolean }
-  ): Promise<TimelineResponse> => {
-    const params: Record<string, string> = {};
-    if (options?.ensureDefaults) params.ensure_defaults = '1';
-    if (options?.includeLinks === false) params.include_links = 'false';
-    const response = await api.get<TimelineResponse>(`/api/assignments/${assignmentId}/timeline`, { params });
-    return response.data;
-  },
-  getByCase: async (
-    caseId: string,
-    options?: { ensureDefaults?: boolean; includeLinks?: boolean }
-  ): Promise<TimelineResponse> => {
-    const params: Record<string, string> = {};
-    if (options?.ensureDefaults) params.ensure_defaults = '1';
-    if (options?.includeLinks === false) params.include_links = 'false';
-    const response = await api.get<TimelineResponse>(`/api/cases/${caseId}/timeline`, { params });
-    return response.data;
-  },
-  updateMilestone: async (
-    caseId: string,
-    milestoneId: string,
-    patch: Partial<{
-      title: string;
-      description: string;
-      target_date: string;
-      actual_date: string;
-      status: string;
-      sort_order: number;
-      owner: string;
-      criticality: string;
-      notes: string | null;
-    }>
-  ): Promise<TimelineMilestone> => {
-    const response = await api.patch<TimelineMilestone>(`/api/cases/${caseId}/timeline/milestones/${milestoneId}`, patch);
-    return response.data;
-  },
-};
+export type {
+  OverrideReasonCategory,
+  PayerView,
+  QuoteCreatePayload,
+  QuoteDetail,
+  RfqCreateResult,
+  RfqDetail,
+  RfqRecommendation,
+  RfqSummary,
+  TimelineMilestone,
+  TimelineResponse,
+  TimelineTaskSummary,
+} from './servicesApi';
+export { servicesAPI, rfqAPI, vendorAPI, timelineAPI } from './servicesApi';
 
 // ── Provider Status Grid types (AIQ-14) ───────────────────────────────────────
 
@@ -1574,24 +1120,6 @@ export interface CommandCenterCaseRow {
 }
 
 export type TaskOwner = 'hr' | 'employee' | 'provider' | 'joint';
-
-export interface TimelineMilestone {
-  id: string;
-  case_id: string;
-  milestone_type: string;
-  title: string;
-  description?: string;
-  target_date?: string;
-  actual_date?: string;
-  status: string;
-  sort_order: number;
-  owner?: string;
-  criticality?: string;
-  notes?: string | null;
-  created_at?: string;
-  updated_at?: string;
-  links?: Array<{ id: string; linked_entity_type: string; linked_entity_id: string }>;
-}
 
 export { policyConfigMatrixAPI, companyPolicyAPI, hrPolicyReviewAPI, policyDocumentsAPI } from './policyApi';
 
@@ -1779,13 +1307,6 @@ export const guidanceAPI = {
     return response.data;
   },
 };
-
-export type {
-  PolicyTemplateCategoryOut,
-  PolicyTemplateTierOut,
-  PolicyTemplatesResponse,
-} from './policyBuilderApi';
-export { policyBuilderAPI } from './policyBuilderApi';
 
 export default api;
 

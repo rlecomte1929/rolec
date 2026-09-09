@@ -5,12 +5,13 @@
  * backend/app/routers/data_sheet.py:
  *   GET   /api/cases/{caseId}/datasheet
  *   PATCH /api/cases/{caseId}/datasheet/fields/{fieldId}
+ *   GET   /api/cases/{caseId}/datasheet/pdf   (Phase 3 export)
  *
  * Types are camelCase to match the backend wire format (which follows the
  * CaseRequirementsDTO convention). {caseId} accepts an assignment id or a case
  * id — the backend resolves it — so pass whatever the page already holds.
  */
-import { apiGet, apiPatch } from './client';
+import api, { apiGet, apiPatch } from './client';
 
 /** Where a field's value came from. `consult_professional` = a regulated determination
  *  ReloPass never fills (value is always null). `needs_input` = the employee must supply it. */
@@ -114,3 +115,25 @@ export const patchDataSheetField = (
     `/api/cases/${encodeURIComponent(caseId)}/datasheet/fields/${encodeURIComponent(fieldId)}${queryString(opts)}`,
     { value },
   );
+
+/** Download the data sheet as a print-grade PDF (Phase 3). Streams the bytes and triggers a
+ *  browser download, reading the filename from Content-Disposition (fallback datasheet.pdf).
+ *  Mirrors formEditorAPI.downloadPdf — direct byte stream via the shared axios client. */
+export async function downloadDatasheetPdf(caseId: string): Promise<void> {
+  const response = await api.get(
+    `/api/cases/${encodeURIComponent(caseId)}/datasheet/pdf`,
+    { responseType: 'blob' },
+  );
+  const blob = new Blob([response.data], { type: 'application/pdf' });
+  const disposition = String(response.headers?.['content-disposition'] ?? '');
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const filename = match?.[1] ?? 'datasheet.pdf';
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}

@@ -1,0 +1,18 @@
+{
+  "batch_id": "vendor-enrichment-schools-de-2026-09-09",
+  "record_count": 13,
+  "sha256_ndjson": "1971ed7e47fd1bec43a414b7db2d2a3963952d1c2b73432eb535954bd44b40df",
+  "fields": [
+    "key",
+    "firm_name",
+    "contact_email",
+    "contact_phone",
+    "description",
+    "languages_supported",
+    "specialization_tags",
+    "city",
+    "confidence",
+    "status",
+    "notes"
+  ]
+}
