@@ -16,7 +16,7 @@
  */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { PolicyChunk } from '../retrieve_policy';
+import type { PolicyChunk } from '../../../src/features/policy-builder/retrieve_policy';
 import {
   computeContextPrecision,
   computeContextRecall,

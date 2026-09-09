@@ -31,7 +31,7 @@ export default defineConfig({
     // eslint-rules/ is included so the custom lint rules have real automated
     // coverage. no-low-contrast-text auto-fixes ~890 sites in one sweep, so its
     // fixer has to be verified, not eyeballed against a fixture.
-    include: ['src/**/*.test.{ts,tsx}', 'eslint-rules/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'eval/**/*.test.ts', 'eslint-rules/**/*.test.{ts,tsx}'],
     passWithNoTests: true,
     // TEST-2: load jest-dom matchers once for every test (was imported ad-hoc
     // in ~69/128 files and relied on transitive load in the rest).

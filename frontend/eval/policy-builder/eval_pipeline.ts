@@ -22,7 +22,7 @@
  */
 
 import { classifyChunk, CATEGORIES, type ClassificationOutput, type ExtractedValue } from './classification_prompt';
-import { detectInterDocConflicts, detectIntraDocConflicts, type PolicyFactInput } from './conflict_detector';
+import { detectInterDocConflicts, detectIntraDocConflicts, type PolicyFactInput } from '../../src/features/policy-builder/conflict_detector';
 
 // ---------------------------------------------------------------------------
 // Ground truth types
