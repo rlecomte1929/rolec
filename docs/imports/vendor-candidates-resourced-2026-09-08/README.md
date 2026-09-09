@@ -489,6 +489,23 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1065 → 1070. (IT housing now 40: Rome 4 +
   Milan 5 + Florence 6 + Turin 8 + Naples 5 + Bologna 7 + Genoa 5.)
 
+### XX-IT housing_agencies (Verona real-estate agencies) — `vendor-resourced-xx-it-housing-verona-2026-09-09` (landed 2026-09-10)
+- Source (GCS): `1788997711202_s4bga7kw.ndjson` (+ manifest `1788997766496_72r73yca.json`).
+- Otto manifest: **7 sourced, 7 rejected** (counts reconcile: 7 ndjson objects = total_sourced 7).
+  Honest rejects: commercial-only, industrial-only, residential-sales-only, out-of-city
+  (Tregnago/Villafranca/Castel d'Azzano); Engel & Völkers Verona City (GBSRE S.r.l.) rejected —
+  franchise, no firm-published REA; Immobiliare Castello excluded (REA present but out of target city).
+- **PUBLIC_REGISTER (registroimprese.it / REA).** All 7 `source_url`s = wired `registroimprese.it`
+  (0 firm-site); corridor **XX-IT** explicit. REA province **VR**: Area Affari VR-354521, Finalmente
+  Casa Verona VR-396194, Immobiliare Verona Centrale VR-383018, Caloi Immobiliare VR-420849,
+  Immobiliare Maffei VR-389338, Puccio Case VR-418952, Veronahome VR-422119. Same captcha-walled
+  register caveat — vetter confirms on the live register.
+- `_name_key` predictor: all 7 distinct + new; no franchise/multinational, no domain collisions.
+  Landed: **+7 new suppliers** (IT/housing_agencies, pending), 0 mis-attach. Tripwire: `ssc`
+  `approved` **130 → 130** md5 `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1070 → 1077.
+  (IT housing now 47: Rome 4 + Milan 5 + Florence 6 + Turin 8 + Naples 5 + Bologna 7 + Genoa 5 +
+  Verona 7.)
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
