@@ -1,0 +1,134 @@
+{
+  "categories": [],
+  "tags": [],
+  "sources": [
+    {
+      "source_name": "www.service-public.fr",
+      "publisher": "www.service-public.fr",
+      "source_type": "commercial",
+      "url": "https://www.service-public.fr/particuliers/vosdroits/N20360",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.service-public.gouv.fr",
+      "publisher": "www.service-public.gouv.fr",
+      "source_type": "commercial",
+      "url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F2413",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.education.gouv.fr",
+      "publisher": "www.education.gouv.fr",
+      "source_type": "commercial",
+      "url": "https://www.education.gouv.fr/",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.impots.gouv.fr",
+      "publisher": "www.impots.gouv.fr",
+      "source_type": "commercial",
+      "url": "https://www.impots.gouv.fr/",
+      "trust_tier": "T2"
+    },
+    {
+      "source_name": "www.iledefrance-mobilites.fr",
+      "publisher": "www.iledefrance-mobilites.fr",
+      "source_type": "commercial",
+      "url": "https://www.iledefrance-mobilites.fr/",
+      "trust_tier": "T2"
+    }
+  ],
+  "resources": [
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "city_name": "Paris",
+      "category_key": "housing",
+      "title": "Housing — Paris",
+      "body": "Renting in Paris typically requires a full dossier (photo ID, proof of income around three times the rent, employment contract, guarantor). Unfurnished leases (bail vide) run three years and furnished leases (bail meuble) one year. The security deposit is capped by law at one month's rent for unfurnished and two months for furnished.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-fr-paris-housing",
+      "source_url": "https://www.service-public.fr/particuliers/vosdroits/N20360",
+      "source_name": "www.service-public.fr"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "city_name": "Paris",
+      "category_key": "admin_essentials",
+      "title": "Banking — Paris",
+      "body": "Opening a French bank account requires proof of identity and proof of address. If a bank refuses, the 'droit au compte' guarantees basic banking services through an institution designated by the Banque de France.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-fr-paris-banking",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F2413",
+      "source_name": "www.service-public.gouv.fr"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "city_name": "Paris",
+      "category_key": "schools_childcare",
+      "title": "Schools & childcare — Paris",
+      "body": "Paris public schools are overseen by the Academie de Paris. Enrolment (inscription scolaire) for maternelle and elementaire is handled by the Mairie de Paris, and directly by the establishment for college and lycee. International and bilingual sections and private international schools are also available.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-fr-paris-schools",
+      "source_url": "https://www.education.gouv.fr/",
+      "source_name": "www.education.gouv.fr"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "city_name": "Paris",
+      "category_key": "admin_essentials",
+      "title": "Registration & admin — Paris",
+      "body": "New residents complete residence and registration formalities. Non-EU nationals must validate their long-stay visa or hold a titre de sejour; administrative procedures are centralised on service-public.fr.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-fr-paris-legal_admin",
+      "source_url": "https://www.service-public.fr/",
+      "source_name": "www.service-public.fr"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "city_name": "Paris",
+      "category_key": "admin_essentials",
+      "title": "Tax & finance — Paris",
+      "body": "Residents declare income to the Direction generale des Finances publiques via impots.gouv.fr. A tax number (numero fiscal) is required to create an online account and file a declaration.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-fr-paris-tax_finance",
+      "source_url": "https://www.impots.gouv.fr/",
+      "source_name": "www.impots.gouv.fr"
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "city_name": "Paris",
+      "category_key": "transport",
+      "title": "Transport — Paris",
+      "body": "Paris and the Ile-de-France region are served by an integrated network of metro, RER, bus and tram, accessed with the Navigo pass. Fares and passes are set by Ile-de-France Mobilites.",
+      "resource_type": "guide",
+      "audience_type": "all",
+      "status": "draft",
+      "is_visible_to_end_users": false,
+      "external_key": "citysvc-fr-paris-transport",
+      "source_url": "https://www.iledefrance-mobilites.fr/",
+      "source_name": "www.iledefrance-mobilites.fr"
+    }
+  ],
+  "events": []
+}

@@ -27,6 +27,6 @@ export function pathTileSubtitle(input: {
     const noun = requirementCount === 1 ? 'requirement' : 'requirements';
     return `${requirementCount} ${noun} for this destination — see below.`;
   }
-  if (destination) return 'No permit mapping for this destination yet.';
+  if (destination) return 'This corridor is not ready. No permit mapping for this destination yet.';
   return 'Awaiting destination from intake.';
 }

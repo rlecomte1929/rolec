@@ -150,6 +150,7 @@ def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]
             "required_fields_json": json.dumps(["employeeProfile.passportExpiry"]),
             "citations_json": json.dumps(source_ids[:1]),
             "last_verified_at": now,
+            "review_status": "pending",
         },
         {
             "id": str(uuid.uuid4()),
@@ -163,6 +164,7 @@ def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]
             "required_fields_json": json.dumps(["assignmentContext.employerName", "assignmentContext.jobTitle"]),
             "citations_json": json.dumps(source_ids[:1]),
             "last_verified_at": now,
+            "review_status": "pending",
         },
         {
             "id": str(uuid.uuid4()),
@@ -176,6 +178,7 @@ def _default_requirements(dest_country: str, purpose: str, source_ids: List[str]
             "required_fields_json": json.dumps(["assignmentContext.contractStartDate"]),
             "citations_json": json.dumps(source_ids[:2]),
             "last_verified_at": now,
+            "review_status": "pending",
         },
     ]
     return requirements

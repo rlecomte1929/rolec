@@ -1,7 +1,7 @@
 export const EMPLOYEE_POLICY_ASSISTANT_TITLE = 'Ask about your policy';
 
 export const EMPLOYEE_POLICY_ASSISTANT_SUBTITLE =
-  'Questions use your company’s published relocation policy for this assignment.';
+  'Finds the relevant clause in your company’s published policy. Open the cited source for numbers and exact wording.';
 
 /** Same as subtitle; used where the sheet chrome repeats context. */
 export const EMPLOYEE_POLICY_ASSISTANT_PANEL_INTRO = EMPLOYEE_POLICY_ASSISTANT_SUBTITLE;
@@ -22,7 +22,7 @@ export const EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY = 'Not legal or immi
  * no longer renders them.
  */
 export const EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL =
-  'Verified from your company policy — not legal or immigration advice';
+  'Orientation from published policy — open the source for the fact. Not legal or immigration advice';
 
 export const EMPLOYEE_POLICY_ASSISTANT_NO_ASSIGNMENT =
   'Link an active assignment to use policy Q&A.';

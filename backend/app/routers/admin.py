@@ -12,6 +12,7 @@ from ..db import SessionLocal
 from ...database import db, Database
 from ...db.policies import UnattestedLawyerReviewError, UnquotedApprovalError
 from .. import crud, schemas, models
+from ..services.knowledge_layer_scorecard import score_requirement_rows
 from ..services.research import run_country_research
 from ..services import requirements_builder
 from ..services.official_ingest_service import ingest_url_to_knowledge_doc
@@ -89,15 +90,23 @@ def list_countries(user: dict = Depends(require_admin)):
         items = []
         for profile in profiles:
             sources = crud.list_sources(db, profile.country_code)
-            requirements = crud.list_requirements(db, profile.country_code)
+            source_map = {record.id: record for record in sources}
+            all_requirements = crud.list_requirements(
+                db, profile.country_code, include_unapproved=True
+            )
+            approved = [r for r in all_requirements if (r.review_status or "") == "approved"]
+            card = score_requirement_rows(all_requirements, source_map)
             top_domains = list({source.publisher_domain for source in sources})[:3]
             items.append(
                 schemas.CountryListItemDTO(
                     countryCode=profile.country_code,
                     lastUpdatedAt=profile.last_updated_at,
-                    requirementsCount=len(requirements),
+                    requirementsCount=len(approved),
                     confidenceScore=profile.confidence_score,
                     topDomains=top_domains,
+                    catalogReady=card.catalog_ready,
+                    pendingCount=card.pending_count,
+                    citationResolvePct=card.citation_resolve_pct,
                 )
             )
         return schemas.CountryListDTO(countries=items)
@@ -241,10 +250,22 @@ def list_country_requirements(country_code: str, user: dict = Depends(require_ad
         dtos = [_review_dto(i, source_map) for i in items]
     order = {"pending": 0, "rejected": 1, "approved": 2}
     dtos.sort(key=lambda d: (order.get(d.reviewStatus, 9), d.purpose, d.title))
+    card = score_requirement_rows(items, source_map)
     return schemas.AdminRequirementListDTO(
         countryCode=code,
         pendingCount=sum(1 for d in dtos if d.reviewStatus == "pending"),
         items=dtos,
+        scorecard=schemas.KnowledgeScorecardDTO(
+            approvedCount=card.approved_count,
+            pendingCount=card.pending_count,
+            rejectedCount=card.rejected_count,
+            citationResolvedApproved=card.citation_resolved_approved,
+            citationResolvePct=card.citation_resolve_pct,
+            pillarsPresent=list(card.pillars_present),
+            lastHumanReviewAt=card.last_human_review_at,
+            catalogReady=card.catalog_ready,
+            notReadyReason=card.not_ready_reason,
+        ),
     )
 
 

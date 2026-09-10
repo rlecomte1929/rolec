@@ -32,7 +32,7 @@ describe('pathTileSubtitle', () => {
   it('falls back to the permit-mapping notice when the catalog has nothing', () => {
     expect(
       pathTileSubtitle({ permitLabel: null, requirementCount: 0, destination: 'IRELAND' }),
-    ).toBe('No permit mapping for this destination yet.');
+    ).toBe('This corridor is not ready. No permit mapping for this destination yet.');
   });
 
   it('still distinguishes "no destination" from "destination with no mapping"', () => {

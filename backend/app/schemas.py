@@ -234,10 +234,25 @@ class AdminRequirementReviewDTO(BaseModel):
     attestedAt: Optional[datetime] = None
 
 
+class KnowledgeScorecardDTO(BaseModel):
+    """Admin/public catalog sufficiency. Does not change which rows are served."""
+
+    approvedCount: int
+    pendingCount: int
+    rejectedCount: int = 0
+    citationResolvedApproved: int
+    citationResolvePct: float
+    pillarsPresent: List[str] = []
+    lastHumanReviewAt: Optional[datetime] = None
+    catalogReady: bool
+    notReadyReason: Optional[str] = None
+
+
 class AdminRequirementListDTO(BaseModel):
     countryCode: str
     pendingCount: int = 0
     items: List[AdminRequirementReviewDTO] = []
+    scorecard: Optional[KnowledgeScorecardDTO] = None
 
 
 class AdminRequirementReviewRequest(BaseModel):
@@ -250,6 +265,9 @@ class CountryListItemDTO(BaseModel):
     requirementsCount: int
     confidenceScore: Optional[float] = None
     topDomains: List[str]
+    catalogReady: bool = False
+    pendingCount: int = 0
+    citationResolvePct: float = 0.0
 
 
 class CountryListDTO(BaseModel):
@@ -280,6 +298,10 @@ class CaseRequirementsDTO(BaseModel):
     # that country, NOT because nothing is required. Lets the UI say so instead
     # of rendering an empty list as "nothing required" (the AIQ-1349 silent-miss).
     covered: bool = True
+    # Knowledge-layer sufficiency of the approved catalog (citations + pillars).
+    # Independent of `covered`: a known destination can still be not-ready to sell.
+    catalogReady: bool = True
+    catalogNotReadyReason: Optional[str] = None
 
 
 class AssignmentType(str, Enum):

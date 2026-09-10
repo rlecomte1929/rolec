@@ -45,7 +45,7 @@ describe('an empty section must never claim "nothing is required"', () => {
     getRequirements.mockResolvedValue(dto({ covered: false, requirements: [] }));
     render(<DestinationRequirements caseId="c1" />);
 
-    await waitFor(() => expect(screen.getByText(/Requirements not available yet/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/This corridor is not ready/i)).toBeTruthy());
     expect(screen.queryByText(/no destination requirements apply/i)).toBeNull();
   });
 });

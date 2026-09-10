@@ -543,6 +543,9 @@ export interface CountryListDTO {
     requirementsCount: number;
     confidenceScore?: number;
     topDomains: string[];
+    catalogReady?: boolean;
+    pendingCount?: number;
+    citationResolvePct?: number;
   }[];
 }
 
@@ -569,6 +572,9 @@ export interface CaseRequirementsDTO {
   // the empty list then means "no catalogue yet", not "nothing required".
   // Undefined from older backends → treat as covered (no notice).
   covered?: boolean;
+  /** False when the approved catalog fails citation/pillar sufficiency. */
+  catalogReady?: boolean;
+  catalogNotReadyReason?: string | null;
 }
 
 export interface RelocationCaseListItem {

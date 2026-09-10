@@ -122,6 +122,31 @@ def test_a_reimport_updates_content_in_place_rather_than_inserting(db):
     assert row.description == "Revised wording from the re-import."
 
 
+def test_reimport_does_not_clobber_review_status(db):
+    """A human publish must survive a seed/Otto re-run that still says pending."""
+    payloads = _norway_payloads()
+    first = dict(payloads[0], last_verified_at=datetime(2026, 8, 15), review_status="pending")
+    crud.create_requirement_item(db, first)
+    row = db.query(models.RequirementItem).one()
+    row.review_status = "approved"
+    db.commit()
+
+    again = dict(first, review_status="pending", description="Agent rewrite")
+    crud.create_requirement_item(db, again)
+    row = db.query(models.RequirementItem).one()
+    assert row.review_status == "approved"
+    assert row.description == "Agent rewrite"
+
+
+def test_insert_without_review_status_lands_pending_not_approved(db):
+    payloads = _norway_payloads()
+    first = dict(payloads[0], last_verified_at=datetime(2026, 8, 15))
+    first.pop("review_status", None)
+    crud.create_requirement_item(db, first)
+    row = db.query(models.RequirementItem).one()
+    assert row.review_status == "pending"
+
+
 # ── (b) the guard is a database constraint, not an application convention ───────────
 
 

@@ -198,8 +198,8 @@ export const RequirementsSufficiencyPanel: React.FC<Props> = ({ caseId, intakeHr
               className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
             >
               We don’t yet hold reviewed requirements for{' '}
-              <strong>{data?.destination_country}</strong>. That means we haven’t recorded
-              them — <strong>not</strong> that nothing is required of you. Check with your HR
+              <strong>{data?.destination_country}</strong>. This corridor is not ready —{' '}
+              <strong>not</strong> that nothing is required of you. Check with your HR
               contact or the destination’s authorities.
             </div>
           )}

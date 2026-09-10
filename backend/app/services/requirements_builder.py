@@ -10,6 +10,7 @@ from .. import crud
 from ..db import SessionLocal
 from ..schemas import CaseRequirementsDTO, RequirementItemDTO, SourceRecordDTO
 from . import lawyer_review_gate
+from .knowledge_layer_scorecard import score_catalog
 from .disclaimers import DEFAULT_VERIFICATION_STATUS, IMMIGRATION_DISCLAIMER
 from .requirements_country_key import resolve_catalog_country, to_iso
 from .requirements_purpose_key import (
@@ -20,6 +21,21 @@ from .requirements_purpose_key import (
 from .rules_engine import apply_rules
 
 log = logging.getLogger(__name__)
+
+
+def _catalog_ready_fields(requirement_dtos: List[RequirementItemDTO]) -> Dict[str, Any]:
+    cited = sum(1 for row in requirement_dtos if row.citations)
+    card = score_catalog(
+        approved_count=len(requirement_dtos),
+        pending_count=0,
+        citation_resolved_approved=cited,
+        pillars=(row.pillar for row in requirement_dtos if row.pillar),
+    )
+    return {
+        "catalogReady": card.catalog_ready,
+        "catalogNotReadyReason": card.not_ready_reason,
+    }
+
 
 # AIQ-1473 boundary (see docs/specs/requirements-engine-consolidation.md):
 # this path (requirement_items) is the in-country RELOCATION DOSSIER across the
@@ -155,6 +171,7 @@ def _in_country_move(case_id: str, dest_raw: str, purpose: str) -> CaseRequireme
         verificationStatus=DEFAULT_VERIFICATION_STATUS,
         staWaived=[],
         covered=True,
+        catalogReady=True,
     )
 
 
@@ -174,6 +191,11 @@ def _not_covered(case_id: str, dest_raw: str, purpose: str) -> CaseRequirementsD
         verificationStatus=DEFAULT_VERIFICATION_STATUS,
         staWaived=[],
         covered=False,
+        catalogReady=False,
+        catalogNotReadyReason=(
+            "This corridor is not ready. We have no approved, cited requirements to serve. "
+            "That is a catalog gap, not a finding that nothing is required."
+        ),
     )
 
 
@@ -401,6 +423,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
             nationalityWaived=sorted({t for t in (flags.get("nationalityWaived") or []) if t}),
             nationalityClass=flags.get("nationalityClass"),
             covered=True,  # AIQ-1473c: destination resolved to a known catalog key
+            **_catalog_ready_fields(requirement_dtos),
         )
 
 

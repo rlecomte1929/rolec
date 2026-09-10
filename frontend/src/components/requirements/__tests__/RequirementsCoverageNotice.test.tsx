@@ -5,12 +5,7 @@ import { RequirementsCoverageNotice } from '../RequirementsCoverageNotice';
 describe('RequirementsCoverageNotice (AIQ-1473d)', () => {
   it('renders an honest "no catalogue" notice when covered is false', () => {
     render(<RequirementsCoverageNotice covered={false} destCountry="ATLANTIS" />);
-    // Heading widened: `covered: false` now also covers "the country IS catalogued but
-    // has no rows for this purpose", so it must not imply the whole country is missing.
-    expect(screen.getByText(/Requirements not available yet for ATLANTIS/i)).toBeTruthy();
-    // The load-bearing half — an empty list means "we can't confirm", never "there is
-    // nothing required".
-    expect(screen.getByText(/not that there are\s+none/i)).toBeTruthy();
+    expect(screen.getByText(/This corridor is not ready for ATLANTIS/i)).toBeTruthy();
     expect(screen.getByText(/not that there are\s+none/i)).toBeTruthy();
   });
 
@@ -22,5 +17,19 @@ describe('RequirementsCoverageNotice (AIQ-1473d)', () => {
   it('renders nothing when covered is undefined (older backend)', () => {
     const { container } = render(<RequirementsCoverageNotice destCountry="GERMANY" />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it('renders a not-ready notice when the catalog fails sufficiency', () => {
+    render(
+      <RequirementsCoverageNotice
+        covered
+        catalogReady={false}
+        destCountry="NORWAY"
+        catalogNotReadyReason="Too few approved requirements carry a resolvable source."
+      />,
+    );
+    expect(screen.getByTestId('requirements-not-ready')).toBeTruthy();
+    expect(screen.getByText(/This corridor is not ready for NORWAY/i)).toBeTruthy();
+    expect(screen.getByText(/resolvable source/i)).toBeTruthy();
   });
 });

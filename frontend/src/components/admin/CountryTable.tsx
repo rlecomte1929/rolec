@@ -99,6 +99,14 @@ function DomainChips({ domains }: { domains: string[] }) {
   );
 }
 
+function CatalogReadyMark({ ready }: { ready?: boolean }) {
+  return (
+    <Badge variant={ready ? 'success' : 'warning'} size="sm">
+      {ready ? 'Ready' : 'Not ready'}
+    </Badge>
+  );
+}
+
 function CountryIdentity({ code }: { code: string }) {
   const name = displayCountryName(code);
   return (
@@ -211,7 +219,12 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
                   onClick={() => onSelect(row.countryCode)}
                   className="grid w-full grid-cols-[minmax(12rem,1.5fr)_8.5rem_7rem_8.5rem_minmax(8rem,1fr)_1.5rem] gap-4 border-t border-slate-200 px-4 py-3 text-left hover:bg-navy-50"
                 >
-                  <CountryIdentity code={row.countryCode} />
+                  <div>
+                    <CountryIdentity code={row.countryCode} />
+                    <div className="mt-1">
+                      <CatalogReadyMark ready={row.catalogReady} />
+                    </div>
+                  </div>
                   <div>
                     <div className="text-sm text-navy-800">{updated.relative}</div>
                     <div className="text-xs text-slate-500">{updated.absolute}</div>
@@ -276,6 +289,9 @@ function CountryCard({
       <div className="flex items-start justify-between gap-3">
         <CountryIdentity code={row.countryCode} />
         <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+      </div>
+      <div className="mt-2">
+        <CatalogReadyMark ready={row.catalogReady} />
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <div>

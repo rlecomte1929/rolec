@@ -1,0 +1,36 @@
+{
+  "started_at": "2026-09-10T12:45:43.485510+00:00",
+  "finished_at": "2026-09-10T12:46:52.951805+00:00",
+  "mode": "draft_only",
+  "entity_reports": [
+    {
+      "entity_type": "sources",
+      "file_name": "docs/imports/city-services-wave-2026-09-10/bundle.json",
+      "started_at": "2026-09-10T12:45:44.145041+00:00",
+      "finished_at": "2026-09-10T12:45:47.814858+00:00",
+      "mode": "draft_only",
+      "rows_read": 25,
+      "inserted": 24,
+      "updated": 1,
+      "skipped": 0,
+      "failed": 0,
+      "warnings": [],
+      "row_errors": []
+    },
+    {
+      "entity_type": "resources",
+      "file_name": "docs/imports/city-services-wave-2026-09-10/bundle.json",
+      "started_at": "2026-09-10T12:45:47.914485+00:00",
+      "finished_at": "2026-09-10T12:46:52.951796+00:00",
+      "mode": "draft_only",
+      "rows_read": 216,
+      "inserted": 216,
+      "updated": 0,
+      "skipped": 0,
+      "failed": 0,
+      "warnings": [],
+      "row_errors": []
+    }
+  ],
+  "summary": "Inserted: 240, Updated: 1, Failed: 0"
+}

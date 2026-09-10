@@ -1,7 +1,7 @@
 export const HR_POLICY_ASSISTANT_TITLE = 'Ask about this policy';
 
 export const HR_POLICY_ASSISTANT_SUBTITLE =
-  'Ask about this policy version, employee-visible rules, and publish impact.';
+  'Finds the relevant clause in this workspace’s policy. Open the cited source for numbers and exact wording.';
 
 export const HR_POLICY_ASSISTANT_PLACEHOLDER = 'Example: What do employees see for shipment?';
 
@@ -14,7 +14,7 @@ export const HR_POLICY_ASSISTANT_SCOPE_NOTE =
  * back-compat; the panel no longer renders it.
  */
 export const HR_POLICY_ASSISTANT_TRUST_PILL =
-  "Verified from this workspace's policy data — not legal or immigration advice";
+  'Orientation from workspace policy — open the source for the fact. Not legal or immigration advice';
 
 export const HR_POLICY_ASSISTANT_NO_POLICY =
   'Publish a policy for this workspace to enable Q&A. Once a policy is live, you can ask questions about it here.';

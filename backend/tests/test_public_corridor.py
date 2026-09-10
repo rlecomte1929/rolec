@@ -57,11 +57,15 @@ def _norway_seed():
     ]
 
 
-def _patch_seed(monkeypatch):
-    monkeypatch.setattr(
-        public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: _norway_seed() if country == "NORWAY" else [],
-    )
+def _list_for(rows):
+    def _list(db, country, purpose=None, include_unapproved=False, **_kwargs):
+        return rows if country == "NORWAY" else []
+    return _list
+
+
+def _patch_seed(monkeypatch, rows=None):
+    monkeypatch.setattr(public_corridor.crud, "list_requirements", _list_for(rows if rows is not None else _norway_seed()))
+    monkeypatch.setattr(public_corridor.crud, "list_sources", lambda db, country, **_kwargs: [])
 
 
 def test_fr_no_lta_returns_generic_requirements_no_auth(monkeypatch):
@@ -72,7 +76,9 @@ def test_fr_no_lta_returns_generic_requirements_no_auth(monkeypatch):
     body = resp.json()
     assert body["corridor"] == {"from": "FR", "to": "NORWAY"}
     assert body["employee_type"] == "LTA"
-    assert "generated_at" in body
+    assert "catalog_ready" in body
+    assert body["catalog_ready"] is False
+    assert body["coverage_note"]
 
     reqs = body["requirements"]
     assert isinstance(reqs, list) and len(reqs) >= 1
@@ -108,10 +114,7 @@ def test_non_obvious_and_timing_are_carried_from_the_catalog_row(monkeypatch):
     seeded = _norway_seed()
     seeded[0].non_obvious = True
     seeded[0].timing = "within 8 days of arrival"
-    monkeypatch.setattr(
-        public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: seeded if country == "NORWAY" else [],
-    )
+    _patch_seed(monkeypatch, seeded)
 
     resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
     assert resp.status_code == 200, resp.text
@@ -136,10 +139,7 @@ def test_a_row_predating_the_columns_degrades_rather_than_raising(monkeypatch):
     bare = _norway_seed()
     for row in bare:
         assert not hasattr(row, "non_obvious") and not hasattr(row, "timing")
-    monkeypatch.setattr(
-        public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: bare if country == "NORWAY" else [],
-    )
+    _patch_seed(monkeypatch, bare)
 
     resp = client.get("/api/public/corridor-requirements?from=FR&to=NO&employee_type=LTA")
     assert resp.status_code == 200, resp.text
@@ -211,10 +211,7 @@ def _two_track_seed():
 
 
 def _patch_two_track(monkeypatch):
-    monkeypatch.setattr(
-        public_corridor.crud, "list_requirements",
-        lambda db, country, purpose: _two_track_seed() if country == "NORWAY" else [],
-    )
+    _patch_seed(monkeypatch, _two_track_seed())
 
 
 def _labels(resp):

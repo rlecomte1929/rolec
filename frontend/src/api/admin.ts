@@ -58,10 +58,23 @@ export interface AdminRequirementReview {
   lastVerifiedAt?: string | null;
 }
 
+export interface KnowledgeScorecard {
+  approvedCount: number;
+  pendingCount: number;
+  rejectedCount: number;
+  citationResolvedApproved: number;
+  citationResolvePct: number;
+  pillarsPresent: string[];
+  lastHumanReviewAt?: string | null;
+  catalogReady: boolean;
+  notReadyReason?: string | null;
+}
+
 export interface AdminRequirementList {
   countryCode: string;
   pendingCount: number;
   items: AdminRequirementReview[];
+  scorecard?: KnowledgeScorecard | null;
 }
 
 /** Includes unapproved rows — the whole point of the review surface. */

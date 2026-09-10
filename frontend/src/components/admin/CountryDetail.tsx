@@ -1,6 +1,6 @@
 import React from 'react';
 import type { CountryProfileDTO } from '../../types';
-import type { AdminRequirementReview, ReviewStatus } from '../../api/admin';
+import type { AdminRequirementReview, KnowledgeScorecard, ReviewStatus } from '../../api/admin';
 import { Card, Button, Badge, CountryFlag } from '../antigravity';
 import { confidenceLevel, confidencePercent, displayCountryName } from './countryCatalog';
 
@@ -8,6 +8,7 @@ interface CountryDetailProps {
   profile: CountryProfileDTO;
   requirements: AdminRequirementReview[];
   pendingCount: number;
+  scorecard?: KnowledgeScorecard | null;
   busyId: string | null;
   onRerun: () => void;
   onReview: (requirementId: string, status: Exclude<ReviewStatus, 'pending'>) => void;
@@ -51,6 +52,7 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
   profile,
   requirements,
   pendingCount,
+  scorecard,
   busyId,
   onRerun,
   onReview,
@@ -83,6 +85,41 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
           <Button onClick={onRerun}>Re-run research</Button>
         </div>
       </Card>
+
+      {scorecard && (
+        <Card padding="lg">
+          <div data-testid="knowledge-scorecard">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-[#0b2b43]">Catalog sufficiency</span>
+              <Badge variant={scorecard.catalogReady ? 'success' : 'warning'} size="sm">
+                {scorecard.catalogReady ? 'Ready' : 'Not ready'}
+              </Badge>
+            </div>
+          <p className="mt-2 text-sm text-slate-600">
+            {scorecard.notReadyReason
+              || 'Approved items carry resolvable sources across more than one pillar. Publish only what a human has reviewed.'}
+          </p>
+          <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">Approved</dt>
+              <dd className="font-mono font-semibold text-navy-800">{scorecard.approvedCount}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">Pending</dt>
+              <dd className="font-mono font-semibold text-navy-800">{scorecard.pendingCount}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">Citation resolve</dt>
+              <dd className="font-mono font-semibold text-navy-800">{scorecard.citationResolvePct}%</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">Pillars</dt>
+              <dd className="font-mono font-semibold text-navy-800">{scorecard.pillarsPresent.length}</dd>
+            </div>
+          </dl>
+          </div>
+        </Card>
+      )}
 
       {pendingCount > 0 && (
         <Card padding="lg">

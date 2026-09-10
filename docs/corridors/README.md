@@ -18,6 +18,7 @@ corridor — most have no requirement records behind them yet.
 | corridor | records | served? | CVR | docs |
 |---|---|---|---|---|
 | IE→ES (Dublin→Madrid) | 25 (15 non-obvious, 2 need counsel) | **no** — all `pending`, migration not applied | none | [`ie-es/`](ie-es/README.md) |
+| FR→NO | `norway.yaml` seed | **no** — seed `pending` | none | [`fr-no/QBR-knowledge-layer.md`](fr-no/QBR-knowledge-layer.md) |
 
 ## Conventions worth knowing before adding one
 

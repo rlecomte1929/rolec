@@ -60,8 +60,9 @@ const COPY: Record<RequirementsAudience, CopyPack> = {
       'Because you have EU/EEA freedom of movement, these immigration requirements don’t apply:',
     emptyBody: (
       <>
-        We don’t have destination requirements for your case yet. This does <strong>not</strong>{' '}
-        mean nothing is required of you — please confirm with your HR contact.
+        This corridor is not ready. We don’t have destination requirements for your case yet.
+        This does <strong>not</strong> mean nothing is required of you — please confirm with
+        your HR contact.
       </>
     ),
   },
@@ -84,8 +85,9 @@ const COPY: Record<RequirementsAudience, CopyPack> = {
       'Because this employee has EU/EEA freedom of movement, these immigration requirements don’t apply:',
     emptyBody: (
       <>
-        We don’t have destination requirements for this case yet. This does <strong>not</strong>{' '}
-        mean nothing is required of this employee — treat it as a gap to confirm, not as an answer.
+        This corridor is not ready. We don’t have destination requirements for this case yet.
+        This does <strong>not</strong> mean nothing is required of this employee — treat it as
+        a gap to confirm, not as an answer.
       </>
     ),
   },
@@ -184,7 +186,12 @@ export const DestinationRequirements: React.FC<{
 
       {state === 'ready' && (
         <>
-          <RequirementsCoverageNotice covered={data?.covered} destCountry={data?.destCountry} />
+          <RequirementsCoverageNotice
+            covered={data?.covered}
+            destCountry={data?.destCountry}
+            catalogReady={data?.catalogReady}
+            catalogNotReadyReason={data?.catalogNotReadyReason}
+          />
 
           {data?.staWaived && data.staWaived.length > 0 && (
             <div className="mt-4 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]">
