@@ -1,0 +1,105 @@
+name: E2E Portals (nightly authenticated smoke)
+
+# Runs the OPT-IN live authenticated-portal suite (QG-AUTH) against prod once a night
+# and on manual dispatch. It signs in as Admin/HR/Employee (throwaway QA accounts) and
+# smoke-checks each portal — see frontend/e2e/portals/ and docs/e2e-live-portals.md.
+#
+# INERT UNTIL YOU OPT IN — mirrors the E2E Sentinel Campaign pattern:
+#   1. Add the six repo SECRETS (Settings → Secrets and variables → Actions → Secrets):
+#        E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD
+#        E2E_HR_EMAIL / E2E_HR_PASSWORD
+#        E2E_EMPLOYEE_EMAIL / E2E_EMPLOYEE_PASSWORD
+#      (the throwaway QA accounts from the Notion "QA Test Credentials" page).
+#   2. Set the repo VARIABLE  E2E_PORTALS_NIGHTLY_ENABLED = true  (Variables tab).
+# Until the variable is 'true' the job is skipped, so merging this file changes nothing.
+#
+# Close the door after a campaign: rotate the throwaway passwords, or flip the variable
+# back to false. This never runs on push and does not gate PRs.
+
+on:
+  schedule:
+    # 02:50 UTC — a quiet slot, offset off the hour to dodge the cron pileup.
+    - cron: "50 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: portals-nightly
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  portals:
+    name: Authenticated portal smoke (Admin/HR/Employee)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ vars.E2E_PORTALS_NIGHTLY_ENABLED == 'true' }}
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      E2E_PORTAL_BASE_URL: ${{ vars.E2E_PORTAL_BASE_URL || 'https://relopass.com' }}
+      E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+      E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+      E2E_HR_EMAIL: ${{ secrets.E2E_HR_EMAIL }}
+      E2E_HR_PASSWORD: ${{ secrets.E2E_HR_PASSWORD }}
+      E2E_EMPLOYEE_EMAIL: ${{ secrets.E2E_EMPLOYEE_EMAIL }}
+      E2E_EMPLOYEE_PASSWORD: ${{ secrets.E2E_EMPLOYEE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Don't fail the run on a Render cold start — wait for the API to answer /health
+      # before signing in. (Login hits the API; the free plan spins down when idle.)
+      - name: Wait for API health
+        working-directory: .
+        run: |
+          API="${E2E_PORTAL_API_URL:-https://api.relopass.com}"
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$API/health" || true)
+            if [ "$code" = "200" ]; then echo "✔ API healthy"; exit 0; fi
+            echo "waiting for API ($code) … $i/30"; sleep 15
+          done
+          echo "✗ API not healthy after timeout"; exit 1
+        env:
+          E2E_PORTAL_API_URL: ${{ vars.E2E_PORTAL_API_URL }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: playwright-
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      # Fail loudly if credentials are missing rather than skipping into a vacuous green.
+      - name: Assert credentials are configured
+        run: |
+          missing=0
+          for v in E2E_ADMIN_EMAIL E2E_ADMIN_PASSWORD E2E_HR_EMAIL E2E_HR_PASSWORD E2E_EMPLOYEE_EMAIL E2E_EMPLOYEE_PASSWORD; do
+            if [ -z "${!v}" ]; then echo "missing secret: $v"; missing=1; fi
+          done
+          [ "$missing" = "0" ] || { echo "Set the six E2E_* secrets (see workflow header)."; exit 1; }
+
+      - name: Run authenticated portal smoke
+        run: npm run test:e2e:portals
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: portals-playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7

@@ -1,0 +1,21 @@
+{
+  "batch_id": "vendor-resourced-xx-no-schools-2026-09-09",
+  "category": "schools",
+  "city": "Oslo",
+  "total_sourced": 3,
+  "total_rejected": 9,
+  "firms": [
+    {"name": "Oslo International School", "status": "sourced", "register": "Nasjonalt skoleregister (NSR/Udir)", "source_url": "https://nsr.udir.no/enheter/971845635"},
+    {"name": "Norlights International School Oslo", "status": "sourced", "register": "Nasjonalt skoleregister (NSR/Udir)", "source_url": "https://nsr.udir.no/enheter/915601618"},
+    {"name": "Asker International School", "status": "sourced", "register": "Nasjonalt skoleregister (NSR/Udir)", "source_url": "https://nsr.udir.no/enheter/998258383"},
+    {"name": "The British School of Oslo", "status": "reject", "reason": "NSR/Brreg confirms closed and under liquidation since November 2025"},
+    {"name": "Manglerud skole — International Classes", "status": "reject", "reason": "IB programme closed August 2026; no longer operating"},
+    {"name": "International School of Oslo (ISoO)", "status": "reject", "reason": "No distinct NSR entity found; name is an alternate reference to Oslo International School"},
+    {"name": "Bjørnsletta skole", "status": "reject", "reason": "Norwegian-curriculum public school; no English-medium international section confirmed"},
+    {"name": "Ringstabekk skole", "status": "reject", "reason": "Norwegian-curriculum public school; no English-medium international section confirmed"},
+    {"name": "Oslo Montessori School", "status": "reject", "reason": "Norwegian-language Montessori school; not an English-curriculum international school"},
+    {"name": "Akademiet International School Oslo", "status": "reject", "reason": "Brreg address is Ålesund, not Oslo metro area"},
+    {"name": "Stiftelsen Den Tysk-Norske Skolen i Oslo", "status": "reject", "reason": "German-medium curriculum (bilingual German–Norwegian); not English-curriculum"},
+    {"name": "Lycée Français René Cassin d'Oslo", "status": "reject", "reason": "French-medium curriculum (AEFE-affiliated); not English-curriculum"}
+  ]
+}

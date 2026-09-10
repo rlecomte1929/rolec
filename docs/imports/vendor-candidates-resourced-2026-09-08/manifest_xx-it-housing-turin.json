@@ -1,0 +1,23 @@
+{
+  "batch_id": "vendor-resourced-xx-it-housing-turin-2026-09-09",
+  "category": "housing_agencies",
+  "city": "Turin",
+  "total_sourced": 8,
+  "total_rejected": 6,
+  "firms": [
+    {"name": "Italian Property Group", "status": "sourced", "rea_number": "REA TO-1278035", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Rubiolo Immobiliare", "status": "sourced", "rea_number": "REA TO 1189434", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Studio Gran Madre", "status": "sourced", "rea_number": "REA TO 835822", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Chiusano & C. Immobiliare", "status": "sourced", "rea_number": "REA TO N. 791891", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Fasano Immobiliare", "status": "sourced", "rea_number": "REA TO-1214239", "source_url": "https://www.registroimprese.it/"},
+    {"name": "SIV Real Estate srl", "status": "sourced", "rea_number": "REA TO-1236771", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Krea Immobiliare", "status": "sourced", "rea_number": "REA TO 1329662", "source_url": "https://www.registroimprese.it/"},
+    {"name": "IO Immobiliare Ottaviani", "status": "sourced", "rea_number": "REA TO 1265282", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Turin Relocation", "status": "reject", "reason": "Explicitly self-declares 'non siamo ne broker ne un agenzia immobiliare' — not a licensed real estate agency; no REA number published"},
+    {"name": "Italia Affitti Torino", "status": "reject", "reason": "Franchise affiliate page shows parent P.IVA 02241270681 (Abruzzo-registered); no Turin (TO) REA number published on the Turin affiliate page"},
+    {"name": "Habitare Service srl", "status": "reject", "reason": "Headquartered in Milan (Via Vaina 8 20122 Milano, P.IVA 06999440966); REA province is MI, not TO; excluded by province-code rule"},
+    {"name": "Urban House Hub", "status": "reject", "reason": "Website returned no text on fetch; unable to verify any REA number"},
+    {"name": "Gruppo Il Sestante", "status": "reject", "reason": "Search snippet shows 'Rea: 1096606' without province code; multiple page fetches did not reveal province prefix; cannot confirm REA is TO province"},
+    {"name": "ItaliaCasa", "status": "reject", "reason": "Published REA is MC 193326 (Macerata province, not Turin TO); fails province-code requirement"}
+  ]
+}

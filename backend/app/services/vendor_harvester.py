@@ -50,7 +50,27 @@ RUN_FAILED = "failed"
 
 # Multi-part public suffixes we actually meet in these corridors. A full PSL is overkill
 # here and would add a dependency; these are the ones that would otherwise mis-normalise.
-_COMPOUND_SUFFIXES = ("co.uk", "com.de", "org.uk", "co.no")
+# Must cover the corridor countries' ccTLDs — omitting one collapses EVERY firm on that TLD
+# to the bare suffix as its dedupe key, so they all falsely dedup to one. (Regression: `.com.au`
+# was missing, so the whole AU harvest keyed to `com.au` and dropped all but the first firm.)
+# If a new corridor's TLD is missing, add it here (or migrate to a public-suffix library).
+_COMPOUND_SUFFIXES = (
+    # Europe
+    "co.uk", "org.uk", "me.uk", "ac.uk",                          # GB
+    "com.de", "co.no", "com.tr", "com.gr", "com.cy", "com.mt",
+    # APAC
+    "com.au", "net.au", "org.au", "edu.au", "asn.au", "id.au",    # AU
+    "co.nz", "net.nz", "org.nz", "ac.nz",                         # NZ
+    "com.sg", "edu.sg", "co.jp", "or.jp", "ne.jp", "co.kr",
+    "com.hk", "com.tw", "com.cn", "co.in", "net.in", "org.in",
+    "com.my", "co.th",
+    # Americas
+    "com.br", "net.br", "org.br", "com.mx", "com.ar", "com.co",
+    "com.pe", "com.uy",
+    # Middle East & Africa
+    "co.za", "org.za", "co.il", "com.sa", "com.qa", "com.bh",
+    "com.kw", "com.om", "com.ae", "net.ae",
+)
 
 
 def normalise_domain(url: Optional[str]) -> Optional[str]:

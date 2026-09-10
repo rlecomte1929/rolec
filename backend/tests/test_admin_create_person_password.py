@@ -43,6 +43,8 @@ class AdminCreatePersonPasswordTests(unittest.TestCase):
         self.addCleanup(self._inv.stop)
         M.db.reset_mock()
         M.db.get_profile_record.return_value = {"id": "p", "email": "x@y.com"}
+        M.db.get_user_by_email.return_value = None
+        M.db.get_profile_by_email.return_value = None
 
     def test_password_creates_loginable_users_row(self) -> None:
         body = AdminCreatePersonRequest(
@@ -71,6 +73,19 @@ class AdminCreatePersonPasswordTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 400)
         M.db.create_profile.assert_not_called()  # failed fast, no partial state
         M.db.create_user.assert_not_called()
+
+    def test_existing_login_is_attached_as_employee(self) -> None:
+        M.db.get_user_by_email.return_value = {"id": "login-1", "role": "HR"}
+        M.db.get_profile_by_email.return_value = {"id": "prof-1", "email": "e@x.com"}
+        M.db.get_profile_record.return_value = {"id": "prof-1", "role": "employee"}
+        body = AdminCreatePersonRequest(email="e@x.com", role="EMPLOYEE", company_id="c1")
+        resp = create_person(body, _Req(), ADMIN)
+        M.db.create_profile.assert_not_called()
+        M.db.create_user.assert_not_called()
+        M.db.set_profile_role.assert_called()
+        M.db.sync_login_role.assert_called()
+        self.assertTrue(resp["login_ready"])
+        self.assertEqual(resp["person"]["id"], "prof-1")
 
 
 if __name__ == "__main__":

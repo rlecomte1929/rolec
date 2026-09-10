@@ -25,8 +25,12 @@ function employeeCaseDossierTarget(ctx: RelocationPlanCtaNavigateContext): CtaNa
   return { kind: 'internal', to: hint ? `${base}?form=${encodeURIComponent(hint)}` : base };
 }
 
-function employeeCaseSummary(routeCaseId: string): string {
-  return `/employee/case/${encodeURIComponent(routeCaseId)}/summary`;
+// There is no `/employee/case/:id/summary` route — this silently fell through React
+// Router's catch-all to the dashboard. Route employee "review/overview" CTAs (and the
+// untyped fallback) to the roadmap (the case's overview page) via buildRoute, so a bad
+// route key is a compile error, not a dead link the literal-only navigate guard can't see.
+function employeeCaseOverview(routeCaseId: string): string {
+  return buildRoute('employeeCaseRoadmap', { caseId: routeCaseId.trim() });
 }
 
 /** Employee messages deep-link (see Messages.tsx — uses `assignmentId`, not `assignment`). */
@@ -96,7 +100,7 @@ function viewDetailsTargetForRole(ctx: RelocationPlanCtaNavigateContext, sem: Re
   }
 
   // Employee "review_case" → intake summary (no separate employee case review route).
-  return { kind: 'internal', to: employeeCaseSummary(aid) };
+  return { kind: 'internal', to: employeeCaseOverview(aid) };
 }
 
 function uploadDocumentTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigateTarget {
@@ -151,7 +155,7 @@ export function resolveRelocationPlanCtaTarget(
     return { kind: 'internal', to: raw.startsWith('/') ? raw : `/${raw}` };
   }
 
-  const fallbackEmployee = employeeCaseSummary(ctx.routeCaseId.trim());
+  const fallbackEmployee = employeeCaseOverview(ctx.routeCaseId.trim());
   const fallbackHr = buildRoute('hrCaseSummary', { caseId: ctx.routeCaseId.trim() });
   const fallbackSummary = ctx.role === 'hr' ? fallbackHr : fallbackEmployee;
 

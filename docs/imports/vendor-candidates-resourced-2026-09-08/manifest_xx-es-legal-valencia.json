@@ -1,0 +1,23 @@
+{
+  "batch_id": "vendor-resourced-xx-es-legal-valencia-2026-09-10",
+  "category": "legal_admin",
+  "city": "Valencia",
+  "total_sourced": 4,
+  "total_rejected": 10,
+  "firms": [
+    {"name": "Olguín Abogados", "status": "sourced", "colegiado": "14262", "named_lawyer": "Martha Mónica Olguín Flores", "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"},
+    {"name": "Fernando Ortega Cano – Abogado", "status": "sourced", "colegiado": "17582", "named_lawyer": "Fernando Ortega Cano", "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"},
+    {"name": "Romina María Chiquini Laude – Abogada", "status": "sourced", "colegiado": "19598", "named_lawyer": "Romina María Chiquini Laude", "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"},
+    {"name": "Modesto Martínez Vizuete – Abogado", "status": "sourced", "colegiado": "11729", "named_lawyer": "Modesto Martínez Vizuete", "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"},
+    {"name": "Joaquín García Pastrana", "status": "rejected", "reason": "ICAV 20503 confirmed on own LinkedIn but extranjería/immigration practice not verifiable from published materials; LinkedIn specialty listed as 'derechos fundamentales-libertades informativas', not extranjería"},
+    {"name": "Inmaculada Moncho Giner", "status": "rejected", "reason": "Based in Gandía (CP 46702), not Valencia city; ICAV number 14318 not found published on own site or any own professional profile"},
+    {"name": "Geijo Abogados (Estíbaliz Geijo)", "status": "rejected", "reason": "ICAV membership confirmed on own site and LinkedIn; extranjería specialist confirmed; but no specific colegiado número published on any own page after thorough search"},
+    {"name": "Sterna Abogados", "status": "rejected", "reason": "Immigration specialists in Valencia with good reviews but no named lawyer with ICAV colegiado número published on firm website or any own professional page"},
+    {"name": "Wiselegal Abogados", "status": "rejected", "reason": "Immigration services in Valencia but no named lawyer with ICAV colegiado número published on firm site or any own professional page"},
+    {"name": "LM Abogados & Asociados (Abogada Luz Mosquera)", "status": "rejected", "reason": "Immigration/extranjería specialist based in Valencia (Av. Gran Via Marqués del Turia 49) but no ICAV colegiado número published on own site or any own profile"},
+    {"name": "Selva & Lorente (abogadoextranjeriavalencia.es)", "status": "rejected", "reason": "Main office in Alicante (Av. Maisonnave 26, Alicante), not Valencia city; no named lawyer with published ICAV colegiado número on site"},
+    {"name": "Miguel Gómez Ruiz", "status": "rejected", "reason": "Office at Avenida del Camí Nou 190, 46950 Xirivella — adjacent municipality, not Valencia city proper; ICAV 20099 confirmed on Melendos profile but city requirement not met"},
+    {"name": "Martínez Sanz Abogados (Fernando Martínez Sanz)", "status": "rejected", "reason": "Immigration law at Valencia office (Calle Almirante Cadarso 11) but no ICAV colegiado número published for any named lawyer on firm website or own profiles"},
+    {"name": "Carolina Rodríguez Alcubilla", "status": "rejected", "reason": "Based in Puerto de Sagunto / Canet d'en Berenguer, not Valencia city; ICAV 19880 confirmed on own ProntoPro profile but location requirement not met"}
+  ]
+}

@@ -4,6 +4,7 @@ import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { adminFreshnessAPI } from '../../../api/client';
 import { AdminFreshnessLayout } from './AdminFreshnessLayout';
+import { getCountryName } from '../../../utils/countries';
 
 type ChangeItem = {
   id?: string;
@@ -142,7 +143,7 @@ export const AdminFreshnessChanges: React.FC = () => {
             {items.map((c) => (
               <tr key={String(c.id)} className="border-b border-slate-100 hover:bg-slate-50">
                 <td className="px-4 py-2 font-medium">{c.source_name ?? '-'}</td>
-                <td className="px-4 py-2">{c.country_code ?? '-'} / {c.city_name ?? '-'}</td>
+                <td className="px-4 py-2">{getCountryName(c.country_code) || c.country_code || '-'} / {c.city_name ?? '-'}</td>
                 <td className="px-4 py-2">
                   <span className={`rounded px-1.5 py-0.5 text-xs ${changeTypeColor(c.change_type ?? '')}`}>
                     {c.change_type ?? '-'}

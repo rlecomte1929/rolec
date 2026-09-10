@@ -1,0 +1,22 @@
+{
+  "batch_id": "vendor-resourced-xx-it-housing-florence-2026-09-09",
+  "category": "housing_agencies",
+  "city": "Florence",
+  "country": "IT",
+  "corridor": "XX-IT",
+  "generated": "2026-09-09",
+  "total_sourced": 6,
+  "total_rejected": 4,
+  "firms": [
+    {"name": "Florence and Abroad S.r.l.", "status": "sourced", "rea_number": "REA FI-357907", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Apartments Florence S.r.l.", "status": "sourced", "rea_number": "REA FI-602633", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Apartments in Florence (Konnettiamo Srl)", "status": "sourced", "rea_number": "REA FI-656840", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Apartments Florence Real Estate SAS di Fagnoni Lorenzo e C.", "status": "sourced", "rea_number": "REA FI-640122", "source_url": "https://www.registroimprese.it/"},
+    {"name": "House in Florence — Agency E.T. di Federico Pieri s.a.s.", "status": "sourced", "rea_number": "Nr. 2807 CCIAA Firenze (Ruolo Agenti Immobiliari)", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Tuscan Feeling RE srl", "status": "sourced", "rea_number": "REA FI-656381", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Pitcher & Flaccomio", "status": "reject", "reason": "P.IVA 05225880482 published but no REA or ruolo agenti number found on own website (home, contact, about, FAQ pages exhaustively checked)"},
+    {"name": "Move to Florence (Danielle Leite / movetoflorence.com)", "status": "reject", "reason": "Individual concierge service — no company registration number or REA published on own website"},
+    {"name": "Dreamer Real Estate (Dreamer S.r.l.)", "status": "reject", "reason": "P.IVA 06906670481 published; REA FI-665153 confirmed in third-party databases but NOT published on own website (contact, about, privacy, Italian version all checked); luxury sales focus, not expat rental relocation"},
+    {"name": "Smart Move Italy (Living srl)", "status": "reject", "reason": "Visa/citizenship/property consulting firm, not a licensed agenzia immobiliare; no REA published (P.IVA 07505120480 only)"}
+  ]
+}

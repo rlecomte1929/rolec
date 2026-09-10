@@ -1,0 +1,53 @@
+{
+  "batch_id": "vendor-resourced-xx-fi-movers-2026-09-09",
+  "category": "movers",
+  "city": "Helsinki",
+  "total_sourced": 4,
+  "total_rejected": 4,
+  "firms": [
+    {
+      "name": "TRAVELCARGO INTERNATIONAL REMOVALS",
+      "status": "sourced",
+      "register": "FIDI",
+      "source_url": "https://www.fidi.org/find-fidi-affiliate/travelcargo-international-removals"
+    },
+    {
+      "name": "NIEMI SERVICES LTD",
+      "status": "sourced",
+      "register": "FIDI",
+      "source_url": "https://www.fidi.org/find-fidi-affiliate/niemi-services-ltd"
+    },
+    {
+      "name": "VICTOR EK MOVING LIMITED",
+      "status": "sourced",
+      "register": "FIDI",
+      "source_url": "https://www.fidi.org/find-fidi-affiliate/victor-ek-moving-limited"
+    },
+    {
+      "name": "ALFA MOBILITY FINLAND OY",
+      "status": "sourced",
+      "register": "FIDI",
+      "source_url": "https://www.fidi.org/find-fidi-affiliate/alfa-mobility-4"
+    },
+    {
+      "name": "Finland Relocation Services Oy",
+      "status": "reject",
+      "reason": "EuRA member but zero Household Goods Movement service tag; DSP/consulting/language-training only \u2014 not a removal mover"
+    },
+    {
+      "name": "KEY Relocation Finland Oy",
+      "status": "reject",
+      "reason": "EuRA member but zero Household Goods Movement service tag; DSP/consulting/visa only \u2014 not a removal mover"
+    },
+    {
+      "name": "KPMG Oy Ab",
+      "status": "reject",
+      "reason": "EuRA member but zero Household Goods Movement service tag; advisory/DSP/tax only \u2014 not a removal mover"
+    },
+    {
+      "name": "Vialto Partners Finland Oy",
+      "status": "reject",
+      "reason": "EuRA member but zero Household Goods Movement service tag; legal/DSP/visa only \u2014 not a removal mover"
+    }
+  ]
+}
