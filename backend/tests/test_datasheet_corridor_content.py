@@ -172,9 +172,11 @@ class DataSheetCorridorContentFallback(unittest.TestCase):
 
     def test_unknown_destination_still_not_covered(self):
         # A destination with no curated content falls through to the 'not covered' sheet.
+        # Use AQ (Antarctica): a real ISO code that will never be a work-relocation
+        # corridor, so this fixture stays valid as new corridor-content files land.
         other = _uuid()
         with self.engine.begin() as conn:
-            _insert_case(conn, other, _uuid(), {}, dest="BR", origin="US")
+            _insert_case(conn, other, _uuid(), {}, dest="AQ", origin="US")
         resp = self.client.get(f"/api/cases/{other}/datasheet")
         self.assertEqual(resp.status_code, 200, resp.text)
         body = resp.json()
