@@ -1,0 +1,69 @@
+{
+  "batch_id": "vendor-resourced-xx-de-schools-2026-09-09",
+  "category": "schools",
+  "city": "Berlin",
+  "country": "DE",
+  "generated": "2026-09-09",
+  "total_sourced": 8,
+  "total_rejected": 2,
+  "firms": [
+    {
+      "name": "John-F.-Kennedy-Schule",
+      "status": "sourced",
+      "register": "06K01",
+      "source_url": "https://www.bildung.berlin.de/schulverzeichnis/Schulportrait.aspx?IDSchulzweig=29954"
+    },
+    {
+      "name": "Berlin Metropolitan School",
+      "status": "sourced",
+      "register": "01E34",
+      "source_url": "https://www.bildung.berlin.de/schulverzeichnis/Schulportrait.aspx?IDSchulzweig=31170"
+    },
+    {
+      "name": "Private Kant-Schule - Berlin International School",
+      "status": "sourced",
+      "register": "04P42",
+      "source_url": "https://www.bildung.berlin.de/schulverzeichnis/Schulportrait.aspx?IDSchulzweig=31217"
+    },
+    {
+      "name": "Berlin British School (Integrierte Sekundarschule)",
+      "status": "sourced",
+      "register": "04P40",
+      "source_url": "https://www.bildung.berlin.de/schulverzeichnis/Schulportrait.aspx?IDSchulzweig=31208"
+    },
+    {
+      "name": "Berlin British School (Grundschule)",
+      "status": "sourced",
+      "register": "04P39",
+      "source_url": "https://www.bildung.berlin.de/schulverzeichnis/Schulportrait.aspx?IDSchulzweig=31194"
+    },
+    {
+      "name": "Bilinguale Schule Phorms Berlin Mitte",
+      "status": "sourced",
+      "register": "01P18",
+      "source_url": "https://www.bildung.berlin.de/schulverzeichnis/Schulportrait.aspx?IDSchulzweig=30408"
+    },
+    {
+      "name": "Berlin Cosmopolitan School",
+      "status": "sourced",
+      "register": "01P22",
+      "source_url": "https://www.bildung.berlin.de/schulverzeichnis/Schulportrait.aspx?IDSchulzweig=29976"
+    },
+    {
+      "name": "Berlin Bilingual School (Grundschule)",
+      "status": "sourced",
+      "register": "02P11",
+      "source_url": "https://www.bildung.berlin.de/schulverzeichnis/Schulportrait.aspx?IDSchulzweig=31046"
+    },
+    {
+      "name": "BBIS Berlin Brandenburg International School",
+      "status": "reject",
+      "reason": "Campus is in Kleinmachnow, Brandenburg — outside Berlin city limits. No entry found in Berliner Schulverzeichnis; no Berliner Schulnummer resolvable."
+    },
+    {
+      "name": "SIS Swiss International School Berlin",
+      "status": "reject",
+      "reason": "No Schulportrait or Schulnummer found in Berliner Schulverzeichnis for a school-level institution. Only a Kindertagesstätte (daycare/preschool) registration appears in Berlin official records under this operator; not a registered Schule."
+    }
+  ]
+}

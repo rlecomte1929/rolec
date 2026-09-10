@@ -1,0 +1,20 @@
+{
+  "batch_id": "vendor-resourced-xx-es-banks-2026-09-09",
+  "category": "banks",
+  "city": "Madrid",
+  "total_sourced": 7,
+  "total_rejected": 4,
+  "firms": [
+    {"name":"Banco Santander, S.A.","status":"sourced","register":"Banco de España - Registro de Entidades","source_url":"https://app.bde.es/ren_www/ren_wwwias/xml/Arranque.html"},
+    {"name":"Banco Bilbao Vizcaya Argentaria, S.A. (BBVA)","status":"sourced","register":"Banco de España - Registro de Entidades","source_url":"https://app.bde.es/ren_www/ren_wwwias/xml/Arranque.html"},
+    {"name":"CaixaBank, S.A.","status":"sourced","register":"Banco de España - Registro de Entidades","source_url":"https://app.bde.es/ren_www/ren_wwwias/xml/Arranque.html"},
+    {"name":"Banco de Sabadell, S.A.","status":"sourced","register":"Banco de España - Registro de Entidades","source_url":"https://app.bde.es/ren_www/ren_wwwias/xml/Arranque.html"},
+    {"name":"Bankinter, S.A.","status":"sourced","register":"Banco de España - Registro de Entidades","source_url":"https://app.bde.es/ren_www/ren_wwwias/xml/Arranque.html"},
+    {"name":"Deutsche Bank, S.A.E.","status":"sourced","register":"Banco de España - Registro de Entidades","source_url":"https://app.bde.es/ren_www/ren_wwwias/xml/Arranque.html"},
+    {"name":"ING Bank N.V., Sucursal en España","status":"sourced","register":"Banco de España - Registro de Entidades","source_url":"https://app.bde.es/ren_www/ren_wwwias/xml/Arranque.html"},
+    {"name":"Wise (TransferWise Ltd.)","status":"reject","reason":"EMI registered in Belgium — not a credit institution in the BdE Registro de Entidades; no BdE código de entidad exists"},
+    {"name":"Revolut Bank UAB (Spain)","status":"reject","reason":"Lithuanian EMI — not registered as a credit institution in the BdE Registro de Entidades; no BdE código de entidad exists"},
+    {"name":"N26 AG (Spain branch)","status":"reject","reason":"German bank passporting into Spain via EU right of establishment — no BdE credit institution código de entidad confirmed"},
+    {"name":"Openbank, S.A.","status":"reject","reason":"Código 0073 cited only in aggregator bank-code lists — not independently confirmed via a BdE Registro de Entidades page or official BdE publication"}
+  ]
+}

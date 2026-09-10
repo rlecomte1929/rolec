@@ -1,0 +1,80 @@
+{
+  "batch_id": "vendor-resourced-xx-it-housing-milan-2026-09-09",
+  "category": "housing_agencies",
+  "city": "Milan",
+  "generated_at": "2026-09-09",
+  "total_sourced": 5,
+  "total_rejected": 8,
+  "firms": [
+    {
+      "name": "Smith Agency S.r.l.",
+      "status": "sourced",
+      "rea_number": "REA MI-2027818",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "Housy Milano (Up-Town srl)",
+      "status": "sourced",
+      "rea_number": "REA MI-2106000",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "Wolf and Wolf Srl",
+      "status": "sourced",
+      "rea_number": "REA MI-2052329",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "Mihouz (Andreoni Davide)",
+      "status": "sourced",
+      "rea_number": "REA MI-2719490",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "Welcome Home (Sforza S.r.l.)",
+      "status": "sourced",
+      "rea_number": "REA MI-1945017",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "Milano Relocation",
+      "status": "reject",
+      "reason": "No REA MI number published on own website (milano-relocation.com); footer shows P.I. 10015630964 only — REA field absent"
+    },
+    {
+      "name": "Impatria",
+      "status": "reject",
+      "reason": "National relocation coordinator (impatria.com), not a Milan-registered agenzia immobiliare; no REA MI number on own site"
+    },
+    {
+      "name": "Casa Londra srl",
+      "status": "reject",
+      "reason": "UK-registered entity (England & Wales No. 07652347); Italian Milan branch (Corso Monforte 23) publishes no REA MI number on casa-londra.com"
+    },
+    {
+      "name": "Habitare Service srl",
+      "status": "reject",
+      "reason": "REA MI-1928391 found on third-party billing site (fatturatoitalia.it) but NOT published on own website footer or about page (habitareservice.it) — rule requires firm-published number"
+    },
+    {
+      "name": "Engel & Voelkers Italia S.r.l.",
+      "status": "reject",
+      "reason": "Own legal info page (engelvoelkers.com/it/it/informazioni-legali/) shows P.IVA 07768820966 only; REA MI number not published by the firm itself on its own pages"
+    },
+    {
+      "name": "Bonola Case",
+      "status": "reject",
+      "reason": "General Milan residential sales agency in Bonola/Gallaratese area; no expat or relocation focus; REA shown as 'R.E.A. Milano 1791331' without explicit MI-XXXXXX province prefix on own site"
+    },
+    {
+      "name": "Milanhouses",
+      "status": "reject",
+      "reason": "No REA MI number published on own website (milanhouses.com); footer shows only address and phone"
+    },
+    {
+      "name": "RossoMattone",
+      "status": "reject",
+      "reason": "No REA MI number confirmed on own website or in search results; insufficient evidence to source"
+    }
+  ]
+}
