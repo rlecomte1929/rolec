@@ -325,7 +325,9 @@ export const HrDashboard: React.FC = () => {
       );
       const failed = results.filter((result) => result.status === 'rejected');
       if (failed.length > 0) {
-        throw failed[0];
+        // PromiseSettledResult has no Axios `response` — rethrow the rejection
+        // reason so the catch can surface the API detail (e.g. 404).
+        throw (failed[0] as PromiseRejectedResult).reason;
       }
       setSelectedForRemoval(new Set());
       setIsConfirmingRemoval(false);
