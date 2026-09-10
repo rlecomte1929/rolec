@@ -377,7 +377,10 @@ def _build_from_corridor_content(
         except ValueError:
             return len(_PHASE_ORDER)
 
-    ordered = sorted(records, key=lambda r: (_phase_index(r.get("section")), r.get("step") or 0))
+    # Group by phase, preserving each file's own within-phase order (Python's sort is stable).
+    # Ordering by phase alone — not by `step` — keeps this robust to `step` being an int (NO/DE/FR)
+    # or a descriptive string (GB), which otherwise mix in one sort key and raise TypeError.
+    ordered = sorted(records, key=lambda r: _phase_index(r.get("section")))
 
     consult: List[schemas.DataSheetConsultDTO] = []
     sections: List[schemas.DataSheetSectionDTO] = []

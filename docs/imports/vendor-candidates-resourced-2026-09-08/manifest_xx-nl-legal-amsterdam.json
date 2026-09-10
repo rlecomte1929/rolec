@@ -1,0 +1,18 @@
+{
+  "batch_id": "vendor-resourced-xx-nl-legal-amsterdam-2026-09-10",
+  "category": "legal_admin",
+  "city": "Amsterdam",
+  "country": "NL",
+  "corridor": "XX-NL",
+  "sourced_date": "2026-09-10",
+  "total_sourced": 6,
+  "total_rejected": 0,
+  "firms": [
+    {"name": "Everaert Advocaten", "status": "sourced", "advocaat": "mr. T.E. van Houwelingen-Boer (NOvA 11613905609)", "source_url": "https://zoekeenadvocaat.advocatenorde.nl/"},
+    {"name": "De Vreede Immigration Law", "status": "sourced", "advocaat": "mr. E. de Vreede / Ester de Vreede (NOvA 13918350753)", "source_url": "https://zoekeenadvocaat.advocatenorde.nl/"},
+    {"name": "Kroes Advocaten Immigration Lawyers", "status": "sourced", "advocaat": "mr. drs. S.M. Groen / Sander Groen (NOvA 11420085760)", "source_url": "https://zoekeenadvocaat.advocatenorde.nl/"},
+    {"name": "Matpanözer Advocatuur", "status": "sourced", "advocaat": "mr. L.K. Matpanözer / Lerna Matpanözer (NOvA 11017333435)", "source_url": "https://zoekeenadvocaat.advocatenorde.nl/"},
+    {"name": "Spuistraat 10 Advocaten", "status": "sourced", "advocaat": "mr. B. Aydin / Bahattin Aydin (NOvA 11831901571)", "source_url": "https://zoekeenadvocaat.advocatenorde.nl/"},
+    {"name": "Prakken d'Oliveira Human Rights Lawyers", "status": "sourced", "advocaat": "mr. E.E.M. Bezem / Eva Bezem (NOvA 12075067103)", "source_url": "https://zoekeenadvocaat.advocatenorde.nl/"}
+  ]
+}

@@ -6,11 +6,12 @@ import type { UserRole } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
 import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
-import { getAuthItem } from '../utils/demo';
+import { getAuthItem, getActiveRole, getStoredRoles } from '../utils/demo';
 import { supabase } from '../api/supabase';
 import { clearAutofillResidueIfStale } from '../utils/clearAutofillResidue';
 import { env } from '../config/env';
 import { swallow } from '../lib/errorTracking';
+import { heldHomeRole } from '../navigation/roleHome';
 import { GlobeNetwork } from '../components/auth/GlobeNetwork';
 import { useAuthPageConfig } from '../hooks/useAuthPageConfig';
 
@@ -317,7 +318,7 @@ export const Auth: React.FC = () => {
   // on a hash-bearing URL (hashHasAuthPayload) — otherwise a pre-existing session
   // would hijack the invite acceptance flow.
   if (getAuthItem('relopass_token') && !inviteMode && !linkError && !hashHasAuthPayload) {
-    const key = homeRouteKeyForRole(getAuthItem('relopass_role'));
+    const key = homeRouteKeyForRole(heldHomeRole(getStoredRoles(), getActiveRole()));
     if (key !== 'landing') return <Navigate to={buildRoute(key)} replace />;
   }
 

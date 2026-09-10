@@ -7,6 +7,7 @@ import { adminStagingAPI, adminCollaborationAPI } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
 import { ThreadSummaryBadge } from '../../../components/admin/collaboration/ThreadSummaryBadge';
 import { LoadErrorBanner, loadErrorMessage } from '../../../components/LoadErrorBanner';
+import { getCountryName } from '../../../utils/countries';
 
 type ResourceCandidate = {
   id: string;
@@ -177,7 +178,7 @@ export const AdminStagingResources: React.FC = () => {
                         />
                       </div>
                     </td>
-                    <td className="px-4 py-2">{r.country_code ?? '-'}</td>
+                    <td className="px-4 py-2">{getCountryName(r.country_code) || r.country_name || r.country_code || '-'}</td>
                     <td className="px-4 py-2">{r.city_name ?? '-'}</td>
                     <td className="px-4 py-2">{r.category_key ?? '-'}</td>
                     <td className="px-4 py-2">

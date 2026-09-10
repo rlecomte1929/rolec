@@ -7,6 +7,7 @@ import { normalizeStoredRole, setAuthItem, setStoredRoles, setActiveRole } from 
 import { seedWelcomeSeenFromLogin } from '../utils/welcomeSeen';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { homeRouteKeyForRole, type RouteKey } from '../navigation/routes';
+import { heldHomeRole } from '../navigation/roleHome';
 import { readPendingInvite } from '../api/companyInvites';
 import { trackAuthPerf } from '../perf/authPerf';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
@@ -46,9 +47,14 @@ export const useAuth = () => {
     setAuthItem('relopass_role', normalizeStoredRole(user.role));
     // AIQ-1363: multi-role — persist all held roles + the active (primary) role.
     // Falls back to the single role so single-role users are unchanged.
-    const roles = user.roles && user.roles.length ? user.roles : [user.role];
-    setStoredRoles(roles);
-    setActiveRole(user.primary_role || user.role);
+    const held = user.roles && user.roles.length ? user.roles : [user.role];
+    setStoredRoles(held);
+    setActiveRole(heldHomeRole(held, user.primary_role || user.role));
+  };
+
+  const landingRole = (user: { role: UserRole; roles?: string[] | null; primary_role?: string | null }): string => {
+    const held = user.roles && user.roles.length ? user.roles : [user.role];
+    return heldHomeRole(held, user.primary_role || user.role);
   };
 
   const postAuthRouteKey = (role: UserRole | string): RouteKey => homeRouteKeyForRole(normalizeStoredRole(role));
@@ -92,22 +98,22 @@ export const useAuth = () => {
       const supabaseT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
       trackAuthPerf({ stage: 'token_refresh_start' });
       trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
-        role: response.user.role,
-        targetRouteKey: postAuthRouteKey(response.user.role),
+        role: landingRole(response.user),
+        targetRouteKey: postAuthRouteKey(landingRole(response.user)),
         source: 'login',
       });
-      redirectByRole(response.user.role);
+      redirectByRole(landingRole(response.user) as UserRole);
       void signInSupabase(email, payload.password).then(() => {
         const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - supabaseT0;
         trackAuthPerf({ stage: 'token_refresh_end', durationMs: dur });
       });
     } else {
       trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
-        role: response.user.role,
-        targetRouteKey: postAuthRouteKey(response.user.role),
+        role: landingRole(response.user),
+        targetRouteKey: postAuthRouteKey(landingRole(response.user)),
         source: 'login',
       });
-      redirectByRole(response.user.role);
+      redirectByRole(landingRole(response.user) as UserRole);
     }
     return response;
   };
@@ -130,11 +136,11 @@ export const useAuth = () => {
     }
     const emailForSb = response.user.email ?? payload.email?.trim() ?? null;
     trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
-      role: response.user.role,
-      targetRouteKey: postAuthRouteKey(response.user.role),
+      role: landingRole(response.user),
+      targetRouteKey: postAuthRouteKey(landingRole(response.user)),
       source: 'register',
     });
-    redirectByRole(response.user.role);
+    redirectByRole(landingRole(response.user) as UserRole);
     if (emailForSb && payload.password) {
       void signInSupabase(emailForSb, payload.password);
     }
@@ -155,11 +161,11 @@ export const useAuth = () => {
     const response = await authAPI.exchangeSupabaseToken(accessToken);
     setSession(response.token, response.user);
     trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
-      role: response.user.role,
-      targetRouteKey: postAuthRouteKey(response.user.role),
+      role: landingRole(response.user),
+      targetRouteKey: postAuthRouteKey(landingRole(response.user)),
       source: 'login',
     });
-    redirectByRole(response.user.role);
+    redirectByRole(landingRole(response.user) as UserRole);
     return response;
   };
 

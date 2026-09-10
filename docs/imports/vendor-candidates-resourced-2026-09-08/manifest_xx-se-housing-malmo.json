@@ -1,0 +1,43 @@
+{
+  "batch_id": "vendor-resourced-xx-se-housing-malmo-2026-09-09",
+  "category": "housing_agencies",
+  "city": "Malmö",
+  "country": "SE",
+  "generated_at": "2026-09-10T00:00:00Z",
+  "total_sourced": 2,
+  "total_rejected": 4,
+  "firms": [
+    {
+      "name": "Öresund Fastighetsförmedling AB",
+      "status": "sourced",
+      "fmi_number": "41270",
+      "source_url": "https://fmi.se/soktjanster/sok-maklare/"
+    },
+    {
+      "name": "Våningen & Villan Sverige AB",
+      "status": "sourced",
+      "fmi_number": "42969",
+      "source_url": "https://fmi.se/soktjanster/sok-maklare/"
+    },
+    {
+      "name": "VF Malmö AB (Croisette)",
+      "status": "rejected",
+      "reason": "FMI firm registration #39659 confirmed but firm's sole published services are commercial property (office/industrial lokalförmedling, capital markets, property valuation); website croisette.se contains no residential rental or expat home-finding offering; not serving relocating employees in the target housing capacity"
+    },
+    {
+      "name": "Sweden Relocators AB",
+      "status": "rejected",
+      "reason": "Immigration and relocation consultancy based in Malmö (Amiralsgatan 86E); provides immigration support (residence/work permits), not property brokerage; no FMI mäklare or mäklarföretag registration found; does not qualify as a fastighetsmäklare"
+    },
+    {
+      "name": "Hej Relocation",
+      "status": "rejected",
+      "reason": "Destination-service provider offering home-finding, school search and authority administration; no FMI registration found; explicitly a DSP consultancy, not a licensed fastighetsmäklare"
+    },
+    {
+      "name": "Homii",
+      "status": "rejected",
+      "reason": "Online rental advisory platform for expats and internationals (homii.se); no FMI mäklare or mäklarföretag registration; does not qualify as a licensed fastighetsmäklare"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "batch_id": "vendor-resourced-xx-it-housing-genoa-2026-09-09",
+  "category": "housing_agencies",
+  "city": "Genoa",
+  "total_sourced": 5,
+  "total_rejected": 5,
+  "firms": [
+    {
+      "name": "Genova International Immobiliare di Karolina Loshuk",
+      "status": "sourced",
+      "rea_number": "REA GE-520864",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "Immobiliare Z.B. S.R.L.",
+      "status": "sourced",
+      "rea_number": "REA GE-377204",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "Lo Presti Immobiliare di Silvia Lo Presti",
+      "status": "sourced",
+      "rea_number": "REA GE-514379",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "Studio Immobiliare AG",
+      "status": "sourced",
+      "rea_number": "Ruolo Agenti CCIAA Genova n. 1526 del 26/09/1995",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "Luisa Casareto Agenzia Immobiliare Real Estate",
+      "status": "sourced",
+      "rea_number": "REA GE-504866",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "MERGER.",
+      "status": "reject",
+      "reason": "No published REA GE number found in any firm-controlled publication; website mergerrealty.com exists but does not display any accreditation number — cannot satisfy 'firm publishes' requirement"
+    },
+    {
+      "name": "Marisa Barbiero Intermediazioni Immobiliari",
+      "status": "reject",
+      "reason": "No own website; REA GE-366871 and ruolo n. 1106 confirmed but only published in third-party portal profile (cercacasa.it) — firm has no own site footer/about page to read it from; also: not expat/relocation focused (30 sales listings, 1 rental observed)"
+    },
+    {
+      "name": "Engel & Völkers Genova Centro",
+      "status": "reject",
+      "reason": "Franchise brand using shared corporate domain engelvoelkers.com (no independent local domain); no local REA GE number confirmed in any accessible firm publication"
+    },
+    {
+      "name": "SmartRent Agency",
+      "status": "reject",
+      "reason": "Short-term vacation rental management platform for property owners — not a tenant-placement or employee-relocation agency; no REA GE published anywhere"
+    },
+    {
+      "name": "ManagerCasa & Partners",
+      "status": "reject",
+      "reason": "No REA GE number published on own website (managercasa.it) or in any accessible firm publication during research; FIAIP membership claimed but accreditation number not verifiable"
+    }
+  ]
+}

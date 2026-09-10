@@ -2323,11 +2323,64 @@ def create_person(
     if initial_password and len(initial_password) < 8:
         raise HTTPException(status_code=400, detail="Initial password must be at least 8 characters")
     request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
-    person_id = str(uuid.uuid4())
     # profiles.full_name has a NOT NULL constraint; derive a default from the email if omitted
     full_name = (body.full_name or "").strip() or email.split("@")[0]
+    role = (body.role or "EMPLOYEE").strip().upper()
+    if role == "EMPLOYEE_USER":
+        role = "EMPLOYEE"
+
+    existing_user = db.get_user_by_email(email)
+    existing_profile = db.get_profile_by_email(email)
+    if not isinstance(existing_user, dict) or not isinstance(existing_user.get("id"), str):
+        existing_user = None
+    if not isinstance(existing_profile, dict) or not isinstance(existing_profile.get("id"), str):
+        existing_profile = None
+
+    # Self-serve signup creates a users row (often HR) without a matching
+    # profiles.id. A later admin "Add person" used to mint a second UUID, so
+    # login kept the HR persona while CMS showed an employee.
+    if existing_user and existing_user.get("id"):
+        login_id = str(existing_user["id"])
+        person_id = str(existing_profile["id"]) if existing_profile and existing_profile.get("id") else login_id
+        try:
+            if existing_profile:
+                db.set_profile_role(person_id, role)
+                db.update_profile(person_id, full_name=full_name, company_id=body.company_id)
+            else:
+                db.create_profile(
+                    person_id=login_id,
+                    email=email,
+                    full_name=full_name,
+                    role=role,
+                    company_id=body.company_id,
+                )
+                person_id = login_id
+            db.sync_login_role(role, user_id=login_id, email=email)
+            if role == "HR" and body.company_id:
+                db.ensure_hr_user_for_profile(person_id, body.company_id)
+            if role in ("EMPLOYEE", "EMPLOYEE_USER") and body.company_id:
+                db.ensure_employee_for_profile(person_id, body.company_id)
+        except Exception as e:
+            log.error(
+                "admin_create_person attach failed request_id=%s email=%s error=%r",
+                request_id,
+                email,
+                e,
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail={"message": "Failed to create person", "request_id": request_id},
+            )
+        profile = db.get_profile_record(person_id) or db.get_profile_by_email(email)
+        db.log_audit(
+            user["id"], "CREATE", "profile", person_id, None,
+            {"email": email, "attached_existing_login": True},
+        )
+        return {"person": profile, "invite_sent": False, "login_ready": True}
+
+    person_id = str(uuid.uuid4())
     try:
-        role = (body.role or "EMPLOYEE").strip().upper()
         db.create_profile(
             person_id=person_id,
             email=email,

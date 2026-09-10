@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { getStoredRoles, getActiveRole } from '../../utils/demo';
-import { roleHomePath } from '../../navigation/roleHome';
+import { roleHomePathForHeldRoles } from '../../navigation/roleHome';
 
 interface RequireEmployeeRouteProps {
   children: React.ReactNode;
@@ -42,7 +42,7 @@ export const RequireEmployeeRoute: React.FC<RequireEmployeeRouteProps> = ({ chil
   }
 
   if (!roles.includes('EMPLOYEE')) {
-    return <Navigate to={roleHomePath(getActiveRole())} state={{ from: location }} replace />;
+    return <Navigate to={roleHomePathForHeldRoles(roles, getActiveRole())} state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

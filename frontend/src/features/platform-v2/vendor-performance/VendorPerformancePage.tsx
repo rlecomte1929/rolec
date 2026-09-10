@@ -17,6 +17,7 @@ import { AppShell } from '../../../components/AppShell';
 import { Button } from '../../../components/antigravity/Button';
 import { CountryFlag } from '../../../components/antigravity/CountryFlag';
 import { countryName } from '../../policy-config/countryList';
+import { compareCountryDisplayNames } from '../../../utils/countries';
 import { hrAPI } from '../../../api/client';
 
 type RangeKey = '30d' | '90d' | '12mo';
@@ -231,7 +232,7 @@ function ScatterChart({ points }: { points: { name: string; cost: number; rating
 
 function CoverageHeatmap({ coverage }: { coverage: CoverageEntry[] }) {
   const categories = [...new Set(coverage.map((c) => c.category))];
-  const countries = [...new Set(coverage.map((c) => c.country))].sort();
+  const countries = [...new Set(coverage.map((c) => c.country))].sort(compareCountryDisplayNames);
   if (categories.length === 0 || countries.length === 0) {
     return <div className="py-6 text-center text-[12px] text-slate-500">No coverage data available.</div>;
   }
@@ -534,7 +535,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
         if (v.country) set.add(v.country);
       }),
     );
-    return Array.from(set).sort();
+    return Array.from(set).sort(compareCountryDisplayNames);
   }, [data]);
 
   // ── Derived: filtered categories ─────────────────────────────────────────
@@ -732,7 +733,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             >
               <option value="all">All regions</option>
               {regionOptions.map((code) => (
-                <option key={code} value={code}>{code}</option>
+                <option key={code} value={code}>{countryName(code)}</option>
               ))}
             </select>
         </div>
