@@ -160,6 +160,24 @@ Not Otto work — listed so both sides see the whole loop:
   + reverse-corridor requirement serving. Any new router registered in **both** `backend/main.py`
   **and** `backend/app/main.py`; any new `public` table gets RLS + policy + `REVOKE ALL … FROM anon`.
 
+### 4.S — First-pass scope & correctness notes
+
+- **Journey-blocking first, polish second.** For the first complete demo, prioritise the 9
+  journey-blocking packages (P1–P7, P9, P10). Treat **P8 storage** (usually a capability flag on a
+  mover, not a separate service), **P11 RAG corpus** and **P12 doc-extraction reference**
+  (answer-quality / OCR, not walk-through-blocking) as a fast-follow Phase 2.
+- **Return is a skeleton, not outbound parity.** P10 delivers the 4–6 highest-value return facts per
+  corridor (host de-registration, host tax exit, home re-registration, social/pension switch-back) —
+  not a mirror of the full outbound set.
+- **Never flip a tile onto an empty state.** Claude Code enables a service tile only once ≥1 approved
+  vendor exists for the destination — reuse the existing `requiresCuration` pattern already applied to
+  Pets in `frontend/src/features/services/serviceConfig.ts`. Until then the category is scaffolded but
+  the tile stays "coming soon".
+- **A-P1 is reconcile-first.** Spain-departure `es-facts-2026-08-31` is HELD, not missing: Claude Code
+  reconciles/loads it; Otto only re-delivers facts that fail the gate or are needed to reach ≥6.
+- **Language (P6) is family-scoped where the mover already speaks the destination language** (Denis →
+  French is for the accompanying spouse, not Denis).
+
 ### 4.A — ANDREA (ES→IE, `non-EEA`) — the gold template
 
 **A-P1 · Complete Spain-departure obligations.** *Goal:* the exit side, currently only HELD.
