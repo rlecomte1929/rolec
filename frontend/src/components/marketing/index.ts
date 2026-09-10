@@ -27,3 +27,4 @@ export { PlatformSystemDiagram } from './PlatformSystemDiagram';
 export { SystemFlowDiagram, type ProcessStep } from './SystemFlowDiagram';
 export { InlineDemoForm } from './InlineDemoForm';
 export { FadeIn } from './FadeIn';
+export { ValueCreationSection } from './ValueCreationSection';
