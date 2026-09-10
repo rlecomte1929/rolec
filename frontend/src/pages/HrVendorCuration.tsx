@@ -14,7 +14,7 @@ import { Checkbox } from '../components/antigravity/Checkbox';
 import { Input } from '../components/antigravity/Input';
 import { AppShell } from '../components/AppShell';
 import { CityPicker, CountryPicker, canonPlace } from '../components/location';
-import { getCountryName } from '../utils/countries';
+import { compareCountryDisplayNames, getCountryName } from '../utils/countries';
 import { Alert, Button, Card } from '../components/antigravity';
 import {
   addCustomVendor,
@@ -225,7 +225,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
         best.set(key, d.country);
       }
     }
-    return Array.from(best.values()).sort((a, b) => a.localeCompare(b));
+    return Array.from(best.values()).sort(compareCountryDisplayNames);
   }, [destinations]);
 
   // Canonical match, so a country picked as 'Ireland' still finds a row stored as 'ireland'.
@@ -737,7 +737,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
               <option value="">Select a country…</option>
               {countryOptions.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {getCountryName(c) || c}
                 </option>
               ))}
               <option value={REQUEST_NEW_VALUE}>+ Request a new destination…</option>

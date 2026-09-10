@@ -20,12 +20,12 @@
  * the read-only directory browser AIQ-1682 left behind.
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import type { ImmigrationContext } from './immigrationContext';
-import { getCountryName } from '../../utils/countries';
+import { compareCountryDisplayNames, getCountryName } from '../../utils/countries';
 
 type Vendor = {
   id: string;
@@ -86,7 +86,10 @@ export const VendorBrowsePanel: React.FC<Props> = ({
     queryFn: async () => (await hrAPI.getVendorCorridors()).corridors ?? [],
     enabled: isOpen,
   });
-  const corridors: string[] = corridorsQuery.data ?? [];
+  const corridors: string[] = useMemo(
+    () => [...(corridorsQuery.data ?? [])].sort(compareCountryDisplayNames),
+    [corridorsQuery.data],
+  );
 
   // Load vendors whenever filters change (or panel opens)
   const vendorsQuery = useQuery({

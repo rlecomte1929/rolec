@@ -5,6 +5,7 @@ import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { TableScroll } from '../../../components/antigravity/TableScroll';
 import { adminAPI } from '../../../api/client';
+import { getCountryName, compareCountryDisplayNames } from '../../../utils/countries';
 import { useV2Flag } from '../useV2Flag';
 import type {
   CompanyV2,
@@ -414,7 +415,9 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
 
   const countries = useMemo(
     () =>
-      [...new Set(companies.map((c) => c.country).filter((x): x is string => Boolean(x)))].sort(),
+      [...new Set(companies.map((c) => c.country).filter((x): x is string => Boolean(x)))].sort(
+        compareCountryDisplayNames,
+      ),
     [companies],
   );
   const sizes = useMemo(
@@ -567,7 +570,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
             <option value="">All countries</option>
             {countries.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {getCountryName(c) || c}
               </option>
             ))}
           </select>

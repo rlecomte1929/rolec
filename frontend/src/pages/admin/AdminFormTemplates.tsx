@@ -17,14 +17,16 @@ import { getCountryName } from '../../utils/countries';
 
 const COUNTRY_OPTIONS: Array<{ code: string; label: string }> = [
   { code: '', label: 'All countries' },
-  { code: 'NO', label: 'Norway' },
-  { code: 'FR', label: 'France' },
-  { code: 'DE', label: 'Germany' },
-  { code: 'NL', label: 'Netherlands' },
-  { code: 'ES', label: 'Spain' },
-  { code: 'IT', label: 'Italy' },
-  { code: 'CH', label: 'Switzerland' },
-  { code: 'GB', label: 'United Kingdom' },
+  ...[
+    { code: 'NO', label: 'Norway' },
+    { code: 'FR', label: 'France' },
+    { code: 'DE', label: 'Germany' },
+    { code: 'NL', label: 'Netherlands' },
+    { code: 'ES', label: 'Spain' },
+    { code: 'IT', label: 'Italy' },
+    { code: 'CH', label: 'Switzerland' },
+    { code: 'GB', label: 'United Kingdom' },
+  ].sort((a, b) => a.label.localeCompare(b.label, 'en', { sensitivity: 'base' })),
 ];
 
 export const AdminFormTemplates: React.FC = () => {

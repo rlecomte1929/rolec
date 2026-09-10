@@ -26,6 +26,13 @@ describe('CountrySelect', () => {
     expect(screen.queryByRole('option', { name: 'NO' })).not.toBeInTheDocument();
   });
 
+  it('lists restricted codes in display-name order, not ISO order', () => {
+    render(<CountrySelect value="" onChange={() => {}} codes={['NO', 'FR', 'AE']} />);
+    fireEvent.click(screen.getByRole('button'));
+    const names = screen.getAllByRole('option').map((el) => el.textContent ?? '');
+    expect(names).toEqual(['France', 'Norway', 'United Arab Emirates']);
+  });
+
   it('emits the ISO code when a name is chosen', () => {
     const onChange = vi.fn();
     render(<CountrySelect value="" onChange={onChange} />);

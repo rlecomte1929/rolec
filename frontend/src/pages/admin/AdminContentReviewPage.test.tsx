@@ -137,8 +137,24 @@ describe('decisions', () => {
     fireEvent.change(box, { target: { value: 'You cannot apply for a D number yourself.' } });
     fireEvent.click(screen.getByRole('button', { name: /save correction/i }));
     await waitFor(() =>
-      expect(editFact).toHaveBeenCalledWith('f1', 'You cannot apply for a D number yourself.'),
+      expect(editFact).toHaveBeenCalledWith(
+        'f1',
+        'You cannot apply for a D number yourself.',
+        undefined,
+        { evidenceQuote: 'You cannot apply for a D number.', approve: false },
+      ),
     );
+  });
+
+  it('will not let you approve a fact that has no evidence quote', async () => {
+    vi.mocked(listReviewFacts).mockResolvedValue(
+      page([mk({ evidence_quote: null, evidence_status: 'no_quote', fact_text: 'A UK claim.' })]) as never,
+    );
+    renderPage();
+    expect(await screen.findByText('No quote yet')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/^Select A UK claim/));
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /add quote from source/i })).toBeInTheDocument();
   });
 });
 
@@ -167,5 +183,20 @@ describe('destination labels (BUG-260910-E623)', () => {
     expect(destFilter).not.toHaveTextContent('NO');
     expect(await screen.findByTestId('fact-text')).toBeInTheDocument();
     expect(screen.getByText(/Norway · eligibility/)).toBeInTheDocument();
+  });
+
+  it('orders destination filter options by country name, not ISO code', async () => {
+    vi.mocked(getReviewSummary).mockResolvedValue({
+      by_destination: { NO: { pending: 1 }, FR: { pending: 1 }, AE: { pending: 1 } },
+      totals: { pending: 3 },
+      pending_evidence: { verified: 0, unverified: 0, unchecked: 0 },
+      pending: 3,
+    } as never);
+    renderPage();
+    const destFilter = await screen.findByLabelText('Destination');
+    const labels = [...destFilter.querySelectorAll('option')]
+      .map((o) => o.textContent ?? '')
+      .filter((t) => t && t !== 'All destinations');
+    expect(labels).toEqual(['France', 'Norway', 'United Arab Emirates']);
   });
 });

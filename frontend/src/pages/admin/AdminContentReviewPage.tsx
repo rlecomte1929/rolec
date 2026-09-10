@@ -11,7 +11,7 @@ import {
   type ReviewFact,
   type ReviewSummary,
 } from '../../api/contentReview';
-import { getCountryName } from '../../utils/countries';
+import { compareCountryDisplayNames, getCountryName } from '../../utils/countries';
 
 /**
  * [AIQ-1821] The content review queue.
@@ -28,6 +28,10 @@ import { getCountryName } from '../../utils/countries';
 
 const PAGE_SIZE = 25;
 
+function hasQuote(fact: ReviewFact): boolean {
+  return Boolean((fact.evidence_quote ?? '').trim());
+}
+
 const EVIDENCE_META: Record<EvidenceStatus, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'neutral'; help: string }> = {
   verified: {
     label: 'Quote in source',
@@ -38,6 +42,11 @@ const EVIDENCE_META: Record<EvidenceStatus, { label: string; variant: 'success' 
     label: 'Translated',
     variant: 'info',
     help: 'The source is in another language, so a word-for-word check cannot apply. This says nothing about whether the fact is right.',
+  },
+  no_quote: {
+    label: 'No quote yet',
+    variant: 'warning',
+    help: 'This fact has no verbatim sentence from the cited page. Paste one before you can approve it — that is what later readers will check against.',
   },
   unverified: {
     label: 'Not found in source',
@@ -84,7 +93,7 @@ export const AdminContentReviewPage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rejectNotes, setRejectNotes] = useState('');
-  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const [editing, setEditing] = useState<{ id: string; text: string; quote: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const updateFilter = (key: string, value: string | undefined) => {
@@ -135,10 +144,20 @@ export const AdminContentReviewPage: React.FC = () => {
   const toggleAll = () =>
     setSelected(allSelected ? new Set() : new Set(facts.map((f) => f.id)));
 
+  const selectedFacts = facts.filter((f) => selected.has(f.id));
+  const unquotedSelected = selectedFacts.filter((f) => !hasQuote(f));
+
   const decide = async (action: 'approve' | 'reject') => {
     if (!selected.size) return;
     if (action === 'reject' && !rejectNotes.trim()) {
       setError('A reason is required when rejecting.');
+      return;
+    }
+    if (action === 'approve' && unquotedSelected.length) {
+      setError(
+        `${unquotedSelected.length} selected fact${unquotedSelected.length === 1 ? '' : 's'} ` +
+          'have no evidence quote. Paste the verbatim sentence from the cited page on each row, then approve.',
+      );
       return;
     }
     setBusy(true);
@@ -159,7 +178,10 @@ export const AdminContentReviewPage: React.FC = () => {
     setBusy(true);
     setError(null);
     try {
-      await editFact(editing.id, editing.text.trim());
+      await editFact(editing.id, editing.text.trim(), undefined, {
+        evidenceQuote: editing.quote,
+        approve: false,
+      });
       setEditing(null);
       setReloadKey((k) => k + 1);
     } catch (err) {
@@ -171,7 +193,7 @@ export const AdminContentReviewPage: React.FC = () => {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const destinations = useMemo(
-    () => Object.keys(summary?.by_destination ?? {}).sort(),
+    () => Object.keys(summary?.by_destination ?? {}).sort(compareCountryDisplayNames),
     [summary],
   );
 
@@ -284,7 +306,7 @@ export const AdminContentReviewPage: React.FC = () => {
             </div>
             <ul className="divide-y divide-slate-200">
               {facts.map((f) => {
-                const meta = EVIDENCE_META[f.evidence_status];
+                const meta = EVIDENCE_META[f.evidence_status] ?? EVIDENCE_META.unverified;
                 return (
                   <li key={f.id} data-testid="review-row" className="px-4 py-3">
                     <div className="flex gap-3">
@@ -305,9 +327,19 @@ export const AdminContentReviewPage: React.FC = () => {
                           <div className="mt-1">
                             <Textarea
                               value={editing.text}
-                              onChange={(v: string) => setEditing({ id: f.id, text: v })}
+                              onChange={(v: string) => setEditing({ ...editing, text: v })}
                               rows={3}
                               aria-label="Corrected fact text"
+                            />
+                            <label className="mt-2 block text-xs font-medium text-slate-600" htmlFor={`quote-${f.id}`}>
+                              Verbatim sentence from the cited page
+                            </label>
+                            <Textarea
+                              id={`quote-${f.id}`}
+                              value={editing.quote}
+                              onChange={(v: string) => setEditing({ ...editing, quote: v })}
+                              rows={3}
+                              aria-label="Evidence quote"
                             />
                             <div className="mt-2 flex gap-2">
                               <Button size="sm" onClick={saveEdit} disabled={busy}>Save correction</Button>
@@ -329,9 +361,13 @@ export const AdminContentReviewPage: React.FC = () => {
                             <button
                               type="button"
                               className="text-[#1f8e8b] hover:underline"
-                              onClick={() => setEditing({ id: f.id, text: f.fact_text })}
+                              onClick={() => setEditing({
+                                id: f.id,
+                                text: f.fact_text,
+                                quote: f.evidence_quote ?? '',
+                              })}
                             >
-                              Correct the wording
+                              {hasQuote(f) ? 'Correct the wording' : 'Add quote from source'}
                             </button>
                           )}
                           {f.reviewed_by && <span className="text-slate-500">Reviewed by {f.reviewed_by}</span>}
@@ -360,7 +396,18 @@ export const AdminContentReviewPage: React.FC = () => {
             value={rejectNotes}
             onChange={(e) => setRejectNotes(e.target.value)}
           />
-          <Button size="sm" onClick={() => decide('approve')} disabled={busy}>Approve</Button>
+          <Button
+            size="sm"
+            onClick={() => decide('approve')}
+            disabled={busy || unquotedSelected.length > 0}
+          >
+            Approve
+          </Button>
+          {unquotedSelected.length > 0 && (
+            <span className="text-xs text-amber-800">
+              {unquotedSelected.length} need a quote from the cited page before they can be approved.
+            </span>
+          )}
           <Button
             size="sm"
             variant="outline"
