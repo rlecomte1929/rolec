@@ -384,6 +384,130 @@ def _build_settlement_track(case: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _build_return_track(case: Dict[str, Any]) -> Dict[str, Any]:
+    """Return & repatriation track — the round-trip back half of the journey.
+
+    Skeleton scaffold per ``docs/otto/journey-completion-brief-2026-09-10.md`` (P10): the
+    highest-value steps every temporary assignment ends with. Steps are generic and
+    ``locked`` until the assignment nears its end; reverse-corridor requirement facts
+    (host-exit, home re-registration, social/pension switch-back) enrich them later the
+    same way ``_apply_corridor_overlay`` enriches the outbound tracks. Omitted for a
+    PERMANENT relocation, which has no return (see ``_return_track_applies``).
+    """
+    draft = case.get("draft", {})
+    basics = draft.get("relocationBasics", {})
+    origin_country = basics.get("originCountry") or basics.get("origin_country") or "home country"
+    dest_country = basics.get("destCountry", "destination country")
+
+    steps = [
+        {
+            "n": 20,
+            "key": "return-review",
+            "title": "End-of-assignment review",
+            "status": "locked",
+            "owner": "HR",
+            "where": "ReloPass",
+            "time": "~6 months before end",
+            "cost": "—",
+            "depends": "Assignment nearing end",
+            "line": "HR and the employee plan the return: next role, timing, and what the return covers.",
+            "subs": [
+                "Confirm assignment end date",
+                "Agree return or onward-transfer destination",
+                "Review return entitlements in the policy",
+            ],
+        },
+        {
+            "n": 21,
+            "key": "return-host-exit",
+            "title": f"Close registrations & tax in {dest_country}",
+            "status": "locked",
+            "owner": "You",
+            "where": f"{dest_country} authorities",
+            "time": "2–6 weeks",
+            "cost": "—",
+            "depends": "End-of-assignment review",
+            "line": "De-register locally and settle the final host-country tax filing before leaving.",
+            "subs": [
+                "De-register your address / residence",
+                "File the final host-country tax return",
+                "Close or convert local accounts and utilities",
+            ],
+        },
+        {
+            "n": 22,
+            "key": "return-home-reentry",
+            "title": f"Re-register in {origin_country}",
+            "status": "locked",
+            "owner": "You",
+            "where": f"{origin_country} authorities",
+            "time": "1–3 weeks",
+            "cost": "—",
+            "depends": "Arrival home",
+            "line": "Re-establish home-country residence: address, healthcare, and tax residence.",
+            "subs": [
+                "Re-register your address",
+                "Re-activate home healthcare cover",
+                "Confirm tax-residence status on return",
+            ],
+        },
+        {
+            "n": 23,
+            "key": "return-social",
+            "title": "Social security & pension switch-back",
+            "status": "locked",
+            "owner": "You",
+            "where": "Home social-security body",
+            "time": "2–4 weeks",
+            "cost": "—",
+            "depends": "Re-registration",
+            "line": "Move social-security and pension cover back to the home scheme; close any A1 / certificate of coverage.",
+            "subs": [
+                "Notify the home social-security scheme",
+                "Confirm pension continuity across the assignment",
+                "Close the A1 / certificate of coverage",
+            ],
+        },
+        {
+            "n": 24,
+            "key": "return-move",
+            "title": "Return move & storage release",
+            "status": "locked",
+            "owner": "You",
+            "where": f"{dest_country} → {origin_country}",
+            "time": "4–8 weeks",
+            "cost": "Variable",
+            "depends": "End-of-assignment review",
+            "line": "Book the return shipment and release anything left in storage at origin.",
+            "subs": [
+                "Get return-move quotes",
+                "Schedule packing and shipment",
+                "Release goods from storage",
+            ],
+        },
+        {
+            "n": 25,
+            "key": "return-close",
+            "title": "Return case close-out",
+            "status": "locked",
+            "owner": "HR",
+            "where": "ReloPass",
+            "time": "—",
+            "cost": "—",
+            "depends": "All return steps complete",
+            "line": "HR marks the assignment as Repatriated and archives the return record.",
+            "subs": [],
+        },
+    ]
+
+    return {
+        "id": "return",
+        "name": "Return & repatriation",
+        "icon": "return",
+        "steps": steps,
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Requirements gating
 # ─────────────────────────────────────────────────────────────────────────────
@@ -406,6 +530,17 @@ def _visa_track_required(draft: Dict[str, Any]) -> bool:
         contract_type=profile.get("contract_type"),
     )
     return regime.regime_id not in _NO_VISA_REGIMES
+
+
+def _return_track_applies(draft: Dict[str, Any]) -> bool:
+    """The Return & repatriation track applies to every temporary assignment.
+
+    Omitted only for an explicit PERMANENT relocation, which has no return. An absent
+    assignment type defaults to temporary (mirrors the LTA default in roadmap_generator),
+    so an incomplete draft keeps the track — fail-open toward showing the full arc.
+    """
+    ac = draft.get("assignmentContext") or {}
+    return str(ac.get("assignmentType") or "").upper() != "PERMANENT"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -436,6 +571,10 @@ def derive_roadmap(case: Dict[str, Any]) -> Dict[str, Any]:
     if family_track:
         tracks.append(family_track)
     tracks.append(_build_settlement_track(case))
+    # Round-trip back half — the return/repatriation skeleton (journey-completion brief P10).
+    # Omitted for a PERMANENT relocation, which has no return.
+    if _return_track_applies(draft):
+        tracks.append(_build_return_track(case))
 
     # Outcome labels
     outcomes = ["Right to live and work in destination", "Civil registration complete"]
@@ -443,6 +582,8 @@ def derive_roadmap(case: Dict[str, Any]) -> Dict[str, Any]:
         outcomes.append("Partner registered")
     if has_kids:
         outcomes.append("Children enrolled in school")
+    if _return_track_applies(draft):
+        outcomes.append("Return / repatriation planned")
 
     # Time estimate (rough based on destination)
     dest = (basics.get("destCountry") or "").upper()
