@@ -65,7 +65,7 @@ _COMPOUND_SUFFIXES = (
     "com.hk", "com.tw", "com.cn", "co.in", "net.in", "org.in",
     "com.my", "co.th",
     # Americas
-    "com.br", "net.br", "org.br", "com.mx", "com.ar", "com.co",
+    "com.br", "net.br", "org.br", "adv.br", "com.mx", "com.ar", "com.co",
     "com.pe", "com.uy",
     # Middle East & Africa
     "co.za", "org.za", "co.il", "com.sa", "com.qa", "com.bh",
