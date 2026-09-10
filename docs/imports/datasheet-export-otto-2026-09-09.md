@@ -25,8 +25,9 @@ authored by Otto as ReloPass editorial assessment and are **NOT lawyer-verified*
 | `corridor-content/AU.ndjson` | 24 records | same, Australia (482/186 visa, SBS sponsorship + nomination, skills assessment, VEVO, TFN, Medicare, super SG + fund choice, PAYG, state payroll tax, Fair Work, STP, DASP, PR). Wave 1. **`source` citation field omitted by Otto — stored NULL (not invented); citation re-request pending.** |
 | `corridor-content/US.ndjson` | 45 records | same, United States (H-1B/L-1/O-1, LCA/prevailing wage, I-94, SSN, I-9, state DL/REAL ID, W-4/FICA, ACA, substantial-presence, dual-status return, tax treaty, ITIN, FBAR/FATCA, PERM green card). Wave 1. |
 | `corridor-content/AE.ndjson` | 24 records | same, United Arab Emirates (MOHRE work permit + entry permit, attestation, medical fitness, residence visa, Emirates ID, labour contract, Ejari, DEWA, DHA/DOH health, WPS, end-of-service gratuity, tax-residency cert; nil personal income tax). Wave 1. |
+| `corridor-content/JP.ndjson` | 24 records | same, Japan (CoE + status of residence + work visa, zairyu card, juminhyo registration, My Number, shakai hoken / kokumin kenko hoken + nenkin, koyo hoken, resident tax, nenmatsu chosei / kakutei shinkoku, pension lump-sum). Wave 1. |
 
-Record counts reconcile against Otto's informal manifest (NO=10, DE=8, FR=8, GB=20, ES=12, CH=12, IT=17, CA=20, AU=24, US=45, AE=24).
+Record counts reconcile against Otto's informal manifest (NO=10, DE=8, FR=8, GB=20, ES=12, CH=12, IT=17, CA=20, AU=24, US=45, AE=24, JP=24).
 
 ## Wave 1 harvest — GB (2026-09-09)
 
