@@ -531,6 +531,20 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   Bolagsverket org-nummer, or target a rental-specific register. Surfaced to the founder; not decided
   by the applier.
 
+### XX-SE housing_agencies (Malmö estate agents) — `vendor-resourced-xx-se-housing-malmo-2026-09-09` (landed 2026-09-10) — completes SE/housing pivot
+- Source (GCS): `1789001315964_ncs13r95.ndjson` (+ manifest `1789001319407_t6xymj9a.json`). (This one
+  was wiped by an Audos reload mid-research, revived clean by a nudge — the delivered artifacts verify.)
+- Otto manifest: **2 sourced, 4 rejected** (counts reconcile). Both firm-level FMI reg#,
+  `source_url`=wired `fmi.se`, corridor **XX-SE**: Öresund Fastighetsförmedling AB 41270, Våningen &
+  Villan Sverige AB 42969. Honest rejects: VF Malmö/Croisette (FMI firm #39659 CONFIRMED but
+  commercial-only lokalförmedling, no residential — sharp reject), Sweden Relocators (no FMI), Hej
+  Relocation (DSP, no FMI), Homii (rental platform, no FMI).
+- `_name_key` predictor: both new; no existing Öresund/Våningen in prod (no mis-attach). Landed:
+  **+2 new suppliers** (SE/housing_agencies, pending), 0 mis-attach. Tripwire: `ssc` `approved`
+  **130 → 130** md5 `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1078 → 1080. **SE/housing
+  pivot complete tonight: Stockholm 4 + Gothenburg 1 + Malmö 2 = 7 across 3 cities, all FMI-gated.**
+  No more SE/housing until the founder rules on the FMI-vs-Bolagsverket gate decision above.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
