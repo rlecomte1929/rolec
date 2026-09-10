@@ -1,0 +1,20 @@
+{
+  "batch_id": "vendor-resourced-xx-nl-housing-amsterdam-2026-09-10",
+  "category": "housing_agencies",
+  "city": "Amsterdam",
+  "total_sourced": 8,
+  "total_rejected": 3,
+  "firms": [
+    {"name": "Dutch Housing Centre B.V.", "status": "sourced", "mva_id": "Jeroen de Bruijn KRMT (MVA Certified Expat Broker)", "source_url": "https://www.mva.nl/"},
+    {"name": "JLG Real Estate B.V.", "status": "sourced", "mva_id": "Dimitry Jansen RM (MVA Certified Expat Broker)", "source_url": "https://www.mva.nl/"},
+    {"name": "De Graaf & Groot Makelaars o.g.", "status": "sourced", "mva_id": "Olivier Hoogeveen KRMT; Eppo Henselijn KRMT (MVA Certified Expat Brokers)", "source_url": "https://www.mva.nl/"},
+    {"name": "Engel & Volkers Amsterdam Zuid", "status": "sourced", "mva_id": "Marieke Versloot KRMT & RT (MVA Certified Expat Broker)", "source_url": "https://www.mva.nl/"},
+    {"name": "Ramon Mossel Makelaardij o.g. B.V.", "status": "sourced", "mva_id": "Dianne van Vlerken KRMT (MVA Certified Expat Broker)", "source_url": "https://www.mva.nl/"},
+    {"name": "Broersma Werken en Wonen", "status": "sourced", "mva_id": "Anniek Steltenpool-Docter RM RT (MVA Certified Expat Broker)", "source_url": "https://www.mva.nl/"},
+    {"name": "Eefje Voogd Makelaardij B.V.", "status": "sourced", "mva_id": "Maryse Hofstee RM RT (MVA Certified Expat Broker)", "source_url": "https://www.mva.nl/"},
+    {"name": "Forte Makelaars", "status": "sourced", "mva_id": "Jeroen Henselijn RM RT (MVA Certified Expat Broker)", "source_url": "https://www.mva.nl/"},
+    {"name": "Ellen Mouthaan Makelaardij o.g.", "status": "rejected", "reason": "MVA member with Certified Expat Broker but registered in Naarden (Gooi region), not Amsterdam. Listings are in Hilversum/Bussum/Naarden area; outside Amsterdam market."},
+    {"name": "The Agency Amsterdam", "status": "rejected", "reason": "MVA member but no MVA Certified Expat Broker designation on staff and listings appear primarily sales-focused. No evidence of rental or expat home-finding service."},
+    {"name": "CSV Makelaars B.V.", "status": "rejected", "reason": "MVA member but no Certified Expat Broker on staff and listings appear primarily sales-focused. No expat or rental service specialisation evident."}
+  ]
+}
