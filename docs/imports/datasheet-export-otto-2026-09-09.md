@@ -28,6 +28,7 @@ authored by Otto as ReloPass editorial assessment and are **NOT lawyer-verified*
 | `corridor-content/SG.ndjson` | 25 records | same, Singapore (EP/COMPASS + S Pass + Work Permit via MOM, IPA, FIN, SingPass, tenancy stamp duty, foreign-worker levy, IRAS tax-residency + non-resident rate + IR21 clearance; CPF nil for foreign employees). Wave 2. |
 | `corridor-content/IE.ndjson` | 12 records | same, Ireland (GEP/CSEP employment permit, entry visa, IRP/immigration registration, PPSN, Revenue myAccount/RPN + emergency tax, USC bands, HSE/GP, RTB tenancy, PRSI, tax residence). Wave 2. |
 | `corridor-content/NL.ndjson` | 17 records | same, Netherlands (kennismigrant residence permit + MVV via IND, BSN at gemeente, 30% ruling eligibility/application/compliance, DigiD, zorgverzekering, loonheffing payroll, rental, income tax return, PE risk). Wave 2. |
+| `corridor-content/SE.ndjson` | 16 records | same, Sweden (work permit + union statement via Migrationsverket, posted-worker notification, folkbokforing, personnummer/samordningsnummer, Forsakringskassan, BankID, ID card, A-skatt, SINK, A1 certificate). Wave 2. |
 | `corridor-content/JP.ndjson` | 24 records | same, Japan (CoE + status of residence + work visa, zairyu card, juminhyo registration, My Number, shakai hoken / kokumin kenko hoken + nenkin, koyo hoken, resident tax, nenmatsu chosei / kakutei shinkoku, pension lump-sum). Wave 1. |
 
 Record counts reconcile against Otto's informal manifest (NO=10, DE=8, FR=8, GB=20, ES=12, CH=12, IT=17, CA=20, AU=24, US=45, AE=24, JP=24).
