@@ -55,7 +55,21 @@ export type EmployeePendingOverviewRow = {
  */
 export function formatDestinationLabel(dest?: EmployeeOverviewDestination | null): string {
   const label = dest?.label?.trim();
-  if (label) return label;
+  if (label) {
+    if (label.includes('→')) {
+      return label
+        .split('→')
+        .map((part) => getCountryName(part.trim()) || part.trim())
+        .join(' → ');
+    }
+    const comma = label.lastIndexOf(',');
+    if (comma !== -1) {
+      const city = label.slice(0, comma).trim();
+      const country = getCountryName(label.slice(comma + 1).trim());
+      if (city && country) return `${city}, ${country}`;
+    }
+    return getCountryName(label) || label;
+  }
   const city = dest?.host_city?.trim();
   // M-03 (AIQ-1261): resolve ISO codes to full names ("AE" → "United Arab
   // Emirates"); getCountryName passes already-full names and unknowns through.

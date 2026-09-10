@@ -74,8 +74,12 @@ const data = parsed.success
 
 /** Validated, typed front-end environment. */
 export const env = {
-  /** Backend base URL. Falls back to localhost in dev, relative ('') in prod. */
-  apiUrl: data.VITE_API_URL ?? (DEV ? 'http://localhost:8000' : ''),
+  /**
+   * Backend base URL. Empty = same-origin `/api` (Vite proxies to :8000 in
+   * dev). Do not default to http://localhost:8000 — a page on 127.0.0.1:PORT
+   * then CORS-fails against localhost.
+   */
+  apiUrl: data.VITE_API_URL ?? '',
   /** Provider-portal axios base URL (VITE_API_BASE_URL). */
   apiBaseUrl: data.VITE_API_BASE_URL ?? '',
   supabaseUrl: data.VITE_SUPABASE_URL,

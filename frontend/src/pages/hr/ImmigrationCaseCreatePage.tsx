@@ -15,6 +15,7 @@ import { hrAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import api from '../../api/client';
 import type { AssignmentSummary } from '../../types';
+import { getCountryName } from '../../utils/countries';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -230,7 +231,7 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
                           a.employeeFirstName,
                           a.employeeLastName,
                           a.case?.home_country && a.case?.host_country
-                            ? `(${a.case.home_country} → ${a.case.host_country})`
+                            ? `(${getCountryName(a.case.home_country)} → ${getCountryName(a.case.host_country)})`
                             : '',
                         ]
                           .filter(Boolean)

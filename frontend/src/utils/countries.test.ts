@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getCountryName } from './countries';
+import { getCountryName, sortByCountryDisplayName } from './countries';
 
 describe('getCountryName', () => {
   it('resolves an ISO code to its display name', () => {
@@ -27,5 +27,19 @@ describe('getCountryName', () => {
 
   it('resolves identity-list countries that are not relocation destinations', () => {
     expect(getCountryName('LB')).toBe('Lebanon');
+  });
+});
+
+describe('sortByCountryDisplayName', () => {
+  it('orders ISO codes by the name the user sees, not by the code', () => {
+    expect(sortByCountryDisplayName(['NO', 'FR', 'AE'])).toEqual(['FR', 'NO', 'AE']);
+  });
+
+  it('orders mixed names and codes the same way', () => {
+    expect(sortByCountryDisplayName(['United Arab Emirates', 'France', 'NO'])).toEqual([
+      'France',
+      'NO',
+      'United Arab Emirates',
+    ]);
   });
 });

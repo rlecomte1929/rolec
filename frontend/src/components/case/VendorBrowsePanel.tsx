@@ -20,11 +20,12 @@
  * the read-only directory browser AIQ-1682 left behind.
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import type { ImmigrationContext } from './immigrationContext';
+import { compareCountryDisplayNames, getCountryName } from '../../utils/countries';
 
 type Vendor = {
   id: string;
@@ -85,7 +86,10 @@ export const VendorBrowsePanel: React.FC<Props> = ({
     queryFn: async () => (await hrAPI.getVendorCorridors()).corridors ?? [],
     enabled: isOpen,
   });
-  const corridors: string[] = corridorsQuery.data ?? [];
+  const corridors: string[] = useMemo(
+    () => [...(corridorsQuery.data ?? [])].sort(compareCountryDisplayNames),
+    [corridorsQuery.data],
+  );
 
   // Load vendors whenever filters change (or panel opens)
   const vendorsQuery = useQuery({
@@ -222,12 +226,12 @@ export const VendorBrowsePanel: React.FC<Props> = ({
               >
                 <option value="">All corridors</option>
                 {corridors.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>{getCountryName(c) || c}</option>
                 ))}
               </select>
               {destCountry && !selectedCorridor && (
                 <p className="text-xs text-[#64748b] mt-1">
-                  Destination: {destCountry}
+                  Destination: {getCountryName(destCountry) || destCountry}
                 </p>
               )}
             </div>
@@ -297,7 +301,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
                       {/* Corridors */}
                       {vendor.corridors?.length > 0 && (
                         <p className="text-xs text-[#64748b] mt-1.5">
-                          Corridors: {vendor.corridors.join(', ')}
+                          Corridors: {vendor.corridors.map((c) => getCountryName(c) || c).join(', ')}
                         </p>
                       )}
 

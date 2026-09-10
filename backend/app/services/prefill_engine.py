@@ -106,6 +106,29 @@ def _now() -> str:
 # Public entry point
 # ---------------------------------------------------------------------------
 
+def fields_need_prefill(
+    template_fields: List[Dict[str, Any]],
+    stored: Dict[str, Dict[str, Any]],
+) -> bool:
+    """True when a fillable `prefill_source` field is still blank.
+
+    Used by GET /fields so opening the editor compiles from intake even when
+    the CaseForm was created before the employee finished intake. Consult
+    determinations stay blank on purpose.
+    """
+    for field in template_fields:
+        if field.get("consult_professional"):
+            continue
+        if not field.get("prefill_source"):
+            continue
+        field_id = field.get("id") or field.get("field_id") or ""
+        sv = stored.get(str(field_id))
+        value = (sv.get("value") if sv else None) or ""
+        if not str(value).strip():
+            return True
+    return False
+
+
 def run_prefill(case_form_id: str, case_uuid: str) -> int:
     """
     Populate FieldValue records for a single CaseForm.
@@ -152,6 +175,7 @@ def _run(case_form_id: str, case_uuid: str) -> int:
     # 3. Load existing field state to skip overrides and detect real changes
     overridden_ids = _load_overridden_field_ids(case_form_id)
     existing_values = _load_existing_values(case_form_id)
+    existing_actors = _load_existing_actors(case_form_id)
 
     # 4. Resolve each field. Track two sets:
     #    - resolved: every field the engine can fill (drives completion %)
@@ -165,6 +189,18 @@ def _run(case_form_id: str, case_uuid: str) -> int:
             continue
         if field_id in overridden_ids:
             continue  # never overwrite user-edited values
+
+        # Human answers stay put. System-filled blanks and system values may
+        # refresh from later intake (lazy GET-on-open and blocker re-runs).
+        existing = existing_values.get(field_id)
+        actor = (existing_actors.get(field_id) or "").lower()
+        if (
+            existing is not None
+            and str(existing).strip() != ""
+            and actor in ("employee", "hr", "specialist")
+        ):
+            resolved_field_ids.append(field_id)
+            continue
 
         prefill_source: Optional[str] = field.get("prefill_source")
         if not prefill_source:
@@ -265,6 +301,23 @@ def _load_existing_values(case_form_id: str) -> Dict[str, Optional[str]]:
         return {r[0]: r[1] for r in rows}
     except Exception:
         logger.exception("prefill_engine: failed to load existing values cf=%s", case_form_id)
+        return {}
+
+
+def _load_existing_actors(case_form_id: str) -> Dict[str, str]:
+    """Return {field_id: filled_by} so human answers are not clobbered on re-run."""
+    try:
+        with db.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    f"SELECT field_id, filled_by FROM {_t('case_form_field_values')} "
+                    f"WHERE case_form_id = :cfid"
+                ),
+                {"cfid": case_form_id},
+            ).fetchall()
+        return {r[0]: (r[1] or "") for r in rows}
+    except Exception:
+        logger.exception("prefill_engine: failed to load existing actors cf=%s", case_form_id)
         return {}
 
 

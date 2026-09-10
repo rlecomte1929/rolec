@@ -7,7 +7,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/antigravity/Button';
 import { Badge } from '../../components/antigravity/Badge';
-import { AlertTriangle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { AlertTriangle, BookOpen, Clock, ListChecks } from 'lucide-react';
 import { AppShell } from '../../components/AppShell';
 import { buildRoute } from '../../navigation/routes';
 import { servicesAPI, apiGet } from '../../api/client';
@@ -18,6 +19,16 @@ import { PrivacyNotice } from '../../features/privacy/PrivacyNotice';
 import { PRIVACY_NOTICE_VERSION } from '../../features/privacy/privacyNoticeContent';
 import { useSelectedCase } from '../../contexts/SelectedCaseContext';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import { assertSafeUrl } from '../../utils/assertSafeUrl';
+import {
+  formatAbsoluteDate,
+  hrTaskTimeline,
+  hrWhatsExpected,
+  roadmapTaskTimeline,
+  roadmapWhatsExpected,
+  sourceHostLabel,
+  type TimelineLine,
+} from './taskCardCopy';
 
 // ── Status colours ────────────────────────────────────────────────────────────
 
@@ -52,6 +63,38 @@ function getCompletionMessage(taskType: TaskType): string {
   }
 }
 
+function GuidanceSection({
+  icon: Icon,
+  label,
+  testId,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  testId: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div data-testid={testId} className="mt-3">
+      <div className="mb-1 flex items-center gap-1.5">
+        <Icon className="h-3.5 w-3.5 text-navy-700" aria-hidden="true" />
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">{label}</span>
+      </div>
+      <div className="text-sm text-slate-700 leading-relaxed">{children}</div>
+    </div>
+  );
+}
+
+function TimelineList({ lines }: { lines: TimelineLine[] }) {
+  return (
+    <ul className="space-y-1">
+      {lines.map((line) => (
+        <li key={`${line.kind}-${line.text}`}>{line.text}</li>
+      ))}
+    </ul>
+  );
+}
+
 // ── Task card ─────────────────────────────────────────────────────────────────
 
 interface TaskCardProps {
@@ -63,9 +106,10 @@ interface TaskCardProps {
   justCompleted?: boolean;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled, justCompleted = false }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled, justCompleted = false }) => {
   const [submitting, setSubmitting] = useState(false);
   const [note, setNote] = useState('');
+  const expected = hrWhatsExpected(task.task_type, task.description);
 
   const handleSubmit = async () => {
     if (submitDisabled) return;
@@ -88,23 +132,27 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled, jus
             <Badge variant="info" size="sm">HR request</Badge>
           </div>
           <h3 className="font-medium text-slate-900">{task.title}</h3>
-          {task.due_date && (
-            <p className="text-xs text-slate-500 mt-0.5">
-              Due {new Date(task.due_date).toLocaleDateString()}
-            </p>
-          )}
         </div>
         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLE[task.status]}`}>
           {STATUS_LABEL[task.status]}
         </span>
       </div>
 
-      {task.description && (
-        <p className="text-sm text-slate-600 mb-3">{task.description}</p>
-      )}
+      <GuidanceSection icon={ListChecks} label="What’s expected" testId="task-whats-expected">
+        <p>{expected.instruction}</p>
+        {expected.detail && expected.detail !== expected.instruction && (
+          <p className="mt-1.5 text-slate-600">{expected.detail}</p>
+        )}
+      </GuidanceSection>
+      <GuidanceSection icon={BookOpen} label="Where this comes from" testId="task-source">
+        <p>Your HR team requested this. It is not a government requirement unless they say so in the details above.</p>
+      </GuidanceSection>
+      <GuidanceSection icon={Clock} label="Timeline" testId="task-timeline">
+        <TimelineList lines={hrTaskTimeline(task.due_date)} />
+      </GuidanceSection>
 
       {task.status === 'revision_requested' && task.review_note && (
-        <div className="mb-3 rounded bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-800">
+        <div className="mt-3 mb-3 rounded bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-800">
           <span className="font-medium">Revision requested:</span> {task.review_note}
         </div>
       )}
@@ -128,7 +176,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onSubmit, submitDisabled, jus
       {canSubmit && (
         <>
           <textarea
-            className="w-full rounded border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0b2b43] mb-3"
+            className="mt-3 w-full rounded border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy-800 mb-3"
             rows={2}
             placeholder="Add a note (optional)…"
             value={note}
@@ -198,47 +246,106 @@ function roadmapSection(status: RoadmapV2Step['status']): TaskSection | null {
   }
 }
 
-export const RoadmapStepCard: React.FC<{ step: RoadmapV2Step }> = ({ step }) => (
-  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-    <div className="flex items-start justify-between gap-3 mb-3">
-      <div>
-        <div className="mb-1.5">
-          <Badge variant="neutral" size="sm">Move task</Badge>
+export const RoadmapStepCard: React.FC<{ step: RoadmapV2Step; caseId?: string | null }> = ({
+  step,
+  caseId,
+}) => {
+  const expected = roadmapWhatsExpected(step);
+  const sourceUrl = step.source_url?.trim() || null;
+  const safeSourceHref = sourceUrl ? assertSafeUrl(sourceUrl) : null;
+  const dossierHref = caseId
+    ? buildRoute('employeeCaseDossier', { caseId })
+    : null;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <div className="mb-1.5">
+            <Badge variant="neutral" size="sm">Move task</Badge>
+          </div>
+          <h3 className="font-medium text-slate-900">{step.title}</h3>
         </div>
-        <h3 className="font-medium text-slate-900">{step.title}</h3>
-        {step.due_date && (
-          <p className="text-xs text-slate-500 mt-0.5">
-            Due {new Date(step.due_date).toLocaleDateString()}
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ROADMAP_STATUS_STYLE[step.status]}`}>
+          {ROADMAP_STATUS_LABEL[step.status]}
+        </span>
+      </div>
+      <GuidanceSection icon={ListChecks} label="What’s expected" testId="task-whats-expected">
+        <p>{expected.instruction}</p>
+        {expected.howTo && (
+          <p className="mt-1.5 text-slate-600">
+            <span className="font-medium text-slate-800">How to complete it: </span>
+            {expected.howTo}
           </p>
         )}
-      </div>
-      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ROADMAP_STATUS_STYLE[step.status]}`}>
-        {ROADMAP_STATUS_LABEL[step.status]}
-      </span>
-    </div>
-    {step.description && (
-      <p className="text-sm text-slate-600">{step.description}</p>
-    )}
-    {step.non_obvious && step.non_obvious_note && (
-      // The trap this step exists to warn about — the reason it matters, in the mover's
-      // terms. Amber, matching the "Easy to miss" treatment used on requirement cards, so
-      // the two surfaces read as one product. role="note" is announced, not interrupting.
-      <div
-        role="note"
-        className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3"
-        data-testid="roadmap-step-trap"
-      >
-        <div className="mb-1 flex items-center gap-1.5">
-          <AlertTriangle className="h-3.5 w-3.5 text-amber-700" aria-hidden="true" />
-          <span className="text-xs font-semibold uppercase tracking-wide text-amber-800">
-            Easy to miss
-          </span>
+      </GuidanceSection>
+      <GuidanceSection icon={BookOpen} label="Where this comes from" testId="task-source">
+        {safeSourceHref && safeSourceHref !== '#' ? (
+          <>
+            <p>
+              This step is based on destination requirements published at{' '}
+              <a
+                href={safeSourceHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-accent-700 hover:underline"
+              >
+                {sourceHostLabel(sourceUrl as string)}
+              </a>
+              . That is the official reference — not ReloPass inventing the rule.
+            </p>
+            {step.source_excerpt?.trim() && (
+              <p className="mt-1.5 border-l-2 border-slate-200 pl-2 text-slate-600 italic">
+                “{step.source_excerpt.trim()}”
+              </p>
+            )}
+            {step.source_fetched_at && (
+              <p className="mt-1 text-xs text-slate-500">
+                Source last checked {formatAbsoluteDate(step.source_fetched_at)}.
+              </p>
+            )}
+          </>
+        ) : (
+          <p>
+            This is a step on your relocation roadmap.
+            {dossierHref ? (
+              <>
+                {' '}
+                <Link to={dossierHref} className="font-medium text-accent-700 hover:underline">
+                  Open your destination requirements
+                </Link>
+                {' '}for the cited sources behind this move.
+              </>
+            ) : (
+              ' Open your case dossier for the cited sources behind this move.'
+            )}
+          </p>
+        )}
+      </GuidanceSection>
+      <GuidanceSection icon={Clock} label="Timeline" testId="task-timeline">
+        <TimelineList lines={roadmapTaskTimeline(step)} />
+      </GuidanceSection>
+      {step.non_obvious && step.non_obvious_note && (
+        // The trap this step exists to warn about — the reason it matters, in the mover's
+        // terms. Amber, matching the "Easy to miss" treatment used on requirement cards, so
+        // the two surfaces read as one product. role="note" is announced, not interrupting.
+        <div
+          role="note"
+          className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3"
+          data-testid="roadmap-step-trap"
+        >
+          <div className="mb-1 flex items-center gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-700" aria-hidden="true" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+              Easy to miss
+            </span>
+          </div>
+          <p className="text-sm text-amber-900">{step.non_obvious_note}</p>
         </div>
-        <p className="text-sm text-amber-900">{step.non_obvious_note}</p>
-      </div>
-    )}
-  </div>
-);
+      )}
+    </div>
+  );
+};
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -343,8 +450,27 @@ export const EmployeeTaskPage: React.FC = () => {
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-slate-900">My tasks</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Documents and actions requested by your HR team.
+            What you need to do next, in plain English: what is expected, where the
+            requirement comes from, and when to complete it. HR requests sit next to
+            destination move steps.
           </p>
+          {roadmapCaseId && (
+            <p className="mt-2 text-sm">
+              <Link
+                to={buildRoute('employeeCaseDossier', { caseId: roadmapCaseId })}
+                className="font-medium text-accent-700 hover:underline"
+              >
+                Full destination requirements with sources
+              </Link>
+              {' · '}
+              <Link
+                to={buildRoute('employeeCaseRoadmap', { caseId: roadmapCaseId })}
+                className="font-medium text-accent-700 hover:underline"
+              >
+                Open your roadmap
+              </Link>
+            </p>
+          )}
         </div>
 
         {error && (
@@ -387,7 +513,7 @@ export const EmployeeTaskPage: React.FC = () => {
                 </h2>
                 <div className="space-y-3">
                   {pending.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} justCompleted={completedTaskId === t.id} />)}
-                  {rmAction.map((s) => <RoadmapStepCard key={s.id} step={s} />)}
+                  {rmAction.map((s) => <RoadmapStepCard key={s.id} step={s} caseId={roadmapCaseId} />)}
                 </div>
               </section>
             )}
@@ -398,7 +524,7 @@ export const EmployeeTaskPage: React.FC = () => {
                 </h2>
                 <div className="space-y-3">
                   {submitted.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} justCompleted={completedTaskId === t.id} />)}
-                  {rmReview.map((s) => <RoadmapStepCard key={s.id} step={s} />)}
+                  {rmReview.map((s) => <RoadmapStepCard key={s.id} step={s} caseId={roadmapCaseId} />)}
                 </div>
               </section>
             )}
@@ -409,7 +535,7 @@ export const EmployeeTaskPage: React.FC = () => {
                 </h2>
                 <div className="space-y-3">
                   {approved.map((t) => <TaskCard key={t.id} task={t} onSubmit={handleSubmit} submitDisabled={!acknowledged} justCompleted={completedTaskId === t.id} />)}
-                  {rmDone.map((s) => <RoadmapStepCard key={s.id} step={s} />)}
+                  {rmDone.map((s) => <RoadmapStepCard key={s.id} step={s} caseId={roadmapCaseId} />)}
                 </div>
               </section>
             )}

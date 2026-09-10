@@ -1,0 +1,56 @@
+{
+  "batch_id": "vendor-resourced-xx-gb-tax-london-2026-09-10",
+  "category": "tax_finance",
+  "city": "London",
+  "total_sourced": 7,
+  "total_rejected": 1,
+  "firms": [
+    {
+      "name": "Buzzacott Livingstone Ltd",
+      "status": "sourced",
+      "icaew_id": "Z1r1b1w",
+      "source_url": "https://find.icaew.com/firms/london/buzzacott-livingstone-ltd/Z1r1b1w"
+    },
+    {
+      "name": "Blick Rothenberg Limited",
+      "status": "sourced",
+      "icaew_id": "1CT85L",
+      "source_url": "https://find.icaew.com/firms/london/blick-rothenberg-limited/1CT85L"
+    },
+    {
+      "name": "Saffery LLP",
+      "status": "sourced",
+      "icaew_id": "ZmYFAs",
+      "source_url": "https://find.icaew.com/firms/london/saffery-llp/ZmYFAs"
+    },
+    {
+      "name": "Alliotts LLP",
+      "status": "sourced",
+      "icaew_id": "2nVUkq",
+      "source_url": "https://find.icaew.com/firms/london/alliotts-llp-bas/2nVUkq"
+    },
+    {
+      "name": "Gerald Edelman LLP",
+      "status": "sourced",
+      "icaew_id": "ZpXLiP",
+      "source_url": "https://find.icaew.com/firms/london/gerald-edelman-llp/ZpXLiP"
+    },
+    {
+      "name": "Moore Kingston Smith & Partners LLP",
+      "status": "sourced",
+      "icaew_id": "eCdj7",
+      "source_url": "https://find.icaew.com/firms/london/moore-kingston-smith-and-partners-llp/eCdj7"
+    },
+    {
+      "name": "HaysMac LLP",
+      "status": "sourced",
+      "icaew_id": "Z1jA1VE",
+      "source_url": "https://find.icaew.com/firms/london/haysmac-llp/Z1jA1VE"
+    },
+    {
+      "name": "Tax Partners Limited",
+      "status": "rejected",
+      "reason": "No confirmed expat/cross-border personal-tax specialisation found on own website or in public records; appears to be a generic SME accountancy practice."
+    }
+  ]
+}

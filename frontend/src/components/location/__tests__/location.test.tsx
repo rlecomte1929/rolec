@@ -78,6 +78,21 @@ describe('CountryPicker — a closed list', () => {
     render(<CountryPicker value="Kosovo" onChange={() => {}} label="Country" />);
     expect(screen.getByRole('option', { name: 'Kosovo' })).toBeInTheDocument();
   });
+
+  it('orders a restricted list by display name, not the order the caller passed', () => {
+    render(
+      <CountryPicker
+        value=""
+        onChange={() => {}}
+        label="Country"
+        options={['Norway', 'France', 'United Arab Emirates']}
+      />,
+    );
+    const values = [...screen.getByLabelText('Country').querySelectorAll('option')]
+      .map((o) => (o as HTMLOptionElement).value)
+      .filter(Boolean);
+    expect(values).toEqual(['France', 'Norway', 'United Arab Emirates']);
+  });
 });
 
 describe('CityPicker — catalogue-backed, never a hard block', () => {
