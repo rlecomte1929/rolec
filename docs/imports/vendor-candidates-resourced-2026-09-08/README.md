@@ -995,6 +995,23 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   housing = `ares.gov.cz` (Czech Trade Register). All CZ categories already 08-31-covered (banks 6 / housing 4 /
   legal 3 / tax 4) → expect dedup on the rest.
 
+### XX-CZ tax_finance (Prague audit firms) via KAČR — `vendor-resourced-xx-cz-tax-prague-2026-09-10` (landed 2026-09-10) — +4 net (Big-4 held)
+- Source (GCS): `1789075317936_ha6dpkb3.ndjson` (+ manifest `1789075355676_mqyhycm7.json`).
+- Otto manifest: **8 sourced, 2 rejected** (counts reconcile). All 8 `source_url`=wired `www.kacr.cz` (KAČR — Komora
+  auditorů ČR, Chamber of Auditors; PUBLIC_REGISTER, register-root OK), corridor **XX-CZ**, category tax_finance,
+  Prague. `accreditation_number` = KAČR audit-firm reg # (021/071/079/401/158/018/603/482). The audit-scope caveat
+  played out exactly: the only KAČR-registered "tax" firms are the global audit networks.
+- **Ran the #2219 predictor HARD (multinational audit networks).** The 08-31 CZ/tax 4 turn out to BE the Big-4:
+  **PwC (021), KPMG (071), Deloitte (079), EY (401) already exist in prod as CZ/tax_finance with exact-name matches
+  → HELD** (promote() would attach a duplicate CZ/tax cap; same-entity, already covered — not a foreign-arm mis-attach).
+  The cross-corridor `pwc.com`/`ey.com` domain hits to PT/HU/EE/SG/NL/… entities are separate suppliers with distinct
+  `_name_key`s (not the match target), so no mis-attach there either.
+- Genuinely new (no `_name_key` match, no domain dup): **Forvis Mazars** (`vc-3caaf105`), **BDO Audit** (`vc-ae53c709`),
+  **Grant Thornton Audit** (`vc-4c21fb4d`), **Crowe Advartis** (`vc-e33a337f`) — the mid-tier networks the 08-31 pass
+  didn't take. Landed **+4** (CZ/tax pending). CZ/tax caps **4 → 8**. Dry-run: staged 4 / dup 0 / promote 4.
+- **Create-only guard held:** approved **1262 UNCHANGED**; pending 12 → 16, all `vc-*`, CZ, tax_finance, vetted_by
+  NULL. No mis-attach. Rejects honest (RSM entity-mismatch; BDO Czech Republic s.r.o. shares bdo.cz with BDO Audit).
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
