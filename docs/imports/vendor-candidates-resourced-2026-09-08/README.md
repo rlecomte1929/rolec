@@ -679,6 +679,44 @@ generator before the first batch; London GB legal came back with per-firm URLs o
 - Landed: **+4 new suppliers** (NL/legal_admin, pending), 0 mis-attach. Tripwire: `ssc` `approved`
   **130 → 130** md5 `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; NL/legal 3 → 7.
 
+### XX-NL housing_agencies (Amsterdam expat-rental brokers) — `vendor-resourced-xx-nl-housing-amsterdam-2026-09-10` (landed 2026-09-10)
+- Source (GCS): `1789029500169_sx3v6325.ndjson` (+ manifest `1789029504879_m0my12gu.json`).
+- Otto manifest: **8 sourced, 3 rejected** (counts reconcile). Rejects used the MVA "Certified Expat
+  Broker" gate well: Ellen Mouthaan (Naarden, not Amsterdam), The Agency Amsterdam + CSV Makelaars
+  (sales-only, no expat-broker designation).
+- **PUBLIC_REGISTER (MVA / mva.nl).** All 8 `source_url`s = wired `www.mva.nl`, corridor **XX-NL**,
+  category housing_agencies; `accreditation_number` = the named **MVA Certified Expat Broker** (a real
+  expat-rental quality designation), e.g. Dutch Housing Centre/Jeroen de Bruijn KRMT, JLG/Dimitry Jansen
+  RM, Ramon Mossel/Dianne van Vlerken KRMT.
+- **Net +8 (all 8 landed).** Firms: Dutch Housing Centre, JLG Real Estate, De Graaf & Groot Makelaars,
+  Engel & Völkers Amsterdam Zuid, Ramon Mossel Makelaardij, Broersma Werken en Wonen, Eefje Voogd
+  Makelaardij, Forte Makelaars.
+- **Franchise-domain refinement (important):** Engel & Völkers Amsterdam Zuid uses the global
+  `engelvoelkers.com` domain, which prod already holds via E&V **Prague (CZ)** and E&V **Luxembourg (LU)**.
+  It was therefore classified `status='duplicate'` at stage (domain seen in prod, cross-corridor) — BUT it
+  **still landed as a NEW distinct NL supplier**, because the stage *drop* filter (`_staged_keys`) is
+  **corridor+category-scoped**: `engelvoelkers.com` was staged under XX-CZ/XX-LU, not XX-NL, so it was not
+  dropped; promote() then created it new via its distinct `_name_key` (`engelvolkersamsterdamzuid`), and
+  the CZ/LU E&V rows were untouched (no mis-attach). This refines the Naples-Coldwell note: a same-domain
+  franchise sibling drops **only** when the prior one was in the SAME corridor+category; a **cross-corridor**
+  same-domain office lands as its own supplier.
+- `_name_key` predictor: all 8 distinct + new. Landed: **+8 new suppliers** (NL/housing_agencies,
+  pending), 0 mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5
+  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; NL/housing 3 → 11.
+
+### XX-NL banks (Amsterdam) — `vendor-resourced-xx-nl-banks-amsterdam-2026-09-10` — ⛔ PARKED, NOT LANDED (no artifact)
+- **Nothing landed.** Audos instability across ~4 attempts / 40 min (a wipe/reset + transient "something
+  went wrong" errors) — the research reached real DNB register codes but never uploaded a GCS file. No
+  artifact = no hash/count to verify, so no hand-landing from a text list (same call as Valencia ES/tax).
+- **Confirmed DNB-registered banks recorded for a calm rerun** (dnb.nl root, XX-NL, banks): ING B0163,
+  ABN AMRO B0149, Triodos Bank B0195, bunq R127999; + Rabobank and Knab/Aegon Bank to confirm. **To land:**
+  rerun the DNB brief when Audos is calm → clean NDJSON+manifest → curl+verify+`--apply --promote`.
+  Expect net low after ABN/ING/Rabo multinational dedup, and run the `_name_key` national-arm predictor.
+- Also parked (register issue, not Audos): **NL tax** — `afm.nl` is a financial-services register, not a
+  tax-adviser bar; NBA/RB/NOB unwired → skipped until a real NL-tax register is wired (founder-flagged).
+- Tripwire untouched (no write): `ssc` `approved` **130 | 1c4c3899925c5a8c4b3c168abcfbfc22**. NL banks
+  stays at its prior count until re-sourced with an artifact.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
