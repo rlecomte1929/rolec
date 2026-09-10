@@ -17,9 +17,12 @@ if _REPO_ROOT not in sys.path:
 from backend.app.services.roadmap_builder import derive_roadmap
 
 
-def _case(assignment_type=None):
+def _case(assignment_type=None, purpose=None):
+    basics = {"originCountry": "ES", "destCountry": "IE", "destCity": "Dublin"}
+    if purpose is not None:
+        basics["purpose"] = purpose
     draft = {
-        "relocationBasics": {"originCountry": "ES", "destCountry": "IE", "destCity": "Dublin"},
+        "relocationBasics": basics,
         "familyMembers": {"maritalStatus": "solo"},
     }
     if assignment_type is not None:
@@ -44,6 +47,11 @@ class ReturnTrackTests(unittest.TestCase):
 
     def test_permanent_relocation_has_no_return_track(self) -> None:
         result = derive_roadmap(_case("PERMANENT"))
+        self.assertIsNone(self._return_track(result))
+        self.assertNotIn("Return / repatriation planned", result["outcomes"])
+
+    def test_purpose_permanent_with_empty_assignment_type_has_no_return_track(self) -> None:
+        result = derive_roadmap(_case(None, purpose="permanent"))
         self.assertIsNone(self._return_track(result))
         self.assertNotIn("Return / repatriation planned", result["outcomes"])
 

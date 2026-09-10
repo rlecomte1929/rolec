@@ -19,6 +19,7 @@ from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 from .immigration_regime import ImmigrationRegimeRouter
+from .requirements_purpose_key import assignment_type_from_purpose
 from .roadmap_corridor_overlay import corridor_overlay
 from .wizard_draft_mapper import extract_profile_from_wizard_draft
 
@@ -540,7 +541,15 @@ def _return_track_applies(draft: Dict[str, Any]) -> bool:
     so an incomplete draft keeps the track — fail-open toward showing the full arc.
     """
     ac = draft.get("assignmentContext") or {}
-    return str(ac.get("assignmentType") or "").upper() != "PERMANENT"
+    raw = ac.get("assignmentType")
+    at = str(raw).strip().upper() if isinstance(raw, str) and raw.strip() else ""
+    if not at:
+        # Same hole as cases_write: many drafts store lta/sta/permanent in purpose.
+        recovered = assignment_type_from_purpose(
+            (draft.get("relocationBasics") or {}).get("purpose")
+        )
+        at = (recovered or "").upper()
+    return at != "PERMANENT"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
