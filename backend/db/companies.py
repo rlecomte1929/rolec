@@ -18,6 +18,7 @@ import time
 import uuid
 
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from ..db_config import DATABASE_URL as _raw_url
 
@@ -1069,12 +1070,31 @@ class CompaniesMixin:
         return self._row_to_dict(row) if row else None
 
     def delete_employee_for_company(self, employee_id: str, company_id: str) -> bool:
-        """Remove an employee from the company roster. Returns False if not found/wrong company."""
+        """Remove an employee from the company roster. Returns False if not found/wrong company.
+
+        Accepts either ``employees.id`` or ``profile_id`` (GET already does). Linked
+        relocation cases stay; this only drops the roster row.
+        """
         with self.engine.begin() as conn:
-            result = conn.execute(
-                text("DELETE FROM employees WHERE id = :eid AND company_id = :cid"),
+            row = conn.execute(
+                text(
+                    "SELECT id FROM employees WHERE company_id = :cid "
+                    "AND (CAST(id AS TEXT) = :eid OR profile_id = :eid)"
+                ),
                 {"eid": employee_id, "cid": company_id},
-            )
+            ).fetchone()
+            if not row:
+                return False
+            eid = row._mapping["id"] if hasattr(row, "_mapping") else row[0]
+            try:
+                result = conn.execute(
+                    text("DELETE FROM employees WHERE id = :eid AND company_id = :cid"),
+                    {"eid": eid, "cid": company_id},
+                )
+            except IntegrityError as ex:
+                # Soft-unlink instead of 500 when another table still references the row.
+                log.warning("delete_employee_for_company integrity: %s", ex)
+                raise
         return result.rowcount > 0 if hasattr(result, "rowcount") else True
 
     def list_hr_policies_by_company(self, company_id: str) -> List[Dict[str, Any]]:

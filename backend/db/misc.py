@@ -4021,6 +4021,16 @@ class MiscMixin:
         if not updates:
             return True
         with self.engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT id FROM employees WHERE company_id = :cid "
+                    "AND (CAST(id AS TEXT) = :eid OR profile_id = :eid)"
+                ),
+                {"eid": employee_id, "cid": company_id},
+            ).fetchone()
+            if not row:
+                return False
+            params["eid"] = row._mapping["id"] if hasattr(row, "_mapping") else row[0]
             result = conn.execute(
                 text(f"UPDATE employees SET {', '.join(updates)} WHERE id = :eid AND company_id = :cid"),
                 params,

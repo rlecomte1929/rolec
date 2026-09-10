@@ -256,6 +256,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
+  const [rosterError, setRosterError] = useState('');
 
   // ── delete state ──────────────────────────────────────────────────────────
   const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
@@ -321,8 +322,15 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
   const handleUpdate = useCallback(
     (empId: string, field: 'band' | 'assignment_type' | 'status') =>
       async (value: string) => {
-        await hrAPI.updateEmployee(empId, { [field]: value || undefined });
-        onReload();
+        setRosterError('');
+        try {
+          await hrAPI.updateEmployee(empId, { [field]: value || undefined });
+          onReload();
+        } catch (err) {
+          const e = err as { response?: { data?: { detail?: string } } };
+          const detail = e.response?.data?.detail;
+          setRosterError(typeof detail === 'string' ? detail : 'Could not update this employee.');
+        }
       },
     [onReload]
   );
@@ -331,6 +339,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
   async function confirmDelete() {
     if (!pendingDelete) return;
     setDeleting(true);
+    setRosterError('');
     try {
       await Promise.all(pendingDelete.map((id) => hrAPI.deleteEmployee(id)));
       setSelected((prev) => {
@@ -339,6 +348,10 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
         return next;
       });
       onReload();
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      const detail = e.response?.data?.detail;
+      setRosterError(typeof detail === 'string' ? detail : 'Could not remove this employee.');
     } finally {
       setDeleting(false);
       setPendingDelete(null);
@@ -357,6 +370,11 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
 
   return (
     <>
+      {rosterError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          {rosterError}
+        </div>
+      )}
       {pendingDelete && (
         <ConfirmModal
           count={pendingDelete.length}
