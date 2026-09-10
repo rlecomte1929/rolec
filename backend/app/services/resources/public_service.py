@@ -6,7 +6,7 @@ Falls back to RKG country_resources, then curated defaults when published view i
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-import uuid
+import re
 from typing import Any, Dict, List, Optional
 
 from . import dto
@@ -209,6 +209,88 @@ def _get_rkg_resources(
         return []
 
 
+def _curated_id(section_key: str, kind: str, title: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", (title or "").lower()).strip("-")[:48]
+    return f"curated_{section_key}_{kind}_{slug or 'item'}"
+
+
+def _curated_card(
+    country_code: str,
+    city: str,
+    category_id: Optional[str],
+    *,
+    section_key: str,
+    kind: str,
+    title: str,
+    summary: str = "",
+    resource_type: str = "guide",
+    url: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    title = (title or "").strip()
+    if not title:
+        return None
+    return {
+        "id": _curated_id(section_key, kind, title),
+        "countryCode": country_code,
+        "cityName": city or None,
+        "categoryId": category_id,
+        "title": title,
+        "summary": summary or "",
+        "resourceType": resource_type,
+        "isFamilyFriendly": False,
+        "isFeatured": False,
+        "externalUrl": url,
+        "trustTier": "curated",
+    }
+
+
+def build_settling_guide(country_code: str, city: str) -> Dict[str, Any]:
+    """Deterministic settle-in pack from curated country defaults (no LLM)."""
+    from ..country_resources import get_default_section_content
+
+    cc = (country_code or "").upper()
+    welcome = get_default_section_content(cc, city, "welcome")
+    admin = get_default_section_content(cc, city, "admin_essentials")
+    community = get_default_section_content(cc, city, "community")
+    safety = get_default_section_content(cc, city, "safety")
+    first_steps: List[Dict[str, Any]] = []
+    for topic in admin.get("topics") or []:
+        if not isinstance(topic, dict) or not topic.get("title"):
+            continue
+        first_steps.append(
+            {
+                "title": topic.get("title"),
+                "timeline": topic.get("timeline") or "",
+                "url": topic.get("link"),
+            }
+        )
+    groups: List[Dict[str, Any]] = []
+    for group in community.get("groups") or []:
+        if not isinstance(group, dict) or not group.get("title"):
+            continue
+        groups.append(
+            {
+                "title": group.get("title"),
+                "url": group.get("url"),
+                "description": group.get("description") or "",
+            }
+        )
+    return {
+        "culturalAwareness": {
+            "intro": welcome.get("intro") or "",
+            "tips": [t for t in (welcome.get("cultural_tips") or []) if t],
+            "workCulture": [t for t in (welcome.get("work_culture") or []) if t],
+        },
+        "firstSteps": first_steps,
+        "community": {
+            "overview": community.get("overview") or "",
+            "groups": groups,
+        },
+        "practicalTips": [t for t in (safety.get("tips") or []) if t],
+        "emergency": safety.get("emergency"),
+    }
+
+
 def _get_curated_resources_as_public(
     country_code: str,
     city: str,
@@ -231,63 +313,142 @@ def _get_curated_resources_as_public(
         content = get_default_section_content(country_code, city, section_key)
         cat_id = cat_key_to_id.get(section_key)
 
+        intro = content.get("intro")
+        if intro:
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="intro",
+                title="How to approach daily life here",
+                summary=str(intro),
+                resource_type="guide",
+            )
+            if card:
+                resources.append(card)
+        for tip in content.get("cultural_tips") or []:
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="tip",
+                title=str(tip),
+                summary="Cultural awareness",
+                resource_type="guide",
+            )
+            if card:
+                resources.append(card)
+        for line in content.get("work_culture") or []:
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="work",
+                title=str(line),
+                summary="How people work here",
+                resource_type="guide",
+            )
+            if card:
+                resources.append(card)
+        overview = content.get("overview")
+        if overview:
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="overview",
+                title=SECTION_LABELS.get(section_key, section_key.replace("_", " ").title()),
+                summary=str(overview),
+                resource_type="guide",
+            )
+            if card:
+                resources.append(card)
         for item in content.get("platforms", []) or []:
-            resources.append({
-                "id": f"curated_{uuid.uuid4().hex[:12]}",
-                "countryCode": country_code,
-                "cityName": city or None,
-                "categoryId": cat_id,
-                "title": item.get("title", ""),
-                "summary": item.get("description", "") or "",
-                "resourceType": "official_link",
-                "isFamilyFriendly": False,
-                "isFeatured": False,
-                "externalUrl": item.get("url"),
-                "trustTier": "curated",
-            })
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="platform",
+                title=item.get("title", ""),
+                summary=item.get("description", "") or "",
+                resource_type="official_link",
+                url=item.get("url"),
+            )
+            if card:
+                resources.append(card)
         for item in content.get("topics", []) or []:
-            resources.append({
-                "id": f"curated_{uuid.uuid4().hex[:12]}",
-                "countryCode": country_code,
-                "cityName": city or None,
-                "categoryId": cat_id,
-                "title": item.get("title", ""),
-                "summary": item.get("timeline", "") or "",
-                "resourceType": "checklist_item",
-                "isFamilyFriendly": False,
-                "isFeatured": False,
-                "externalUrl": item.get("link"),
-                "trustTier": "curated",
-            })
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="topic",
+                title=item.get("title", ""),
+                summary=item.get("timeline", "") or "",
+                resource_type="checklist_item",
+                url=item.get("link"),
+            )
+            if card:
+                resources.append(card)
         for item in content.get("groups", []) or []:
-            resources.append({
-                "id": f"curated_{uuid.uuid4().hex[:12]}",
-                "countryCode": country_code,
-                "cityName": city or None,
-                "categoryId": cat_id,
-                "title": item.get("title", ""),
-                "summary": item.get("description", "") or "",
-                "resourceType": "place",
-                "isFamilyFriendly": False,
-                "isFeatured": False,
-                "externalUrl": item.get("url"),
-                "trustTier": "curated",
-            })
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="group",
+                title=item.get("title", ""),
+                summary=item.get("description", "") or "",
+                resource_type="place",
+                url=item.get("url"),
+            )
+            if card:
+                resources.append(card)
+        for name in content.get("neighborhoods") or []:
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="area",
+                title=str(name),
+                summary="Area to know when choosing housing",
+                resource_type="place",
+            )
+            if card:
+                resources.append(card)
+        for name in content.get("school_types") or []:
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="school",
+                title=str(name),
+                summary="School type in this destination",
+                resource_type="guide",
+            )
+            if card:
+                resources.append(card)
         for item in content.get("items", []) or []:
-            if isinstance(item, dict):
-                resources.append({
-                    "id": f"curated_{uuid.uuid4().hex[:12]}",
-                    "countryCode": country_code,
-                    "cityName": city or None,
-                    "categoryId": cat_id,
-                    "title": item.get("title", "") or item.get("label", ""),
-                    "summary": item.get("description", "") or "",
-                    "resourceType": "guide",
-                    "isFamilyFriendly": False,
-                    "isFeatured": False,
-                    "externalUrl": item.get("url"),
-                    "trustTier": "curated",
-                })
+            if not isinstance(item, dict):
+                continue
+            value = item.get("value") or ""
+            note = item.get("note") or ""
+            summary = item.get("description") or ""
+            if value:
+                summary = f"{value}" + (f" — {summary}" if summary else "")
+            if note:
+                summary = f"{summary} ({note})".strip() if summary else str(note)
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="item",
+                title=item.get("title", "") or item.get("label", ""),
+                summary=summary,
+                resource_type="guide",
+                url=item.get("url"),
+            )
+            if card:
+                resources.append(card)
+        for tip in content.get("tips") or []:
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="safety",
+                title=str(tip),
+                summary="Practical tip",
+                resource_type="guide",
+            )
+            if card:
+                resources.append(card)
+        emergency = content.get("emergency")
+        if emergency:
+            card = _curated_card(
+                country_code, city, cat_id,
+                section_key=section_key, kind="emergency",
+                title=f"Emergency: {emergency}",
+                summary="Keep this number in your phone.",
+                resource_type="guide",
+            )
+            if card:
+                resources.append(card)
     return resources, categories
 
 
@@ -423,6 +584,7 @@ def get_resources_page_data_for_preview(
         "events": events,
         "recommended": recommended,
         "hints": hints,
+        "settlingGuide": build_settling_guide(cc, city or ""),
         "filtersApplied": user_filters,
     }
 
@@ -499,5 +661,6 @@ def get_resources_page_data(
         "events": events,
         "recommended": recommended,
         "hints": hints,
+        "settlingGuide": build_settling_guide(cc, city or ""),
         "filtersApplied": user_filters,
     }
