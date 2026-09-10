@@ -21,10 +21,9 @@ import type {
 } from '../types';
 import { signOutSupabase } from './supabaseAuth';
 
-// VITE_API_URL must be set for every environment:
-//   - Development:  http://localhost:8000         (via frontend/.env.development)
+// VITE_API_URL:
+//   - Development: leave unset so axios hits same-origin `/api` (Vite proxy → :8000)
 //   - Production:   https://api.relopass.com      (via frontend/.env.production)
-// Fallback keeps local dev working if .env.development is missing.
 const API_BASE_URL: string = env.apiUrl;
 
 export { API_BASE_URL };

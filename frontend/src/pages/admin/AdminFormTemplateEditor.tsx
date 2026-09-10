@@ -49,7 +49,7 @@ const COUNTRY_OPTIONS: Array<{ code: string; label: string }> = [
   { code: 'GB', label: 'United Kingdom' },
   { code: 'US', label: 'United States' },
   { code: 'CA', label: 'Canada' },
-];
+].sort((a, b) => a.label.localeCompare(b.label, 'en', { sensitivity: 'base' }));
 
 const CATEGORY_OPTIONS = [
   'registration',

@@ -122,6 +122,64 @@ class ContentReviewTests(unittest.TestCase):
         self.assertEqual(bad["evidence_status"], "unverified")
         self.assertEqual(bad["evidence_context"], "")
 
+    def test_an_empty_quote_is_labelled_no_quote_not_unverified(self):
+        """Approve 422s until a verbatim sentence is stored. Calling that 'not found in
+        source' invited reviewers to rubber-stamp the UK backlog."""
+        empty = str(uuid.uuid4())
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO requirement_facts (id, entity_id, fact_type, fact_key, "
+                "fact_text, applies_to, required_fields, source_doc_id, source_url, "
+                "evidence_quote, confidence, status) VALUES "
+                "(:i,:e,'eligibility','no_quote','A UK claim.','{}','[]',:d,'https://gov.uk/x',"
+                "NULL,'high','pending')"),
+                {"i": empty, "e": ENTITY, "d": DOC})
+        item = self._one(self._list()["items"], empty)
+        self.assertEqual(item["evidence_status"], "no_quote")
+        self.assertFalse((item["evidence_quote"] or "").strip())
+
+    def test_edit_can_store_the_verbatim_quote_without_approving(self):
+        empty = str(uuid.uuid4())
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO requirement_facts (id, entity_id, fact_type, fact_key, "
+                "fact_text, applies_to, required_fields, source_doc_id, source_url, "
+                "evidence_quote, confidence, status) VALUES "
+                "(:i,:e,'eligibility','no_quote','A UK claim.','{}','[]',:d,'https://gov.uk/x',"
+                "NULL,'high','pending')"),
+                {"i": empty, "e": ENTITY, "d": DOC})
+        quote = "You cannot apply for a D number."
+        acr.edit_fact(empty, acr.EditRequest(
+            fact_text="A UK claim.",
+            evidence_quote=quote,
+            approve=False,
+        ), user=_ADMIN)
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT evidence_quote, status FROM requirement_facts WHERE id=:i"),
+                {"i": empty}).first()
+        self.assertEqual(row[0], quote)
+        self.assertEqual(row[1], "pending")
+
+    def test_approve_still_refuses_a_fact_with_no_quote(self):
+        empty = str(uuid.uuid4())
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO requirement_facts (id, entity_id, fact_type, fact_key, "
+                "fact_text, applies_to, required_fields, source_doc_id, source_url, "
+                "evidence_quote, confidence, status) VALUES "
+                "(:i,:e,'eligibility','no_quote','A UK claim.','{}','[]',:d,'https://gov.uk/x',"
+                "NULL,'high','pending')"),
+                {"i": empty, "e": ENTITY, "d": DOC})
+        with self.assertRaises(HTTPException) as ctx:
+            acr.decide(acr.DecideRequest(fact_ids=[empty], action="approve"), user=_ADMIN)
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertIn(empty, str(ctx.exception.detail))
+        with self.engine.connect() as conn:
+            self.assertEqual(conn.execute(text(
+                "SELECT status FROM requirement_facts WHERE id=:i"), {"i": empty}).scalar_one(),
+                "pending")
+
     def test_the_quote_is_found_when_the_excerpt_captured_only_a_cookie_banner(self):
         """`knowledge_docs` has two source-text columns and neither is reliably the fuller one.
 

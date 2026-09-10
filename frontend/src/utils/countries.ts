@@ -91,6 +91,16 @@ export function getCountryName(codeOrName: string | null | undefined): string {
   return countryNameFromIso(v);
 }
 
+/** Compare ISO codes or names by the English label the user sees. */
+export function compareCountryDisplayNames(a: string, b: string): number {
+  return getCountryName(a).localeCompare(getCountryName(b), 'en', { sensitivity: 'base' });
+}
+
+/** Sort a country chooser (codes or names) A–Z by display name, not ISO code. */
+export function sortByCountryDisplayName<T extends string>(values: readonly T[]): T[] {
+  return [...values].sort(compareCountryDisplayNames);
+}
+
 /** Get cities for a country by name */
 export function getCitiesForCountry(countryName: string): string[] {
   const country = DESTINATION_COUNTRIES.find((c) => c.name === countryName);

@@ -1,4 +1,5 @@
 import React from 'react';
+import { getCountryName } from '../../utils/countries';
 
 interface RequirementsCoverageNoticeProps {
   /** CaseRequirementsDTO.covered — undefined (older backend) is treated as covered. */
@@ -37,7 +38,7 @@ export const RequirementsCoverageNotice: React.FC<RequirementsCoverageNoticeProp
     );
   }
   if (covered !== false) return null;
-  const where = destCountry ? ` for ${destCountry}` : '';
+    const where = destCountry ? ` for ${getCountryName(destCountry) || destCountry}` : '';
   return (
     <div
       role="status"

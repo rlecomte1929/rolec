@@ -4,6 +4,7 @@ import { Button } from '../../../components/antigravity/Button';
 import { adminFreshnessAPI } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
 import { AdminFreshnessLayout } from './AdminFreshnessLayout';
+import { getCountryName } from '../../../utils/countries';
 
 type Overview = {
   active_schedules_count?: number;
@@ -144,7 +145,7 @@ export const AdminFreshnessOverview: React.FC = () => {
                   <tbody>
                     {(countries?.items ?? []).slice(0, 8).map((c) => (
                       <tr key={c.country_code} className="border-b border-slate-100">
-                        <td className="py-1.5 pr-2 font-medium">{c.country_code}</td>
+                        <td className="py-1.5 pr-2 font-medium">{getCountryName(c.country_code) || c.country_code}</td>
                         <td className="py-1.5 pr-2">{c.fresh_count ?? 0}</td>
                         <td className="py-1.5 pr-2">{c.stale_count ?? 0}</td>
                         <td className="py-1.5">{c.overdue_count ?? 0}</td>
@@ -220,7 +221,7 @@ export const AdminFreshnessOverview: React.FC = () => {
                       {r.title ?? 'Untitled'}
                     </Link>
                     <span className="ml-1 text-slate-500">
-                      {r.country_code ?? ''}/{r.city_name ?? ''} · {r.stale_reason ?? 'old_updated_at'}
+                      {getCountryName(r.country_code) || r.country_code || ''}/{r.city_name ?? ''} · {r.stale_reason ?? 'old_updated_at'}
                     </span>
                   </li>
                 ))}

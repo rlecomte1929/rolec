@@ -3,6 +3,7 @@ import { Button } from '../../../components/antigravity';
 import { ImmigrationDisclaimer } from '../../../components/requirements/ImmigrationDisclaimer';
 import { requirementsAPI } from '../../../api/client';
 import type { RequirementsSufficiency } from '../../../api/client';
+import { getCountryName } from '../../../utils/countries';
 
 /**
  * [AIQ-1821] The official requirements recorded for this case's destination, each with the
@@ -198,7 +199,7 @@ export const RequirementsSufficiencyPanel: React.FC<Props> = ({ caseId, intakeHr
               className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
             >
               We don’t yet hold reviewed requirements for{' '}
-              <strong>{data?.destination_country}</strong>. This corridor is not ready — that
+              <strong>{getCountryName(data?.destination_country) || data?.destination_country}</strong>. This corridor is not ready — that
               is a catalog gap, <strong>not</strong> a finding that nothing is required of you.
             </div>
           )}

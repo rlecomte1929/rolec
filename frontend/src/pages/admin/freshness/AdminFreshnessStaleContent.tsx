@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '../../../components/antigravity/Button';
 import { adminFreshnessAPI } from '../../../api/client';
 import { AdminFreshnessLayout } from './AdminFreshnessLayout';
+import { getCountryName } from '../../../utils/countries';
 
 type StaleResource = {
   id?: string;
@@ -107,7 +108,7 @@ export const AdminFreshnessStaleContent: React.FC = () => {
               {resources.map((r) => (
                 <tr key={String(r.id)} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="px-4 py-2 font-medium">{r.title ?? '-'}</td>
-                  <td className="px-4 py-2">{r.country_code ?? '-'} / {r.city_name ?? '-'}</td>
+                  <td className="px-4 py-2">{getCountryName(r.country_code) || r.country_code || '-'} / {r.city_name ?? '-'}</td>
                   <td className="px-4 py-2">{r.status ?? '-'}</td>
                   <td className="px-4 py-2">
                     {r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '-'}
@@ -144,7 +145,7 @@ export const AdminFreshnessStaleContent: React.FC = () => {
               {events.map((e) => (
                 <tr key={String(e.id)} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="px-4 py-2 font-medium">{e.title ?? '-'}</td>
-                  <td className="px-4 py-2">{e.country_code ?? '-'} / {e.city_name ?? '-'}</td>
+                  <td className="px-4 py-2">{getCountryName(e.country_code) || e.country_code || '-'} / {e.city_name ?? '-'}</td>
                   <td className="px-4 py-2">
                     {e.start_datetime ? new Date(e.start_datetime).toLocaleString() : '-'}
                   </td>

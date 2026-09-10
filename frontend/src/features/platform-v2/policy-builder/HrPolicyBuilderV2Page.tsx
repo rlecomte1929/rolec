@@ -1579,7 +1579,7 @@ const BENCH_COUNTRIES = [
   { code: 'CH', name: 'Switzerland',    flag: '🇨🇭' },
   { code: 'SG', name: 'Singapore',      flag: '🇸🇬' },
   { code: 'JP', name: 'Japan',          flag: '🇯🇵' },
-];
+].sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
 
 type BenchEntry = { range: [number,number]; avg: number; providers: number };
 const BENCH_DATA: Record<string, Record<string, BenchEntry>> = {
