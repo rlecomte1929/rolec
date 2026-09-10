@@ -316,7 +316,7 @@ export const ValueCreationSection: React.FC = () => {
               <button type="button" data-persona="emp" aria-pressed={persona === 'emp'} onClick={() => setPersona('emp')}><span className="vc-dot" />Employee</button>
             </div>
           </div>
-          <span className="vc-hint"><IcResize />Two lenses — compare today vs ReloPass, and focus on HR, the employee, or both.</span>
+          <span className="vc-hint"><IcResize /><strong>Click to switch views</strong> — compare today with ReloPass, or focus on HR or the employee.</span>
         </div>
 
         <div className="vc-legend">
@@ -421,8 +421,9 @@ export const ValueCreationSection: React.FC = () => {
           <div className="vc-calc">
             <div className="vc-panel">
               <h3>Your numbers</h3>
-              <p className="vc-sub">Roughly, for your team as it runs today.</p>
+              <p className="vc-sub">Roughly, for your team as it runs today. Adjust anything — the estimate updates below.</p>
 
+              <div className="vc-fieldgrid">
               <div className="vc-field"><label htmlFor="vc-relos">Relocations per year</label>
                 <input id="vc-relos" type="number" min={1} max={100000} step={1} value={calc.relos} onChange={(e) => setField('relos', e.target.value)} /></div>
               <div className="vc-field"><label htmlFor="vc-hours">HR hours spent coordinating one move</label>
@@ -439,9 +440,11 @@ export const ValueCreationSection: React.FC = () => {
                 <input id="vc-failrate" type="number" min={0} max={100} step={1} value={calc.failrate} onChange={(e) => setField('failrate', e.target.value)} /></div>
               <div className="vc-field"><label htmlFor="vc-failcost">Cost when a move goes wrong <span className="vc-cur">{cur}</span></label>
                 <input id="vc-failcost" type="number" min={0} max={100000000} step={500} value={calc.failcost} onChange={(e) => setField('failcost', e.target.value)} /></div>
+              </div>
 
               <div className="vc-assump">
                 <div className="vc-ah">ReloPass impact · adjustable assumptions</div>
+                <div className="vc-fieldgrid">
                 <div className="vc-field"><label htmlFor="vc-acoord">HR coordination time removed <span className="vc-cur vc-mono">{coord}%</span></label>
                   <div className="vc-row2"><input id="vc-acoord" type="range" min={0} max={90} step={5} value={calc.aCoord} onChange={(e) => setField('aCoord', e.target.value)} /></div></div>
                 <div className="vc-field"><label htmlFor="vc-aemp">Employee’s own time removed <span className="vc-cur vc-mono">{empRed}%</span></label>
@@ -450,6 +453,7 @@ export const ValueCreationSection: React.FC = () => {
                   <div className="vc-row2"><input id="vc-avend" type="range" min={0} max={30} step={1} value={calc.aVend} onChange={(e) => setField('aVend', e.target.value)} /></div></div>
                 <div className="vc-field"><label htmlFor="vc-afail">Failure rate falls to <span className="vc-cur vc-mono">{failTo}%</span></label>
                   <div className="vc-row2"><input id="vc-afail" type="range" min={0} max={100} step={1} value={calc.aFail} onChange={(e) => setField('aFail', e.target.value)} /></div></div>
+                </div>
                 <div className="vc-field" style={{ marginTop: 18 }}>
                   <span className="vc-cap">Currency</span>
                   <div className="vc-cur-select" role="group" aria-label="Currency">

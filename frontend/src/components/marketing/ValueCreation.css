@@ -59,22 +59,28 @@
 .vc-controls{display:flex;flex-wrap:wrap;align-items:center;gap:16px 20px}
 .vc-ctrl-block{display:flex;flex-direction:column;gap:7px}
 .vc-ctrl-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--vc-text-muted)}
-.vc-seg{display:inline-flex;background:var(--vc-surface);border:1px solid var(--vc-line-strong);border-radius:12px;padding:5px;gap:4px;box-shadow:var(--vc-shadow)}
-.vc-seg button{font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;border:0;background:transparent;color:var(--vc-text-muted);padding:9px 16px;border-radius:8px;display:flex;align-items:center;gap:8px;transition:background .25s,color .25s}
+.vc-seg{display:inline-flex;background:var(--vc-surface-2);border:1px solid var(--vc-line-strong);border-radius:11px;padding:4px;gap:4px;box-shadow:var(--vc-shadow)}
+.vc-seg button{font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;border:1px solid transparent;background:transparent;color:var(--vc-text-strong);padding:9px 15px;border-radius:8px;display:flex;align-items:center;gap:8px;transition:background .2s,color .2s,box-shadow .2s,border-color .2s}
+.vc-seg button:hover{background:var(--vc-surface);border-color:var(--vc-line)}
 .vc-seg button .vc-dot{width:9px;height:9px;border-radius:50%;flex:none}
 .vc-seg button[data-mode='today'] .vc-dot{background:var(--vc-friction)}
 .vc-seg button[data-mode='relopass'] .vc-dot{background:var(--vc-teal)}
-.vc-root.mode-today .vc-seg button[data-mode='today']{background:var(--vc-friction-wash);color:var(--vc-text-strong)}
-.vc-root.mode-relopass .vc-seg button[data-mode='relopass']{background:var(--vc-teal-wash);color:var(--vc-text-strong)}
 .vc-seg.vc-persona button[data-persona='hr'] .vc-dot{background:var(--vc-navy)}
 .vc-seg.vc-persona button[data-persona='emp'] .vc-dot{background:var(--vc-teal)}
 .vc-seg.vc-persona .vc-twin{display:inline-flex;gap:3px}
 .vc-seg.vc-persona .vc-twin .vc-dot{width:8px;height:8px}
 .vc-seg.vc-persona .vc-twin .vc-dot:first-child{background:var(--vc-navy)}
 .vc-seg.vc-persona .vc-twin .vc-dot:last-child{background:var(--vc-teal)}
-.vc-seg.vc-persona button[aria-pressed='true']{background:var(--vc-navy-wash);color:var(--vc-text-strong)}
+/* active segment = solid navy chip, so it reads as a pressed toggle */
+.vc-root.mode-today .vc-seg button[data-mode='today'],
+.vc-root.mode-relopass .vc-seg button[data-mode='relopass'],
+.vc-seg.vc-persona button[aria-pressed='true']{background:var(--vc-navy);color:#fff;border-color:var(--vc-navy);box-shadow:0 1px 3px rgba(12,25,41,.28)}
+.vc-root.mode-today .vc-seg button[data-mode='today'] .vc-dot,
+.vc-root.mode-relopass .vc-seg button[data-mode='relopass'] .vc-dot,
+.vc-seg.vc-persona button[aria-pressed='true'] .vc-dot{box-shadow:0 0 0 1.5px rgba(255,255,255,.35)}
 .vc-seg button:focus-visible{outline:2px solid var(--vc-navy-500);outline-offset:2px}
 .vc-hint{font-size:13px;color:var(--vc-text-muted);display:flex;align-items:center;gap:8px}
+.vc-hint strong{color:var(--vc-text-strong);font-weight:600}
 .vc-hint svg{width:15px;height:15px;color:var(--vc-teal-600);flex:none}
 
 .vc-legend{margin-top:20px;display:flex;flex-wrap:wrap;gap:8px 20px;font-size:12.5px;color:var(--vc-text-muted)}
@@ -101,9 +107,10 @@
 .vc-node{fill:var(--vc-surface);stroke:var(--vc-line-strong);stroke-width:1.5}
 .vc-node-lab{font-family:Inter,sans-serif;font-size:12px;font-weight:600;fill:var(--vc-text-strong)}
 .vc-node-sub{font-family:Inter,sans-serif;font-size:10.5px;fill:var(--vc-text-muted)}
-.vc-pnode{fill:var(--vc-navy)}
+.vc-pnode .vc-node{fill:var(--vc-navy);stroke:var(--vc-navy)}
+.vc-pnode.vc-emp .vc-node{fill:var(--vc-teal);stroke:var(--vc-teal)}
 .vc-pnode .vc-node-lab{fill:#fff}
-.vc-pnode.vc-emp{fill:var(--vc-navy-700)}
+.vc-pnode .vc-node-sub{fill:rgba(255,255,255,.82)}
 .vc-link{stroke:var(--vc-friction);stroke-width:1.4;fill:none;opacity:.55}
 .vc-link.vc-b{stroke:var(--vc-text-muted);opacity:.4}
 .vc-spine{fill:var(--vc-navy);stroke:var(--vc-teal);stroke-width:2}
@@ -185,8 +192,9 @@
 .vc-scount{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--vc-text-muted);font-variant-numeric:tabular-nums}
 
 /* ---------- calculator ---------- */
-.vc-calc{display:grid;grid-template-columns:1fr;gap:22px}
-@media(min-width:900px){.vc-calc{grid-template-columns:340px 1fr;align-items:start}}
+.vc-calc{display:flex;flex-direction:column;gap:20px}
+.vc-fieldgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px 20px;margin-top:16px}
+.vc-fieldgrid .vc-field{margin-top:0}
 .vc-panel{background:var(--vc-surface);border:1px solid var(--vc-line);border-radius:var(--vc-radius);box-shadow:var(--vc-shadow);padding:22px}
 .vc-panel h3{font-size:15px;font-weight:600;letter-spacing:-.01em}
 .vc-panel .vc-sub{font-size:12.5px;color:var(--vc-text-muted);margin-top:4px}
@@ -204,13 +212,14 @@
 .vc-cur-select button{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;border:1px solid var(--vc-line-strong);background:var(--vc-surface-2);color:var(--vc-text-muted);border-radius:7px;width:34px;height:30px;cursor:pointer}
 .vc-cur-select button[aria-pressed=true]{background:var(--vc-navy);color:#fff;border-color:var(--vc-navy)}
 .vc-results{display:flex;flex-direction:column;gap:18px}
-.vc-headline{background:var(--vc-navy);color:var(--vc-invert);border-radius:var(--vc-radius);padding:24px 26px;overflow:hidden;box-shadow:var(--vc-shadow);border:1px solid var(--vc-navy-700)}
-.vc-headline .vc-lab{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#8fd6d1}
-.vc-headline .vc-big{font-family:'JetBrains Mono',monospace;font-size:clamp(38px,6vw,58px);font-weight:700;letter-spacing:-.02em;line-height:1;margin-top:8px;font-variant-numeric:tabular-nums;color:#fff}
-.vc-headline .vc-per{font-size:14px;color:#b9cad6;margin-top:10px}
+.vc-headline{background:var(--vc-navy);color:var(--vc-invert);border-radius:var(--vc-radius);padding:clamp(24px,4vw,36px);overflow:hidden;box-shadow:var(--vc-shadow);border:1px solid var(--vc-navy-700);border-top:3px solid var(--vc-teal)}
+.vc-headline .vc-lab{font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#8fd6d1}
+.vc-headline .vc-big{font-family:'JetBrains Mono',monospace;font-size:clamp(46px,8vw,80px);font-weight:700;letter-spacing:-.03em;line-height:1;margin-top:10px;font-variant-numeric:tabular-nums;color:#fff}
+.vc-headline .vc-per{font-size:15px;color:#b9cad6;margin-top:12px}
 .vc-headline .vc-per b{color:#fff;font-weight:600}
 .vc-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
-@media(min-width:560px){.vc-tiles{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:600px){.vc-tiles{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:940px){.vc-tiles{grid-template-columns:repeat(5,1fr)}}
 .vc-tile{background:var(--vc-surface);border:1px solid var(--vc-line);border-radius:12px;padding:15px 15px 16px;box-shadow:var(--vc-shadow)}
 .vc-tile .vc-tl{font-size:11.5px;color:var(--vc-text-muted);font-weight:600;display:flex;align-items:center;gap:7px;min-height:32px}
 .vc-tile .vc-tl .vc-ic{width:9px;height:9px;border-radius:3px;flex:none}
