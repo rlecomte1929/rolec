@@ -26,6 +26,7 @@ authored by Otto as ReloPass editorial assessment and are **NOT lawyer-verified*
 | `corridor-content/US.ndjson` | 45 records | same, United States (H-1B/L-1/O-1, LCA/prevailing wage, I-94, SSN, I-9, state DL/REAL ID, W-4/FICA, ACA, substantial-presence, dual-status return, tax treaty, ITIN, FBAR/FATCA, PERM green card). Wave 1. |
 | `corridor-content/AE.ndjson` | 24 records | same, United Arab Emirates (MOHRE work permit + entry permit, attestation, medical fitness, residence visa, Emirates ID, labour contract, Ejari, DEWA, DHA/DOH health, WPS, end-of-service gratuity, tax-residency cert; nil personal income tax). Wave 1. |
 | `corridor-content/SG.ndjson` | 25 records | same, Singapore (EP/COMPASS + S Pass + Work Permit via MOM, IPA, FIN, SingPass, tenancy stamp duty, foreign-worker levy, IRAS tax-residency + non-resident rate + IR21 clearance; CPF nil for foreign employees). Wave 2. |
+| `corridor-content/IE.ndjson` | 12 records | same, Ireland (GEP/CSEP employment permit, entry visa, IRP/immigration registration, PPSN, Revenue myAccount/RPN + emergency tax, USC bands, HSE/GP, RTB tenancy, PRSI, tax residence). Wave 2. |
 | `corridor-content/JP.ndjson` | 24 records | same, Japan (CoE + status of residence + work visa, zairyu card, juminhyo registration, My Number, shakai hoken / kokumin kenko hoken + nenkin, koyo hoken, resident tax, nenmatsu chosei / kakutei shinkoku, pension lump-sum). Wave 1. |
 
 Record counts reconcile against Otto's informal manifest (NO=10, DE=8, FR=8, GB=20, ES=12, CH=12, IT=17, CA=20, AU=24, US=45, AE=24, JP=24).
