@@ -628,6 +628,57 @@ its per-entity page. Required regex per register: **SRA** `sraNumber=\d+` · **I
 `/s/firm` · **GIAS** `/Establishment/Details/\d+` · **ARLA Propertymark** `/company/`. Flagged to the
 generator before the first batch; London GB legal came back with per-firm URLs on all 6.
 
+### XX-GB housing_agencies (London estate/lettings agents) — `vendor-resourced-xx-gb-housing-london-2026-09-10` (landed 2026-09-10)
+- Source (GCS): `1789021761849_85a8cmgv.ndjson` (+ manifest `1789021795428_8sv6brzx.json`). (A reconnect
+  caused a re-upload; the earlier `1789020730496` pair was superseded and ignored.)
+- Otto manifest: **6 sourced, 2 rejected** (counts reconcile). Rejects: Chestertons, Savills (no London
+  `/company/` page found).
+- **HTTP_LISTING (ARLA Propertymark / propertymark.co.uk).** All 6 `source_url`s are per-entity
+  `/company/` pages (0 root), domain `www.propertymark.co.uk`, corridor **XX-GB**. **Vetter note:**
+  `accreditation_number` is the Propertymark branch **slug** (e.g. `knight-frank-9`) — Propertymark's
+  `/company/` pages publish no numeric membership number; the vetter confirms each against the directory.
+- **Franchise/chain dedup — net +2 of 6** (all six are big London chains): **Knight Frank** and **John D
+  Wood & Co.** landed new. The other four were already held from an earlier GB/housing harvest and
+  correctly did NOT duplicate:
+  - **Hamptons International**, **Marsh & Parsons**, **Dexters** — domain-dedup dropped at stage (their
+    firm domains `hamptons.co.uk` / `marshandparsons.co.uk` / `dexters.co.uk` already in prod).
+  - **Foxtons** — its Tower-Bridge-branch site (`goandco.co.uk`) is a new domain so it staged, but
+    `_name_key` `foxtons` matched the existing GB Foxtons at promote → attached (cap already present →
+    absorbed), no duplicate created (Foxtons stays a single supplier).
+- Landed: **+2 new suppliers** (GB/housing_agencies, pending), 0 mis-attach. Tripwire: `ssc` `approved`
+  **130 → 130** md5 `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; GB/housing 4 → 6.
+
+### XX-GB tax_finance (London expat-tax / chartered accountants) — `vendor-resourced-xx-gb-tax-london-2026-09-10` (landed 2026-09-10)
+- Source (GCS): `1789023450599_aprmxtp4.ndjson` (+ manifest `1789023452196_cf3ge6ti.json`).
+- Otto manifest: **7 sourced, 1 rejected** (counts reconcile). Reject: Tax Partners Ltd (generic SME, no
+  expat specialisation).
+- **HTTP_LISTING (ICAEW / find.icaew.com).** All 7 `source_url`s are per-entity `/firms/` pages (0 root),
+  registrable domain `icaew.com`, corridor **XX-GB**, category tax_finance; `accreditation_number` = the
+  ICAEW firm id from the URL.
+- **Net +5 of 7** (dedup on marquee multi-office firms, all already held from an earlier GB/tax harvest):
+  **Blick Rothenberg** (name + `blickrothenberg.com` domain match) and **Buzzacott Livingstone**
+  (its `buzzacott.co.uk` domain already held by the existing "Buzzacott LLP") both domain-dedup dropped —
+  no duplicate. Landed new: **Saffery LLP, Alliotts LLP, Gerald Edelman LLP, Moore Kingston Smith &
+  Partners LLP, HaysMac LLP** (Moore Kingston Smith was flagged as a possible dedup but is genuinely new).
+- `_name_key` predictor: the 5 landed all distinct + new. Landed: **+5 new suppliers** (GB/tax_finance,
+  pending), 0 mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5
+  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; GB/tax 2 → 7.
+
+### XX-NL legal_admin (Amsterdam immigration/vreemdelingenrecht lawyers) — `vendor-resourced-xx-nl-legal-amsterdam-2026-09-10` (landed 2026-09-10) — first XX-NL land, FINAL cell of the run
+- Source (GCS): `1789026083313_essmy5ik.ndjson` (+ manifest `1789026112888_iuo9wb9i.json`).
+- Otto manifest: **6 sourced, 0 rejected** (counts reconcile).
+- **PUBLIC_REGISTER (NOvA / advocatenorde.nl).** All 6 `source_url`s = wired `advocatenorde.nl`
+  (`zoekeenadvocaat.advocatenorde.nl` subdomain, matched by suffix — no per-entity pattern needed for a
+  PUBLIC_REGISTER), corridor **XX-NL**, category legal_admin. `accreditation_number` carries the named
+  advocaat + their **real NOvA registration number** (Otto pulled the actual register numbers), e.g.
+  Everaert/T.E. van Houwelingen-Boer 11613905609, Matpanözer/L.K. Matpanözer 11017333435, Spuistraat 10/
+  B. Aydin 11831901571, Prakken d'Oliveira/E.E.M. Bezem 12075067103.
+- **Net +4 of 6** — landed new: Everaert Advocaten, Matpanözer Advocatuur, Spuistraat 10 Advocaten,
+  Prakken d'Oliveira Human Rights Lawyers. **De Vreede Immigration Law** and **Kroes Advocaten** were
+  already held (NL/legal, from an earlier NL harvest) — `_name_key` collision → deduped, no duplicate.
+- Landed: **+4 new suppliers** (NL/legal_admin, pending), 0 mis-attach. Tripwire: `ssc` `approved`
+  **130 → 130** md5 `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; NL/legal 3 → 7.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
