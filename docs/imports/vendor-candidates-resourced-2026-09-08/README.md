@@ -809,6 +809,18 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   **tax + banks PARKED** (Audos flakiness — firms recorded above). Next front: Canada (pre-flighted,
   all 5 registers wired PUBLIC_REGISTER).
 
+### XX-CA legal_admin (Toronto immigration lawyers) via LSO — `vendor-resourced-xx-ca-legal-toronto-2026-09-10` (landed 2026-09-10) — first XX-CA; THIN
+- Source (GCS): `1789050291683_u1h5z7v1.ndjson` (+ manifest `1789050295240_yb8h14ho.json`).
+- Otto manifest: **1 sourced, 3 rejected** (counts reconcile; Audos flakiness forced an early wrap before
+  more LSO#s could be confirmed). The 1 `source_url`=wired `lso.ca`, corridor **XX-CA**, category
+  legal_admin: Sobirovs Law Firm, LSO **82485Q** (Mariam Jammal). Site sobirovs.com (`.com`).
+- Rejects (real Toronto immigration firms, LSO# unconfirmed at close — candidates for a calm re-run):
+  Bellissimo Law Group (Mario Bellissimo), CILF / Canadian Immigration Law Firm (Jacqueline Bonisteel),
+  Bart Law. Same LSO#-in-footer extraction difficulty as the AU licence/TPB registers.
+- `_name_key` predictor: new; no prod dup, no mis-attach. Landed: **+1 new supplier** (CA/legal_admin,
+  pending). Create-only guard held: approved count **218 unchanged** across the op. CA/legal 3 → 4.
+  First Canada land — the LSO register + XX-CA corridor confirmed working end-to-end (`.ca` bug-unaffected).
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
