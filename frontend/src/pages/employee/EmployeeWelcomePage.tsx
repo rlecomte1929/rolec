@@ -37,6 +37,7 @@ export function EmployeeWelcomePage() {
         unlocks the next.
       </p>
 
+      <h2 className="text-base font-semibold text-navy-800 mb-4">How it works</h2>
       <div className="flex flex-col gap-4">
         <WelcomeStepCard
           step={1}
