@@ -30,6 +30,7 @@ authored by Otto as ReloPass editorial assessment and are **NOT lawyer-verified*
 | `corridor-content/NL.ndjson` | 17 records | same, Netherlands (kennismigrant residence permit + MVV via IND, BSN at gemeente, 30% ruling eligibility/application/compliance, DigiD, zorgverzekering, loonheffing payroll, rental, income tax return, PE risk). Wave 2. |
 | `corridor-content/SE.ndjson` | 16 records | same, Sweden (work permit + union statement via Migrationsverket, posted-worker notification, folkbokforing, personnummer/samordningsnummer, Forsakringskassan, BankID, ID card, A-skatt, SINK, A1 certificate). Wave 2. |
 | `corridor-content/DK.ndjson` | 15 records | same, Denmark (Fast-track employer certification + work/residence permit via SIRI, CPR number, folkeregister, MitID, SKAT tax card, NemKonto, forsker researcher tax scheme, sundhedskort/GP, arsopgorelse, A1). Wave 2. |
+| `corridor-content/BE.ndjson` | 14 records | same, Belgium (single permit + entry visa D, LIMOSA, arrival declaration + annex 19 at the commune, residence card type B, rijksregisternummer, mutualite health, ONSS/RSZ, precompte professionnel, IPP tax return). Wave 2. |
 | `corridor-content/JP.ndjson` | 24 records | same, Japan (CoE + status of residence + work visa, zairyu card, juminhyo registration, My Number, shakai hoken / kokumin kenko hoken + nenkin, koyo hoken, resident tax, nenmatsu chosei / kakutei shinkoku, pension lump-sum). Wave 1. |
 
 Record counts reconcile against Otto's informal manifest (NO=10, DE=8, FR=8, GB=20, ES=12, CH=12, IT=17, CA=20, AU=24, US=45, AE=24, JP=24).
