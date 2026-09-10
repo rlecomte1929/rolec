@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FreshnessStatusBadge } from '../../../components/admin/freshness/FreshnessStatusBadge';
 import { adminFreshnessAPI } from '../../../api/client';
 import { AdminFreshnessLayout } from './AdminFreshnessLayout';
+import { getCountryName } from '../../../utils/countries';
 
 type SourceItem = {
   source_name?: string;
@@ -60,7 +61,7 @@ export const AdminFreshnessSources: React.FC = () => {
             {items.map((s) => (
               <tr key={String(s.source_name)} className="border-b border-slate-100 hover:bg-slate-50">
                 <td className="px-4 py-2 font-medium">{s.source_name ?? '-'}</td>
-                <td className="px-4 py-2">{s.country_code ?? '-'}</td>
+                <td className="px-4 py-2">{getCountryName(s.country_code) || s.country_code || '-'}</td>
                 <td className="px-4 py-2">{s.city_name ?? '-'}</td>
                 <td className="px-4 py-2">{s.content_domain ?? '-'}</td>
                 <td className="px-4 py-2">{s.expected_cadence_days ?? '-'}d</td>

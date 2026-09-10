@@ -80,6 +80,7 @@ class EditRequest(BaseModel):
     fact_text: str = Field(..., min_length=3)
     notes: Optional[str] = None
     approve: bool = True
+    evidence_quote: Optional[str] = None
 
 
 @router.get("/facts")
@@ -145,7 +146,13 @@ def list_facts(
 
     items = []
     for r in rows:
-        check = check_evidence(r[3], best_source_text(r[15], r[17]))
+        quote = r[3]
+        check = check_evidence(quote, best_source_text(r[15], r[17]))
+        # check_evidence maps an empty quote to UNVERIFIED ("not found in source").
+        # That is the wrong prompt: there is nothing to look for yet, and Approve
+        # will 422 until a verbatim sentence is stored. Label it so the queue can
+        # ask for the quote instead of inviting a rubber stamp.
+        evidence_status = "no_quote" if not str(quote or "").strip() else check.status
         items.append({
             "id": str(r[0]),
             "fact_text": r[1],
@@ -156,7 +163,7 @@ def list_facts(
             "status": r[6],
             # Recomputed rather than trusted from the column: the stored flag can lag an edit or
             # a re-archived source, and a stale "verified" badge is worse than none.
-            "evidence_status": check.status,
+            "evidence_status": evidence_status,
             "evidence_context": check.context,
             "reviewed_by": r[9],
             "reviewed_at": str(r[10]) if r[10] else None,
@@ -236,8 +243,15 @@ def edit_fact(
     reviewer = _reviewer_id(user)
     try:
         result = db.edit_requirement_fact(
-            fact_id, body.fact_text, reviewer, body.notes, approve=body.approve
+            fact_id,
+            body.fact_text,
+            reviewer,
+            body.notes,
+            approve=body.approve,
+            evidence_quote=body.evidence_quote,
         )
+    except UnquotedApprovalError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if result is None:

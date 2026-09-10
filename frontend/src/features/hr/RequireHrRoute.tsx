@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { getStoredRoles, getActiveRole } from '../../utils/demo';
-import { roleHomePath } from '../../navigation/roleHome';
+import { roleHomePathForHeldRoles } from '../../navigation/roleHome';
 
 interface RequireHrRouteProps {
   children: React.ReactNode;
@@ -42,5 +42,5 @@ export const RequireHrRoute: React.FC<RequireHrRouteProps> = ({ children, allowE
     return <>{children}</>;
   }
 
-  return <Navigate to={roleHomePath(getActiveRole())} state={{ from: location }} replace />;
+  return <Navigate to={roleHomePathForHeldRoles(roles, getActiveRole())} state={{ from: location }} replace />;
 };

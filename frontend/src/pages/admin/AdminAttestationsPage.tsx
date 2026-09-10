@@ -15,6 +15,7 @@ import {
   promoteAttestation,
   sendAttestation,
 } from '../../api/attestation';
+import { getCountryName } from '../../utils/countries';
 
 export const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-slate-100 text-slate-700',
@@ -207,7 +208,7 @@ export const AdminAttestationsPage: React.FC = () => {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} className="border-b border-slate-100">
-                    <td className="py-2 pr-4 font-medium text-navy-900">{r.country_code}</td>
+                    <td className="py-2 pr-4 font-medium text-navy-900">{getCountryName(r.country_code) || r.country_code}</td>
                     <td className="py-2 pr-4">{r.reviewer_org || r.reviewer_name || '—'}</td>
                     <td className="py-2 pr-4">{r.item_count}</td>
                     <td className="py-2 pr-4">

@@ -16,6 +16,7 @@ import { DataTable, ResetColumnsLink, type DataTableColumn } from '../data-table
 import { useHrCompanyContext } from '../../../contexts/HrCompanyContext';
 import { fetchExecSummary } from '../../../api/nlg';
 import { HrCaseHealthPanel } from '../../../components/case/HrCaseHealthPanel';
+import { getCountryName } from '../../../utils/countries';
 
 /**
  * Mobility Control Center — V2.
@@ -179,8 +180,8 @@ function corridorKey(originCountry?: string | null, destCountry?: string | null)
   return `${o ?? `?${originCountry ?? ''}`}|${d ?? `?${destCountry ?? ''}`}`;
 }
 function corridorLabel(originCountry?: string | null, destCountry?: string | null): string {
-  const o = resolveISO2(originCountry) ?? (originCountry?.trim() || '—');
-  const d = resolveISO2(destCountry) ?? (destCountry?.trim() || '—');
+  const o = getCountryName(originCountry) || originCountry?.trim() || '—';
+  const d = getCountryName(destCountry) || destCountry?.trim() || '—';
   return `${o} → ${d}`;
 }
 
@@ -224,12 +225,13 @@ function NotLinked({ label = 'Not set', title }: { label?: string; title?: strin
 }
 
 function Flag({ iso2, raw }: { iso2: string | null; raw?: string | null }) {
+  const name = getCountryName(iso2 || raw || '');
   if (!iso2) {
     // BRAND-5: muted intentional empty — show the raw value if we have one
     // (even unresolved, it's information), otherwise "Not set", never "tbd".
     return (
-      <span title={raw ? `Unknown country code: ${raw}` : 'No country recorded'} className="text-slate-500">
-        {raw ? raw : 'Not set'}
+      <span title={raw ? `Unknown country: ${raw}` : 'No country recorded'} className="text-slate-500">
+        {name || raw || 'Not set'}
       </span>
     );
   }
@@ -237,7 +239,7 @@ function Flag({ iso2, raw }: { iso2: string | null; raw?: string | null }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="text-[14px] leading-none" aria-hidden>{emoji}</span>
-      <span className="font-mono text-[11px] text-slate-600">{iso2}</span>
+      <span className="text-[12px] text-slate-700">{name || iso2}</span>
     </span>
   );
 }

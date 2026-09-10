@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from sqlalchemy import text
 
@@ -40,6 +40,11 @@ from backend.app.services.vendor_harvester import (
 )
 
 log = logging.getLogger(__name__)
+
+# Nationally incorporated (or nationally licensed) entities that share a brand are
+# distinct suppliers. Global networks (movers) are not — one Crown, many countries.
+# Keep this set conservative; widening it is a follow-up, not this fix.
+NATIONAL_ENTITY_CATEGORIES = frozenset({"banks", "legal_admin", "tax_finance"})
 
 _INSERT_RUN = text(
     """
@@ -222,6 +227,24 @@ _INSERT_ACCREDITATION = text(
 )
 
 
+def _collapse_name_match(
+    category: str,
+    candidate_country: str,
+    matched_countries: Set[str],
+) -> bool:
+    """Whether a `_name_key` hit is the same legal entity, not just the same brand.
+
+    Movers (and every category outside NATIONAL_ENTITY_CATEGORIES) keep today's
+    collapse: one supplier, per-country capabilities. Banks and licensed
+    professions collapse only when the matched supplier already has a capability
+    in the candidate's country — otherwise "Banco Santander, S.A." (ES) would
+    attach to "Banco Santander (Brasil) S.A.".
+    """
+    if (category or "").strip().lower() not in NATIONAL_ENTITY_CATEGORIES:
+        return True
+    return bool(candidate_country) and candidate_country in matched_countries
+
+
 def _capability_for(row: Any) -> Dict[str, Any]:
     """One capability per candidate row.
 
@@ -281,7 +304,7 @@ def promote(
     Returns (promoted, skipped, problems). Idempotent on `promoted_supplier_id`, so a re-run
     promotes nothing.
     """
-    from backend.app.models import Supplier
+    from backend.app.models import Supplier, SupplierServiceCapability
     from backend.app.services import supplier_registry
     from backend.app.services.supplier_registry import DuplicateSupplierError
     from backend.app.services.vendor_harvester import _name_key
@@ -299,6 +322,7 @@ def promote(
     # Both name AND legal_name — a register reports the legal entity, and "Expat Relocation
     # Norway" is stored with legal_name "Expat Relocation AS", exactly what the harvest found.
     existing: Dict[str, str] = {}
+    keys_by_sid: Dict[str, Set[str]] = {}
     for sid, sname, slegal in session.query(
         Supplier.id, Supplier.name, Supplier.legal_name
     ).all():
@@ -306,6 +330,22 @@ def promote(
             k = _name_key(n)
             if k:
                 existing.setdefault(k, sid)
+                keys_by_sid.setdefault(sid, set()).add(k)
+
+    countries_by_sid: Dict[str, Set[str]] = {}
+    existing_in_country: Dict[Tuple[str, str], str] = {}
+    for cap_sid, cc in session.query(
+        SupplierServiceCapability.supplier_id,
+        SupplierServiceCapability.country_code,
+    ).all():
+        if not cc:
+            continue
+        code = str(cc).strip().upper()[:2]
+        if not code:
+            continue
+        countries_by_sid.setdefault(cap_sid, set()).add(code)
+        for k in keys_by_sid.get(cap_sid, ()):
+            existing_in_country.setdefault((k, code), cap_sid)
 
     promoted = 0
     skipped = 0
@@ -315,11 +355,27 @@ def promote(
         name = (row["name"] or "").strip()
         key = _name_key(name)
         capability = _capability_for(row)
+        category = capability["service_category"]
+        country = capability["country_code"]
+
+        def _remember(sid: str) -> None:
+            if key:
+                existing.setdefault(key, sid)
+                if country:
+                    existing_in_country[(key, country)] = sid
+            if country:
+                countries_by_sid.setdefault(sid, set()).add(country)
 
         # A company that serves both corridors — Grospiron and AGS France both do — is ONE
         # supplier with TWO capabilities, not two suppliers and not one dropped row. Skipping
-        # the second would silently lose a corridor's coverage.
-        if key in existing:
+        # the second would silently lose a corridor's coverage. National entities are the
+        # exception: a name-key hit in a different country is a different legal entity.
+        matched_id = None
+        if key:
+            matched_id = existing_in_country.get((key, country)) or existing.get(key)
+        if matched_id and _collapse_name_match(
+            category, country, countries_by_sid.get(matched_id, set())
+        ):
             if dry_run:
                 # Counted as PROMOTED, not skipped: a real run adds a capability to the
                 # existing supplier, so counting it as a skip would make the preview
@@ -328,27 +384,24 @@ def promote(
                 problems.append(
                     f"{name}: already a supplier — would add a capability to it, not a new row"
                 )
-                continue
-            existing_id = existing[key]
-            if not existing_id:
-                skipped += 1
-                problems.append(f"{name}: name collides but the supplier could not be found")
+                _remember(matched_id)
                 continue
             try:
-                supplier_registry.add_capability(session, existing_id, capability)
+                supplier_registry.add_capability(session, matched_id, capability)
             except ValueError as exc:
                 skipped += 1
                 problems.append(f"{name}: capability not added — {exc}")
                 continue
-            _attach_accreditation(session, existing_id, row)
-            session.execute(_LINK_CANDIDATE, {"sid": existing_id, "cid": row["id"]})
+            _attach_accreditation(session, matched_id, row)
+            session.execute(_LINK_CANDIDATE, {"sid": matched_id, "cid": row["id"]})
             session.commit()
+            _remember(matched_id)
             promoted += 1
             continue
 
         if dry_run:
             promoted += 1
-            existing[key] = "(pending)"
+            _remember("(pending)")
             continue
 
         supplier_id = f"vc-{row['id']}"
@@ -383,7 +436,7 @@ def promote(
         session.execute(_LINK_CANDIDATE, {"sid": supplier_id, "cid": row["id"]})
         session.commit()
 
-        existing[key] = supplier_id
+        _remember(supplier_id)
         promoted += 1
 
     return promoted, skipped, problems
