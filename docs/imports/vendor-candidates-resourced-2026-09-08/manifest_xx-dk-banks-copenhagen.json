@@ -1,0 +1,17 @@
+{
+  "batch_id": "vendor-resourced-xx-dk-banks-copenhagen-2026-09-10",
+  "category": "banks",
+  "city": "Copenhagen",
+  "total_sourced": 6,
+  "total_rejected": 2,
+  "firms": [
+    {"name": "Danske Bank A/S", "status": "sourced", "ft_nummer": "FT-nr. 3000", "source_url": "https://www.finanstilsynet.dk/"},
+    {"name": "Nordea Danmark, filial af Nordea Bank Abp, Finland", "status": "sourced", "ft_nummer": "FT-nr. 2222", "source_url": "https://www.finanstilsynet.dk/"},
+    {"name": "Jyske Bank A/S", "status": "sourced", "ft_nummer": "FT-nr. 7858", "source_url": "https://www.finanstilsynet.dk/"},
+    {"name": "Nykredit Bank A/S", "status": "sourced", "ft_nummer": "FT-nr. 8117", "source_url": "https://www.finanstilsynet.dk/"},
+    {"name": "AL Sydbank A/S", "status": "sourced", "ft_nummer": "AL Sydbank A/S (Finanstilsynet-approved merger of Sydbank FT-nr. 8079 + Arbejdernes Landsbank FT-nr. 5301 + Vestjysk Bank; approved Dec 2025)", "source_url": "https://www.finanstilsynet.dk/"},
+    {"name": "Spar Nord Bank A/S", "status": "sourced", "ft_nummer": "FT-nr. 9380", "source_url": "https://www.finanstilsynet.dk/"},
+    {"name": "Sydbank A/S", "status": "rejected", "reason": "Merged into AL Sydbank A/S (Finanstilsynet-approved Dec 2025); no longer an independent pengeinstitut; successor entity sourced as AL Sydbank A/S"},
+    {"name": "Arbejdernes Landsbank", "status": "rejected", "reason": "Merged into AL Sydbank A/S (Finanstilsynet-approved Dec 2025); no longer an independent pengeinstitut; successor entity sourced as AL Sydbank A/S"}
+  ]
+}

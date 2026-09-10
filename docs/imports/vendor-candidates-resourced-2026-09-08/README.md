@@ -934,6 +934,23 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   pending — CA-tax 4 + CA-banks 2 + DK-legal 2, so approved 1254 → 1262 and pending fell back to 0 before this land);
   pending 0 → 3, all `vc-*`, DK, tax_finance, vetted_by NULL. No mis-attach.
 
+### XX-DK banks (Copenhagen major banks) via Finanstilsynet — `vendor-resourced-xx-dk-banks-copenhagen-2026-09-10` (landed 2026-09-10) — +3 net (3 overlaps deduped)
+- Source (GCS): `1789071993862_yqr0y1tr.ndjson` (+ manifest `1789072023124_ze4pivtu.json`).
+- Otto manifest: **6 sourced, 2 rejected** (counts reconcile). All 6 `source_url`=wired `www.finanstilsynet.dk`
+  (PUBLIC_REGISTER, register-root OK), corridor **XX-DK**, category banks, Copenhagen. `accreditation_number` =
+  Finanstilsynet FT-nummer (AL Sydbank carries a merger-successor prose note instead of a bare FT-nr — stored
+  verbatim; fine for pending-for-vetter). Distinct domains → no franchise drop.
+- Rejects honest: Sydbank A/S + Arbejdernes Landsbank (both merged into AL Sydbank, Finanstilsynet-approved
+  Dec 2025) — Otto sourced the merged successor instead, no dead/dup rows.
+- **Predictor HARD vs the 08-31 DK/banks 3 (Danske / Nordea / Nykredit).** All three overlaps carry their matching
+  domain in DK/banks, so stage() cross-run domain-dedup DROPS them pre-insert — no `_name_key` attach risk here
+  (unlike the CA RBC case, where the prod domain differed so it had to be held by hand). Genuinely new: Jyske Bank,
+  AL Sydbank, Spar Nord.
+- Landed: **+3 new suppliers** — Jyske Bank A/S (`vc-7764657e`), AL Sydbank A/S (`vc-121f0133`), Spar Nord Bank A/S
+  (`vc-db76ff38`), DK/banks pending. DK/banks caps **3 → 6**. Full-6 dry-run: staged 3 / duplicates 0 / promote 3.
+- **Create-only guard held:** approved **1262 UNCHANGED** across the op; pending 3 → 6 (DK-tax 3 + DK-banks 3), all
+  `vc-*`, DK, banks, vetted_by NULL. No mis-attach.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
