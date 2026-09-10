@@ -915,6 +915,25 @@ generator before the first batch; London GB legal came back with per-firm URLs o
 - **Create-only guard held:** approved **1254 UNCHANGED** across the op; pending 6 → 8, all `vc-*`, DK, legal_admin,
   vetted_by NULL. No mis-attach.
 
+### XX-DK tax_finance (Copenhagen expat-tax revisorer) via FSR — `vendor-resourced-xx-dk-tax-copenhagen-2026-09-10` (landed 2026-09-10) — +3, no overlap
+- Source (GCS): `1789070936430_4i9dgyr8.ndjson` (+ manifest `1789070967771_96dh0dxz.json`). (Otto hit a transient
+  Audos error mid-run; the relay retried once → recovered clean.)
+- Otto manifest: **3 sourced, 6 rejected** (counts reconcile). All 3 `source_url`=wired `www.fsr.dk` (FSR — danske
+  revisorer; PUBLIC_REGISTER, register-root OK), corridor **XX-DK**, category tax_finance, Copenhagen.
+  `accreditation_number` = statsautoriseret/godkendt revisor firm legal name + CVR. Distinct domains
+  (skatteinform.dk / bakertilly.dk / bdo.dk) → no franchise drop.
+- Rejects honest: PrivatRevision, Crossbord ApS, expatfinance.dk (finance blog), Northern Partners / GTS Nordic
+  (EOR firms, not FSR revisorer), Vialto Partners (UK-mobility, not a DK revisor).
+- **Predictor vs prod + the 08-31 DK/tax 4 — NO overlap.** The existing 08-31 DK/tax set is Christensen Kjærulff,
+  Deloitte, Grant Thornton, Kreston CM — a *different* four. BDO / Baker Tilly (the relay's suspected repeats) are
+  NOT in prod under any `_name_key`, and no candidate domain hits DK/tax → all 3 genuinely new. Dry-run: staged 3 /
+  duplicates 0 / promote 3.
+- Landed: **+3 new suppliers** — SkatteInform (`vc-24b6f7f1`), Baker Tilly Denmark (`vc-513d20da`), BDO Danmark
+  (`vc-9ac9e1c4`), DK/tax pending. DK/tax caps **4 → 7**.
+- **Create-only guard held:** approved **1262 UNCHANGED** across the op (the founder had just approved the prior 8
+  pending — CA-tax 4 + CA-banks 2 + DK-legal 2, so approved 1254 → 1262 and pending fell back to 0 before this land);
+  pending 0 → 3, all `vc-*`, DK, tax_finance, vetted_by NULL. No mis-attach.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
