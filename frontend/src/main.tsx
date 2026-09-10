@@ -6,14 +6,14 @@ import { initAnalytics, ensureTestDriveReplay } from './analytics';
 import { initErrorTracking } from './lib/errorTracking';
 // Self-hosted Inter (replaces the Google Fonts @import in index.css).
 // GDPR: avoids sending every visitor's IP to Google's font CDN. Family name
-// stays 'Inter', so no font-family references change. Weights match what the
-// app uses (300-800); the browser fetches only the subsets it needs.
-import '@fontsource/inter/300.css';
+// stays 'Inter', so no font-family references change. DESIGN.md documents
+// 300–800; product + marketing only use 400/500/600/700 (no font-light,
+// font-extralight, font-[300], font-extrabold, or font-[800]), so 300 and 800
+// are omitted. The browser still fetches only the unicode subsets it needs.
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
-import '@fontsource/inter/800.css';
 // JetBrains Mono — the brand mono font (DESIGN.md), used for code/data/IDs via
 // `font-mono` and `--font-mono`. Self-hosted like Inter; only the weights the app
 // uses (400/500/700) are loaded so the browser fetches only what it needs.

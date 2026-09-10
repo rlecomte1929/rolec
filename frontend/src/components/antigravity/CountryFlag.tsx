@@ -1,4 +1,8 @@
 import React from 'react';
+// Colocated (not index.css): marketing routes that never mount CountryFlag
+// skip the ~flag-icons sprite sheet. Static import so HR/employee chunks
+// load the stylesheet with this module — no post-paint dynamic import flash.
+import 'flag-icons/css/flag-icons.min.css';
 import { countryName } from '../../features/policy-config/countryList';
 import { countryFlagCode } from '../../lib/countryFlagCode';
 

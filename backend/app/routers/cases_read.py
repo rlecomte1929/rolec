@@ -44,6 +44,7 @@ from ..services.roadmap_builder import derive_roadmap
 from ..services.roadmap_projection import project_tracks, track_label_for_form
 from ..services.confidence_mapping import tier_to_confidence
 from ..services.localised_labels import localised_label
+from ..services.prefill_engine import fields_need_prefill, run_prefill
 from ..services.roadmap_lead_times import lead_time_days_for
 from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
 from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case, gate_ai_roadmap
@@ -1647,6 +1648,9 @@ def get_form_fields(
     """
     Return every field in the form template merged with the stored FieldValue (if any).
     Fields with no stored value still appear in the list with value=None.
+
+    If fillable fields are still blank, run the pre-fill engine once so opening
+    the editor compiles from intake instead of presenting an empty pack.
     """
     _assert_case_access(user, case_id)
 
@@ -1683,6 +1687,30 @@ def get_form_fields(
             raw_fields = json.loads(raw_fields)
         except (json.JSONDecodeError, TypeError):
             raw_fields = []
+
+    if fields_need_prefill(raw_fields, stored):
+        # BUG-260909-E7B1: form rows created before intake completed stay blank
+        # until the employee opens them. Prefill is idempotent and blank-only.
+        run_prefill(form_id, case_id)
+        try:
+            with main_db.engine.connect() as conn:
+                fv_rows = conn.execute(
+                    _sql_text(
+                        f"""
+                        SELECT field_id, value, filled_by, ai_confidence, source, reviewed, overridden
+                        FROM {_pg_table('case_form_field_values')}
+                        WHERE case_form_id = :form_id
+                        """
+                    ),
+                    {"form_id": form_id},
+                ).mappings().all()
+            stored = {str(r["field_id"]): dict(r) for r in fv_rows}
+        except Exception:
+            logger.exception(
+                "fields: prefill reload failed case_id=%s form_id=%s",
+                case_id,
+                form_id,
+            )
 
     # The label language is the TEMPLATE's, not the viewer's — which authority's form this is.
     template_language = form_row.get("template_source_language") or "en"

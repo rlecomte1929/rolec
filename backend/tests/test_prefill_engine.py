@@ -24,6 +24,7 @@ if _REPO_ROOT not in sys.path:
 from backend.app.services import prefill_engine  # noqa: E402
 from backend.app.services.prefill_engine import (  # noqa: E402
     _resolve_path,
+    fields_need_prefill,
     run_prefill,
     run_prefill_for_dependents,
 )
@@ -468,6 +469,56 @@ class PreFillEngineTests(unittest.TestCase):
                 "WHERE case_form_id = :id AND field_id = 'passport_number'"
             ), {"id": cf_id}).scalar()
         self.assertEqual(val, "USER_VALUE")
+
+    def test_does_not_overwrite_nonempty_employee_value(self):
+        """Blank-only writes: an employee answer without overridden=true stays put."""
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields  = [{"id": "passport_number", "prefill_source": "profile.passport_number"}]
+        intake  = {"profile": {"passport_number": "SYSTEM_VALUE"}}
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, intake)
+            _insert_profile(conn, emp_id)
+            _insert_template(conn, tmpl, "UTL-2011", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+            conn.execute(text(
+                "INSERT INTO case_form_field_values "
+                "(id, case_form_id, field_id, value, filled_by, overridden) "
+                "VALUES (:id, :cfid, 'passport_number', 'USER_VALUE', 'employee', 0)"
+            ), {"id": _uuid(), "cfid": cf_id})
+
+        self.assertEqual(run_prefill(cf_id, case_id), 0)
+
+        with self.engine.connect() as conn:
+            val = conn.execute(text(
+                "SELECT value FROM case_form_field_values "
+                "WHERE case_form_id = :id AND field_id = 'passport_number'"
+            ), {"id": cf_id}).scalar()
+        self.assertEqual(val, "USER_VALUE")
+
+    def test_fills_blank_on_second_run_after_intake_arrives(self):
+        """Lazy open: first run has no intake, second run fills the blank slot."""
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields  = [{"id": "passport_number", "prefill_source": "profile.passport_number"}]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, {})
+            _insert_profile(conn, emp_id)
+            _insert_template(conn, tmpl, "UTL-2011", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+
+        self.assertEqual(run_prefill(cf_id, case_id), 0)
+
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE cases SET intake_data = :d WHERE id = :id"
+            ), {"d": json.dumps({"profile": {"passport_number": "P999"}}), "id": case_id})
+
+        self.assertEqual(run_prefill(cf_id, case_id), 1)
+        with self.engine.connect() as conn:
+            val = conn.execute(text(
+                "SELECT value FROM case_form_field_values "
+                "WHERE case_form_id = :id AND field_id = 'passport_number'"
+            ), {"id": cf_id}).scalar()
+        self.assertEqual(val, "P999")
 
     # ── completion % and status ──────────────────────────────────────────────
 
@@ -1082,3 +1133,22 @@ class TestCaseLevelPrefillSources(unittest.TestCase):
         # filled with a wrong or placeholder value on an accuracy-critical sheet.
         cf = self._run([{"id": "arrival_date", "prefill_source": "case.arrival_date"}])
         self.assertIsNone(self._row(cf, "arrival_date"))
+
+
+class TestFieldsNeedPrefill(unittest.TestCase):
+    def test_blank_fillable_field_needs_prefill(self):
+        fields = [{"id": "n", "prefill_source": "profile.legal_full_name"}]
+        self.assertTrue(fields_need_prefill(fields, {}))
+        self.assertTrue(fields_need_prefill(fields, {"n": {"value": "  "}}))
+
+    def test_filled_or_consult_does_not(self):
+        fields = [
+            {"id": "n", "prefill_source": "profile.legal_full_name"},
+            {"id": "tax", "prefill_source": "profile.x", "consult_professional": True},
+        ]
+        self.assertFalse(fields_need_prefill(fields, {"n": {"value": "Ada"}}))
+        self.assertFalse(fields_need_prefill(
+            [{"id": "tax", "prefill_source": "profile.x", "consult_professional": True}],
+            {},
+        ))
+        self.assertFalse(fields_need_prefill([{"id": "n"}], {}))

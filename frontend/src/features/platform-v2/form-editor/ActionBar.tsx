@@ -25,6 +25,8 @@ interface ActionBarProps {
   isDownloadingPdf?: boolean;
   /** ISO date of last generated draft PDF — shown as "Last generated: X" */
   draftPdfGeneratedAt?: string | null;
+  /** Official authority URL to file this registration. Hidden when unknown. */
+  officialSubmitUrl?: string | null;
 }
 
 // Spinner SVG shared between buttons
@@ -48,6 +50,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
   onDownloadPdf,
   isDownloadingPdf = false,
   draftPdfGeneratedAt,
+  officialSubmitUrl,
 }) => {
   return (
     <div className="sticky bottom-0 z-20 bg-white border-t border-slate-200 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
@@ -116,6 +119,17 @@ export const ActionBar: React.FC<ActionBarProps> = ({
                 </span>
               )}
             </div>
+          )}
+
+          {officialSubmitUrl && (
+            <a
+              href={officialSubmitUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded text-sm font-medium border border-slate-300 text-navy-800 bg-white hover:bg-slate-50 transition-colors"
+            >
+              Open official site
+            </a>
           )}
 
           <Button unstyled
