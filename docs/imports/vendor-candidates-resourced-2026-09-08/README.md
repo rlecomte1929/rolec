@@ -717,6 +717,73 @@ generator before the first batch; London GB legal came back with per-firm URLs o
 - Tripwire untouched (no write): `ssc` `approved` **130 | 1c4c3899925c5a8c4b3c168abcfbfc22**. NL banks
   stays at its prior count until re-sourced with an artifact.
 
+### XX-AU legal_admin (Sydney migration agents) — `vendor-resourced-xx-au-legal-sydney-2026-09-10` (partial land 2026-09-10) — first XX-AU; ⚠ exposed a normalise_domain bug
+- Source (GCS): `1789034426741_tydus30r.ndjson` (+ manifest `1789034430487_jxbmaqkp.json`).
+- Otto manifest: **5 sourced, 8 rejected** (counts reconcile). All 5 `source_url`=wired `portal.mara.gov.au`
+  (`mara.gov.au`, OMARA PUBLIC_REGISTER), corridor **XX-AU**, category legal_admin, `accreditation_number`
+  = 7-digit MARN: WIDEN Migration Experts 1576536, DMA Migration 1798821, IME Advisors 2217902, Bay
+  Migration Solution 1799395, KAN Migration Services 1807176.
+- **Landed: +1 only (IME Advisors).** The other 4 were WRONGLY dropped as duplicates by a
+  `normalise_domain()` bug — **not real dups.** `_COMPOUND_SUFFIXES` (vendor_harvester.py) lists `.co.uk`
+  (so GB keyed correctly) but is **missing `.com.au`**, so every `*.com.au` site collapses to the bare
+  registrable key `com.au`. WIDEN/DMA/Bay/KAN (all `.com.au`) therefore all keyed to `com.au`, which the
+  2026-08-30 AU pass had already staged (it mis-keyed "Migration Centre of Australia" +
+  "Australian Immigration Centre" to `com.au` too, and wrongly marked one `status='duplicate'`). IME
+  Advisors survived only because it is `.com`, not `.com.au`.
+- **Impact + fix:** every AU firm on a `.com.au` domain collapses to one key per corridor+category → AU
+  housing/tax/banks would all drop to ~1/cell. Fix = add `com.au` (+ `.net.au`/`.org.au` and other
+  multi-part ccTLD suffixes) to `_COMPOUND_SUFFIXES` + test.
+- **RESOLVED 2026-09-10 — fix PR #2263 merged to main (`79cf9031`)**, `_COMPOUND_SUFFIXES` now includes
+  `com.au` (+ the corridor ccTLD set; the PR also bundled a reference `manifest.json` on this dir so the
+  fact-citation ratchet correctly excludes vendor batches — see that fix in the delivery notes). The 4
+  held firms were **re-landed from this same CSV** (no re-research): with the fix they key distinctly
+  (`widen.com.au` / `dmamigration.com.au` / `baymigration.com.au` / `kanmigration.com.au`) → **staged 4,
+  promote 4** (IME correctly skipped as already-staged). **AU legal batch total = +5** (IME +1 then +4);
+  fix confirmed live in the land env by the +4 (vs the buggy +1).
+- Create-only guard held on both lands (approved count unchanged across each op): 130 across the IME
+  land; **218 before and after the +4 re-land** (the founder's concurrent vetting had moved the approved
+  baseline 130 → 218 — see the Valencia entry; the old fixed-md5 tripwire is retired). AU/legal
+  **3 → 4 (IME) → 8 (+4 re-land)**.
+
+### XX-ES legal_admin (Valencia extranjería lawyers) — `vendor-resourced-xx-es-legal-valencia-2026-09-10` (landed 2026-09-10) — UN-PARKS the earlier Valencia hold
+- Source (GCS): `1789037619004_hp0369jo.ndjson` (+ manifest `1789037699891_e2puiit2.json`). Clean re-run
+  after the earlier Audos-wipe park; `.es` domain → unaffected by the `.com.au` normalise bug.
+- Otto manifest: **4 sourced, 10 rejected** (counts reconcile). All 4 `source_url`=wired `www.abogacia.es`,
+  corridor **XX-ES**, category legal_admin, ICAV named-lawyer colegiado: Olguín Abogados 14262, Fernando
+  Ortega Cano 17582, Romina María Chiquini Laude 19598, Modesto Martínez Vizuete 11729. Good discipline:
+  the two parked SEEDS were **honestly rejected** on re-verification (García Pastrana ICAV 20503 =
+  *derechos fundamentales*, not extranjería; Moncho Giner = Gandía not Valencia city, número unpublished),
+  so all 4 are genuinely-verified NEW firms. 3 are individual advocates with no firm site → name-keyed.
+- `_name_key` predictor: all 4 distinct + new; no prod dup, no mis-attach. Landed: **+4 new suppliers**
+  (ES/legal_admin, pending). ES legal now 20 (Madrid 7 + Barcelona 4 + Seville 5 + Valencia 4).
+- **Tripwire — invariant change (2026-09-10 ~11:01):** the campaign-long fixed `approved = 130 |
+  1c4c3899925c5a8c4b3c168abcfbfc22` is now **RETIRED**: the founder began working `/admin/vetting-queue`
+  and `admin@relopass.com` approved 86 caps in a bulk pass (approved pool 130 → 218; 139 harvest
+  suppliers now live). That is the human gate working as designed, unrelated to this append-only land.
+  The applier invariant is now **create-only**: each land only INSERTs new `pending` caps and never
+  mutates an existing/approved cap. This land satisfied it — the approved count did not drop across the
+  op, and the 4 new Valencia caps are `pending` (verified). Going forward the check is "my N caps landed
+  pending + approved count did not decrease," not a fixed md5.
+
+### XX-AU housing_agencies (Sydney) via NSW Fair Trading — `vendor-resourced-xx-au-housing-sydney-2026-09-10` (landed 2026-09-10) — THIN
+- Source (GCS): `1789041729806_8fx5ydrh.ndjson` (+ manifest `1789041773132_2xgxc63n.json`).
+- Otto manifest: **1 sourced, 8 rejected** (counts reconcile). Rejects: firm doesn't publish a NSW Fair
+  Trading licence number on its site (Urban Renters, Property Providers, SydneySlice, Hunter James,
+  Sydney Rental Search, Home Hunters Relocations) or holds the wrong state's licence (Relocate Sydney =
+  Victorian REIV, Australian Relocation Managers = VIC).
+- **PUBLIC_REGISTER (NSW Fair Trading / verify.licence.nsw.gov.au).** The 1 `source_url`=wired
+  `verify.licence.nsw.gov.au`, corridor **XX-AU**, category housing_agencies. Find My Rental Property,
+  NSW licence **20111067**. Its site is `findmyrentalproperty.com.au` and it keyed/staged distinctly —
+  **another end-to-end confirmation the com.au fix (#2263) works** (a `.com.au` firm no longer collapses).
+- Landed: **+1 new supplier** (AU/housing_agencies, pending). Create-only guard held: approved count
+  **218 unchanged** across the op. AU/housing 4 → 5.
+- **⚠ STRUCTURAL LEARNING (brief refinement, flagged not re-run):** the brief required the firm to
+  *self-publish* its NSW licence number, but most Sydney agencies just say "fully licensed" → thin
+  yield. Better future AU-housing brief: look each agency up **by name** on
+  `verify.licence.nsw.gov.au` to obtain its licence#, rather than requiring self-publication (vetter
+  confirms). Same shape as the SE/housing FMI thinness — the register is fine; the sourcing predicate
+  was too strict.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
