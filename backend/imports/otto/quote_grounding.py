@@ -224,7 +224,11 @@ def load_ndjson(path: Path) -> List[dict]:
 
 
 def gating_exit(verdicts: Sequence[QuoteVerdict]) -> int:
-    if any(v.status in ("not_on_page", "unreachable") for v in verdicts):
+    # `no_quote` gates too. A fact with no evidence_quote can never be verbatim-confirmed, so it
+    # is exactly as unservable as one whose quote is not on the page — and letting it pass was the
+    # same class of hole as the empty-string substring bug (norm("") is a substring of anything).
+    # A quote-less row is a batch defect to fix or withhold, not a silent pass.
+    if any(v.status in ("not_on_page", "unreachable", "no_quote") for v in verdicts):
         return 1
     return 0
 

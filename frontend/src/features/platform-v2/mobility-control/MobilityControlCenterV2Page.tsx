@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { PlaneTakeoff } from 'lucide-react';
 import { Button } from '../../../components/antigravity/Button';
-import { ConversationalEmptyState } from '../../../components/antigravity';
+import { ConversationalEmptyState, TableScroll } from '../../../components/antigravity';
 import { buildRoute } from '../../../navigation/routes';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
@@ -253,13 +253,7 @@ interface KpiProps {
 }
 
 function Kpi({ label, value, sub, tone = 'default', progress, title }: KpiProps) {
-  const valueColor: Record<NonNullable<KpiProps['tone']>, string> = {
-    default: 'text-slate-900',
-    success: 'text-emerald-700',
-    warning: 'text-rose-700',
-    accent: 'text-accent-700',
-    danger: 'text-rose-700',
-  };
+  const valueColor = 'text-navy-800';
   const bar: Record<NonNullable<KpiProps['tone']>, string> = {
     default: 'bg-slate-400',
     success: 'bg-emerald-500',
@@ -274,10 +268,10 @@ function Kpi({ label, value, sub, tone = 'default', progress, title }: KpiProps)
       title={title}
     >
       <div className="truncate text-[10px] font-semibold uppercase tracking-widest text-slate-500">{label}</div>
-      <div className={`mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums ${valueColor[tone]}`}>
+      <div className={`mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums ${valueColor}`}>
         {value}
       </div>
-      <div className="mt-1.5 truncate text-[11px] text-slate-500">{sub}</div>
+      <div className="mt-1.5 text-[11px] text-slate-500 text-pretty">{sub}</div>
       <div className="absolute inset-x-0 bottom-0 h-1 bg-slate-100">
         <div className={`h-full ${bar[tone]}`} style={{ width: `${pct}%` }} />
       </div>
@@ -706,7 +700,7 @@ export function MobilityControlCenterV2Page() {
           !(displayKpis && displayKpis.activeCases === 0 && displayKpis.atRiskCount === 0 && displayKpis.completedCount === 0) && (
           <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Executive summary</p>
-            <p className="mt-1 text-[13px] leading-relaxed text-slate-700">{execSummary}</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-slate-700 text-pretty break-words">{execSummary}</p>
           </div>
         )}
 
@@ -758,6 +752,7 @@ export function MobilityControlCenterV2Page() {
                 hint="Takes about 2 minutes — you'll add the employee, destination, and move date."
               />
             ) : (
+              <TableScroll minWidthClass="min-w-[48rem]">
               <DataTable
                 tableId="hr.mobility-control"
                 columns={columns}
@@ -773,6 +768,7 @@ export function MobilityControlCenterV2Page() {
                   </div>
                 }
               />
+              </TableScroll>
             )}
           </div>
 

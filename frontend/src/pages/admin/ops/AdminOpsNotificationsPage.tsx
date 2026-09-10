@@ -73,7 +73,7 @@ export const AdminOpsNotificationsPage: React.FC = () => {
                 ))}
               </ul>
             </div>
-            <Link to={buildRoute('adminOverview')} className="text-sm text-[#0b2b43] underline">
+            <Link to={buildRoute('adminConsole')} className="text-sm text-[#0b2b43] underline">
               → Back to admin
             </Link>
           </>

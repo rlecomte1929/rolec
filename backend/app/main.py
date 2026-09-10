@@ -9,6 +9,7 @@ from .routers import (
     admin_ai_unit_economics,
     admin_autopilot_metrics,
     admin_corrections,
+    admin_reconciliation,
     admin_dsar,
     admin_feature_flags,
     admin_exec_overview,
@@ -43,6 +44,7 @@ from .routers import (
     case_requirement_checklist,
     cases_read,
     cases_write,
+    data_sheet,
     case_documents,
     conjoint,
     employee_quotes,
@@ -96,7 +98,6 @@ from .routers import (
     policy_gaps,
     policy_publish,
     policy_summary,
-    policy_templates,
     predictions,
     test_drive,
     rag_roadmap,
@@ -148,6 +149,7 @@ def create_app() -> FastAPI:
     # Original cases.py is retained as a support module for Pydantic models + private
     # helpers that cases_write.py still imports from. Its router is no longer wired.
     app.include_router(cases_read.router)
+    app.include_router(data_sheet.router)  # [DataSheet P1] GET /api/cases/{id}/datasheet — dual-layer registration
     app.include_router(case_requirement_checklist.router)
     app.include_router(case_integrations.router)  # I-4 — email plan + calendar .ics
     app.include_router(cases_write.router)
@@ -270,6 +272,7 @@ def create_app() -> FastAPI:
     # [Parker-H] Conjoint (CBC) company-scoped HR/respondent API
     app.include_router(conjoint.router)
     app.include_router(admin_corrections.router)  # [AIQ-554] /api/admin/corrections/by-reason
+    app.include_router(admin_reconciliation.router)  # WS1 1.5 — /api/admin/reconciliation
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(admin_prompts.router, prefix="/api/admin")
@@ -295,7 +298,6 @@ def create_app() -> FastAPI:
     app.include_router(policy_summary.router)
     app.include_router(policy_canonical.admin_router, prefix="/api/admin")
     app.include_router(policy_canonical.read_router, prefix="/api")
-    app.include_router(policy_templates.router)
     app.include_router(admin_settings.router)  # [Task-4] admin AI-governance controls panel
     app.include_router(admin_feedback.router)  # [Task-6] unified feedback console
     app.include_router(admin_admins.router)  # [Task-7] admin lifecycle management

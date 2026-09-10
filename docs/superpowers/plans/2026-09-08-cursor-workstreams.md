@@ -272,13 +272,13 @@ COUNT queries; the rest is identity (Task 2.7).
 - [ ] Query-count characterisation test on the handler (recording stub, as in
   `backend/tests/test_employee_policy_caps_query_count.py`); vitest for the sidebar pause/resume.
 
-#### Task 2.7: Identity overhead — one lookup per request, not seven (needs founder sign-off on TTL)
+#### Task 2.7: Identity overhead — one lookup per request, not seven (TTL approved: 30 s, 2026-09-09)
 
 **Files:** `backend/app/auth_deps.py` (`get_current_user`), `backend/db/auth.py` (`get_user_by_token`),
 `backend/db/users.py` (`ensure_profile_record`, `get_user_roles`), the seven `_caller_company_id`
 copies (see WS1 Task 1.3, which should land first so there is one place to fix).
 
-**Design to implement (proposed; confirm TTL with Romain before coding):**
+**Design to implement (TTL approved by Romain 2026-09-09: 30 s per-process cache):**
 - Collapse `get_user_by_token` + `get_user_by_id` + `get_user_roles` into one SQL joining `sessions`,
   `users`, roles. Keep the returned dict shape identical.
 - `ensure_profile_record` becomes write-on-miss only: check a per-process set of user ids already

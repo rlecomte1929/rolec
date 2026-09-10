@@ -6,5 +6,4 @@ export { MessageInput } from './MessageInput';
 export { DateSeparator } from './DateSeparator';
 export { TypingIndicator } from './TypingIndicator';
 export { buildConversationsFromMessages, buildConversationsFromQuoteThreads } from './utils';
-export { MOCK_CONVERSATIONS } from './mockData';
 export type { Message, Conversation, SenderRole } from './types';

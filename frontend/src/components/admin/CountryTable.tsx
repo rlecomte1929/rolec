@@ -4,13 +4,16 @@ import { Badge } from '../antigravity/Badge';
 import { Button } from '../antigravity/Button';
 import { CountryFlag } from '../antigravity/CountryFlag';
 import { Input } from '../antigravity/Input';
+import { TableScroll } from '../antigravity/TableScroll';
 import type { CountryListDTO } from '../../types';
 import {
   type CatalogAttention,
   type CatalogSortKey,
   type CountryListRow,
+  catalogConfidenceScore,
   confidenceLevel,
   confidencePercent,
+  displayCountryIso,
   displayCountryName,
   filterCatalog,
   formatUpdatedLabel,
@@ -37,11 +40,21 @@ const SORT_OPTIONS: { value: CatalogSortKey; label: string }[] = [
   { value: 'updated', label: 'Last updated' },
 ];
 
-function ConfidenceMark({ score }: { score: number | undefined }) {
+function ConfidenceMark({
+  score,
+  empty,
+}: {
+  score: number | null;
+  empty: boolean;
+}) {
   const level = confidenceLevel(score);
   const pct = confidencePercent(score);
   if (level === 'unknown') {
-    return <Badge variant="neutral" size="sm">Unknown</Badge>;
+    return (
+      <Badge variant="neutral" size="sm">
+        {empty ? 'No evidence' : 'Unknown'}
+      </Badge>
+    );
   }
   const variant = level === 'high' ? 'success' : level === 'medium' ? 'warning' : 'error';
   const label = level === 'high' ? 'High' : level === 'medium' ? 'Medium' : 'Low';
@@ -101,10 +114,14 @@ function DomainChips({ domains }: { domains: string[] }) {
 
 function CountryIdentity({ code }: { code: string }) {
   const name = displayCountryName(code);
+  const iso = displayCountryIso(code);
   return (
     <span className="flex min-w-0 items-center gap-3">
+      {/* Show the English name once; ISO chip is the code, not the name again */}
       <CountryFlag country={code} label={name} className="min-w-0 text-sm font-semibold text-navy-800" />
-      <span className="shrink-0 font-mono text-[11px] uppercase tracking-wide text-slate-500">{code}</span>
+      {iso && (
+        <span className="shrink-0 font-mono text-[11px] uppercase tracking-wide text-slate-500">{iso}</span>
+      )}
     </span>
   );
 }
@@ -125,10 +142,35 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
     <div className="space-y-4" data-testid="country-table">
       {/* fix: BUG-260908-9601 — catalog summary so coverage gaps are visible without scanning every row */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <SummaryTile testId="catalog-stat-countries" label="Destinations" value={summary.countries} />
-        <SummaryTile testId="catalog-stat-requirements" label="Requirements" value={summary.requirements} />
-        <SummaryTile testId="catalog-stat-empty" label="Empty catalogs" value={summary.empty} tone={summary.empty > 0 ? 'warn' : 'ok'} />
-        <SummaryTile testId="catalog-stat-refresh" label="Needs refresh" value={summary.needsRefresh} tone={summary.needsRefresh > 0 ? 'warn' : 'ok'} />
+        <SummaryTile
+          testId="catalog-stat-countries"
+          label="Destinations"
+          value={summary.countries}
+          selected={attention === 'all'}
+          onSelect={() => setAttention('all')}
+        />
+        <SummaryTile
+          testId="catalog-stat-requirements"
+          label="Requirements"
+          value={summary.requirements}
+          onSelect={() => { setAttention('all'); setSort('requirements'); }}
+        />
+        <SummaryTile
+          testId="catalog-stat-empty"
+          label="Empty catalogs"
+          value={summary.empty}
+          tone={summary.empty > 0 ? 'warn' : 'ok'}
+          selected={attention === 'empty'}
+          onSelect={() => setAttention('empty')}
+        />
+        <SummaryTile
+          testId="catalog-stat-refresh"
+          label="Needs refresh"
+          value={summary.needsRefresh}
+          tone={summary.needsRefresh > 0 ? 'warn' : 'ok'}
+          selected={attention === 'refresh'}
+          onSelect={() => setAttention('refresh')}
+        />
       </div>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -175,6 +217,9 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
           </label>
         </div>
       </div>
+      <p className="text-xs text-slate-500">
+        Confidence is shown only when this catalog has recorded requirements and sources.
+      </p>
 
       {rows.length === 0 ? (
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-600">
@@ -184,14 +229,17 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
         </div>
       ) : (
         <>
+          <p className="text-xs text-slate-500">
+            Showing {rows.length} of {data.countries.length} destinations
+          </p>
           <div className="space-y-2 md:hidden">
             {rows.map((row) => (
               <CountryCard key={row.countryCode} row={row} now={now} max={maxRequirements} onSelect={onSelect} />
             ))}
           </div>
-          <div className="hidden overflow-hidden rounded-xl border border-slate-200 md:block">
+          <TableScroll className="hidden rounded-xl border border-slate-200 md:block">
             <div
-              className="grid grid-cols-[minmax(12rem,1.5fr)_8.5rem_7rem_8.5rem_minmax(8rem,1fr)_1.5rem] gap-4 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+              className="grid grid-cols-[minmax(14rem,1.6fr)_8.5rem_7rem_9rem_minmax(10rem,1fr)_1.5rem] gap-4 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500"
               role="row"
             >
               <div>Country</div>
@@ -209,22 +257,33 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
                   key={row.countryCode}
                   unstyled
                   onClick={() => onSelect(row.countryCode)}
-                  className="grid w-full grid-cols-[minmax(12rem,1.5fr)_8.5rem_7rem_8.5rem_minmax(8rem,1fr)_1.5rem] gap-4 border-t border-slate-200 px-4 py-3 text-left hover:bg-navy-50"
+                  className="grid w-full grid-cols-[minmax(14rem,1.6fr)_8.5rem_7rem_9rem_minmax(10rem,1fr)_1.5rem] gap-4 border-t border-slate-200 px-4 py-3 text-left hover:bg-navy-50"
                 >
-                  <CountryIdentity code={row.countryCode} />
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <CountryIdentity code={row.countryCode} />
+                    {row.catalogReady === true && (
+                      <Badge variant="success" size="sm">Ready</Badge>
+                    )}
+                    {row.catalogReady === false && (
+                      <Badge variant="warning" size="sm">Not ready</Badge>
+                    )}
+                  </div>
                   <div>
                     <div className="text-sm text-navy-800">{updated.relative}</div>
                     <div className="text-xs text-slate-500">{updated.absolute}</div>
                     {stale && <Badge variant="warning" size="sm">Needs refresh</Badge>}
                   </div>
                   <RequirementCount count={row.requirementsCount} max={maxRequirements} />
-                  <ConfidenceMark score={row.confidenceScore} />
+                  <ConfidenceMark
+                    score={catalogConfidenceScore(row)}
+                    empty={(row.requirementsCount || 0) === 0}
+                  />
                   <DomainChips domains={row.topDomains} />
                   <ChevronRight className="mt-1 h-4 w-4 text-slate-500" aria-hidden="true" />
                 </Button>
               );
             })}
-          </div>
+          </TableScroll>
         </>
       )}
     </div>
@@ -236,22 +295,31 @@ function SummaryTile({
   value,
   testId,
   tone = 'ok',
+  selected = false,
+  onSelect,
 }: {
   label: string;
   value: number;
   testId: string;
   tone?: 'ok' | 'warn';
+  selected?: boolean;
+  onSelect: () => void;
 }) {
   return (
-    <div
+    <Button
+      unstyled
       data-testid={testId}
-      className="rounded-xl border border-slate-200 bg-white px-4 py-3"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`rounded-xl border px-4 py-3 text-left ${
+        selected ? 'border-navy-800 bg-navy-50' : 'border-slate-200 bg-white hover:border-navy-800'
+      }`}
     >
       <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">{label}</p>
       <p className={`mt-1 text-2xl font-semibold ${tone === 'warn' && value > 0 ? 'text-amber-800' : 'text-navy-800'}`}>
         {value}
       </p>
-    </div>
+    </Button>
   );
 }
 
@@ -275,7 +343,11 @@ function CountryCard({
     >
       <div className="flex items-start justify-between gap-3">
         <CountryIdentity code={row.countryCode} />
-        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+        <div className="flex items-center gap-2">
+          {row.catalogReady === false && <Badge variant="warning" size="sm">Not ready</Badge>}
+          {row.catalogReady === true && <Badge variant="success" size="sm">Ready</Badge>}
+          <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+        </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <div>
@@ -286,7 +358,10 @@ function CountryCard({
           )}
         </div>
         <RequirementCount count={row.requirementsCount} max={max} />
-        <ConfidenceMark score={row.confidenceScore} />
+        <ConfidenceMark
+          score={catalogConfidenceScore(row)}
+          empty={(row.requirementsCount || 0) === 0}
+        />
         <DomainChips domains={row.topDomains} />
       </div>
     </Button>

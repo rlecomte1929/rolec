@@ -1,4 +1,6 @@
+import type { AdminRequirementReview, ReviewStatus } from '../../api/admin';
 import { countryName } from '../../features/policy-config/countryList';
+import { countryFlagCode } from '../../lib/countryFlagCode';
 import type { CountryListDTO } from '../../types';
 
 export type CountryListRow = CountryListDTO['countries'][number];
@@ -10,7 +12,14 @@ export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'unknown';
 export const CATALOG_STALE_DAYS = 90;
 
 export function displayCountryName(code: string): string {
+  const iso = countryFlagCode(code);
+  if (iso) return countryName(iso.toUpperCase());
   return countryName(code);
+}
+
+export function displayCountryIso(code: string): string | null {
+  const iso = countryFlagCode(code);
+  return iso ? iso.toUpperCase() : null;
 }
 
 export function confidencePercent(score: number | undefined | null): number | null {
@@ -26,6 +35,21 @@ export function confidenceLevel(score: number | undefined | null): ConfidenceLev
   if (pct >= 75) return 'high';
   if (pct >= 40) return 'medium';
   return 'low';
+}
+
+/** Stored research scores are not catalog quality. Empty rows must not read as High. */
+export function catalogConfidenceScore(
+  row: Pick<CountryListRow, 'confidenceScore' | 'requirementsCount' | 'topDomains'>,
+): number | null {
+  const requirements = row.requirementsCount || 0;
+  const sources = (row.topDomains || []).length;
+  if (requirements <= 0) return null;
+  if (sources <= 0) {
+    const pct = confidencePercent(row.confidenceScore);
+    if (pct === null) return null;
+    return Math.min(row.confidenceScore ?? 0, 0.39);
+  }
+  return row.confidenceScore ?? null;
 }
 
 export function isCatalogStale(
@@ -98,13 +122,81 @@ export function filterCatalog(
   });
 }
 
+export type RequirementStatusFilter = 'all' | ReviewStatus;
+
+const REVIEW_SORT: Record<ReviewStatus, number> = {
+  pending: 0,
+  approved: 1,
+  rejected: 2,
+};
+
+export function displayCatalogLabel(value: string | undefined | null): string {
+  const raw = (value || '').trim();
+  if (!raw) return 'Uncategorised';
+  return raw
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+export function countRequirementStatuses(items: AdminRequirementReview[]) {
+  return {
+    all: items.length,
+    pending: items.filter((item) => item.reviewStatus === 'pending').length,
+    approved: items.filter((item) => item.reviewStatus === 'approved').length,
+    rejected: items.filter((item) => item.reviewStatus === 'rejected').length,
+  };
+}
+
+export function filterRequirements(
+  items: AdminRequirementReview[],
+  query: string,
+  status: RequirementStatusFilter,
+): AdminRequirementReview[] {
+  const q = query.trim().toLowerCase();
+  return items.filter((item) => {
+    if (status !== 'all' && item.reviewStatus !== status) return false;
+    if (!q) return true;
+    const hay = [
+      item.title,
+      item.description,
+      item.pillar,
+      item.purpose,
+      item.owner,
+      item.severity,
+      ...item.citations.map((citation) => citation.title),
+    ]
+      .join(' ')
+      .toLowerCase();
+    return hay.includes(q);
+  });
+}
+
+export function groupRequirementsByPillar(
+  items: AdminRequirementReview[],
+): { pillar: string; items: AdminRequirementReview[] }[] {
+  const sorted = [...items].sort((a, b) => {
+    const byStatus = REVIEW_SORT[a.reviewStatus] - REVIEW_SORT[b.reviewStatus];
+    if (byStatus !== 0) return byStatus;
+    return a.title.localeCompare(b.title, 'en');
+  });
+  const groups = new Map<string, AdminRequirementReview[]>();
+  for (const item of sorted) {
+    const pillar = item.pillar || 'Uncategorised';
+    const list = groups.get(pillar) ?? [];
+    list.push(item);
+    groups.set(pillar, list);
+  }
+  return [...groups.entries()].map(([pillar, grouped]) => ({ pillar, items: grouped }));
+}
+
 export function sortCatalog(rows: CountryListRow[], sort: CatalogSortKey): CountryListRow[] {
   const copy = [...rows];
   copy.sort((a, b) => {
     if (sort === 'requirements') return (b.requirementsCount || 0) - (a.requirementsCount || 0);
     if (sort === 'confidence') {
-      const av = a.confidenceScore ?? -1;
-      const bv = b.confidenceScore ?? -1;
+      const av = catalogConfidenceScore(a) ?? -1;
+      const bv = catalogConfidenceScore(b) ?? -1;
       return bv - av;
     }
     if (sort === 'updated') {

@@ -29,7 +29,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..auth_deps import require_admin_or_hr
+from ..auth_deps import caller_company_id, require_admin_or_hr
 from ..db import SessionLocal
 from ...database import db
 
@@ -57,27 +57,16 @@ def _get_db() -> Generator[Session, None, None]:
 def _caller_company_id(user: Dict[str, Any] = Depends(require_admin_or_hr)) -> str:
     """The company the caller actually belongs to. The ONLY source of the invite's tenant.
 
-    Resolution order copies `hr_catalog._caller_company_id` (AIQ-862): `hr_users` first,
-    because legacy text HR ids (e.g. `seed-hr-testingapril`) have a NULL
-    `profiles.company_id` but a valid `hr_users` row, and a profiles-only lookup would
-    403 them. Unlike `auth_deps.get_org_id_for_hr_user`, which returns "" when nothing
-    resolves, this raises: an invite with no tenant must never be written.
-
-    This is a FastAPI dependency so tests can override it. The real resolution path is
-    exercised by ST5's adversarial suite.
+    Thin FastAPI dependency so tests can override it. Resolution lives in
+    ``caller_company_id`` (hr_users first, AIQ-862). Unlike
+    ``get_org_id_for_hr_user``, which returns "" when nothing resolves, this
+    raises: an invite with no tenant must never be written.
     """
-    uid = user.get("id")
-    company_id = (
-        (db.get_hr_company_id(uid) if uid else None)
-        or (db.get_profile_record(uid) or {}).get("company_id")
-        or user.get("company")
+    return caller_company_id(
+        user,
+        required=True,
+        detail="No company linked to this profile — an invite needs a tenant.",
     )
-    if not company_id:
-        raise HTTPException(
-            status_code=403,
-            detail="No company linked to this profile — an invite needs a tenant.",
-        )
-    return str(company_id)
 
 
 class InviteBody(BaseModel):

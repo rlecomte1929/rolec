@@ -9,6 +9,7 @@ Login behaviour is byte-for-byte identical — this is a pure relocation.
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -30,6 +31,27 @@ _is_sqlite = _raw_url.startswith("sqlite")
 # routes the user back to login (the existing client.ts interceptor); a seamless
 # sliding/refresh-token mechanism is a documented follow-up.
 SESSION_TTL_DAYS = 14
+
+
+def _parse_role_rows(raw: Any) -> List[Dict[str, Any]]:
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (TypeError, ValueError):
+            return []
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        if not role:
+            continue
+        out.append({"role": role, "is_primary": bool(item.get("is_primary"))})
+    return out
 
 
 def _session_is_expired(created_at: Optional[str]) -> bool:
@@ -77,44 +99,74 @@ class AuthMixin:
         return self.get_user_by_id(row._mapping["user_id"])
 
     def get_user_context_by_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """One round-trip: session + user row + user_roles (WS2 Task 2.7).
+
+        Replaces ``get_user_by_token`` (which itself calls ``get_user_by_id``)
+        plus ``get_user_roles``. Returns the users-row dict (same keys as
+        ``get_user_by_id``) plus ``role_rows`` in the shape ``get_user_roles``
+        returns. ``get_admin_session`` stays a separate call.
+
+        Also keeps the keys ``backend.main.get_current_user`` already reads
+        from this method (``full_name``, ``company_id``, ``is_admin``).
         """
-        Single-query replacement for the 4-call chain:
-            get_user_by_token -> get_user_by_id -> get_admin_session -> get_profile_record
-        Returns None if the session token is unknown.
-        """
-        sql = text("""
-            SELECT
-                u.id,
-                u.email,
-                u.role,
-                u.username,
-                p.full_name,
-                p.company_id::text AS company_id,
-                (LOWER(u.role) = 'admin') AS is_admin,
-                s.created_at AS session_created_at
-            FROM sessions s
-            JOIN users u ON u.id = s.user_id
-            LEFT JOIN profiles p ON p.id::text = u.id
-            WHERE s.token = :token
-            LIMIT 1
-        """)
-        with self.engine.connect() as conn:
-            row = conn.execute(sql, {"token": token}).fetchone()
+        if _is_sqlite:
+            roles_sql = (
+                "(SELECT json_group_array(json_object("
+                "'role', ur.role, 'is_primary', ur.is_primary)) "
+                "FROM user_roles ur WHERE ur.user_id = u.id)"
+            )
+            company_sql = "CAST(p.company_id AS TEXT)"
+            profile_join = "LEFT JOIN profiles p ON CAST(p.id AS TEXT) = CAST(u.id AS TEXT)"
+        else:
+            roles_sql = (
+                "(SELECT json_agg(json_build_object("
+                "'role', ur.role, 'is_primary', ur.is_primary)) "
+                "FROM user_roles ur WHERE ur.user_id = u.id)"
+            )
+            company_sql = "p.company_id::text"
+            profile_join = "LEFT JOIN profiles p ON p.id::text = u.id"
+
+        sql_with_roles = (
+            "SELECT u.*, s.created_at AS session_created_at, "
+            f"p.full_name AS profile_full_name, {company_sql} AS company_id, "
+            f"{roles_sql} AS role_rows "
+            "FROM sessions s "
+            "JOIN users u ON u.id = s.user_id "
+            f"{profile_join} "
+            "WHERE s.token = :token LIMIT 1"
+        )
+        sql_no_roles = (
+            "SELECT u.*, s.created_at AS session_created_at, "
+            f"p.full_name AS profile_full_name, {company_sql} AS company_id "
+            "FROM sessions s "
+            "JOIN users u ON u.id = s.user_id "
+            f"{profile_join} "
+            "WHERE s.token = :token LIMIT 1"
+        )
+
+        row = None
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(text(sql_with_roles), {"token": token}).fetchone()
+        except (OperationalError, ProgrammingError):
+            with self.engine.connect() as conn:
+                row = conn.execute(text(sql_no_roles), {"token": token}).fetchone()
         if not row:
             return None
-        m = row._mapping
-        # SEC-FE-1: reject sessions past their TTL (treat as unknown → 401).
-        if _session_is_expired(m.get("session_created_at")):
+        payload = self._row_to_dict(row)
+        if not payload:
             return None
-        return {
-            "id":          m["id"],
-            "email":       m["email"],
-            "role":        m["role"],
-            "username":    m.get("username"),
-            "full_name":   m.get("full_name"),
-            "company_id":  m.get("company_id"),
-            "is_admin":    bool(m.get("is_admin")),
-        }
+        session_created_at = payload.pop("session_created_at", None)
+        if _session_is_expired(session_created_at):
+            return None
+        profile_full_name = payload.pop("profile_full_name", None)
+        role_rows = _parse_role_rows(payload.pop("role_rows", None))
+        # users.created_at can be shadowed by the session alias on some drivers;
+        # the users-row shape is otherwise SELECT u.*.
+        payload["full_name"] = profile_full_name if profile_full_name is not None else payload.get("name")
+        payload["is_admin"] = (str(payload.get("role") or "")).lower() == "admin"
+        payload["role_rows"] = role_rows
+        return payload
 
     def get_claim_invite_by_token(self, token: str) -> Optional[Dict[str, Any]]:
         """

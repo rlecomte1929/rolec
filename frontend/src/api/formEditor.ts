@@ -64,9 +64,17 @@ export interface FieldUpsertInput {
   value: string | null;
 }
 
+/**
+ * Matches `FormStatusPatchPayload` in `backend/app/routers/cases.py` /
+ * `cases_write.py`. The handler allows ready | submitted | approved |
+ * rejected | not_started (HR/ADMIN-only for rejected and not_started),
+ * plus optional note / receipt_ref / rejection_reason.
+ */
 export interface FormStatusPatchPayload {
-  status: 'ready' | 'submitted';
+  status: 'ready' | 'submitted' | 'approved' | 'rejected' | 'not_started';
   receipt_ref?: string;
+  note?: string;
+  rejection_reason?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +105,7 @@ export const formEditorAPI = {
       .then((r: { data: CaseFormSummary }) => r.data),
 
   /**
-   * Transition the form status (ready | submitted).
+   * Transition the form status (ready | submitted | approved | rejected | not_started).
    * 'ready' validates server-side that all required fields are filled.
    * Returns the updated CaseFormSummary.
    */

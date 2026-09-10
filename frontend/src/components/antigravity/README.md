@@ -88,6 +88,11 @@ import { Checkbox, Radio, FileInput } from '../components/antigravity';
 Unlike `Input` (value-based `onChange`), these keep the **native event** onChange
 — their values (`checked` / `files`) don't fit the value-string contract.
 
+## Select
+
+`sort` defaults to `'none'` (caller / product order). Pass `sort="label"` only
+for A–Z lists. Status workflows stay Pending → Approved, not alphabetical.
+
 ## Brand colours
 
 Source of truth: `design/system/tokens.css`. Exposed as Tailwind scales in

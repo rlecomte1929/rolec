@@ -1,0 +1,28 @@
+{
+  "batch_id": "ie-p0-resource-gapfill-2026-09-09",
+  "batch_type": "direct-load reference batch — NDJSON in src/ is the source of truth for the generated requirement_items migration (the ie_es-corridor-load pattern), NOT an otto_staging fact stream; per-record Otto-v6 gate checks do not apply.",
+  "corridor": "IE (destination-keyed, IE-P0 living-in-Ireland layer)",
+  "generated": "2026-09-09",
+  "target_table": "public.requirement_items",
+  "upsert_key": "id",
+  "on_conflict": "DO NOTHING",
+  "status": "candidate",
+  "review_status": "pending",
+  "verification_status": "representative",
+  "record_count": 3,
+  "provenance": "Researched directly against official Irish sources (revenue.ie, citizensinformation.ie) via browser/WebFetch; NOT an Otto/Audos deliverable. Each record carries one verbatim official evidence_quote.",
+  "files": [
+    {
+      "path": "src/ie-p0-resource-gapfill.ndjson",
+      "sha256": "a0062466ff5350f5fca53620a5e8da72be778b31644803ca75e3730ebe7fe7f7",
+      "records": 3
+    }
+  ],
+  "generator": "gen_load.py",
+  "migration": "supabase/migrations/20261133000000_ie_p0_resource_gapfill_candidates.sql",
+  "records": [
+    {"id": "ie_timeline_emergency_tax_refund_via_payroll", "pillar": "TIMELINE", "source": "revenue.ie"},
+    {"id": "ie_timeline_myaccount_password_by_post", "pillar": "TIMELINE", "source": "revenue.ie"},
+    {"id": "ie_medical_card_ordinarily_resident_requirement", "pillar": "HEALTHCARE", "source": "citizensinformation.ie"}
+  ]
+}

@@ -80,7 +80,7 @@ function defaultSections(): NavSection[] {
     {
       label: 'Admin · ReloPass',
       items: [
-        { id: 'admin-overview', name: 'Admin overview', to: r('adminOverview') },
+        { id: 'admin-overview', name: 'Admin overview', to: r('adminConsole') },
         { id: 'admin-companies', name: 'Companies', to: r('adminCompanies') },
         { id: 'review-queue', name: 'Review queue', to: r('adminReviewQueue'), badge: { label: '24', tone: 'count' } },
         { id: 'ops-analytics', name: 'Ops analytics', to: r('adminOpsSla') },

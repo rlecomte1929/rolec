@@ -17,6 +17,9 @@ import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { EmployeeCaseRoadmapPage } from '../EmployeeCaseRoadmapPage';
 
+// The data sheet is orthogonal to roadmap behaviour and pulls in React Query; stub it so this
+// page test needs no QueryClientProvider. DataSheetView has its own coverage in features/datasheet.
+vi.mock('../../../features/datasheet/DataSheetView', () => ({ DataSheetView: () => null }));
 vi.mock('../../../components/AppShell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));

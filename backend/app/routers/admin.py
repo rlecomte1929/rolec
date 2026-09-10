@@ -12,8 +12,15 @@ from ..db import SessionLocal
 from ...database import db, Database
 from ...db.policies import UnattestedLawyerReviewError, UnquotedApprovalError
 from .. import crud, schemas, models
+from ..services.country_catalog_display import (
+    catalog_lookup_keys,
+    dedupe_by_id,
+    evidence_backed_confidence,
+    unique_domains,
+)
 from ..services.research import run_country_research
 from ..services import requirements_builder
+from ..services.knowledge_layer_scorecard import score_requirement_rows
 from ..services.official_ingest_service import ingest_url_to_knowledge_doc
 from ..services import verification_guard
 from ..services import lawyer_review_gate
@@ -82,22 +89,47 @@ def require_admin(authorization: Optional[str] = Header(None)) -> dict:
     return user
 
 
+def _catalog_evidence(db, country_code: str):
+    keys = catalog_lookup_keys(country_code)
+    sources = dedupe_by_id(
+        db.query(models.SourceRecord)
+        .filter(models.SourceRecord.country_code.in_(keys))
+        .all()
+    )
+    requirements = dedupe_by_id(
+        db.query(models.RequirementItem)
+        .filter(models.RequirementItem.country_code.in_(keys))
+        .all()
+    )
+    return sources, requirements
+
+
+def _scorecard_dto(requirements, sources) -> schemas.KnowledgeScorecardDTO:
+    card = score_requirement_rows(requirements, {record.id: record for record in sources})
+    return schemas.KnowledgeScorecardDTO.model_validate(card.as_dict())
+
+
 @router.get("/countries", response_model=schemas.CountryListDTO)
 def list_countries(user: dict = Depends(require_admin)):
     with SessionLocal() as db:
         profiles = crud.list_country_profiles(db)
         items = []
         for profile in profiles:
-            sources = crud.list_sources(db, profile.country_code)
-            requirements = crud.list_requirements(db, profile.country_code)
-            top_domains = list({source.publisher_domain for source in sources})[:3]
+            sources, requirements = _catalog_evidence(db, profile.country_code)
+            scorecard = _scorecard_dto(requirements, sources)
             items.append(
                 schemas.CountryListItemDTO(
                     countryCode=profile.country_code,
                     lastUpdatedAt=profile.last_updated_at,
                     requirementsCount=len(requirements),
-                    confidenceScore=profile.confidence_score,
-                    topDomains=top_domains,
+                    confidenceScore=evidence_backed_confidence(
+                        profile.confidence_score,
+                        len(requirements),
+                        len(sources),
+                    ),
+                    topDomains=unique_domains(source.publisher_domain for source in sources),
+                    catalogReady=scorecard.catalogReady,
+                    notReadyReason=scorecard.notReadyReason,
                 )
             )
         return schemas.CountryListDTO(countries=items)
@@ -109,8 +141,7 @@ def get_country(country_code: str, user: dict = Depends(require_admin)):
         profile = crud.get_country_profile(db, country_code.upper())
         if not profile:
             raise HTTPException(status_code=404, detail="Country not found")
-        sources = crud.list_sources(db, profile.country_code)
-        requirements = crud.list_requirements(db, profile.country_code)
+        sources, requirements = _catalog_evidence(db, profile.country_code)
         groups = {}
         for item in requirements:
             groups.setdefault(item.pillar, []).append(
@@ -130,7 +161,11 @@ def get_country(country_code: str, user: dict = Depends(require_admin)):
         return schemas.CountryProfileDTO(
             countryCode=profile.country_code,
             lastUpdatedAt=profile.last_updated_at,
-            confidenceScore=profile.confidence_score,
+            confidenceScore=evidence_backed_confidence(
+                profile.confidence_score,
+                len(requirements),
+                len(sources),
+            ),
             sources=[schemas.SourceRecordDTO(
                 id=source.id,
                 url=source.url,
@@ -239,12 +274,14 @@ def list_country_requirements(country_code: str, user: dict = Depends(require_ad
         # across six countries, and the reviewer would have no link to check.
         source_map = {record.id: record for record in crud.list_sources(db, code)}
         dtos = [_review_dto(i, source_map) for i in items]
+        scorecard = _scorecard_dto(items, source_map.values())
     order = {"pending": 0, "rejected": 1, "approved": 2}
     dtos.sort(key=lambda d: (order.get(d.reviewStatus, 9), d.purpose, d.title))
     return schemas.AdminRequirementListDTO(
         countryCode=code,
         pendingCount=sum(1 for d in dtos if d.reviewStatus == "pending"),
         items=dtos,
+        scorecard=scorecard,
     )
 
 

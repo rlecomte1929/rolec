@@ -114,6 +114,30 @@ regexes = [
   # single-string match, same approach as the test-token literal above, so the rest of
   # that 6,421-row scraped corpus stays scanned.
   '''40Demystifying''',
+  # [datasheet corridor-content] Curated relocation fact_key slugs carry a DOTTED
+  # domain/country prefix — "ch.bvg_pillar2", "ca.td1_declaration",
+  # "au.visa_8107_compliance", "no.residence_permit.application_reference". A segment
+  # that mixes letters and a digit (bvg_pillar2, td1, 8107) clears the generic-api-key
+  # entropy threshold, and BOTH lowercase slug rules above refuse `.`, so each falls
+  # through. These are field identifiers rendered into the Data Sheet from public
+  # relocation content — not credentials. Three fired on the 12-country corpus.
+  #
+  # Same SHAPE discipline as the AIQ-1825 rule above — the WHOLE string must be
+  # lowercase alphanumerics joined by separators — one separator wider (`.` as well as
+  # `_`). The primary defence is the lowercase anchor: sk_live_ / AKIA / ghp_ / a JWT
+  # all carry uppercase (base64 / mixed-case) and never match. The 24-char SEGMENT cap
+  # is the secondary defence — a credential is one long continuous run and overflows
+  # it, while a slug is short words. 24 not 16 because German compound nouns are the
+  # long words here ("sozialversicherung" 18, "niederlassungserlaubnis" 23); a 16 cap
+  # dropped "de.sozialversicherung.number". Still strictly tighter than a credential:
+  # the sk_live_ / hex-run shapes in the test are 26-30 continuous chars and are
+  # refused. NOT a `paths` entry, deliberately — a path allowlist for
+  # data/corridor-content would blind the scanner to a real key pasted into a future
+  # country file, and that corpus grows a file per batch. Verified on the 12-file
+  # corpus (0 findings) with sk_live_ / ghp_ / a service_role JWT planted in a corridor
+  # file all still firing, and the cap refusing a 26-30 char lowercase run. Keep the
+  # singular [allowlist] table (8.24.3 silently drops the [[allowlists]] array form).
+  '''^[a-z][a-z0-9]{0,23}(?:[._][a-z0-9]{1,24})+$''',
 ]
 
 # --- Known false-positive paths ------------------------------------------------

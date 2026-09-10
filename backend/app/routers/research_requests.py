@@ -11,9 +11,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from ..auth_deps import require_admin, require_hr_or_employee
+from ..auth_deps import caller_company_id, require_admin, require_hr_or_employee
 from ..services import research_request_service as svc
-from ...database import db as main_db
 
 router = APIRouter(tags=["research-requests"])
 
@@ -21,16 +20,10 @@ router = APIRouter(tags=["research-requests"])
 def _caller_company_id(user: Dict[str, Any]) -> str:
     """Resolve the caller's company SERVER-SIDE — never trust a client-supplied
     company_id (the service uses the admin client, so a body value would be an
-    IDOR). Mirrors hr_catalog._caller_company_id."""
-    uid = user.get("id")
-    company_id = (
-        (main_db.get_hr_company_id(uid) if uid else None)
-        or (main_db.get_profile_record(uid) or {}).get("company_id")
-        or user.get("company")
+    IDOR)."""
+    return caller_company_id(
+        user, required=True, detail="No company associated with this user"
     )
-    if not company_id:
-        raise HTTPException(status_code=403, detail="No company associated with this user")
-    return str(company_id)
 
 
 class CreateResearchRequestBody(BaseModel):

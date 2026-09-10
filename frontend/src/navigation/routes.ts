@@ -143,7 +143,6 @@ export const ROUTE_DEFS = {
   hrEmployeeDetail: { path: '/hr/employees/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
   notificationSettings: { path: '/settings/notifications', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   adminConsole: { path: '/admin', roles: ['ADMIN'] as RouteRole[] },
-  adminOverview: { path: '/admin', roles: ['ADMIN'] as RouteRole[] },
   adminCatalogQueue: { path: '/admin/catalog-queue', roles: ['ADMIN'] as RouteRole[] },
   // Country requirement catalog — the review surface for what employees, HR and the public
   // corridor endpoint are served. Declared here (rather than only in the legacy src/routes.ts)

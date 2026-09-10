@@ -68,7 +68,11 @@ def _row(country: str, pillar: str, title: str) -> models.RequirementItem:
         severity="WARN",
         owner="EMPLOYEE",
         required_fields_json="[]",
-        citations_json="[]",
+        # 82c02e0f gates serving on citation sufficiency (knowledge_layer_scorecard): an
+        # approved row with no resolvable citation makes the corridor "not ready" and sets
+        # coverage_note. Seed a citation so the corridor scores ready — the point of this
+        # file is the real SELECT / mapped-column drift, not the sufficiency copy.
+        citations_json='["https://example.gov/seed-source"]',
         review_status="approved",
         verification_status="representative",
         last_verified_at=datetime(2026, 8, 22),
@@ -88,7 +92,13 @@ def seeded_db(monkeypatch):
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    models.Base.metadata.create_all(engine, tables=[models.RequirementItem.__table__])
+    # 82c02e0f added a crud.list_sources() (source_records) read to the endpoint for
+    # citation parity, so the real query chain now touches that table too. Create it
+    # (empty) alongside requirement_items or the endpoint 500s with "no such table".
+    models.Base.metadata.create_all(
+        engine,
+        tables=[models.RequirementItem.__table__, models.SourceRecord.__table__],
+    )
     Session = sessionmaker(bind=engine, future=True)
     with Session() as session:
         for country, items in _SEED.items():

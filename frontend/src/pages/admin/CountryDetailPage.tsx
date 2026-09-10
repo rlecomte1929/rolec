@@ -8,7 +8,7 @@ import {
   rerunCountryResearch,
   reviewCountryRequirement,
 } from '../../api/admin';
-import type { AdminRequirementReview, ReviewStatus } from '../../api/admin';
+import type { AdminRequirementReview, KnowledgeScorecard, ReviewStatus } from '../../api/admin';
 import type { CountryProfileDTO } from '../../types';
 
 export const CountryDetailPage: React.FC = () => {
@@ -16,6 +16,7 @@ export const CountryDetailPage: React.FC = () => {
   const [profile, setProfile] = useState<CountryProfileDTO | null>(null);
   const [requirements, setRequirements] = useState<AdminRequirementReview[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
+  const [scorecard, setScorecard] = useState<KnowledgeScorecard | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +33,7 @@ export const CountryDetailPage: React.FC = () => {
     setProfile(profileData);
     setRequirements(reqData.items);
     setPendingCount(reqData.pendingCount);
+    setScorecard(reqData.scorecard ?? null);
   };
 
   useEffect(() => {
@@ -65,6 +67,7 @@ export const CountryDetailPage: React.FC = () => {
           profile={profile}
           requirements={requirements}
           pendingCount={pendingCount}
+          scorecard={scorecard}
           busyId={busyId}
           onRerun={async () => {
             await rerunCountryResearch(profile.countryCode);

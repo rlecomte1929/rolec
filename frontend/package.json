@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:portals": "E2E_LIVE_PORTALS=1 playwright test",
     "lint": "eslint src --ext .ts,.tsx",
     "size": "size-limit",
     "licenses": "node scripts/check-licenses.mjs",
