@@ -545,6 +545,25 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   pivot complete tonight: Stockholm 4 + Gothenburg 1 + Malmö 2 = 7 across 3 cities, all FMI-gated.**
   No more SE/housing until the founder rules on the FMI-vs-Bolagsverket gate decision above.
 
+### XX-ES legal_admin (Barcelona immigration/extranjería lawyers) — `vendor-resourced-xx-es-legal-barcelona-2026-09-09` (landed 2026-09-10)
+- Source (GCS): `1789002997489_vrohp8lq.ndjson` (+ manifest `1789003001606_i7j2rr12.json`). (Recovered
+  from an Audos wipe via nudge; delivered artifacts verify.)
+- Otto manifest: **4 sourced, 9 rejected** (counts reconcile). All 4 `source_url`=wired
+  `www.abogacia.es` (censo de letrados), corridor **XX-ES**, category legal_admin, ICAB body,
+  named-lawyer colegiado número: Rodríguez Calistro Abogados 36453 (María Elisa Rodríguez Calistro),
+  Ventura Extranjería Abogados 46337 (Pau Ventura), Calero Legal Abogados 47049 (Domingo Calero),
+  Català Reinón Abogados 19731 (Jordi Català Soriano).
+- **Vetter notes (carried to pending):** (1) **Colegiado 19731 attribution conflict** — Otto sourced
+  Català Reinón with 19731 for Jordi Català Soriano and rejected "BCN Extranjería" which claims 19731
+  for Gemma Reinón Tardáguila (catala-reinon.es puts Gemma at 22600). Conservative attribution; vetter
+  confirms 19731's true holder against the ICAB census before serve. (2) **36453 single-count** — the
+  rejected national directory "Extranjería al Día" lists the same lawyer (Rodríguez Calistro, 36453)
+  already sourced under Rodríguez Calistro Abogados; not double-counted (only the firm row is in the 4).
+- `_name_key` predictor: all 4 distinct + new; no prod dup, no mis-attach. Landed: **+4 new suppliers**
+  (ES/legal_admin, pending). Tripwire: `ssc` `approved` **130 → 130** md5
+  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1080 → 1084. (ES legal now 11: Madrid 7 +
+  Barcelona 4.)
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
