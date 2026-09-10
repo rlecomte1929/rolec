@@ -704,6 +704,19 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   pending), 0 mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5
   `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; NL/housing 3 → 11.
 
+### XX-NL banks (Amsterdam) — `vendor-resourced-xx-nl-banks-amsterdam-2026-09-10` — ⛔ PARKED, NOT LANDED (no artifact)
+- **Nothing landed.** Audos instability across ~4 attempts / 40 min (a wipe/reset + transient "something
+  went wrong" errors) — the research reached real DNB register codes but never uploaded a GCS file. No
+  artifact = no hash/count to verify, so no hand-landing from a text list (same call as Valencia ES/tax).
+- **Confirmed DNB-registered banks recorded for a calm rerun** (dnb.nl root, XX-NL, banks): ING B0163,
+  ABN AMRO B0149, Triodos Bank B0195, bunq R127999; + Rabobank and Knab/Aegon Bank to confirm. **To land:**
+  rerun the DNB brief when Audos is calm → clean NDJSON+manifest → curl+verify+`--apply --promote`.
+  Expect net low after ABN/ING/Rabo multinational dedup, and run the `_name_key` national-arm predictor.
+- Also parked (register issue, not Audos): **NL tax** — `afm.nl` is a financial-services register, not a
+  tax-adviser bar; NBA/RB/NOB unwired → skipped until a real NL-tax register is wired (founder-flagged).
+- Tripwire untouched (no write): `ssc` `approved` **130 | 1c4c3899925c5a8c4b3c168abcfbfc22**. NL banks
+  stays at its prior count until re-sourced with an artifact.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
