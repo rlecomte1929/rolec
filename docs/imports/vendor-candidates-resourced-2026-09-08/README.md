@@ -974,6 +974,27 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   end-to-end. Next front: Czech Republic or Cyprus (legal-first) — PT legal is unwired (Ordem dos Advogados has no
   firm listing; PT's other categories already 08-31-covered), CZ `cak.cz` + CY `cyprusbar.org` are wired PUBLIC_REGISTER.
 
+### XX-CZ legal_admin (Prague expat boutiques) via ČAK — `vendor-resourced-xx-cz-legal-prague-2026-09-10` (landed 2026-09-10) — first XX-CZ this campaign; +5
+- Source (GCS): `1789074282307_bbrtocqa.ndjson` (+ manifest `1789074329130_91natmlc.json`).
+- Otto manifest: **5 sourced, 5 rejected** (counts reconcile). All 5 `source_url`=wired `www.cak.cz` (ČAK — Czech
+  Bar advocate register; PUBLIC_REGISTER, register-root OK), corridor **XX-CZ**, category legal_admin, Prague.
+  `accreditation_number` = ČAK evidenční číslo (16244 / 03468 / 13848 / 17452 / 12022). Distinct independent domains
+  (expatlegal.cz / rutlandandpartners.com / czechlawyer.legal / solers.legal / gt-legal.com).
+- Rejects honest: Brno-seat firm (geo), non-lawyer advisory sites (movetoprague.com, zahist.lawyer), asylum/criminal-
+  only (CIKR), and Otto proactively rejected an Ecovis franchise branch sharing the parent corporate domain (dodged
+  the franchise-domain-dedup trap).
+- **Predictor vs the 08-31 CZ/legal 3** (JUDr. Abraham / Mgr. Absolon / Mgr. Abu Assad — the alphabetical first three
+  *individual* advocates from the register). All 5 candidates are firms (s.r.o.), name-new, no domain dup → no overlap.
+  Dry-run: staged 5 / duplicates 0 / promote 5.
+- Landed: **+5 new suppliers** — EXPATLEGAL (`vc-073a26d3`), GT Legal (`vc-65017540`), PEERS (`vc-138ac528`), rutland
+  & partners (`vc-681fce94`), Solers legal (`vc-f02a9649`), CZ/legal pending. CZ/legal caps **3 → 8**.
+- **Create-only guard held:** approved **1262 UNCHANGED**; pending 7 → 12, all `vc-*`, CZ, legal_admin, vetted_by
+  NULL. No mis-attach.
+- **CZ front pre-flight (for the relay):** tax = **KAČR `kacr.cz`** (Chamber of Auditors — ⚠ NOT KDP ČR `kdpcr.cz`,
+  which is unwired; auditors-only scope like ES/ICAC) · banks = `cnb.cz` (register-root OK, per-entity CAPTCHA-gated) ·
+  housing = `ares.gov.cz` (Czech Trade Register). All CZ categories already 08-31-covered (banks 6 / housing 4 /
+  legal 3 / tax 4) → expect dedup on the rest.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
