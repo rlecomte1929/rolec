@@ -648,6 +648,22 @@ generator before the first batch; London GB legal came back with per-firm URLs o
 - Landed: **+2 new suppliers** (GB/housing_agencies, pending), 0 mis-attach. Tripwire: `ssc` `approved`
   **130 → 130** md5 `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; GB/housing 4 → 6.
 
+### XX-GB tax_finance (London expat-tax / chartered accountants) — `vendor-resourced-xx-gb-tax-london-2026-09-10` (landed 2026-09-10)
+- Source (GCS): `1789023450599_aprmxtp4.ndjson` (+ manifest `1789023452196_cf3ge6ti.json`).
+- Otto manifest: **7 sourced, 1 rejected** (counts reconcile). Reject: Tax Partners Ltd (generic SME, no
+  expat specialisation).
+- **HTTP_LISTING (ICAEW / find.icaew.com).** All 7 `source_url`s are per-entity `/firms/` pages (0 root),
+  registrable domain `icaew.com`, corridor **XX-GB**, category tax_finance; `accreditation_number` = the
+  ICAEW firm id from the URL.
+- **Net +5 of 7** (dedup on marquee multi-office firms, all already held from an earlier GB/tax harvest):
+  **Blick Rothenberg** (name + `blickrothenberg.com` domain match) and **Buzzacott Livingstone**
+  (its `buzzacott.co.uk` domain already held by the existing "Buzzacott LLP") both domain-dedup dropped —
+  no duplicate. Landed new: **Saffery LLP, Alliotts LLP, Gerald Edelman LLP, Moore Kingston Smith &
+  Partners LLP, HaysMac LLP** (Moore Kingston Smith was flagged as a possible dedup but is genuinely new).
+- `_name_key` predictor: the 5 landed all distinct + new. Landed: **+5 new suppliers** (GB/tax_finance,
+  pending), 0 mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5
+  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; GB/tax 2 → 7.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
