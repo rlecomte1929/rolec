@@ -30,12 +30,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 import { Combobox } from '../Combobox';
 import { COUNTRY_OPTIONS } from '../../features/policy-config/countryList';
+import { compareCountryDisplayNames, getCountryName } from '../../utils/countries';
 import { listEmployeeDestinations, type AllowlistedDestination } from '../../api/destinations';
 import { countryFlagEmoji } from '../../lib/countryFlagCode';
 
 function countryOptionLabel(name: string, code?: string): string {
+  const display = getCountryName(name) || name;
   const flag = countryFlagEmoji(code || name);
-  return flag ? `${flag} ${name}` : name;
+  return flag ? `${flag} ${display}` : display;
 }
 
 /** Canonical key for comparing two spellings of one place. Mirrors the backend's
@@ -157,13 +159,13 @@ export const CountryPicker: React.FC<{
       </label>
     );
   }
-  const list = options ?? COUNTRY_NAMES;
+  const list = [...(options ?? COUNTRY_NAMES)].sort(compareCountryDisplayNames);
   // A stored value that is not on the list (legacy free-text data) is offered as its own
   // option rather than silently blanked — losing what someone previously saved would be a
-  // worse bug than the one this fixes.
-  const withCurrent = value && !list.some((o) => canonPlace(o) === canonPlace(value))
-    ? [value, ...list]
-    : list;
+  // worse bug than the one this fixes. Sorted with the rest so a stray ISO code does not
+  // jump to the top of an otherwise A–Z list.
+  const extra = value && !list.some((o) => canonPlace(o) === canonPlace(value));
+  const withCurrent = extra ? [value, ...list].sort(compareCountryDisplayNames) : list;
   return (
     <label className={`block ${className ?? ''}`}>
       {label && <span className="block text-sm font-medium text-[#0b2b43] mb-1">{label}</span>}

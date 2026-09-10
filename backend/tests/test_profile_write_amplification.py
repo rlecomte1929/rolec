@@ -139,3 +139,29 @@ class TestNoWriteOnUnchangedProfile:
         with engine.begin() as conn:
             role = conn.execute(text("SELECT role FROM profiles WHERE id = :i"), {"i": uid}).scalar()
         assert role == "hr"
+
+    def test_email_fallback_does_not_clobber_existing_profile_role(self):
+        """Login users.id can differ from profiles.id for the same email.
+        Updating that CMS row from users.role turned employees into HR."""
+        from backend.db.users import UsersMixin
+
+        engine, seen = self._engine_with_counter()
+
+        class _DB(UsersMixin):
+            def __init__(self, eng):
+                self.engine = eng
+
+        db = _DB(engine)
+        cms_id = "aaaaaaaa-0a3a-4a1e-9f1a-9c2b7c1d5e11"
+        login_id = "bbbbbbbb-0a3a-4a1e-9f1a-9c2b7c1d5e11"
+        db.ensure_profile_record(user_id=cms_id, email="split@x.com", role="employee",
+                                 full_name="Ada", company_id="co-1")
+        seen.clear()
+        db.ensure_profile_record(user_id=login_id, email="split@x.com", role="hr",
+                                 full_name="Ada", company_id="co-1")
+        assert "UPDATE" not in seen, f"email fallback wrote over CMS role: {seen}"
+        with engine.begin() as conn:
+            role = conn.execute(
+                text("SELECT role FROM profiles WHERE id = :i"), {"i": cms_id}
+            ).scalar()
+        assert role == "employee"

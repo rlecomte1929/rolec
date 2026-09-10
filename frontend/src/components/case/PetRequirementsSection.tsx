@@ -17,6 +17,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../api/supabase';
 import { Card, Badge } from '../antigravity';
+import { getCountryName } from '../../utils/countries';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -216,11 +217,11 @@ export const PetRequirementsSection: React.FC<Props> = ({ caseId, destCountry })
         <div>
           <div className="text-sm font-semibold text-[#0b2b43]">Pet import requirements</div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Import rules for {destCountry || 'the destination country'} — verify with source links before travel
+            Import rules for {getCountryName(destCountry) || destCountry || 'the destination country'} — verify with source links before travel
           </p>
         </div>
         {destCountry && (
-          <Badge variant="info" size="sm">{destCountry.toUpperCase()}</Badge>
+          <Badge variant="info" size="sm">{getCountryName(destCountry) || destCountry.toUpperCase()}</Badge>
         )}
       </div>
 
