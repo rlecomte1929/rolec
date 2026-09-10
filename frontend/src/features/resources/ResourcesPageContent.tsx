@@ -9,6 +9,7 @@ import type {
   PublicEvent,
   RecommendationGroup,
   CityActivity,
+  SettlingGuide,
 } from '../../types';
 
 export const SECTIONS = [
@@ -232,6 +233,16 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
 
   const recommended = (payload?.recommended ?? {}) as RecommendationGroup;
   const hints = payload?.hints ?? { priorities: [], recommendations: [] };
+  const settlingGuide = payload?.settlingGuide;
+  const showSettlingGuide = Boolean(
+    settlingGuide?.culturalAwareness?.intro ||
+      settlingGuide?.culturalAwareness?.tips?.length ||
+      settlingGuide?.culturalAwareness?.workCulture?.length ||
+      settlingGuide?.firstSteps?.length ||
+      settlingGuide?.community?.overview ||
+      settlingGuide?.community?.groups?.length ||
+      settlingGuide?.practicalTips?.length,
+  );
 
   const scrollToSection = (id: string) => {
     setActiveSection(id);
@@ -278,12 +289,12 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
         )}
         <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
-            { label: 'First steps', icon: '📋', sectionId: 'admin_essentials' },
+            { label: 'First steps', icon: '📋', sectionId: showSettlingGuide ? 'settling-first-steps' : 'admin_essentials' },
             { label: 'Housing', icon: '🏠', sectionId: 'housing' },
             { label: 'Healthcare', icon: '🏥', sectionId: 'healthcare' },
             ...(context?.hasChildren
               ? [{ label: 'Schools', icon: '🎓', sectionId: 'schools' }]
-              : [{ label: 'Community', icon: '🤝', sectionId: 'community' }]),
+              : [{ label: 'Community', icon: '🤝', sectionId: showSettlingGuide ? 'settling-community' : 'community' }]),
           ].map(({ label, icon, sectionId }) => (
             <Button unstyled
               key={label}
@@ -297,6 +308,9 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
           ))}
         </div>
       </section>
+
+      {/* fix: IDR-260909-D201 — settle-in guide so /resources is never a blank catalog shell */}
+      {showSettlingGuide && settlingGuide && <SettlingGuidePanel guide={settlingGuide} sectionRefs={sectionRefs} />}
 
       {/* Recommendations */}
       {(recommended.recommendedForYou?.length > 0 ||
@@ -504,7 +518,7 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
             (including 'overview') rather than rendering an empty header. */}
         {SECTIONS.filter((s) => s.id !== 'events').every(
           (s) => (resourcesBySection[s.id]?.length ?? 0) === 0,
-        ) && (
+        ) && !showSettlingGuide && (
           <Card padding="lg">
             <p className="text-[#6b7280] text-sm">No resources available for this destination yet.</p>
           </Card>
@@ -604,6 +618,128 @@ export const ResourcesPageContent: React.FC<ResourcesPageContentProps> = ({
     </>
   );
 };
+
+function SettlingGuidePanel({
+  guide,
+  sectionRefs,
+}: {
+  guide: SettlingGuide;
+  sectionRefs: React.MutableRefObject<Record<string, HTMLElement | null>>;
+}) {
+  const culture = guide.culturalAwareness;
+  return (
+    <div className="space-y-4 mb-6">
+      {(culture.intro || culture.tips.length > 0 || culture.workCulture.length > 0) && (
+        <Card padding="lg">
+          <h2 className="text-lg font-semibold text-navy-800 mb-2">Cultural awareness</h2>
+          {culture.intro && <p className="text-sm text-slate-600 mb-3">{culture.intro}</p>}
+          {culture.tips.length > 0 && (
+            <ul className="list-disc pl-5 space-y-1 text-sm text-slate-600">
+              {culture.tips.map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ul>
+          )}
+          {culture.workCulture.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium text-slate-500 mb-2">How people work here</h3>
+              <ul className="list-disc pl-5 space-y-1 text-sm text-slate-600">
+                {culture.workCulture.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+      )}
+      {guide.firstSteps.length > 0 && (
+        <section
+          ref={(el) => {
+            sectionRefs.current['settling-first-steps'] = el;
+            sectionRefs.current['admin_essentials'] = el;
+          }}
+        >
+          <Card padding="lg">
+            <h2 className="text-lg font-semibold text-navy-800 mb-3">First steps to settle in</h2>
+            <ol className="space-y-3">
+              {guide.firstSteps.map((step, i) => (
+                <li key={step.title} className="text-sm">
+                  <div className="font-medium text-navy-800">
+                    {i + 1}. {step.title}
+                  </div>
+                  {step.timeline && <p className="text-slate-500 mt-0.5">{step.timeline}</p>}
+                  {step.url && (
+                    <a
+                      href={step.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-accent-600 hover:text-accent-700 text-xs mt-1 inline-block"
+                    >
+                      Official source
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </Card>
+        </section>
+      )}
+      {(guide.community.overview || guide.community.groups.length > 0) && (
+        <section
+          ref={(el) => {
+            sectionRefs.current['settling-community'] = el;
+            sectionRefs.current['community'] = el;
+          }}
+        >
+          <Card padding="lg">
+            <h2 className="text-lg font-semibold text-navy-800 mb-2">Communities</h2>
+            {guide.community.overview && (
+              <p className="text-sm text-slate-600 mb-3">{guide.community.overview}</p>
+            )}
+            {guide.community.groups.length > 0 && (
+              <ul className="space-y-2">
+                {guide.community.groups.map((g) => (
+                  <li key={g.title} className="text-sm">
+                    {g.url ? (
+                      <a
+                        href={g.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-accent-600 hover:text-accent-700"
+                      >
+                        {g.title}
+                      </a>
+                    ) : (
+                      <span className="font-medium text-navy-800">{g.title}</span>
+                    )}
+                    {g.description && <p className="text-slate-500">{g.description}</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </section>
+      )}
+      {(guide.practicalTips.length > 0 || guide.emergency) && (
+        <Card padding="lg">
+          <h2 className="text-lg font-semibold text-navy-800 mb-2">Practical tips</h2>
+          {guide.emergency && (
+            <p className="text-sm text-slate-600 mb-2">
+              Emergency number: <span className="font-medium text-navy-800">{guide.emergency}</span>
+            </p>
+          )}
+          {guide.practicalTips.length > 0 && (
+            <ul className="list-disc pl-5 space-y-1 text-sm text-slate-600">
+              {guide.practicalTips.map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+    </div>
+  );
+}
 
 function CityActivityCard({ activity }: { activity: CityActivity }) {
   return (

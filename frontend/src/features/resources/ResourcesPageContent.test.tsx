@@ -51,6 +51,50 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+describe('ResourcesPageContent · settling guide', () => {
+  it('renders cultural awareness, first steps, and community when the catalog is empty', () => {
+    getCityActivities.mockResolvedValue([]);
+    render(
+      <ResourcesPageContent
+        payload={{
+          ...payload,
+          settlingGuide: {
+            culturalAwareness: {
+              intro: 'Norway values work-life balance and punctuality.',
+              tips: ['Arrive on time', 'Informal but professional communication'],
+              workCulture: ['Typical hours: 37.5/week'],
+            },
+            firstSteps: [
+              {
+                title: 'Residence registration (Folkeregisteret)',
+                timeline: 'Within 7 days',
+                url: 'https://www.skatteetaten.no/',
+              },
+            ],
+            community: {
+              overview: 'Expat communities and professional networks.',
+              groups: [{ title: 'Internations Oslo', url: 'https://www.internations.org/oslo-expats', description: 'Expat meetups' }],
+            },
+            practicalTips: ['Keep emergency numbers in phone'],
+            emergency: '113',
+          },
+        }}
+        filters={EMPTY_RESOURCES_FILTERS}
+        updateFilters={() => undefined}
+        clearFilters={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('heading', { name: /cultural awareness/i })).toBeInTheDocument();
+    expect(screen.getByText(/work-life balance/i)).toBeInTheDocument();
+    expect(screen.getByText(/Arrive on time/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /first steps to settle in/i })).toBeInTheDocument();
+    expect(screen.getByText(/Folkeregisteret/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /communities/i })).toBeInTheDocument();
+    expect(screen.getByText(/Internations Oslo/)).toBeInTheDocument();
+    expect(screen.queryByText(/No resources available for this destination yet/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('ResourcesPageContent · city activities', () => {
   it('surfaces an error when the city activities request fails', async () => {
     getCityActivities.mockRejectedValue(new Error('Could not load city activities.'));

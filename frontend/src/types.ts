@@ -1309,6 +1309,33 @@ export interface CityActivitiesResponse {
   activities: CityActivity[];
 }
 
+export interface SettlingGuideGroup {
+  title: string;
+  url?: string | null;
+  description?: string;
+}
+
+export interface SettlingGuideStep {
+  title: string;
+  timeline?: string;
+  url?: string | null;
+}
+
+export interface SettlingGuide {
+  culturalAwareness: {
+    intro: string;
+    tips: string[];
+    workCulture: string[];
+  };
+  firstSteps: SettlingGuideStep[];
+  community: {
+    overview: string;
+    groups: SettlingGuideGroup[];
+  };
+  practicalTips: string[];
+  emergency?: string | null;
+}
+
 export interface ResourcesPagePayload {
   context: ResourceContext;
   categories: ResourceCategory[];
@@ -1316,6 +1343,7 @@ export interface ResourcesPagePayload {
   events: PublicEvent[];
   recommended: RecommendationGroup;
   hints: { priorities: string[]; recommendations: string[] };
+  settlingGuide?: SettlingGuide;
   filtersApplied: Record<string, unknown>;
 }
 
