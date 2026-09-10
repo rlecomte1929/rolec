@@ -1032,6 +1032,37 @@ generator before the first batch; London GB legal came back with per-firm URLs o
 - **✅ CZ FRONT WRAPPED:** legal **+5** · tax **+4** (Big-4 held) · housing **+5** · banks **skipped** (near-total dedup).
   **Czech Republic net-new = 14 suppliers** across 3 landed cells. Next: IT/tax (Milan, CNDCEC) — top clean fresh vein.
 
+## Saturation-phase fresh veins (2026-09-11)
+The wired harvest is largely saturated (every wired country already covered in its hard categories). Chasing the last
+fresh veins — with a new filter learned the hard way: **"wired PUBLIC_REGISTER + 0 caps" is not enough; the
+accreditation must be publicly READABLE.**
+
+### XX-IT tax_finance (Milan) via CNDCEC — `vendor-resourced-xx-it-tax-milan-2026-09-11` — ⛔ DEAD VEIN (0 sourced / 12 rejected), NOTHING LANDED
+- **Paper-wired dead vein, like PT legal.** The CNDCEC *Albo dei Dottori Commercialisti* is fully bot-walled (not even
+  Google-indexed) AND no Italian commercialista publishes their Albo número on their own site → **no citable
+  accreditation** → Otto honestly rejected all 12 rather than invent. No GCS artifact to land. **IT/tax dropped (all cities).**
+- 12 Milan expat-tax firms recorded as retry seeds only (AeA Tax Law, Moore Professionisti Associati, Studio Genise,
+  TFP, ABPS, Studio Paci, EXPATH Italy, Arletti, Consulenza Marino, Taxing.it, Tax4Expats, Leonardo Nesa) — NOT landable
+  (no readable accreditation). Lesson recorded in memory: filter fresh targets by readable-accreditation, not just wiring.
+
+### XX-BR legal_admin (São Paulo immigration boutiques) via OAB-SP — `vendor-resourced-xx-br-legal-sao-paulo-2026-09-11` (landed 2026-09-11) — first XX-BR legal; +3 (.adv.br bug fixed inline)
+- Source (GCS): `1789080803022_3lk3w52c.ndjson` (+ manifest `1789080850785_0nhxcysj.json`).
+- Otto manifest: **3 sourced, 8 rejected** (counts reconcile). All 3 `source_url`=wired `www.oabsp.org.br` (OAB-SP — São
+  Paulo Bar *Sociedades de Advocacia* register; PUBLIC_REGISTER, register-root OK), corridor **XX-BR**, category
+  legal_admin, São Paulo. `accreditation_number` = OAB/SP número (524.997 / 204.390 / 280.701). Immigration boutiques.
+- **⚠ `.adv.br` compound-suffix bug fixed inline (commit 7b4c2eb2) BEFORE landing.** 2 of 3 firms are on `.adv.br`
+  (droliveira.adv.br, mcbs.adv.br) — the Brazilian LAWYER TLD, missing from `_COMPOUND_SUFFIXES`, so both collapsed to
+  the bare key `adv.br` and would have collided/dropped one (the #2263 `.com.au` class). Added `adv.br` + regression
+  tests (28 pass); keys now distinct. **Predicted at the BR preflight, confirmed 2/3, patched, re-verified before land.**
+- Rejects honest: geo (Campinas / Pres. Prudente; Botinha & Cabral OAB/MG), entity-type (Fragomen Brasil = immigration-
+  services Ltda, not a Sociedade de Advogados), directional scope (Michelon / Baracchini practise OUTBOUND US-immigration).
+- `_name_key` predictor: all 3 distinct + new (existing BR/legal = Mattos Filho / Pinheiro Neto, corporate .com.br). Dry-run:
+  staged 3 / dup 0 / promote 3.
+- Landed: **+3 new suppliers** — Dr. Oliveira (`vc-4bb48b59`), MCBS (`vc-23fe7e65`), Bruno Carmona (`vc-e9cfee2d`),
+  BR/legal pending. BR/legal caps **2 → 5** (both `.adv.br` firms landed distinctly — fix confirmed live).
+- **Create-only guard held:** approved **1278 → 1283** across the op (founder's concurrent approval of the 5 CZ housing
+  pending; approved UP not down); my 3 caps landed pending, all `vc-*`, BR, legal_admin, vetted_by NULL. No mis-attach.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
