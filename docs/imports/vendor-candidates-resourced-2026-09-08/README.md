@@ -506,6 +506,31 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   (IT housing now 47: Rome 4 + Milan 5 + Florence 6 + Turin 8 + Naples 5 + Bologna 7 + Genoa 5 +
   Verona 7.)
 
+### XX-SE housing_agencies (Gothenburg estate agents) — `vendor-resourced-xx-se-housing-gothenburg-2026-09-09` (landed 2026-09-10) — THIN
+- Source (GCS): `1788998901052_vnkey404.ndjson` (+ manifest `1788998902611_yiv6qa33.json`).
+- Otto manifest: **1 sourced, 6 rejected** (counts reconcile). Honest rejects: Key Relocation Center,
+  Human Entrance, Residensportalen (relocation/destination-service, no FMI reg), Solveria + Rentaborg
+  (rental booking/listing platforms, not licensed mäklarföretag), Sweden Relocators (Malmö immigration
+  consultancy, no FMI).
+- **PUBLIC_REGISTER (FMI / fmi.se).** The 1 `source_url` = wired `fmi.se`, corridor **XX-SE**. Nordic
+  Relocation Group AB, **FMI reg# 40955**, body Fastighetsmäklarinspektionen. **Shape note for vetter:**
+  40955 is the FMI *firm* (mäklarföretag) registration — Otto searched the företag register — NOT a
+  named-individual mäklare reg# as in the Stockholm batch. Valid + verifiable, firm-level. The applier
+  stores `accreditation_number` verbatim and does not require the individual shape, so it lands fine;
+  vetter confirms on the FMI register.
+- `_name_key` predictor: `nordicrelocationgroupab` new; no existing "Nordic Relocation" in prod (no
+  mis-attach into the movers/relocation catalog). Landed: **+1 new supplier** (SE/housing_agencies,
+  pending), 0 mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5
+  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1077 → 1078. (SE housing now 5: Stockholm 4 +
+  Gothenburg 1.)
+- **⚠ STRUCTURAL SIGNAL (founder decision, held) —** FMI ≈ estate agents who mainly handle SALES, so
+  the fmi.se gate is structurally thin for the *rental-relocation* use case (expat rental home-finding
+  in SE is dominated by relocation consultancies + rental platforms that are NOT FMI-registered).
+  Expect ~1–3/city, not 5–12. Decision to take **after Malmö**: (a) keep mining SE/housing via FMI
+  (clean but thin), or (b) pivot the SE-housing accreditation — accept relocation firms under a
+  Bolagsverket org-nummer, or target a rental-specific register. Surfaced to the founder; not decided
+  by the applier.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
