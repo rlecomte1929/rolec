@@ -598,6 +598,36 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
 - Tripwire untouched (no write): `ssc` `approved` **130 | 1c4c3899925c5a8c4b3c168abcfbfc22**. ES legal
   stays 16 (Madrid 7 + Barcelona 4 + Seville 5) until Valencia is re-sourced with an artifact.
 
+### XX-GB legal_admin (London immigration solicitors) — `vendor-resourced-xx-gb-legal-london-2026-09-10` (landed 2026-09-10) — first new-country (GB) batch
+- Source (GCS): `1789017875150_4hx31ej8.ndjson` (+ manifest `1789017876612_dspdombz.json`).
+- Otto manifest: **6 sourced, 2 rejected** (counts reconcile). Honest rejects: Reiss Edwards (no
+  readable SRA# on own site), Colman Coyle (general practice, not work-visa specialised).
+- **HTTP_LISTING (SRA / sra.org.uk).** All 6 `source_url`s are **per-entity** register pages matching
+  the tier gate's `sraNumber=\d+` pattern (0 root fallbacks — see the GB pre-flight below), domain
+  `www.sra.org.uk`, corridor **XX-GB**, category legal_admin, SRA number in `accreditation_number`:
+  Bindmans LLP 484856, Fragomen LLP 459836, Gherson Solicitors LLP 824641, Magrath Sheldrick LLP
+  484817, RLegal 380691, A Y & J Solicitors 633686. Vetter note: RLegal `accreditation_number` is
+  zero-padded `00380691` (SRA number is 380691, leading zeros spurious) — vetter normalizes.
+- **Dedup — Fragomen LLP already held, dropped safely (net +5, not +6).** Prod already had
+  "Fragomen LLP" (GB/legal/**pending**, `vc-c3f90216`) AND "Fragomen Worldwide" (NO/legal/**approved**,
+  served), both on `fragomen.com`. The candidate's dedupe_key `fragomen.com` matched → `stage()` dropped
+  it (already held); it did NOT create a duplicate and did NOT touch the approved NO row (its `_name_key`
+  `fragomen` matches the GB "Fragomen LLP", not `fragomenworldwide`). **Approved tripwire verified frozen
+  across the write.**
+- `_name_key` predictor: the 5 landed all distinct + new. Landed: **+5 new suppliers** (GB/legal_admin,
+  pending), 0 mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5
+  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1089 → 1094. (GB legal now 8: 3 prior — Fragomen,
+  Kingsley Napley, Laura Devine — + Bindmans, Gherson, Magrath Sheldrick, RLegal, A Y & J.)
+
+### GB pre-flight (2026-09-10) — all 5 GB registers are HTTP_LISTING, register-root REJECTS
+Ran the tier gate from the live worktree before the GB phase. sra.org.uk/icaew.com/fca.org.uk/
+get-information-schools.service.gov.uk/propertymark.co.uk are all wired (XX-GB), all
+`Acquisition.HTTP_LISTING`, and `validate()` (vendor_harvester.py:214) rejects any `source_url` that
+does not match the source's `entry_url_pattern`. So a **register-root URL bounces** — every GB row needs
+its per-entity page. Required regex per register: **SRA** `sraNumber=\d+` · **ICAEW** `/firms/` · **FCA**
+`/s/firm` · **GIAS** `/Establishment/Details/\d+` · **ARLA Propertymark** `/company/`. Flagged to the
+generator before the first batch; London GB legal came back with per-firm URLs on all 6.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
