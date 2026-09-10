@@ -26,9 +26,9 @@
   --vc-teal:var(--marketing-accent);
   --vc-teal-600:var(--marketing-accent);
   --vc-teal-wash:rgba(25,123,120,.10);
-  --vc-friction:#a1571c;
+  --vc-friction:#8f4e18;             /* AA: 5.1:1 as badge text on the friction wash */
   --vc-friction-wash:rgba(161,87,28,.10);
-  --vc-success:#0e8a5f;
+  --vc-success:#0a6b48;              /* AA: 5.6:1 as badge text on the success wash */
   --vc-success-wash:rgba(14,138,95,.12);
   --vc-shadow:0 1px 2px rgba(12,25,41,.05), 0 8px 24px -18px rgba(12,25,41,.16);
   --vc-radius:14px;
