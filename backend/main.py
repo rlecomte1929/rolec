@@ -7202,16 +7202,19 @@ def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(requ
     """
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.HR)
-    assignment = db.get_assignment_by_id(assignment_id)
+    # Same id-space as GET /api/hr/assignments/{id}: HR surfaces mix assignment PK
+    # and relocation-case UUID. Looking up only by assignment PK 404s a valid case.
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     if not _hr_can_access_assignment(assignment, user):
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
-    deleted = db.delete_assignment(assignment_id, actor_id=effective.get("id"))
+    aid = str(assignment.get("id") or assignment_id)
+    deleted = db.delete_assignment(aid, actor_id=effective.get("id"))
     if not deleted:
         # Either it was already archived or race with concurrent delete.
         raise HTTPException(status_code=404, detail="Assignment not found")
-    return {"success": True, "deleted": assignment_id}
+    return {"success": True, "deleted": aid}
 
 
 @app.post("/api/hr/cases/{case_id}/erasure")
@@ -8377,10 +8380,11 @@ def _hr_can_access_assignment(assignment: Dict[str, Any], user: Dict[str, Any]) 
     if effective.get("is_admin"):
         return True
     eid = effective.get("id")
-    if eid is not None and assignment.get("hr_user_id") == eid:
+    # Postgres uuid vs text session ids must still match (HR manager ≠ case owner otherwise).
+    if eid is not None and str(assignment.get("hr_user_id") or "") == str(eid):
         return True
     hr_company = _get_hr_company_id(effective)
-    return bool(hr_company and db.assignment_belongs_to_company(assignment.get("id", ""), hr_company))
+    return bool(hr_company and db.assignment_belongs_to_company(str(assignment.get("id") or ""), hr_company))
 
 
 def _assert_hr_can_mutate_case(case_id: str, user: Dict[str, Any]) -> None:
