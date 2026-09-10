@@ -1012,6 +1012,26 @@ generator before the first batch; London GB legal came back with per-firm URLs o
 - **Create-only guard held:** approved **1262 UNCHANGED**; pending 12 → 16, all `vc-*`, CZ, tax_finance, vetted_by
   NULL. No mis-attach. Rejects honest (RSM entity-mismatch; BDO Czech Republic s.r.o. shares bdo.cz with BDO Audit).
 
+### XX-CZ housing_agencies (Prague expat-relocation boutiques) via ARES — `vendor-resourced-xx-cz-housing-prague-2026-09-10` (landed 2026-09-10) — LAST CZ cell; +5
+- Source (GCS): `1789076631995_afuxupj3.ndjson` (+ manifest `1789076680000_rsk1hzt3.json`; the first upload was truncated
+  → relay discarded + re-uploaded, I re-verified 5/5 rows parse).
+- Otto manifest: **5 sourced, 8 rejected** (counts reconcile). All 5 `source_url`=wired `ares.gov.cz` (ARES/RŽP — Czech
+  Trade Register; PUBLIC_REGISTER, register-root OK), corridor **XX-CZ**, category housing_agencies, Prague.
+  `accreditation_number` = IČO (trade-register number). Distinct independent domains — and expat/relocation-focused
+  (Foreigners.cz, MH Relocations, Expat Advisors), not sales agencies.
+- Rejects honest: broker-platforms/aggregators (QARA, Flat Zone) + Otto refused to invent IČOs for timed-out sites
+  (BPR, PragueStay, Prague Home Finder, 4you.cz).
+- **Predictor vs the 08-31 CZ/housing 4** (E&V Prague / LEXXUS NORTON / MAXIMA REALITY / Svoboda & Williams — premium
+  sales agencies). All 5 candidates name-new, no domain dup → complementary (relocation boutiques, not sales). Dry-run:
+  staged 5 / dup 0 / promote 5.
+- Landed: **+5 new suppliers** — Foreigners.cz (`vc-9fcdd379`), MH Relocations (`vc-8ad08bd3`), Prestige Group Apart
+  (`vc-9fd9bc99`), Residenture (`vc-42c0a408`), Expat Advisors (`vc-a59e2cf0`), CZ/housing pending. CZ/housing **4 → 9**.
+- **Create-only guard held:** approved **1262 → 1278** across the op — the founder's concurrent overnight approval wave
+  (approved went UP, not down; the 16 prior pending — CZ legal 5 + CZ tax 4 + DK tax 3 + DK banks 3 + DK housing 1 —
+  were approved during this land). My 5 caps landed pending, all `vc-*`, CZ, housing_agencies, vetted_by NULL. No mis-attach.
+- **✅ CZ FRONT WRAPPED:** legal **+5** · tax **+4** (Big-4 held) · housing **+5** · banks **skipped** (near-total dedup).
+  **Czech Republic net-new = 14 suppliers** across 3 landed cells. Next: IT/tax (Milan, CNDCEC) — top clean fresh vein.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
