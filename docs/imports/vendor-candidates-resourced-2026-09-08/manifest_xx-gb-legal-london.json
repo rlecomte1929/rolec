@@ -1,0 +1,17 @@
+{
+  "batch_id": "vendor-resourced-xx-gb-legal-london-2026-09-10",
+  "category": "legal_admin",
+  "city": "London",
+  "total_sourced": 6,
+  "total_rejected": 2,
+  "firms": [
+    {"name": "Bindmans LLP", "status": "sourced", "sra_number": "484856", "source_url": "https://www.sra.org.uk/consumers/register/organisation/?sraNumber=484856"},
+    {"name": "Fragomen LLP", "status": "sourced", "sra_number": "459836", "source_url": "https://www.sra.org.uk/consumers/register/organisation/?sraNumber=459836"},
+    {"name": "Gherson Solicitors LLP", "status": "sourced", "sra_number": "824641", "source_url": "https://www.sra.org.uk/consumers/register/organisation/?sraNumber=824641"},
+    {"name": "Magrath Sheldrick LLP", "status": "sourced", "sra_number": "484817", "source_url": "https://www.sra.org.uk/consumers/register/organisation/?sraNumber=484817"},
+    {"name": "RLegal", "status": "sourced", "sra_number": "00380691", "source_url": "https://www.sra.org.uk/consumers/register/organisation/?sraNumber=380691"},
+    {"name": "A Y & J Solicitors", "status": "sourced", "sra_number": "633686", "source_url": "https://www.sra.org.uk/consumers/register/organisation/?sraNumber=633686"},
+    {"name": "Reiss Edwards", "status": "rejected", "reason": "SRA number not readable from any page on the firm's own website (scraper returns navigation-only content; no footer regulatory disclosure visible); cannot cite a firm-published SRA number as required."},
+    {"name": "Colman Coyle", "status": "rejected", "reason": "General-practice firm; immigration service listed as 'International Immigration Services' without clear specialisation in UK work-visa routes (Skilled Worker, GBM, sponsor licences) required for this batch."}
+  ]
+}

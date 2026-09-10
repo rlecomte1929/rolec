@@ -18,6 +18,21 @@ describe('CountrySelect', () => {
     expect(screen.queryByText('Select a country')).toBeInTheDocument();
   });
 
+  it('resolves API codes to full names when restricting the list', () => {
+    render(<CountrySelect value="" onChange={() => {}} codes={['NO', 'FR']} allowEmpty />);
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByText('Norway')).toBeInTheDocument();
+    expect(screen.getByText('France')).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'NO' })).not.toBeInTheDocument();
+  });
+
+  it('lists restricted codes in display-name order, not ISO order', () => {
+    render(<CountrySelect value="" onChange={() => {}} codes={['NO', 'FR', 'AE']} />);
+    fireEvent.click(screen.getByRole('button'));
+    const names = screen.getAllByRole('option').map((el) => el.textContent ?? '');
+    expect(names).toEqual(['France', 'Norway', 'United Arab Emirates']);
+  });
+
   it('emits the ISO code when a name is chosen', () => {
     const onChange = vi.fn();
     render(<CountrySelect value="" onChange={onChange} />);

@@ -1,4 +1,6 @@
 import { Page } from '@playwright/test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Log in through the real ReloPass login form so every auth artefact the app
@@ -65,4 +67,58 @@ export async function seedAuth(
     },
     [role, token] as const,
   );
+}
+
+/** Roles exercised by the live authenticated-portal suite (QG-AUTH). */
+export const PORTAL_ROLES = ['ADMIN', 'HR', 'EMPLOYEE'] as const;
+
+/**
+ * Per-role credentials, read at CALL time (after playwright.config.ts has run
+ * loadTestEnv()) so `.env.test` values are visible. Employee falls back to the
+ * module defaults above to preserve the existing live-mode behaviour.
+ */
+function credsFor(role: Role): { email?: string; password?: string } {
+  switch (role) {
+    case 'ADMIN':
+      return { email: process.env.E2E_ADMIN_EMAIL, password: process.env.E2E_ADMIN_PASSWORD };
+    case 'HR':
+      return { email: process.env.E2E_HR_EMAIL, password: process.env.E2E_HR_PASSWORD };
+    case 'EMPLOYEE':
+      return {
+        email: process.env.E2E_EMPLOYEE_EMAIL || EMPLOYEE_EMAIL,
+        password: process.env.E2E_EMPLOYEE_PASSWORD || EMPLOYEE_PASSWORD,
+      };
+  }
+}
+
+/**
+ * Log in as any role through the real login form (same artefacts as loginAsEmployee).
+ * Used by portals/auth.setup.ts to mint each role's reusable session.
+ */
+export async function loginAs(page: Page, role: Role): Promise<void> {
+  const { email, password } = credsFor(role);
+  if (!email || !password) {
+    throw new Error(
+      `Missing credentials for ${role}. Set E2E_${role}_EMAIL / E2E_${role}_PASSWORD ` +
+        `in frontend/.env.test (see frontend/.env.test.example).`,
+    );
+  }
+  await page.goto('/login');
+  await page.locator('#auth-login-identifier').fill(email);
+  await page.locator('#auth-login-password').fill(password);
+  await page.locator('#auth-login-password').press('Enter');
+  await page.waitForFunction(() => !!localStorage.getItem('relopass_token'), undefined, {
+    timeout: 20_000,
+  });
+}
+
+// Config/specs load as native ESM here — derive the dir from import.meta, not __dirname.
+const AUTH_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../playwright/.auth',
+); // → frontend/playwright/.auth
+
+/** Path to a role's persisted Playwright storageState (gitignored). */
+export function authFile(role: Role): string {
+  return path.join(AUTH_DIR, `${role.toLowerCase()}.json`);
 }

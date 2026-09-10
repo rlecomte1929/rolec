@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { roleHomePath } from '../roleHome';
+import { roleHomePath, roleHomePathForHeldRoles } from '../roleHome';
 
 /**
  * AIQ-980: an authenticated user who hits an unmatched URL (e.g. an employee
@@ -28,5 +28,15 @@ describe('roleHomePath', () => {
     expect(roleHomePath(undefined)).toBe('/');
     expect(roleHomePath('')).toBe('/');
     expect(roleHomePath('SOMETHING_ELSE')).toBe('/');
+  });
+});
+
+describe('roleHomePathForHeldRoles', () => {
+  it('uses the active role when it is held', () => {
+    expect(roleHomePathForHeldRoles(['HR', 'EMPLOYEE'], 'HR')).toBe('/hr/dashboard');
+  });
+
+  it('sends an EMPLOYEE-only session to the employee home even if active role is HR', () => {
+    expect(roleHomePathForHeldRoles(['EMPLOYEE'], 'HR')).toBe('/employee/dashboard');
   });
 });

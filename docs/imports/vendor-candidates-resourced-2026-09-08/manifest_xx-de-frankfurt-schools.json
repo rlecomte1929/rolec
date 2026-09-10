@@ -1,0 +1,24 @@
+{
+  "batch_id": "vendor-resourced-xx-de-frankfurt-schools-2026-09-09",
+  "category": "schools",
+  "city": "Frankfurt",
+  "country": "DE",
+  "generated_at": "2026-09-09T12:00:00Z",
+  "total_sourced": 8,
+  "total_rejected": 5,
+  "firms": [
+    {"name": "International Bilingual Montessori School", "status": "sourced", "register": "Hessische Schuldatenbank", "source_url": "https://schul-db.bildung.hessen.de/schul_db.html/details/?school_no=4293"},
+    {"name": "SIS Swiss International School Frankfurt", "status": "sourced", "register": "Hessische Schuldatenbank", "source_url": "https://schul-db.bildung.hessen.de/schul_db.html/details/?school_no=4871"},
+    {"name": "Metropolitan School Frankfurt", "status": "sourced", "register": "Hessische Schuldatenbank", "source_url": "https://schul-db.bildung.hessen.de/schul_db.html/details/?school_no=4382"},
+    {"name": "Phorms Frankfurt", "status": "sourced", "register": "Hessische Schuldatenbank", "source_url": "https://schul-db.bildung.hessen.de/schul_db.html/details/?school_no=4383"},
+    {"name": "Europäische Schule RheinMain", "status": "sourced", "register": "Hessische Schuldatenbank", "source_url": "https://schul-db.bildung.hessen.de/schul_db.html/details/?school_no=4866"},
+    {"name": "accadis International School", "status": "sourced", "register": "Hessische Schuldatenbank", "source_url": "https://schul-db.bildung.hessen.de/schul_db.html/details/?school_no=4861"},
+    {"name": "ASB Erasmus Frankfurter Stadtschule Gymnasium", "status": "sourced", "register": "Hessische Schuldatenbank", "source_url": "https://schul-db.bildung.hessen.de/schul_db.html/details/?school_no=4390"},
+    {"name": "ASB Erasmus Frankfurter Stadtschule Grundschule", "status": "sourced", "register": "Hessische Schuldatenbank", "source_url": "https://schul-db.bildung.hessen.de/schul_db.html/details/?school_no=4381"},
+    {"name": "Frankfurt International School (FIS), Oberursel", "status": "reject", "reason": "Could not confirm a Hessische Schuldatenbank detail record / Schulnummer via available tools. FIS is an 'anerkannte Ergänzungsschule' (recognised supplementary school), a legal category not listed as an Ersatzschule in the searchable database; no verifiable per-entity detail page found. Not guessing a school_no."},
+    {"name": "ISF International School Frankfurt Rhein-Main, Frankfurt-Sindlingen", "status": "reject", "reason": "English-medium IB/IGCSE/AP school in metro, but could not confirm a Hessische Schuldatenbank detail page / Schulnummer via available tools. Rejected to avoid fabricating a school_no."},
+    {"name": "Strothoff International School, Dreieich", "status": "reject", "reason": "IB World School with integrated Hessian curriculum in metro, but could not confirm a Hessische Schuldatenbank detail page / Schulnummer via available tools. Rejected to avoid fabricating a school_no."},
+    {"name": "Lycée Français International Victor Hugo, Frankfurt", "status": "reject", "reason": "In the Hessische Schuldatenbank (school_no 4324) but French-medium (French national curriculum), not English-medium/IB/Cambridge. Curriculum out of scope."},
+    {"name": "IKS - Interkulturelle Schule Rhein-Main, Frankfurt", "status": "reject", "reason": "In the Hessische Schuldatenbank (school_no 4393) but curriculum could not be confirmed as English-medium/IB/Cambridge/recognised English-bilingual. Out of scope on curriculum."}
+  ]
+}

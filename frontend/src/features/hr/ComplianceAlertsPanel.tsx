@@ -17,6 +17,7 @@ import {
   setEmployerRegNumber,
   setExpectedStartDate,
 } from '../../api/compliance';
+import { getCountryName } from '../../utils/countries';
 
 const SEVERITY_ORDER: AlertSeverity[] = ['critical', 'high', 'medium', 'low'];
 
@@ -226,7 +227,7 @@ export const ComplianceAlertsPanel: React.FC = () => {
                       <p className="text-xs text-[#6b7280] mt-0.5">
                         {a.category}
                         {a.home_country && a.host_country
-                          ? ` · ${a.home_country} → ${a.host_country}`
+                          ? ` · ${getCountryName(a.home_country)} → ${getCountryName(a.host_country)}`
                           : ''}
                         {a.fired_at ? ` · ${new Date(a.fired_at).toLocaleDateString()}` : ''}
                       </p>

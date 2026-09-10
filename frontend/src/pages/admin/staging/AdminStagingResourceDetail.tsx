@@ -5,6 +5,7 @@ import { AdminLayout } from '../AdminLayout';
 import { adminStagingAPI } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
 import { InternalThreadPanel } from '../../../components/admin/collaboration/InternalThreadPanel';
+import { getCountryName } from '../../../utils/countries';
 
 type Candidate = {
   id?: string;
@@ -237,7 +238,7 @@ export const AdminStagingResourceDetail: React.FC = () => {
                 <div>
                   <dt className="text-slate-500">Country / City</dt>
                   <dd>
-                    {candidate.country_code ?? ''} / {candidate.city_name ?? '-'}
+                    {getCountryName(candidate.country_code) || candidate.country_code || ''} / {candidate.city_name ?? '-'}
                   </dd>
                 </div>
                 <div>

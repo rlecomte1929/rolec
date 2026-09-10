@@ -1,0 +1,71 @@
+{
+  "batch_id": "vendor-resourced-xx-it-banks-2026-09-09",
+  "category": "banks",
+  "city": "Milan",
+  "total_sourced": 7,
+  "total_rejected": 4,
+  "firms": [
+    {
+      "name": "UniCredit S.p.A.",
+      "status": "sourced",
+      "register": "Albo delle banche",
+      "source_url": "https://www.bancaditalia.it/servizi-cittadino/servizi/albi-elenchi/index.html"
+    },
+    {
+      "name": "Intesa Sanpaolo S.p.A.",
+      "status": "sourced",
+      "register": "Albo delle banche",
+      "source_url": "https://www.bancaditalia.it/servizi-cittadino/servizi/albi-elenchi/index.html"
+    },
+    {
+      "name": "Banco BPM S.p.A.",
+      "status": "sourced",
+      "register": "Albo delle banche",
+      "source_url": "https://www.bancaditalia.it/servizi-cittadino/servizi/albi-elenchi/index.html"
+    },
+    {
+      "name": "FinecoBank S.p.A.",
+      "status": "sourced",
+      "register": "Albo delle banche",
+      "source_url": "https://www.bancaditalia.it/servizi-cittadino/servizi/albi-elenchi/index.html"
+    },
+    {
+      "name": "Banca Mediolanum S.p.A.",
+      "status": "sourced",
+      "register": "Albo delle banche",
+      "source_url": "https://www.bancaditalia.it/servizi-cittadino/servizi/albi-elenchi/index.html"
+    },
+    {
+      "name": "Deutsche Bank S.p.A.",
+      "status": "sourced",
+      "register": "Albo delle banche",
+      "source_url": "https://www.bancaditalia.it/servizi-cittadino/servizi/albi-elenchi/index.html"
+    },
+    {
+      "name": "BNL - Banca Nazionale del Lavoro S.p.A.",
+      "status": "sourced",
+      "register": "Albo delle banche",
+      "source_url": "https://www.bancaditalia.it/servizi-cittadino/servizi/albi-elenchi/index.html"
+    },
+    {
+      "name": "Wise (TransferWise)",
+      "status": "reject",
+      "reason": "Payment institution / EMI (registered in Belgium as Wise Europe SA); not a bank in the Banca d'Italia Albo delle banche; no Italian ABI code"
+    },
+    {
+      "name": "Revolut",
+      "status": "reject",
+      "reason": "Revolut Bank UAB is a Lithuanian-licensed bank; EU-passported into Italy but not incorporated as an Italian bank in the Albo delle banche; no Italian ABI code"
+    },
+    {
+      "name": "N26 Bank GmbH",
+      "status": "reject",
+      "reason": "German bank (BaFin-licensed) EU-passported into Italy; not incorporated as an Italian bank in the Albo delle banche; no Italian ABI code"
+    },
+    {
+      "name": "ING Bank N.V. (Italy)",
+      "status": "reject",
+      "reason": "Dutch bank operating in Italy via EU passporting; ABI 03239 appears in secondary aggregator sources but could not be independently confirmed against the Albo delle banche register; excluded on honesty-over-volume principle"
+    }
+  ]
+}

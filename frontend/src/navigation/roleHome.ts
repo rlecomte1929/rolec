@@ -21,3 +21,22 @@ export function roleHomePath(role?: string | null): string {
       return ROUTE_DEFS.landing.path;
   }
 }
+
+/**
+ * Home for a session whose active role may disagree with membership.
+ * Login can persist users.role as HR while roles[] is only EMPLOYEE; redirecting
+ * to the HR home then hits RequireHrRoute, which bounced back to HR home — a blank loop.
+ */
+export function heldHomeRole(roles: string[], active?: string | null): string {
+  const held = roles.map((r) => (r || '').trim().toUpperCase()).filter(Boolean);
+  const act = (active || '').trim().toUpperCase();
+  if (act && held.includes(act)) return act;
+  if (held.includes('EMPLOYEE')) return 'EMPLOYEE';
+  if (held.includes('HR')) return 'HR';
+  if (held.includes('ADMIN')) return 'ADMIN';
+  return act;
+}
+
+export function roleHomePathForHeldRoles(roles: string[], active?: string | null): string {
+  return roleHomePath(heldHomeRole(roles, active));
+}

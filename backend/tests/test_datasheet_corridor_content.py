@@ -183,5 +183,63 @@ class DataSheetCorridorContentFallback(unittest.TestCase):
         self.assertEqual(body["sections"], [])
 
 
+import datetime as _dt  # noqa: E402
+from pathlib import Path  # noqa: E402
+from backend.app.services.data_sheet_service import _build_from_corridor_content  # noqa: E402
+
+_CC_DIR = Path(_REPO_ROOT) / "data" / "corridor-content"
+_ALL_ISOS = sorted(p.stem for p in _CC_DIR.glob("*.ndjson"))
+_RENDER_MOVE = _dt.date(2026, 10, 1)
+
+
+class EveryCorridorContentFileRenders(unittest.TestCase):
+    """Render invariants for EVERY curated corridor-content file — DB-free, so it also guards new
+    ISOs the moment their file lands. Calls the composer directly (it only reads data/, no DB)."""
+
+    def test_at_least_the_known_corridors_are_present(self):
+        for iso in ("NO", "DE", "FR", "GB"):
+            self.assertIn(iso, _ALL_ISOS, f"{iso}.ndjson missing from data/corridor-content")
+
+    def test_each_file_renders_a_valid_preview(self):
+        for iso in _ALL_ISOS:
+            with self.subTest(iso=iso):
+                recs = corridor_content.load_corridor_content(iso)
+                self.assertTrue(recs, f"{iso} loaded no records")
+                sheet = _build_from_corridor_content(
+                    f"case-{iso}", iso, None, f"XX→{iso}", _RENDER_MOVE, None,
+                    "employee", "en", "full",
+                )
+                # A preview: covered but not fillable, nothing prefilled.
+                self.assertTrue(sheet.covered)
+                self.assertTrue(sheet.preview)
+                self.assertEqual(sheet.completionPct, 0)
+                # One section per curated step, one field each, never a value.
+                self.assertEqual(len(sheet.sections), len(recs))
+                for s in sheet.sections:
+                    self.assertEqual(len(s.fields), 1)
+                    self.assertIn(s.fields[0].source, {"needs_input", "consult_professional"})
+                    self.assertIsNone(s.fields[0].value)
+                # Banners = the non-obvious rows; consult panel = the consult rows; needs-input count
+                # = the fillable rows. Derived from the file, so this holds for any ISO.
+                n_obvious = sum(1 for r in recs if r.get("is_non_obvious"))
+                n_consult = sum(1 for r in recs if r.get("consult_professional"))
+                self.assertEqual(len(sheet.banners), n_obvious)
+                self.assertEqual(len(sheet.consultProfessional), n_consult)
+                self.assertEqual(sheet.needsInputCount, len(recs) - n_consult)
+
+    def test_gb_string_steps_do_not_break_ordering(self):
+        # GB uses a descriptive string `step` (not the int NO/DE/FR use); the phase-only stable sort
+        # must handle it without a mixed int/str TypeError.
+        self.assertIn("GB", _ALL_ISOS)
+        recs = corridor_content.load_corridor_content("GB")
+        self.assertTrue(any(isinstance(r.get("step"), str) for r in recs), "GB should carry string steps")
+        sheet = _build_from_corridor_content(
+            "case-GB", "GB", None, "US→GB", _RENDER_MOVE, None, "hr", "en", "full",
+        )
+        self.assertTrue(sheet.preview)
+        # HR view surfaces responsible-party on at least one step.
+        self.assertTrue(any(s.responsibleParty for s in sheet.sections))
+
+
 if __name__ == "__main__":
     unittest.main()

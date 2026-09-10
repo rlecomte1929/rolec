@@ -15,6 +15,7 @@ import { createCaseAttestation, type AttestationCreated } from '../../api/attest
 import { getApiErrorMessage } from '../../utils/apiDetail';
 import { buildRoute } from '../../navigation/routes';
 import { AdminLayout } from './AdminLayout';
+import { getCountryName } from '../../utils/countries';
 
 function JsonBlock({ value }: { value: unknown }) {
   if (value == null) return <span className="text-gray-500"> - </span>;
@@ -312,7 +313,7 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
               </dd>
               <dt className="text-[#64748b]">Route</dt>
               <dd>
-                {dash(caseRow.origin_country)} → {dash(caseRow.destination_country)} · {dash(caseRow.case_type)}
+                {dash(getCountryName(typeof caseRow.origin_country === 'string' ? caseRow.origin_country : null) || caseRow.origin_country)} → {dash(getCountryName(typeof caseRow.destination_country === 'string' ? caseRow.destination_country : null) || caseRow.destination_country)} · {dash(caseRow.case_type)}
               </dd>
             </dl>
             {!op && (

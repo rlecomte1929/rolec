@@ -1,0 +1,22 @@
+{
+  "batch_id": "vendor-resourced-xx-se-housing-stockholm-2026-09-09",
+  "category": "housing_agencies",
+  "city": "Stockholm",
+  "country": "SE",
+  "generated_at": "2026-09-09",
+  "total_sourced": 4,
+  "total_rejected": 7,
+  "firms": [
+    {"name": "Residensportalen AB", "status": "sourced", "fmi_number": "32848", "agent": "Torun Sarah Foxen", "source_url": "https://fmi.se/soktjanster/sok-maklare/"},
+    {"name": "Estate Fastighetsbyrå AB", "status": "sourced", "fmi_number": "31950", "agent": "David Gergils Brännhult", "source_url": "https://fmi.se/soktjanster/sok-maklare/"},
+    {"name": "Victory Stockholm AB", "status": "sourced", "fmi_number": "44637", "agent": "Victor Magnusson", "source_url": "https://fmi.se/soktjanster/sok-maklare/"},
+    {"name": "Quality Living Stockholm", "status": "sourced", "fmi_number": "32803", "agent": "Björn Olof Peter Öberg", "source_url": "https://fmi.se/soktjanster/sok-maklare/"},
+    {"name": "Newstay Rental AB", "status": "reject", "reason": "FMI-registered agents left or were removed from the FMI register; confirmed by industry reporting (hemhyra.se article)."},
+    {"name": "Kassoe Housing", "status": "reject", "reason": "Headquartered in Denmark (Kgs. Lyngby); no Swedish FMI-registered agents identified."},
+    {"name": "Relocate to Sweden", "status": "reject", "reason": "General relocation consulting service; no FMI-registered estate or letting agents identified on team pages."},
+    {"name": "Nimmersion", "status": "reject", "reason": "HR relocation services; no FMI registration found; refers clients to third-party letting agents rather than acting as a registered broker."},
+    {"name": "C/O Stockholm", "status": "reject", "reason": "Holiday and corporate apartment booking platform; no FMI-registered mediation agent identified."},
+    {"name": "Företagsbostäder", "status": "reject", "reason": "Furnished apartment provider/property manager; not an FMI-registered mediation firm; no named FMI agent found."},
+    {"name": "Företagslogi", "status": "reject", "reason": "Website claims FMI-registered agents but site was unreachable during research; no named agent or specific FMI registration number could be verified."}
+  ]
+}

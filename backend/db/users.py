@@ -632,26 +632,10 @@ class UsersMixin:
                     {"email": email_norm},
                 ).fetchone()
                 if existing_by_email:
-                    if _profile_matches(existing_by_email, role_norm, email_norm,
-                                        full_name_norm, company_id):
-                        return
-                    try:
-                        if company_id is None:
-                            conn.execute(text(
-                                "UPDATE profiles SET role = :role, full_name = :full_name "
-                                "WHERE LOWER(TRIM(email)) = :email"
-                            ), {"role": role_norm, "full_name": full_name_norm, "email": email_norm})
-                        else:
-                            conn.execute(text(
-                                "UPDATE profiles SET role = :role, full_name = :full_name, company_id = :company_id "
-                                "WHERE LOWER(TRIM(email)) = :email"
-                            ), {"role": role_norm, "full_name": full_name_norm,
-                                "company_id": company_id, "email": email_norm})
-                    except Exception as _ep:
-                        log.warning(
-                            "ensure_profile_record email-update failed user_id=%s email=%s error=%s",
-                            (user_id or "")[:8], email_norm, _ep,
-                        )
+                    # Split identity: login users.id ≠ profiles.id (admin "Add person"
+                    # after a self-serve signup). Do not overwrite the CMS role with
+                    # users.role — that turned an admin-created employee into HR on
+                    # every login.
                     return
             # ----------------------------------------------------------------------
 
@@ -728,7 +712,16 @@ class UsersMixin:
             row = conn.execute(
                 text("SELECT * FROM profiles WHERE id = :id"), {"id": user_uuid}
             ).fetchone()
-        return self._row_to_dict(row)
+        found = self._row_to_dict(row)
+        if found:
+            return found
+        # Split identity: the login row and the admin people row can have different
+        # UUIDs for the same email. Resolve the CMS profile so company/role land.
+        user = self.get_user_by_id(user_id)
+        email = (user or {}).get("email")
+        if email:
+            return self.get_profile_by_email(str(email))
+        return None
 
     def mark_welcome_seen(self, user_id: str) -> bool:
         """[AIQ-1701] Record that this user dismissed their first-login welcome page.
@@ -820,7 +813,7 @@ class UsersMixin:
             r = (role or "").strip().upper()
             if r in ("ADMIN", "HR", "EMPLOYEE", "EMPLOYEE_USER"):
                 updates.append("role = :role")
-                params["role"] = r
+                params["role"] = "employee" if r in ("EMPLOYEE", "EMPLOYEE_USER") else r.lower()
         if company_id is not None:
             updates.append("company_id = :company_id")
             params["company_id"] = company_id.strip() if company_id else None
@@ -836,17 +829,66 @@ class UsersMixin:
                 text(f"UPDATE profiles SET {', '.join(updates)} WHERE id = :id"),
                 params,
             )
+            email_row = conn.execute(
+                text("SELECT email FROM profiles WHERE id = :id"),
+                {"id": person_id},
+            ).fetchone()
+        if role is not None:
+            email_norm = None
+            if email_row is not None:
+                email_norm = (email_row._mapping.get("email") or "").strip().lower() or None
+            self.sync_login_role(role, user_id=person_id, email=email_norm)
         return result.rowcount > 0
+
+    def sync_login_role(
+        self,
+        role: str,
+        user_id: Optional[str] = None,
+        email: Optional[str] = None,
+    ) -> None:
+        """Keep public.users.role in lockstep with the admin-set persona.
+
+        Login authenticates against ``users``, not ``profiles``. An admin role
+        change that only updates profiles leaves the person logging in as HR
+        (or the previous users.role) forever.
+        """
+        r = (role or "").strip().upper()
+        if r == "EMPLOYEE_USER":
+            r = "EMPLOYEE"
+        if r not in ("ADMIN", "HR", "EMPLOYEE"):
+            return
+        email_norm = (email or "").strip().lower() or None
+        with self.engine.begin() as conn:
+            if user_id:
+                conn.execute(
+                    text("UPDATE users SET role = :role WHERE id = :id"),
+                    {"role": r, "id": user_id},
+                )
+            if email_norm:
+                conn.execute(
+                    text("UPDATE users SET role = :role WHERE LOWER(TRIM(email)) = :email"),
+                    {"role": r, "email": email_norm},
+                )
 
     def set_profile_role(self, person_id: str, role: str) -> bool:
         r = (role or "").strip().upper()
         if r not in ("ADMIN", "HR", "EMPLOYEE", "EMPLOYEE_USER"):
             r = "EMPLOYEE"
+        # profiles.role CHECK is lowercase employee/hr/admin.
+        profile_role = "employee" if r in ("EMPLOYEE", "EMPLOYEE_USER") else r.lower()
+        email_norm = None
         with self.engine.begin() as conn:
             result = conn.execute(
                 text("UPDATE profiles SET role = :role WHERE id = :id"),
-                {"role": r, "id": person_id},
+                {"role": profile_role, "id": person_id},
             )
+            row = conn.execute(
+                text("SELECT email FROM profiles WHERE id = :id"),
+                {"id": person_id},
+            ).fetchone()
+            if row is not None:
+                email_norm = (row._mapping.get("email") or "").strip().lower() or None
+        self.sync_login_role(r, user_id=person_id, email=email_norm)
         return result.rowcount > 0
 
     def deactivate_profile(self, person_id: str) -> bool:
