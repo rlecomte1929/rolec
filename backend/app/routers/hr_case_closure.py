@@ -93,18 +93,31 @@ class CloseResult(BaseModel):
     outstanding_at_close: Outstanding = Outstanding()
 
 
+def _case_lookup_id(assignment: Dict[str, Any]) -> str:
+    """Prefer canonical_case_id — list/detail surfaces already do. A stale case_id
+    used to 404 Close even though the assignment was in the HR's company."""
+    for key in ("canonical_case_id", "case_id"):
+        raw = assignment.get(key)
+        if raw and str(raw).strip():
+            return str(raw).strip()
+    return ""
+
+
 def _require_assignment_access(assignment_id: str, org_id: str) -> Dict[str, Any]:
     """Load the assignment and prove the caller's org owns its case.
 
     404 (never 403) on a tenant mismatch, matching `hr_case_detail._require_case_access`:
     a different status code would let an attacker probe which ids belong to other tenants.
     """
-    assignment = db.get_assignment_by_id(assignment_id)
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
-    case_id = assignment.get("case_id")
+    case_id = _case_lookup_id(assignment)
     case = db.get_relocation_case(case_id) if case_id else None
     if not case:
+        aid = str(assignment.get("id") or "")
+        if org_id and aid and db.assignment_belongs_to_company(aid, org_id):
+            return assignment
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
     case_company_id = case.get("company_id")
     if case_company_id and str(case_company_id) != str(org_id):
@@ -163,10 +176,10 @@ def get_closure_readiness(
     assignment = _require_assignment_access(assignment_id, org_id)
     current = str(assignment.get("status") or "")
     return ClosureReadiness(
-        assignment_id=assignment_id,
+        assignment_id=str(assignment.get("id") or assignment_id),
         status=current or None,
         already_closed=current == CLOSED,
-        outstanding=_outstanding_for_case(str(assignment.get("case_id") or "")),
+        outstanding=_outstanding_for_case(_case_lookup_id(assignment)),
     )
 
 
@@ -184,26 +197,27 @@ def close_assignment(
     an abandoned move never reaches approval at all.
     """
     assignment = _require_assignment_access(assignment_id, org_id)
-    case_id = str(assignment.get("case_id") or "")
+    aid = str(assignment.get("id") or assignment_id)
+    case_id = _case_lookup_id(assignment)
     current = str(assignment.get("status") or "")
 
     if current == CLOSED:
         # Idempotent: a second close is a no-op and must NOT write a second audit event,
         # or the timeline gains a closure that never happened.
         return CloseResult(
-            assignment_id=assignment_id,
+            assignment_id=aid,
             status=CLOSED,
             already_closed=True,
             outstanding_at_close=Outstanding(),
         )
 
     outstanding = _outstanding_for_case(case_id)
-    db.update_assignment_status(assignment_id, CLOSED)
+    db.update_assignment_status(aid, CLOSED)
 
     try:
         db.insert_case_event(
             case_id=case_id,
-            assignment_id=assignment_id,
+            assignment_id=aid,
             actor_principal_id=hr_user.get("id"),
             event_type=CLOSE_EVENT,
             payload={
@@ -220,11 +234,11 @@ def close_assignment(
         # would tell HR the close failed while the case is, in fact, closed.
         logger.exception(
             "hr_case_closure: close event insert failed assignment=%s case=%s",
-            assignment_id, case_id,
+            aid, case_id,
         )
 
     return CloseResult(
-        assignment_id=assignment_id,
+        assignment_id=aid,
         status=CLOSED,
         already_closed=False,
         outstanding_at_close=outstanding,
