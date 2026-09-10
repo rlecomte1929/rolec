@@ -628,6 +628,26 @@ its per-entity page. Required regex per register: **SRA** `sraNumber=\d+` · **I
 `/s/firm` · **GIAS** `/Establishment/Details/\d+` · **ARLA Propertymark** `/company/`. Flagged to the
 generator before the first batch; London GB legal came back with per-firm URLs on all 6.
 
+### XX-GB housing_agencies (London estate/lettings agents) — `vendor-resourced-xx-gb-housing-london-2026-09-10` (landed 2026-09-10)
+- Source (GCS): `1789021761849_85a8cmgv.ndjson` (+ manifest `1789021795428_8sv6brzx.json`). (A reconnect
+  caused a re-upload; the earlier `1789020730496` pair was superseded and ignored.)
+- Otto manifest: **6 sourced, 2 rejected** (counts reconcile). Rejects: Chestertons, Savills (no London
+  `/company/` page found).
+- **HTTP_LISTING (ARLA Propertymark / propertymark.co.uk).** All 6 `source_url`s are per-entity
+  `/company/` pages (0 root), domain `www.propertymark.co.uk`, corridor **XX-GB**. **Vetter note:**
+  `accreditation_number` is the Propertymark branch **slug** (e.g. `knight-frank-9`) — Propertymark's
+  `/company/` pages publish no numeric membership number; the vetter confirms each against the directory.
+- **Franchise/chain dedup — net +2 of 6** (all six are big London chains): **Knight Frank** and **John D
+  Wood & Co.** landed new. The other four were already held from an earlier GB/housing harvest and
+  correctly did NOT duplicate:
+  - **Hamptons International**, **Marsh & Parsons**, **Dexters** — domain-dedup dropped at stage (their
+    firm domains `hamptons.co.uk` / `marshandparsons.co.uk` / `dexters.co.uk` already in prod).
+  - **Foxtons** — its Tower-Bridge-branch site (`goandco.co.uk`) is a new domain so it staged, but
+    `_name_key` `foxtons` matched the existing GB Foxtons at promote → attached (cap already present →
+    absorbed), no duplicate created (Foxtons stays a single supplier).
+- Landed: **+2 new suppliers** (GB/housing_agencies, pending), 0 mis-attach. Tripwire: `ssc` `approved`
+  **130 → 130** md5 `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; GB/housing 4 → 6.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries

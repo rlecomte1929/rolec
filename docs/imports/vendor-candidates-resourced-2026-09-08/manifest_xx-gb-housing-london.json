@@ -1,0 +1,55 @@
+{
+  "batch_id": "vendor-resourced-xx-gb-housing-london-2026-09-10",
+  "category": "housing_agencies",
+  "city": "London",
+  "total_sourced": 6,
+  "total_rejected": 2,
+  "firms": [
+    {
+      "name": "Knight Frank",
+      "status": "sourced",
+      "propertymark_id": "knight-frank-9",
+      "source_url": "https://www.propertymark.co.uk/company/knight-frank-9.html"
+    },
+    {
+      "name": "Foxtons",
+      "status": "sourced",
+      "propertymark_id": "foxtons-tower-bridge-1",
+      "source_url": "https://www.propertymark.co.uk/company/foxtons-tower-bridge-1.html"
+    },
+    {
+      "name": "John D Wood & Co.",
+      "status": "sourced",
+      "propertymark_id": "john-d-wood-co-lettings-8",
+      "source_url": "https://www.propertymark.co.uk/company/john-d-wood-co-lettings-8.html"
+    },
+    {
+      "name": "Hamptons International",
+      "status": "sourced",
+      "propertymark_id": "hamptons-international-4",
+      "source_url": "https://www.propertymark.co.uk/company/hamptons-international-4.html"
+    },
+    {
+      "name": "Marsh & Parsons",
+      "status": "sourced",
+      "propertymark_id": "marsh-parsons",
+      "source_url": "https://www.propertymark.co.uk/company/marsh-parsons.html"
+    },
+    {
+      "name": "Dexters",
+      "status": "sourced",
+      "propertymark_id": "dexters---wapping-lettings-1",
+      "source_url": "https://www.propertymark.co.uk/company/dexters---wapping-lettings-1.html"
+    },
+    {
+      "name": "Chestertons",
+      "status": "rejected",
+      "reason": "No individual London branch /company/ page found on propertymark.co.uk via site: search or direct URL probing; hard rule requires own /company/ page on Propertymark member directory"
+    },
+    {
+      "name": "Savills",
+      "status": "rejected",
+      "reason": "No London /company/ page found on propertymark.co.uk; site:propertymark.co.uk/company search returned no results for Savills London"
+    }
+  ]
+}
