@@ -50,12 +50,27 @@ Target a different environment with `E2E_PORTAL_BASE_URL` (e.g. a preview deploy
   `employee-portal`, so `--project=chromium` never selects them.
 - The live projects are only added to the config when `E2E_LIVE_PORTALS=1`; CI never
   sets it.
-- The default `chromium` project has `testIgnore: ['**/portals/**']`, so even a naked
-  `playwright test` in a CI job would skip the portal specs.
+- Portal specs are excluded by the mode-aware **top-level** `testIgnore`, so even a naked
+  `playwright test` in a CI job skips them (the deterministic project stays `chromium`).
 
-If you ever want this to run automatically, add a **scheduled** GitHub Actions job (not a
-PR-gating one) that provides the six `E2E_*` values as secrets and runs
-`npm run test:e2e:portals`.
+This runs automatically **nightly at 02:50 UTC** via `.github/workflows/portals-nightly.yml`
+(plus `workflow_dispatch`), gated behind the repo variable `E2E_PORTALS_NIGHTLY_ENABLED`
+and the six `E2E_*` credential secrets.
+
+## Launching from Audos (Otto / QA Guru)
+
+`audos-workspace-776786/tools/github-dispatch-portals-qa.ts` is an Audos-native trigger:
+an agent (QA Guru / Otto) can launch the suite on demand instead of waiting for the nightly
+cron. It calls GitHub's `workflow_dispatch` API for `portals-nightly.yml` and returns the run
+URL (add `--watch` to wait for the pass/fail result).
+
+- Requires a `GITHUB_DISPATCH_TOKEN` secret in the Audos Space (Connect Integrations): a
+  fine-grained PAT scoped to the repo with **Actions: Read and write**, or a classic PAT with
+  `repo` + `workflow`. Keep the scope minimal — this token can start workflows.
+- QA Guru still does **not** run the test itself (it can't authenticate); it only *launches*
+  the Playwright suite, which does the sign-ins. The launch stays passwordless and auditable.
+- Bind the tool to the QA Guru agent in the Audos UI if you want it to appear among that
+  agent's capabilities; the file is auto-discovered as a workspace tool either way.
 
 ## Scope / follow-ups
 
