@@ -17,6 +17,7 @@ import { Button } from '../antigravity/Button';
 import type { ProviderGridRow, CoordinationStatus } from '../../api/client';
 import { ROUTE_DEFS } from '../../navigation/routes';
 import { ProviderStatusCell } from './ProviderStatusCell';
+import { getCountryName } from '../../utils/countries';
 
 const PROVIDER_COLUMNS: Array<{ key: keyof ProviderGridRow['cells']; label: string }> = [
   { key: 'housing',      label: 'Housing' },
@@ -232,7 +233,7 @@ export const ProviderStatusGrid: React.FC<ProviderStatusGridProps> = ({
                         </div>
                       )}
                     </td>
-                    <td style={{ ...tdStyle, color: '#374151' }}>{row.dest_country ?? '—'}</td>
+                    <td style={{ ...tdStyle, color: '#374151' }}>{getCountryName(row.dest_country) || row.dest_country || '—'}</td>
                     <td style={{ ...tdStyle, color: '#374151' }}>
                       {row.move_date
                         ? new Date(row.move_date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })

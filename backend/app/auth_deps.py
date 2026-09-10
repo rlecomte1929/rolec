@@ -116,6 +116,13 @@ def derive_roles(
     roles = [r["role"] for r in role_rows if r.get("role")]
     if not roles:
         roles = [fallback_role]
+    elif fallback_role and fallback_role not in roles:
+        # users.role is the login persona. A junction-only EMPLOYEE row (added
+        # when this account is linked as a relocating employee) must not hide it,
+        # or primary_role falls back to HR/ADMIN while roles[] omits that value —
+        # the frontend then redirects to an HR home the membership guard rejects,
+        # which blanks the page in a Navigate loop.
+        roles.append(fallback_role)
     if is_admin:
         if UserRole.ADMIN.value not in roles:
             roles.append(UserRole.ADMIN.value)

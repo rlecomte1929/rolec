@@ -1076,12 +1076,12 @@ function RankingDebugCard({
         </div>
         <div>
           <label htmlFor="sd-destination-country" className="block text-xs text-[#6b7280] mb-0.5">Destination country</label>
-          <Input id="sd-destination-country" unstyled
-            type="text"
+          <CountrySelect
+            id="sd-destination-country"
             value={destinationCountry}
-            onChange={(v) => setDestinationCountry(v.toUpperCase().slice(0, 2))}
-            className="w-20 border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
-            placeholder="GB"
+            onChange={setDestinationCountry}
+            className="min-w-[220px]"
+            placeholder="Select destination"
           />
         </div>
         <div>

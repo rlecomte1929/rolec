@@ -14,7 +14,7 @@ import { apiGet, apiPatch, apiPost } from './client';
  * facts are English renderings of French pages, so a verbatim match is impossible by
  * construction. Showing those as "unverified" would put 97 sound facts in the suspect pile.
  */
-export type EvidenceStatus = 'verified' | 'translated' | 'unverified' | 'no_source';
+export type EvidenceStatus = 'verified' | 'translated' | 'unverified' | 'no_source' | 'no_quote';
 
 export interface ReviewFact {
   id: string;
@@ -83,8 +83,11 @@ export const editFact = (
   id: string,
   factText: string,
   notes?: string,
+  extras?: { evidenceQuote?: string; approve?: boolean },
 ): Promise<{ ok: boolean; fact_text: string; previous_fact_text: string }> =>
   apiPatch(`/api/admin/content-review/facts/${encodeURIComponent(id)}`, {
     fact_text: factText,
     notes,
+    ...(extras?.evidenceQuote !== undefined ? { evidence_quote: extras.evidenceQuote } : {}),
+    ...(extras?.approve !== undefined ? { approve: extras.approve } : {}),
   });

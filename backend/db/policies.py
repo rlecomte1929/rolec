@@ -1723,6 +1723,7 @@ class PoliciesMixin:
         reviewer_user_id: str,
         notes: Optional[str] = None,
         approve: bool = True,
+        evidence_quote: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """[AIQ-1821] Correct a fact's wording, recording both sides.
 
@@ -1734,19 +1735,33 @@ class PoliciesMixin:
 
         Storing before AND after is also the clearest signal the extractor can get about how it
         was wrong. Returns None when the fact does not exist.
+
+        `evidence_quote` is the verbatim sentence from the cited page. Approval still
+        requires one (AIQ-2124); the review queue used to have no write path for it,
+        so reviewers hit the gate with no way to satisfy it.
         """
         new_text = (new_fact_text or "").strip()
         if not new_text:
             raise ValueError("new_fact_text is required")
+        quote_provided = evidence_quote is not None
+        stored_quote = (evidence_quote or "").strip() or None if quote_provided else None
 
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             row = conn.execute(text(
-                "SELECT fact_text FROM requirement_facts WHERE id = :id"
+                "SELECT fact_text, evidence_quote FROM requirement_facts WHERE id = :id"
             ), {"id": fact_id}).first()
             if not row:
                 return None
             previous = row[0]
+            existing_quote = row[1]
+            final_quote = stored_quote if quote_provided else existing_quote
+            if approve and not str(final_quote or "").strip():
+                raise UnquotedApprovalError(
+                    "cannot approve a requirement fact with no evidence_quote: "
+                    + str(fact_id)
+                    + " — supply the verbatim sentence from the cited page first"
+                )
 
             # An edited fact is re-verified against its source by the next backfill run: the
             # reviewer rewrote the claim, so the stored evidence offset no longer describes it.
@@ -1754,9 +1769,16 @@ class PoliciesMixin:
                 "UPDATE requirement_facts "
                 "SET fact_text = :txt, reviewed_by = :reviewer, reviewed_at = :now, "
                 "    evidence_verified = NULL, evidence_offset = NULL"
+                + (", evidence_quote = :quote" if quote_provided else "")
                 + (", status = 'approved'" if approve else "")
                 + " WHERE id = :id"
-            ), {"txt": new_text, "reviewer": reviewer_user_id, "now": now, "id": fact_id})
+            ), {
+                "txt": new_text,
+                "reviewer": reviewer_user_id,
+                "now": now,
+                "id": fact_id,
+                "quote": stored_quote,
+            })
 
             conn.execute(text(
                 "INSERT INTO requirement_reviews "

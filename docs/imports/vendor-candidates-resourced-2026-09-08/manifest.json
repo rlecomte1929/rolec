@@ -1,0 +1,5 @@
+{
+  "batch_id": "vendor-candidates-resourced-2026-09-08",
+  "target_table": "vendor_candidates",
+  "note": "Reference manifest for the vendor batch family. Declares target_table so the fact/content citation ratchet (scripts/tests/test_check_otto_batches_citations.py :: _batch_targets_vendor_candidates) EXCLUDES these vendor rows: a vendor row's source_url is a VENDOR evidence URL graded by the supplier tier gate (backend/app/services/vendor_harvester.validate()), not a normative fact citation. Each sub-batch ships its own manifest_<slice>.json + src/<slice>.ndjson + vendor_candidates_<slice>.csv; this file carries no fact NDJSON stream of its own (reference batch)."
+}

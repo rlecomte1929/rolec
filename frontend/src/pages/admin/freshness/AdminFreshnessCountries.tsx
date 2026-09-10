@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { adminFreshnessAPI } from '../../../api/client';
 import { AdminFreshnessLayout } from './AdminFreshnessLayout';
+import { getCountryName } from '../../../utils/countries';
 
 type CountryItem = {
   country_code?: string;
@@ -54,7 +55,7 @@ export const AdminFreshnessCountries: React.FC = () => {
           <tbody>
             {items.map((c) => (
               <tr key={String(c.country_code)} className="border-b border-slate-100 hover:bg-slate-50">
-                <td className="px-4 py-2 font-medium">{c.country_code ?? '-'}</td>
+                <td className="px-4 py-2 font-medium">{getCountryName(c.country_code) || c.country_code || '-'}</td>
                 <td className="px-4 py-2">{c.fresh_count ?? 0}</td>
                 <td className="px-4 py-2">{c.stale_count ?? 0}</td>
                 <td className="px-4 py-2">{c.overdue_count ?? 0}</td>

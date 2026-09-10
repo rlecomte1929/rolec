@@ -25,6 +25,7 @@ import { Select } from '../../../components/antigravity/Select';
 import { Button } from '../../../components/antigravity/Button';
 import { hrAPI, employeeAPI } from '../../../api/client';
 import type { AssignmentSummary } from '../../../types';
+import { getCountryName } from '../../../utils/countries';
 
 interface RecipientOption {
   value: string; // assignment_id
@@ -46,7 +47,7 @@ function hrRecipientLabel(a: AssignmentSummary): string {
     'Employee';
   const route =
     a.case?.home_country && a.case?.host_country
-      ? ` · ${a.case.home_country} → ${a.case.host_country}`
+      ? ` · ${getCountryName(a.case.home_country)} → ${getCountryName(a.case.host_country)}`
       : '';
   return `${name}${route}`;
 }
