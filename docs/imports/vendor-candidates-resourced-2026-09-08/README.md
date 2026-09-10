@@ -585,6 +585,19 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1084 → 1089. (ES legal now 16: Madrid 7 +
   Barcelona 4 + Seville 5.)
 
+### XX-ES legal_admin (Valencia) — `vendor-resourced-xx-es-legal-valencia-2026-09-09` — ⛔ PARKED, NOT LANDED (no artifact)
+- **Nothing landed.** The ~3-5AM Audos reload window wiped this thread **6×**, each time before file
+  assembly, so **no GCS NDJSON/manifest was ever produced**. The applier does not hand-land firms from
+  a relayed text list — no artifact = no auditable hash/count to verify, which is the guarantee this
+  harvest exists to uphold (same call as the parked Rome IT/tax row).
+- **2 firms CONFIRMED by the generator, recorded here for a calm rerun** (abogacia.es / ICAV / XX-ES /
+  legal_admin): Joaquín García Pastrana — ICAV 20503; Inmaculada Moncho Giner — ICAV 14318 (immigration
+  specialist). Also seen mid-research: Díaz & Asociados; sharp reject noted: Gloria Ferrandis (Sueca
+  bar #172, not ICAV). **To land:** re-run the ICAV brief when Audos is calm → get the clean
+  NDJSON+manifest on GCS → curl+verify+`--apply --promote` like the other ES/legal cities (expect 5-8).
+- Tripwire untouched (no write): `ssc` `approved` **130 | 1c4c3899925c5a8c4b3c168abcfbfc22**. ES legal
+  stays 16 (Madrid 7 + Barcelona 4 + Seville 5) until Valencia is re-sourced with an artifact.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
