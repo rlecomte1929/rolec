@@ -738,6 +738,26 @@ generator before the first batch; London GB legal came back with per-firm URLs o
 - Tripwire held on the IME land: `ssc` `approved` **130 → 130** md5
   `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; AU/legal 3 → 4.
 
+### XX-ES legal_admin (Valencia extranjería lawyers) — `vendor-resourced-xx-es-legal-valencia-2026-09-10` (landed 2026-09-10) — UN-PARKS the earlier Valencia hold
+- Source (GCS): `1789037619004_hp0369jo.ndjson` (+ manifest `1789037699891_e2puiit2.json`). Clean re-run
+  after the earlier Audos-wipe park; `.es` domain → unaffected by the `.com.au` normalise bug.
+- Otto manifest: **4 sourced, 10 rejected** (counts reconcile). All 4 `source_url`=wired `www.abogacia.es`,
+  corridor **XX-ES**, category legal_admin, ICAV named-lawyer colegiado: Olguín Abogados 14262, Fernando
+  Ortega Cano 17582, Romina María Chiquini Laude 19598, Modesto Martínez Vizuete 11729. Good discipline:
+  the two parked SEEDS were **honestly rejected** on re-verification (García Pastrana ICAV 20503 =
+  *derechos fundamentales*, not extranjería; Moncho Giner = Gandía not Valencia city, número unpublished),
+  so all 4 are genuinely-verified NEW firms. 3 are individual advocates with no firm site → name-keyed.
+- `_name_key` predictor: all 4 distinct + new; no prod dup, no mis-attach. Landed: **+4 new suppliers**
+  (ES/legal_admin, pending). ES legal now 20 (Madrid 7 + Barcelona 4 + Seville 5 + Valencia 4).
+- **Tripwire — invariant change (2026-09-10 ~11:01):** the campaign-long fixed `approved = 130 |
+  1c4c3899925c5a8c4b3c168abcfbfc22` is now **RETIRED**: the founder began working `/admin/vetting-queue`
+  and `admin@relopass.com` approved 86 caps in a bulk pass (approved pool 130 → 218; 139 harvest
+  suppliers now live). That is the human gate working as designed, unrelated to this append-only land.
+  The applier invariant is now **create-only**: each land only INSERTs new `pending` caps and never
+  mutates an existing/approved cap. This land satisfied it — the approved count did not drop across the
+  op, and the 4 new Valencia caps are `pending` (verified). Going forward the check is "my N caps landed
+  pending + approved count did not decrease," not a fixed md5.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
