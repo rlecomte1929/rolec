@@ -564,6 +564,27 @@ underway (first batch: SE legal via advokatsamfundet per-entity pages).
   `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1080 → 1084. (ES legal now 11: Madrid 7 +
   Barcelona 4.)
 
+### XX-ES legal_admin (Seville immigration/extranjería lawyers) — `vendor-resourced-xx-es-legal-seville-2026-09-09` (landed 2026-09-10)
+- Source (GCS): `1789009147649_r1p5zb4y.ndjson` (+ manifest `1789009149297_2xwwrokk.json`). (Completed
+  after surviving the ~3-4AM Audos wipe window, nudge-revived; delivered artifacts verify.)
+- Otto manifest: **5 sourced, 4 rejected** (counts reconcile). All 5 `source_url`=wired
+  `www.abogacia.es`, corridor **XX-ES**, category legal_admin, ICAS named-lawyer colegiado: Bolonia
+  Abogacía 8.538 (Max Adam Romero), Peralta Rojas Abogados 15.174 (Nilson David Peralta Rojas),
+  Extranjería al Día — Germán Saldaña Espejo 8086, Despacho Paula Schmid Porras 13.737, Marta Reina
+  Grau 16.931. Honest rejects: Lexpats/Sandra Stojakovic (no número), Abogado Extranjería Sevilla (no
+  named lawyer), QD Abogados (no número + Huelva), Miguel Ángel Lechuga (número only in a pleitex
+  aggregate, not self-published).
+- **Vetter notes (carried to pending):** (1) Marta Reina Grau 16.931 — número sourced from a
+  self-submitted Pleitex directory profile (`pleitex.com`), no standalone firm site; verify against the
+  ICAS register before serve. (2) "Extranjería al Día" appears here **sourced** as a specific named
+  Sevilla lawyer (Germán Saldaña Espejo, ICAS 8086), whereas in Barcelona the same brand was **rejected**
+  as a national directory — here it is a valid named-lawyer attribution (distinct `_name_key`, no
+  double-count).
+- `_name_key` predictor: all 5 distinct + new; no prod dup, no mis-attach. Landed: **+5 new suppliers**
+  (ES/legal_admin, pending). Tripwire: `ssc` `approved` **130 → 130** md5
+  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; pending 1084 → 1089. (ES legal now 16: Madrid 7 +
+  Barcelona 4 + Seville 5.)
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries

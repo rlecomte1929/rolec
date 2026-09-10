@@ -1,0 +1,59 @@
+{
+  "batch_id": "vendor-resourced-xx-es-legal-seville-2026-09-09",
+  "category": "legal_admin",
+  "city": "Sevilla",
+  "total_sourced": 5,
+  "total_rejected": 4,
+  "firms": [
+    {
+      "name": "Bolonia Abogacía",
+      "status": "sourced",
+      "colegiado": "8.538 — Max Adam Romero",
+      "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"
+    },
+    {
+      "name": "Peralta Rojas Abogados",
+      "status": "sourced",
+      "colegiado": "15.174 — Nilson David Peralta Rojas",
+      "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"
+    },
+    {
+      "name": "Extranjería al Día — Germán Saldaña Espejo",
+      "status": "sourced",
+      "colegiado": "8086 — Germán Saldaña Espejo",
+      "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"
+    },
+    {
+      "name": "Despacho Paula Schmid Porras",
+      "status": "sourced",
+      "colegiado": "13.737 — Paula Schmid Porras",
+      "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"
+    },
+    {
+      "name": "Marta Reina Grau — Abogada de Extranjería",
+      "status": "sourced",
+      "colegiado": "16.931 — Marta Reina Grau (verify against ICAS register; number sourced from self-submitted Pleitex directory profile, no standalone firm website found)",
+      "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"
+    },
+    {
+      "name": "Lexpats (Sandra Stojakovic)",
+      "status": "rejected",
+      "reason": "No ICAS colegiado número published on firm website lexpats.com or its aviso legal. Sandra Stojakovic confirmed as founding lawyer and immigration specialist, but bar registration number not disclosed on any page of the site."
+    },
+    {
+      "name": "Abogado Extranjería Sevilla (abogadoextranjeriasevilla.com)",
+      "status": "rejected",
+      "reason": "No named lawyer identified and no ICAS colegiado número published anywhere on the website."
+    },
+    {
+      "name": "QD Abogados (qdabogados.com)",
+      "status": "rejected",
+      "reason": "No ICAS colegiado número published on website. Primarily Huelva-based firm with a satellite office in Sevilla; blog author listed as 'Q. Dominguez' but no colegiado número found."
+    },
+    {
+      "name": "Miguel Ángel Lechuga Villalobos",
+      "status": "rejected",
+      "reason": "ICAS nº 16477 appears only in a pleitex.com aggregated listing page (not a dedicated self-submitted profile); no own firm website or self-published profile found to confirm the number."
+    }
+  ]
+}
