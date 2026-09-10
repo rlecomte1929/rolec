@@ -1,0 +1,62 @@
+{
+  "batch_id": "vendor-resourced-xx-dk-housing-copenhagen-2026-09-10",
+  "category": "housing_agencies",
+  "city": "Copenhagen",
+  "total_sourced": 3,
+  "total_rejected": 7,
+  "firms": [
+    {
+      "name": "home a/s (Copenhagen)",
+      "status": "sourced",
+      "mde_id": "home a/s Ejendomsmæglerkæde; home Vesterbro CVR 41567805; MDE member confirmed verbatim on home.dk",
+      "source_url": "https://www.de.dk/"
+    },
+    {
+      "name": "danbolig (Copenhagen)",
+      "status": "sourced",
+      "mde_id": "danbolig Ejendomsmæglerkæde; Østerbro & Nordhavn; Ejendomsmægler MDE confirmed verbatim on danbolig.dk",
+      "source_url": "https://www.de.dk/"
+    },
+    {
+      "name": "Estate Mæglerne — Estate City & Christianshavn",
+      "status": "sourced",
+      "mde_id": "CVR 45742180; Ejendomsmægler MDE (Halberg-Lange, Jakobsen, Kristensen, Ibsen) confirmed on estate.dk",
+      "source_url": "https://www.de.dk/"
+    },
+    {
+      "name": "HomeConnector ApS",
+      "status": "rejected",
+      "reason": "Specialist expat rental agency (CVR 32834957, Vesterbrogade 12, 1620 KBH V); NOT a registered ejendomsmægler / MDE member; no MDE claim on homeconnector.dk"
+    },
+    {
+      "name": "CopenhagenExpats (copenhagenexpats.com)",
+      "status": "rejected",
+      "reason": "Relocation/housing consultancy; NOT MDE-registered ejendomsmægler; office in Roskilde (not Copenhagen); no ejendomsmægler registration found"
+    },
+    {
+      "name": "Copenhagen Relocations (relocate.dk)",
+      "status": "rejected",
+      "reason": "Relocation & immigration consultancy; NOT MDE-registered ejendomsmægler; website dormant since 2016"
+    },
+    {
+      "name": "RelocationDK (relocationdk.com)",
+      "status": "rejected",
+      "reason": "Relocation consultancy (CVR 43157701); NOT a registered ejendomsmægler / MDE member"
+    },
+    {
+      "name": "EasyHousing (easyhousing.dk)",
+      "status": "rejected",
+      "reason": "Corporate furnished housing provider for expats; NOT a registered ejendomsmægler / MDE member"
+    },
+    {
+      "name": "Toscana Bolig ApS (toscanabolig.dk)",
+      "status": "rejected",
+      "reason": "MDE member (Peter Simmering, Ejendomsmægler MDE, CVR confirmed) but specialises exclusively in Italian property; no Copenhagen rental activity"
+    },
+    {
+      "name": "Movinn (movinn.com)",
+      "status": "rejected",
+      "reason": "Serviced/furnished apartment provider for expats in Copenhagen; NOT a registered ejendomsmægler / MDE member"
+    }
+  ]
+}

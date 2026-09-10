@@ -951,6 +951,29 @@ generator before the first batch; London GB legal came back with per-firm URLs o
 - **Create-only guard held:** approved **1262 UNCHANGED** across the op; pending 3 → 6 (DK-tax 3 + DK-banks 3), all
   `vc-*`, DK, banks, vetted_by NULL. No mis-attach.
 
+### XX-DK housing_agencies (Copenhagen MDE estate agents) via de.dk — `vendor-resourced-xx-dk-housing-copenhagen-2026-09-10` (landed 2026-09-10) — LAST DK cell; +1 net (2 deduped)
+- Source (GCS): `1789073029123_eanpj0p0.ndjson` (+ manifest `1789073030801_rv5ag4eo.json`).
+- Otto manifest: **3 sourced, 7 rejected** (counts reconcile). All 3 `source_url`=wired `www.de.dk` (MDE — Dansk
+  Ejendomsmæglerforening; PUBLIC_REGISTER, register-root OK), corridor **XX-DK**, category housing_agencies,
+  Copenhagen. `accreditation_number` = MDE membership prose (verbatim "…medlemmer af Dansk Ejendomsmæglerforening")
+  + CVR. Distinct domains (home.dk / danbolig.dk / estate.dk).
+- **Not thin in the SE/FMI sense:** Otto kept the MDE ejendomsmæglere that do rental relo and rejected the non-MDE
+  expat consultancies (CopenhagenExpats, Copenhagen Relocations, RelocationDK, EasyHousing, Movinn). ⚠ Retry seed:
+  Toscana Bolig ApS (Peter Simmering, Ejendomsmægler MDE, CVR confirmed) was rejected on a truncated reason — worth
+  a look if it's Copenhagen + rental.
+- **Predictor vs the 08-31 DK/housing 4 (danbolig Østerbro / EDC / home Østerbro / Nybolig Østerbro).** home a/s
+  (home.dk) and danbolig (danbolig.dk) share the 08-31 chains' corporate domains → stage() cross-run domain-dedup
+  DROPS both pre-insert. Genuinely new: Estate Mæglerne (estate.dk).
+- Landed: **+1 new supplier** — Estate Mæglerne City & Christianshavn (`vc-461aa91e`), DK/housing pending.
+  DK/housing caps **4 → 5**. Dry-run: staged 1 / duplicates 0 / promote 1.
+- **Create-only guard held:** approved **1262 UNCHANGED**; pending 6 → 7, `vc-*`, DK, housing_agencies, vetted_by
+  NULL. No mis-attach.
+- **✅ DK FRONT WRAPPED:** legal **+2** (1 held: Holm Thomsen already in prod) · tax **+3** · banks **+3** (Danske/
+  Nordea/Nykredit deduped) · housing **+1** (home/danbolig deduped). **Denmark net-new = 9 suppliers** across 4
+  landed cells; all four DK registers (advokatnoeglen.dk / fsr.dk / finanstilsynet.dk / de.dk) confirmed working
+  end-to-end. Next front: Czech Republic or Cyprus (legal-first) — PT legal is unwired (Ordem dos Advogados has no
+  firm listing; PT's other categories already 08-31-covered), CZ `cak.cz` + CY `cyprusbar.org` are wired PUBLIC_REGISTER.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
