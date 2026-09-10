@@ -79,6 +79,13 @@ def make(**kw) -> Candidate:
         ("deep.sub.example.com", "example.com"),
         ("example.co.uk", "example.co.uk"),                 # compound suffix kept whole
         ("www.sub.example.co.uk", "example.co.uk"),
+        # Corridor ccTLDs must NOT collapse to the bare suffix (the .com.au regression):
+        ("https://www.widen.com.au", "widen.com.au"),
+        ("dmamigration.com.au", "dmamigration.com.au"),
+        ("foo.net.au", "foo.net.au"),
+        ("sub.example.co.nz", "example.co.nz"),
+        ("firm.com.sg/office", "firm.com.sg"),
+        ("bureau.co.za", "bureau.co.za"),
         ("https://example.com:8443/x", "example.com"),      # port stripped
         # The shapes that actually live in prod suppliers.website:
         ("agsmovers.com/branches/movers-europe/norway/norway/", "agsmovers.com"),
@@ -103,6 +110,20 @@ def test_normalise_domain_is_case_and_slash_insensitive():
         "www.acme-movers.de",
     ]
     assert len({normalise_domain(v) for v in variants}) == 1
+
+
+def test_normalise_domain_distinct_firms_on_same_cctld_do_not_collide():
+    """Different firms on the same multi-part ccTLD must key distinctly — the false-dedup
+    regression that collapsed every *.com.au to `com.au` and dropped a whole AU harvest."""
+    firms = [
+        "https://www.widen.com.au",
+        "https://www.dmamigration.com.au",
+        "https://baymigration.com.au",
+        "https://www.kanmigration.com.au",
+    ]
+    keys = {normalise_domain(f) for f in firms}
+    assert len(keys) == 4                       # four firms, four keys
+    assert "com.au" not in keys                 # never the bare public suffix
 
 
 # ── validation — the rules that keep bad rows out ────────────────────────────
