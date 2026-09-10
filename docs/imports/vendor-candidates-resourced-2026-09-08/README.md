@@ -1063,6 +1063,35 @@ accreditation must be publicly READABLE.**
 - **Create-only guard held:** approved **1278 → 1283** across the op (founder's concurrent approval of the 5 CZ housing
   pending; approved UP not down); my 3 caps landed pending, all `vc-*`, BR, legal_admin, vetted_by NULL. No mis-attach.
 
+### XX-FI housing_agencies (Helsinki välitysliikkeet) via Luova Välitysliikerekisteri — `vendor-resourced-xx-fi-housing-helsinki-2026-09-11` (landed 2026-09-11) — LAST sourcing cell; +5
+- Source (GCS): `1789081877405_pqlvd8a3.ndjson` (+ manifest `1789081931736_hmyxlu63.json`).
+- Otto manifest: **5 sourced, 8 rejected** (counts reconcile). All 5 `source_url`=wired `lvv.fi` (Luova
+  Välitysliikerekisteri — the mandatory FI real-estate/letting-agency register; PUBLIC_REGISTER, register-root OK),
+  corridor **XX-FI**, category housing_agencies, Helsinki. `accreditation_number` = **y-tunnus** (Finnish business ID —
+  publicly readable; the register itself is data-protection-limited / y-tunnus-lookup, so the y-tunnus is the citable
+  identifier and the vetter confirms välitysliike registration by it — the readability the IT/tax dead vein lacked).
+  Distinct domains.
+- Not thin after all (5). Rejects honest, exactly the SE/FMI discipline: separated registered välitysliike from DIRECT
+  LANDLORDS (Lumo Kodit / VVO = vuokranantaja), relocation consultancies (Finland Relocation Services), Sweden-based
+  (Nordic Relocation Group), and no-y-tunnus firms (Kiinteistömaailma / RE/MAX Finland / Helsinki Homes).
+- `_name_key` predictor: all 5 name-new (FI/housing was 0 caps). Dry-run: staged 5 / dup 0 / promote 5.
+- Landed: **+5 new suppliers** — SATO Oyj (`vc-6f0d8637`), Huoneistokeskus (`vc-97a2ff3d`), OP Koti Uusimaa
+  (`vc-9592b404`), OVV Asuntopalvelut Helsinki (`vc-c8ec084a`), Bo LKV (`vc-cda9126d`), FI/housing pending. FI/housing **0 → 5**.
+  ⚠ Vetter note: SATO Oyj is a large residential company — confirm it's registered as a *välitysliike* (brokerage) rather
+  than a pure landlord before serving (Otto has its y-tunnus 0201470-5 on the register).
+- **Create-only guard held:** approved **1283 UNCHANGED**; pending 3 → 8 (BR/legal 3 + FI/housing 5), all `vc-*`, FI,
+  housing_agencies, vetted_by NULL. No mis-attach.
+
+## 🏁 SOURCING RUNWAY COMPLETE (2026-09-11)
+All wired **and sourceable** fresh veins are now exhausted. Saturation-phase probes: **IT/tax DEAD** (paper-wired — bot-walled
+register + no published Albo número), **BR/legal +3**, **FI/housing +5**. The wired vendor-harvest is **SATURATED**: no fresh
+`wired × sourceable × 0-caps` country×category remains (the readable-accreditation filter, learned from IT/tax, is the gate).
+Remaining sourcing would be deeper city coverage in already-covered cells (dedup wall) or caveated registers (ES/housing
+voluntary, SE legal+tax HTTP_LISTING, IT/legal non-commercial). **The bottleneck has shifted to (a) the founder's vetting
+queue and (b) ENRICHMENT** — 1,090 of ~1,166 harvest suppliers still lack a `contact_email` (the RFQ-loop blocker).
+Enrichment batch #1 (ES/legal_admin, 20 approved firms, contact-email fill via `enrich_suppliers.py`, fill-empty) is teed up,
+gated on the founder's direct go-ahead to the relay.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
