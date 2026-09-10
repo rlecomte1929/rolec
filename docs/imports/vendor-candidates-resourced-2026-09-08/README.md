@@ -821,6 +821,26 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   pending). Create-only guard held: approved count **218 unchanged** across the op. CA/legal 3 → 4.
   First Canada land — the LSO register + XX-CA corridor confirmed working end-to-end (`.ca` bug-unaffected).
 
+### XX-CA housing_agencies (Toronto) via RECO — `vendor-resourced-xx-ca-housing-toronto-2026-09-10` — ⛔ PARKED, NOT LANDED (no artifact) — STRUCTURALLY THIN
+- **Nothing landed.** Otto's RECO Registrant Search lookup stalled on all 3 in-chat attempts (the
+  reconnect-drops-the-in-progress-run Audos flakiness, ×3 across a pause). Per the "never invent an
+  accreditation number" rule Otto refused to fabricate RECO registration numbers → **0 sourced /
+  10 rejected**, no GCS artifact → no hand-landing from a text list (same discipline as Valencia /
+  NL banks / AU tax / AU banks). `reco.on.ca` is a wired PUBLIC_REGISTER; the block was verifying each
+  firm's RECO#, not the register wiring or the XX-CA corridor (both confirmed by the CA/legal land above).
+- **10 real Toronto brokerages recorded for a calm re-run** (reco.on.ca register, XX-CA,
+  housing_agencies — all rejected "RECO# not verified", NOT landable without a verified number):
+  Brookfield, Weichert, Dwellworks, SIRVA, Benecke, Royal LePage, RE/MAX Hallmark, Engel & Völkers
+  Toronto Central, Harvey Kalles, Chestnut Park.
+- **⚠ STRUCTURAL LEARNING:** Toronto RECO housing is thin the same way AU housing (self-published
+  licence#) and SE housing (FMI sales-agents-only) are — brokerages rarely self-publish their RECO#.
+  Better future CA-housing predicate: look each firm up **by name** in RECO Registrant Search to obtain
+  its number (vetter confirms), rather than requiring self-publication. A background-task retry
+  (web_fetch vs RECO Registrant Search, no reply-timeout) was offered by Otto and flagged to the
+  founder — not run.
+- Tripwire untouched (no write): create-only invariant, approved count unchanged (no op). CA/housing
+  stays at 0 until re-sourced with an artifact.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
