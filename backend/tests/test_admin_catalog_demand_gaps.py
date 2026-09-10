@@ -97,6 +97,7 @@ class DemandGapsTests(unittest.TestCase):
         self.assertEqual(kw["destination_city"], "Munich")
         self.assertEqual(out["scraped_count"], 2)
         self.assertTrue(out["allowlisted"])
+        self.assertIn("lookup_ran", out)
 
     def test_fill_tolerates_already_allowlisted(self):
         from backend.app.services import scrape_safety, catalog_scraper
@@ -106,6 +107,20 @@ class DemandGapsTests(unittest.TestCase):
         # Still scrapes even when the allowlist entry already exists; empty
         # scraper result (disabled / no key) is a valid 0, not an error.
         scrape.assert_called_once()
+        self.assertEqual(out["scraped_count"], 0)
+        self.assertIn("lookup_ran", out)
+
+    def test_fill_lookup_ran_false_when_scraper_disabled(self):
+        from backend.app.services import scrape_safety, catalog_scraper
+
+        with mock.patch.object(scrape_safety, "add_allowlist_entry", return_value={}), \
+             mock.patch.object(catalog_scraper, "populate_destination_catalog", return_value=[]), \
+             mock.patch.object(catalog_scraper, "_enabled", return_value=False):
+            out = mod.fill_demand_gap(
+                mod.FillGapBody(category="movers", city="Munich", country="Germany"),
+                user=_ADMIN,
+            )
+        self.assertFalse(out["lookup_ran"])
         self.assertEqual(out["scraped_count"], 0)
 
 
