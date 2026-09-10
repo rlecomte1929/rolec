@@ -31,6 +31,8 @@ export const HrEmployeeDetail: React.FC = () => {
   const [assignmentType, setAssignmentType] = useState('');
   const [status, setStatus] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   // `error` is also written by handleSave, so keep it local and fold the read
   // error into what we render below.
   const [error, setError] = useState('');
@@ -102,6 +104,28 @@ export const HrEmployeeDetail: React.FC = () => {
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!id) return;
+    setIsRemoving(true);
+    setError('');
+    try {
+      await hrAPI.deleteEmployee(id);
+      await queryClient.invalidateQueries({ queryKey: ['hr', 'company-employees'] });
+      safeNavigate(navigate, 'hrEmployees');
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string }; status?: number } };
+      if (e.response?.status === 404) {
+        setError('Employee not found.');
+      } else {
+        const detail = e.response?.data?.detail;
+        setError(typeof detail === 'string' ? detail : 'Failed to remove employee.');
+      }
+      setConfirmRemove(false);
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -209,11 +233,33 @@ export const HrEmployeeDetail: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <div className="pt-2">
-                <Button onClick={handleSave} disabled={isSaving}>
+              <div className="pt-2 flex flex-wrap items-center gap-2">
+                <Button onClick={handleSave} disabled={isSaving || isRemoving}>
                   {isSaving ? 'Saving…' : 'Save changes'}
                 </Button>
+                {!confirmRemove ? (
+                  <Button variant="outline" onClick={() => setConfirmRemove(true)} disabled={isRemoving}>
+                    Remove from company
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      unstyled
+                      className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
+                      onClick={handleRemove}
+                      disabled={isRemoving}
+                    >
+                      {isRemoving ? 'Removing…' : 'Confirm remove'}
+                    </Button>
+                    <Button variant="outline" onClick={() => setConfirmRemove(false)} disabled={isRemoving}>
+                      Cancel
+                    </Button>
+                  </>
+                )}
               </div>
+              <p className="text-xs text-[#6b7280]">
+                Removing them from the company roster does not delete their ReloPass account or active cases.
+              </p>
             </div>
           </Card>
         )}
