@@ -1,4 +1,3 @@
-import posthog from 'posthog-js';
 import { env } from './config/env';
 // NOTE: getTestDriveSession is imported LAZILY inside ensureTestDriveReplay (not
 // at module top). It lives in ./api/testDrive, which imports ./api/client →
@@ -7,12 +6,33 @@ import { env } from './config/env';
 // static graph means `track()` / analyticsEvents can be imported by any component
 // without dragging supabase into its module graph and breaking that component's
 // unit tests. Runtime behaviour is unchanged (replay is best-effort, idempotent).
+//
+// posthog-js is also imported lazily (see loadPosthog). The SDK is ~the size of
+// the app entry; we only pull it in after analytics consent is granted, or when
+// a test-drive session must start replay. Until then capturing stays off.
 
+let client: PosthogClient | null = null;
 let enabled = false;
+let loadPromise: Promise<PosthogClient | null> | null = null;
 let replayStarted = false;
 
 /** localStorage key holding the visitor's analytics consent decision. */
 const CONSENT_KEY = 'relopass_analytics_consent';
+
+/**
+ * Minimal surface we use on the posthog-js default export. Kept local so this
+ * module has no static `import` from 'posthog-js' (type-only or otherwise).
+ */
+type PosthogClient = {
+  init: (key: string, options: Record<string, unknown>) => void;
+  opt_in_capturing: () => void;
+  opt_out_capturing: () => void;
+  capture: (event: string, properties?: Record<string, unknown>) => void;
+  register: (properties: Record<string, unknown>) => void;
+  identify: (distinctId: string, properties?: Record<string, unknown>) => void;
+  startSessionRecording: () => void;
+  get_distinct_id?: () => string;
+};
 
 /**
  * Read the stored analytics consent decision. `null` = the visitor has not yet
@@ -28,6 +48,62 @@ export function getAnalyticsConsent(): 'granted' | 'denied' | null {
   }
 }
 
+/** Apply the latest stored consent to a live SDK instance. */
+function syncConsent(posthog: PosthogClient): void {
+  const consent = getAnalyticsConsent();
+  if (consent === 'granted') posthog.opt_in_capturing();
+  else if (consent === 'denied') posthog.opt_out_capturing();
+}
+
+/**
+ * Dynamic-import posthog-js and init once. Resolves null when there is no key
+ * or the import fails. Concurrent callers share the same in-flight promise.
+ */
+function loadPosthog(): Promise<PosthogClient | null> {
+  if (client) return Promise.resolve(client);
+  if (loadPromise) return loadPromise;
+  const key = env.posthogKey;
+  if (!key) return Promise.resolve(null);
+
+  loadPromise = import('posthog-js')
+    .then((mod) => {
+      if (client) return client;
+      const posthog = mod.default as PosthogClient;
+      const host = env.posthogHost;
+      posthog.init(key, {
+        api_host: host,
+        capture_pageview: true,
+        persistence: 'localStorage+cookie',
+        autocapture: false,
+        // GDPR: opt OUT of all capturing (events + cookies) until the visitor grants
+        // consent via the ConsentBanner. A returning visitor who already granted stays
+        // opted in. Test-drive sessions opt themselves in (see ensureTestDriveReplay) —
+        // testers consent as part of the provisioning flow.
+        opt_out_capturing_by_default: getAnalyticsConsent() !== 'granted',
+        // PII backstop via posthog's native denylist (safe — never strips the api_key).
+        property_denylist: PII_KEYS,
+        // TD-M2 (AIQ-1560): the SDK stays loaded for product/marketing analytics, but
+        // session RECORDING is OFF by default so real HR/employee/admin users are never
+        // recorded. Recording is started ONLY inside a test-drive session (see
+        // ensureTestDriveReplay). maskAllInputs redacts every input value (the tester's
+        // survey name/email, plus any password/token) in the replays we do capture.
+        disable_session_recording: true,
+        session_recording: { maskAllInputs: true },
+      });
+      client = posthog;
+      enabled = true;
+      // Consent may have flipped while the chunk was downloading (Accept after a
+      // late init, or Decline mid-load). Honour the stored decision now.
+      syncConsent(posthog);
+      return posthog;
+    })
+    .catch(() => {
+      loadPromise = null;
+      return null;
+    });
+  return loadPromise;
+}
+
 /** Grant consent: persist and start capturing. Called by the ConsentBanner. */
 export function grantAnalyticsConsent(): void {
   try {
@@ -35,7 +111,13 @@ export function grantAnalyticsConsent(): void {
   } catch {
     /* best-effort */
   }
-  if (enabled) posthog.opt_in_capturing();
+  if (enabled && client) {
+    client.opt_in_capturing();
+    return;
+  }
+  // SDK not loaded yet (first Accept, or init still in flight). Kick off load;
+  // syncConsent after init calls opt_in if this grant still stands.
+  void loadPosthog();
 }
 
 /** Revoke consent: persist and stop capturing (also stops any active replay). */
@@ -45,7 +127,8 @@ export function revokeAnalyticsConsent(): void {
   } catch {
     /* best-effort */
   }
-  if (enabled) posthog.opt_out_capturing();
+  // Safe if the SDK never loaded — first-time Decline never imported posthog-js.
+  if (enabled && client) client.opt_out_capturing();
 }
 
 // PII property keys stripped from every event before it leaves the browser, as a
@@ -66,29 +149,11 @@ const PII_KEYS = [
 export function initAnalytics(): void {
   const key = env.posthogKey;
   if (!key) return;
-
-  const host = env.posthogHost;
-  posthog.init(key, {
-    api_host: host,
-    capture_pageview: true,
-    persistence: 'localStorage+cookie',
-    autocapture: false,
-    // GDPR: opt OUT of all capturing (events + cookies) until the visitor grants
-    // consent via the ConsentBanner. A returning visitor who already granted stays
-    // opted in. Test-drive sessions opt themselves in (see ensureTestDriveReplay) —
-    // testers consent as part of the provisioning flow.
-    opt_out_capturing_by_default: getAnalyticsConsent() !== 'granted',
-    // PII backstop via posthog's native denylist (safe — never strips the api_key).
-    property_denylist: PII_KEYS,
-    // TD-M2 (AIQ-1560): the SDK stays loaded for product/marketing analytics, but
-    // session RECORDING is OFF by default so real HR/employee/admin users are never
-    // recorded. Recording is started ONLY inside a test-drive session (see
-    // ensureTestDriveReplay). maskAllInputs redacts every input value (the tester's
-    // survey name/email, plus any password/token) in the replays we do capture.
-    disable_session_recording: true,
-    session_recording: { maskAllInputs: true },
-  });
-  enabled = true;
+  // Returning visitor who already consented: load the SDK now. Undecided and
+  // declined visitors do not pay the posthog-js download on first paint.
+  if (getAnalyticsConsent() === 'granted') {
+    void loadPosthog();
+  }
 }
 
 /**
@@ -101,14 +166,16 @@ export function initAnalytics(): void {
  * a normal HR/employee/admin page.
  */
 export function ensureTestDriveReplay(): void {
-  if (!enabled || replayStarted) return;
+  if (replayStarted) return;
   // Lazy-load testDrive (and its api/client chain) only when we actually need it —
   // see the import note at the top of this file. Fire-and-forget: replay start is
   // best-effort and already idempotent via `replayStarted`.
-  void import('./api/testDrive').then(({ getTestDriveSession }) => {
+  void import('./api/testDrive').then(async ({ getTestDriveSession }) => {
     if (replayStarted) return;
     const slice = getTestDriveSession();
     if (!slice?.session_id) return; // not a test-drive session — never record
+    const posthog = await loadPosthog();
+    if (!posthog || replayStarted) return;
     try {
       // Testers consent to recording as part of the test-drive provisioning flow, so
       // opt this synthetic session in explicitly (real users stay opted out until they
@@ -130,11 +197,11 @@ export function ensureTestDriveReplay(): void {
 }
 
 export function track(event: string, properties?: Record<string, unknown>): void {
-  if (!enabled) return;
+  if (!enabled || !client) return;
   // Feedback join keys (never put message/screenshot here):
   //   feedback_widget_opened { route }
   //   feedback_submitted { report_id, category, route }
-  posthog.capture(event, properties);
+  client.capture(event, properties);
 }
 
 /**
@@ -144,8 +211,8 @@ export function track(event: string, properties?: Record<string, unknown>): void
  * (AIQ-1223b) can be segmented by arm. No-op without an analytics key.
  */
 export function registerSuperProperties(properties: Record<string, unknown>): void {
-  if (!enabled) return;
-  posthog.register(properties);
+  if (!enabled || !client) return;
+  client.register(properties);
 }
 
 /** Emit a marketing funnel event to BOTH PostHog and the server-side
@@ -176,15 +243,19 @@ let bugReplayStarted = false;
  * id / replay url then ride along on the report via collectDiagnostics().
  */
 export function startBugReportRecording(): void {
-  if (!enabled || bugReplayStarted) return;
+  if (bugReplayStarted) return;
   if (getAnalyticsConsent() !== 'granted') return; // never record a user who declined
-  try {
-    posthog.opt_in_capturing();
-    posthog.startSessionRecording();
-    bugReplayStarted = true;
-  } catch {
-    /* best-effort — never surface to the reporter */
-  }
+  void loadPosthog().then((posthog) => {
+    if (!posthog || bugReplayStarted) return;
+    if (getAnalyticsConsent() !== 'granted') return;
+    try {
+      posthog.opt_in_capturing();
+      posthog.startSessionRecording();
+      bugReplayStarted = true;
+    } catch {
+      /* best-effort — never surface to the reporter */
+    }
+  });
 }
 
 // posthog-js exposes these on the module instance. get_distinct_id is typed; the
@@ -196,9 +267,9 @@ type PosthogSessionApi = {
 
 /** Current PostHog person distinct id — reliable (module instance, not window.posthog). */
 export function getPosthogDistinctId(): string | null {
-  if (!enabled) return null;
+  if (!enabled || !client) return null;
   try {
-    return posthog.get_distinct_id?.() ?? null;
+    return client.get_distinct_id?.() ?? null;
   } catch {
     return null;
   }
@@ -206,10 +277,10 @@ export function getPosthogDistinctId(): string | null {
 
 /** Current PostHog session id — ties a bug report to its session replay. */
 export function getPosthogSessionId(): string | null {
-  if (!enabled) return null;
+  if (!enabled || !client) return null;
   try {
-    const fn = (posthog as unknown as PosthogSessionApi).get_session_id;
-    return fn ? fn.call(posthog) ?? null : null;
+    const fn = (client as unknown as PosthogSessionApi).get_session_id;
+    return fn ? fn.call(client) ?? null : null;
   } catch {
     return null;
   }
@@ -217,10 +288,10 @@ export function getPosthogSessionId(): string | null {
 
 /** Direct URL to the current session's replay, when the SDK exposes it. */
 export function getPosthogReplayUrl(): string | null {
-  if (!enabled) return null;
+  if (!enabled || !client) return null;
   try {
-    const fn = (posthog as unknown as PosthogSessionApi).get_session_replay_url;
-    return fn ? fn.call(posthog, { withTimestamp: true }) ?? null : null;
+    const fn = (client as unknown as PosthogSessionApi).get_session_replay_url;
+    return fn ? fn.call(client, { withTimestamp: true }) ?? null : null;
   } catch {
     return null;
   }
@@ -233,4 +304,13 @@ export function readUtm(): { utm_source?: string; utm_campaign?: string } {
     utm_source: usp.get('utm_source') || undefined,
     utm_campaign: usp.get('utm_campaign') || undefined,
   };
+}
+
+/** @internal Drop lazy-SDK state so unit tests start from a cold visitor. */
+export function resetAnalyticsForTests(): void {
+  client = null;
+  enabled = false;
+  loadPromise = null;
+  replayStarted = false;
+  bugReplayStarted = false;
 }

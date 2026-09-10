@@ -2,7 +2,8 @@
    The previous Google Fonts @import was removed to stop leaking visitor IPs
    to Google's CDN (GDPR). */
 
-@import 'flag-icons/css/flag-icons.min.css';
+/* flag-icons CSS is imported from CountryFlag.tsx so the marketing homepage
+   does not parse the full flag sprite sheet. Do not add Google Fonts here. */
 
 @tailwind base;
 @tailwind components;

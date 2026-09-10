@@ -784,6 +784,18 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   confirms). Same shape as the SE/housing FMI thinness — the register is fine; the sourcing predicate
   was too strict.
 
+### XX-AU tax_finance (Sydney) via TPB — `vendor-resourced-xx-au-tax-sydney-2026-09-10` — ⛔ PARKED, NOT LANDED (no artifact)
+- **Nothing landed.** Audos errored right before upload across 3 attempts (research reached real TPB
+  numbers each time). No GCS artifact → no hand-landing from a text list (same discipline as Valencia/
+  NL banks/AU tax). Not a data or com.au-fix problem — purely Audos instability.
+- **Confirmed TPB firms recorded for a calm rerun** (tpb.gov.au root, XX-AU, tax_finance): Murphy Tax /
+  Bradley Murphy TPB 25999083 (⚠ registered Black Rock VIC but has a Sydney office — vetter's call on
+  Sydney inclusion); HLB Mann Judd (NSW) Pty Ltd (ABN 32 001 500 358, Sydney expat-tax, TPB# to confirm);
+  Expat Tax Specialists Pty Ltd (Sydney expat-tax); Pitcher Partners Sydney (TPB# to confirm). One clean
+  TPB rerun should get 3-5.
+- Tripwire untouched (no write): create-only invariant, approved count unchanged (no op). AU/tax stays
+  at its prior count until re-sourced with an artifact.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
