@@ -796,6 +796,19 @@ generator before the first batch; London GB legal came back with per-firm URLs o
 - Tripwire untouched (no write): create-only invariant, approved count unchanged (no op). AU/tax stays
   at its prior count until re-sourced with an artifact.
 
+### XX-AU banks (Sydney) via APRA — `vendor-resourced-xx-au-banks-sydney-2026-09-10` — ⛔ PARKED, NOT LANDED (no artifact)
+- **Nothing landed.** Audos errored within ~4 min on 2 back-to-back attempts; no GCS artifact → no
+  hand-landing (same discipline as Valencia / NL banks / AU tax). Lowest-value AU cell anyway — the
+  major ADIs heavily dedup against the 2026-08-31 AU/global banks already in prod.
+- **Confirmed APRA ADIs recorded for a calm rerun** (apra.gov.au ADI register root, XX-AU, banks):
+  CBA/Commonwealth Bank, Westpac, ANZ, NAB, Macquarie Bank, ING Australia (ING Bank Australia Ltd),
+  HSBC Australia, Bendigo & Adelaide Bank. Expect net low after dedup; run the `_name_key`+domain
+  predictor + the #2219 national-arm guard on the foreign subs (ING/HSBC AU) before landing.
+- Tripwire untouched (no write): create-only invariant, approved count unchanged (no op).
+- **AU front summary:** legal **8** (5 net-new incl. the +4 com.au re-land) + housing **5** (+1) landed;
+  **tax + banks PARKED** (Audos flakiness — firms recorded above). Next front: Canada (pre-flighted,
+  all 5 registers wired PUBLIC_REGISTER).
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
