@@ -1,0 +1,76 @@
+{
+  "batch_id": "vendor-resourced-xx-it-housing-naples-2026-09-09",
+  "category": "housing_agencies",
+  "city": "Naples",
+  "generated_at": "2026-09-09",
+  "total_sourced": 6,
+  "total_rejected": 6,
+  "firms": [
+    {
+      "name": "Knight Immobiliare s.r.l.",
+      "status": "sourced",
+      "rea_number": "REA NA-648197",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "360° Real Estate & Services (360RES)",
+      "status": "sourced",
+      "rea_number": "REA NA-973451",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "RE/MAX Immobiliari Uniti",
+      "status": "sourced",
+      "rea_number": "REA NA-806141",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "FGIMMOBILIARE di Errico Giovanni (REPLAT Affiliato Bagnoli)",
+      "status": "sourced",
+      "rea_number": "REA NA-1055730",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "Erre Emme Servizi Immobiliari di Riccardo Mirone",
+      "status": "sourced",
+      "rea_number": "REA NA-725632",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "Coldwell Banker 24RE",
+      "status": "sourced",
+      "rea_number": "REA NA-1562255",
+      "source_url": "https://www.registroimprese.it/"
+    },
+    {
+      "name": "My Place Napoli",
+      "status": "reject",
+      "reason": "Vacation/short-term rental management company (Airbnb, Booking.com). REA NA-1089215 is a valid NA-province number published on own site, but service scope (tourist lets, not corporate/long-term relocation) does not match housing_agencies for relocating employees."
+    },
+    {
+      "name": "Edilblu Case S.r.l.",
+      "status": "reject",
+      "reason": "Registered and operating from Capri (Via Marina Grande 238, 80073 Capri), not Naples city. REA NA-799131 is valid NA-province but the office location is outside the Naples city scope requested."
+    },
+    {
+      "name": "Grimaldi Immobiliare Napoli Vomero Cilea",
+      "status": "reject",
+      "reason": "No verifiable REA number found on firm's own website or controlled commercial pages; cannot confirm NA-province enrollment."
+    },
+    {
+      "name": "Casagency Immobiliare (Frazionamenti Stabili S.r.l.)",
+      "status": "reject",
+      "reason": "REA NA-708425 confirmed in Registro Imprese aggregator records (P.IVA 04697731216) but NOT published on the firm's own website (casagencyimmobiliare.it) — only P.IVA is shown. Fails the self-publication requirement."
+    },
+    {
+      "name": "L'Immobiliare.com Napoli Chiaia (Lombardi & C. s.r.l.)",
+      "status": "reject",
+      "reason": "No REA number published on firm's own website (napolichiaia.limmobiliare.com); only P.IVA 07605530638 shown. Fails the self-publication requirement."
+    },
+    {
+      "name": "Faggella Immobiliare",
+      "status": "reject",
+      "reason": "FIMAA member at Via Francesco Crispi 92, Chiaia, Naples. Own website (faggella.net) returned no accessible content; no verifiable published REA number could be confirmed from any firm-controlled page."
+    }
+  ]
+}

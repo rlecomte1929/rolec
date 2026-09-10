@@ -68,6 +68,16 @@ _pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 AUTH_PERF_DEBUG = os.getenv("AUTH_PERF_DEBUG", "").lower() in ("1", "true", "yes")
 
+
+def _coerce_user_role(raw: Any) -> UserRole:
+    key = str(raw or "").strip().upper()
+    if key == "EMPLOYEE_USER":
+        key = "EMPLOYEE"
+    try:
+        return UserRole(key)
+    except ValueError:
+        return UserRole.EMPLOYEE
+
 # Login must not block on the EMPLOYEE post-signin reconcile path. A slow or
 # wedged query in reconcile previously held the request open until Cloudflare's
 # 100s edge timeout. Cap reconcile to a strict budget; if it overruns, the
@@ -477,7 +487,7 @@ def login(body: LoginRequest, request: Request):
     )
     profile = db.get_profile_record(user["id"])
 
-    effective_role = UserRole(user["role"])
+    effective_role = _coerce_user_role(user.get("role"))
     if _is_admin_user(user):
         effective_role = UserRole.ADMIN
 
@@ -710,7 +720,7 @@ def exchange_supabase_token(
     )
     profile = db.get_profile_record(user["id"])
 
-    effective_role = UserRole(user["role"])
+    effective_role = _coerce_user_role(user.get("role"))
     if _is_admin_user(user):
         effective_role = UserRole.ADMIN
 

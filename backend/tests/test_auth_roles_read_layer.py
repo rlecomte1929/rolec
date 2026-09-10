@@ -108,6 +108,15 @@ class GetCurrentUserRolesTests(unittest.TestCase):
         self.assertEqual(u["roles"], ["EMPLOYEE"])
         self.assertEqual(u["primary_role"], "EMPLOYEE")
 
+    def test_fallback_role_is_held_when_junction_omits_it(self):
+        m = self._base_mock(
+            {"id": "u1", "role": "HR", "email": "h@x"},
+            role_rows=[{"role": "EMPLOYEE", "is_primary": False}],
+        )
+        u = self._call(m)
+        self.assertEqual(set(u["roles"]), {"HR", "EMPLOYEE"})
+        self.assertEqual(u["primary_role"], "HR")
+
     def test_admin_short_circuit_keeps_admin(self):
         m = self._base_mock({"id": "a1", "role": "ADMIN", "email": "a@x"}, role_rows=[])
         u = self._call(m)

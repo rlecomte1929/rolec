@@ -23,6 +23,7 @@ import {
   type EmployeeDemandRow,
 } from '../api/hrCatalog';
 import { HrVendorCuration } from './HrVendorCuration';
+import { getCountryName } from '../utils/countries';
 
 type ServiceTab = 'dashboard' | 'vendor' | 'providers';
 
@@ -191,7 +192,7 @@ function ServiceProvidersDashboard({
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {g.rows.slice(0, 4).map((r) => (
                     <Badge key={r.id} variant="neutral" size="sm">
-                      {[r.destination_city, r.destination_country].filter(Boolean).join(', ') || 'Unspecified'} · {r.demand_count}
+                      {[r.destination_city, getCountryName(r.destination_country) || r.destination_country].filter(Boolean).join(', ') || 'Unspecified'} · {r.demand_count}
                     </Badge>
                   ))}
                 </div>

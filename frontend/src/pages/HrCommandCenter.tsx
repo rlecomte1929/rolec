@@ -12,6 +12,7 @@ import { hrAPI } from '../api/client';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { HrExceptionsQueueCard } from '../features/exceptions/HrExceptionsQueueCard';
 import { ComplianceAlertsPanel } from '../features/hr/ComplianceAlertsPanel';
+import { getCountryName } from '../utils/countries';
 
 type CaseRow = {
   id: string;
@@ -155,7 +156,7 @@ export const HrCommandCenter: React.FC = () => {
                       className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0b2b43]"
                     >
                       <td className="py-3 pr-4 text-[#0b2b43] font-medium">{row.employeeIdentifier}</td>
-                      <td className="py-3 pr-4 text-[#4b5563]">{row.destCountry || '-'}</td>
+                      <td className="py-3 pr-4 text-[#4b5563]">{getCountryName(row.destCountry) || '-'}</td>
                       <td className="py-3 pr-4 text-[#4b5563]">{row.status}</td>
                       <td className="py-3 pr-4">
                         <RiskBadge status={row.riskStatus as 'green' | 'yellow' | 'red'} size="sm" />

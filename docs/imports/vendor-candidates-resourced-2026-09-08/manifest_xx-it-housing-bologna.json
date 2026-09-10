@@ -1,0 +1,27 @@
+{
+  "batch_id": "vendor-resourced-xx-it-housing-bologna-2026-09-09",
+  "category": "housing_agencies",
+  "city": "Bologna",
+  "country": "IT",
+  "sourced_at": "2026-09-09",
+  "total_sourced": 7,
+  "total_rejected": 8,
+  "notes": "REA province code BO confirmed for all sourced firms. corridor INTL-IT = multi-origin international-to-Bologna. One firm (Appartamenti Bologna) sourced from Google snippet extraction of live site — human vetter to confirm REA on firm website.",
+  "firms": [
+    {"name": "Mondore Srl", "status": "sourced", "rea_number": "REA BO-513838", "source_url": "https://www.registroimprese.it/", "website": "https://www.mondore.it"},
+    {"name": "InquiliniDOC — Daniele Castagna", "status": "sourced", "rea_number": "REA BO-541703", "source_url": "https://www.registroimprese.it/", "website": "https://www.inquilinidoc.it"},
+    {"name": "Casa dei Professionisti — Ferro Claudio & C. SAS", "status": "sourced", "rea_number": "REA BO-425339", "source_url": "https://www.registroimprese.it/", "website": "https://www.casadeiprofessionisti.it"},
+    {"name": "Studio Giannerini S.n.c.", "status": "sourced", "rea_number": "REA BO-426997", "source_url": "https://www.registroimprese.it/", "website": "https://www.studiogiannerini.it"},
+    {"name": "Realkasa — Immobiliare RK Andrea Costa Srl", "status": "sourced", "rea_number": "REA BO-504653", "source_url": "https://www.registroimprese.it/", "website": "https://www.realkasa.it"},
+    {"name": "Realkasa — Immobiliare RK Azeglio Srl", "status": "sourced", "rea_number": "REA BO-514022", "source_url": "https://www.registroimprese.it/", "website": "https://www.realkasa.it"},
+    {"name": "Appartamenti Bologna — Andrea Cerasi", "status": "sourced", "rea_number": "REA BO-495281", "source_url": "https://www.registroimprese.it/", "website": "https://appartamentibologna.com"},
+    {"name": "Relocate Bologna", "status": "reject", "reason": "No REA/ruolo agenti number published on relocatebologna.it; operates as relocation consultant under P.IVA 03858651205, not a licensed agenzia immobiliare"},
+    {"name": "Engel & Völkers Bologna", "status": "reject", "reason": "No REA BO number found on engelvoelkers.com/it/it/shops/bologna; shop page displays no REA despite showing full contact and team info"},
+    {"name": "Felsina Real Estate", "status": "reject", "reason": "No REA number found on felsinarealestate.com; imprint page present but empty of REA; third-party immobiliare.it listing shows REA BO-548041 only for Casalecchio branch, not main Bologna entity"},
+    {"name": "Malossini Studio Casa", "status": "reject", "reason": "No REA number found on malossini.it; footer shows P.IVA IT03936521206 only"},
+    {"name": "Coldwell Banker Prime Properties Bologna", "status": "reject", "reason": "No REA BO number found on coldwellbanker.it agency page; shows P.IVA 04122961206 only"},
+    {"name": "Giordani & Partners Real Estate", "status": "reject", "reason": "No REA found on firm's own website giordanire.com; third-party cercacasa.it shows REA 455844 without province code — not confirmed from firm's own published material"},
+    {"name": "Abitare Bologna Srl", "status": "reject", "reason": "No REA number found on abitarebologna.it; footer shows P.IVA 01999491200 only"},
+    {"name": "Immobiliare Maggiore", "status": "reject", "reason": "No REA number found on immobiliaremaggiore.it"}
+  ]
+}

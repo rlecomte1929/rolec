@@ -1,0 +1,78 @@
+{
+  "batch_id": "vendor-resourced-xx-es-legal-barcelona-2026-09-09",
+  "category": "legal_admin",
+  "city": "Barcelona",
+  "total_sourced": 4,
+  "total_rejected": 9,
+  "firms": [
+    {
+      "name": "Rodríguez Calistro Abogados",
+      "status": "sourced",
+      "colegiado": "36453",
+      "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"
+    },
+    {
+      "name": "Ventura Extranjería Abogados",
+      "status": "sourced",
+      "colegiado": "46337",
+      "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"
+    },
+    {
+      "name": "Calero Legal Abogados",
+      "status": "sourced",
+      "colegiado": "47049",
+      "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"
+    },
+    {
+      "name": "Català Reinón Abogados",
+      "status": "sourced",
+      "colegiado": "19731",
+      "source_url": "https://www.abogacia.es/servicios/ciudadanos/servicios-de-orientacion-juridica-gratuita/censo-de-letrados/"
+    },
+    {
+      "name": "BCN Extranjería / Abogados Extranjería Barcelona (abogadosextranjeriabarcelona.com)",
+      "status": "rejected",
+      "reason": "ICAB number conflict: firm's own site attributes ICAB 19731 to Gemma Reinón Tardáguila, but Català Reinón Abogados' own site (catala-reinon.es) explicitly attributes 19731 to a different lawyer (Jordi Català Soriano) and attributes 22600 to Gemma Reinón. Unresolvable without register access — vetter should verify against ICAB census."
+    },
+    {
+      "name": "Barcelona Extranjería Abogados (barcelonaextranjeria.com)",
+      "status": "rejected",
+      "reason": "No ICAB colegiado number published on any page of the firm's own website. Founder Anna Estella Monteys is confirmed ICAB-registered per EU Lawyers Union and LinkedIn, but the firm does not publish her número on site."
+    },
+    {
+      "name": "Immigration Spain / Lawyers Spain (immigrationspain.es)",
+      "status": "rejected",
+      "reason": "No ICAB colegiado number published for CEO Cristian Balcells or any member of the immigration team on the firm's own website."
+    },
+    {
+      "name": "Orlando Ochoa Abogados (orlandoochoaabogados.com)",
+      "status": "rejected",
+      "reason": "No ICAB colegiado number published on the firm's website; firm's registered office is in L'Hospitalet de Llobregat (Avinguda del Torrent Gornal 42, 08904), not Barcelona city."
+    },
+    {
+      "name": "Conesa Legal (conesalegal.com)",
+      "status": "rejected",
+      "reason": "Immigration lawyers Luciana Torrents and Esjaba Messaoud El-Ghadi both practise extranjería from the Barcelona office, but no ICAB colegiado number is published for either on the firm's own website."
+    },
+    {
+      "name": "Martínez Caballero Abogados (martinezcaballeroabogados.com)",
+      "status": "rejected",
+      "reason": "Firm practises immigration/extranjería law in Barcelona but no ICAB colegiado numbers are published on the firm's website for founders Diana Caballero or Jose María Martínez."
+    },
+    {
+      "name": "Isabel Fernández Abogada (isabelfernandezabogada.com)",
+      "status": "rejected",
+      "reason": "Practises extranjería in Barcelona; contact email is fernandezisabel@icab.cat (confirming ICAB membership) but no specific colegiado número is published on the firm's own website."
+    },
+    {
+      "name": "AS Abogada (asabogada.com)",
+      "status": "rejected",
+      "reason": "Anisha Samtani practises extranjería and labour law from Travessera de Gràcia 18-20, Barcelona; uses anisha.samtani@icab.cat confirming ICAB membership, but no colegiado número is published on the firm's own website."
+    },
+    {
+      "name": "Extranjería al Día (extranjeriaaldia.es)",
+      "status": "rejected",
+      "reason": "National network/directory of immigration lawyers across Spain, not a single Barcelona law firm. The Barcelona-based lawyer in the network, María Elisa Rodríguez Calistro (ICAB 36453), has been sourced separately under her own firm Rodríguez Calistro Abogados."
+    }
+  ]
+}
