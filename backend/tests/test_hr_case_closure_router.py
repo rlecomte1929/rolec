@@ -40,8 +40,17 @@ class _Recorder:
     def get_assignment_by_id(self, aid):
         return dict(self.assignment) if aid == "asg-1" else None
 
+    def get_assignment_by_case_id(self, cid):
+        if cid in (self.assignment.get("id"), self.assignment.get("case_id"),
+                   self.assignment.get("canonical_case_id")):
+            return dict(self.assignment)
+        return None
+
     def get_relocation_case(self, cid):
-        return dict(self.case) if cid == "case-1" else None
+        return dict(self.case) if cid == self.case["id"] else None
+
+    def assignment_belongs_to_company(self, aid, company_id):
+        return aid == self.assignment.get("id") and company_id == self.case.get("company_id")
 
     def update_assignment_status(self, aid, status, request_id=None):
         self.status_writes.append((aid, status))
@@ -55,7 +64,9 @@ class _Recorder:
 def rec(monkeypatch):
     r = _Recorder()
     monkeypatch.setattr(hr_case_closure.db, "get_assignment_by_id", r.get_assignment_by_id)
+    monkeypatch.setattr(hr_case_closure.db, "get_assignment_by_case_id", r.get_assignment_by_case_id)
     monkeypatch.setattr(hr_case_closure.db, "get_relocation_case", r.get_relocation_case)
+    monkeypatch.setattr(hr_case_closure.db, "assignment_belongs_to_company", r.assignment_belongs_to_company)
     monkeypatch.setattr(hr_case_closure.db, "update_assignment_status", r.update_assignment_status)
     monkeypatch.setattr(hr_case_closure.db, "insert_case_event", r.insert_case_event)
     # The outstanding probe is advisory and hits raw SQL; pin it so these tests are
@@ -158,6 +169,23 @@ def test_outstanding_probe_degrades_to_zeros_rather_than_raising(monkeypatch):
 
     monkeypatch.setattr(hr_case_closure.db, "engine", _BrokenEngine())
     assert hr_case_closure._outstanding_for_case("case-1") == hr_case_closure.Outstanding()
+
+
+def test_close_accepts_relocation_case_id(client, rec):
+    """Command-center URLs sometimes carry relocation_cases.id, not the assignment PK."""
+    r = client.post("/api/hr/assignments/case-1/close", json={})
+    assert r.status_code == 200
+    assert rec.status_writes == [("asg-1", "closed")]
+    assert r.json()["assignment_id"] == "asg-1"
+
+
+def test_close_resolves_via_canonical_case_id(client, rec):
+    """Stale case_id with a live canonical_case_id used to 404 Close."""
+    rec.assignment["case_id"] = "stale-missing"
+    rec.assignment["canonical_case_id"] = "case-1"
+    r = client.post("/api/hr/assignments/asg-1/close", json={})
+    assert r.status_code == 200
+    assert rec.status_writes == [("asg-1", "closed")]
 
 
 def test_close_still_succeeds_when_the_probe_returns_nothing(client, rec, monkeypatch):
