@@ -329,7 +329,7 @@ export const ValueCreationSection: React.FC = () => {
           <div className="vc-diagram-card">
             <div className="vc-diagram-top">
               <p className="vc-t-today"><strong>Today —</strong> HR and the employee each chase the same movers, banks, lawyers and landlords separately. Status lives in inboxes, not in systems — nobody owns the whole picture, and things slip between them.</p>
-              <p className="vc-t-relo"><strong>With ReloPass —</strong> HR sets the rules once; the employee follows one guided journey; suppliers are orchestrated in order. Both sides read the same live case — the case does the coordination, so the team does the work.</p>
+              <p className="vc-t-relo"><strong>With ReloPass —</strong> HR sets the rules once; the employee follows one guided path; suppliers are orchestrated in order. Both sides read the same live case — the case does the coordination, so the team does the work.</p>
             </div>
             <div className="vc-diagram-stage">
               <div className="vc-stagewrap">
@@ -346,7 +346,7 @@ export const ValueCreationSection: React.FC = () => {
                   <path className="vc-rail-in vc-lk-emp" d="M190 244 C 265 244, 275 190, 330 190" />
                   <g>{RELO_OUT.map((d, i) => <path key={i} className="vc-rail-out" d={d} />)}</g>
                   <g className="vc-pnode vc-hrnode"><rect className="vc-node" x={70} y={72} width={120} height={48} rx={10} /><text className="vc-node-lab" x={130} y={94} textAnchor="middle">HR</text><text className="vc-node-sub" x={130} y={109} textAnchor="middle">sets policy</text></g>
-                  <g className="vc-pnode vc-emp vc-empnode"><rect className="vc-node" x={70} y={220} width={120} height={48} rx={10} /><text className="vc-node-lab" x={130} y={242} textAnchor="middle">EMPLOYEE</text><text className="vc-node-sub" x={130} y={257} textAnchor="middle">one journey</text></g>
+                  <g className="vc-pnode vc-emp vc-empnode"><rect className="vc-node" x={70} y={220} width={120} height={48} rx={10} /><text className="vc-node-lab" x={130} y={242} textAnchor="middle">EMPLOYEE</text><text className="vc-node-sub" x={130} y={257} textAnchor="middle">one clear path</text></g>
                   <rect className="vc-spine" x={330} y={72} width={140} height={196} rx={16} />
                   <text className="vc-spine-lab" x={400} y={164} textAnchor="middle">ReloPass</text>
                   <text className="vc-spine-sub" x={400} y={186} textAnchor="middle">ONE LIVE CASE</text>
@@ -462,7 +462,7 @@ export const ValueCreationSection: React.FC = () => {
                 <div className="vc-per">About <b>{money(perMove)}</b> saved on every relocation.</div>
               </div>
               <div className="vc-tiles">
-                <div className="vc-tile"><div className="vc-tl"><i className="vc-ic vc-ic-hrs" />HR hours freed / year</div><div className="vc-tv">{fmtInt(hoursSaved)}</div><div className="vc-tu">hours back to real work</div></div>
+                <div className="vc-tile"><div className="vc-tl"><i className="vc-ic vc-ic-hrs" />HR hours freed / year</div><div className="vc-tv">{fmtInt(hoursSaved)}</div><div className="vc-tu">reclaimed from coordination</div></div>
                 <div className="vc-tile"><div className="vc-tl"><i className="vc-ic vc-ic-hr" />HR cost saved</div><div className="vc-tv">{money(hrCost)}</div><div className="vc-tu">that coordination time, valued</div></div>
                 <div className="vc-tile"><div className="vc-tl"><i className="vc-ic vc-ic-emp" />Employee time saved</div><div className="vc-tv">{money(empCost)}</div><div className="vc-tu">less time off work on paperwork</div></div>
                 <div className="vc-tile"><div className="vc-tl"><i className="vc-ic vc-ic-vn" />Supplier spend saved</div><div className="vc-tv">{money(vendSaved)}</div><div className="vc-tu">competitive quotes in one view</div></div>
