@@ -867,6 +867,33 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   op only INSERTed: **approved 1254 UNCHANGED across the op; pending 0 → 4** (my 4 caps), all `vc-*`, CA,
   tax_finance, vetted_by NULL, created 19:04. No mis-attach.
 
+### XX-CA banks (Toronto major banks) via CDIC — `vendor-resourced-xx-ca-banks-toronto-2026-09-10` (landed 2026-09-10) — HEAVY-DEDUP, +2 net
+- Source (GCS): `1789066979417_9d3y0b6h.ndjson` (+ manifest `1789067017154_tyyxjdfj.json`).
+- Otto manifest: **7 sourced, 3 rejected** (counts reconcile: 7 NDJSON = 7 sourced). All 7 `source_url`=wired
+  `www.cdic.ca` (PUBLIC_REGISTER, register-root OK), corridor **XX-CA**, category banks. CDIC issues no
+  public member number → `accreditation_number` = the CDIC member legal name (name-keyed identifier; vetter
+  confirms on the CDIC member list). Rejects honest: HSBC Bank Canada (merged into RBC Mar-2024, no longer a
+  separate CDIC member), Simplii (CIBC division, insured under CIBC), EQ Bank (no newcomer/expat programme).
+- **Ran the #2219 `_name_key` + national-arm predictor HARD (banks = the mis-attach-prone category).** The
+  inverted risk the relay flagged did NOT materialize — every prod collision is the canonical **CA** entity
+  from the 08-31 CA-banks pass, not a foreign arm:
+  - **RBC — HELD.** `_name_key` (`royalbankofcanada`) matches existing CA supplier `vc-e1c940db 'Royal Bank
+    of Canada (RBC)'` (already has a CA/banks cap). Its prod candidate uses a non-`rbc.com` domain, so
+    stage() would NOT domain-drop it → promote() would attach a **duplicate** CA/banks cap to the same RBC.
+    Same entity, nothing to add → dropped from the land (not a mis-attach; already covered).
+  - **Scotiabank / BMO / CIBC / TD — dropped by stage() cross-run domain-dedup** (their domains already
+    carry a CA/banks cap: 'The Bank of Nova Scotia (Scotiabank)', 'Bank of Montreal (BMO)', 'CIBC', 'The
+    Toronto-Dominion Bank (TD)'), so `_staged_keys` skips them pre-insert (they don't even show as duplicates).
+  - **National Bank of Canada + Tangerine Bank** — no `_name_key` match, no domain dup → genuinely NEW.
+- Landed: **+2 new suppliers** — National Bank of Canada (`vc-0938b4c8`), Tangerine Bank (`vc-f3c8f672`),
+  CA/banks pending. CA/banks caps **5 → 7**. 2-row dry-run: staged 2 / duplicates 0 / promote 2.
+- **Create-only guard held:** approved **1254 UNCHANGED** across the op; pending 4 → 6 (CA-tax 4 + CA-banks
+  2), all `vc-*`, CA, banks, vetted_by NULL. No mis-attach. The full-7 CSV + rejects worklist are on disk;
+  only the 2 net-new rows were promoted.
+- **✅ CA FRONT WRAPPED:** legal **+1** (Sobirovs) · housing **PARKED** (RECO thin, no artifact) · tax **+4**
+  (CPA Ontario) · banks **+2** (CDIC, 5 already-in-prod deduped/held). **Canada net-new = 7 suppliers** across
+  3 landed cells; housing parked for a calm re-run.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries

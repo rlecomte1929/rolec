@@ -1,0 +1,68 @@
+{
+  "batch_id": "vendor-resourced-xx-ca-banks-toronto-2026-09-10",
+  "category": "banks",
+  "city": "Toronto",
+  "country": "CA",
+  "generated_at": "2026-09-10",
+  "total_sourced": 7,
+  "total_rejected": 3,
+  "firms": [
+    {
+      "name": "Royal Bank of Canada",
+      "status": "sourced",
+      "cdic_member": "Royal Bank of Canada",
+      "source_url": "https://www.cdic.ca/"
+    },
+    {
+      "name": "Bank of Nova Scotia (Scotiabank)",
+      "status": "sourced",
+      "cdic_member": "Bank of Nova Scotia",
+      "source_url": "https://www.cdic.ca/"
+    },
+    {
+      "name": "Bank of Montreal (BMO)",
+      "status": "sourced",
+      "cdic_member": "Bank of Montreal",
+      "source_url": "https://www.cdic.ca/"
+    },
+    {
+      "name": "Canadian Imperial Bank of Commerce (CIBC)",
+      "status": "sourced",
+      "cdic_member": "Canadian Imperial Bank of Commerce",
+      "source_url": "https://www.cdic.ca/"
+    },
+    {
+      "name": "The Toronto-Dominion Bank (TD)",
+      "status": "sourced",
+      "cdic_member": "The Toronto-Dominion Bank",
+      "source_url": "https://www.cdic.ca/"
+    },
+    {
+      "name": "National Bank of Canada",
+      "status": "sourced",
+      "cdic_member": "National Bank of Canada",
+      "source_url": "https://www.cdic.ca/"
+    },
+    {
+      "name": "Tangerine Bank",
+      "status": "sourced",
+      "cdic_member": "Tangerine Bank",
+      "source_url": "https://www.cdic.ca/"
+    },
+    {
+      "name": "HSBC Bank Canada",
+      "status": "rejected",
+      "reason": "No longer a separate CDIC member institution \u2014 acquired by and merged into Royal Bank of Canada (acquisition completed March 2024)."
+    },
+    {
+      "name": "Simplii Financial",
+      "status": "rejected",
+      "reason": "Division of Canadian Imperial Bank of Commerce (CIBC), not a separate CDIC member institution; deposits insured under CIBC's membership."
+    },
+    {
+      "name": "EQ Bank (Equitable Bank)",
+      "status": "rejected",
+      "reason": "CDIC member but no dedicated newcomer/expat relocation banking programme; primarily a digital savings bank, not a full-service newcomer banking provider."
+    }
+  ]
+}
