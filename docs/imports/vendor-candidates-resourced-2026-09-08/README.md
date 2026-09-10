@@ -841,6 +841,32 @@ generator before the first batch; London GB legal came back with per-firm URLs o
 - Tripwire untouched (no write): create-only invariant, approved count unchanged (no op). CA/housing
   stays at 0 until re-sourced with an artifact.
 
+### XX-CA tax_finance (Toronto CPA firms) via CPA Ontario — `vendor-resourced-xx-ca-tax-toronto-2026-09-10` (landed 2026-09-10)
+- Source (GCS): `1789066350927_te8pi4dr.ndjson` (+ manifest `1789066387283_cmgzej9h.json`).
+- Otto manifest: **4 sourced, 6 rejected** (counts reconcile: 4 NDJSON rows = 4 sourced; 6 named rejects).
+  All 4 `source_url`=wired `www.cpaontario.ca` (PUBLIC_REGISTER, register-root OK), corridor **XX-CA**,
+  category tax_finance, CPA Ontario firm ID in `accreditation_number`: Trowbridge Professional Corporation
+  **5TTDAC** (trowbridgeglobal.com), GTA Accounting Professional Corporation **MA06WI** (gtaaccounting.ca),
+  Maroof HS Cross Border Tax Professional Corporation **4UAC65** (maroofhs.com), Fuller Landau LLP
+  **5LIJQB** (fullerllp.com). Distinct registrable domains → no franchise-domain drop.
+- Rejects honest: North American Tax Services / Soussan (member# unverifiable — directory page empty),
+  A Garg CPA (Burlington not Toronto), Andersen in Canada (no CPA Ontario firm-directory entry — it's a
+  network), Bazar McBean LLP (Oakville not Toronto), Akif CPA (no directory entry), CBTA (network/
+  association, not a single registered firm).
+- **Register bot-walled** (cpaontario.ca returns HTTP 403 + anti-bot JS on both the root and per-firm
+  directory pages — same as bde.es / abogacia.es / LSO), so per-entity curl can't confirm; the CPA
+  público IDs are well-formed 6-char and match the manifest directory slugs → PUBLIC_REGISTER lands to
+  **pending** for the vetter to confirm at /admin/vetting-queue.
+- `_name_key` predictor: all 4 distinct + NEW; **no prod "Trowbridge" / Fuller / Maroof / GTA at all**
+  (the cross-border-Trowbridge multinational-arm risk is moot — no existing arm to mis-attach to). Dry-run:
+  staged 4, duplicates 0, promote 4.
+- Landed: **+4 new suppliers** (CA/tax_finance, pending). CA/tax **3 → 7** (the prior 3 are 08-31 global-pass caps).
+- **Create-only guard held.** The approved baseline has moved far past the retired 218: `admin@relopass.com`
+  (vetted_by `4e275218…`) bulk-approved essentially the whole pending queue — **approved 1254 / pending 0 /
+  rejected 3 immediately before this land** (that includes the CA/legal Sobirovs cap, approved 14:57). This
+  op only INSERTed: **approved 1254 UNCHANGED across the op; pending 0 → 4** (my 4 caps), all `vc-*`, CA,
+  tax_finance, vetted_by NULL, created 19:04. No mis-attach.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
