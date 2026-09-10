@@ -717,6 +717,27 @@ generator before the first batch; London GB legal came back with per-firm URLs o
 - Tripwire untouched (no write): `ssc` `approved` **130 | 1c4c3899925c5a8c4b3c168abcfbfc22**. NL banks
   stays at its prior count until re-sourced with an artifact.
 
+### XX-AU legal_admin (Sydney migration agents) — `vendor-resourced-xx-au-legal-sydney-2026-09-10` (partial land 2026-09-10) — first XX-AU; ⚠ exposed a normalise_domain bug
+- Source (GCS): `1789034426741_tydus30r.ndjson` (+ manifest `1789034430487_jxbmaqkp.json`).
+- Otto manifest: **5 sourced, 8 rejected** (counts reconcile). All 5 `source_url`=wired `portal.mara.gov.au`
+  (`mara.gov.au`, OMARA PUBLIC_REGISTER), corridor **XX-AU**, category legal_admin, `accreditation_number`
+  = 7-digit MARN: WIDEN Migration Experts 1576536, DMA Migration 1798821, IME Advisors 2217902, Bay
+  Migration Solution 1799395, KAN Migration Services 1807176.
+- **Landed: +1 only (IME Advisors).** The other 4 were WRONGLY dropped as duplicates by a
+  `normalise_domain()` bug — **not real dups.** `_COMPOUND_SUFFIXES` (vendor_harvester.py) lists `.co.uk`
+  (so GB keyed correctly) but is **missing `.com.au`**, so every `*.com.au` site collapses to the bare
+  registrable key `com.au`. WIDEN/DMA/Bay/KAN (all `.com.au`) therefore all keyed to `com.au`, which the
+  2026-08-30 AU pass had already staged (it mis-keyed "Migration Centre of Australia" +
+  "Australian Immigration Centre" to `com.au` too, and wrongly marked one `status='duplicate'`). IME
+  Advisors survived only because it is `.com`, not `.com.au`.
+- **Impact + fix:** every AU firm on a `.com.au` domain collapses to one key per corridor+category → AU
+  housing/tax/banks would all drop to ~1/cell. Fix = add `com.au` (+ `.net.au`/`.org.au` and other
+  multi-part ccTLD suffixes) to `_COMPOUND_SUFFIXES` + test (separate code PR). **After the fix I re-land
+  the 4 held firms from this same CSV (no re-research) → AU legal becomes +5.** AU harvest paused until
+  the fix merges.
+- Tripwire held on the IME land: `ssc` `approved` **130 → 130** md5
+  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; AU/legal 3 → 4.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
