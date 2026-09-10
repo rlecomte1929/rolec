@@ -894,6 +894,27 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   (CPA Ontario) · banks **+2** (CDIC, 5 already-in-prod deduped/held). **Canada net-new = 7 suppliers** across
   3 landed cells; housing parked for a calm re-run.
 
+### XX-DK legal_admin (Copenhagen immigration lawyers) via Advokatnøglen — `vendor-resourced-xx-dk-legal-copenhagen-2026-09-10` (landed 2026-09-10) — first XX-DK this campaign; +2 (1 held)
+- Source (GCS): `1789069055385_5s68gc2q.ndjson` (+ manifest `1789069118779_l293say0.json`).
+- Otto manifest: **3 sourced, 10 rejected** (counts reconcile: 3 NDJSON = 3 sourced). All 3 `source_url`=wired
+  `www.advokatnoeglen.dk` (Advokatnøglen — the Danish Bar register; PUBLIC_REGISTER, register-root OK; ✓ **not**
+  advokatsamfundet.dk, which is unwired), corridor **XX-DK**, category legal_admin, Copenhagen. `accreditation_number`
+  = CVR + Advokatnøglen firm/advokat UUID (+ beskikkelse year for an individual advokat). Distinct independent
+  domains (globeadvokater.dk / holmthomsenlaw.com / advokatnehansen.dk) → no franchise drop.
+- Rejects honest & well-scoped: Poul Schmith (represents the immigration authority — conflict), immigration-
+  denmark.com / Gateway to Denmark / VisaGuiden / NMD Law Group (non-advokat consultants, no Advokatnøglen entry),
+  Karoline Normann (criminal-defence focus), Piroz / Grotkjær Elmstrøm / KQOMANN / Homann (Aarhus/Charlottenlund —
+  not Copenhagen).
+- **`_name_key` collision caught — 1 HELD.** "Holm Thomsen Law Advokatanpartsselskab" exact-matches existing
+  `vc-4c56ac7b` — a DK/legal_admin supplier from the **08-31 global DK pass** (already approved/live). stage() did
+  NOT domain-drop it (its 08-31 record carries no website), so promote() would have attached a **duplicate** DK/legal
+  cap. Same firm, already covered → **held** (dropped from the land; not a mis-attach). ⚠ Diverged from the relay's
+  "staged 3" expectation — the independent `_name_key` predictor caught it (the relay didn't see the 08-31 DK supplier).
+- Landed: **+2 new suppliers** — Globe Advokater (`vc-3fc5204d`), Advokatkontoret Niels-Erik Hansen (`vc-baec3895`),
+  DK/legal pending. DK/legal caps **4 → 6**. 2-row dry-run: staged 2 / duplicates 0 / promote 2.
+- **Create-only guard held:** approved **1254 UNCHANGED** across the op; pending 6 → 8, all `vc-*`, DK, legal_admin,
+  vetted_by NULL. No mis-attach.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
