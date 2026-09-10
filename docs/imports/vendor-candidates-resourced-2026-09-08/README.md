@@ -664,6 +664,21 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   pending), 0 mis-attach. Tripwire: `ssc` `approved` **130 → 130** md5
   `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; GB/tax 2 → 7.
 
+### XX-NL legal_admin (Amsterdam immigration/vreemdelingenrecht lawyers) — `vendor-resourced-xx-nl-legal-amsterdam-2026-09-10` (landed 2026-09-10) — first XX-NL land, FINAL cell of the run
+- Source (GCS): `1789026083313_essmy5ik.ndjson` (+ manifest `1789026112888_iuo9wb9i.json`).
+- Otto manifest: **6 sourced, 0 rejected** (counts reconcile).
+- **PUBLIC_REGISTER (NOvA / advocatenorde.nl).** All 6 `source_url`s = wired `advocatenorde.nl`
+  (`zoekeenadvocaat.advocatenorde.nl` subdomain, matched by suffix — no per-entity pattern needed for a
+  PUBLIC_REGISTER), corridor **XX-NL**, category legal_admin. `accreditation_number` carries the named
+  advocaat + their **real NOvA registration number** (Otto pulled the actual register numbers), e.g.
+  Everaert/T.E. van Houwelingen-Boer 11613905609, Matpanözer/L.K. Matpanözer 11017333435, Spuistraat 10/
+  B. Aydin 11831901571, Prakken d'Oliveira/E.E.M. Bezem 12075067103.
+- **Net +4 of 6** — landed new: Everaert Advocaten, Matpanözer Advocatuur, Spuistraat 10 Advocaten,
+  Prakken d'Oliveira Human Rights Lawyers. **De Vreede Immigration Law** and **Kroes Advocaten** were
+  already held (NL/legal, from an earlier NL harvest) — `_name_key` collision → deduped, no duplicate.
+- Landed: **+4 new suppliers** (NL/legal_admin, pending), 0 mis-attach. Tripwire: `ssc` `approved`
+  **130 → 130** md5 `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; NL/legal 3 → 7.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
