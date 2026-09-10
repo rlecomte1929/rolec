@@ -24,7 +24,7 @@
   --vc-navy-500:var(--marketing-primary-muted);
   --vc-navy-wash:rgba(12,25,41,.06);
   --vc-teal:var(--marketing-accent);
-  --vc-teal-600:var(--marketing-accent);
+  --vc-teal-600:#146b68;             /* darker accent for small TEXT: AA (>=4.5) on the teal wash + muted band */
   --vc-teal-wash:rgba(25,123,120,.10);
   --vc-friction:#8f4e18;             /* AA: 5.1:1 as badge text on the friction wash */
   --vc-friction-wash:rgba(161,87,28,.10);
