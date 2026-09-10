@@ -65,6 +65,28 @@ describe('RequireHrRoute', () => {
     expect(screen.getByText('EMPLOYEE HOME')).toBeInTheDocument();
   });
 
+  it('does not loop on HR home when membership is EMPLOYEE but active role is HR', () => {
+    getStoredRoles.mockReturnValue(['EMPLOYEE']);
+    getActiveRole.mockReturnValue('HR');
+    render(
+      <MemoryRouter initialEntries={['/hr/dashboard']}>
+        <Routes>
+          <Route
+            path="/hr/dashboard"
+            element={(
+              <RequireHrRoute>
+                <div>HR CONTENT</div>
+              </RequireHrRoute>
+            )}
+          />
+          <Route path="/employee/dashboard" element={<div>EMPLOYEE HOME</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText('HR CONTENT')).not.toBeInTheDocument();
+    expect(screen.getByText('EMPLOYEE HOME')).toBeInTheDocument();
+  });
+
   it('allows EMPLOYEE through when allowEmployee is set', () => {
     getStoredRoles.mockReturnValue(['EMPLOYEE']);
     renderGuarded(true);

@@ -15,6 +15,7 @@ import { AlertTriangle, Clock } from 'lucide-react';
 import { Card, ProgressBar } from '../../components/antigravity';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { getCaseChecklist, setCaseChecklistItem, type ChecklistView } from '../../api/cases';
+import { getCountryName } from '../../utils/countries';
 
 export const VisaChecklistCard: React.FC<{ caseId: string | null | undefined }> = ({ caseId }) => {
   const queryClient = useQueryClient();
@@ -64,7 +65,7 @@ export const VisaChecklistCard: React.FC<{ caseId: string | null | undefined }> 
       <Card padding="md">
         <div className="text-sm font-semibold text-navy-800 mb-1">Visa Checklist</div>
         <div className="text-sm text-slate-500">
-          No requirements catalogue for {view.destCountry} yet — nothing to check off until this
+          No requirements catalogue for {getCountryName(view.destCountry) || view.destCountry} yet — nothing to check off until this
           corridor is covered.
         </div>
       </Card>

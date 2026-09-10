@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import type * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
@@ -366,10 +366,14 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef<HTMLDivElement>(null);
-  const selected = options.find((c) => c.code === value);
+  const ordered = useMemo(
+    () => [...options].sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' })),
+    [options],
+  );
+  const selected = ordered.find((c) => c.code === value);
   const filtered = query
-    ? options.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) || c.code.toLowerCase().includes(query.toLowerCase()))
-    : options;
+    ? ordered.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) || c.code.toLowerCase().includes(query.toLowerCase()))
+    : ordered;
 
   useEffect(() => {
     if (!open) return;

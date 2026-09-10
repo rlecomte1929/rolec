@@ -1,0 +1,79 @@
+{
+  "batch_id": "vendor-resourced-xx-au-legal-sydney-2026-09-10",
+  "category": "legal_admin",
+  "city": "Sydney",
+  "total_sourced": 5,
+  "total_rejected": 8,
+  "firms": [
+    {
+      "name": "WIDEN Migration Experts",
+      "status": "sourced",
+      "marn": "1576536",
+      "source_url": "https://portal.mara.gov.au/search-the-register-of-migration-agents/"
+    },
+    {
+      "name": "DMA Migration",
+      "status": "sourced",
+      "marn": "1798821",
+      "source_url": "https://portal.mara.gov.au/search-the-register-of-migration-agents/"
+    },
+    {
+      "name": "IME Advisors",
+      "status": "sourced",
+      "marn": "2217902",
+      "source_url": "https://portal.mara.gov.au/search-the-register-of-migration-agents/"
+    },
+    {
+      "name": "Bay Migration Solution",
+      "status": "sourced",
+      "marn": "1799395",
+      "source_url": "https://portal.mara.gov.au/search-the-register-of-migration-agents/"
+    },
+    {
+      "name": "KAN Migration Services",
+      "status": "sourced",
+      "marn": "1807176",
+      "source_url": "https://portal.mara.gov.au/search-the-register-of-migration-agents/"
+    },
+    {
+      "name": "Global Migrations",
+      "status": "rejected",
+      "reason": "Main registered office Level 8, 276 Flinders Street, Melbourne VIC 3000; Sydney presence is SEO landing page only, no verified physical Sydney address"
+    },
+    {
+      "name": "Australian Skilled Migration",
+      "status": "rejected",
+      "reason": "Offices in Melbourne VIC and Seymour VIC only; not Sydney-based"
+    },
+    {
+      "name": "Australian Migration Agents",
+      "status": "rejected",
+      "reason": "MARN 2217744 displayed on website but no named individual RMA identified on public site; comparemigrationagents.com.au places their registered base in Bundall (Gold Coast), not Sydney"
+    },
+    {
+      "name": "Sydney Migration Agency",
+      "status": "rejected",
+      "reason": "No MARN displayed on website sydneymigrationagency.com.au; cannot verify RMA registration as required"
+    },
+    {
+      "name": "Migration Centre of Australia",
+      "status": "rejected",
+      "reason": "MARN not found displayed on public-facing pages of migrationcentreofaustralia.com.au"
+    },
+    {
+      "name": "Collins Quarters",
+      "status": "rejected",
+      "reason": "Melbourne-based law firm (offices in Melbourne, Chennai, Kuala Lumpur); no verified Sydney physical office; also, principal practitioners are lawyers, not MARN-holding RMAs"
+    },
+    {
+      "name": "Migration Republic",
+      "status": "rejected",
+      "reason": "MARN not found displayed on public-facing pages of migrationrepublic.com.au"
+    },
+    {
+      "name": "Klintsaris Immigration Services",
+      "status": "rejected",
+      "reason": "Website inaccessible; MARN not verifiable from any published source"
+    }
+  ]
+}

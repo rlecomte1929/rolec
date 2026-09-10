@@ -14,6 +14,7 @@ import { Checkbox } from '../components/antigravity/Checkbox';
 import { Input } from '../components/antigravity/Input';
 import { AppShell } from '../components/AppShell';
 import { CityPicker, CountryPicker, canonPlace } from '../components/location';
+import { compareCountryDisplayNames, getCountryName } from '../utils/countries';
 import { Alert, Button, Card } from '../components/antigravity';
 import {
   addCustomVendor,
@@ -224,7 +225,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
         best.set(key, d.country);
       }
     }
-    return Array.from(best.values()).sort((a, b) => a.localeCompare(b));
+    return Array.from(best.values()).sort(compareCountryDisplayNames);
   }, [destinations]);
 
   // Canonical match, so a country picked as 'Ireland' still finds a row stored as 'ireland'.
@@ -621,7 +622,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
         setInfo(null);
       } else {
         setInfo(
-          `${row.destination_city}, ${row.destination_country} isn't on your allowlist yet — ` +
+          `${row.destination_city}, ${getCountryName(row.destination_country) || row.destination_country} isn't on your allowlist yet — ` +
             'use "Request a new destination" to send it to admin.',
         );
       }
@@ -698,7 +699,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
                 const catLabel = CATEGORY_LABELS[row.category] || row.category;
                 const dest =
                   row.destination_city && row.destination_country
-                    ? `${row.destination_city}, ${row.destination_country}`
+                    ? `${row.destination_city}, ${getCountryName(row.destination_country) || row.destination_country}`
                     : row.destination_city || '—';
                 return (
                   <li key={row.id} className="p-3 flex items-center justify-between gap-3">
@@ -736,7 +737,7 @@ export const HrVendorCuration: React.FC<{ embedded?: boolean }> = ({ embedded = 
               <option value="">Select a country…</option>
               {countryOptions.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {getCountryName(c) || c}
                 </option>
               ))}
               <option value={REQUEST_NEW_VALUE}>+ Request a new destination…</option>

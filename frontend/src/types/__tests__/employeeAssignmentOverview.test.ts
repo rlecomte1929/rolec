@@ -26,6 +26,12 @@ describe('formatDestinationLabel', () => {
     expect(formatDestinationLabel({ host_country: 'Germany' })).toBe('Germany');
   });
 
+  it('expands ISO codes in labels and host fields', () => {
+    expect(formatDestinationLabel({ label: 'NO' })).toBe('Norway');
+    expect(formatDestinationLabel({ label: 'Oslo, NO' })).toBe('Oslo, Norway');
+    expect(formatDestinationLabel({ host_country: 'NO' })).toBe('Norway');
+  });
+
   it('falls back to "Not set yet" for null/empty destination', () => {
     expect(formatDestinationLabel(null)).toBe('Not set yet');
     expect(formatDestinationLabel(undefined)).toBe('Not set yet');
