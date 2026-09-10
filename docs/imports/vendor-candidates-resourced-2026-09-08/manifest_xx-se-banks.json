@@ -1,0 +1,73 @@
+{
+  "batch_id": "vendor-resourced-xx-se-banks-2026-09-09",
+  "category": "banks",
+  "city": "Stockholm",
+  "country": "SE",
+  "generated_at": "2026-09-09T12:00:00Z",
+  "total_sourced": 7,
+  "total_rejected": 4,
+  "firms": [
+    {
+      "name": "Skandinaviska Enskilda Banken AB",
+      "status": "sourced",
+      "register": "Finansinspektionen - Företagsregistret",
+      "source_url": "https://www.fi.se/en/our-registers/company-register/details?id=1356"
+    },
+    {
+      "name": "Swedbank AB",
+      "status": "sourced",
+      "register": "Finansinspektionen - Företagsregistret",
+      "source_url": "https://www.fi.se/en/our-registers/company-register/details?id=1826"
+    },
+    {
+      "name": "Svenska Handelsbanken AB",
+      "status": "sourced",
+      "register": "Finansinspektionen - Företagsregistret",
+      "source_url": "https://www.fi.se/en/our-registers/company-register/details?id=1358"
+    },
+    {
+      "name": "SBAB Bank AB (publ)",
+      "status": "sourced",
+      "register": "Finansinspektionen - Företagsregistret",
+      "source_url": "https://www.fi.se/en/our-registers/company-register/details?id=1707"
+    },
+    {
+      "name": "ICA Banken AB",
+      "status": "sourced",
+      "register": "Finansinspektionen - Företagsregistret",
+      "source_url": "https://www.fi.se/en/our-registers/company-register/details?id=27435"
+    },
+    {
+      "name": "Avanza Bank AB",
+      "status": "sourced",
+      "register": "Finansinspektionen - Företagsregistret",
+      "source_url": "https://www.fi.se/en/our-registers/company-register/details?id=22856"
+    },
+    {
+      "name": "Nordea Bank Abp, filial i Sverige",
+      "status": "sourced",
+      "register": "Finansinspektionen - Företagsregistret",
+      "source_url": "https://www.fi.se/en/our-registers/company-register/details?id=168257"
+    },
+    {
+      "name": "Länsförsäkringar Bank AB",
+      "status": "reject",
+      "reason": "Could not confirm a valid details?id= NUMBER page on fi.se that renders the bank name; all candidate IDs returned either 404 or an unrelated fund"
+    },
+    {
+      "name": "Danske Bank A/S, Danmark, Sverige Filial",
+      "status": "reject",
+      "reason": "Could not confirm a valid details?id= NUMBER page on fi.se that renders the branch name; all candidate IDs returned either 404 or an unrelated fund"
+    },
+    {
+      "name": "Collector Bank AB (now Norion Bank AB)",
+      "status": "reject",
+      "reason": "Company renamed to Norion Bank AB; could not confirm a valid details?id= page rendering the bank name under either name"
+    },
+    {
+      "name": "Nordea Bank Abp (parent)",
+      "status": "reject",
+      "reason": "Registered on fi.se as foreign bank cross-border (category saknas); Swedish-licensed entity is the filial i Sverige (already sourced)"
+    }
+  ]
+}

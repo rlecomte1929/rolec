@@ -1,0 +1,25 @@
+{
+  "batch_id": "vendor-resourced-xx-it-housing-verona-2026-09-09",
+  "category": "housing_agencies",
+  "city": "Verona",
+  "country": "IT",
+  "generated_at": "2026-09-09",
+  "total_sourced": 7,
+  "total_rejected": 7,
+  "firms": [
+    {"name": "Area Affari", "status": "sourced", "rea_number": "VR-354521", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Finalmente Casa Verona", "status": "sourced", "rea_number": "VR-396194", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Immobiliare Verona Centrale", "status": "sourced", "rea_number": "VR-383018", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Caloi Immobiliare", "status": "sourced", "rea_number": "VR-420849", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Immobiliare Maffei", "status": "sourced", "rea_number": "VR-389338", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Puccio Case", "status": "sourced", "rea_number": "VR-418952", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Veronahome", "status": "sourced", "rea_number": "VR-422119", "source_url": "https://www.registroimprese.it/"},
+    {"name": "Aziendale S.R.L.", "status": "reject", "reason": "Commercial business sales/acquisitions only — no residential rental or expat-relocation services"},
+    {"name": "Immobiliare Bonetti S.r.l.", "status": "reject", "reason": "Industrial and commercial real estate only (warehouses, logistics, offices) — no residential or expat-relocation services"},
+    {"name": "Borgo Trento Immobiliare", "status": "reject", "reason": "Residential sales specialist only — no rental or expat/relocation services advertised"},
+    {"name": "Studio ImmobilCASA (Merzari Fabrizio)", "status": "reject", "reason": "Primarily serves rural Tregnago and Illasi area — not Verona city; no expat or corporate-relocation focus"},
+    {"name": "Renova (Verona branch)", "status": "reject", "reason": "Investment and sales focus — no expat, home-finding or relocation-specific services found on site"},
+    {"name": "Immobiliare Castello", "status": "reject", "reason": "Offices in Villafranca di Verona and Castel d'Azzano — not Verona city proper; REA VR-295365 and VR-409282 confirmed but out of target city"},
+    {"name": "Engel & Völkers Verona City (GBSRE S.r.l.)", "status": "reject", "reason": "Franchise licence-partner office; no REA number published on engelvoelkers.com shop page or any indexable GBSRE S.r.l. web page — cannot verify VR REA without a firm-published number"}
+  ]
+}

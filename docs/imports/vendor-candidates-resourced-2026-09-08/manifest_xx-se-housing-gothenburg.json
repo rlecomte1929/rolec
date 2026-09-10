@@ -1,0 +1,45 @@
+{
+  "batch_id": "vendor-resourced-xx-se-housing-gothenburg-2026-09-09",
+  "category": "housing_agencies",
+  "city": "Gothenburg",
+  "total_sourced": 1,
+  "total_rejected": 6,
+  "firms": [
+    {
+      "name": "Nordic Relocation Group AB",
+      "status": "sourced",
+      "fmi_number": "40955",
+      "source_url": "https://fmi.se/soktjanster/sok-maklare/"
+    },
+    {
+      "name": "KEY Relocation Center AB",
+      "status": "rejected",
+      "reason": "No FMI firm registration found (searched 'Key Relocation' at https://fmi.se/soktjanster/sok-maklarforetag/ — returned no results). Firm HQ: Hugo Grauers Gata 3B, 411 33 Göteborg; provides relocation/destination services including home-finding but publishes no named FMI-registered mäklare and holds no identifiable FMI firm registration."
+    },
+    {
+      "name": "Human Entrance AB",
+      "status": "rejected",
+      "reason": "No FMI firm registration found (searched 'Human Entrance' at https://fmi.se/soktjanster/sok-maklarforetag/ — no results). Has Gothenburg and Stockholm offices; offers home search within relocation packages but no named FMI-registered mäklare is published or findable."
+    },
+    {
+      "name": "Residensportalen AB",
+      "status": "rejected",
+      "reason": "No FMI firm registration found (searched 'Residensportalen' at https://fmi.se/soktjanster/sok-maklarforetag/ — no results). References FMI compliance in terms of service but no named FMI-registered mäklare is publicly identifiable at this firm."
+    },
+    {
+      "name": "Solveria AB",
+      "status": "rejected",
+      "reason": "Rental property booking/listing platform with Gothenburg properties; not a licensed fastighetsmäklarföretag. No FMI registration found."
+    },
+    {
+      "name": "Rentaborg AB (rentaborg.com)",
+      "status": "rejected",
+      "reason": "Corporate housing booking platform with Gothenburg coverage; not a licensed fastighetsmäklarföretag. No FMI registration found."
+    },
+    {
+      "name": "Sweden Relocators AB",
+      "status": "rejected",
+      "reason": "Immigration/relocation consultancy based in Malmö, handling Gothenburg cases remotely; not a licensed fastighetsmäklarföretag and holds no FMI property brokerage registration."
+    }
+  ]
+}
