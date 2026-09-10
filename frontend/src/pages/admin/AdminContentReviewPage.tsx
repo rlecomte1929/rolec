@@ -11,6 +11,7 @@ import {
   type ReviewFact,
   type ReviewSummary,
 } from '../../api/contentReview';
+import { getCountryName } from '../../utils/countries';
 
 /**
  * [AIQ-1821] The content review queue.
@@ -224,7 +225,10 @@ export const AdminContentReviewPage: React.FC = () => {
           onChange={(e) => updateFilter('destination', e.target.value || undefined)}
         >
           <option value="">All destinations</option>
-          {destinations.map((d) => <option key={d} value={d}>{d}</option>)}
+          {/* fix: BUG-260910-E623 — destination lists show full country names, not ISO codes */}
+          {destinations.map((d) => (
+            <option key={d} value={d}>{getCountryName(d) || d}</option>
+          ))}
         </select>
         <select
           aria-label="Evidence"
@@ -293,7 +297,7 @@ export const AdminContentReviewPage: React.FC = () => {
                         <div className="mb-1 flex flex-wrap items-center gap-2">
                           <Badge variant={meta.variant} size="sm">{meta.label}</Badge>
                           <span className="font-mono text-xs text-slate-500">
-                            {f.destination_country} · {f.fact_type} · {f.topic_key}
+                            {getCountryName(f.destination_country) || f.destination_country} · {f.fact_type} · {f.topic_key}
                           </span>
                         </div>
 

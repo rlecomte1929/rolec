@@ -30,12 +30,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 import { Combobox } from '../Combobox';
 import { COUNTRY_OPTIONS } from '../../features/policy-config/countryList';
+import { getCountryName } from '../../utils/countries';
 import { listEmployeeDestinations, type AllowlistedDestination } from '../../api/destinations';
 import { countryFlagEmoji } from '../../lib/countryFlagCode';
 
 function countryOptionLabel(name: string, code?: string): string {
+  const display = getCountryName(name) || name;
   const flag = countryFlagEmoji(code || name);
-  return flag ? `${flag} ${name}` : name;
+  return flag ? `${flag} ${display}` : display;
 }
 
 /** Canonical key for comparing two spellings of one place. Mirrors the backend's

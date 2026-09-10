@@ -732,7 +732,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
             >
               <option value="all">All regions</option>
               {regionOptions.map((code) => (
-                <option key={code} value={code}>{code}</option>
+                <option key={code} value={code}>{countryName(code)}</option>
               ))}
             </select>
         </div>

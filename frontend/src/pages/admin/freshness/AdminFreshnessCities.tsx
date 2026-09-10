@@ -4,6 +4,7 @@ import { Input } from '../../../components/antigravity/Input';
 import { Button } from '../../../components/antigravity/Button';
 import { adminFreshnessAPI } from '../../../api/client';
 import { AdminFreshnessLayout } from './AdminFreshnessLayout';
+import { getCountryName } from '../../../utils/countries';
 
 type CityItem = {
   country_code?: string;
@@ -84,7 +85,7 @@ export const AdminFreshnessCities: React.FC = () => {
           <tbody>
             {items.map((c, i) => (
               <tr key={i} className="border-b border-slate-100 hover:bg-slate-50">
-                <td className="px-4 py-2">{c.country_code ?? '-'}</td>
+                <td className="px-4 py-2">{getCountryName(c.country_code) || c.country_code || '-'}</td>
                 <td className="px-4 py-2 font-medium">{c.city_name ?? '-'}</td>
                 <td className="px-4 py-2">{c.fresh_count ?? 0}</td>
                 <td className="px-4 py-2">{c.stale_count ?? 0}</td>

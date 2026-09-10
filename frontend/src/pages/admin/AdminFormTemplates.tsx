@@ -13,6 +13,7 @@ import { adminFormTemplatesAPI, type FormTemplate } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
+import { getCountryName } from '../../utils/countries';
 
 const COUNTRY_OPTIONS: Array<{ code: string; label: string }> = [
   { code: '', label: 'All countries' },
@@ -137,7 +138,7 @@ export const AdminFormTemplates: React.FC = () => {
                     </Link>
                   </td>
                   <td className="py-2 pr-4">{t.name}</td>
-                  <td className="py-2 pr-4">{t.country}</td>
+                  <td className="py-2 pr-4">{getCountryName(t.country) || t.country}</td>
                   <td className="py-2 pr-4 text-slate-600">{t.authority_code || '—'}</td>
                   <td className="py-2 pr-4 text-slate-600">{t.category || '—'}</td>
                   <td className="py-2 pr-4 font-mono text-xs text-slate-500">{t.version}</td>

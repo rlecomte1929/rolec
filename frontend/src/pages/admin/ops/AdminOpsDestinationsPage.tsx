@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { adminOpsAnalyticsAPI } from '../../../api/client';
 import { AdminOpsLayout } from './AdminOpsLayout';
+import { getCountryName } from '../../../utils/countries';
 
 type DestRow = { country_code?: string; city_name?: string; total?: number; critical?: number };
 
@@ -53,7 +54,7 @@ export const AdminOpsDestinationsPage: React.FC = () => {
                 ) : (
                   items.map((d, i) => (
                     <tr key={i} className="hover:bg-slate-50">
-                      <td className="px-3 py-2 font-medium">{d.country_code ?? '-'}</td>
+                      <td className="px-3 py-2 font-medium">{getCountryName(d.country_code) || d.country_code || '-'}</td>
                       <td className="px-3 py-2">{d.city_name ?? '-'}</td>
                       <td className="px-3 py-2 text-right">{d.total ?? 0}</td>
                       <td className="px-3 py-2 text-right text-red-600">{d.critical ?? 0}</td>

@@ -7,6 +7,7 @@ import { adminStagingAPI, adminCollaborationAPI } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
 import { ThreadSummaryBadge } from '../../../components/admin/collaboration/ThreadSummaryBadge';
 import { LoadErrorBanner, loadErrorMessage } from '../../../components/LoadErrorBanner';
+import { getCountryName } from '../../../utils/countries';
 
 type EventCandidate = {
   id: string;
@@ -173,7 +174,7 @@ export const AdminStagingEvents: React.FC = () => {
                         />
                       </div>
                     </td>
-                    <td className="px-4 py-2">{e.country_code ?? '-'}</td>
+                    <td className="px-4 py-2">{getCountryName(e.country_code) || e.country_code || '-'}</td>
                     <td className="px-4 py-2">{e.city_name ?? '-'}</td>
                     <td className="px-4 py-2">{e.event_type ?? '-'}</td>
                     <td className="px-4 py-2">

@@ -9,6 +9,7 @@ import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
 import { LoadErrorBanner, loadErrorMessage } from '../../components/LoadErrorBanner';
+import { getCountryName } from '../../utils/countries';
 
 const EVENT_TYPES = ['cinema', 'concert', 'family_activity', 'festival', 'museum', 'networking', 'sports', 'theater'];
 
@@ -171,7 +172,7 @@ export const AdminEvents: React.FC = () => {
                       </Link>
                     </td>
                     <td className="py-2">{e.event_type || '-'}</td>
-                    <td className="py-2">{e.country_code || '-'}</td>
+                    <td className="py-2">{getCountryName(e.country_code) || e.country_code || '-'}</td>
                     <td className="py-2">{e.city_name || '-'}</td>
                     <td className="py-2 text-slate-500">
                       {e.start_datetime ? new Date(e.start_datetime).toLocaleString() : '-'}

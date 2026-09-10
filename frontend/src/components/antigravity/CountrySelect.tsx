@@ -3,7 +3,7 @@
  * Native <option> cannot render CSS flag glyphs, so this is a combobox.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { COUNTRY_OPTIONS } from '../../features/policy-config/countryList';
+import { COUNTRY_OPTIONS, countryName } from '../../features/policy-config/countryList';
 import { Button } from './Button';
 import { CountryFlag } from './CountryFlag';
 import { Input } from './Input';
@@ -47,7 +47,7 @@ export const CountrySelect: React.FC<Props> = ({
           const match = options.find(
             (o) => o.code === code || (code === 'UK' && o.code === 'GB'),
           );
-          return { code, name: match?.name ?? code };
+          return { code, name: match?.name ?? countryName(code) };
         })
       : [...options];
     return [...source].sort((a, b) => a.name.localeCompare(b.name, 'en'));

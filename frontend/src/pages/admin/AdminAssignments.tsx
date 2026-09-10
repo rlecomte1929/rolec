@@ -7,7 +7,7 @@ import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
 import type { AdminAssignment, AdminAssignmentDetail, AdminCompany } from '../../types';
 import { buildRoute } from '../../navigation/routes';
-import { DESTINATION_COUNTRIES } from '../../utils/countries';
+import { DESTINATION_COUNTRIES, getCountryName } from '../../utils/countries';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../../utils/apiDetail';
 import { AdminLayout } from './AdminLayout';
 
@@ -41,9 +41,9 @@ const employeeName = (a: AdminAssignment) =>
   a.employee_full_name || [a.employee_first_name, a.employee_last_name].filter(Boolean).join(' ') || a.employee_identifier || '-';
 
 const destination = (a: AdminAssignment) =>
-  a.destination_country || a.host_country || a.destination_from_profile || '-';
+  getCountryName(a.destination_country || a.host_country || a.destination_from_profile) || '-';
 
-const origin = (a: AdminAssignment) => a.home_country || '-';
+const origin = (a: AdminAssignment) => getCountryName(a.home_country) || '-';
 
 const formatCreated = (a: AdminAssignment) => {
   const raw = a.created_at;
@@ -838,8 +838,8 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
               <section>
                 <h3 className="text-sm font-medium text-[#374151] mb-2">Relocation</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <span className="text-[#6b7280]">Destination:</span><span>{detail.host_country ?? detail.destination_from_profile ?? '-'}</span>
-                  <span className="text-[#6b7280]">Origin:</span><span>{detail.home_country ?? '-'}</span>
+                  <span className="text-[#6b7280]">Destination:</span><span>{getCountryName(detail.host_country ?? detail.destination_from_profile) || '-'}</span>
+                  <span className="text-[#6b7280]">Origin:</span><span>{getCountryName(detail.home_country) || '-'}</span>
                   <span className="text-[#6b7280]">Type:</span><span>{detail.assignment_type ?? '-'}</span>
                   <span className="text-[#6b7280]">Move date:</span><span>{detail.move_date ?? '-'}</span>
                 </div>

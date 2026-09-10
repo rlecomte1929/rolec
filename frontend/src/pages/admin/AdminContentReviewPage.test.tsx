@@ -158,3 +158,14 @@ describe('a failed load never reads as an empty queue', () => {
     expect(screen.queryByTestId('content-review-error')).not.toBeInTheDocument();
   });
 });
+
+describe('destination labels (BUG-260910-E623)', () => {
+  it('shows full country names in the destination filter and fact rows', async () => {
+    renderPage();
+    const destFilter = await screen.findByLabelText('Destination');
+    expect(destFilter).toHaveTextContent('Norway');
+    expect(destFilter).not.toHaveTextContent('NO');
+    expect(await screen.findByTestId('fact-text')).toBeInTheDocument();
+    expect(screen.getByText(/Norway · eligibility/)).toBeInTheDocument();
+  });
+});

@@ -25,6 +25,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../antigravity/Button';
 import { hrAPI } from '../../api/client';
 import type { ImmigrationContext } from './immigrationContext';
+import { getCountryName } from '../../utils/countries';
 
 type Vendor = {
   id: string;
@@ -222,12 +223,12 @@ export const VendorBrowsePanel: React.FC<Props> = ({
               >
                 <option value="">All corridors</option>
                 {corridors.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>{getCountryName(c) || c}</option>
                 ))}
               </select>
               {destCountry && !selectedCorridor && (
                 <p className="text-xs text-[#64748b] mt-1">
-                  Destination: {destCountry}
+                  Destination: {getCountryName(destCountry) || destCountry}
                 </p>
               )}
             </div>
@@ -297,7 +298,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
                       {/* Corridors */}
                       {vendor.corridors?.length > 0 && (
                         <p className="text-xs text-[#64748b] mt-1.5">
-                          Corridors: {vendor.corridors.join(', ')}
+                          Corridors: {vendor.corridors.map((c) => getCountryName(c) || c).join(', ')}
                         </p>
                       )}
 
