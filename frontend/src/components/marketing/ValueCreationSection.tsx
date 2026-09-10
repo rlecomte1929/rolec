@@ -1,5 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import './ValueCreation.css';
+// Inline the scoped stylesheet as a string and render it in a <style> tag below.
+// The landing page is lazy-loaded and prerendered; a plain `import './x.css'`
+// becomes a separate CSS chunk that the prerendered HTML never links, so the
+// section shipped unstyled. Inlining guarantees the CSS is present in both the
+// prerendered HTML and the client render.
+import vcStyles from './ValueCreation.css?inline';
 
 /**
  * ValueCreationSection — "Both Sides of the Move"
@@ -291,6 +296,7 @@ export const ValueCreationSection: React.FC = () => {
 
   return (
     <div className={`vc-root mode-${mode} persona-${persona}`}>
+      <style>{vcStyles}</style>
       <div className="vc-inner">
 
         {/* ---- controls ---- */}
