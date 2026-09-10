@@ -765,6 +765,25 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   op, and the 4 new Valencia caps are `pending` (verified). Going forward the check is "my N caps landed
   pending + approved count did not decrease," not a fixed md5.
 
+### XX-AU housing_agencies (Sydney) via NSW Fair Trading — `vendor-resourced-xx-au-housing-sydney-2026-09-10` (landed 2026-09-10) — THIN
+- Source (GCS): `1789041729806_8fx5ydrh.ndjson` (+ manifest `1789041773132_2xgxc63n.json`).
+- Otto manifest: **1 sourced, 8 rejected** (counts reconcile). Rejects: firm doesn't publish a NSW Fair
+  Trading licence number on its site (Urban Renters, Property Providers, SydneySlice, Hunter James,
+  Sydney Rental Search, Home Hunters Relocations) or holds the wrong state's licence (Relocate Sydney =
+  Victorian REIV, Australian Relocation Managers = VIC).
+- **PUBLIC_REGISTER (NSW Fair Trading / verify.licence.nsw.gov.au).** The 1 `source_url`=wired
+  `verify.licence.nsw.gov.au`, corridor **XX-AU**, category housing_agencies. Find My Rental Property,
+  NSW licence **20111067**. Its site is `findmyrentalproperty.com.au` and it keyed/staged distinctly —
+  **another end-to-end confirmation the com.au fix (#2263) works** (a `.com.au` firm no longer collapses).
+- Landed: **+1 new supplier** (AU/housing_agencies, pending). Create-only guard held: approved count
+  **218 unchanged** across the op. AU/housing 4 → 5.
+- **⚠ STRUCTURAL LEARNING (brief refinement, flagged not re-run):** the brief required the firm to
+  *self-publish* its NSW licence number, but most Sydney agencies just say "fully licensed" → thin
+  yield. Better future AU-housing brief: look each agency up **by name** on
+  `verify.licence.nsw.gov.au` to obtain its licence#, rather than requiring self-publication (vetter
+  confirms). Same shape as the SE/housing FMI thinness — the register is fine; the sourcing predicate
+  was too strict.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries
