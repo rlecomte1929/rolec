@@ -4134,7 +4134,15 @@ def delete_hr_company_employee(
     company_id = _get_hr_company_id(effective)
     if not company_id:
         raise HTTPException(status_code=400, detail="No company linked to your profile")
-    deleted = db.delete_employee_for_company(employee_id, company_id)
+    try:
+        deleted = db.delete_employee_for_company(employee_id, company_id)
+    except Exception as ex:
+        # IntegrityError (and siblings) used to 500 the roster remove button.
+        log.warning("delete_hr_company_employee failed: %s", ex)
+        raise HTTPException(
+            status_code=409,
+            detail="This person is still linked to other records. Remove their relocation case first, then try again.",
+        ) from ex
     if not deleted:
         raise HTTPException(status_code=404, detail="Employee not found")
     db.log_audit(effective["id"], "DELETE", "employee", employee_id, "HR delete", {"company_id": company_id})
@@ -7210,7 +7218,11 @@ def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(requ
     if not _hr_can_access_assignment(assignment, user):
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
     aid = str(assignment.get("id") or assignment_id)
-    deleted = db.delete_assignment(aid, actor_id=effective.get("id"))
+    try:
+        deleted = db.delete_assignment(aid, actor_id=effective.get("id"))
+    except Exception as ex:
+        log.error("delete_hr_assignment failed aid=%s error=%s", aid[:8], repr(ex), exc_info=True)
+        raise HTTPException(status_code=500, detail="Unable to remove this case.") from ex
     if not deleted:
         # Either it was already archived or race with concurrent delete.
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -7390,8 +7402,8 @@ def get_hr_assignment(
         if not _hr_can_access_assignment(assignment, user):
             raise HTTPException(status_code=403, detail="Not authorized for this assignment")
 
-        aid = assignment["id"]
-        case_id = _effective_relocation_case_id(assignment) or assignment.get("id") or ""
+        aid = str(assignment["id"])
+        case_id = str(_effective_relocation_case_id(assignment) or assignment.get("id") or "")
         if not case_id:
             log.warning("request_id=%s assignment_id=%s assignment has no case_id", req_id, assignment_id)
 
@@ -7512,13 +7524,23 @@ def get_hr_assignment(
             }
 
         profile_dict = profile if isinstance(profile, dict) else None
-        intake_raw = build_intake_checklist_items(profile_dict)
-        ui_raw = build_hr_case_readiness_ui(
-            profile=profile_dict,
-            intake_items=intake_raw,
-            readiness_snap=readiness_snap,
-            compliance_report=report,
-        )
+        intake_raw: List[Dict[str, Any]] = []
+        ui_raw: Dict[str, Any] = {}
+        try:
+            intake_raw = build_intake_checklist_items(profile_dict)
+            ui_raw = build_hr_case_readiness_ui(
+                profile=profile_dict,
+                intake_items=intake_raw,
+                readiness_snap=readiness_snap,
+                compliance_report=report,
+            )
+        except Exception as e:
+            log.warning(
+                "request_id=%s assignment_id=%s case readiness view failed: %s",
+                req_id,
+                assignment_id,
+                e,
+            )
         case_readiness_ui: Optional[CaseReadinessUi] = None
         try:
             case_readiness_ui = CaseReadinessUi.model_validate(ui_raw)
@@ -7537,6 +7559,13 @@ def get_hr_assignment(
             except Exception:
                 continue
 
+        completeness_i = None
+        if completeness is not None:
+            try:
+                completeness_i = int(completeness)
+            except (TypeError, ValueError):
+                completeness_i = None
+
         dur_ms = (time.perf_counter() - start) * 1000
         log.info(
             "request_id=%s assignment_id=%s get_hr_assignment ok dur_ms=%.2f",
@@ -7550,8 +7579,8 @@ def get_hr_assignment(
             submittedAt=submitted_at_str,
             hrNotes=assignment.get("hr_notes"),
             profile=parsed_profile,
-            completeness=completeness,
-            complianceReport=report,
+            completeness=completeness_i,
+            complianceReport=report if isinstance(report, dict) else None,
             employeeFirstName=assignment.get("employee_first_name"),
             employeeLastName=assignment.get("employee_last_name"),
             employeeEmail=linked_email,

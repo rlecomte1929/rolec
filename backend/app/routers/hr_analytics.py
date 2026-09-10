@@ -105,39 +105,56 @@ def list_calibration_alerts(
     Returns all non-dismissed policy_calibration_alerts rows for the
     caller's organisation, newest first.
     """
-    company_id: Optional[str] = user.get("company_id")
+    # Session tokens often carry `company`, not `company_id`. Missing table
+    # used to 500 the HR dashboard banner three times per load.
+    company_id: Optional[str] = None
+    try:
+        company_id = get_org_id_for_hr_user(user) or user.get("company_id") or user.get("company")
+    except Exception:
+        company_id = user.get("company_id") or user.get("company")
     if not company_id:
         return []
 
-    with main_db.engine.connect() as conn:
-        rows = conn.execute(
-            main_db.text(
-                """
-                SELECT id, organization_id, category, tier_name,
-                       exception_count, avg_excess_pct, alert_message,
-                       created_at
-                FROM public.policy_calibration_alerts
-                WHERE organization_id = :org_id
-                  AND dismissed_at IS NULL
-                ORDER BY created_at DESC
-                """
-            ),
-            {"org_id": company_id},
-        ).fetchall()
+    try:
+        with main_db.engine.connect() as conn:
+            rows = conn.execute(
+                main_db.text(
+                    """
+                    SELECT id, organization_id, category, tier_name,
+                           exception_count, avg_excess_pct, alert_message,
+                           created_at
+                    FROM policy_calibration_alerts
+                    WHERE organization_id = :org_id
+                      AND dismissed_at IS NULL
+                    ORDER BY created_at DESC
+                    """
+                ),
+                {"org_id": company_id},
+            ).fetchall()
+    except Exception:
+        logger.exception("list_calibration_alerts query failed")
+        return []
 
-    return [
-        CalibrationAlertOut(
-            id=str(r["id"]),
-            organization_id=str(r["organization_id"]),
-            category=r["category"],
-            tier_name=r["tier_name"],
-            exception_count=r["exception_count"],
-            avg_excess_pct=float(r["avg_excess_pct"]),
-            alert_message=r["alert_message"],
-            created_at=str(r["created_at"]),
-        )
-        for r in rows
-    ]
+    out: List[CalibrationAlertOut] = []
+    for r in rows:
+        m = r._mapping if hasattr(r, "_mapping") else r
+        try:
+            pct = m["avg_excess_pct"]
+            out.append(
+                CalibrationAlertOut(
+                    id=str(m["id"]),
+                    organization_id=str(m["organization_id"]),
+                    category=m["category"],
+                    tier_name=m["tier_name"],
+                    exception_count=int(m["exception_count"] or 0),
+                    avg_excess_pct=float(pct) if pct is not None else 0.0,
+                    alert_message=m["alert_message"],
+                    created_at=str(m["created_at"]),
+                )
+            )
+        except Exception:
+            logger.warning("list_calibration_alerts skipped a malformed row", exc_info=True)
+    return out
 
 
 @router.patch(
@@ -157,30 +174,38 @@ def dismiss_calibration_alert(
     from fastapi import HTTPException
     import uuid
 
-    company_id: Optional[str] = user.get("company_id")
+    company_id: Optional[str] = None
+    try:
+        company_id = get_org_id_for_hr_user(user) or user.get("company_id") or user.get("company")
+    except Exception:
+        company_id = user.get("company_id") or user.get("company")
     user_id: Optional[str] = user.get("id") or user.get("sub")
 
     if not company_id:
         raise HTTPException(status_code=403, detail="No company context")
 
-    with main_db.engine.begin() as conn:
-        result = conn.execute(
-            main_db.text(
-                """
-                UPDATE public.policy_calibration_alerts
-                SET    dismissed_at = NOW(),
-                       dismissed_by = :user_id
-                WHERE  id = :alert_id
-                  AND  organization_id = :org_id
-                  AND  dismissed_at IS NULL
-                """
-            ),
-            {
-                "alert_id": alert_id,
-                "org_id": company_id,
-                "user_id": user_id,
-            },
-        )
+    try:
+        with main_db.engine.begin() as conn:
+            result = conn.execute(
+                main_db.text(
+                    """
+                    UPDATE policy_calibration_alerts
+                    SET    dismissed_at = NOW(),
+                           dismissed_by = :user_id
+                    WHERE  id = :alert_id
+                      AND  organization_id = :org_id
+                      AND  dismissed_at IS NULL
+                    """
+                ),
+                {
+                    "alert_id": alert_id,
+                    "org_id": company_id,
+                    "user_id": user_id,
+                },
+            )
+    except Exception:
+        logger.exception("dismiss_calibration_alert failed")
+        raise HTTPException(status_code=404, detail="Alert not found or already dismissed")
 
     if result.rowcount == 0:
         from fastapi import HTTPException
