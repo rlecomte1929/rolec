@@ -732,11 +732,18 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   Advisors survived only because it is `.com`, not `.com.au`.
 - **Impact + fix:** every AU firm on a `.com.au` domain collapses to one key per corridor+category → AU
   housing/tax/banks would all drop to ~1/cell. Fix = add `com.au` (+ `.net.au`/`.org.au` and other
-  multi-part ccTLD suffixes) to `_COMPOUND_SUFFIXES` + test (separate code PR). **After the fix I re-land
-  the 4 held firms from this same CSV (no re-research) → AU legal becomes +5.** AU harvest paused until
-  the fix merges.
-- Tripwire held on the IME land: `ssc` `approved` **130 → 130** md5
-  `1c4c3899925c5a8c4b3c168abcfbfc22` unchanged; AU/legal 3 → 4.
+  multi-part ccTLD suffixes) to `_COMPOUND_SUFFIXES` + test.
+- **RESOLVED 2026-09-10 — fix PR #2263 merged to main (`79cf9031`)**, `_COMPOUND_SUFFIXES` now includes
+  `com.au` (+ the corridor ccTLD set; the PR also bundled a reference `manifest.json` on this dir so the
+  fact-citation ratchet correctly excludes vendor batches — see that fix in the delivery notes). The 4
+  held firms were **re-landed from this same CSV** (no re-research): with the fix they key distinctly
+  (`widen.com.au` / `dmamigration.com.au` / `baymigration.com.au` / `kanmigration.com.au`) → **staged 4,
+  promote 4** (IME correctly skipped as already-staged). **AU legal batch total = +5** (IME +1 then +4);
+  fix confirmed live in the land env by the +4 (vs the buggy +1).
+- Create-only guard held on both lands (approved count unchanged across each op): 130 across the IME
+  land; **218 before and after the +4 re-land** (the founder's concurrent vetting had moved the approved
+  baseline 130 → 218 — see the Valencia entry; the old fixed-md5 tripwire is retired). AU/legal
+  **3 → 4 (IME) → 8 (+4 re-land)**.
 
 ### XX-ES legal_admin (Valencia extranjería lawyers) — `vendor-resourced-xx-es-legal-valencia-2026-09-10` (landed 2026-09-10) — UN-PARKS the earlier Valencia hold
 - Source (GCS): `1789037619004_hp0369jo.ndjson` (+ manifest `1789037699891_e2puiit2.json`). Clean re-run
