@@ -4,6 +4,25 @@ import { MemoryRouter } from 'react-router-dom';
 import { WelcomeStepCard } from './WelcomeStepCard';
 
 describe('WelcomeStepCard', () => {
+  it('hides the decorative step number and prefixes the heading with Step N of M', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <WelcomeStepCard
+          step={1}
+          title="Configure your company"
+          description="Add your company name."
+          href="/hr/company-profile"
+          badge="Start here"
+        />
+      </MemoryRouter>,
+    );
+    const number = container.querySelector('[aria-hidden="true"]');
+    expect(number?.textContent).toBe('1');
+    expect(
+      screen.getByRole('heading', { name: /step 1 of 3\. configure your company/i }),
+    ).toBeInTheDocument();
+  });
+
   it('gives Get started a 24px-tall hit area without changing the text size', () => {
     render(
       <MemoryRouter>

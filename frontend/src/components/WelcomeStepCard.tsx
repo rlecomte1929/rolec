@@ -15,6 +15,8 @@ interface WelcomeStepCardProps {
   ctaLabel?: string;
   /** Stronger treatment for the recommended first step (AIQ-2282). */
   emphasized?: boolean;
+  /** Total steps on the page — used only in the sr-only "Step N of M" prefix. */
+  stepCount?: number;
 }
 
 /**
@@ -32,6 +34,7 @@ export function WelcomeStepCard({
   showCta = true,
   ctaLabel = 'Get started →',
   emphasized = false,
+  stepCount = 3,
 }: WelcomeStepCardProps) {
   return (
     <div>
@@ -43,7 +46,10 @@ export function WelcomeStepCard({
         }
       >
         <div className="flex items-start gap-4">
-          <div className="w-9 h-9 shrink-0 rounded-full bg-navy-800 text-white text-sm font-semibold flex items-center justify-center">
+          <div
+            className="w-9 h-9 shrink-0 rounded-full bg-navy-800 text-white text-sm font-semibold flex items-center justify-center"
+            aria-hidden="true"
+          >
             {step}
           </div>
           <div className="flex-1 min-w-0">
@@ -54,7 +60,10 @@ export function WelcomeStepCard({
                 </Badge>
               </div>
             )}
-            <h3 className="text-base font-semibold text-navy-800">{title}</h3>
+            <h3 className="text-base font-semibold text-navy-800">
+              <span className="sr-only">Step {step} of {stepCount}. </span>
+              {title}
+            </h3>
             <p className="text-sm text-slate-600 mt-1">{description}</p>
           </div>
           {showCta ? (
