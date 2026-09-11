@@ -89,6 +89,7 @@ const EmployeeDocumentsPage = lazy(() => import('./pages/employee/EmployeeDocume
 // [P1-6] Case roadmap page
 const EmployeeCaseRoadmapPage = lazy(() => import('./pages/employee/EmployeeCaseRoadmapPage').then((module) => ({ default: module.EmployeeCaseRoadmapPage })));
 const ImmigrationPage = lazy(() => import('./pages/employee/ImmigrationPage').then((module) => ({ default: module.ImmigrationPage })));
+const ImmigrationFormsPage = lazy(() => import('./pages/employee/ImmigrationFormsPage').then((module) => ({ default: module.ImmigrationFormsPage })));
 const MyImmigrationData = lazy(() => import('./components/immigration/MyImmigrationData').then((module) => ({ default: module.MyImmigrationData })));
 // [MVG-6] Immigration workflow screens
 const ImmigrationCaseCreatePage = lazy(() => import('./pages/hr/ImmigrationCaseCreatePage').then((module) => ({ default: module.ImmigrationCaseCreatePage })));
@@ -443,6 +444,7 @@ function App() {
         {/* [AIQ-1259b] /plan consolidated into /roadmap — redirect, preserving caseId. */}
         <Route path={WIZARD_ROUTES.CASE_PLAN} element={<RequireEmployeeRoute><CasePlanToRoadmapRedirect /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeCaseImmigration.path} element={<RequireEmployeeRoute><ImmigrationPage /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeCaseImmigrationForms.path} element={<RequireEmployeeRoute><ImmigrationFormsPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeImmigrationAssistant.path} element={<RequireEmployeeRoute><ImmigrationAssistantPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeCaseMyData.path} element={<RequireEmployeeRoute><MyImmigrationData /></RequireEmployeeRoute>} />
         {/* [P1-5] Dossier & Forms list view */}

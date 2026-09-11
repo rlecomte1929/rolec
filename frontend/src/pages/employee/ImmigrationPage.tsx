@@ -21,6 +21,7 @@ import { ImmigrationInterviewShell } from '../../features/immigration/Immigratio
 import { getAuthItem } from '../../utils/demo';
 import api from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
+import { isImmigrationFormsEnabled } from '../../featureFlags';
 
 type FlowStage = 'loading' | 'error' | 'consent' | 'ocr' | 'interview' | 'complete';
 
@@ -145,6 +146,22 @@ export const ImmigrationPage: React.FC = () => {
           onComplete={() => setStage('complete')}
           onSaveAndExit={() => navigate(caseRoadmapHref)}
         />
+      )}
+
+      {/* Auto-fill visa forms from case data (form-fill Phase 1, flag-gated) */}
+      {isImmigrationFormsEnabled() && stage !== 'loading' && stage !== 'error' && caseId && (
+        <div className="mt-8 border-t border-[#e2e8f0] pt-4 text-center">
+          <Button unstyled
+            type="button"
+            onClick={() => navigate(buildRoute('employeeCaseImmigrationForms', { caseId }))}
+            className="text-sm font-semibold text-[#0b2b43] underline hover:text-[#1f8e8b]"
+          >
+            Auto-fill your visa forms →
+          </Button>
+          <p className="text-xs text-slate-500 mt-1">
+            Generate a pre-filled copy of your official visa form from what you have already entered.
+          </p>
+        </div>
       )}
 
       {/* GDPR data-management entry point — available throughout the journey */}
