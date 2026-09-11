@@ -1,0 +1,82 @@
+{
+  "bundle_type": "resources",
+  "schema_version": "1.0",
+  "slug": "no-fr-driving-licence-2026-09-10",
+  "corridor": "NO-FR",
+  "category": "driving_licence",
+  "generated_at": "2026-09-11",
+  "status": "draft",
+  "persona": "Denis - Norwegian national (EEA), Oslo to Paris repatriation",
+  "resources": [
+    {
+      "resource_key": "no_fr_dl_eea_recognition",
+      "title": "EEA driving licence recognition in France (no exchange required while valid)",
+      "url": "https://www.service-public.fr/particuliers/vosdroits/F1460",
+      "source_authority": "Service-Public.fr (DILA, French government)",
+      "category": "driving_licence",
+      "status": "draft",
+      "corridor": "NO-FR",
+      "note": "A valid Norwegian EEA licence may be used to drive in France without exchange; exchange only becomes necessary on expiry, loss/theft, or after a French offence affecting the licence."
+    },
+    {
+      "resource_key": "no_fr_dl_ants_exchange",
+      "title": "Optional exchange of a foreign licence for a French permit (ANTS online procedure)",
+      "url": "https://permisdeconduire.ants.gouv.fr/",
+      "source_authority": "ANTS - Agence nationale des titres securises",
+      "category": "driving_licence",
+      "status": "draft",
+      "corridor": "NO-FR",
+      "note": "Exchange is optional for an EEA licence while valid. Application is online via ANTS; expect a multi-month processing time and a small fee for issuance of the French title."
+    },
+    {
+      "resource_key": "no_fr_dl_eu_exchange_conditions",
+      "title": "Conditions and deadlines to exchange an EU/EEA licence in France",
+      "url": "https://www.service-public.fr/particuliers/vosdroits/F13160",
+      "source_authority": "Service-Public.fr (DILA, French government)",
+      "category": "driving_licence",
+      "status": "draft",
+      "corridor": "NO-FR",
+      "note": "Explains when an EEA licence holder resident in France must or may exchange (e.g. expiry, points/penalty events, need for a French photocard)."
+    },
+    {
+      "resource_key": "no_fr_dl_categories",
+      "title": "Driving licence categories (B, BE, C, ...) and EEA equivalence",
+      "url": "https://www.service-public.fr/particuliers/vosdroits/F2826",
+      "source_authority": "Service-Public.fr (DILA, French government)",
+      "category": "driving_licence",
+      "status": "draft",
+      "corridor": "NO-FR",
+      "note": "EEA licence categories are harmonised; Norwegian categories B, BE, C etc. map to the equivalent French categories."
+    },
+    {
+      "resource_key": "no_fr_dl_lost_stolen",
+      "title": "Lost or stolen foreign licence while resident in France",
+      "url": "https://www.service-public.fr/particuliers/vosdroits/F1465",
+      "source_authority": "Service-Public.fr (DILA, French government)",
+      "category": "driving_licence",
+      "status": "draft",
+      "corridor": "NO-FR",
+      "note": "If a Norwegian licence is lost or stolen in France, a French replacement is generally obtained via ANTS rather than reissue from Norway, since the holder is resident in France."
+    },
+    {
+      "resource_key": "no_fr_dl_idp_third_country",
+      "title": "International Driving Permit - not required within the EEA, useful for third countries",
+      "url": "https://www.service-public.fr/particuliers/vosdroits/F1461",
+      "source_authority": "Service-Public.fr (DILA, French government)",
+      "category": "driving_licence",
+      "status": "draft",
+      "corridor": "NO-FR",
+      "note": "An IDP is not needed to drive in France with a Norwegian EEA licence, but can be useful when driving in non-EEA third countries."
+    },
+    {
+      "resource_key": "no_fr_dl_vegvesen_renewal",
+      "title": "Renewing or replacing a Norwegian driving licence (Statens vegvesen)",
+      "url": "https://www.vegvesen.no/en/driving-licences/",
+      "source_authority": "Statens vegvesen - Norwegian Public Roads Administration",
+      "category": "driving_licence",
+      "status": "draft",
+      "corridor": "NO-FR",
+      "note": "Because renewing an EEA licence from abroad is difficult, the holder should keep the Norwegian licence valid; renewal/replacement is handled by Statens vegvesen."
+    }
+  ]
+}
