@@ -123,6 +123,7 @@ describe('HrWelcomePage — real HR', () => {
     expect(screen.queryByRole('heading', { name: /open your first relocation case/i })).toBeNull();
     expect(screen.queryByTestId('hr-welcome-create-case')).toBeNull();
     expect(screen.getByRole('button', { name: /open the mobility command center/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^open cases$/i })).toBeInTheDocument();
   });
 
   it('sends step 3 to Service Providers vendor curation, not the legacy grid', () => {

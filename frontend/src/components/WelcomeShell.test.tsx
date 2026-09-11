@@ -19,6 +19,17 @@ describe('WelcomeShell', () => {
     expect(screen.getByRole('button', { name: 'Open Cases →' })).toBeInTheDocument();
   });
 
+  it('can hide the top skip so the page owns a single bottom exit', () => {
+    render(
+      <MemoryRouter>
+        <WelcomeShell onSkip={() => undefined} hideSkip>
+          <p>welcome</p>
+        </WelcomeShell>
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('button', { name: /open cases|skip/i })).not.toBeInTheDocument();
+  });
+
   it('reserves bottom space for the analytics consent banner', () => {
     render(
       <MemoryRouter>

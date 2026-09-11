@@ -4,6 +4,8 @@ import { AppShell } from './AppShell';
 interface WelcomeShellProps {
   onSkip: () => void; // called when the user clicks the "skip" link
   skipLabel?: string;
+  /** Hide the top skip — used when the page owns a single bottom exit. */
+  hideSkip?: boolean;
   children: React.ReactNode;
 }
 
@@ -18,6 +20,7 @@ interface WelcomeShellProps {
 export function WelcomeShell({
   onSkip,
   skipLabel = 'Skip, go to dashboard →',
+  hideSkip = false,
   children,
 }: WelcomeShellProps) {
   return (
@@ -26,7 +29,7 @@ export function WelcomeShell({
         className="flex flex-col items-center pt-4 px-2 pb-[max(3rem,var(--consent-banner-offset,0px))]"
         data-testid="welcome-shell"
       >
-        {/* Skip link — top right, low visual weight */}
+        {!hideSkip ? (
         <div className="w-full max-w-2xl flex justify-end mb-8">
           <button
             onClick={onSkip}
@@ -35,6 +38,7 @@ export function WelcomeShell({
             {skipLabel}
           </button>
         </div>
+        ) : null}
 
         {/* Content slot */}
         <div className="w-full max-w-2xl animate-fade-in">{children}</div>
