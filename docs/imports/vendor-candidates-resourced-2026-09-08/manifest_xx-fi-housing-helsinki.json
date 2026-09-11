@@ -1,0 +1,79 @@
+{
+  "batch_id": "vendor-resourced-xx-fi-housing-helsinki-2026-09-11",
+  "category": "housing_agencies",
+  "city": "Helsinki",
+  "total_sourced": 5,
+  "total_rejected": 8,
+  "firms": [
+    {
+      "name": "SATO Oyj",
+      "status": "sourced",
+      "y_tunnus": "0201470-5",
+      "source_url": "https://lvv.fi/"
+    },
+    {
+      "name": "Huoneistokeskus Oy",
+      "status": "sourced",
+      "y_tunnus": "1831315-2",
+      "source_url": "https://lvv.fi/"
+    },
+    {
+      "name": "OP Koti Uusimaa Oy LKV",
+      "status": "sourced",
+      "y_tunnus": "0821497-8",
+      "source_url": "https://lvv.fi/"
+    },
+    {
+      "name": "OVV Asuntopalvelut Helsinki (Garant Vuokravälitys Oy)",
+      "status": "sourced",
+      "y_tunnus": "2955402-3",
+      "source_url": "https://lvv.fi/"
+    },
+    {
+      "name": "Bo LKV Oy",
+      "status": "sourced",
+      "y_tunnus": "2796763-3",
+      "source_url": "https://lvv.fi/"
+    },
+    {
+      "name": "Kiinteistomaailma Oy",
+      "status": "rejected",
+      "reason": "No Y-tunnus found published on kiinteistomaailma.fi (tietosuojaseloste 404, footer absent)"
+    },
+    {
+      "name": "REMAX Finland / REF Franchices Finland Oy",
+      "status": "rejected",
+      "reason": "No Y-tunnus published on remax.fi (privacy page names entity but omits Y-tunnus)"
+    },
+    {
+      "name": "Kotimaailma Apartments",
+      "status": "rejected",
+      "reason": "No Y-tunnus on kotimaailma.com; also operates as furnished-apartment provider, not a registered välitysliike"
+    },
+    {
+      "name": "Finland Relocation Services (finlandrelocation.com)",
+      "status": "rejected",
+      "reason": "Relocation consultancy / HR mobility service, not a kiinteiston- tai vuokrahuoneiston välitysliike"
+    },
+    {
+      "name": "Nordic Relocation Group",
+      "status": "rejected",
+      "reason": "Sweden-based company (nrgab.com), not a Finnish välitysliike"
+    },
+    {
+      "name": "Lumo Kodit Oyj / Lumo Asuminen Oy",
+      "status": "rejected",
+      "reason": "Direct landlord (vuokranantaja), not a välitysliike; no Y-tunnus on lumo.fi"
+    },
+    {
+      "name": "VVO Group (historical)",
+      "status": "rejected",
+      "reason": "Merged into Lumo brand; same rejection grounds as Lumo"
+    },
+    {
+      "name": "Helsinki Homes (helsinkihomes.fi)",
+      "status": "rejected",
+      "reason": "No verifiable website or Y-tunnus found"
+    }
+  ]
+}

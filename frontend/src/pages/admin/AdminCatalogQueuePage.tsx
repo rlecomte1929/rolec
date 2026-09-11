@@ -25,6 +25,16 @@ import {
 import type { DestinationRequest } from '../../api/hrCatalog';
 import { AdminLayout } from './AdminLayout';
 import { DiscoverSection } from './DiscoverSection';
+import {
+  CATALOG_QUEUE_INTRO,
+  CATALOG_QUEUE_INTRO_HEADING,
+  CATALOG_QUEUE_SUBTITLE,
+  CATALOG_QUEUE_TITLE,
+  FIND_PROVIDERS_BUSY,
+  FIND_PROVIDERS_LABEL,
+  fillProvidersOutcome,
+  findProvidersAriaLabel,
+} from './catalogQueueCopy';
 
 const STATUS_TABS: { value: 'pending' | 'approved' | 'rejected'; label: string }[] = [
   { value: 'pending', label: 'Pending' },
@@ -110,7 +120,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
       const updated = await resolveDestinationRequest(id, status);
       setInfo(
         status === 'approved'
-          ? `Approved ${updated.city}, ${updated.country}. It's now on the allowlist for all companies.`
+          ? `Approved ${updated.city}, ${updated.country}. ReloPass may look up providers there for every company.`
           : `Rejected ${updated.city}, ${updated.country}.`,
       );
       await loadAll();
@@ -163,13 +173,13 @@ export const AdminCatalogQueuePage: React.FC = () => {
     setInfo(null);
     try {
       const entry = await addAllowlistEntry(newCity.trim(), newCountry.trim(), newNotes.trim() || undefined);
-      setInfo(`Added ${entry.city}, ${entry.country} to the allowlist.`);
+      setInfo(`Opened ${entry.city}, ${entry.country} as an approved destination.`);
       setNewCity('');
       setNewCountry('');
       setNewNotes('');
       await loadAll();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Could not add to allowlist.';
+      const msg = err instanceof Error ? err.message : 'Could not open this destination.';
       setError(msg);
     } finally {
       setAdding(false);
@@ -184,9 +194,12 @@ export const AdminCatalogQueuePage: React.FC = () => {
     try {
       const res = await fillDemandGap(g.category, g.city, g.country);
       setInfo(
-        res.scraped_count > 0
-          ? `Added ${res.scraped_count} ${g.category} provider${res.scraped_count === 1 ? '' : 's'} for ${g.city}.`
-          : `${g.city} is now allowlisted. The scraper returned nothing yet (it may be disabled or have no API key) — re-run once it's configured.`,
+        fillProvidersOutcome({
+          city: g.city,
+          category: g.category,
+          scrapedCount: res.scraped_count,
+          lookupRan: res.lookup_ran,
+        }),
       );
       await loadAll();
     } catch (err: unknown) {
@@ -207,9 +220,12 @@ export const AdminCatalogQueuePage: React.FC = () => {
     try {
       const res = await fillDemandGap(category, corridor.city, corridor.country);
       setInfo(
-        res.scraped_count > 0
-          ? `Added ${res.scraped_count} ${category} provider${res.scraped_count === 1 ? '' : 's'} for ${corridor.city}.`
-          : `${corridor.city} is now allowlisted. The scraper returned nothing yet (it may be disabled or have no API key) — re-run once it's configured.`,
+        fillProvidersOutcome({
+          city: corridor.city,
+          category,
+          scrapedCount: res.scraped_count,
+          lookupRan: res.lookup_ran,
+        }),
       );
       await loadAll();
     } catch (err: unknown) {
@@ -228,9 +244,13 @@ export const AdminCatalogQueuePage: React.FC = () => {
 
   return (
     <AdminLayout
-      title="Catalog destination queue"
-      subtitle="HR-opened scrape requests + admin-managed allowlist."
+      title={CATALOG_QUEUE_TITLE}
+      subtitle={CATALOG_QUEUE_SUBTITLE}
     >
+      <Card padding="lg" className="mb-6">
+        <h2 className="text-lg font-semibold text-[#0b2b43]">{CATALOG_QUEUE_INTRO_HEADING}</h2>
+        <p className="mt-2 text-sm text-[#475569] leading-relaxed">{CATALOG_QUEUE_INTRO}</p>
+      </Card>
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
       {info && <Alert variant="success" className="mb-4">{info}</Alert>}
 
@@ -243,7 +263,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
         <div className="mb-1 text-lg font-semibold text-[#0b2b43]">Coverage gaps employees are hitting</div>
         <p className="text-sm text-[#64748b] mb-4">
           Highest-demand service + destination combos with no catalog coverage yet, across all companies.
-          Filling one allowlists the destination and runs the scraper — no manual search.
+          Opening a city puts it on the approved list, then tries to find providers for that service.
         </p>
         {gaps.length === 0 ? (
           <p className="text-sm text-slate-500 py-2">
@@ -263,14 +283,15 @@ export const AdminCatalogQueuePage: React.FC = () => {
                     <div className="text-sm text-[#64748b]">
                       {g.demand} request{g.demand === 1 ? '' : 's'} from {g.companies} compan{g.companies === 1 ? 'y' : 'ies'}
                       {' · last '}{formatDate(g.last_seen_at)}
-                      {g.allowlisted ? ' · already allowlisted' : ''}
+                      {g.allowlisted ? ' · already an approved destination' : ''}
                     </div>
                   </div>
                   <Button
                     onClick={() => void fillGap(g)}
                     disabled={fillingKey === key}
+                    aria-label={findProvidersAriaLabel(g.category, g.city)}
                   >
-                    {fillingKey === key ? 'Filling…' : 'Allowlist & scrape'}
+                    {fillingKey === key ? FIND_PROVIDERS_BUSY : FIND_PROVIDERS_LABEL}
                   </Button>
                 </li>
               );
@@ -286,7 +307,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
         <div className="mb-1 text-lg font-semibold text-[#0b2b43]">Emerging corridors (from intake)</div>
         <p className="text-sm text-[#64748b] mb-4">
           Destinations employees are moving to, ranked by intake volume, with the service categories
-          still missing catalog coverage. Pre-warm them here before employees hit an empty state.
+          still missing catalog coverage. Find providers here before anyone hits an empty list.
         </p>
         {corridors.length === 0 ? (
           <p className="text-sm text-slate-500 py-2">
@@ -303,7 +324,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
                   <div className="text-sm text-[#64748b]">
                     {c.intake_count} intake{c.intake_count === 1 ? '' : 's'}
                     {' · last '}{formatDate(c.last_intake_at)}
-                    {c.allowlisted ? ' · already allowlisted' : ''}
+                    {c.allowlisted ? ' · already an approved destination' : ''}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -316,8 +337,11 @@ export const AdminCatalogQueuePage: React.FC = () => {
                         variant="outline"
                         onClick={() => void fillCorridorCategory(c, cat)}
                         disabled={fillingKey === key}
+                        aria-label={findProvidersAriaLabel(cat, c.city)}
                       >
-                        {fillingKey === key ? 'Filling…' : <span className="capitalize">{cat}</span>}
+                        {fillingKey === key ? FIND_PROVIDERS_BUSY : (
+                          <span className="capitalize">Find {cat}</span>
+                        )}
                       </Button>
                     );
                   })}
@@ -331,11 +355,10 @@ export const AdminCatalogQueuePage: React.FC = () => {
       <Card padding="lg" className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-[#0b2b43]">HR scrape requests</h2>
+            <h2 className="text-lg font-semibold text-[#0b2b43]">HR requests to open a city</h2>
             <p className="text-sm text-[#6b7280] mt-1">
-              Tickets opened by HR when they ask the AI to populate a destination that isn&apos;t yet
-              on our supported list. Approving auto-adds (city, country) to the allowlist for
-              every company.
+              HR files these when they need providers in a city that is not approved yet.
+              Approving opens that city for every company.
             </p>
           </div>
           <div className="flex flex-wrap gap-1">
@@ -378,7 +401,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
                 onClick={() => void bulkResolve('approved')}
                 disabled={bulkBusy}
               >
-                {bulkBusy ? 'Working…' : `Approve & allowlist (${selection.selectedRows.length})`}
+                {bulkBusy ? 'Working…' : `Approve city (${selection.selectedRows.length})`}
               </Button>
               <Button
                 variant="outline"
@@ -427,7 +450,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
                         </span>
                         {onAllowlist && (
                           <span className="ml-2 inline-flex items-center rounded-full border border-[#bbf7d0] bg-[#dcfce7] px-2 py-0.5 text-xs font-medium text-[#166534]">
-                            on allowlist
+                            approved destination
                           </span>
                         )}
                       </div>
@@ -460,7 +483,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
                           onClick={() => void resolve(t.id, 'approved')}
                           disabled={saving || bulkBusy}
                         >
-                          {saving ? 'Saving…' : 'Approve & allowlist'}
+                          {saving ? 'Saving…' : 'Approve city'}
                         </Button>
                       </div>
                     )}
@@ -473,10 +496,10 @@ export const AdminCatalogQueuePage: React.FC = () => {
       </Card>
 
       <Card padding="lg">
-        <h2 className="text-lg font-semibold text-[#0b2b43]">Destination allowlist</h2>
+        <h2 className="text-lg font-semibold text-[#0b2b43]">Approved destinations</h2>
         <p className="text-sm text-[#6b7280] mt-1">
-          Where HR is allowed to fire the AI scraper without going through the ticket queue.
-          Adding a row here is the same as approving a pending ticket.
+          Cities ReloPass may look up providers for. This is the allowlist: adding a city here
+          is the same as approving an HR request. It does not by itself add providers.
         </p>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-[2fr,2fr,3fr,auto] gap-3 items-end">
           {/* Free text here is how `catalog_destination_allowlist` grew three Dublins
@@ -492,7 +515,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
             className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
           />
           <Button onClick={() => void addEntry()} disabled={adding || !newCity.trim() || !newCountry.trim()}>
-            {adding ? 'Adding…' : 'Add'}
+            {adding ? 'Opening…' : 'Approve this destination'}
           </Button>
         </div>
         {allowlist.length > 0 ? (
@@ -516,7 +539,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
             ))}
           </ul>
         ) : (
-          <p className="mt-4 text-sm text-[#6b7280]">No allowlisted destinations yet.</p>
+          <p className="mt-4 text-sm text-[#6b7280]">No approved destinations yet.</p>
         )}
       </Card>
     </AdminLayout>

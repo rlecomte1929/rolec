@@ -1,0 +1,64 @@
+{
+  "batch_id": "vendor-resourced-xx-cz-legal-prague-2026-09-10",
+  "category": "legal_admin",
+  "city": "Prague",
+  "total_sourced": 5,
+  "total_rejected": 5,
+  "firms": [
+    {
+      "name": "EXPATLEGAL advokátní kancelář, s.r.o.",
+      "status": "sourced",
+      "cak_number": "16244",
+      "source_url": "https://www.cak.cz/"
+    },
+    {
+      "name": "rutland & partners, advokátní kancelář s.r.o.",
+      "status": "sourced",
+      "cak_number": "03468",
+      "source_url": "https://www.cak.cz/"
+    },
+    {
+      "name": "PEERS advokátní kancelář, s.r.o.",
+      "status": "sourced",
+      "cak_number": "13848",
+      "source_url": "https://www.cak.cz/"
+    },
+    {
+      "name": "Solers legal s.r.o.",
+      "status": "sourced",
+      "cak_number": "17452",
+      "source_url": "https://www.cak.cz/"
+    },
+    {
+      "name": "GT Legal, advokátní kancelář, s.r.o.",
+      "status": "sourced",
+      "cak_number": "12022",
+      "source_url": "https://www.cak.cz/"
+    },
+    {
+      "name": "BROŽ BROŽ VALA advokátní kancelář s.r.o. (czechvisalawyer.cz)",
+      "status": "rejected",
+      "reason": "Registered seat Brno (Marie Steyskalové 767/62, 616 00 Brno); Prague is a branch office only; prefer independent Prague firms per brief"
+    },
+    {
+      "name": "movetoprague.com",
+      "status": "rejected",
+      "reason": "Informational/advisory website, not a ČAK-registered advokátní kancelář"
+    },
+    {
+      "name": "Ecovis Czech Republic (ecovis.com/czech-republic)",
+      "status": "rejected",
+      "reason": "Global franchise branch office sharing parent corporate domain ecovis.com; not an independent Prague firm with distinct domain per brief preference"
+    },
+    {
+      "name": "zahist.lawyer",
+      "status": "rejected",
+      "reason": "Lawyer network website with Prague address; no ČAK evidenční číslo found for any listed practitioner in this session"
+    },
+    {
+      "name": "CIKR (cikr.cz)",
+      "status": "rejected",
+      "reason": "Primarily asylum/refugee and criminal defence focus; not primarily a corporate relocation/zaměstnanecká karta/work-permit practice for relocating employees"
+    }
+  ]
+}

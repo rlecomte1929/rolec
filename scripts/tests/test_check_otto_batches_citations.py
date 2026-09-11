@@ -44,24 +44,45 @@ import check_otto_batches as cob  # noqa: E402
 REPO_ROOT = SCRIPTS_DIR.parent
 
 
+_VENDOR_STORE_TABLES = ("vendor_candidates", "suppliers")
+
+
 def _batch_targets_vendor_candidates(imports: Path, stream: Path) -> bool:
-    """True if `stream`'s batch declares ``target_table`` = vendor_candidates.
+    """True if `stream`'s batch is a vendor store, not a fact/content citation batch.
 
     The batch dir is the first path segment under ``docs/imports/``; its ``manifest.json``
-    top-level ``target_table`` names the store. Vendor-candidate batches are out of scope
-    for the fact/content citation ratchet: a vendor row's ``source_url`` is a VENDOR
-    evidence URL graded by the supplier tier gate (``vendor_harvester.validate()``, which
-    rejects a self-declared or aggregator URL outright), not a normative citation. Grading
-    them here would judge one batch by another's contract — the #1990 mistake this module
-    exists to avoid. Keyed on the manifest, not record shape, so a fact batch can never
-    opt out.
+    top-level ``target_table`` names the store. Vendor-candidate *and* supplier-enrichment
+    batches are out of scope for the fact/content citation ratchet: a vendor row's
+    ``source_url`` is a VENDOR evidence URL (the firm's own site / contact page) graded by
+    the supplier tier gate (``vendor_harvester.validate()``, which rejects a self-declared
+    or aggregator URL outright), not a normative citation. Grading them here would judge
+    one batch by another's contract — the #1990 mistake this module exists to avoid.
+    Keyed on the manifest, not record shape, so a fact batch can never opt out.
     """
     try:
         batch_dir = imports / stream.relative_to(imports).parts[0]
         manifest = json.loads((batch_dir / "manifest.json").read_text(encoding="utf-8"))
     except (OSError, ValueError, IndexError):
         return False
-    return "vendor_candidates" in str(manifest.get("target_table") or "").lower()
+    table = str(manifest.get("target_table") or "").lower()
+    return any(name in table for name in _VENDOR_STORE_TABLES)
+
+
+class VendorStoreSkip(unittest.TestCase):
+    def test_supplier_enrichment_batch_is_out_of_scope(self):
+        imports = REPO_ROOT / "docs" / "imports"
+        stream = (
+            imports
+            / "vendor-enrichment-2026-09-11"
+            / "src"
+            / "enrich-xx-es-legal-contact.ndjson"
+        )
+        if not stream.is_file():
+            self.skipTest("vendor-enrichment batch not in this tree")
+        self.assertTrue(
+            _batch_targets_vendor_candidates(imports, stream),
+            "target_table=suppliers must skip the fact-citation ratchet",
+        )
 
 
 class UrlSpecificityBlocks(unittest.TestCase):

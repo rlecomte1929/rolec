@@ -1,0 +1,5 @@
+{
+  "batch_id": "vendor-enrichment-2026-09-11",
+  "target_table": "suppliers",
+  "note": "Contact-enrichment batches (fill-empty on already-landed vc-* suppliers via scripts/enrich_suppliers.py). Per-batch Otto manifests are manifest_<slice>.json; the delivered NDJSON is src/enrich-<slice>.ndjson and the schema-mapped landing file is src/enrich-<slice>.LANDING.ndjson. Nothing here changes vetting status."
+}

@@ -1,0 +1,81 @@
+{
+  "batch_id": "vendor-resourced-xx-cz-housing-prague-2026-09-10",
+  "category": "housing_agencies",
+  "city": "Prague",
+  "country": "CZ",
+  "generated_at": "2026-09-10",
+  "total_sourced": 5,
+  "total_rejected": 8,
+  "firms": [
+    {
+      "name": "Foreigners.cz, s.r.o.",
+      "status": "sourced",
+      "ico": "28824059",
+      "source_url": "https://ares.gov.cz/"
+    },
+    {
+      "name": "MH Relocations s.r.o.",
+      "status": "sourced",
+      "ico": "10814574",
+      "source_url": "https://ares.gov.cz/"
+    },
+    {
+      "name": "Prestige Group Apart s.r.o.",
+      "status": "sourced",
+      "ico": "28171926",
+      "source_url": "https://ares.gov.cz/"
+    },
+    {
+      "name": "Residenture Real Estate (Gleb Barkov)",
+      "status": "sourced",
+      "ico": "02654385",
+      "source_url": "https://ares.gov.cz/"
+    },
+    {
+      "name": "Expat Advisors s.r.o.",
+      "status": "sourced",
+      "ico": "07320612",
+      "source_url": "https://ares.gov.cz/"
+    },
+    {
+      "name": "ISG Invest s.r.o.",
+      "status": "rejected",
+      "reason": "IČO not published on investmentsolutions.group (homepage and privacy policy checked); ARES not directly fetchable to confirm independently"
+    },
+    {
+      "name": "QARA s.r.o. / realtorprague.com",
+      "status": "rejected",
+      "reason": "QARA (ICO 01740113) is a broker-platform/umbrella for independent agents, not itself an expat-facing rental agency; individual agent Alexandra Kurbanova operates under QARA but does not publish own IČO on realtorprague.com"
+    },
+    {
+      "name": "Flat Zone s.r.o.",
+      "status": "rejected",
+      "reason": "Property search aggregator for new-build developments (novostavby), not an expat rental/relocation agency"
+    },
+    {
+      "name": "BPR Realitní kancelář",
+      "status": "rejected",
+      "reason": "Website not accessible — IČO could not be verified"
+    },
+    {
+      "name": "Prague Property",
+      "status": "rejected",
+      "reason": "Website timed out — IČO could not be verified"
+    },
+    {
+      "name": "PragueStay",
+      "status": "rejected",
+      "reason": "Website not accessible — IČO could not be verified"
+    },
+    {
+      "name": "Prague Home Finder",
+      "status": "rejected",
+      "reason": "Website not accessible — IČO could not be verified"
+    },
+    {
+      "name": "4you.cz",
+      "status": "rejected",
+      "reason": "Website not accessible — IČO could not be verified"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "batch_id": "vendor-resourced-xx-dk-legal-copenhagen-2026-09-10",
+  "category": "legal_admin",
+  "city": "Copenhagen",
+  "total_sourced": 3,
+  "total_rejected": 10,
+  "firms": [
+    {
+      "name": "Globe Advokatanpartsselskab (Globe Advokater)",
+      "status": "sourced",
+      "beskikkelse": "Globe Advokatanpartsselskab – CVR 43999648 (Advokatnøglen firm ID: 8848063a-6cc6-45ea-80d0-9c845351ddb0)",
+      "source_url": "https://www.advokatnoeglen.dk/"
+    },
+    {
+      "name": "Holm Thomsen Law Advokatanpartsselskab",
+      "status": "sourced",
+      "beskikkelse": "Helle Holm Thomsen – Beskikkelsesaar 2008, Moederet for landsret (CVR 44210088, advokat ID: 4e0dff72-4b00-4a6a-a5e4-81c0eccc73a0)",
+      "source_url": "https://www.advokatnoeglen.dk/"
+    },
+    {
+      "name": "Advokatkontoret Niels-Erik Hansen",
+      "status": "sourced",
+      "beskikkelse": "Niels-Erik Hansen - CVR 32623905 (Advokatnøglen firm ID: da2addfd-d728-4618-9ccf-a01494ce418d)",
+      "source_url": "https://www.advokatnoeglen.dk/"
+    },
+    {
+      "name": "Poul Schmith",
+      "status": "rejected",
+      "reason": "Explicitly states it does not represent foreigners or advise on residence/immigration matters - represents immigration authorities, creating a conflict of interest"
+    },
+    {
+      "name": "immigration-denmark.com",
+      "status": "rejected",
+      "reason": "Staff described as agents not licensed advokater; no Advokatnøglen entry found; suspicious non-Danish +35 phone prefix"
+    },
+    {
+      "name": "Gateway to Denmark",
+      "status": "rejected",
+      "reason": "Relocation/consulting company (CVR 20520604, Frederiksberg C); no Advokatnøglen entry found for firm or any named advokat"
+    },
+    {
+      "name": "Karoline Normann (Stagetorn Advokater)",
+      "status": "rejected",
+      "reason": "Confirmed on Advokatnøglen (CVR 29569312, Kobenhavn K) but primary focus is criminal defense (strafferet), not expat/corporate immigration law"
+    },
+    {
+      "name": "Advokatfirmaet Piroz",
+      "status": "rejected",
+      "reason": "No Advokatnøglen entry found; located in Charlottenlund, not Copenhagen"
+    },
+    {
+      "name": "VisaGuiden",
+      "status": "rejected",
+      "reason": "No Advokatnøglen entry found"
+    },
+    {
+      "name": "Advokatfirmaet Grotkjaer Elmstrom",
+      "status": "rejected",
+      "reason": "Advokatnøglen shows principal advokat Tobias Grotkjaer Elmstrom registered in Aarhus (Lille Torv 6A, 8000 Aarhus C), not Copenhagen"
+    },
+    {
+      "name": "NMD Law Group",
+      "status": "rejected",
+      "reason": "No Advokatnøglen entry found for firm or any named advokat despite multiple search attempts"
+    },
+    {
+      "name": "KQOMANN advokatfirma",
+      "status": "rejected",
+      "reason": "Aarhus-based firm; offers remote Copenhagen service but is not a Copenhagen-registered advokat firm"
+    },
+    {
+      "name": "Homann Advokater",
+      "status": "rejected",
+      "reason": "No Advokatnøglen firm entry found for Amagertorv 11 Copenhagen firm via Google site search"
+    }
+  ]
+}

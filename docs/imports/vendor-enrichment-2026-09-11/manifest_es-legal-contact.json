@@ -1,0 +1,44 @@
+{
+  "batch_id": "enrich-xx-es-legal-contact-2026-09-11",
+  "generated_at": "2026-09-11",
+  "total_attempted": 17,
+  "total_filled": 17,
+  "fully_filled_both_fields": 13,
+  "partial_rows": [
+    {
+      "supplier_id": "vc-b85baeba-679a-4e1f-9cd7-a86dfc816d11",
+      "name": "Calero Legal Abogados",
+      "fields_found": ["contact_phone"],
+      "reason_missing_email": "Email Cloudflare-protected on all site pages; not extractable by web scraper"
+    },
+    {
+      "supplier_id": "vc-02d821c9-5420-4b21-bd78-bb4166d43670",
+      "name": "Extranjeria al Dia (German Saldana)",
+      "fields_found": ["contact_email"],
+      "reason_missing_phone": "No phone number published on site; contact page returned 404"
+    },
+    {
+      "supplier_id": "vc-390f3e72-3006-4ffa-9de3-bfc160ba0a97",
+      "name": "Marta Reina Grau",
+      "fields_found": ["contact_email", "contact_phone"],
+      "note": "Supplier website is a Pleitex directory profile; contact details (info@pleitex.com, +34919935168) belong to the Pleitex platform, not the individual lawyer's direct contact. No personal contact for Marta Reina Grau is published on the given URL."
+    },
+    {
+      "supplier_id": "vc-b14f42d1-6516-42e1-ab1a-ecc44b7269e0",
+      "name": "Rodriguez Calistro Abogados",
+      "fields_found": ["contact_phone"],
+      "reason_missing_email": "Email Cloudflare-protected on all site pages including aviso legal; not extractable by web scraper"
+    },
+    {
+      "supplier_id": "vc-e36ef272-2e23-45ea-91fd-d313b458a525",
+      "name": "Ventura Extranjeria Abogados",
+      "fields_found": ["contact_phone"],
+      "reason_missing_email": "Email Cloudflare-protected on all site pages including aviso legal; not extractable by web scraper"
+    }
+  ],
+  "skipped_no_website": [
+    "vc-14c1a4bf-0993-4e65-ac61-9355dde81304 (Fernando Ortega Cano) - no website provided",
+    "vc-26201571-f39f-41e4-926b-c36570ea1df2 (Modesto Martinez Vizuete) - no website provided",
+    "vc-62912f04-c544-46be-b11d-4252dbf9ac49 (Romina Chiquini Laude) - no website provided"
+  ]
+}
