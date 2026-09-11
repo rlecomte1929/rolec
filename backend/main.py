@@ -258,6 +258,7 @@ from .app.routers import relocation_profile as relocation_profile_router
 from .app.routers import rules as rules_router
 from .app.routers import marketplace as marketplace_router
 from .app.routers import hr_analytics as hr_analytics_router
+from .app.routers import hr_duty_of_care as hr_duty_of_care_router  # AIQ-2268 — GET /api/hr/duty-of-care
 from .app.routers import hr_case_summary as hr_case_summary_router  # AIQ-1697 — AI case summary proxy (dual-layer per CLAUDE.md)
 from .app.routers import hr_onboarding as hr_onboarding_router  # AIQ-1223c — onboarding inference (dual-layer per CLAUDE.md)
 from .app.routers import setup_assistant as setup_assistant_router  # Setup & Help Assistant — read-only setup-status (dual-layer per CLAUDE.md)
@@ -15519,6 +15520,7 @@ app.include_router(rules_router.router)
 app.include_router(marketplace_router.router)  # [AUDIT-C2.3 restore]
 # GAP 3: HR policy compliance matrix (cross-case heatmap for S5c)
 app.include_router(hr_analytics_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(hr_duty_of_care_router.router)  # AIQ-2268 — GET /api/hr/duty-of-care (dual-layer)
 app.include_router(hr_case_summary_router.router)  # AIQ-1697 — AI case summary proxy
 app.include_router(hr_onboarding_router.router)  # AIQ-1223c — deterministic onboarding inference
 # GAP 4: Immigration advisor matching
