@@ -1,0 +1,51 @@
+name: Seed/prod parity (form-fill)
+
+# Nightly guard: does PROD actually hold the field mappings each real government form is
+# supposed to have? Form-fill seed migrations are merged to the repo but applied to prod
+# out-of-band (no apply-on-merge; the applier is jammed), and three of them silently never
+# reached prod for months — FR served stale fictional field ids, ES had none — with nothing
+# to catch it (fill tests use fixtures, the ledger isn't reconciled, a row-count check passes
+# on stale data). This reads prod (read-only) and compares actual field ids to the manifest,
+# failing on MISSING or STALE rows. See scripts/check_seed_prod_parity.py.
+#
+# Not a PR gate: a brand-new form's rows are applied AFTER merge, so prod legitimately would
+# not have them at PR time. Nightly checks after the data should have been loaded.
+#
+# Reuses the SAME read-only prod secret as the migration-drift / RLS-coverage checks:
+#   - secrets.RLS_COVERAGE_DATABASE_URL   (a read-only role, session-mode 5432)
+#   - vars.RLS_COVERAGE_DATABASE_URL_SET = 'true'   (secrets.* is not allowed in a job if:)
+# No-op until those are configured — no new secret to provision.
+
+on:
+  schedule:
+    # 05:00 UTC daily (offset from the 04:00 compliance job).
+    - cron: "0 5 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: seed-prod-parity
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    name: Form-fill seed/prod parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # No-op unless the read-only prod DATABASE_URL secret is configured.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Run seed/prod parity check
+        env:
+          # Quoted env (not inlined into run:) per workflow-injection guidance.
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/check_seed_prod_parity.py
