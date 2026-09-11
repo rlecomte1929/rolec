@@ -1,0 +1,6 @@
+corridor,service_category,source_name,source_url,rejection_reason,notes
+US-EC,temp_housing,MIDUVI - Ministerio de Desarrollo Urbano y Vivienda,https://www.habitatyvivienda.gob.ec/,source_unreachable,Register did not render; no browsable operator/housing directory reachable.
+US-EC,temp_housing,datosabiertos.gob.ec (Ecuador open data portal),https://www.datosabiertos.gob.ec/,waf_blocked,Returned HTTP 403 (WAF) from datacenter egress.
+US-EC,temp_housing,SRI RUC lookup (taxpayer registry),https://srienlinea.sri.gob.ec/,source_unreachable,"Angular SPA behind F5/BIG-IP WAF; per-RUC lookup only, not keyword-searchable for candidate generation."
+US-EC,temp_housing,ACESS housing/operator register,https://www.acess.gob.ec/,source_unreachable,30s navigation timeout; no text returned.
+US-EC,temp_housing,ICF / EMCC Quito relocation-adjacent listings,https://www.emccglobal.org/,waf_blocked,Captcha-gated; could not resolve challenge.

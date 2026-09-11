@@ -1,0 +1,18 @@
+{
+  "slug": "ec-quito-temp-housing-2026-09-10",
+  "corridor": "US-EC",
+  "phase": "P3",
+  "package_type": "temp_housing",
+  "generated_at": "2026-09-11T00:00:00Z",
+  "providers_file": "1789135834948_0024bbby.csv",
+  "providers_count": 0,
+  "rejects_count": 5,
+  "honest_zero": true,
+  "reason": "Ecuadorian official housing registers were WAF/JS-blocked or returned 403/timeout; no browser-grounded providers could be verified.",
+  "sha256": {
+    "providers_csv": "4a7361e7603fc55bbbdf2c0b3d81665199e4640bcec6da5b4b5aab6819f02fbb",
+    "rejects_csv": "6959e3cbc0251a89887507fe895b5c2023a54b3ecaccf7d48f9da65303c92615",
+    "manifest": "fd3dab614712cc28843e9a3a5ac759c49a39bd76b5ddbbf439e512ed2fc6f258",
+    "readme": "aeef5f92878f05fdea7ba0ebd7fda34f9d9b6b3afefdad5d244b0138d72646dc"
+  }
+}

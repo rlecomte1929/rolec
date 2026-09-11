@@ -24,9 +24,10 @@ facts batches. Everything is candidate-only: facts `review_status=pending` /
 `platform_vetting_status=pending`. **Nothing is served; the human lawyer gate at
 `/admin/countries` (facts) and the vetting queue (vendors) remain.**
 
-## Landed (candidate-only) — 25 batches, 147 items
+## Landed (candidate-only) — 29 batches, 162 items
 
-*(21 in the first pull below + 4 Denis packages recovered 2026-09-11 via Otto's GCS listing — see "Denis — recovered" section.)*
+*(21 in the first pull below + 4 Denis packages recovered via Otto's GCS listing + 4 Abraham
+US→EC vendor batches completed from Otto's metadata re-run — see the two sections before "Deferred".)*
 
 ### Requirement FACTS — 58 facts (39 non-obvious, 12 needs_lawyer_review), gate PASS
 
@@ -81,6 +82,25 @@ Still missing (beyond the 100-item listing window) — a targeted Otto re-run is
 **D-P5** no-fr-driving-licence. The two facts packages are the priority — Denis has no departure/return
 facts landed until they arrive.
 
+### Abraham US→EC — vendor batches completed (2026-09-11, metadata re-run)
+
+Otto regenerated rejects/manifest/README from the existing `providers.csv` (task #134438). Every
+`providers.csv` / `rejects.csv` / `README.md` sha256 matches the value Otto stated **and** the value
+declared inside each manifest; the manifest's own `sha256.manifest` is a self-hash (blanked-field
+canonical form), so it is not a raw-bytes match by design. Manifest schema is leaner than §3.C
+(`slug` + `providers_count`, no per-category self-assessment) — noted for the reviewer; the vendor
+loader reads `providers.csv`, not the manifest.
+
+| Batch (slug) | Accepted | Rejects | Note |
+|---|--:|--:|---|
+| ec-quito-temp-housing-2026-09-10 (AB-P3) | 0 | 5 | **honest-zero** — EC registers WAF/JS-blocked |
+| ec-language-2026-09-10 (AB-P6) | 1 | 4 | Escuela de Español UDLA (SACIC) |
+| ec-quito-dual-career-2026-09-10 (AB-P7) | 4 | 4 | ICF coach profiles |
+| ec-quito-core-providers-2026-09-10 (AB-CORE) | 10 | 5 | 5 banks + 5 legal |
+
+*(Corrupted superseded AB-CORE rejects upload `1789155493577_2e2p19cr.csv` was ignored per Otto's
+flag; the byte-perfect `1789155617167_a7kffdbu.csv` is used.)*
+
 ## Deferred to the load step (needs backend venv + DB, out of this PR's scope)
 
 - `scripts/import_otto_facts.py <batch> --dry-run` → `--apply --promote` (facts → `requirement_items`, `pending`).
@@ -90,14 +110,17 @@ facts landed until they arrive.
 
 ## Outstanding — needs Otto (not recoverable in-repo)
 
-- **Denis NO→FR (#134016)** — 14/28 files recovered via Otto's GCS listing and landed (4 packages,
-  above). The remaining 4 packages fell outside the 100-item listing window: **D-P1 no-departure
-  (14 facts), D-P10 fr-no-return (9 facts), D-P3 temp-housing, D-P5 driving-licence.** A targeted
-  Otto re-run of just these four is queued (files-only to GCS, candidate-only). The two facts
-  packages are the priority.
-- **Abraham US→EC vendor batches — partial filenames only** (AB-P3/P6/P7/CORE providers captured,
-  but rejects/manifest/README timestamps are partial). Requested from Otto: paste the full filenames
-  (or GCS-list the #134224 `1789135…` and #134263 `178914[1|2]…` windows).
+- **Denis NO→FR — first 4 packages landed; re-run of the other 4 COMPLETE (#134437) but blocked on
+  truncated filenames.** Landed already (from the listing): D-P2 health, D-P4 medical (honest-zero),
+  D-P6 language, D-P7 dual-career. The re-run produced the remaining 4 — D-P1 no-departure
+  (**16 facts**), D-P10 fr-no-return (**12 facts**), D-P3 temp-housing (4 accepted/2 rejects),
+  D-P5 driving-licence (7 resources) — with known content sha256 (D-P1 `1675f73a…`, D-P10
+  `b50b2768…`, D-P3 providers `228537057…`/rejects `343f5388…`, D-P5 `2e80621a…`), **but the GCS
+  object filenames came back truncated (`…494......`)** and the bucket denies anonymous listing, so
+  they can't be fetched yet. Need the untruncated filenames (Otto page accessibility tree, or a
+  plain-text paste / fresh `list_media` matched to the sha256 above). Then they land the same way.
+- **Abraham US→EC vendor batches — RESOLVED (#134438).** Metadata re-run delivered full filenames;
+  all 4 batches completed and landed (see the Abraham vendor section above). No longer outstanding.
 - **Abraham Job C (#134263)** — all honest-zeros (Quito registers WAF/JS-blocked); no content to load.
 
 ## Honest-zeros to retry (registers were offline/blocked at research time)
