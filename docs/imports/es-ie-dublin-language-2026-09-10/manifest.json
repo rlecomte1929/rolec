@@ -1,0 +1,28 @@
+{
+  "batch_id": "es-ie-dublin-language-2026-09-10",
+  "corridor": "XX-IE",
+  "categories": [
+    {
+      "service_category": "language",
+      "register": "TrustEd Ireland statutory quality-mark listing (QQI-managed ACELS/QQI International Education Mark)",
+      "denominator": 5,
+      "accepted": 3,
+      "rejected": 3,
+      "confidence": "high",
+      "notes": "Provenance is the statutory TrustEd Ireland register page, which lists each accepted school by name. Only 5 ELE providers are nationally authorised so far, so 3 Dublin schools accepted is below the 4-6 target. ACELS is now administered by QQI and closed to new applicants; ILEP is closed; the ACELS by-county recognisedproviders map is JS-driven and unreadable, which capped additional Dublin finds. accreditation_body=QQI. Numbers/expiry not published, left blank."
+    }
+  ],
+  "files": {
+    "providers.csv": {
+      "records": 3,
+      "sha256": "4ac3c8869ce546b4cea681e7b3f5bc266d56d7cd9e569cc04e4dc657bb75376b"
+    },
+    "rejects.csv": {
+      "records": 3,
+      "sha256": "ea5e7de27c157560637ceb70243ae7bd4971cf59949b896d850e0bba3c75117b"
+    }
+  },
+  "total_accepted": 3,
+  "total_rejected": 3,
+  "platform_vetting_status": "pending"
+}

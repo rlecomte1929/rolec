@@ -1,0 +1,28 @@
+{
+  "batch_id": "es-ie-dublin-dual-career-2026-09-10",
+  "corridor": "XX-IE",
+  "categories": [
+    {
+      "service_category": "spouse",
+      "register": "ICF Credentialed Coach Finder / EMCC Global accredited directory / CRO (all attempted)",
+      "denominator": 0,
+      "accepted": 0,
+      "rejected": 5,
+      "confidence": "n/a",
+      "notes": "Honest zero. 0 providers verifiable: ICF find-a-coach, EMCC Global directory, and CRO/opencorporates search are all JS-driven, login-gated or captcha-gated and returned no fetchable listing. All 5 candidates found are provider own-sites (tier-3) and are recorded in rejects.csv. Retry when a fetchable/official directory endpoint is available."
+    }
+  ],
+  "files": {
+    "providers.csv": {
+      "records": 0,
+      "sha256": "4a7361e7603fc55bbbdf2c0b3d81665199e4640bcec6da5b4b5aab6819f02fbb"
+    },
+    "rejects.csv": {
+      "records": 5,
+      "sha256": "598843a041db674ed8afe81d271d520e78d3bb38fd0d7ed95b3d098207dc07ba"
+    }
+  },
+  "total_accepted": 0,
+  "total_rejected": 5,
+  "platform_vetting_status": "pending"
+}

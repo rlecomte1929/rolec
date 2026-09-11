@@ -1,0 +1,6 @@
+corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry,reject_reason
+XX-IE,spouse,The Career Coach,https://thecareer-coach.com/,,,,,,tier-3: own-site only / not confirmed on official register (ICF/EMCC/CRO directories JS-driven or captcha-gated, could not fetch listing)
+XX-IE,spouse,CareerCoaching.ie (Catherine),https://careercoaching.ie/,,,EMCC,,,"tier-3: own-site claims EMCC EIA but could not confirm on EMCC Global directory (login/JS-gated, unreadable)"
+XX-IE,spouse,Angela Burke Career Consulting,https://angelaburke.ie/,,,,,,tier-3: own-site only / not confirmed on official register
+XX-IE,spouse,Michelle A McCarthy Career Coach,https://michelleamccarthy.com/,,,,,,tier-3: own-site only / not confirmed on official register
+XX-IE,spouse,IMPACT Group (Dublin Outplacement),https://impactgrouphr.com/services/outplacement/global-delivery/dublin-outplacement-services/,,,,,,tier-3: own-site only / not confirmed on Irish official register (CRO)

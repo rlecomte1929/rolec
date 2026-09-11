@@ -1,0 +1,139 @@
+{
+  "batch_id": "ec-driving-licence-2026-09-10",
+  "persona": "Abraham (US national, Seattle -> Quito, Ecuador)",
+  "generated_date": "2026-09-11",
+  "categories": [
+    {
+      "key": "transport",
+      "label": "Transport & Driving",
+      "description": "Driving, licences, permits and vehicle-related requirements for relocating to Ecuador."
+    }
+  ],
+  "tags": [
+    { "key": "driving-licence", "label": "Driving Licence" },
+    { "key": "us-licence", "label": "US Licence" },
+    { "key": "idp", "label": "International Driving Permit" },
+    { "key": "ant", "label": "ANT (Agencia Nacional de Tránsito)" },
+    { "key": "licence-exchange", "label": "Licence Exchange / Canje" },
+    { "key": "quito", "label": "Quito" },
+    { "key": "documents", "label": "Documents Required" },
+    { "key": "official-gap", "label": "Unconfirmed Official Rule" }
+  ],
+  "sources": [
+    {
+      "source_name": "Agencia Nacional de Tránsito (ANT) — Guía Oficial de Trámites y Servicios (gob.ec): Canje de licencia de conducir extranjera por ecuatoriana",
+      "source_url": "https://www.gob.ec/ant/tramites/canje-licencia-conducir-extranjera-ecuatoriana",
+      "fetched": true,
+      "last_updated_on_page": "2026-01-13",
+      "notes": "Official ANT procedure page. Provides exchange (canje) requirements, cost (USD 142.00 + bank commission), issued-licence validity (5 years, or limited to visa/authorised stay if shorter), and legal basis. Does NOT state a tourist grace period for driving on a foreign licence."
+    },
+    {
+      "source_name": "Agencia Nacional de Tránsito (ANT) — Guía Oficial de Trámites y Servicios (gob.ec): Emisión de permiso internacional para conductores",
+      "source_url": "https://www.gob.ec/ant/tramites/emision-permiso-internacional-conductores",
+      "fetched": true,
+      "last_updated_on_page": "2026-01-13",
+      "notes": "Official ANT procedure page for Ecuador-issued International Driving Permits (PIC). Explicitly states the Ecuador-issued PIC 'NO ES VALIDO EN ECUADOR' (it is for Ecuadorian licence-holders driving abroad), and requires a valid Ecuadorian licence to obtain one. Confirms an IDP is an outbound-travel document, not a way to drive in Ecuador."
+    },
+    {
+      "source_name": "U.S. Embassy & Consulate in Ecuador (ec.usembassy.gov) — Information about U.S. Driver License in Ecuador (Spanish)",
+      "source_url": "https://ec.usembassy.gov/es/services-es/information-about-u-s-driver-license-in-ecuador-es/",
+      "fetched": true,
+      "last_updated_on_page": null,
+      "notes": "Official U.S. Government source (secondary/supporting, not on the ANT/Cancilleria allow-list). States tourists and temporary visitors may drive in Ecuador on a valid foreign licence of a category equivalent to a non-professional Ecuadorian Type B licence, that passport/visa may be checked, and describes the DMV certification + apostille route for exchanging a US licence. Does NOT publish a specific number of days/months for the tourist grace period. Included only as corroboration; primary authority remains ANT."
+    }
+  ],
+  "resources": [
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "transport",
+      "title": "Driving in Ecuador on a US licence or IDP: what actually applies to Abraham",
+      "resource_type": "guide",
+      "summary": "As a US national moving to Quito, Abraham can drive on his valid US licence as a temporary visitor, but an Ecuador-issued International Driving Permit is NOT valid in Ecuador and once he becomes a resident he must exchange his licence with the ANT. The exact tourist grace period is not published on ANT's official pages.",
+      "body": "OVERVIEW (US national relocating Seattle -> Quito).\n\n1) DRIVING ON A US LICENCE AS A VISITOR. According to Ecuadorian law as summarised by the U.S. Embassy in Ecuador, tourists and temporary visitors may drive in Ecuador on a VALID foreign driving licence, provided it is of a category equivalent to a non-professional Ecuadorian Type B licence. Authorities (police / ANT) may ask to see Abraham's passport to confirm his date of entry and the visa/status he entered under. IMPORTANT GAP: neither ANT's official procedure pages (gob.ec/ant) nor Cancilleria (cancilleria.gob.ec) publish a specific NUMBER OF DAYS OR MONTHS for how long a foreign licence may be used before exchange is required. The frequently-quoted figures ('one year for tourism' / 'exchange required if your visa exceeds 180 days') appear only on ANT's social-media posts (Facebook / Instagram / X), which are NOT citable official sources — so this guide does not assert a specific period. Abraham should confirm the current grace period directly with ANT (Contacto Ciudadano, tel. 023828890) before relying on it.\n\n2) INTERNATIONAL DRIVING PERMIT (IDP). The ANT page for the International Driving Permit (Permiso Internacional de Conducir, PIC) is explicit: the Ecuador-issued PIC is for driving ABROAD and 'NO ES VALIDO EN ECUADOR' (it is NOT valid in Ecuador). An IDP is therefore an outbound-travel document for licence-holders driving in other countries, NOT a mechanism to drive inside Ecuador. Abraham does not need an Ecuador IDP to drive locally. A US-issued IDP (from AAA) simply travels with, and translates, his US licence; the underlying US licence remains the operative document. Ecuador does not publish an official rule granting extra driving rights on the strength of a US IDP alone.\n\n3) WHEN EXCHANGE (CANJE) BECOMES NECESSARY. Once Abraham holds a residence visa / authorised stay in Ecuador and intends to keep driving beyond the (officially-unpublished) visitor period, the correct route is the ANT 'Canje de licencia de conducir extranjera por ecuatoriana' (exchange of a foreign licence for an Ecuadorian one). This converts (convalidates) his US non-professional licence into an Ecuadorian licence WITHOUT re-sitting the full local driving course, subject to presenting a certified/authenticated copy of his valid US licence. See the dedicated exchange resource below for exact documents, cost and validity.\n\n4) NO LOCAL TEST FOR THE EXCHANGE ROUTE. The ANT exchange procedure is a document-validation (convalidacion) process, not a fresh licensing exam — the requirements listed are documentary (ID, blood-type card, valid foreign licence, an official certification of the foreign licence, proof of payment, migratory-movement certificate). ANT does not list a practical or theory driving test as a requirement for the canje. (If instead Abraham chose to obtain a brand-new Ecuadorian licence from scratch rather than exchange, the ordinary first-time licensing process — including its own tests — would apply; that is a different trámite.)\n\nBOTTOM LINE FOR ABRAHAM: drive on the valid US licence as a temporary visitor; do not rely on an IDP to drive inside Ecuador (an Ecuador IDP is invalid here); once a resident, use the ANT canje to convert the US licence — no local driving test is required for that route. Confirm the exact visitor grace period with ANT directly, because it is not officially published online.",
+      "source_url": "https://www.gob.ec/ant/tramites/emision-permiso-internacional-conductores",
+      "source_name": "Agencia Nacional de Tránsito (ANT) — gob.ec Guía Oficial de Trámites",
+      "tags": ["driving-licence", "us-licence", "idp", "ant", "quito", "official-gap"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "transport",
+      "title": "How to exchange a US licence for an Ecuadorian one at the ANT (Canje)",
+      "resource_type": "guide",
+      "summary": "Step-by-step official ANT process to convert a valid foreign (US) driving licence into an Ecuadorian one: documents, cost (USD 142.00 + bank fee), where to apply, and the resulting licence validity.",
+      "body": "The official ANT trámite is 'Canje de licencia de conducir extranjera por ecuatoriana' (exchange of a foreign driving licence for an Ecuadorian one). It performs a convalidation of the foreign professional or non-professional licence and issues an Ecuadorian licence.\n\nWHO IT IS FOR: any person 18+ (Ecuadorian or foreign) who wants to convert a foreign licence. Note: the applicant must be able to read and write Spanish.\n\nPROCESS (in person / presencial):\n1. Generate the payment order (orden de pago) on the ANT website.\n2. Pay the fee at an authorised payment point.\n3. Submit the required documents plus proof of payment at the licence modules / supervision desk of an ANT provincial office.\n4. Receive the exchanged Ecuadorian licence.\n\nCOST: USD 142.00 (not subject to VAT) plus the bank commission. (Per ANT tariff table 2024, Resolucion Nro. 025-DIR-2023-ANT.)\n\nVALIDITY OF THE ISSUED LICENCE: 5 years. For foreign nationals whose visa and/or authorised stay is shorter than 5 years, the Ecuadorian licence is issued only for that (shorter) authorised period.\n\nWHERE TO APPLY: Provincial Directorates of the ANT nationwide. In Quito, Abraham applies at an ANT office in Pichincha province (the ANT Matriz / provincial directorate). Hours: Monday-Friday, 08h00-16h30.\n\nCONTACT: Contacto Ciudadano Digital (https://www.contactociudadano.gob.ec/), tel. 023828890.\n\nLEGAL BASIS: Ley Organica de Transporte Terrestre, Transito y Seguridad Vial and its Reglamento; Resolutions 118-DIR-2015-ANT (and reforms 038-DIR-2016-ANT, 016-DE-ANT-2018), 025-DIR-2023-ANT (tariff).",
+      "source_url": "https://www.gob.ec/ant/tramites/canje-licencia-conducir-extranjera-ecuatoriana",
+      "source_name": "Agencia Nacional de Tránsito (ANT) — gob.ec: Canje de licencia de conducir extranjera por ecuatoriana",
+      "tags": ["licence-exchange", "us-licence", "ant", "quito", "documents"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "transport",
+      "title": "Documents required for the ANT licence exchange (checklist)",
+      "resource_type": "checklist_item",
+      "summary": "The exact document list ANT requires to exchange a foreign (US) licence for an Ecuadorian one, including the apostille/consularisation and translation rules for a US-issued licence certification.",
+      "body": "Mandatory documents for the ANT 'Canje de licencia de conducir extranjera por ecuatoriana' (all originals):\n\n1. Original identification document (for Abraham: passport / Ecuadorian cedula or visa document as applicable).\n2. Original blood-type certificate or card (carne de tipo sanguineo) issued by the Cruz Roja Ecuatoriana (Ecuadorian Red Cross).\n3. Original of the valid foreign professional or non-professional driving licence (his valid US licence).\n4. Original certification that the foreign licence is valid, issued by ONE of the following, in Spanish:\n   - the diplomatic mission of the country of origin in Ecuador, or a diplomatic mission of that country (in Spanish); OR\n   - the traffic authority of the country of origin. If NOT in Spanish it must be apostilled or consularised, and the translation must be authenticated by a Notary, Consul, or Civil Court Judge in Ecuador. If issued in Spanish it must be duly apostilled.\n   >> FOR A US LICENCE SPECIFICALLY: the U.S. Embassy in Ecuador states it CANNOT certify a US state licence; the issuing US state's DMV must certify the licence, then it must be apostilled by that state's Secretary of State, and a professional Spanish translation may be required.\n5. Original proof of payment (comprobante de pago).\n6. Migratory-movement certificate (certificado de movimiento migratorio).\n\nSPECIAL NOTE: the holder must be able to read and write Spanish.",
+      "source_url": "https://www.gob.ec/ant/tramites/canje-licencia-conducir-extranjera-ecuatoriana",
+      "source_name": "Agencia Nacional de Tránsito (ANT) — gob.ec: Canje de licencia de conducir extranjera por ecuatoriana",
+      "tags": ["documents", "licence-exchange", "us-licence", "ant", "checklist_item"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": null,
+      "category_key": "transport",
+      "title": "An International Driving Permit does NOT let you drive inside Ecuador on its own",
+      "resource_type": "tip",
+      "summary": "ANT's own International Driving Permit page states the Ecuador-issued PIC is not valid in Ecuador; an IDP is an outbound document. It supplements a valid national licence and does not replace the need to exchange once resident.",
+      "body": "Key clarification from the ANT International Driving Permit (Permiso Internacional de Conducir, PIC) procedure page:\n\n- The PIC lets a driver drive AS A TOURIST ABROAD for one year from issue, in the vehicle classes designated.\n- The page explicitly warns: 'Se recuerda que este permiso NO ES VALIDO EN ECUADOR' (this permit is NOT valid in Ecuador).\n- To be issued an Ecuadorian PIC you must already hold a valid Ecuadorian licence (issued at least one year before the request).\n\nWhat this means for Abraham: an IDP is a translation/companion of a national licence for driving in OTHER countries; it does not, by itself, grant driving rights inside Ecuador. His valid US licence is the operative document as a visitor. An IDP is NOT a substitute for exchanging his licence at the ANT once he becomes a resident. Ecuador does not publish an official rule that a US IDP extends how long he may drive locally.",
+      "source_url": "https://www.gob.ec/ant/tramites/emision-permiso-internacional-conductores",
+      "source_name": "Agencia Nacional de Tránsito (ANT) — gob.ec: Emision de permiso internacional para conductores",
+      "tags": ["idp", "ant", "driving-licence", "official-gap"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": null,
+      "category_key": "transport",
+      "title": "Official ANT exchange procedure (link)",
+      "resource_type": "official_link",
+      "summary": "Direct link to ANT's official 'Canje de licencia de conducir extranjera por ecuatoriana' procedure on the Ecuadorian government portal.",
+      "body": "Official ANT / gob.ec procedure page for exchanging a foreign driving licence for an Ecuadorian one (canje). Includes eligibility, required documents, in-person process, fee (USD 142.00 + bank commission), validity of the issued licence (5 years, or limited to visa/authorised stay), offices and hours, and legal basis. Page last updated (per gob.ec): 2026-01-13.",
+      "source_url": "https://www.gob.ec/ant/tramites/canje-licencia-conducir-extranjera-ecuatoriana",
+      "source_name": "Agencia Nacional de Tránsito (ANT) — Guia Oficial de Tramites (gob.ec)",
+      "tags": ["ant", "licence-exchange", "official-link"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": null,
+      "category_key": "transport",
+      "title": "Official ANT International Driving Permit procedure (link)",
+      "resource_type": "official_link",
+      "summary": "Direct link to ANT's official 'Emision de permiso internacional para conductores' procedure, which confirms the Ecuador-issued IDP is not valid inside Ecuador.",
+      "body": "Official ANT / gob.ec procedure page for issuing the Ecuadorian International Driving Permit (PIC), used by Ecuadorian licence-holders driving abroad. Confirms the permit is not valid in Ecuador, requires a valid Ecuadorian licence, and is valid for up to one year. Fee USD 127.00 + bank commission. Page last updated (per gob.ec): 2026-01-13.",
+      "source_url": "https://www.gob.ec/ant/tramites/emision-permiso-internacional-conductores",
+      "source_name": "Agencia Nacional de Tránsito (ANT) — Guia Oficial de Tramites (gob.ec)",
+      "tags": ["ant", "idp", "official-link"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": null,
+      "category_key": "transport",
+      "title": "HONEST GAP: no official ANT/Cancilleria figure for the tourist driving grace period",
+      "resource_type": "tip",
+      "summary": "The specific length of time a foreigner may drive in Ecuador on a foreign licence before exchange is required is NOT published on ant.gob.ec, gob.ec/ant, or cancilleria.gob.ec. Do not rely on the social-media figures without confirming with ANT.",
+      "body": "TRANSPARENCY NOTE (do not treat any specific number below as confirmed):\n\nDuring this research, NO official page on ant.gob.ec, gob.ec/ant, or cancilleria.gob.ec was found that states a specific number of days or months during which a foreign national may drive in Ecuador on a foreign (e.g. US) licence before an exchange (canje) is required.\n\n- The ANT exchange page confirms the canje route and its documents, cost and validity, but not a visitor grace period.\n- The U.S. Embassy in Ecuador (official US Government source, corroborating only) confirms that tourists/temporary visitors may drive on a valid foreign licence equivalent to Type B, and that passport/visa may be checked — but it does NOT state a specific time limit either.\n- The often-repeated figures — 'up to one year for tourism' and 'exchange required if your visa exceeds 180 days' — were found ONLY on ANT's official SOCIAL-MEDIA accounts (Facebook / Instagram / X) and on third-party/blog/vendor pages, none of which meet ReloPass's official-source standard. They are therefore NOT asserted as fact in this bundle.\n\nRECOMMENDED ACTION FOR ABRAHAM: before relying on any grace period, confirm the current rule directly with ANT — Contacto Ciudadano Digital (https://www.contactociudadano.gob.ec/), tel. 023828890 — or at the ANT provincial office in Quito (Pichincha). Treat the canje as the safe, officially-documented path once he is a resident.",
+      "source_url": "https://www.gob.ec/ant/tramites/canje-licencia-conducir-extranjera-ecuatoriana",
+      "source_name": "ReloPass research note (grounded on ANT gob.ec pages; gap explicitly flagged)",
+      "tags": ["official-gap", "driving-licence", "ant"],
+      "status": "draft"
+    }
+  ],
+  "events": []
+}

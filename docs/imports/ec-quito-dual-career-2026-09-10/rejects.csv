@@ -1,0 +1,5 @@
+corridor,service_category,source_name,source_url,rejection_reason,notes
+US-EC,spouse,EMCC Ecuador coach directory,https://www.emccglobal.org/,captcha_gated,Coach directory captcha-gated; could not enumerate profiles.
+US-EC,spouse,CRO / Colegio de Psicologos del Ecuador,,js_blocked,JS-rendered directory did not load; no browsable member list.
+US-EC,spouse,LinkedIn / generic career-coach listings (Quito),,unverified_no_accreditation,Coaches found via web search but not on ICF Credentialed Coach Finder; accreditation unverifiable.
+US-EC,spouse,Additional ICF profiles outside Quito metro,https://apps.coachingfederation.org/,out_of_scope,Credentialed but located outside the Quito relocation metro; excluded from shortlist.

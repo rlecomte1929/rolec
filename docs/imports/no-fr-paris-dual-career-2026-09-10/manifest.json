@@ -1,0 +1,11 @@
+{
+  "batch_id": "no-fr-paris-dual-career-2026-09-10",
+  "corridor": "NO-FR",
+  "service_category": "spouse",
+  "accepted_count": 5,
+  "rejected_count": 5,
+  "artifact": "providers.csv",
+  "sha256": "ff1dec71d8118e5d52e46313993883b1b670e8761b70271bd58f117e11507ad1",
+  "platform_vetting_status_all": "pending",
+  "scope": "Spouse/partner career-transition services (bilan de competences, career coaching, relocation career firms) in Paris for the NO->FR corridor. EEA family work-rights are automatic; this batch is career-services vendors only. Providers accepted only when verified at an official SIRENE company record (annuaire-entreprises.data.gouv.fr). Own-website-only and out-of-scope candidates are in rejects.csv."
+}

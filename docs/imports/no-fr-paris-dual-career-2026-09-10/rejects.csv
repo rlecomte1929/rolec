@@ -1,0 +1,6 @@
+corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry
+NO-FR,spouse,AB COMPETENCES,https://www.ab-competences.fr,provider own website (tier-3),https://www.ab-competences.fr/bilan-de-competences-a-paris-9eme-en-presentiel,,,
+NO-FR,spouse,EXTEND CONSULTING,https://extend-consulting.com,provider own website (tier-3),https://extend-consulting.com/conseil-rh/bilan-de-competences/,,,
+NO-FR,spouse,GEMELLI CONSULTING,https://www.gemelliconsulting.fr,provider own website (tier-3),https://www.gemelliconsulting.fr,,,
+NO-FR,spouse,ANAKA CONSULTING,https://www.anakaconsulting.com,"SIRENE record out-of-scope (67800 Bischheim, not Paris)",https://annuaire-entreprises.data.gouv.fr/entreprise/825021090,,,
+NO-FR,spouse,TALENT RH,https://talentrh.fr,provider own website (tier-3; no Paris-domiciled SIRENE match),https://talentrh.fr/nos-services/bilan-competences/,,,

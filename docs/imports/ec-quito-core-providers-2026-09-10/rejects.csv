@@ -1,0 +1,6 @@
+corridor,service_category,source_name,source_url,rejection_reason,notes
+US-EC,banks,Superintendencia de Bancos - appweb reportes backend,https://appweb.superbancos.gob.ec/gen/publico/reportes/,source_unreachable,Data application backend returned RES_NOT_FOUND (404) on this run; individual-bank reports/balances unavailable (catastro was up in the earlier run).
+US-EC,banks,datosabiertos.gob.ec (Ecuador open data portal),https://www.datosabiertos.gob.ec/,waf_blocked,Returned HTTP 403 (WAF) from datacenter egress.
+US-EC,legal_admin,Foro de Abogados JSF consulta (intermittent),https://app.funcionjudicial.gob.ec/ForoAbogados/Publico/,source_unreachable,"JSF app intermittently returns 'Acceso Restringido'/hangs; per-name lookup form, not a browsable specialisation directory."
+US-EC,tax,CCPE / Colegio de Contadores del Ecuador - Directorio Miembros,https://www.ccpp.org.ec/,login_gated,Member directory behind login (Miembros/Ingresar); no public register.
+US-EC,banks,SRI RUC lookup (fallback for entity enumeration),https://srienlinea.sri.gob.ec/,source_unreachable,Per-RUC/cedula lookup only; cannot keyword-search to enumerate candidates.

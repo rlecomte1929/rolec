@@ -1,0 +1,34 @@
+{
+  "batch_id": "fr-sg-singapore-dual-career-2026-09-10",
+  "corridor": "XX-SG",
+  "service_category": "spouse",
+  "providers_file": "fr-sg-singapore-dual-career-2026-09-10.providers.csv",
+  "providers_count": 5,
+  "providers_sha256": "e657816d06edbbbfb27adf14b1cd97b764f0582575f5501d7b6caa9133f56617",
+  "rejects_file": "fr-sg-singapore-dual-career-2026-09-10.rejects.csv",
+  "rejects_count": 3,
+  "rejects_sha256": "c15aeafd3bb4adf6d6aca348bdfb58be116c6d00c2fd1ff9e283e4ac9ea1a39f",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "status_all": "draft",
+  "platform_vetting_status_all": "pending",
+  "official_register": {
+    "name": "Accounting and Corporate Regulatory Authority (ACRA) — Information on Corporate Entities",
+    "register": "ACRA registered-entities open dataset, published on data.gov.sg as 27 alphabetically-partitioned CSV files (collection id 2); each accepted vendor matched by exact entity_name with entity_status='Live'",
+    "collection_url": "https://data.gov.sg/collections/2/view",
+    "authority": "official",
+    "note": "accreditation_body=ACRA and accreditation_number=UEN (unique entity number) for every accepted provider. All five accepted providers show entity_status_description='Live' / 'Live Company' in the current (Aug 2026) ACRA dataset. ACRA registration does not carry an expiry date, so accreditation_expiry is LEFT BLANK. Dataset IDs used: 'A' d_8575e84912df3c28995b8e6e0e05205a, 'C' d_c0650f23e94c42e7a20921f4c5b75c24, 'E' d_124a9bd407c7a25f8335b93b86e50fdd, 'R' d_2b8c54b2a490d2fa36b925289e5d9572."
+  },
+  "accepted_entities": [
+    {"company_name": "Executive Coach International Pte. Ltd.", "uen": "200414184R", "status": "Live Company", "primary_ssic": "70201", "note": "Professional coaching org founded 2004; founder is SEA's first ICF Master Certified Coach (context, not asserted per-record)."},
+    {"company_name": "Right Management Singapore Pte. Ltd.", "uen": "199308166C", "status": "Live Company", "primary_ssic": "70201", "secondary_ssic": "82301", "note": "ManpowerGroup career-transition / outplacement brand."},
+    {"company_name": "Avodah People Solutions Pte. Ltd.", "uen": "201811519K", "status": "Live Company", "primary_ssic": "70204", "user_activity": "Corporate consultancy services for talent career development management"},
+    {"company_name": "Career Navigators SG LLP", "uen": "T16LL1455L", "status": "Live", "primary_ssic": "85509", "user_activity": "Providing career and motivational courses"},
+    {"company_name": "Randstad Pte. Limited", "uen": "199304055W", "status": "Live Company", "primary_ssic": "78104", "secondary_ssic": "70201", "note": "Operates the RiseSmart outplacement / career-transition service line in Singapore."}
+  ],
+  "scope": "4-6 spouse/partner career-transition (career-services) vendors in Singapore for a relocating EP holder's accompanying partner, each verified against the OFFICIAL ACRA registered-entities register (via data.gov.sg). A Dependant's Pass holder needs a Letter of Consent or their own work pass to work in Singapore (regulatory context only — NOT a service captured here; these are CAREER-SERVICES VENDORS ONLY). Providers whose only provenance was their own website (tier-3) were rejected. corridor='XX-SG' (career services are not corridor-specific). All records candidate-only, awaiting human verification.",
+  "provenance_notes": "accreditation_body=ACRA and accreditation_number=UEN for every accepted provider. accreditation_expiry LEFT BLANK (ACRA registration has no expiry date; the register carries a status, and all five are Live). website_url is the operator's own brand domain (informational only) and is LEFT BLANK for Career Navigators SG LLP because no website could be reliably tied to that exact legal entity without assumption. No UEN, website, fee or credential was invented.",
+  "icf_note": "The ICF Credentialed Coach Finder and 'Verify a Coach' directories (apps.coachingfederation.org) were the intended coach-credential source but are JS-gated dynamic pages that could not be enumerated from this egress (results render as a [NumberOfResults] placeholder). ICF individual-credential status was therefore NOT asserted per-vendor; provenance falls back entirely to the official ACRA company register. Kelvin Lim of Executive Coach International being an ICF MCC is recorded as context only, not as a verified per-record accreditation.",
+  "gdpr_note": "No personal data captured. All accepted records are business entities identified by their ACRA legal name and UEN; no named individuals, personal emails or personal phone numbers are included.",
+  "source_access_notes": "ACRA data retrieved via the official data.gov.sg api-open poll-download endpoint (-> signed AWS S3 URL) and parsed locally; each vendor matched by exact entity_name with entity_status='Live' in the Aug-2026 partition. The data.gov.sg dataset-metadata JSON endpoint requires a User-Agent header (403 without it). The ICF CCF / Verify-a-Coach directories and ACRA BizFile+ interactive search are JS-gated and could not be scraped; the ACRA open dataset was used as the equivalent official register. No provider was accepted without an exact ACRA register match."
+}

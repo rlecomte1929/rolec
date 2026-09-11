@@ -1,0 +1,16 @@
+{
+  "batch_id": "us-departure-2026-09-10",
+  "corridor": "US-EC",
+  "origin_country_code": "US",
+  "destination_country_code": "US",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "record_count": 10,
+  "non_obvious_count": 7,
+  "needs_lawyer_review_count": 5,
+  "artifact": "us-departure-2026-09-10.ndjson",
+  "sha256": "91b3ce00ef7417acca1d776d1a384584f7334af8830ddd7d42f79be11e40774c",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "scope": "US-departure (US exit side) requirement facts for a US citizen relocating Seattle -> Quito on a professional residence visa (US->EC corridor). Covers continuing US federal income tax filing (Form 1040) on worldwide income, foreign earned income exclusion (Form 2555) and its physical presence test, FBAR (FinCEN Form 114) foreign-account reporting, the absence of a Washington State individual income tax (no state exit filing), the absence of a US-Ecuador Social Security totalization agreement, maintaining an SSN for filing, and the automatic 2-month filing extension for citizens abroad. Official sources only (irs.gov, fincen.gov, ssa.gov, dor.wa.gov). Candidate-only; every fact carries a verbatim official quote. STEP / State Dept enrolment could not be sourced (see README gap)."
+}

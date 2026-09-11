@@ -106,10 +106,12 @@ _EXPECTED_ARRIVAL_ANCHOR = {
     "FR_ES": "TRAVEL_TO_ES",
     "FR_NL": "TRAVEL_TO_NL",
     "FR_NO": "TRAVEL_TO_NO",
+    "FR_SG": "TRAVEL_TO_SG",
     "IN_DE": "TRAVEL_TO_DE",
     # No "arrive in France" step exists: a returning citizen needs no visa, permit
     # or registration, so departure IS the move and the runway is legitimately zero.
     "NO_FR": "A0_DEPART_NO",
+    "US_EC": "TRAVEL_TO_EC",
 }
 
 

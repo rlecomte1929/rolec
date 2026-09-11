@@ -1,0 +1,232 @@
+# Corridor Agent — US_EC_PROFESSIONAL_RESIDENCE_2026  (United States → Ecuador, professional / work temporary residence)
+#
+# ⚠️ REPRESENTATIVE / AUTHORING — indicative content, NOT SME-verified, NOT counsel-assured.
+# Nothing here may be rendered as legal advice in ReloPass's own voice. Personalised
+# immigration/tax determinations route to a regulated professional. Ecuador (Cancillería /
+# MREMH, Ministerio del Trabajo, SRI, IESS, Registro Civil) is the binding jurisdiction.
+#
+# PROFILE (the validation case): Abraham Romo, a US national relocating Seattle → Quito on a
+# temporary residence visa (professional route, or the employer-sponsored work-dependency
+# route). The non-obvious pile: tourist status prohibits work; every US-issued document must
+# be apostilled; the visa is only step one — a resident must then get a cédula (via an
+# "orden de cedulación"), a RUC for tax, work registration (SUT) and IESS affiliation; and on
+# the US side there is NO US–Ecuador social-security totalization agreement.
+#
+# CONTENT SOURCE: authored from the corridor's own reviewed/representative requirement_items
+# already in the product (ECUADOR rows: professional temporary residence visa, work-dependency
+# visa, e-VISAS, cédula/orden de cedulación, RUC/SRI, SUT, IESS, apostille, tourist-work bar)
+# plus the delivered US-departure facts. Fees are transcribed from those rows and MUST be
+# reconfirmed against MREMH/SRI before authoritative use. Step durations are ESTIMATES pending
+# agent confirmation — re-derive, do not hand-edit.
+
+corridor_agent:
+  corridor_id: US_EC_PROFESSIONAL_RESIDENCE_2026
+  version: "2026.01"
+  petitioning_party: EMPLOYEE   # the mover applies for the residence visa (work-dependency route is employer-linked, surfaced as alternate).
+  origin_country_iso3: USA
+  destination_country_iso3: ECU
+  description: >
+    US national → Ecuador on a temporary residence visa. Primary route: the professional
+    temporary residence visa; alternate: the employer-sponsored work-dependency residence
+    visa. The journey is: online visa application (MREMH e-VISAS) → visa granted → travel →
+    orden de cedulación (MREMH) → cédula (Registro Civil) → RUC / tax (SRI) → work
+    registration (Ministerio del Trabajo, SUT) → IESS social-security affiliation → health.
+    All foreign documents must be apostilled; tourist status does not permit work.
+
+  applicable_rules:
+    - legal_reference: "Ley Orgánica de Movilidad Humana (LOMH)"
+      rule_id: EC_LOMH
+      summary: "Governing statute for foreigners' residence in Ecuador; sets residence categories, the post-residence registration duties (art. 42) and the temporary-residence framework (2-year validity)."
+    - legal_reference: "Temporary residence visa — professional (MREMH)"
+      rule_id: EC_VISA_PROFESSIONAL
+      summary: "Temporary residence visa for a qualified professional; primary route for a self-driven professional mover. Valid 2 years under the LOMH."
+    - legal_reference: "Visa de residencia temporal de trabajo (por dependencia) (MREMH)"
+      rule_id: EC_VISA_WORK_DEPENDENCY
+      summary: "Employer-sponsored work-residency visa; requires an employment contract/personnel action and supporting certificates. Valid 2 years."
+    - legal_reference: "MREMH e-VISAS platform"
+      rule_id: EC_EVISAS
+      summary: "Visa applications are processed only online through the Ministry of Foreign Affairs' official e-VISAS platform. Application fee USD $50 + visa issuance USD $270 for the work-residency visa."
+    - legal_reference: "Apostille / legalisation of foreign documents"
+      rule_id: EC_APOSTILLE
+      summary: "Documents issued abroad (US-issued documents used in the residency/cédula process) must be duly apostilled or legalised before they are accepted."
+    - legal_reference: "Cédula para extranjeros — orden de cedulación (MREMH + Registro Civil)"
+      rule_id: EC_CEDULA
+      summary: "After residence is granted the foreigner obtains an 'orden de cedulación' from the MREMH (fee USD $10) before the Registro Civil issues the foreign-resident cédula; registration is a duty under LOMH art. 42."
+    - legal_reference: "SRI — RUC registration and Impuesto a la Renta"
+      rule_id: EC_SRI_RUC
+      summary: "RUC (tax) registration is compulsory for natural/legal persons, national and foreign, who carry out economic activity; inscription is free. Income tax and the annual declaration apply; tax residence follows SRI rules."
+    - legal_reference: "Ministerio del Trabajo — work registration (SUT)"
+      rule_id: EC_MDT_SUT
+      summary: "The employment relationship is registered with the Ministry of Labour via the Sistema Único de Trabajo (SUT)."
+    - legal_reference: "Ley de Seguridad Social, art. 73 — IESS affiliation"
+      rule_id: EC_IESS
+      summary: "Affiliation to the Seguro General Obligatorio (IESS) is mandatory for everyone earning income for work; the employer must register (registro patronal) and affiliate the worker; failure is sanctioned as evasion of contributions."
+    - legal_reference: "Ministerio de Salud Pública (MSP) / IESS Seguro de Salud"
+      rule_id: EC_HEALTH
+      summary: "IESS provides integral health services to affiliates; the MSP governs the national health system."
+    - legal_reference: "US worldwide taxation of citizens (IRC — Form 1040 / FEIE / FBAR)"
+      rule_id: US_TAX_WORLDWIDE
+      summary: "A US citizen remains taxed on worldwide income and must keep filing; FEIE (Form 2555) and the foreign tax credit require filing, and foreign accounts over USD $10,000 trigger an FBAR."
+    - legal_reference: "No US–Ecuador social-security totalization agreement"
+      rule_id: US_EC_NO_TOTALIZATION
+      summary: "Ecuador is not on the SSA totalization list, so contributions do not aggregate across the two systems — a planning fact, not a procedural step."
+
+  required_documents:
+    - PASSPORT_TD3:employee            # valid 6+ months
+    - PASSPORT_TD3:family.spouse?
+    - PASSPORT_TD3:family.children.*
+    - CRIMINAL_BACKGROUND_CERT_APOSTILLED:employee
+    - EMPLOYMENT_CONTRACT_OR_PERSONNEL_ACTION    # work-dependency route
+    - PROFESSIONAL_OR_DEGREE_EVIDENCE            # professional route
+    - PROOF_OF_FUNDS?
+    - MARRIAGE_CERT_APOSTILLED?
+    - BIRTH_CERT_APOSTILLED:family.children.*
+
+  required_data_points:
+    - key: visa_category
+      type: enum
+      source: USER_INPUT             # professional | work_dependency
+    - key: has_employer_sponsor
+      type: bool
+      source: USER_INPUT
+    - key: docs_apostilled
+      type: bool
+      source: USER_INPUT
+      validations:
+        - "== true"
+    - key: passport_valid_6_months
+      type: bool
+      source: USER_INPUT
+      validations:
+        - "== true"
+    - key: intended_stay_months
+      type: int
+      source: USER_INPUT
+
+  # Government fees (USD) — transcribed from the corridor's requirement_items; CONFIRM against
+  # MREMH before authoritative use.
+  fees_usd:
+    visa_application: 50
+    visa_issuance_work_dependency: 270
+    orden_de_cedulacion: 10
+
+  eligibility_logic:
+    branches:
+      - id: BRANCH_PROFESSIONAL_RESIDENCE
+        label: "Temporary residence visa — professional route"
+        cite: EC_VISA_PROFESSIONAL
+        requires_all:
+          - docs_apostilled == true
+          - passport_valid_6_months == true
+        verdict_on_pass: ELIGIBLE
+        annotation: "Self-driven professional route under the LOMH; 2-year temporary residence. Confirm the current documentary list with MREMH."
+      - id: ALT_WORK_DEPENDENCY
+        label: "Employer-sponsored work-dependency residence visa"
+        cite: EC_VISA_WORK_DEPENDENCY
+        requires_all:
+          - has_employer_sponsor == true
+          - docs_apostilled == true
+          - passport_valid_6_months == true
+        verdict_on_pass: ALTERNATE_PATHWAY
+        annotation: "Requires an employment contract/personnel action and supporting certificates; fees USD $50 application + $270 issuance. Employer also carries the SUT and IESS duties below."
+    no_branch_verdict: NOT_ELIGIBLE
+
+  exception_cases:
+    - id: TOURIST_PROHIBITS_WORK
+      condition: "true"
+      cite: EC_LOMH
+      action: SURFACE_AS_ADVISORY
+      hint: >
+        Tourist status prohibits work. You cannot start the job on a tourist entry — the
+        residence visa (professional or work-dependency) must be granted first.
+    - id: DOCS_MUST_BE_APOSTILLED
+      condition: "docs_apostilled == false"
+      cite: EC_APOSTILLE
+      action: SURFACE_AS_ALTERNATE_PATHWAY
+      hint: >
+        Every US-issued document used in the visa and cédula process (criminal-background
+        certificate, civil records, qualifications) must be apostilled before you leave the
+        US — arranging apostilles after arrival is slow and blocks the cédula.
+    - id: NO_US_EC_TOTALIZATION
+      condition: "true"
+      cite: US_EC_NO_TOTALIZATION
+      action: SURFACE_AS_ADVISORY
+      hint: >
+        There is no US–Ecuador social-security totalization agreement, so IESS contributions
+        and US Social Security do not aggregate. Factor this into pension/coverage planning.
+
+  # Step graph — visa (online) → grant → travel → cédula → tax → work reg → social security → health.
+  step_graph:
+    - step_id: VISA_APPLICATION
+      name: "Apply for the temporary residence visa online (MREMH e-VISAS)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 21
+      prerequisite_step_ids: []
+      cite: EC_EVISAS
+      non_obvious: true
+      non_obvious_note: "Visa applications are processed only online through the MREMH e-VISAS platform, and every US-issued supporting document must already be apostilled. The work-dependency route costs USD $50 (application) + $270 (issuance)."
+
+    - step_id: VISA_GRANTED
+      name: "Temporary residence visa granted (professional or work-dependency)"
+      responsible_party: AUTHORITY_EC_MREMH
+      expected_duration_days: 14
+      prerequisite_step_ids: [VISA_APPLICATION]
+      cite: EC_LOMH
+      non_obvious: true
+      non_obvious_note: "The temporary residence visa is valid for 2 years under the LOMH. The visa is only the entry right — the cédula, tax (RUC), work registration and IESS affiliation below all still have to be done after arrival."
+
+    - step_id: TRAVEL_TO_EC
+      name: "Travel to Ecuador (on the granted residence visa)"
+      arrival_anchor: true
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: [VISA_GRANTED]
+
+    - step_id: ORDEN_CEDULACION
+      name: "Obtain the 'orden de cedulación' from the MREMH (fee USD $10)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 10
+      prerequisite_step_ids: [TRAVEL_TO_EC]
+      cite: EC_CEDULA
+      non_obvious: true
+      non_obvious_note: "Before the Registro Civil will issue the foreign-resident cédula you must first get an 'orden de cedulación' from the MREMH (USD $10). Registering as a resident after the visa is a duty under LOMH art. 42, not optional."
+
+    - step_id: CEDULA
+      name: "Registro Civil issues the cédula de identidad para extranjeros"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [ORDEN_CEDULACION]
+      cite: EC_CEDULA
+
+    - step_id: RUC_SRI
+      name: "Register the RUC and understand income tax / tax residence (SRI)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 5
+      prerequisite_step_ids: [CEDULA]
+      cite: EC_SRI_RUC
+      non_obvious: true
+      non_obvious_note: "RUC registration is compulsory for anyone (national or foreign) carrying out economic activity and is free of charge. The annual income-tax declaration is obligatory; tax residence follows SRI rules."
+
+    - step_id: SUT_WORK_REGISTRATION
+      name: "Register the employment with the Ministerio del Trabajo (SUT)"
+      responsible_party: EMPLOYER
+      expected_duration_days: 7
+      prerequisite_step_ids: [CEDULA]
+      conditional_on: "visa_category == 'work_dependency'"
+      cite: EC_MDT_SUT
+
+    - step_id: IESS_AFFILIATION
+      name: "Employer affiliates the worker to IESS (Seguro General Obligatorio)"
+      responsible_party: EMPLOYER
+      expected_duration_days: 3
+      prerequisite_step_ids: [SUT_WORK_REGISTRATION]
+      cite: EC_IESS
+      non_obvious: true
+      non_obvious_note: "IESS affiliation is mandatory from the start of work; the employer must hold a registro patronal and affiliate the worker (art. 73 Ley de Seguridad Social). Failure to affiliate in time is sanctioned as evasion of contributions."
+
+    - step_id: HEALTH_SETUP
+      name: "Access health cover (IESS Seguro de Salud; MSP public system)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [IESS_AFFILIATION]
+      cite: EC_HEALTH

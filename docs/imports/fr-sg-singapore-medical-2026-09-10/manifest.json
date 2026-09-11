@@ -1,0 +1,28 @@
+{
+  "batch_id": "fr-sg-singapore-medical-2026-09-10",
+  "corridor": "FR-SG",
+  "service_category": "medical",
+  "providers_file": "fr-sg-singapore-medical-2026-09-10.providers.csv",
+  "providers_count": 6,
+  "providers_sha256": "fe41c432181bd74828cfea7af0d439dba330dc7051497a42136cf43343c8a7c1",
+  "rejects_file": "fr-sg-singapore-medical-2026-09-10.rejects.csv",
+  "rejects_count": 3,
+  "rejects_sha256": "78d0753fd79843730b68d9de897ca8cca6b3564130ae9f2ba4390c28e952fecc",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "status_all": "draft",
+  "platform_vetting_status_all": "pending",
+  "official_register": {
+    "name": "Ministry of Health (MOH) — CHAS Clinics register",
+    "register": "CHAS Clinics (Community Health Assist Scheme participating clinics), published as open data on data.gov.sg",
+    "dataset_id": "d_548c33ea2d99e29ec63a7cc9edcccedc",
+    "source_url": "https://data.gov.sg/datasets/d_548c33ea2d99e29ec63a7cc9edcccedc/view",
+    "authority": "official",
+    "note": "1,193 records; 1,053 with LICENCE_TYPE=MC (Medical Clinic). Each accepted clinic is matched on HCI_CODE (the MOH Healthcare Institution licence code) and LICENCE_TYPE=MC. accreditation_body=MOH, accreditation_number=HCI_CODE."
+  },
+  "scope": "4-6 licensed GP / family medical clinics in Singapore for a relocating EP holder, each verified against an OFFICIAL MOH register (CHAS Clinics via data.gov.sg). corridor='XX-SG' (primary care is not corridor-specific). All records candidate-only, awaiting human verification.",
+  "provenance_notes": "accreditation_body=MOH and accreditation_number=HCI_CODE for every accepted clinic. accreditation_expiry is LEFT BLANK - the CHAS open dataset does not publish licence expiry dates. website_url is LEFT BLANK - the dataset does not publish clinic websites and none were invented; the practice's official general telephone is available in the source dataset (HCI_TEL) but is intentionally not carried into this file to avoid propagating unverified contact data. The clinic's location is embedded in company_name for disambiguation.",
+  "new_patient_and_expat_flag_note": "Singapore private GP clinics operate on a walk-in basis and accept new patients by default - there is no NHS-style panel-registration or 'accepting new patients' flag in any official register, so acceptance is NOT asserted per-clinic (it is the sector norm). 'Expat-friendly' is likewise NOT an official register attribute and was NOT asserted per-clinic to avoid fabrication; Asia HealthPartners and ACMS (both on Orchard Road) are commonly used by international residents, but this is context, not an official accreditation.",
+  "gdpr_note": "No personal data captured. Clinics are business entities; no named individual doctors, personal emails or personal phone numbers are included. Only the official register's business-level identifiers are used.",
+  "source_access_notes": "The data.gov.sg datastore_search JSON endpoint returned no text via the platform scraper. The dataset was retrieved via a direct HTTPS download of the official data.gov.sg signed S3 blob (poll-download API -> signed S3 URL, GeoJSON with HTML-encoded attribute tables) and parsed locally. The MOH aggregate 'Health Facilities (Primary Care...)' dataset (d_e4663ad3f088a46dabd3972dc166402d) was inspected first but contains only yearly COUNTS, not named clinics, so the named CHAS register was used instead. The HealthHub Directory (the full list of licensed healthcare service providers) is JS-gated and could not be scraped; expat clinics absent from CHAS are recorded in rejects.csv for re-check there."
+}

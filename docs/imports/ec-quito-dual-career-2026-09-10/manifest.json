@@ -1,0 +1,17 @@
+{
+ "batch_id": "ec-quito-dual-career-2026-09-10",
+ "slug": "ec-quito-dual-career-2026-09-10",
+ "corridor": "US-EC",
+ "phase": "P7",
+ "package_type": "dual_career",
+ "generated_at": "2026-09-11T00:00:00Z",
+ "providers_file": "1789135858920_7jrq1msu.csv",
+ "providers_count": 4,
+ "rejects_count": 4,
+ "sha256": {
+  "providers_csv": "8327bd2de1ed55dc86941e0d49f3147e326b9b3f6319ae908453ade164c5ba6d",
+  "rejects_csv": "284a75ec363e83066ffb3ddcdf9730c2bb1b477a15bcfedc0122429722286e12",
+  "manifest": "90914aec1a29091aa489f8e026c5dd640822082e6e16488b20384e2396a4e175",
+  "readme": "0f8ad6e54f9082c3a5e233940ee0727e465c3e45d5d449818d2271a689625888"
+ }
+}

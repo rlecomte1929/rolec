@@ -1,0 +1,19 @@
+{
+ "batch_id": "ec-quito-core-providers-2026-09-10",
+ "slug": "ec-quito-core-providers-2026-09-10",
+ "corridor": "US-EC",
+ "phase": "CORE",
+ "package_type": "core_providers",
+ "generated_at": "2026-09-11T00:00:00Z",
+ "providers_file": "1789135793079_7p0n4z6j.csv",
+ "providers_count": 10,
+ "rejects_count": 5,
+ "banks_count": 5,
+ "legal_count": 5,
+ "sha256": {
+  "providers_csv": "c2b6b432d911f74b1eedb4b16e9daf73f3bd9bcb1b4c7b2ab5af9846cc4a95d4",
+  "rejects_csv": "75ec5ea452e0ea665f76c385c4edc344ace60713dbd2aace58441435bb631c36",
+  "manifest": "47ddff00cfdea6b2e8de276969c175b3bba7569a273a46a8c961b78f91924d17",
+  "readme": "f44726786cab1f2f69c72dca504baa2fe61a4c18afd9dac9cfdcc91ef4fecbfc"
+ }
+}

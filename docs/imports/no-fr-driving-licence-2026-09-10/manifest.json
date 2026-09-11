@@ -1,0 +1,31 @@
+{
+ "batch_id": "no-fr-driving-licence-2026-09-10",
+ "package_id": "D-P5",
+ "slug": "no-fr-driving-licence-2026-09-10",
+ "package_type": "resource_json_importbundle",
+ "corridor": "NO-FR",
+ "category": "driving_licence",
+ "persona": "Denis",
+ "generated_at": "2026-09-11",
+ "counts": {
+  "resources": 7
+ },
+ "constraints": {
+  "status": "draft",
+  "db_writes": 0,
+  "webhook_calls": 0
+ },
+ "files": [
+  {
+   "filename": "no-fr-driving-licence-2026-09-10.json",
+   "sha256": "2e80621aeaebda488c94f0352120ec44a3f37dc67ef924f6361e2a22f36377e7",
+   "bytes": 4212,
+   "records": 7
+  },
+  {
+   "filename": "no-fr-driving-licence-2026-09-10-README.md",
+   "sha256": "126ba78bf9d9aa616b8d349a4bf1584d7ff1db9a0d8f090b888fe9de0b9cc0fd",
+   "bytes": 1715
+  }
+ ]
+}
