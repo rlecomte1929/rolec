@@ -30,7 +30,12 @@ MANIFEST_PATH = SCRIPTS_DIR / "seed_prod_parity_manifest.json"
 
 def test_manifest_loads_and_covers_fr_es_de():
     m = guard.load_manifest(MANIFEST_PATH)
-    assert set(m) == {"FR_cerfa_14571_v2024", "ES_ex17_v2024", "DE_blue_card_v2024"}
+    assert set(m) == {
+        "FR_cerfa_14571_v2024",
+        "ES_ex17_v2024",
+        "ES_ex18_v2024",
+        "DE_blue_card_v2024",
+    }
 
 
 def test_manifest_expected_counts_are_locked():
@@ -42,6 +47,9 @@ def test_manifest_expected_counts_are_locked():
     es = m["ES_ex17_v2024"]
     assert len(es["text"]) == 8 and len(es["single_radio"]) == 2
     assert "Año_Nacimiento" in es["text"] and "Sexo" in es["single_radio"]
+    ex18 = m["ES_ex18_v2024"]
+    assert len(ex18["text"]) == 8 and len(ex18["checkbox_option"]) == 7
+    assert "Texto1" in ex18["text"] and "Casilla de verificación2" in ex18["checkbox_option"]
     assert len(m["DE_blue_card_v2024"]["text"]) == 15
 
 

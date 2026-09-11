@@ -47,6 +47,27 @@
         "Estado Civil"
       ]
     },
+    "ES_ex18_v2024": {
+      "text": [
+        "Texto1",
+        "Texto5",
+        "Texto7",
+        "Texto8",
+        "Texto9",
+        "Texto10",
+        "Texto11",
+        "Texto13"
+      ],
+      "checkbox_option": [
+        "Casilla de verificación2",
+        "Casilla de verificación3",
+        "Casilla de verificación4",
+        "Casilla de verificación5",
+        "Casilla de verificación6",
+        "Casilla de verificación7",
+        "Casilla de verificación8"
+      ]
+    },
     "DE_blue_card_v2024": {
       "text": [
         "date_of_birth",
