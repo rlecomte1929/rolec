@@ -5,7 +5,7 @@ import { authAPI } from '../api/client';
 import { useBrandingConfig } from '../hooks/useBrandingConfig';
 import { getNavigationError } from '../navigation/safeNavigate';
 import { buildRoute, homeRouteKeyForRole, ROUTE_DEFS } from '../navigation/routes';
-import { employeeUnlinkedActionCopy } from './employeeUnlinkedBanner';
+import { employeeUnlinkedActionCopy, employeeUnlinkedBannerClassName } from './employeeUnlinkedBanner';
 import { useRegisterNav } from '../navigation/registry';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { setPreferredEmployeeAssignmentId } from '../utils/employeeAssignmentScope';
@@ -265,8 +265,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         <GlobalApiErrorBanner />
 
         {showEmployeeBanner && (
-          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-sm text-amber-900 shrink-0">
-            <span className="mr-2">⏳</span>
+          <div className={employeeUnlinkedBannerClassName}>
+            <span className="mr-2" aria-hidden="true">ℹ</span>
             Your account isn&apos;t linked to a relocation case yet — most features are on hold.
             If HR set one up for your email, {employeeUnlinkedActionCopy(onEmployeeDashboard)}
             {' '}(a case for your verified email links automatically).

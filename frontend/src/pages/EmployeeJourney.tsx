@@ -640,7 +640,7 @@ export const EmployeeJourney: React.FC = () => {
       ) : null}
 
       {!assignmentLoading && overviewError ? (
-        <Alert variant="warning" className="mb-6" title="Could not load assignments">
+        <Alert variant="error" className="mb-6" title="Could not load assignments">
           {overviewError}{' '}
           {overviewErrorKind === 'unauthorized' ? (
             <Link
