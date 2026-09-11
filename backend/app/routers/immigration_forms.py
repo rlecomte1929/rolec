@@ -27,6 +27,7 @@ from ..auth_deps import (
 )
 from ...database import db
 from ..services.form_prefill_service import (
+    FILLABLE_FORM_IDS,
     generate_prefilled_pdf,
     get_available_forms,
     visa_types_for_corridor,
@@ -115,6 +116,11 @@ def _generate_and_report(
     download URL + per-field fill report. [AIQ-1855] Shared by the HR and employee
     generate-form routes; the caller is responsible for loading a profile the caller
     is authorised to read (HR: org-scoped; employee: their own case + consent)."""
+    # Defense in depth: get_available_forms already hides non-fillable forms, but a direct
+    # POST could still name one. Only genuinely-fillable government AcroForms may be
+    # generated — never a synthetic stand-in (e.g. DE_blue_card_v2024, which has no real PDF).
+    if form_id not in FILLABLE_FORM_IDS:
+        raise HTTPException(status_code=404, detail="form not available")
     profile = _decrypt_passport(profile)
     try:
         result = generate_prefilled_pdf(form_id, case_id, profile)
