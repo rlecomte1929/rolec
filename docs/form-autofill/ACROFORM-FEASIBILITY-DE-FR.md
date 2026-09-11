@@ -191,3 +191,24 @@ locks every seeded `form_field_id` to the committed artifact and proves a fill l
 Still open (needs the browser, France-Visas 403s non-browser fetchers): upload the real `*05` PDF to
 the `form-templates` bucket as `FR_cerfa_14571_v2024.pdf`. The edition caveat (5) is unchanged and
 still Romain's call.
+
+---
+
+# Follow-up (2026-09-11, cont.) — real PDF acquired; radios filled; on-state was /On
+
+- **The real form is in the repo.** `docs/form-autofill/artifacts/fr_cerfa_14571-05.pdf`
+  (sha256 `f40adc32…`, 148 KB, `%PDF-1.6`, 3 pages, **172 AcroForm fields**), fetched from
+  `https://france-visas.gouv.fr/documents/d/france-visas/ls_14571-05_fr_09` inside a real browser
+  session (still 403s any non-browser fetcher, as recorded above). All 18 mapped field names (9 text
+  + 9 radio) are present. It fills end-to-end: `backend/tests/test_fr_cerfa_real_pdf_fill.py` runs the
+  production path (`build_fill_plan` + `build_choice_fill` + `fill_acroform`) against this fixture and
+  verifies text + radios at the PDF level.
+- **The radio groups are filled** (see the merged `build_choice_fill`, #2287) — the "deliberate
+  follow-up" above is done.
+- **On-state correction:** the real CERFA checkboxes use on-state **`/On`**, not reportlab's `/Yes`.
+  `fill_acroform` now reads each checkbox's real on-state from the template (`_resolve_checkbox_states`)
+  instead of assuming one, so the tick lands on the government form.
+- **Production upload still open:** put `fr_cerfa_14571-05.pdf` into the `form-templates` bucket as
+  `FR_cerfa_14571_v2024.pdf` (operator-run — the seed script needs the Supabase service key). The
+  fill pipeline then serves the real filled visa PDF with no code change. Edition `*05` vs `*06`
+  remains Romain's content call.
