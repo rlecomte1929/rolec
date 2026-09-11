@@ -217,6 +217,10 @@ backend/app/routers/crons.py:corridor_deadline_sweep
 # Daily corridor deadline-alert sweep, invoked by the corridor-deadline-sweep
 # workflow (and by pg_cron). Reads open cases and writes notification_outbox +
 # corridor_deadline_events; exactly-once via that ledger's PK. Not an end-user route.
+backend/app/routers/crons.py:repatriation_planning_sweep
+# CRON (AIQ-2270): _verify_cron_secret(request) inline (503 if unset, 401 on
+# mismatch). Daily 6-month-before-end return-phase seed, invoked by pg_cron.
+# Not an end-user route.
 backend/app/routers/crons.py:weekly_mobility_status
 # CRON (AIQ-1237): _verify_cron_secret(request) inline. Weekly (Mon 08:00 UTC)
 # overdue-steps digest to HR owners, invoked by the weekly-mobility-status workflow.

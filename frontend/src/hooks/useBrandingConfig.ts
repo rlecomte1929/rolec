@@ -16,19 +16,19 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 
 let _cache: { data: BrandingConfigResponse; ts: number } | null = null;
 
-function applyBrandingCssVars(branding: BrandingConfigResponse['branding']): void {
+function applyBrandingCssVars(branding: BrandingConfigResponse['branding'] | null | undefined): void {
   const root = document.documentElement;
-  if (branding.primary_colour) {
+  if (branding?.primary_colour) {
     root.style.setProperty('--brand-primary', branding.primary_colour);
   } else {
     root.style.removeProperty('--brand-primary');
   }
-  if (branding.secondary_colour) {
+  if (branding?.secondary_colour) {
     root.style.setProperty('--brand-secondary', branding.secondary_colour);
   } else {
     root.style.removeProperty('--brand-secondary');
   }
-  if (branding.accent_colour) {
+  if (branding?.accent_colour) {
     root.style.setProperty('--brand-accent', branding.accent_colour);
   } else {
     root.style.removeProperty('--brand-accent');

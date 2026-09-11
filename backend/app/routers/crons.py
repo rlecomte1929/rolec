@@ -46,6 +46,7 @@ from ..services.crawl_scheduler_service import process_due_schedules
 from ..services.dossier_notifications import run_deadline_reminder_cron
 from ..services.milestone_reminders import run_milestone_reminder_cron
 from ..services.monitoring_alerts import send_test_alert
+from ..services.repatriation_planning_sweep import run_repatriation_planning_sweep
 from ..services.rule_change_notifier import notify_superseded_rules
 from ..services.source_reliability_service import recompute_reliability_scores
 from ..services.vendor_metric_snapshot_service import snapshot_vendor_metrics
@@ -250,6 +251,33 @@ def corridor_deadline_sweep(request: Request,
             raise HTTPException(status_code=400, detail="today must be an ISO date (YYYY-MM-DD)")
     log.info("corridor_deadline_sweep cron triggered (dry_run=%s)", body.dry_run)
     result = run_corridor_deadline_sweep(today=today, dry_run=body.dry_run)
+    return {"ok": True, **result}
+
+
+@router.post("/repatriation-planning-sweep")
+def repatriation_planning_sweep(request: Request,
+                                body: Optional[CorridorDeadlineSweepBody] = None) -> Dict[str, Any]:
+    """
+    Daily 6-month-before-end repatriation planning sweep.
+
+    Temporary assignments whose assignment end falls in ``[end-182d, end)``
+    get the Engine B return-phase milestones appended. PERMANENT and domestic
+    cases are skipped with a stated reason. Missing start+duration is skipped,
+    never defaulted to today. Idempotent: existing ``task_return_*`` milestones
+    suppress a re-seed.
+
+    Schedule post-merge via pg_cron, mirroring corridor-deadline-sweep.
+    """
+    _verify_cron_secret(request)
+    body = body or CorridorDeadlineSweepBody()
+    today = None
+    if body.today:
+        try:
+            today = date.fromisoformat(body.today)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="today must be an ISO date (YYYY-MM-DD)")
+    log.info("repatriation_planning_sweep cron triggered (dry_run=%s)", body.dry_run)
+    result = run_repatriation_planning_sweep(today=today, dry_run=body.dry_run)
     return {"ok": True, **result}
 
 

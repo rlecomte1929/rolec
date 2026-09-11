@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { RelocationPlanPhaseTaskDTO } from '../../../types/relocationPlanView';
-import { formatDue } from './roadmapTemplateHelpers';
+import { formatDue, phaseIcon } from './roadmapTemplateHelpers';
+import { Undo2, MapPin } from 'lucide-react';
 
 function task(p: Partial<RelocationPlanPhaseTaskDTO>): RelocationPlanPhaseTaskDTO {
   return {
@@ -41,5 +42,15 @@ describe('formatDue (AIQ-1340 suggested dates)', () => {
     const s = formatDue(task({ due_date: '2099-12-31', due_date_is_suggested: false }));
     expect(s).not.toMatch(/Suggested/);
     expect(s).toMatch(/^Due /);
+  });
+});
+
+describe('phaseIcon', () => {
+  it('uses Undo2 for the return phase', () => {
+    expect(phaseIcon('return')).toBe(Undo2);
+  });
+
+  it('falls back to MapPin for an unknown phase', () => {
+    expect(phaseIcon('not-a-phase')).toBe(MapPin);
   });
 });
