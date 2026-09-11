@@ -49,8 +49,9 @@ def make_module(root: Path, dotted: str, body: str = "") -> Path:
 
 @pytest.fixture()
 def repo(tmp_path, monkeypatch):
-    """A miniature repo with ONE serving root, so unit tests are hermetic."""
+    """A miniature repo with ONE serving root and NO fill roots, so unit tests are hermetic."""
     monkeypatch.setattr(guard, "SERVING_ROOTS", ("backend.app.services.serving_engine",))
+    monkeypatch.setattr(guard, "FILL_ROOTS", ())
     make_module(tmp_path, "backend.app.services.serving_engine", "x = 1\n")
     return tmp_path
 
@@ -347,6 +348,27 @@ def test_real_repo_closure_is_not_suspiciously_small():
         f"serving closure collapsed to {len(closure)} modules — the import graph is "
         f"probably not resolving; a clean result here would be meaningless"
     )
+
+
+def test_fill_root_catches_llm_import_from_form_prefill_service():
+    # A mapper module that imports an LLM gateway, reachable from the fill path, must FAIL the guard.
+    # Use the module-level `guard` (imported via the sys.path insertion above) rather than
+    # re-importing as `scripts.check_serving_llm_isolation`: `scripts` is not an importable
+    # package under CI's full-suite discovery, so the dotted re-import raises ModuleNotFoundError.
+    assert "backend.app.services.form_prefill_service" in (guard.SERVING_ROOTS + guard.FILL_ROOTS), \
+        "the live fill path must be a protected root"
+
+
+def test_a_fill_root_that_is_itself_a_boundary_is_caught(repo, monkeypatch):
+    """Mechanism test for the fill path, analogous to
+    test_a_serving_root_that_is_itself_a_boundary_is_caught above: membership in
+    FILL_ROOTS alone proves nothing about whether check() actually walks it. A synthetic
+    fill root that imports an LLM gateway directly must fail the guard."""
+    monkeypatch.setattr(guard, "FILL_ROOTS", ("backend.app.services.fill_engine",))
+    make_module(repo, "backend.app.services.fill_engine", "import anthropic\n")
+    code, report = guard.check(repo)
+    assert code == 1, report
+    assert "fill_engine" in report and "anthropic" in report
 
 
 # ─── reconciliation vs the validated reference ──────────────────────────────
