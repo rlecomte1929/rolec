@@ -24,7 +24,9 @@ facts batches. Everything is candidate-only: facts `review_status=pending` /
 `platform_vetting_status=pending`. **Nothing is served; the human lawyer gate at
 `/admin/countries` (facts) and the vetting queue (vendors) remain.**
 
-## Landed (candidate-only) — 21 batches, 128 items
+## Landed (candidate-only) — 25 batches, 147 items
+
+*(21 in the first pull below + 4 Denis packages recovered 2026-09-11 via Otto's GCS listing — see "Denis — recovered" section.)*
 
 ### Requirement FACTS — 58 facts (39 non-obvious, 12 needs_lawyer_review), gate PASS
 
@@ -62,6 +64,23 @@ facts batches. Everything is candidate-only: facts `review_status=pending` /
 | fr-sg-singapore-medical-2026-09-10 | 6 | 3 | MOH CHAS register |
 | fr-sg-singapore-dual-career-2026-09-10 | 5 | 3 | ACRA (UENs confirmed) |
 
+### Denis NO→FR — recovered via GCS listing (2026-09-11)
+
+Otto's `list_media` (100-item cap) recovered 14 of Denis's ~28 files; these 4 complete packages
+are staged. Bundle sha256 for D-P2 matches Otto's stated hash (`c809e876…310b8ce9`).
+
+| Batch | Type | Content |
+|---|---|---|
+| no-fr-predeparture-health-2026-09-10 (D-P2) | resource bundle (draft) | 8 resources (EHIC/S1, CPAM/PUMa, médecin traitant) |
+| no-fr-paris-language-2026-09-10 (D-P6) | vendor | 6 accepted (Label FLE) / 4 rejects |
+| no-fr-paris-dual-career-2026-09-10 (D-P7) | vendor | 5 accepted (SIRENE) / 5 rejects |
+| no-fr-paris-medical-2026-09-10 (D-P4) | vendor | **honest-zero** (0 / 2 rejects) — ameli/Ordre annuaire is JS/SPA |
+
+Still missing (beyond the 100-item listing window) — a targeted Otto re-run is queued:
+**D-P1** no-departure (14 facts), **D-P10** fr-no-return (9 facts), **D-P3** no-fr-paris-temp-housing,
+**D-P5** no-fr-driving-licence. The two facts packages are the priority — Denis has no departure/return
+facts landed until they arrive.
+
 ## Deferred to the load step (needs backend venv + DB, out of this PR's scope)
 
 - `scripts/import_otto_facts.py <batch> --dry-run` → `--apply --promote` (facts → `requirement_items`, `pending`).
@@ -71,11 +90,11 @@ facts batches. Everything is candidate-only: facts `review_status=pending` /
 
 ## Outstanding — needs Otto (not recoverable in-repo)
 
-- **Denis NO→FR (#134016) — 24 files exist on GCS but filenames were never captured.** The bucket
-  denies anonymous listing, so they can't be recovered here. Requested from Otto: (a) GCS-listing
-  by the ~07:10 UTC window cross-checked to the known D-P1 sha256 `3fcbe327…`, and (b) a re-run as
-  fallback. Known content: D-P1 no-departure (14 recs), D-P10 fr-no-return (9), D-P2 health (8),
-  D-P5 driving (6), D-P3 housing (4), D-P6 language (6), D-P7 dual-career (5); D-P4 medical honest-zero.
+- **Denis NO→FR (#134016)** — 14/28 files recovered via Otto's GCS listing and landed (4 packages,
+  above). The remaining 4 packages fell outside the 100-item listing window: **D-P1 no-departure
+  (14 facts), D-P10 fr-no-return (9 facts), D-P3 temp-housing, D-P5 driving-licence.** A targeted
+  Otto re-run of just these four is queued (files-only to GCS, candidate-only). The two facts
+  packages are the priority.
 - **Abraham US→EC vendor batches — partial filenames only** (AB-P3/P6/P7/CORE providers captured,
   but rejects/manifest/README timestamps are partial). Requested from Otto: paste the full filenames
   (or GCS-list the #134224 `1789135…` and #134263 `178914[1|2]…` windows).

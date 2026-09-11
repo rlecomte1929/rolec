@@ -1,0 +1,11 @@
+{
+  "batch_id": "no-fr-paris-medical-2026-09-10",
+  "corridor": "XX-FR",
+  "service_category": "medical",
+  "accepted_count": 0,
+  "rejected_count": 2,
+  "artifact": "providers.csv",
+  "sha256": "4a7361e7603fc55bbbdf2c0b3d81665199e4640bcec6da5b4b5aab6819f02fbb",
+  "platform_vetting_status_all": "pending",
+  "scope": "Medecins generalistes / GP practices in Paris accepting new patients as medecin traitant (English-speaking flagged where the official register indicates it). Corridor NO->FR. Provenance restricted to Conseil National de l'Ordre des Medecins (conseil-national.medecin.fr / tableau.ordre.medecin.fr) or ameli.fr annuaire sante (annuairesante.ameli.fr). Both official registers were JS-rendered SPAs inaccessible to the text scraper, yielding an honest zero for the accepted list."
+}

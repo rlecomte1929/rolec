@@ -1,0 +1,11 @@
+{
+  "batch_id": "no-fr-paris-language-2026-09-10",
+  "corridor": "XX-FR",
+  "service_category": "language",
+  "accepted_count": 6,
+  "rejected_count": 4,
+  "artifact": "providers.csv",
+  "sha256": "844319798e76388d6dfab41a255e860f569027cffe8b02ac37754f5fb35919de",
+  "platform_vetting_status_all": "pending",
+  "scope": "Accredited FLE (Français Langue Étrangère) schools in Paris offering adult general French for an accompanying non-French-speaking spouse/family. Corridor NO->FR. Provenance: official Label Qualité FLE register (France Éducation international, published via data.education.gouv.fr) and qualitefle.fr centre directory pages. Own-site / aggregator / municipal candidates rejected as tier-3."
+}

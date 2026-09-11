@@ -1,0 +1,164 @@
+{
+  "categories": [
+    { "key": "healthcare", "name": "Healthcare" }
+  ],
+  "tags": [
+    "france",
+    "paris",
+    "healthcare",
+    "eea",
+    "pre-departure",
+    "ehic",
+    "ceam",
+    "s1",
+    "puma",
+    "cpam",
+    "assurance-maladie",
+    "carte-vitale",
+    "medecin-traitant",
+    "medical-records",
+    "prescriptions",
+    "vaccinations"
+  ],
+  "sources": [
+    {
+      "source_name": "Service-Public.fr - Carte europeenne d'assurance maladie (CEAM)",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F34441"
+    },
+    {
+      "source_name": "Service-Public.fr - Demander une carte europeenne d'assurance maladie (Ceam)",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/R49815"
+    },
+    {
+      "source_name": "Service-Public.fr - Assurance maladie d'un Francais vivant a l'etranger",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F407"
+    },
+    {
+      "source_name": "Service-Public.fr - Quelle assurance maladie lors du retour en France apres avoir travaille comme expatrie ?",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F32824"
+    },
+    {
+      "source_name": "ameli.fr - La protection universelle maladie",
+      "source_url": "https://www.ameli.fr/assure/droits-demarches/principes/protection-universelle-maladie"
+    },
+    {
+      "source_name": "Service-Public.fr - Medecin traitant et parcours de soins coordonnes",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F163"
+    },
+    {
+      "source_name": "ameli.fr - Mon espace sante, un carnet sante numerique et securise",
+      "source_url": "https://www.ameli.fr/assure/sante/mon-espace-sante/mon-espace-sante-carnet-sante-numerique"
+    },
+    {
+      "source_name": "Service-Public.fr - Calendrier des vaccinations",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F724"
+    }
+  ],
+  "resources": [
+    {
+      "country_code": "FR",
+      "city_name": "Paris",
+      "category_key": "healthcare",
+      "title": "Before you move: order a European Health Insurance Card (CEAM/EHIC) to cover the gap",
+      "resource_type": "checklist_item",
+      "summary": "Order the EHIC (in France: CEAM) from your current EEA country before departure so medically necessary care is covered while your French affiliation is being set up.",
+      "body": "The European Health Insurance Card (in France: Carte Europeenne d'Assurance Maladie, CEAM) proves your Assurance maladie rights and covers medically necessary public-sector care during a temporary stay in another EU/EEA state, Switzerland or the UK, on the same terms as a local insured person. Per Service-Public.fr, it covers medically necessary care, chronic or pre-existing conditions, pregnancy and childbirth; private-sector care and rescue/repatriation are NOT covered. Key limitation for a permanent move: 'Si vous allez vivre dans un autre pays europeen, vous devez utiliser le formulaire S1, et non la carte europeenne d'assurance maladie, pour vous inscrire' - i.e. the CEAM/EHIC is for temporary stays, and the portable S1 document is what you use to register in your new country of residence. In France, the CEAM is ordered free of charge online via your compte ameli or FranceConnect; Service-Public.fr states it should be requested at least 20 days before departure. Denis and family should each carry a valid EHIC/CEAM (issued by their current EEA country's health authority) as gap coverage until French CPAM affiliation is active.",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F34441",
+      "source_name": "Service-Public.fr - Carte europeenne d'assurance maladie (CEAM)",
+      "tags": ["france", "healthcare", "eea", "pre-departure", "ehic", "ceam", "s1"],
+      "status": "draft"
+    },
+    {
+      "country_code": "FR",
+      "city_name": "Paris",
+      "category_key": "healthcare",
+      "title": "How to order the CEAM/EHIC: free, online, at least 20 days before departure",
+      "resource_type": "official_link",
+      "summary": "The official online CEAM request: free service, 3 steps, sign in via FranceConnect or your compte ameli, request it at least 20 days before you travel.",
+      "body": "Service-Public.fr describes the official online procedure to request a Carte Europeenne d'Assurance Maladie (CEAM). It is open to 'Toute personne souhaitant commander une carte europeenne d'Assurance maladie (Ceam), mais aussi en declarer la perte ou le vol'. Details stated on the page: 'Cout: Service gratuit'; 'Nombre d'etapes: 3 etapes'; connection 'avec France Connect ou via votre compte Ameli'; and the calendar note 'La CEAM doit etre demandee 20 jours au moins avant le depart'. Steps: verify your postal details, go to the 'Mes demarches' section and order a CEAM, then wait to receive it. If the card does not arrive, you can renew the request after checking the address entered. Note: this card is issued by the country where the person is currently insured; a family member insured in another EEA country should order their EHIC from that country's own health service before the move.",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/R49815",
+      "source_name": "Service-Public.fr - Demander une carte europeenne d'assurance maladie (Ceam)",
+      "tags": ["france", "healthcare", "eea", "pre-departure", "ehic", "ceam"],
+      "status": "draft"
+    },
+    {
+      "country_code": "FR",
+      "city_name": "Paris",
+      "category_key": "healthcare",
+      "title": "The S1 portable document: registering family with a French sickness fund",
+      "resource_type": "guide",
+      "summary": "The portable S1 lets people who keep insurance in another EEA state (or family members) register with a French sickness fund for local care.",
+      "body": "Service-Public.fr (Assurance maladie d'un Francais vivant a l'etranger) explains the portable S1 mechanics. Where a worker's insurance stays with another EEA/Swiss institution but family members reside in France, 'vous devez demander le document S1 (attestation pour l'inscription des membres de la famille du travailleur salarie ou non-salarie) a votre institution etrangere d'affiliation. Votre famille doit ensuite remettre ce document a sa caisse d'assurance maladie en France, afin d'etre enregistree.' Similarly, a person who keeps entitlement in the former country requests the S1 and hands it to the sickness fund at their new French address to obtain cover for their medical care. Separately, to have periods of insurance completed abroad taken into account when opening rights, you can ask your (former) fund for the E104 attestation (totalisation of periods of insurance, employment or residence). This is the correct route for EEA arrivals: register via S1 / CPAM affiliation, rather than any entry vaccination gate.",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F407",
+      "source_name": "Service-Public.fr - Assurance maladie d'un Francais vivant a l'etranger",
+      "tags": ["france", "healthcare", "eea", "s1", "cpam", "pre-departure"],
+      "status": "draft"
+    },
+    {
+      "country_code": "FR",
+      "city_name": "Paris",
+      "category_key": "healthcare",
+      "title": "Returning to France: open your Assurance maladie rights with CPAM (S1106 / PUMa)",
+      "resource_type": "guide",
+      "summary": "Scenario for a French national returning from an EEA country: how rights re-open on arrival, the S1106 form, the 3-month rule if not working, and updating the carte Vitale.",
+      "body": "Service-Public.fr (retour en France apres expatriation) sets out the rules for a French national returning from an EU/EEA country or Switzerland. If you start work in France: 'l'affiliation obligatoire a l'Assurance maladie francaise sur critere d'activite professionnelle est acquise des la 1ere heure travaillee.' To open rights, send a copy of your employment contract or a payslip together with 'le formulaire S1106 (demande d'ouverture de droit a la protection universelle maladie - Puma) a la CPAM de votre lieu de residence', then update your carte Vitale. If you are NOT working: check with your former foreign fund whether a maintien de droit exists (you would then present your CEAM or the portable S1); if there is no maintien de droit, 'vous demandez la protection universelle maladie (Puma) a votre CPAM. Une fois en France, vous devez attendre 3 mois avant de voir vos droits ouverts des lors que vous ne reprenez pas une activite professionnelle.' Denis should plan gap coverage (EHIC/CEAM or S1) for any waiting period.",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F32824",
+      "source_name": "Service-Public.fr - Quelle assurance maladie lors du retour en France apres avoir travaille comme expatrie ?",
+      "tags": ["france", "healthcare", "eea", "puma", "cpam", "carte-vitale"],
+      "status": "draft"
+    },
+    {
+      "country_code": "FR",
+      "city_name": "Paris",
+      "category_key": "healthcare",
+      "title": "PUMa: healthcare rights based on stable and lawful residence in France",
+      "resource_type": "guide",
+      "summary": "Protection universelle maladie (PUMa) gives anyone working or residing stably and lawfully in France the right to have their health costs covered; how to open rights.",
+      "body": "ameli.fr explains the Protection universelle maladie (PUMa): 'Toute personne qui travaille ou reside en France de maniere stable et reguliere a droit a la prise en charge de ses frais de sante a titre personnel et de maniere continue tout au long de sa vie.' Since 1 January 2016, employees and self-employed people have their health costs covered from the start of activity, and people without professional activity are covered on the sole basis of stable and lawful residence in France. To open rights: 'il faut completer le formulaire Cerfa S1106 et le transmettre a l'organisme d'Assurance Maladie de son lieu de residence, accompagne des justificatifs demandes.' A major adult already an 'ayant droit' can request individual affiliation on a residence basis using form S1110. Note ameli's caution: beneficiaries (except minors) may be asked to provide proof of lawful residence and stable residence, with a 30-day deadline to respond. This CPAM/PUMa affiliation - not an entry vaccination gate - is the core healthcare step for EEA arrivals.",
+      "source_url": "https://www.ameli.fr/assure/droits-demarches/principes/protection-universelle-maladie",
+      "source_name": "ameli.fr - La protection universelle maladie",
+      "tags": ["france", "healthcare", "puma", "cpam", "assurance-maladie", "eea"],
+      "status": "draft"
+    },
+    {
+      "country_code": "FR",
+      "city_name": "Paris",
+      "category_key": "healthcare",
+      "title": "Choose and declare a medecin traitant (coordinated care pathway)",
+      "resource_type": "guide",
+      "summary": "After affiliation, freely choose a treating doctor and declare them so you stay in the parcours de soins coordonnes and are better reimbursed.",
+      "body": "Service-Public.fr explains the medecin traitant (treating doctor) and the parcours de soins coordonnes. You freely choose your treating doctor, who must agree to the role; for children under 16 a parent (or holder of parental authority) chooses. The doctor may be a GP or specialist, sector 1 or sector 2, and can be near your home or work. You must declare a treating doctor if you don't have one, if you change, or if yours stops practising. Two ways to declare: online by the doctor (with your carte Vitale), or by paper form completed and signed by both you and the doctor, then given or posted to your Assurance maladie fund (the declaration form is the S3704 / Cerfa 12485*03). Consulting outside this pathway (a doctor you haven't declared) means you are 'moins bien rembourse', with normal reimbursement kept if you are under 16, far from home, or seen in an emergency. If you cannot find a treating doctor you can contact an organisation coordonnee territoriale or your CPAM.",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F163",
+      "source_name": "Service-Public.fr - Medecin traitant et parcours de soins coordonnes",
+      "tags": ["france", "healthcare", "medecin-traitant", "cpam"],
+      "status": "draft"
+    },
+    {
+      "country_code": "FR",
+      "city_name": "Paris",
+      "category_key": "healthcare",
+      "title": "Carrying medical records and repeat prescriptions: use Mon espace sante",
+      "resource_type": "tip",
+      "summary": "Bring your medical history and ongoing prescriptions, and store them in Mon espace sante so a French doctor can continue treatment safely.",
+      "body": "ameli.fr describes Mon espace sante, the secure digital health record offered by the Assurance Maladie and the Ministry of Health. Its medical record lets each patient keep in one secure place 'toutes ses informations de sante (traitements, resultats d'examens, comptes rendus de radiologie et des examens bucco-dentaire, ordonnances, carnet de vaccination)' and freely add any document useful to their care; the patient can also record allergies and family history. 'Le dossier medical peut etre partage avec les professionnels de sante de son choix... Par exemple lorsqu'un patient est pris en charge par un medecin qui n'est pas son medecin habituel, a l'occasion d'un deplacement ou en cas d'urgence, le dossier medical... permet d'etre soigne plus efficacement.' Practical tip for the move: bring copies of your family's medical records, current treatments and repeat prescriptions (ideally with the medicine's international non-proprietary / molecule name), plus your vaccination record, and upload them to Mon espace sante so your new medecin traitant can continue care. Access is available at monespacesante.fr.",
+      "source_url": "https://www.ameli.fr/assure/sante/mon-espace-sante/mon-espace-sante-carnet-sante-numerique",
+      "source_name": "ameli.fr - Mon espace sante, un carnet sante numerique et securise",
+      "tags": ["france", "healthcare", "medical-records", "prescriptions", "pre-departure"],
+      "status": "draft"
+    },
+    {
+      "country_code": "FR",
+      "city_name": "Paris",
+      "category_key": "healthcare",
+      "title": "Check vaccinations against the French calendrier vaccinal (routine, EEA context)",
+      "resource_type": "checklist_item",
+      "summary": "France's vaccination calendar applies to everyone residing in France; check the family is up to date on routine obligatory and recommended vaccines before or soon after arrival.",
+      "body": "Service-Public.fr explains the calendrier des vaccinations: 'Ce calendrier concerne les personnes qui vivent en France quelle que soit leur nationalite. Certaines vaccinations sont obligatoires, d'autres sont recommandees.' The calendar indicates obligatory and recommended vaccinations by age, general and specific recommendations for people at particular risk, and the schedule of injections; it is updated each year by the Ministry of Health. There may be contraindications (e.g. medical contraindications, fever), and a health professional decides whether vaccination can be carried out. If records are missing or rappels are overdue, a 'rattrapage vaccinal' (catch-up schedule) is set by a doctor. Practical step for an EEA move: this is routine preventive care, not an entry vaccination gate - review the family's records against the French calendar (especially childhood obligatory vaccines needed for creche/school enrolment) with a doctor or pharmacist, and keep the carnet de vaccination up to date. The simplified calendar is published by the Ministry of Health.",
+      "source_url": "https://www.service-public.gouv.fr/particuliers/vosdroits/F724",
+      "source_name": "Service-Public.fr - Calendrier des vaccinations",
+      "tags": ["france", "healthcare", "vaccinations", "eea", "pre-departure"],
+      "status": "draft"
+    }
+  ],
+  "events": []
+}
