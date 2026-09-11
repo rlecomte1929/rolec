@@ -1,0 +1,12 @@
+{
+  "batch_id": "enrich-xx-gb-legal-contact-2026-09-11",
+  "total_attempted": 7,
+  "total_filled": 6,
+  "unfilled": [
+    {
+      "supplier_id": "vc-c3f90216-e7d5-4c07-9be4-4deef5691554",
+      "name": "Fragomen LLP",
+      "reason": "fragomen.com has restructured its URL space — /contact-us, /about-us/offices, /offices/europe/united-kingdom, /about-fragomen/offices/united-kingdom all return 404. Main homepage renders no inline phone or email. 'Contact Us' nav link leads to a JS-gated form page the scraper cannot render. Neither field recoverable."
+    }
+  ]
+}

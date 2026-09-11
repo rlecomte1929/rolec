@@ -1,0 +1,30 @@
+{
+  "batch_id": "vendor-resourced-xx-ca-legal-toronto-2026-09-10",
+  "category": "legal_admin",
+  "city": "Toronto",
+  "total_sourced": 1,
+  "total_rejected": 3,
+  "firms": [
+    {
+      "name": "Sobirovs Law Firm",
+      "status": "sourced",
+      "lso": "82485Q",
+      "source_url": "https://lso.ca/public-resources/finding-a-lawyer-or-paralegal/directory"
+    },
+    {
+      "name": "Bellissimo Law Group",
+      "status": "rejected",
+      "reason": "Named lawyer (Mario D. Bellissimo) identified but LSO number not confirmed from a verifiable source before batch close"
+    },
+    {
+      "name": "CILF / Canadian Immigration Law Firm",
+      "status": "rejected",
+      "reason": "Named lawyer Jacqueline Bonisteel identified but LSO number not confirmed from a verifiable source before batch close"
+    },
+    {
+      "name": "Bart Law",
+      "status": "rejected",
+      "reason": "No verifiable LSO-licensed named immigration lawyer with confirmed LSO number before batch close"
+    }
+  ]
+}

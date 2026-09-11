@@ -1,0 +1,57 @@
+{
+  "batch_id": "vendor-resourced-xx-dk-tax-copenhagen-2026-09-10",
+  "category": "tax_finance",
+  "city": "Copenhagen",
+  "total_sourced": 3,
+  "total_rejected": 6,
+  "firms": [
+    {
+      "name": "SkatteInform Statsautoriseret RevisionpartnersselskAb",
+      "status": "sourced",
+      "fsr_id": "SkatteInform Statsautoriseret RevisionpartnersselskAb (CVR 35394206)",
+      "source_url": "https://www.fsr.dk/"
+    },
+    {
+      "name": "Baker Tilly Denmark",
+      "status": "sourced",
+      "fsr_id": "Baker Tilly Denmark Godkendt Revisionsaktieselskab (CVR 35257691)",
+      "source_url": "https://www.fsr.dk/"
+    },
+    {
+      "name": "BDO Danmark",
+      "status": "sourced",
+      "fsr_id": "BDO Statsautoriseret Revisionspartnerselskab (CVR 45719375)",
+      "source_url": "https://www.fsr.dk/"
+    },
+    {
+      "name": "PrivatRevision",
+      "status": "rejected",
+      "reason": "Aarhus-based (M.P. Bruuns Gade 36, 8000 Aarhus C) - confirmed not Copenhagen"
+    },
+    {
+      "name": "Crossbord ApS",
+      "status": "rejected",
+      "reason": "Aalborg-based (Hobrovej 42D, 9000 Aalborg) - not Copenhagen; payroll/tax consultancy, not a statsautoriseret revisionsfirma"
+    },
+    {
+      "name": "expatfinance.dk",
+      "status": "rejected",
+      "reason": "Personal finance content blog - not a licensed revisor firm, no FSR membership"
+    },
+    {
+      "name": "Northern Partners Group (NP Group)",
+      "status": "rejected",
+      "reason": "Nordic Employer of Record (EOR) company - not a statsautoriseret revisor or FSR member"
+    },
+    {
+      "name": "GTS Nordic",
+      "status": "rejected",
+      "reason": "EOR/staffing company - not a statsautoriseret revisor or FSR member"
+    },
+    {
+      "name": "Vialto Partners",
+      "status": "rejected",
+      "reason": "UK-registered global mobility firm (UK SRA Number 839727) - no FSR Denmark membership, not a Danish statsautoriseret revisor"
+    }
+  ]
+}

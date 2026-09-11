@@ -1,0 +1,26 @@
+{
+  "batch_id": "enrich-xx-se-housing-contact-2026-09-11",
+  "generated_at": "2026-09-11",
+  "total_attempted": 7,
+  "total_filled": 5,
+  "unfilled": [
+    {
+      "supplier_id": "vc-5925875e-48d1-4799-b8dc-f88803c3802d",
+      "name": "Nordic Relocation Group AB",
+      "reason": "Contact page (nrgab.com/contact) and homepage render only a web form — no email address or phone number published publicly on the firm's own site"
+    },
+    {
+      "supplier_id": "vc-6dd31667-268b-48e1-a9e8-2923f5877e41",
+      "name": "Residensportalen AB",
+      "reason": "Site (residensportalen.se) returned no text content on both /kontakt and homepage fetch attempts — zero contact details extractable"
+    }
+  ],
+  "field_notes": [
+    "Estate Fastighetsbyrå (vc-5ead1932): email + phone from /kontakt page. Primary phone only (sales line 08-611 99 60); rental line 08-611 99 45 omitted.",
+    "Öresund Fastighetsförmedling (vc-81d72114): /kontakt returns 404 but site footer on firm's own domain contained email + phone — extracted from footer.",
+    "Quality Living Stockholm (vc-f03ea2f1): /contact returns 404 but site footer on firm's own domain contained email + phone — extracted from footer.",
+    "Våningen & Villan (vc-902decaa): phone found on /kontakt; no general corporate email published — only individual agent @vaningen.se addresses listed on homepage, omitted per rules.",
+    "Victory Stockholm (vc-05b90ae4): email + phone from /kontakt. General info@ used; individual agent phones omitted.",
+    "All phones converted to E.164 format (+46)."
+  ]
+}

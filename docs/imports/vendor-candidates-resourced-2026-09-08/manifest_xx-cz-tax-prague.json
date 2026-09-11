@@ -1,0 +1,67 @@
+{
+  "batch_id": "vendor-resourced-xx-cz-tax-prague-2026-09-10",
+  "category": "tax_finance",
+  "city": "Prague",
+  "total_sourced": 8,
+  "total_rejected": 2,
+  "firms": [
+    {
+      "name": "PricewaterhouseCoopers Audit, s.r.o.",
+      "status": "sourced",
+      "kacr_number": "021",
+      "source_url": "https://www.kacr.cz/"
+    },
+    {
+      "name": "KPMG Česká republika Audit, s.r.o.",
+      "status": "sourced",
+      "kacr_number": "071",
+      "source_url": "https://www.kacr.cz/"
+    },
+    {
+      "name": "Deloitte Audit s.r.o.",
+      "status": "sourced",
+      "kacr_number": "079",
+      "source_url": "https://www.kacr.cz/"
+    },
+    {
+      "name": "Ernst & Young Audit, s.r.o.",
+      "status": "sourced",
+      "kacr_number": "401",
+      "source_url": "https://www.kacr.cz/"
+    },
+    {
+      "name": "Forvis Mazars Audit s.r.o.",
+      "status": "sourced",
+      "kacr_number": "158",
+      "source_url": "https://www.kacr.cz/"
+    },
+    {
+      "name": "BDO Audit s.r.o.",
+      "status": "sourced",
+      "kacr_number": "018",
+      "source_url": "https://www.kacr.cz/"
+    },
+    {
+      "name": "Grant Thornton Audit s.r.o.",
+      "status": "sourced",
+      "kacr_number": "603",
+      "source_url": "https://www.kacr.cz/"
+    },
+    {
+      "name": "Crowe Advartis Audit s.r.o.",
+      "status": "sourced",
+      "kacr_number": "482",
+      "source_url": "https://www.kacr.cz/"
+    },
+    {
+      "name": "RSM Czech Republic (RSM Audit CZ s.r.o.)",
+      "status": "rejected",
+      "reason": "KAČR number for current entity RSM Audit CZ s.r.o. (IČO 24260673) not confirmed in public register; predecessor RSM TACOMA Auditing s.r.o. (KAČR 284) was struck off 12 Feb 2013 at own request"
+    },
+    {
+      "name": "BDO Czech Republic s.r.o. (KAČR 462)",
+      "status": "rejected",
+      "reason": "Shares domain bdo.cz and contact with BDO Audit s.r.o. (KAČR 018); not an independent firm — BDO sourced via primary entity only"
+    }
+  ]
+}

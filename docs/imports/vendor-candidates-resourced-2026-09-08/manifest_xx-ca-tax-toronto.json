@@ -1,0 +1,63 @@
+{
+  "batch_id": "vendor-resourced-xx-ca-tax-toronto-2026-09-10",
+  "category": "tax_finance",
+  "city": "Toronto",
+  "total_sourced": 4,
+  "total_rejected": 6,
+  "firms": [
+    {
+      "name": "Trowbridge Professional Corporation",
+      "status": "sourced",
+      "cpa_number": "5TTDAC",
+      "source_url": "https://www.cpaontario.ca/protecting-the-public/directories/firm/trowbridge-5ttdac"
+    },
+    {
+      "name": "GTA Accounting Professional Corporation",
+      "status": "sourced",
+      "cpa_number": "MA06WI",
+      "source_url": "https://www.cpaontario.ca/protecting-the-public/directories/coa/gta-ma06wi"
+    },
+    {
+      "name": "Maroof HS Cross Border Tax Professional Corporation",
+      "status": "sourced",
+      "cpa_number": "4UAC65",
+      "source_url": "https://www.cpaontario.ca/protecting-the-public/directories/firm/maroof-4uac65"
+    },
+    {
+      "name": "Fuller Landau LLP",
+      "status": "sourced",
+      "cpa_number": "5LIJQB",
+      "source_url": "https://www.cpaontario.ca/protecting-the-public/directories/firm/fuller-5lijqb"
+    },
+    {
+      "name": "North American Tax Services (Joseph Soussan)",
+      "status": "rejected",
+      "reason": "CPA Ontario member number not verifiable — member directory page returned empty; no member number published on firm website"
+    },
+    {
+      "name": "A Garg CPA Professional Corp",
+      "status": "rejected",
+      "reason": "Business city is Burlington, Ontario — not Toronto"
+    },
+    {
+      "name": "Andersen in Canada",
+      "status": "rejected",
+      "reason": "No CPA Ontario firm directory entry found by name search"
+    },
+    {
+      "name": "Bazar McBean LLP",
+      "status": "rejected",
+      "reason": "Located in Oakville, Ontario — not Toronto"
+    },
+    {
+      "name": "Akif CPA",
+      "status": "rejected",
+      "reason": "No CPA Ontario firm directory entry found by name"
+    },
+    {
+      "name": "CBTA",
+      "status": "rejected",
+      "reason": "Network/association of partner firms — not a single CPA Ontario-registered Toronto firm"
+    }
+  ]
+}

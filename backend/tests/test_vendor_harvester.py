@@ -86,6 +86,9 @@ def make(**kw) -> Candidate:
         ("sub.example.co.nz", "example.co.nz"),
         ("firm.com.sg/office", "firm.com.sg"),
         ("bureau.co.za", "bureau.co.za"),
+        # .adv.br = the Brazilian LAWYER second-level (BR/legal regression, 2026-09-11):
+        ("https://droliveira.adv.br", "droliveira.adv.br"),
+        ("mcbs.adv.br", "mcbs.adv.br"),
         ("https://example.com:8443/x", "example.com"),      # port stripped
         # The shapes that actually live in prod suppliers.website:
         ("agsmovers.com/branches/movers-europe/norway/norway/", "agsmovers.com"),
@@ -124,6 +127,16 @@ def test_normalise_domain_distinct_firms_on_same_cctld_do_not_collide():
     keys = {normalise_domain(f) for f in firms}
     assert len(keys) == 4                       # four firms, four keys
     assert "com.au" not in keys                 # never the bare public suffix
+
+
+def test_normalise_domain_distinct_firms_on_same_adv_br_do_not_collide():
+    """Brazilian law firms live on `.adv.br`; two distinct firms there must key distinctly.
+    The São Paulo BR/legal batch (droliveira.adv.br + mcbs.adv.br) would otherwise collapse to
+    the bare `adv.br` and drop one — the same class as the .com.au regression."""
+    firms = ["https://droliveira.adv.br", "https://mcbs.adv.br"]
+    keys = {normalise_domain(f) for f in firms}
+    assert keys == {"droliveira.adv.br", "mcbs.adv.br"}
+    assert "adv.br" not in keys
 
 
 # ── validation — the rules that keep bad rows out ────────────────────────────

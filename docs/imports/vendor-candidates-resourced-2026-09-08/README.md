@@ -809,6 +809,289 @@ generator before the first batch; London GB legal came back with per-firm URLs o
   **tax + banks PARKED** (Audos flakiness — firms recorded above). Next front: Canada (pre-flighted,
   all 5 registers wired PUBLIC_REGISTER).
 
+### XX-CA legal_admin (Toronto immigration lawyers) via LSO — `vendor-resourced-xx-ca-legal-toronto-2026-09-10` (landed 2026-09-10) — first XX-CA; THIN
+- Source (GCS): `1789050291683_u1h5z7v1.ndjson` (+ manifest `1789050295240_yb8h14ho.json`).
+- Otto manifest: **1 sourced, 3 rejected** (counts reconcile; Audos flakiness forced an early wrap before
+  more LSO#s could be confirmed). The 1 `source_url`=wired `lso.ca`, corridor **XX-CA**, category
+  legal_admin: Sobirovs Law Firm, LSO **82485Q** (Mariam Jammal). Site sobirovs.com (`.com`).
+- Rejects (real Toronto immigration firms, LSO# unconfirmed at close — candidates for a calm re-run):
+  Bellissimo Law Group (Mario Bellissimo), CILF / Canadian Immigration Law Firm (Jacqueline Bonisteel),
+  Bart Law. Same LSO#-in-footer extraction difficulty as the AU licence/TPB registers.
+- `_name_key` predictor: new; no prod dup, no mis-attach. Landed: **+1 new supplier** (CA/legal_admin,
+  pending). Create-only guard held: approved count **218 unchanged** across the op. CA/legal 3 → 4.
+  First Canada land — the LSO register + XX-CA corridor confirmed working end-to-end (`.ca` bug-unaffected).
+
+### XX-CA housing_agencies (Toronto) via RECO — `vendor-resourced-xx-ca-housing-toronto-2026-09-10` — ⛔ PARKED, NOT LANDED (no artifact) — STRUCTURALLY THIN
+- **Nothing landed.** Otto's RECO Registrant Search lookup stalled on all 3 in-chat attempts (the
+  reconnect-drops-the-in-progress-run Audos flakiness, ×3 across a pause). Per the "never invent an
+  accreditation number" rule Otto refused to fabricate RECO registration numbers → **0 sourced /
+  10 rejected**, no GCS artifact → no hand-landing from a text list (same discipline as Valencia /
+  NL banks / AU tax / AU banks). `reco.on.ca` is a wired PUBLIC_REGISTER; the block was verifying each
+  firm's RECO#, not the register wiring or the XX-CA corridor (both confirmed by the CA/legal land above).
+- **10 real Toronto brokerages recorded for a calm re-run** (reco.on.ca register, XX-CA,
+  housing_agencies — all rejected "RECO# not verified", NOT landable without a verified number):
+  Brookfield, Weichert, Dwellworks, SIRVA, Benecke, Royal LePage, RE/MAX Hallmark, Engel & Völkers
+  Toronto Central, Harvey Kalles, Chestnut Park.
+- **⚠ STRUCTURAL LEARNING:** Toronto RECO housing is thin the same way AU housing (self-published
+  licence#) and SE housing (FMI sales-agents-only) are — brokerages rarely self-publish their RECO#.
+  Better future CA-housing predicate: look each firm up **by name** in RECO Registrant Search to obtain
+  its number (vetter confirms), rather than requiring self-publication. A background-task retry
+  (web_fetch vs RECO Registrant Search, no reply-timeout) was offered by Otto and flagged to the
+  founder — not run.
+- Tripwire untouched (no write): create-only invariant, approved count unchanged (no op). CA/housing
+  stays at 0 until re-sourced with an artifact.
+
+### XX-CA tax_finance (Toronto CPA firms) via CPA Ontario — `vendor-resourced-xx-ca-tax-toronto-2026-09-10` (landed 2026-09-10)
+- Source (GCS): `1789066350927_te8pi4dr.ndjson` (+ manifest `1789066387283_cmgzej9h.json`).
+- Otto manifest: **4 sourced, 6 rejected** (counts reconcile: 4 NDJSON rows = 4 sourced; 6 named rejects).
+  All 4 `source_url`=wired `www.cpaontario.ca` (PUBLIC_REGISTER, register-root OK), corridor **XX-CA**,
+  category tax_finance, CPA Ontario firm ID in `accreditation_number`: Trowbridge Professional Corporation
+  **5TTDAC** (trowbridgeglobal.com), GTA Accounting Professional Corporation **MA06WI** (gtaaccounting.ca),
+  Maroof HS Cross Border Tax Professional Corporation **4UAC65** (maroofhs.com), Fuller Landau LLP
+  **5LIJQB** (fullerllp.com). Distinct registrable domains → no franchise-domain drop.
+- Rejects honest: North American Tax Services / Soussan (member# unverifiable — directory page empty),
+  A Garg CPA (Burlington not Toronto), Andersen in Canada (no CPA Ontario firm-directory entry — it's a
+  network), Bazar McBean LLP (Oakville not Toronto), Akif CPA (no directory entry), CBTA (network/
+  association, not a single registered firm).
+- **Register bot-walled** (cpaontario.ca returns HTTP 403 + anti-bot JS on both the root and per-firm
+  directory pages — same as bde.es / abogacia.es / LSO), so per-entity curl can't confirm; the CPA
+  público IDs are well-formed 6-char and match the manifest directory slugs → PUBLIC_REGISTER lands to
+  **pending** for the vetter to confirm at /admin/vetting-queue.
+- `_name_key` predictor: all 4 distinct + NEW; **no prod "Trowbridge" / Fuller / Maroof / GTA at all**
+  (the cross-border-Trowbridge multinational-arm risk is moot — no existing arm to mis-attach to). Dry-run:
+  staged 4, duplicates 0, promote 4.
+- Landed: **+4 new suppliers** (CA/tax_finance, pending). CA/tax **3 → 7** (the prior 3 are 08-31 global-pass caps).
+- **Create-only guard held.** The approved baseline has moved far past the retired 218: `admin@relopass.com`
+  (vetted_by `4e275218…`) bulk-approved essentially the whole pending queue — **approved 1254 / pending 0 /
+  rejected 3 immediately before this land** (that includes the CA/legal Sobirovs cap, approved 14:57). This
+  op only INSERTed: **approved 1254 UNCHANGED across the op; pending 0 → 4** (my 4 caps), all `vc-*`, CA,
+  tax_finance, vetted_by NULL, created 19:04. No mis-attach.
+
+### XX-CA banks (Toronto major banks) via CDIC — `vendor-resourced-xx-ca-banks-toronto-2026-09-10` (landed 2026-09-10) — HEAVY-DEDUP, +2 net
+- Source (GCS): `1789066979417_9d3y0b6h.ndjson` (+ manifest `1789067017154_tyyxjdfj.json`).
+- Otto manifest: **7 sourced, 3 rejected** (counts reconcile: 7 NDJSON = 7 sourced). All 7 `source_url`=wired
+  `www.cdic.ca` (PUBLIC_REGISTER, register-root OK), corridor **XX-CA**, category banks. CDIC issues no
+  public member number → `accreditation_number` = the CDIC member legal name (name-keyed identifier; vetter
+  confirms on the CDIC member list). Rejects honest: HSBC Bank Canada (merged into RBC Mar-2024, no longer a
+  separate CDIC member), Simplii (CIBC division, insured under CIBC), EQ Bank (no newcomer/expat programme).
+- **Ran the #2219 `_name_key` + national-arm predictor HARD (banks = the mis-attach-prone category).** The
+  inverted risk the relay flagged did NOT materialize — every prod collision is the canonical **CA** entity
+  from the 08-31 CA-banks pass, not a foreign arm:
+  - **RBC — HELD.** `_name_key` (`royalbankofcanada`) matches existing CA supplier `vc-e1c940db 'Royal Bank
+    of Canada (RBC)'` (already has a CA/banks cap). Its prod candidate uses a non-`rbc.com` domain, so
+    stage() would NOT domain-drop it → promote() would attach a **duplicate** CA/banks cap to the same RBC.
+    Same entity, nothing to add → dropped from the land (not a mis-attach; already covered).
+  - **Scotiabank / BMO / CIBC / TD — dropped by stage() cross-run domain-dedup** (their domains already
+    carry a CA/banks cap: 'The Bank of Nova Scotia (Scotiabank)', 'Bank of Montreal (BMO)', 'CIBC', 'The
+    Toronto-Dominion Bank (TD)'), so `_staged_keys` skips them pre-insert (they don't even show as duplicates).
+  - **National Bank of Canada + Tangerine Bank** — no `_name_key` match, no domain dup → genuinely NEW.
+- Landed: **+2 new suppliers** — National Bank of Canada (`vc-0938b4c8`), Tangerine Bank (`vc-f3c8f672`),
+  CA/banks pending. CA/banks caps **5 → 7**. 2-row dry-run: staged 2 / duplicates 0 / promote 2.
+- **Create-only guard held:** approved **1254 UNCHANGED** across the op; pending 4 → 6 (CA-tax 4 + CA-banks
+  2), all `vc-*`, CA, banks, vetted_by NULL. No mis-attach. The full-7 CSV + rejects worklist are on disk;
+  only the 2 net-new rows were promoted.
+- **✅ CA FRONT WRAPPED:** legal **+1** (Sobirovs) · housing **PARKED** (RECO thin, no artifact) · tax **+4**
+  (CPA Ontario) · banks **+2** (CDIC, 5 already-in-prod deduped/held). **Canada net-new = 7 suppliers** across
+  3 landed cells; housing parked for a calm re-run.
+
+### XX-DK legal_admin (Copenhagen immigration lawyers) via Advokatnøglen — `vendor-resourced-xx-dk-legal-copenhagen-2026-09-10` (landed 2026-09-10) — first XX-DK this campaign; +2 (1 held)
+- Source (GCS): `1789069055385_5s68gc2q.ndjson` (+ manifest `1789069118779_l293say0.json`).
+- Otto manifest: **3 sourced, 10 rejected** (counts reconcile: 3 NDJSON = 3 sourced). All 3 `source_url`=wired
+  `www.advokatnoeglen.dk` (Advokatnøglen — the Danish Bar register; PUBLIC_REGISTER, register-root OK; ✓ **not**
+  advokatsamfundet.dk, which is unwired), corridor **XX-DK**, category legal_admin, Copenhagen. `accreditation_number`
+  = CVR + Advokatnøglen firm/advokat UUID (+ beskikkelse year for an individual advokat). Distinct independent
+  domains (globeadvokater.dk / holmthomsenlaw.com / advokatnehansen.dk) → no franchise drop.
+- Rejects honest & well-scoped: Poul Schmith (represents the immigration authority — conflict), immigration-
+  denmark.com / Gateway to Denmark / VisaGuiden / NMD Law Group (non-advokat consultants, no Advokatnøglen entry),
+  Karoline Normann (criminal-defence focus), Piroz / Grotkjær Elmstrøm / KQOMANN / Homann (Aarhus/Charlottenlund —
+  not Copenhagen).
+- **`_name_key` collision caught — 1 HELD.** "Holm Thomsen Law Advokatanpartsselskab" exact-matches existing
+  `vc-4c56ac7b` — a DK/legal_admin supplier from the **08-31 global DK pass** (already approved/live). stage() did
+  NOT domain-drop it (its 08-31 record carries no website), so promote() would have attached a **duplicate** DK/legal
+  cap. Same firm, already covered → **held** (dropped from the land; not a mis-attach). ⚠ Diverged from the relay's
+  "staged 3" expectation — the independent `_name_key` predictor caught it (the relay didn't see the 08-31 DK supplier).
+- Landed: **+2 new suppliers** — Globe Advokater (`vc-3fc5204d`), Advokatkontoret Niels-Erik Hansen (`vc-baec3895`),
+  DK/legal pending. DK/legal caps **4 → 6**. 2-row dry-run: staged 2 / duplicates 0 / promote 2.
+- **Create-only guard held:** approved **1254 UNCHANGED** across the op; pending 6 → 8, all `vc-*`, DK, legal_admin,
+  vetted_by NULL. No mis-attach.
+
+### XX-DK tax_finance (Copenhagen expat-tax revisorer) via FSR — `vendor-resourced-xx-dk-tax-copenhagen-2026-09-10` (landed 2026-09-10) — +3, no overlap
+- Source (GCS): `1789070936430_4i9dgyr8.ndjson` (+ manifest `1789070967771_96dh0dxz.json`). (Otto hit a transient
+  Audos error mid-run; the relay retried once → recovered clean.)
+- Otto manifest: **3 sourced, 6 rejected** (counts reconcile). All 3 `source_url`=wired `www.fsr.dk` (FSR — danske
+  revisorer; PUBLIC_REGISTER, register-root OK), corridor **XX-DK**, category tax_finance, Copenhagen.
+  `accreditation_number` = statsautoriseret/godkendt revisor firm legal name + CVR. Distinct domains
+  (skatteinform.dk / bakertilly.dk / bdo.dk) → no franchise drop.
+- Rejects honest: PrivatRevision, Crossbord ApS, expatfinance.dk (finance blog), Northern Partners / GTS Nordic
+  (EOR firms, not FSR revisorer), Vialto Partners (UK-mobility, not a DK revisor).
+- **Predictor vs prod + the 08-31 DK/tax 4 — NO overlap.** The existing 08-31 DK/tax set is Christensen Kjærulff,
+  Deloitte, Grant Thornton, Kreston CM — a *different* four. BDO / Baker Tilly (the relay's suspected repeats) are
+  NOT in prod under any `_name_key`, and no candidate domain hits DK/tax → all 3 genuinely new. Dry-run: staged 3 /
+  duplicates 0 / promote 3.
+- Landed: **+3 new suppliers** — SkatteInform (`vc-24b6f7f1`), Baker Tilly Denmark (`vc-513d20da`), BDO Danmark
+  (`vc-9ac9e1c4`), DK/tax pending. DK/tax caps **4 → 7**.
+- **Create-only guard held:** approved **1262 UNCHANGED** across the op (the founder had just approved the prior 8
+  pending — CA-tax 4 + CA-banks 2 + DK-legal 2, so approved 1254 → 1262 and pending fell back to 0 before this land);
+  pending 0 → 3, all `vc-*`, DK, tax_finance, vetted_by NULL. No mis-attach.
+
+### XX-DK banks (Copenhagen major banks) via Finanstilsynet — `vendor-resourced-xx-dk-banks-copenhagen-2026-09-10` (landed 2026-09-10) — +3 net (3 overlaps deduped)
+- Source (GCS): `1789071993862_yqr0y1tr.ndjson` (+ manifest `1789072023124_ze4pivtu.json`).
+- Otto manifest: **6 sourced, 2 rejected** (counts reconcile). All 6 `source_url`=wired `www.finanstilsynet.dk`
+  (PUBLIC_REGISTER, register-root OK), corridor **XX-DK**, category banks, Copenhagen. `accreditation_number` =
+  Finanstilsynet FT-nummer (AL Sydbank carries a merger-successor prose note instead of a bare FT-nr — stored
+  verbatim; fine for pending-for-vetter). Distinct domains → no franchise drop.
+- Rejects honest: Sydbank A/S + Arbejdernes Landsbank (both merged into AL Sydbank, Finanstilsynet-approved
+  Dec 2025) — Otto sourced the merged successor instead, no dead/dup rows.
+- **Predictor HARD vs the 08-31 DK/banks 3 (Danske / Nordea / Nykredit).** All three overlaps carry their matching
+  domain in DK/banks, so stage() cross-run domain-dedup DROPS them pre-insert — no `_name_key` attach risk here
+  (unlike the CA RBC case, where the prod domain differed so it had to be held by hand). Genuinely new: Jyske Bank,
+  AL Sydbank, Spar Nord.
+- Landed: **+3 new suppliers** — Jyske Bank A/S (`vc-7764657e`), AL Sydbank A/S (`vc-121f0133`), Spar Nord Bank A/S
+  (`vc-db76ff38`), DK/banks pending. DK/banks caps **3 → 6**. Full-6 dry-run: staged 3 / duplicates 0 / promote 3.
+- **Create-only guard held:** approved **1262 UNCHANGED** across the op; pending 3 → 6 (DK-tax 3 + DK-banks 3), all
+  `vc-*`, DK, banks, vetted_by NULL. No mis-attach.
+
+### XX-DK housing_agencies (Copenhagen MDE estate agents) via de.dk — `vendor-resourced-xx-dk-housing-copenhagen-2026-09-10` (landed 2026-09-10) — LAST DK cell; +1 net (2 deduped)
+- Source (GCS): `1789073029123_eanpj0p0.ndjson` (+ manifest `1789073030801_rv5ag4eo.json`).
+- Otto manifest: **3 sourced, 7 rejected** (counts reconcile). All 3 `source_url`=wired `www.de.dk` (MDE — Dansk
+  Ejendomsmæglerforening; PUBLIC_REGISTER, register-root OK), corridor **XX-DK**, category housing_agencies,
+  Copenhagen. `accreditation_number` = MDE membership prose (verbatim "…medlemmer af Dansk Ejendomsmæglerforening")
+  + CVR. Distinct domains (home.dk / danbolig.dk / estate.dk).
+- **Not thin in the SE/FMI sense:** Otto kept the MDE ejendomsmæglere that do rental relo and rejected the non-MDE
+  expat consultancies (CopenhagenExpats, Copenhagen Relocations, RelocationDK, EasyHousing, Movinn). ⚠ Retry seed:
+  Toscana Bolig ApS (Peter Simmering, Ejendomsmægler MDE, CVR confirmed) was rejected on a truncated reason — worth
+  a look if it's Copenhagen + rental.
+- **Predictor vs the 08-31 DK/housing 4 (danbolig Østerbro / EDC / home Østerbro / Nybolig Østerbro).** home a/s
+  (home.dk) and danbolig (danbolig.dk) share the 08-31 chains' corporate domains → stage() cross-run domain-dedup
+  DROPS both pre-insert. Genuinely new: Estate Mæglerne (estate.dk).
+- Landed: **+1 new supplier** — Estate Mæglerne City & Christianshavn (`vc-461aa91e`), DK/housing pending.
+  DK/housing caps **4 → 5**. Dry-run: staged 1 / duplicates 0 / promote 1.
+- **Create-only guard held:** approved **1262 UNCHANGED**; pending 6 → 7, `vc-*`, DK, housing_agencies, vetted_by
+  NULL. No mis-attach.
+- **✅ DK FRONT WRAPPED:** legal **+2** (1 held: Holm Thomsen already in prod) · tax **+3** · banks **+3** (Danske/
+  Nordea/Nykredit deduped) · housing **+1** (home/danbolig deduped). **Denmark net-new = 9 suppliers** across 4
+  landed cells; all four DK registers (advokatnoeglen.dk / fsr.dk / finanstilsynet.dk / de.dk) confirmed working
+  end-to-end. Next front: Czech Republic or Cyprus (legal-first) — PT legal is unwired (Ordem dos Advogados has no
+  firm listing; PT's other categories already 08-31-covered), CZ `cak.cz` + CY `cyprusbar.org` are wired PUBLIC_REGISTER.
+
+### XX-CZ legal_admin (Prague expat boutiques) via ČAK — `vendor-resourced-xx-cz-legal-prague-2026-09-10` (landed 2026-09-10) — first XX-CZ this campaign; +5
+- Source (GCS): `1789074282307_bbrtocqa.ndjson` (+ manifest `1789074329130_91natmlc.json`).
+- Otto manifest: **5 sourced, 5 rejected** (counts reconcile). All 5 `source_url`=wired `www.cak.cz` (ČAK — Czech
+  Bar advocate register; PUBLIC_REGISTER, register-root OK), corridor **XX-CZ**, category legal_admin, Prague.
+  `accreditation_number` = ČAK evidenční číslo (16244 / 03468 / 13848 / 17452 / 12022). Distinct independent domains
+  (expatlegal.cz / rutlandandpartners.com / czechlawyer.legal / solers.legal / gt-legal.com).
+- Rejects honest: Brno-seat firm (geo), non-lawyer advisory sites (movetoprague.com, zahist.lawyer), asylum/criminal-
+  only (CIKR), and Otto proactively rejected an Ecovis franchise branch sharing the parent corporate domain (dodged
+  the franchise-domain-dedup trap).
+- **Predictor vs the 08-31 CZ/legal 3** (JUDr. Abraham / Mgr. Absolon / Mgr. Abu Assad — the alphabetical first three
+  *individual* advocates from the register). All 5 candidates are firms (s.r.o.), name-new, no domain dup → no overlap.
+  Dry-run: staged 5 / duplicates 0 / promote 5.
+- Landed: **+5 new suppliers** — EXPATLEGAL (`vc-073a26d3`), GT Legal (`vc-65017540`), PEERS (`vc-138ac528`), rutland
+  & partners (`vc-681fce94`), Solers legal (`vc-f02a9649`), CZ/legal pending. CZ/legal caps **3 → 8**.
+- **Create-only guard held:** approved **1262 UNCHANGED**; pending 7 → 12, all `vc-*`, CZ, legal_admin, vetted_by
+  NULL. No mis-attach.
+- **CZ front pre-flight (for the relay):** tax = **KAČR `kacr.cz`** (Chamber of Auditors — ⚠ NOT KDP ČR `kdpcr.cz`,
+  which is unwired; auditors-only scope like ES/ICAC) · banks = `cnb.cz` (register-root OK, per-entity CAPTCHA-gated) ·
+  housing = `ares.gov.cz` (Czech Trade Register). All CZ categories already 08-31-covered (banks 6 / housing 4 /
+  legal 3 / tax 4) → expect dedup on the rest.
+
+### XX-CZ tax_finance (Prague audit firms) via KAČR — `vendor-resourced-xx-cz-tax-prague-2026-09-10` (landed 2026-09-10) — +4 net (Big-4 held)
+- Source (GCS): `1789075317936_ha6dpkb3.ndjson` (+ manifest `1789075355676_mqyhycm7.json`).
+- Otto manifest: **8 sourced, 2 rejected** (counts reconcile). All 8 `source_url`=wired `www.kacr.cz` (KAČR — Komora
+  auditorů ČR, Chamber of Auditors; PUBLIC_REGISTER, register-root OK), corridor **XX-CZ**, category tax_finance,
+  Prague. `accreditation_number` = KAČR audit-firm reg # (021/071/079/401/158/018/603/482). The audit-scope caveat
+  played out exactly: the only KAČR-registered "tax" firms are the global audit networks.
+- **Ran the #2219 predictor HARD (multinational audit networks).** The 08-31 CZ/tax 4 turn out to BE the Big-4:
+  **PwC (021), KPMG (071), Deloitte (079), EY (401) already exist in prod as CZ/tax_finance with exact-name matches
+  → HELD** (promote() would attach a duplicate CZ/tax cap; same-entity, already covered — not a foreign-arm mis-attach).
+  The cross-corridor `pwc.com`/`ey.com` domain hits to PT/HU/EE/SG/NL/… entities are separate suppliers with distinct
+  `_name_key`s (not the match target), so no mis-attach there either.
+- Genuinely new (no `_name_key` match, no domain dup): **Forvis Mazars** (`vc-3caaf105`), **BDO Audit** (`vc-ae53c709`),
+  **Grant Thornton Audit** (`vc-4c21fb4d`), **Crowe Advartis** (`vc-e33a337f`) — the mid-tier networks the 08-31 pass
+  didn't take. Landed **+4** (CZ/tax pending). CZ/tax caps **4 → 8**. Dry-run: staged 4 / dup 0 / promote 4.
+- **Create-only guard held:** approved **1262 UNCHANGED**; pending 12 → 16, all `vc-*`, CZ, tax_finance, vetted_by
+  NULL. No mis-attach. Rejects honest (RSM entity-mismatch; BDO Czech Republic s.r.o. shares bdo.cz with BDO Audit).
+
+### XX-CZ housing_agencies (Prague expat-relocation boutiques) via ARES — `vendor-resourced-xx-cz-housing-prague-2026-09-10` (landed 2026-09-10) — LAST CZ cell; +5
+- Source (GCS): `1789076631995_afuxupj3.ndjson` (+ manifest `1789076680000_rsk1hzt3.json`; the first upload was truncated
+  → relay discarded + re-uploaded, I re-verified 5/5 rows parse).
+- Otto manifest: **5 sourced, 8 rejected** (counts reconcile). All 5 `source_url`=wired `ares.gov.cz` (ARES/RŽP — Czech
+  Trade Register; PUBLIC_REGISTER, register-root OK), corridor **XX-CZ**, category housing_agencies, Prague.
+  `accreditation_number` = IČO (trade-register number). Distinct independent domains — and expat/relocation-focused
+  (Foreigners.cz, MH Relocations, Expat Advisors), not sales agencies.
+- Rejects honest: broker-platforms/aggregators (QARA, Flat Zone) + Otto refused to invent IČOs for timed-out sites
+  (BPR, PragueStay, Prague Home Finder, 4you.cz).
+- **Predictor vs the 08-31 CZ/housing 4** (E&V Prague / LEXXUS NORTON / MAXIMA REALITY / Svoboda & Williams — premium
+  sales agencies). All 5 candidates name-new, no domain dup → complementary (relocation boutiques, not sales). Dry-run:
+  staged 5 / dup 0 / promote 5.
+- Landed: **+5 new suppliers** — Foreigners.cz (`vc-9fcdd379`), MH Relocations (`vc-8ad08bd3`), Prestige Group Apart
+  (`vc-9fd9bc99`), Residenture (`vc-42c0a408`), Expat Advisors (`vc-a59e2cf0`), CZ/housing pending. CZ/housing **4 → 9**.
+- **Create-only guard held:** approved **1262 → 1278** across the op — the founder's concurrent overnight approval wave
+  (approved went UP, not down; the 16 prior pending — CZ legal 5 + CZ tax 4 + DK tax 3 + DK banks 3 + DK housing 1 —
+  were approved during this land). My 5 caps landed pending, all `vc-*`, CZ, housing_agencies, vetted_by NULL. No mis-attach.
+- **✅ CZ FRONT WRAPPED:** legal **+5** · tax **+4** (Big-4 held) · housing **+5** · banks **skipped** (near-total dedup).
+  **Czech Republic net-new = 14 suppliers** across 3 landed cells. Next: IT/tax (Milan, CNDCEC) — top clean fresh vein.
+
+## Saturation-phase fresh veins (2026-09-11)
+The wired harvest is largely saturated (every wired country already covered in its hard categories). Chasing the last
+fresh veins — with a new filter learned the hard way: **"wired PUBLIC_REGISTER + 0 caps" is not enough; the
+accreditation must be publicly READABLE.**
+
+### XX-IT tax_finance (Milan) via CNDCEC — `vendor-resourced-xx-it-tax-milan-2026-09-11` — ⛔ DEAD VEIN (0 sourced / 12 rejected), NOTHING LANDED
+- **Paper-wired dead vein, like PT legal.** The CNDCEC *Albo dei Dottori Commercialisti* is fully bot-walled (not even
+  Google-indexed) AND no Italian commercialista publishes their Albo número on their own site → **no citable
+  accreditation** → Otto honestly rejected all 12 rather than invent. No GCS artifact to land. **IT/tax dropped (all cities).**
+- 12 Milan expat-tax firms recorded as retry seeds only (AeA Tax Law, Moore Professionisti Associati, Studio Genise,
+  TFP, ABPS, Studio Paci, EXPATH Italy, Arletti, Consulenza Marino, Taxing.it, Tax4Expats, Leonardo Nesa) — NOT landable
+  (no readable accreditation). Lesson recorded in memory: filter fresh targets by readable-accreditation, not just wiring.
+
+### XX-BR legal_admin (São Paulo immigration boutiques) via OAB-SP — `vendor-resourced-xx-br-legal-sao-paulo-2026-09-11` (landed 2026-09-11) — first XX-BR legal; +3 (.adv.br bug fixed inline)
+- Source (GCS): `1789080803022_3lk3w52c.ndjson` (+ manifest `1789080850785_0nhxcysj.json`).
+- Otto manifest: **3 sourced, 8 rejected** (counts reconcile). All 3 `source_url`=wired `www.oabsp.org.br` (OAB-SP — São
+  Paulo Bar *Sociedades de Advocacia* register; PUBLIC_REGISTER, register-root OK), corridor **XX-BR**, category
+  legal_admin, São Paulo. `accreditation_number` = OAB/SP número (524.997 / 204.390 / 280.701). Immigration boutiques.
+- **⚠ `.adv.br` compound-suffix bug fixed inline (commit 7b4c2eb2) BEFORE landing.** 2 of 3 firms are on `.adv.br`
+  (droliveira.adv.br, mcbs.adv.br) — the Brazilian LAWYER TLD, missing from `_COMPOUND_SUFFIXES`, so both collapsed to
+  the bare key `adv.br` and would have collided/dropped one (the #2263 `.com.au` class). Added `adv.br` + regression
+  tests (28 pass); keys now distinct. **Predicted at the BR preflight, confirmed 2/3, patched, re-verified before land.**
+- Rejects honest: geo (Campinas / Pres. Prudente; Botinha & Cabral OAB/MG), entity-type (Fragomen Brasil = immigration-
+  services Ltda, not a Sociedade de Advogados), directional scope (Michelon / Baracchini practise OUTBOUND US-immigration).
+- `_name_key` predictor: all 3 distinct + new (existing BR/legal = Mattos Filho / Pinheiro Neto, corporate .com.br). Dry-run:
+  staged 3 / dup 0 / promote 3.
+- Landed: **+3 new suppliers** — Dr. Oliveira (`vc-4bb48b59`), MCBS (`vc-23fe7e65`), Bruno Carmona (`vc-e9cfee2d`),
+  BR/legal pending. BR/legal caps **2 → 5** (both `.adv.br` firms landed distinctly — fix confirmed live).
+- **Create-only guard held:** approved **1278 → 1283** across the op (founder's concurrent approval of the 5 CZ housing
+  pending; approved UP not down); my 3 caps landed pending, all `vc-*`, BR, legal_admin, vetted_by NULL. No mis-attach.
+
+### XX-FI housing_agencies (Helsinki välitysliikkeet) via Luova Välitysliikerekisteri — `vendor-resourced-xx-fi-housing-helsinki-2026-09-11` (landed 2026-09-11) — LAST sourcing cell; +5
+- Source (GCS): `1789081877405_pqlvd8a3.ndjson` (+ manifest `1789081931736_hmyxlu63.json`).
+- Otto manifest: **5 sourced, 8 rejected** (counts reconcile). All 5 `source_url`=wired `lvv.fi` (Luova
+  Välitysliikerekisteri — the mandatory FI real-estate/letting-agency register; PUBLIC_REGISTER, register-root OK),
+  corridor **XX-FI**, category housing_agencies, Helsinki. `accreditation_number` = **y-tunnus** (Finnish business ID —
+  publicly readable; the register itself is data-protection-limited / y-tunnus-lookup, so the y-tunnus is the citable
+  identifier and the vetter confirms välitysliike registration by it — the readability the IT/tax dead vein lacked).
+  Distinct domains.
+- Not thin after all (5). Rejects honest, exactly the SE/FMI discipline: separated registered välitysliike from DIRECT
+  LANDLORDS (Lumo Kodit / VVO = vuokranantaja), relocation consultancies (Finland Relocation Services), Sweden-based
+  (Nordic Relocation Group), and no-y-tunnus firms (Kiinteistömaailma / RE/MAX Finland / Helsinki Homes).
+- `_name_key` predictor: all 5 name-new (FI/housing was 0 caps). Dry-run: staged 5 / dup 0 / promote 5.
+- Landed: **+5 new suppliers** — SATO Oyj (`vc-6f0d8637`), Huoneistokeskus (`vc-97a2ff3d`), OP Koti Uusimaa
+  (`vc-9592b404`), OVV Asuntopalvelut Helsinki (`vc-c8ec084a`), Bo LKV (`vc-cda9126d`), FI/housing pending. FI/housing **0 → 5**.
+  ⚠ Vetter note: SATO Oyj is a large residential company — confirm it's registered as a *välitysliike* (brokerage) rather
+  than a pure landlord before serving (Otto has its y-tunnus 0201470-5 on the register).
+- **Create-only guard held:** approved **1283 UNCHANGED**; pending 3 → 8 (BR/legal 3 + FI/housing 5), all `vc-*`, FI,
+  housing_agencies, vetted_by NULL. No mis-attach.
+
+## 🏁 SOURCING RUNWAY COMPLETE (2026-09-11)
+All wired **and sourceable** fresh veins are now exhausted. Saturation-phase probes: **IT/tax DEAD** (paper-wired — bot-walled
+register + no published Albo número), **BR/legal +3**, **FI/housing +5**. The wired vendor-harvest is **SATURATED**: no fresh
+`wired × sourceable × 0-caps` country×category remains (the readable-accreditation filter, learned from IT/tax, is the gate).
+Remaining sourcing would be deeper city coverage in already-covered cells (dedup wall) or caveated registers (ES/housing
+voluntary, SE legal+tax HTTP_LISTING, IT/legal non-commercial). **The bottleneck has shifted to (a) the founder's vetting
+queue and (b) ENRICHMENT** — 1,090 of ~1,166 harvest suppliers still lack a `contact_email` (the RFQ-loop blocker).
+Enrichment batch #1 (ES/legal_admin, 20 approved firms, contact-email fill via `enrich_suppliers.py`, fill-empty) is teed up,
+gated on the founder's direct go-ahead to the relay.
+
 ## Honesty notes
 - `accreditation_number` is NULL on all 4 — FIDI publishes only a FAIM expiry year and EuRA no
   number, so Otto invented none. `accreditation_expiry` column is always blank (the NDJSON carries

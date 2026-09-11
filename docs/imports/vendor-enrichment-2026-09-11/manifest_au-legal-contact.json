@@ -1,0 +1,36 @@
+{
+  "batch_id": "enrich-xx-au-legal-contact-2026-09-11",
+  "generated_at": "2026-09-11",
+  "total_attempted": 8,
+  "total_filled": 7,
+  "unfilled": [
+    {
+      "supplier_id": "vc-27703039-d52e-408c-977c-9b9d515bd5df",
+      "name": "Bay Migration Solution",
+      "website": "https://baymigration.com.au",
+      "reason": "All fetch attempts (/, /contact, /contact-us, force=true) returned no text — site is JS-rendered or bot-blocking the scraper; no contact data extractable"
+    }
+  ],
+  "field_notes": [
+    {
+      "supplier_id": "vc-c5be3340-cd16-46a4-9242-1aefa82e6438",
+      "note": "Email present on site only as hidden mailto link (rendered as 'Email office' button); plain-text address not published — phone only recorded per rules"
+    },
+    {
+      "supplier_id": "vc-f398e3ef-c0b9-4bed-b861-cd7c9eb340bd",
+      "note": "Email present on site only as a contact-form submit button ('Email Us'); plain-text address not published — phone only recorded per rules"
+    },
+    {
+      "supplier_id": "vc-39012e14-9cca-418f-a349-f21d771b30c6",
+      "note": "Contact page returns HTTP 404 but page footer rendered with address, phone and email; data extracted from footer of https://imeadvisors.com/contact"
+    },
+    {
+      "supplier_id": "vc-7fd2c455-0fb2-4094-a0c3-6af9dea0f3db",
+      "note": "Contact subpage (/contact) returned no text; data extracted from homepage footer (https://www.dmamigration.com.au)"
+    },
+    {
+      "supplier_id": "vc-a3c33238-f09e-45ea-a933-9a24322aff17",
+      "note": "Two phone numbers on page (0424673100 mobile, 02 9186 2553 office); primary office number recorded"
+    }
+  ]
+}

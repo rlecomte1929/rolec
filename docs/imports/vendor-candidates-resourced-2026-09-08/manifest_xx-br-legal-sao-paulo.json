@@ -1,0 +1,65 @@
+{
+  "batch_id": "vendor-resourced-xx-br-legal-sao-paulo-2026-09-11",
+  "category": "legal_admin",
+  "city": "São Paulo",
+  "total_sourced": 3,
+  "total_rejected": 8,
+  "firms": [
+    {
+      "name": "Dr. Oliveira Advocacia & Associados",
+      "status": "sourced",
+      "oab_number": "OAB/SP 524.997",
+      "website": "https://droliveira.adv.br",
+      "source_url": "https://www.oabsp.org.br/"
+    },
+    {
+      "name": "MCBS – Masson Castello Bogasian Serra Advogados",
+      "status": "sourced",
+      "oab_number": "OAB/SP 204.390 (Aloisio Masson)",
+      "website": "https://mcbs.adv.br",
+      "source_url": "https://www.oabsp.org.br/"
+    },
+    {
+      "name": "Bruno Carmona Advocacia",
+      "status": "sourced",
+      "oab_number": "OAB/SP 280.701",
+      "website": "https://www.brunocarmonaadv.com.br",
+      "source_url": "https://www.oabsp.org.br/"
+    },
+    {
+      "name": "Sidval Oliveira",
+      "status": "rejected",
+      "reason": "OAB/SP 168.872 confirmed but office address is Campinas SP — not São Paulo city"
+    },
+    {
+      "name": "ZS Advogados (Zachariah Zagol)",
+      "status": "rejected",
+      "reason": "OAB/SP 351.356 confirmed but office is Presidente Prudente SP — not São Paulo city"
+    },
+    {
+      "name": "Navas Oliveira Advogados / Oliveira Lawyers",
+      "status": "rejected",
+      "reason": "São Paulo office and OAB/SP admission confirmed (Diário OAB) but specific OAB/SP number not published on firm website — cannot record per brief rule"
+    },
+    {
+      "name": "Botinha & Cabral",
+      "status": "rejected",
+      "reason": "Partners registered OAB/MG (Minas Gerais) per LinkedIn; OAB/SP number not published or verifiable on either firm website"
+    },
+    {
+      "name": "Fragomen Brasil Serviços de Imigração Ltda.",
+      "status": "rejected",
+      "reason": "Self-declares 'operating exclusively as an immigration consultancy and not a law firm in Brazil' — no OAB registration"
+    },
+    {
+      "name": "Michelon Advocacia Internacional",
+      "status": "rejected",
+      "reason": "OAB/SP 416.578 confirmed; but practice is outbound (Brazilians emigrating to Italy/Portugal/USA) — not inbound expat/corporate relocation for foreigners in São Paulo"
+    },
+    {
+      "name": "Baracchini & Associates (braziluslaw.com)",
+      "status": "rejected",
+      "reason": "OAB/SP 212.246 confirmed; but practice is US immigration for Brazilians going to USA — not inbound immigration for foreigners relocating to Brazil"
+    }
+  ]
+}
