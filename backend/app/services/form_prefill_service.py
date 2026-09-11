@@ -257,6 +257,106 @@ def build_fill_plan(
 
 
 # ---------------------------------------------------------------------------
+# Choice groups — value → which radio/checkbox button to tick
+# ---------------------------------------------------------------------------
+# Some AcroForm fields are not text but a GROUP of independent checkboxes, one per
+# option (FR CERFA: applicantGenderM/F/Other; applicantMaritalCEL/MAR/SEP/DIV/VEU/AUT).
+# A single vault value (gender, marital_status) selects exactly ONE button — which the
+# scalar text pipeline (build_fill_plan) cannot express. These map a normalised vault
+# value to the one button to tick.
+
+# AcroForm on-state for an independent checkbox (reportlab's default export value).
+# VERIFY against the real CERFA PDF when it lands: a government form may use a custom
+# on-state name (e.g. "/1", "/On"); if so, record it per group rather than assuming "/Yes".
+CHECKBOX_ON = "/Yes"
+
+
+def _norm_choice(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value)).strip().lower()
+
+
+# Vault value → canonical option code. Tolerant of English/French and common synonyms.
+_GENDER_CODES = {
+    "m": "M", "male": "M", "man": "M", "homme": "M", "h": "M", "masculin": "M",
+    "f": "F", "female": "F", "woman": "F", "femme": "F", "feminin": "F", "féminin": "F",
+}
+_MARITAL_CODES = {
+    "single": "SINGLE", "celibataire": "SINGLE", "célibataire": "SINGLE", "unmarried": "SINGLE",
+    "married": "MARRIED", "marie": "MARRIED", "marié": "MARRIED", "mariee": "MARRIED", "mariée": "MARRIED",
+    "separated": "SEPARATED", "separe": "SEPARATED", "séparé": "SEPARATED",
+    "divorced": "DIVORCED", "divorce": "DIVORCED", "divorcé": "DIVORCED",
+    "widowed": "WIDOWED", "widow": "WIDOWED", "widower": "WIDOWED", "veuf": "WIDOWED", "veuve": "WIDOWED",
+}
+
+
+def _canonical_choice(vault_path: str, value: Any) -> Optional[str]:
+    n = _norm_choice(value)
+    if vault_path == "gender":
+        return _GENDER_CODES.get(n, "OTHER")
+    if vault_path == "marital_status":
+        return _MARITAL_CODES.get(n, "OTHER")
+    return None
+
+
+# form_id → vault_field_path → { canonical option code → button form_field_id }.
+# The button ids are the real FR CERFA AcroForm names (docs/form-autofill/artifacts/
+# fr_cerfa_14571-05_acroform_fields.json). Add a form's groups here to make its radios fillable.
+CHOICE_GROUPS: Dict[str, Dict[str, Dict[str, str]]] = {
+    "FR_cerfa_14571_v2024": {
+        "gender": {
+            "M": "applicantGenderM",
+            "F": "applicantGenderF",
+            "OTHER": "applicantGenderOther",
+        },
+        "marital_status": {
+            "SINGLE": "applicantMaritalCEL",
+            "MARRIED": "applicantMaritalMAR",
+            "SEPARATED": "applicantMaritalSEP",
+            "DIVORCED": "applicantMaritalDIV",
+            "WIDOWED": "applicantMaritalVEU",
+            "OTHER": "applicantMaritalAUT",
+        },
+    },
+}
+
+
+def build_choice_fill(
+    form_id: str,
+    profile: Dict[str, Any],
+) -> Tuple[Dict[str, str], List[FieldFillStatus]]:
+    """Resolve the radio/checkbox GROUPS declared for ``form_id`` from the vault profile.
+
+    Returns (button_values, report): ``button_values`` ticks exactly the selected button
+    (``{button_field_id: CHECKBOX_ON}``) and leaves the rest of the group untouched (so they
+    stay unchecked); ``report`` carries one row per group. A group whose vault value is missing
+    is reported STATUS_BLANK and ticks nothing — never guess a protected attribute.
+    """
+    groups = CHOICE_GROUPS.get(form_id, {})
+    button_values: Dict[str, str] = {}
+    report: List[FieldFillStatus] = []
+
+    for vault_path, code_to_button in groups.items():
+        raw = profile.get(vault_path)
+        if raw is None or (isinstance(raw, str) and raw.strip() == ""):
+            report.append(FieldFillStatus(
+                form_field_id=code_to_button.get("OTHER") or next(iter(code_to_button.values())),
+                vault_field_path=vault_path, label=vault_path, status=STATUS_BLANK, value=None,
+            ))
+            continue
+        code = _canonical_choice(vault_path, raw)
+        button = code_to_button.get(code) or code_to_button.get("OTHER")
+        if not button:
+            continue
+        button_values[button] = CHECKBOX_ON
+        report.append(FieldFillStatus(
+            form_field_id=button, vault_field_path=vault_path, label=vault_path,
+            status=STATUS_FILLED, value=code,
+        ))
+
+    return button_values, report
+
+
+# ---------------------------------------------------------------------------
 # AcroForm filling (pypdf)
 # ---------------------------------------------------------------------------
 
@@ -494,6 +594,11 @@ def generate_prefilled_pdf(
 
     field_values, report = build_fill_plan(mappings, employee_profile)
 
+    # Radio/checkbox groups (gender, marital status) — one vault value ticks one button.
+    choice_values, choice_report = build_choice_fill(form_id, employee_profile)
+    field_values.update(choice_values)
+    report.extend(choice_report)
+
     template_bytes = _download_template(form_id)
     pdf_bytes = fill_acroform(template_bytes, field_values)
 
@@ -518,11 +623,17 @@ def generate_prefilled_pdf(
 # Seed / test helper — synthetic AcroForm template
 # ---------------------------------------------------------------------------
 
-def build_synthetic_acroform(field_ids: List[str], title: str = "Synthetic immigration form") -> bytes:
-    """Generate a stand-in AcroForm PDF containing a text field per field_id.
+def build_synthetic_acroform(
+    field_ids: List[str],
+    title: str = "Synthetic immigration form",
+    checkbox_ids: Optional[List[str]] = None,
+) -> bytes:
+    """Generate a stand-in AcroForm PDF: a text field per ``field_ids`` plus a checkbox per
+    ``checkbox_ids`` (the choice-group buttons — see build_choice_fill). Its checkboxes use the
+    reportlab default on-state ``/Yes`` (== CHECKBOX_ON).
 
-    Used by the seed/upload script and tests until the real government PDFs are
-    available. The field NAMES match form_field_mappings.form_field_id so the
+    Used by the seed/upload script and tests until the real government PDFs are available. The
+    field NAMES match form_field_mappings.form_field_id / the CHOICE_GROUPS button ids so the
     same fill pipeline works unchanged when real templates replace these.
     """
     from reportlab.lib.pagesizes import A4
@@ -553,6 +664,23 @@ def build_synthetic_acroform(field_ids: List[str], title: str = "Synthetic immig
             borderStyle="inset",
             forceBorder=True,
             fontSize=9,
+        )
+        y -= 28
+
+    for cid in checkbox_ids or []:
+        if y < 80:
+            c.showPage()
+            c.setFont("Helvetica", 9)
+            y = height - 80
+        c.drawString(56, y + 3, cid)
+        form.checkbox(
+            name=cid,
+            x=240,
+            y=y - 4,
+            size=14,
+            borderStyle="solid",
+            forceBorder=True,
+            checked=False,
         )
         y -= 28
 
