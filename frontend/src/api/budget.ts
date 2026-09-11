@@ -12,7 +12,7 @@
 
 import api from './client';
 
-export type BudgetSummaryStatus = 'within_budget' | 'over_budget' | 'no_cap' | 'no_estimate';
+export type BudgetSummaryStatus = 'within_budget' | 'over_budget' | 'no_cap' | 'no_estimate' | 'not_comparable';
 
 export interface BudgetSummaryCategory {
   /** Service category key, e.g. 'housing', 'schools', 'movers'. */
@@ -44,6 +44,17 @@ export interface HrPolicyCap {
   notes: string | null;
 }
 
+/** [AIQ-2271] Remaining allowance after approved/paid expense claims. */
+export interface BudgetDrawdown {
+  benefit_key: string;
+  name: string;
+  cap_amount: number | null;
+  currency: string | null;
+  claimed_approved: number | null;
+  remaining: number | null;
+  status: BudgetSummaryStatus;
+}
+
 export interface BudgetSummaryResponse {
   case_id: string;
   categories: BudgetSummaryCategory[];
@@ -53,6 +64,8 @@ export interface BudgetSummaryResponse {
    * responses that predate the field.
    */
   hr_policy_caps?: HrPolicyCap[];
+  /** [AIQ-2271] Per-benefit remaining vs approved claims. */
+  drawdown?: BudgetDrawdown[];
 }
 
 export const budgetAPI = {

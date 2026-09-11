@@ -8,16 +8,15 @@ This module is the single source of truth for "which phases appear in a plan".
 It is a pure function with no side effects and no database access — safe to
 call from any context.
 
-Touch policy: this is a NEW FILE. It does not modify any existing module.
-Callers (plan generation routes, task library hydration) import from here.
-
 Phase ordering is preserved from PHASE_ORDER in relocation_plan_task_library.py:
-  pre_departure → immigration → logistics → arrival → post_arrival
+  pre_departure → immigration → logistics → arrival → post_arrival → return
 
 S3 suppression rules:
-  domestic_move     → suppress immigration
+  domestic_move      → suppress immigration
   short_term_project → suppress logistics + post_arrival
-  repatriation      → suppress immigration (replaced by admin_reinstatement)
+  repatriation       → suppress immigration; add the return phase at submit
+  lta / STA / other  → outbound phases only; return is appended by the
+                       6-month repatriation_planning_sweep, not at submit
 """
 
 from __future__ import annotations
@@ -25,8 +24,8 @@ from __future__ import annotations
 from typing import List, Optional
 
 
-# Canonical phase order — mirrors PHASE_ORDER in relocation_plan_task_library.py.
-# Do not reorder; task library hydration depends on this sequence.
+# Outbound phases — mirrors PHASE_ORDER minus ``return``. Return is additive
+# (repatriation submit, or the 6-month sweep) so it is not in this list.
 ALL_PHASES: List[str] = [
     "pre_departure",
     "immigration",
@@ -35,19 +34,20 @@ ALL_PHASES: List[str] = [
     "post_arrival",
 ]
 
-# Repatriation gets its own phase instead of immigration.
+# Standalone repatriation: outbound minus immigration, plus the return workstream.
 REPATRIATION_PHASES: List[str] = [
     "pre_departure",
-    "admin_reinstatement",   # French/home-country re-registration
     "logistics",
     "arrival",
     "post_arrival",
+    "return",
 ]
 
 # case_type → set of phases to suppress from ALL_PHASES
 _SUPPRESSED: dict = {
     "domestic_move":        {"immigration"},
     "short_term_project":   {"logistics", "post_arrival"},
+    "permanent_transfer":  {"return"},
 }
 
 
@@ -63,7 +63,7 @@ def active_phases_for_case_type(case_type: str) -> List[str]:
         ['pre_departure', 'immigration', 'arrival']
 
         >>> active_phases_for_case_type("repatriation")
-        ['pre_departure', 'admin_reinstatement', 'logistics', 'arrival', 'post_arrival']
+        ['pre_departure', 'logistics', 'arrival', 'post_arrival', 'return']
 
         >>> active_phases_for_case_type("lta")
         ['pre_departure', 'immigration', 'logistics', 'arrival', 'post_arrival']
@@ -114,4 +114,5 @@ def plan_scope_summary(case_type: str) -> dict:
         "immigration_required": "immigration" in phases,
         "logistics_included": "logistics" in phases,
         "post_arrival_included": "post_arrival" in phases,
+        "return_included": "return" in phases,
     }

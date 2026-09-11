@@ -55,12 +55,15 @@ FREE_MOVER_WAIVED_MILESTONE_TYPES: Final[FrozenSet[str]] = frozenset({
 
 
 # Global phase ordering (first → last in the journey).
+# ``return`` is last: a task whose phase_key is missing from this tuple is
+# silently dropped by group_tasks_by_phase — never add return tasks without it.
 PHASE_ORDER: Final[Tuple[str, ...]] = (
     "pre_departure",
     "immigration",
     "logistics",
     "arrival",
     "post_arrival",
+    "return",
 )
 
 # Human titles for phases (API / UI).
@@ -70,6 +73,7 @@ PHASE_TITLES: Final[Mapping[str, str]] = {
     "logistics": "Logistics",
     "arrival": "Arrival",
     "post_arrival": "Post-arrival",
+    "return": "Return & repatriation",
 }
 
 _PHASE_INDEX: Dict[str, int] = {k: i for i, k in enumerate(PHASE_ORDER)}
@@ -1048,11 +1052,215 @@ _TASK_LIBRARY_SEQ: Tuple[TaskLibraryEntry, ...] = (
         ),
         sequence_in_phase=1,
     ),
+
+    # ── Return / repatriation (Engine B). Content spec: roadmap_builder._build_return_track.
+    TaskLibraryEntry(
+        task_code="end_of_assignment_review",
+        milestone_type="task_return_review",
+        phase_key="return",
+        title="End-of-assignment review",
+        short_label="End-of-assignment review",
+        default_owner="hr",
+        priority="standard",
+        depends_on=(),
+        auto_completion_hint="manual",
+        why_this_matters=(
+            "HR and the employee plan the return: next role, timing, and what the return covers."
+        ),
+        instructions=(
+            "Confirm the assignment end date.",
+            "Agree the return or onward-transfer destination.",
+            "Review return entitlements in the policy.",
+        ),
+        required_inputs=(),
+        sequence_in_phase=10,
+    ),
+    TaskLibraryEntry(
+        task_code="arrange_return_shipment",
+        milestone_type="task_return_shipment",
+        phase_key="return",
+        title="Return move & storage release",
+        short_label="Return shipment",
+        default_owner="employee",
+        priority="standard",
+        depends_on=("end_of_assignment_review",),
+        auto_completion_hint="manual",
+        why_this_matters="Book the return shipment and release anything left in storage at origin.",
+        instructions=(
+            "Get return-move quotes.",
+            "Schedule packing and shipment.",
+            "Release goods from storage.",
+        ),
+        required_inputs=(),
+        sequence_in_phase=20,
+    ),
+    TaskLibraryEntry(
+        task_code="host_tax_exit",
+        milestone_type="task_return_host_tax",
+        phase_key="return",
+        title="File the final host-country tax return",
+        short_label="Host tax exit",
+        default_owner="employee",
+        priority="critical",
+        depends_on=("end_of_assignment_review",),
+        auto_completion_hint="manual",
+        why_this_matters="Settle the final host-country tax filing before leaving.",
+        instructions=(
+            "File the final host-country tax return.",
+            "Confirm tax-residence status on departure.",
+        ),
+        required_inputs=(),
+        sequence_in_phase=30,
+    ),
+    TaskLibraryEntry(
+        task_code="host_deregistration",
+        milestone_type="task_return_host_dereg",
+        phase_key="return",
+        title="De-register locally in the host country",
+        short_label="Host de-registration",
+        default_owner="employee",
+        priority="standard",
+        depends_on=("end_of_assignment_review",),
+        auto_completion_hint="manual",
+        why_this_matters="De-register your address / residence and close or convert local accounts.",
+        instructions=(
+            "De-register your address / residence.",
+            "Close or convert local accounts and utilities.",
+        ),
+        required_inputs=(),
+        sequence_in_phase=40,
+    ),
+    TaskLibraryEntry(
+        task_code="home_reregistration",
+        milestone_type="task_return_home_reg",
+        phase_key="return",
+        title="Re-register in the home country",
+        short_label="Home re-registration",
+        default_owner="employee",
+        priority="standard",
+        depends_on=("end_of_assignment_review",),
+        auto_completion_hint="manual",
+        why_this_matters="Re-establish home-country residence: address, healthcare, and tax residence.",
+        instructions=(
+            "Re-register your address.",
+            "Re-activate home healthcare cover.",
+            "Confirm tax-residence status on return.",
+        ),
+        required_inputs=(),
+        sequence_in_phase=50,
+    ),
+    TaskLibraryEntry(
+        task_code="social_security_reentry",
+        milestone_type="task_return_social",
+        phase_key="return",
+        title="Social security & pension switch-back",
+        short_label="Social security re-entry",
+        default_owner="employee",
+        priority="standard",
+        depends_on=("end_of_assignment_review",),
+        auto_completion_hint="manual",
+        why_this_matters=(
+            "Move social-security and pension cover back to the home scheme; close any A1 / "
+            "certificate of coverage."
+        ),
+        instructions=(
+            "Notify the home social-security scheme.",
+            "Confirm pension continuity across the assignment.",
+            "Close the A1 / certificate of coverage.",
+        ),
+        required_inputs=(),
+        sequence_in_phase=60,
+    ),
+    TaskLibraryEntry(
+        task_code="lease_deposit_closure",
+        milestone_type="task_return_lease",
+        phase_key="return",
+        title="Close the host-country lease and recover the deposit",
+        short_label="Lease / deposit",
+        default_owner="employee",
+        priority="standard",
+        depends_on=("end_of_assignment_review",),
+        auto_completion_hint="manual",
+        why_this_matters="End the host lease on the assignment end date and recover the deposit.",
+        instructions=(
+            "Give notice per the lease.",
+            "Schedule the check-out inspection.",
+            "Track deposit return.",
+        ),
+        required_inputs=(),
+        sequence_in_phase=70,
+    ),
+    TaskLibraryEntry(
+        task_code="benefits_reinstatement",
+        milestone_type="task_return_benefits",
+        phase_key="return",
+        title="Reinstate home-country benefits",
+        short_label="Benefits reinstatement",
+        default_owner="joint",
+        priority="standard",
+        depends_on=("end_of_assignment_review",),
+        auto_completion_hint="manual",
+        why_this_matters="Payroll, healthcare, and pension need to switch back to the home scheme.",
+        instructions=(
+            "HR confirms payroll country switch.",
+            "Re-enrol in home healthcare / benefits.",
+        ),
+        required_inputs=(),
+        sequence_in_phase=80,
+    ),
+    TaskLibraryEntry(
+        task_code="career_reintegration",
+        milestone_type="task_return_career",
+        phase_key="return",
+        title="Career reintegration",
+        short_label="Career reintegration",
+        default_owner="joint",
+        priority="standard",
+        depends_on=("end_of_assignment_review",),
+        auto_completion_hint="manual",
+        why_this_matters="Agree the next role and reporting line before the employee lands home.",
+        instructions=(
+            "Confirm the receiving manager and role.",
+            "Schedule the reintegration conversation.",
+        ),
+        required_inputs=(),
+        sequence_in_phase=90,
+    ),
+    TaskLibraryEntry(
+        task_code="return_case_closeout",
+        milestone_type="task_return_closeout",
+        phase_key="return",
+        title="Return case close-out",
+        short_label="Return close-out",
+        default_owner="hr",
+        priority="standard",
+        depends_on=(
+            "arrange_return_shipment",
+            "host_tax_exit",
+            "host_deregistration",
+            "home_reregistration",
+            "social_security_reentry",
+            "lease_deposit_closure",
+            "benefits_reinstatement",
+            "career_reintegration",
+        ),
+        auto_completion_hint="manual",
+        why_this_matters="HR marks the assignment as repatriated and archives the return record.",
+        instructions=("Confirm all return steps are complete and close the case.",),
+        required_inputs=(),
+        sequence_in_phase=100,
+    ),
     # ─────────────────────────────────────────────────────────────────────────
 )
 
 TASK_BY_CODE: Dict[str, TaskLibraryEntry] = {t.task_code: t for t in _TASK_LIBRARY_SEQ}
 TASK_BY_MILESTONE_TYPE: Dict[str, TaskLibraryEntry] = {t.milestone_type: t for t in _TASK_LIBRARY_SEQ}
+
+#: Stable set used by the 6-month sweep and compute_default_milestones to gate
+#: the return phase without iterating PHASE_ORDER at call sites.
+RETURN_MILESTONE_TYPES: Final[FrozenSet[str]] = frozenset(
+    t.milestone_type for t in _TASK_LIBRARY_SEQ if t.phase_key == "return"
+)
 
 # Representative per-task-type effort estimate (the "~10 min" shown on the roadmap).
 # Library-level approximations (always rendered with a "~"), not per-case data.
@@ -1104,6 +1312,17 @@ _ESTIMATED_EFFORT: Final[Mapping[str, str]] = {
     "uk_biometric_appointment": "~20 min",
     "uk_brp_collection": "~20 min",
     "uk_right_to_work_check": "~15 min",
+    # Return / repatriation
+    "end_of_assignment_review": "~1 hour",
+    "arrange_return_shipment": "~45 min",
+    "host_tax_exit": "~2 hours",
+    "host_deregistration": "~30 min",
+    "home_reregistration": "~30 min",
+    "social_security_reentry": "~45 min",
+    "lease_deposit_closure": "~30 min",
+    "benefits_reinstatement": "~30 min",
+    "career_reintegration": "~1 hour",
+    "return_case_closeout": "~15 min",
 }
 
 

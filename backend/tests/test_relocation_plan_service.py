@@ -63,6 +63,16 @@ class RelocationPlanLibraryTests(unittest.TestCase):
             "task_uk_biometric_appointment",
             "task_uk_brp_collection",
             "task_uk_right_to_work_check",
+            "task_return_review",
+            "task_return_shipment",
+            "task_return_host_tax",
+            "task_return_host_dereg",
+            "task_return_home_reg",
+            "task_return_social",
+            "task_return_lease",
+            "task_return_benefits",
+            "task_return_career",
+            "task_return_closeout",
         }
         expected = expected_core | expected_extended
         actual = set(TASK_BY_MILESTONE_TYPE.keys())

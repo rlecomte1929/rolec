@@ -28,6 +28,7 @@ SERVICE_KEY_TO_BACKEND: Dict[str, str] = {
     "insurances": "insurance",
     "electricity": "electricity",
     "pets": "pets",
+    "spouse": "partner_career",
 }
 
 # A frontend service can fan out to more than one backend category. "Housing" surfaces
@@ -161,6 +162,20 @@ def _apply_service_shaping(
         out["coverage_types"] = cov_list if cov_list else ["health"]
         out.pop("insurance_type", None)
 
+    elif service_key == "spouse":
+        spouse = out.pop("_spouse", None) or {}
+        if isinstance(spouse, dict):
+            if not out.get("employment"):
+                emp = spouse.get("employment")
+                if emp:
+                    out["employment"] = emp
+            if not out.get("language_level"):
+                lang = spouse.get("languageLevel") or spouse.get("language_level")
+                if lang:
+                    out["language_level"] = lang
+            if "wants_to_work" not in out and "wantsToWork" in spouse:
+                out["wants_to_work"] = spouse.get("wantsToWork")
+
     return out
 
 
@@ -223,6 +238,12 @@ def build_criteria_for_assignment(
         "ins_family": "family_coverage",
         "elec_green": "green_preference",
         "elec_flex": "contract_flexibility",
+        "pet_species": "species",
+        "pet_count": "count",
+        "pet_specific_needs": "specific_needs",
+        "spouse_employment": "employment",
+        "spouse_language": "language_level",
+        "spouse_wants_to_work": "wants_to_work",
     }
     result: Dict[str, Dict[str, Any]] = {}
 
@@ -271,6 +292,12 @@ def build_criteria_for_assignment(
         # duplicate free-text question; keep any legacy answer as fallback.
         if svc_key == "housing" and office_address_case:
             criteria["office_address"] = office_address_case
+
+        if svc_key == "spouse":
+            fam = case_context.get("familyMembers") or {}
+            spouse = fam.get("spouse") if isinstance(fam, dict) else None
+            if isinstance(spouse, dict):
+                criteria["_spouse"] = spouse
 
         criteria = _apply_service_shaping(svc_key, criteria)
         result[backend_key] = criteria

@@ -133,6 +133,8 @@ def intake_draft_to_case_draft(data: Optional[Dict[str, Any]]) -> Dict[str, Any]
             {
                 "fullName": _s(partner.get("name")),
                 "wantsToWork": True if partner.get("needs_work_permit") == "yes" else None,
+                "employment": _s(partner.get("employment")),
+                "languageLevel": _s(partner.get("lang_level")),
             }
         )
 

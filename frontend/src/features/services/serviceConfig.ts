@@ -59,7 +59,7 @@ export const SERVICE_CONFIG: ServiceItem[] = [
   { key: 'community', title: 'Community / integration', description: 'Connect with local communities', icon: '🤝', group: 'settle', enabled: false },
   { key: 'drivers_license', title: "Driver's license exchange", description: 'Convert your license for local use', icon: '🪪', group: 'settle', enabled: false },
   { key: 'language', title: 'Language courses', description: 'Learn the local language', icon: '📚', group: 'settle', enabled: false },
-  { key: 'spouse', title: 'Spouse support', description: 'Employment and integration for partners', icon: '💼', group: 'settle', enabled: false },
+  { key: 'spouse', title: 'Spouse support', description: 'Employment and integration for partners', icon: '💼', group: 'settle', enabled: true, backendKey: 'partner_career' },
   { key: 'transport', title: 'Transportation pass', description: 'Public transport and mobility', icon: '🚌', group: 'settle', enabled: false },
 ];
 
@@ -87,6 +87,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   banks: 'Banks',
   insurances: 'Insurances',
   electricity: 'Electricity',
+  partner_career: 'Partner career support',
 };
 
 /**
@@ -115,6 +116,20 @@ const BACKEND_KEY_TO_CANONICAL: Record<string, string> = {
  *  Unknown/already-canonical values pass through unchanged. */
 export function canonicalServiceKey(category: string): string {
   return BACKEND_KEY_TO_CANONICAL[category] ?? category;
+}
+
+/** Service keys that participate in Preferences + Recommendations (enabled + backend plugin). */
+export const WIZARD_SERVICE_KEYS: ServiceKey[] = SERVICE_CONFIG.filter(
+  (s) => s.enabled && Boolean(s.backendKey),
+).map((s) => s.key);
+
+/** Enabled catalog tiles for this household. Spouse is hidden unless a partner exists. */
+export function enabledServicesForHousehold(hasPartner: boolean): ServiceItem[] {
+  return SERVICE_CONFIG.filter((svc) => {
+    if (!svc.enabled) return false;
+    if (svc.key === 'spouse' && !hasPartner) return false;
+    return true;
+  });
 }
 
 /** The backendKey(s) a canonical key is known by — the inverse of canonicalServiceKey.

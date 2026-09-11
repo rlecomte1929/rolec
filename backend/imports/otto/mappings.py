@@ -363,7 +363,6 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
             else f"pillar={pillar} from domain_area='immigration'"
         ),
         f"severity={DEFAULT_SEVERITY} (not derivable from Otto's schema; a human raises it)",
-        f"owner={DEFAULT_OWNER} (employee-obtained document)",
         f"purpose={purpose} from applies_to.status={status!r}",
         f"nationality classes {classes} from applies_to.nationality={nationality!r}",
     ]
@@ -418,6 +417,34 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
     if timing:
         derivations.append("timing from a contributing fact's applies_to")
 
+    owner = DEFAULT_OWNER
+    stated_owner = next(
+        (str(o).strip().upper() for f in facts
+         if (o := (f.applies_to or {}).get("owner")) and str(o).strip()),
+        None,
+    )
+    if stated_owner:
+        owner = stated_owner
+        derivations.append(f"owner={owner} from a contributing fact's applies_to")
+    else:
+        derivations.append(
+            f"owner={DEFAULT_OWNER} (employee-obtained document)"
+        )
+
+    regimes_json = None
+    stated_regimes = next(
+        ((f.applies_to or {}).get("regimes") for f in facts
+         if (f.applies_to or {}).get("regimes")),
+        None,
+    )
+    if stated_regimes:
+        if isinstance(stated_regimes, str):
+            stated_regimes = [stated_regimes]
+        regimes = [str(x).strip().lower() for x in stated_regimes if str(x).strip()]
+        if regimes:
+            regimes_json = json.dumps(regimes)
+            derivations.append(f"applies_to_regimes={regimes} from a contributing fact's applies_to")
+
     payload = {
         "country_code": country_code,
         "purpose": purpose,
@@ -425,7 +452,7 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
         "title": entity.title,
         "description": compose_description(facts),
         "severity": DEFAULT_SEVERITY,
-        "owner": DEFAULT_OWNER,
+        "owner": owner,
         "required_fields_json": "[]",
         "citations_json": json.dumps(citations, ensure_ascii=False),
         "applies_to_nationality_classes_json": json.dumps(classes),
@@ -438,6 +465,8 @@ def resolve(entity: Any, facts: Sequence[Any]) -> Union[RequirementDraft, Unmapp
     # citations_json guard there exists to prevent.
     if timing:
         payload["timing"] = timing
+    if regimes_json:
+        payload["applies_to_regimes_json"] = regimes_json
 
     return RequirementDraft(
         topic_key=topic,

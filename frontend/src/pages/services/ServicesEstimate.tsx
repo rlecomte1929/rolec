@@ -10,6 +10,8 @@ import { useServicesMoveBanner } from '../../features/services/useServicesMoveBa
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { BudgetSummaryTable } from '../../features/services/BudgetSummaryTable';
 import { HrPolicyCapsSection } from '../../features/services/HrPolicyCapsSection';
+import { ClaimRemainingBar } from '../../features/services/ClaimRemainingBar';
+import { ExpenseClaimForm } from '../../features/services/ExpenseClaimForm';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { buildRoute, type RouteKey } from '../../navigation/routes';
@@ -25,6 +27,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   banks: 'Banks',
   insurance: 'Insurance',
   electricity: 'Electricity',
+  pets: 'Pets',
+  partner_career: 'Partner career support',
 };
 
 export const ServicesEstimate: React.FC = () => {
@@ -134,6 +138,12 @@ export const ServicesEstimate: React.FC = () => {
           .
         </p>
       </Alert>
+      {assignmentId && (
+        <ClaimRemainingBar caseId={assignmentId} className="mb-6" />
+      )}
+      {assignmentId && (
+        <ExpenseClaimForm caseId={assignmentId} />
+      )}
       {/* AIQ-280: policy caps overview at the top — independent of shortlist
           state. PackageSummary below this still renders the per-shortlist-item
           cap comparison; this table answers the "what are my caps?" question

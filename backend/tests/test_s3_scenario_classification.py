@@ -263,7 +263,7 @@ class TestScenario7CamilleRepat:
     """
     Camille, 38, French. Returning to France from Madrid. Month 30 of 18-month LTA.
 
-    Expected: repatriation classification. No immigration phase. admin_reinstatement instead.
+    Expected: repatriation classification. No immigration phase. ``return`` instead.
     """
 
     def test_case_type_is_repatriation(self):
@@ -288,9 +288,10 @@ class TestScenario7CamilleRepat:
         phases = active_phases_for_case_type("repatriation")
         assert "immigration" not in phases
 
-    def test_admin_reinstatement_in_phases(self):
+    def test_return_phase_in_phases(self):
         phases = active_phases_for_case_type("repatriation")
-        assert "admin_reinstatement" in phases
+        assert "return" in phases
+        assert "admin_reinstatement" not in phases
 
 
 # ─── Backward-compatibility: legacy employment_type path ─────────────────────

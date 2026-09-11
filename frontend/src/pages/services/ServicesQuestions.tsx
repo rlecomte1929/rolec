@@ -12,7 +12,7 @@ import { servicesAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { ROUTE_DEFS, buildRoute, type RouteKey } from '../../navigation/routes';
-import type { ServiceKey } from '../../features/services/serviceConfig';
+import { WIZARD_SERVICE_KEYS, type ServiceKey } from '../../features/services/serviceConfig';
 import { recommendationsEngineAPI } from '../../features/recommendations/api';
 import { caseIdForAssignment, parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
@@ -113,13 +113,8 @@ export const ServicesQuestions: React.FC = () => {
   }, []);
 
   const wizardServices = useMemo(
-    () =>
-      new Set(
-        Array.from(selectedServices).filter((k) =>
-          ['housing', 'schools', 'movers', 'banks', 'insurances', 'electricity', 'pets'].includes(k)
-        )
-      ),
-    [selectedServices]
+    () => new Set(Array.from(selectedServices).filter((k) => WIZARD_SERVICE_KEYS.includes(k))),
+    [selectedServices],
   );
 
   const questionsFallbackKey = useMemo(

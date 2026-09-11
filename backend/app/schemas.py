@@ -33,6 +33,8 @@ class FamilyMemberDTO(BaseModel):
     relationship: Optional[str] = None
     nationality: Optional[str] = None
     wantsToWork: Optional[bool] = None
+    employment: Optional[str] = None
+    languageLevel: Optional[str] = None
 
 
 class FamilyMembersDTO(BaseModel):
@@ -58,6 +60,19 @@ class AssignmentContextDTO(BaseModel):
     # AIQ-1603: single-select preferred commute mode, validated against a fixed enum so an
     # invalid value is a 422 (not silent bad data). Bridged onto public.cases.commute_preference.
     commutePreference: Optional[str] = None
+    # posted = stay on home-country social security (A1 / CoC); local = host scheme;
+    # unknown = not yet decided. Extra="ignore" on CaseDraftDTO would drop this otherwise.
+    socialSecurityRegime: Optional[str] = None
+
+    @field_validator("socialSecurityRegime")
+    @classmethod
+    def _valid_ss_regime(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        allowed = {"posted", "local", "unknown"}
+        if v not in allowed:
+            raise ValueError(f"socialSecurityRegime must be one of {sorted(allowed)}")
+        return v
 
     @field_validator("commutePreference")
     @classmethod
@@ -140,6 +155,9 @@ class RequirementItemDTO(BaseModel):
     # Free-text deadline verbatim from the source ("within 8 days of arrival"). None
     # when the source states no deadline.
     timing: Optional[str] = None
+    # Optional JSON-array projection: which social-security regimes this row applies to.
+    # None ⇒ every regime (fail-open).
+    appliesToRegimes: Optional[List[str]] = None
     # Counsel attestation — ORTHOGONAL to verificationStatus, never a rung on the same
     # ladder. That one is our own provenance (representative -> corpus_grounded ->
     # verified); this is external legal sign-off. models.py says it plainly: "Sellable
@@ -218,6 +236,7 @@ class AdminRequirementReviewDTO(BaseModel):
     # serves a third-country visa track to an EU free mover.
     appliesToNationalityClasses: Optional[List[str]] = None
     appliesToAssignmentTypes: Optional[List[str]] = None
+    appliesToRegimes: Optional[List[str]] = None
     citations: List[AdminCitationDTO] = []
     lastVerifiedAt: Optional[datetime] = None
     # Counsel attestation — ORTHOGONAL to verificationStatus, never a rung on the same

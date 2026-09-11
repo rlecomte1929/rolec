@@ -209,6 +209,7 @@ from .app.recommendations.router import router as recommendations_router
 from .app.recommendations.admin_debug import router as admin_recommendations_debug_router
 from .app.routers import suppliers as suppliers_router
 from .app.routers import exception_requests as exception_requests_router
+from .app.routers import expense_claims as expense_claims_router  # [AIQ-2271]
 from .app.routers import services_state as services_state_router
 from .app.routers import admin_catalog as admin_catalog_router
 from .app.routers import hr_catalog as hr_catalog_router
@@ -258,6 +259,7 @@ from .app.routers import relocation_profile as relocation_profile_router
 from .app.routers import rules as rules_router
 from .app.routers import marketplace as marketplace_router
 from .app.routers import hr_analytics as hr_analytics_router
+from .app.routers import hr_duty_of_care as hr_duty_of_care_router  # AIQ-2268 — GET /api/hr/duty-of-care
 from .app.routers import hr_case_summary as hr_case_summary_router  # AIQ-1697 — AI case summary proxy (dual-layer per CLAUDE.md)
 from .app.routers import hr_onboarding as hr_onboarding_router  # AIQ-1223c — onboarding inference (dual-layer per CLAUDE.md)
 from .app.routers import setup_assistant as setup_assistant_router  # Setup & Help Assistant — read-only setup-status (dual-layer per CLAUDE.md)
@@ -280,6 +282,7 @@ from .app.routers import attestation as attestation_router  # counsel attestatio
 from .app.routers import geocoding as geocoding_router  # [AIQ-1607] address autocomplete proxy
 from .app.routers import test_drive as test_drive_router  # TD-2 (AIQ-1420) test-drive provisioning
 from .app.services.question_engine import generate_questions
+from .app.recommendations.criteria_builder import SERVICE_KEY_TO_BACKEND
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
 
@@ -857,6 +860,7 @@ app.include_router(admin_corrections_router.router)  # [AIQ-554] GET /api/admin/
 app.include_router(admin_reconciliation_router.router)  # WS1 1.5 — /api/admin/reconciliation (before remaining inline /api/admin/*)
 app.include_router(crons_router.router)  # [P4-4] cron endpoints
 app.include_router(exception_requests_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(expense_claims_router.router)  # [AIQ-2271] expense claims ledger
 app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
 app.include_router(hr_company_invites_router.router)  # [AIQ-2094] HR raises a colleague invite
@@ -8952,6 +8956,7 @@ def _services_case_context(case_id: str) -> "tuple[Dict[str, Any], Optional[str]
         "destCountry": basics.get("destCountry") or dest_country,
         "originCity": basics.get("originCity") or origin_city,
         "originCountry": origin_country or basics.get("originCountry"),
+        "familyMembers": draft.get("familyMembers") or {},
     }
     # AIQ-1649: fill anything still missing from the relocation_cases row, so a case
     # whose destination lives there (no intake yet) does not falsely read as missing.
@@ -8998,7 +9003,7 @@ def get_services_context(
     selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
     if not selected_keys and fallback_services:
         fallback = [k.strip().lower() for k in fallback_services.split(",") if k.strip()]
-        valid = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
+        valid = set(SERVICE_KEY_TO_BACKEND)
         selected_keys = [k for k in fallback if k in valid]
 
     # AIQ-1649: case context (dest/origin) + target date via the shared helper, which
@@ -9131,7 +9136,7 @@ def get_service_questions(
     # Fallback: when DB has none but frontend passed selection (handles save race / direct visit)
     if not selected_keys and fallback_services:
         fallback = [k.strip().lower() for k in fallback_services.split(",") if k.strip()]
-        valid = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
+        valid = set(SERVICE_KEY_TO_BACKEND)
         selected_keys = [k for k in fallback if k in valid]
     if not selected_keys:
         return {"questions": [], "selected_services": []}
@@ -15519,6 +15524,7 @@ app.include_router(rules_router.router)
 app.include_router(marketplace_router.router)  # [AUDIT-C2.3 restore]
 # GAP 3: HR policy compliance matrix (cross-case heatmap for S5c)
 app.include_router(hr_analytics_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(hr_duty_of_care_router.router)  # AIQ-2268 — GET /api/hr/duty-of-care (dual-layer)
 app.include_router(hr_case_summary_router.router)  # AIQ-1697 — AI case summary proxy
 app.include_router(hr_onboarding_router.router)  # AIQ-1223c — deterministic onboarding inference
 # GAP 4: Immigration advisor matching

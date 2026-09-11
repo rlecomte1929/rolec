@@ -44,6 +44,7 @@ class ChecklistItem(BaseModel):
     timing: Optional[str] = None
     completed: bool = False
     completedAt: Optional[str] = None
+    filingStatus: Optional[str] = None
 
 
 class ChecklistView(BaseModel):
@@ -62,6 +63,7 @@ class ChecklistView(BaseModel):
 class ChecklistToggle(BaseModel):
     requirement_id: str = Field(..., min_length=1, max_length=200)
     completed: bool
+    filing_status: Optional[str] = None
 
 
 def _build_view(case_id: str) -> ChecklistView:
@@ -84,6 +86,7 @@ def _build_view(case_id: str) -> ChecklistView:
                 timing=getattr(req, "timing", None),
                 completed=bool(stored.get("completed")),
                 completedAt=stored.get("completed_at"),
+                filingStatus=stored.get("filing_status"),
             )
         )
 
@@ -138,10 +141,17 @@ def set_checklist_item(
             detail="That requirement is not part of this case's checklist.",
         )
 
+    if body.filing_status is not None and body.filing_status not in checklist_store.FILING_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail="filing_status must be one of: " + ", ".join(checklist_store.FILING_STATUSES),
+        )
+
     checklist_store.set_state(
         case_id=resolved_case_id,
         requirement_id=body.requirement_id,
         completed=body.completed,
         actor_id=user.get("id"),
+        filing_status=body.filing_status,
     )
     return _build_view(resolved_case_id)

@@ -1,6 +1,7 @@
 """Timeline / operational relocation tasks — defaults from case context + summary helpers."""
 from __future__ import annotations
 
+import calendar
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -259,6 +260,99 @@ OPERATIONAL_TASK_DEFAULTS: List[Dict[str, Any]] = [
         "sort_order": 80,
         "days_after_move": 21,
     },
+    # Return / repatriation — dates anchored on assignment end, not move date.
+    # Seeded at submit only when contract_type=repatriation; otherwise the
+    # 6-month sweep appends these rows when today is in [end-182d, end).
+    {
+        "milestone_type": "task_return_review",
+        "title": "End-of-assignment review",
+        "description": "HR and the employee plan the return: next role, timing, and what the return covers.",
+        "owner": "hr",
+        "criticality": "normal",
+        "sort_order": 200,
+        "days_before_end": 182,
+    },
+    {
+        "milestone_type": "task_return_shipment",
+        "title": "Return move & storage release",
+        "description": "Book the return shipment and release anything left in storage at origin.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 210,
+        "days_before_end": 56,
+    },
+    {
+        "milestone_type": "task_return_host_tax",
+        "title": "File the final host-country tax return",
+        "description": "Settle the final host-country tax filing before leaving.",
+        "owner": "employee",
+        "criticality": "critical",
+        "sort_order": 220,
+        "days_before_end": 42,
+    },
+    {
+        "milestone_type": "task_return_host_dereg",
+        "title": "De-register locally in the host country",
+        "description": "De-register your address / residence and close or convert local accounts.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 230,
+        "days_before_end": 28,
+    },
+    {
+        "milestone_type": "task_return_lease",
+        "title": "Close the host-country lease and recover the deposit",
+        "description": "End the host lease on the assignment end date and recover the deposit.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 240,
+        "days_before_end": 30,
+    },
+    {
+        "milestone_type": "task_return_home_reg",
+        "title": "Re-register in the home country",
+        "description": "Re-establish home-country residence: address, healthcare, and tax residence.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 250,
+        "days_after_end": 14,
+    },
+    {
+        "milestone_type": "task_return_social",
+        "title": "Social security & pension switch-back",
+        "description": "Move social-security and pension cover back to the home scheme; close any A1 / certificate of coverage.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 260,
+        "days_after_end": 21,
+    },
+    {
+        "milestone_type": "task_return_benefits",
+        "title": "Reinstate home-country benefits",
+        "description": "Payroll, healthcare, and pension need to switch back to the home scheme.",
+        "owner": "joint",
+        "criticality": "normal",
+        "sort_order": 270,
+        "days_before_end": 14,
+    },
+    {
+        "milestone_type": "task_return_career",
+        "title": "Career reintegration",
+        "description": "Agree the next role and reporting line before the employee lands home.",
+        "owner": "joint",
+        "criticality": "normal",
+        "sort_order": 280,
+        "days_before_end": 90,
+    },
+    {
+        "milestone_type": "task_return_closeout",
+        "title": "Return case close-out",
+        "description": "HR marks the assignment as repatriated and archives the return record.",
+        "owner": "hr",
+        "criticality": "normal",
+        "sort_order": 290,
+        "days_after_end": 0,
+    },
 ]
 
 # Stable milestone_type → title for cross-linking from HR readiness / intake (keep in sync with OPERATIONAL_TASK_DEFAULTS).
@@ -267,6 +361,85 @@ TRACKER_TASK_TITLES: Dict[str, str] = {
     for row in OPERATIONAL_TASK_DEFAULTS
     if isinstance(row, dict) and row.get("milestone_type") and row.get("title")
 }
+
+
+def add_months(d: date, months: int) -> date:
+    """Calendar-month addition that clamps the day to the target month's last day."""
+    y = d.year + (d.month - 1 + months) // 12
+    m = (d.month - 1 + months) % 12 + 1
+    last = calendar.monthrange(y, m)[1]
+    return date(y, m, min(d.day, last))
+
+
+def derive_assignment_end_date(
+    start: Optional[date],
+    months: Optional[int],
+) -> Optional[date]:
+    """assignment_end_date = start + expectedDurationMonths. Never defaults to today."""
+    if start is None or months is None or int(months) <= 0:
+        return None
+    return add_months(start, int(months))
+
+
+def _parse_date_value(value: Any) -> Optional[date]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        text = str(value).strip()
+        if not text:
+            return None
+        if "T" in text:
+            return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+        return datetime.strptime(text[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def parse_assignment_start_from_draft(case_draft: Optional[Dict[str, Any]]) -> Optional[date]:
+    draft = case_draft or {}
+    ac = draft.get("assignmentContext") or {}
+    assignment = draft.get("assignment") or {}
+    for value in (
+        assignment.get("startDate"),
+        assignment.get("start_date"),
+        ac.get("contractStartDate"),
+        ac.get("startDate"),
+        (draft.get("relocationBasics") or {}).get("targetMoveDate"),
+        (draft.get("relocationBasics") or {}).get("target_move_date"),
+    ):
+        parsed = _parse_date_value(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def parse_expected_duration_months(case_draft: Optional[Dict[str, Any]]) -> Optional[int]:
+    draft = case_draft or {}
+    ac = draft.get("assignmentContext") or {}
+    assignment = draft.get("assignment") or {}
+    raw = ac.get("expectedDurationMonths")
+    if raw is None:
+        raw = assignment.get("expectedDurationMonths")
+    try:
+        months = int(raw) if raw is not None and str(raw).strip() != "" else None
+    except (TypeError, ValueError):
+        return None
+    return months if months is not None and months > 0 else None
+
+
+def _parse_assignment_end(case_draft: Optional[Dict[str, Any]]) -> Optional[datetime]:
+    """End-date datetime for return-task anchors. None when start or duration is missing."""
+    end = derive_assignment_end_date(
+        parse_assignment_start_from_draft(case_draft),
+        parse_expected_duration_months(case_draft),
+    )
+    if end is None:
+        return None
+    return datetime(end.year, end.month, end.day)
 
 
 def _parse_move_anchor(case_draft: Optional[Dict[str, Any]], target_move_date: Optional[str]) -> Optional[datetime]:
@@ -540,6 +713,42 @@ def _corridor_milestones(
     return rows, supersedes
 
 
+def build_return_milestones(end: Optional[date]) -> List[Dict[str, Any]]:
+    """Return-phase operational rows, optionally dated from ``end``.
+
+    Used by ``compute_default_milestones`` (via OPERATIONAL_TASK_DEFAULTS) and
+    by the 6-month sweep so both writers share one spec list.
+    """
+    end_dt = datetime(end.year, end.month, end.day) if end is not None else None
+    rows: List[Dict[str, Any]] = []
+    for spec in OPERATIONAL_TASK_DEFAULTS:
+        mt = str(spec["milestone_type"])
+        if not mt.startswith("task_return_"):
+            continue
+        target: Optional[str] = None
+        if end_dt is not None:
+            dbe = spec.get("days_before_end")
+            dae = spec.get("days_after_end")
+            if dbe is not None:
+                target = (end_dt - timedelta(days=int(dbe))).strftime("%Y-%m-%d")
+            elif dae is not None:
+                target = (end_dt + timedelta(days=int(dae))).strftime("%Y-%m-%d")
+        rows.append(
+            {
+                "milestone_type": mt,
+                "title": spec["title"],
+                "description": spec.get("description"),
+                "sort_order": spec["sort_order"],
+                "target_date": target,
+                "status": "pending",
+                "owner": spec.get("owner", "joint"),
+                "criticality": spec.get("criticality", "normal"),
+                "notes": None,
+            }
+        )
+    return rows
+
+
 def compute_default_milestones(
     case_id: str,
     case_draft: Optional[Dict[str, Any]] = None,
@@ -586,10 +795,19 @@ def compute_default_milestones(
             _task_by_mt = {}
 
     def _phase_allowed(milestone_type: str) -> bool:
-        """Return True if this milestone_type's phase is in the active set (or if unknown)."""
+        """Return True if this milestone_type's phase is in the active set (or if unknown).
+
+        Return-phase tasks are NEVER fail-open: without an explicit ``return`` in
+        active_phases they would clutter every outbound LTA at submit.
+        """
+        entry = _task_by_mt.get(milestone_type)  # type: ignore[name-defined]
+        is_return = (entry is not None and entry.phase_key == "return") or str(
+            milestone_type
+        ).startswith("task_return_")
+        if is_return:
+            return active_phases is not None and "return" in active_phases
         if active_phases is None:
             return True
-        entry = _task_by_mt.get(milestone_type)  # type: ignore[name-defined]
         if entry is None:
             return True   # unknown milestone_type → fail open
         return entry.phase_key in active_phases
@@ -624,6 +842,8 @@ def compute_default_milestones(
     # showing only the generic one — the employee cannot tell which is real.
     corridor_rows, superseded_generic = _corridor_milestones(case_draft)
 
+    end_anchor = _parse_assignment_end(case_draft)
+
     result: List[Dict[str, Any]] = []
     for spec in OPERATIONAL_TASK_DEFAULTS:
         mt = spec["milestone_type"]
@@ -636,7 +856,14 @@ def compute_default_milestones(
         if mt in superseded_generic:
             continue  # the corridor answers this step specifically
         target: Optional[str] = None
-        if base:
+        dbe = spec.get("days_before_end")
+        dae = spec.get("days_after_end")
+        if end_anchor is not None and (dbe is not None or dae is not None):
+            if dbe is not None:
+                target = (end_anchor - timedelta(days=int(dbe))).strftime("%Y-%m-%d")
+            elif dae is not None:
+                target = (end_anchor + timedelta(days=int(dae))).strftime("%Y-%m-%d")
+        elif base:
             dbm = spec.get("days_before_move")
             dam = spec.get("days_after_move")
             if dbm is not None:

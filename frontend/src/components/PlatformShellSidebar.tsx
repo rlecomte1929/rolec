@@ -261,6 +261,7 @@ const SECTIONS: NavSection[] = [
       { id: 'relocations', label: 'Relocations', hint: 'Case list and the new-relocation form', to: ROUTE_DEFS.hrDashboard.path, exact: true },
       { id: 'employees', label: 'Employees', hint: 'Your team roster', to: ROUTE_DEFS.hrEmployees.path, exact: true },
       { id: 'risk', label: 'Risk', to: ROUTE_DEFS.hrRisk.path, exact: true },
+      { id: 'duty-of-care', label: 'Duty of care', to: ROUTE_DEFS.hrDutyOfCare.path, exact: true },
       // NAV-POL-1: surface the existing HrPolicy ?tab= tabs as sidebar sub-items
       // (shown indented while on /hr/policy). Each deep-links to a bookmarkable tab.
       {
