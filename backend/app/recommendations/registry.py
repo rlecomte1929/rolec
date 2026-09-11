@@ -20,6 +20,7 @@ from .plugins import (
     LegalAdminPlugin,
     TaxFinancePlugin,
     PetsPlugin,
+    PartnerCareerPlugin,
 )
 from .plugins.base import BasePlugin
 
@@ -44,6 +45,7 @@ def _init_registry() -> None:
         LegalAdminPlugin(),
         TaxFinancePlugin(),
         PetsPlugin(),
+        PartnerCareerPlugin(),
     ]
     for p in plugins:
         _REGISTRY[p.key] = p

@@ -28,6 +28,7 @@ CREATE TABLE quotes (
   id TEXT PRIMARY KEY, total_amount NUMERIC, currency TEXT, vendor_id TEXT, status TEXT
 );
 CREATE TABLE case_services (case_id TEXT, estimated_cost NUMERIC, currency TEXT);
+CREATE TABLE rfq_items (id TEXT PRIMARY KEY, rfq_id TEXT, service_key TEXT);
 """
 
 
@@ -144,6 +145,52 @@ class CaseSpendTests(unittest.TestCase):
 
     def test_blank_company_id_returns_empty_without_querying(self):
         self.assertEqual(cs.committed_spend_for_company("")["has_spend"], False)
+
+    def _item(self, iid, rfq_id, service_key) -> None:
+        self._exec(
+            "INSERT INTO rfq_items (id, rfq_id, service_key) VALUES (:i,:r,:k)",
+            {"i": iid, "r": rfq_id, "k": service_key},
+        )
+
+    def test_service_key_filter_counts_only_partner_career_rfqs(self):
+        self._quote("q1", "1000", "EUR", vendor="v1")
+        self._rfq("r1", "case-A", validated_quote_id="q1", validated_at="t1")
+        self._item("i1", "r1", "spouse")
+        self._quote("q2", "5000", "EUR", vendor="v2")
+        self._rfq("r2", "case-A", validated_quote_id="q2", validated_at="t2")
+        self._item("i2", "r2", "movers")
+        all_spend = cs.committed_spend_for_case("case-A")
+        self.assertEqual(Decimal(all_spend["by_currency"]["EUR"]), Decimal("6000"))
+        partner = cs.committed_spend_for_case(
+            "case-A", service_keys=cs.PARTNER_CAREER_SERVICE_KEYS
+        )
+        self.assertEqual(Decimal(partner["by_currency"]["EUR"]), Decimal("1000"))
+
+    def test_spouse_support_drawdown_same_currency_remaining(self):
+        committed = {"has_spend": True, "by_currency": {"EUR": "2000"}}
+        out = cs.spouse_support_drawdown(
+            cap_amount=7623.0, cap_currency="EUR", committed=committed
+        )
+        self.assertTrue(out["comparable"])
+        self.assertEqual(Decimal(out["remaining"]), Decimal("5623.0"))
+        self.assertEqual(out["remaining_currency"], "EUR")
+
+    def test_spouse_support_drawdown_cross_currency_is_not_comparable(self):
+        committed = {"has_spend": True, "by_currency": {"NOK": "2000"}}
+        out = cs.spouse_support_drawdown(
+            cap_amount=7623.0, cap_currency="EUR", committed=committed
+        )
+        self.assertFalse(out["comparable"])
+        self.assertIsNone(out["remaining"])
+
+    def test_spouse_support_drawdown_no_cap_is_honest_empty(self):
+        out = cs.spouse_support_drawdown(
+            cap_amount=None, cap_currency=None, committed={"has_spend": False, "by_currency": {}}
+        )
+        self.assertFalse(out["has_cap"])
+        self.assertFalse(out["has_spend"])
+        self.assertIsNone(out["remaining"])
+        self.assertNotEqual(out["remaining"], "0")
 
 
 if __name__ == "__main__":

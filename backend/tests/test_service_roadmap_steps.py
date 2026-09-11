@@ -69,3 +69,10 @@ def test_destination_merge_augments_generic_steps():
 def test_immigration_has_no_destination_overrides():
     from backend.app.services.service_roadmap_steps import SERVICE_STEPS_BY_DESTINATION
     assert "immigration" not in SERVICE_STEPS_BY_DESTINATION
+
+
+def test_spouse_steps_include_partner_career_enrichment():
+    keys = {s.key for s in steps_for_service("spouse")}
+    assert {"career_consult", "cv_review", "job_search_intro", "book_coaching",
+            "labour_market_briefing"} <= keys
+    assert service_key_for_category("partner") == "spouse"

@@ -96,6 +96,7 @@ WEIGHTS: Dict[str, Dict[str, float]] = {
     "tax_finance": {"rating": 0.7, "availability": 0.3},
     "language_integration": {"rating": 0.7, "availability": 0.3},
     "pets": {"rating": 0.7, "availability": 0.3},
+    "partner_career": {"rating": 0.7, "availability": 0.3},
 }
 
 

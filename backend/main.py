@@ -282,6 +282,7 @@ from .app.routers import attestation as attestation_router  # counsel attestatio
 from .app.routers import geocoding as geocoding_router  # [AIQ-1607] address autocomplete proxy
 from .app.routers import test_drive as test_drive_router  # TD-2 (AIQ-1420) test-drive provisioning
 from .app.services.question_engine import generate_questions
+from .app.recommendations.criteria_builder import SERVICE_KEY_TO_BACKEND
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
 
@@ -8955,6 +8956,7 @@ def _services_case_context(case_id: str) -> "tuple[Dict[str, Any], Optional[str]
         "destCountry": basics.get("destCountry") or dest_country,
         "originCity": basics.get("originCity") or origin_city,
         "originCountry": origin_country or basics.get("originCountry"),
+        "familyMembers": draft.get("familyMembers") or {},
     }
     # AIQ-1649: fill anything still missing from the relocation_cases row, so a case
     # whose destination lives there (no intake yet) does not falsely read as missing.
@@ -9001,7 +9003,7 @@ def get_services_context(
     selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
     if not selected_keys and fallback_services:
         fallback = [k.strip().lower() for k in fallback_services.split(",") if k.strip()]
-        valid = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
+        valid = set(SERVICE_KEY_TO_BACKEND)
         selected_keys = [k for k in fallback if k in valid]
 
     # AIQ-1649: case context (dest/origin) + target date via the shared helper, which
@@ -9134,7 +9136,7 @@ def get_service_questions(
     # Fallback: when DB has none but frontend passed selection (handles save race / direct visit)
     if not selected_keys and fallback_services:
         fallback = [k.strip().lower() for k in fallback_services.split(",") if k.strip()]
-        valid = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
+        valid = set(SERVICE_KEY_TO_BACKEND)
         selected_keys = [k for k in fallback if k in valid]
     if not selected_keys:
         return {"questions": [], "selected_services": []}

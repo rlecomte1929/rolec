@@ -23,6 +23,23 @@ from .types import RecommendationResponse
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
 
 
+def draft_has_partner(draft: Dict[str, Any]) -> bool:
+    """True when familyMembers.spouse is a non-empty object (partner present)."""
+    fam = (draft or {}).get("familyMembers") or {}
+    if not isinstance(fam, dict):
+        return False
+    spouse = fam.get("spouse")
+    return isinstance(spouse, dict) and bool(spouse)
+
+
+def _drop_spouse_without_partner(selected_keys: List[str], draft: Dict[str, Any]) -> List[str]:
+    if "spouse" not in selected_keys:
+        return selected_keys
+    if draft_has_partner(draft):
+        return selected_keys
+    return [k for k in selected_keys if k != "spouse"]
+
+
 def _log_slate(
     category: str,
     criteria: Dict[str, Any],
@@ -128,7 +145,9 @@ def post_recommendations_batch(
     if not selected_keys:
         services = db.list_case_services(assignment["id"])
         selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
-    valid_svc = {"housing", "schools", "movers", "banks", "insurances", "electricity", "pets"}
+    valid_svc = {
+        "housing", "schools", "movers", "banks", "insurances", "electricity", "pets", "spouse",
+    }
     selected_keys = [k for k in selected_keys if k in valid_svc]
 
     if not selected_keys:
@@ -147,6 +166,10 @@ def post_recommendations_batch(
         dest_country = getattr(case, "dest_country", None)
         origin_city = getattr(case, "origin_city", None)
         origin_country = getattr(case, "origin_country", None)
+    selected_keys = _drop_spouse_without_partner(selected_keys, draft)
+    if not selected_keys:
+        return {"results": {}, "message": "No selected services with recommendation support"}
+
     basics = draft.get("relocationBasics") or {}
     assignment_ctx = draft.get("assignmentContext") or {}
     case_context = {
@@ -156,6 +179,7 @@ def post_recommendations_batch(
         "originCountry": origin_country or basics.get("originCountry"),
         # Phase 0: single source of office address = the intake-captured value.
         "officeAddress": assignment_ctx.get("workLocation"),
+        "familyMembers": draft.get("familyMembers") or {},
     }
     # Phase 3: gate the housing schools layer on the case having school-age kids.
     from .schools_nearby import school_age_from_draft, attach_nearby_schools

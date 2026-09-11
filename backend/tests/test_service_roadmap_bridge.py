@@ -192,3 +192,15 @@ def test_destination_steps_materialise_and_prune(monkeypatch):
     types2 = {r["milestone_type"] for r in _svc_rows(db, "case1")}
     assert "service_banking_anmeldung" not in types2
     assert "service_banking_open_account" in types2
+
+
+def test_selecting_spouse_materialises_partner_career_steps():
+    db = FakeDB()
+    reconcile_service_milestones(db, "case1", ["spouse"])
+    rows = _svc_rows(db, "case1")
+    types = {r["milestone_type"] for r in rows}
+    assert "service_spouse_career_consult" in types
+    assert "service_spouse_job_search_intro" in types
+    assert "service_spouse_book_coaching" in types
+    assert "service_spouse_labour_market_briefing" in types
+    assert {r["service_key"] for r in rows} == {"spouse"}
