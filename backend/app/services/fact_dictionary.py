@@ -70,6 +70,24 @@ _FACTS: List[FactEntry] = [
               prefill_source="profile.passport_number", field_ids=("id_document_number",)),
     FactEntry("passport_expiry", "ID document expiry date", CATEGORY_IDENTITY,
               prefill_source="profile.passport_expiry", field_ids=("id_document_expiry",)),
+    # Identity — split-name and document fields the DE/FR application forms require. The FR→NO
+    # datasheet uses one combined ``full_name`` (above); government application forms split it and
+    # ask for extra document facts, so these are governed separately and join by vault column.
+    FactEntry("legal_first_name", "Legal given name(s)", CATEGORY_IDENTITY,
+              prefill_source="profile.legal_first_name", field_ids=("legal_first_name",)),
+    FactEntry("legal_last_name", "Legal surname", CATEGORY_IDENTITY,
+              prefill_source="profile.legal_last_name", field_ids=("legal_last_name",)),
+    FactEntry("place_of_birth", "Place of birth", CATEGORY_IDENTITY,
+              prefill_source="profile.place_of_birth", field_ids=("place_of_birth",)),
+    FactEntry("gender", "Gender", CATEGORY_IDENTITY,
+              prefill_source="profile.gender", field_ids=("gender",)),
+    FactEntry("passport_issue_date", "Passport date of issue", CATEGORY_IDENTITY,
+              prefill_source="profile.passport_issue_date", field_ids=("passport_issue_date",)),
+    FactEntry("passport_country", "Passport issuing country", CATEGORY_IDENTITY,
+              prefill_source="profile.passport_country", field_ids=("passport_country",)),
+    # Family
+    FactEntry("marital_status", "Marital status", CATEGORY_FAMILY,
+              prefill_source="profile.marital_status", field_ids=("marital_status",)),
     # Employment
     FactEntry("employer_name", "Employer", CATEGORY_EMPLOYMENT,
               prefill_source="contract.employer_name", field_ids=("employer_name",)),
@@ -79,8 +97,12 @@ _FACTS: List[FactEntry] = [
               prefill_source="contract.job_title", field_ids=("job_title",)),
     FactEntry("employment_start_date", "Employment start date", CATEGORY_EMPLOYMENT,
               prefill_source="contract.employment_start_date", field_ids=("employment_start_date",)),
+    # Canonical vault column is ``salary_amount`` (currency stored separately); the FR→NO
+    # datasheet's ``salary_amount_nok`` field id is kept as a fallback join key so that sheet
+    # still resolves. See 20261015000000_seed_frno_data_sheet.sql (salary_amount_nok → salary_amount).
     FactEntry("salary_amount", "Gross annual salary", CATEGORY_EMPLOYMENT,
-              prefill_source="contract.salary_amount_nok", field_ids=("salary_amount_nok",)),
+              prefill_source="contract.salary_amount",
+              field_ids=("salary_amount", "salary_amount_nok")),
     # Immigration / logistics
     FactEntry("arrival_date", "Date of arrival", CATEGORY_IMMIGRATION,
               prefill_source="case.arrival_date", field_ids=("arrival_date",)),
