@@ -352,9 +352,10 @@ def test_real_repo_closure_is_not_suspiciously_small():
 
 def test_fill_root_catches_llm_import_from_form_prefill_service():
     # A mapper module that imports an LLM gateway, reachable from the fill path, must FAIL the guard.
-    import importlib
-    mod = importlib.import_module("scripts.check_serving_llm_isolation")
-    assert "backend.app.services.form_prefill_service" in (mod.SERVING_ROOTS + mod.FILL_ROOTS), \
+    # Use the module-level `guard` (imported via the sys.path insertion above) rather than
+    # re-importing as `scripts.check_serving_llm_isolation`: `scripts` is not an importable
+    # package under CI's full-suite discovery, so the dotted re-import raises ModuleNotFoundError.
+    assert "backend.app.services.form_prefill_service" in (guard.SERVING_ROOTS + guard.FILL_ROOTS), \
         "the live fill path must be a protected root"
 
 
