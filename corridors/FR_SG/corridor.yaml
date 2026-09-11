@@ -5,9 +5,12 @@
 # registers the corridor identity — a FR→SG case now resolves a profile instead of
 # falling through to global defaults.
 #
-# The eligibility pathway step-graph (the Employment Pass route) is authoring TODO:
-# corridor_registry is fallback-safe, so the corridor loads without a `pathways:`
-# section (get_pathways returns ()).
+# The eligibility pathway step-graph (the Employment Pass route) is authored at
+# pathways/EMPLOYMENT_PASS_2026/v1.yaml — REPRESENTATIVE, sourced from the corridor's
+# own reviewed/representative requirement_items (EP, COMPASS, S Pass, PEP, IPA, FIN,
+# IRAS, CPF-exempt, Dependant's Pass) plus the delivered fr-departure / fr-sg-tax /
+# sg-fr-return candidate facts. facts.yaml (fact→step binding) is authored AFTER the
+# facts load, when the refs resolve — authoring it now would invent refs.
 #
 # STATUS: authoring. Nothing here is counsel-verified; nothing may render as legal
 # advice in ReloPass's own voice. Singapore (MOM/ICA/IRAS) is the binding jurisdiction.
@@ -30,5 +33,14 @@ corridor:
     task_key: "immigration_answer"
 
   sla:
-    at_risk_window_days: 30
+    # DERIVED from the EMPLOYMENT_PASS_2026 step graph's pre-arrival runway
+    # (longest path to the TRAVEL_TO_SG arrival anchor):
+    #   JOB_OFFER_CONTRACT 14 + EP_APPLICATION 21 + EP_APPROVED_IPA 14 + TRAVEL_TO_SG 1 = 50.
+    # Durations are estimates pending agent confirmation; re-derive rather than hand-edit.
+    at_risk_window_days: 50
     at_risk_pct: 80
+
+  # Eligibility Corridor Agent pathways (REPRESENTATIVE content).
+  pathways:
+    - id: "EMPLOYMENT_PASS_2026"
+      file: "pathways/EMPLOYMENT_PASS_2026/v1.yaml"

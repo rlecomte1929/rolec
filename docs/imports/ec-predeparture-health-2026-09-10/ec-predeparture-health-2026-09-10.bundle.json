@@ -1,0 +1,177 @@
+{
+  "batch_id": "ec-predeparture-health-2026-09-10",
+  "persona": "Abraham",
+  "route": "Seattle, US -> Quito, Ecuador",
+  "categories": [
+    {
+      "key": "healthcare",
+      "name": "Healthcare",
+      "description": "Pre-departure and in-country health resources for relocating to Quito, Ecuador."
+    }
+  ],
+  "tags": [
+    { "key": "vaccinations", "name": "Vaccinations" },
+    { "key": "yellow-fever", "name": "Yellow Fever" },
+    { "key": "altitude", "name": "Altitude" },
+    { "key": "prescriptions", "name": "Prescriptions & Medicines" },
+    { "key": "medical-records", "name": "Medical Records" },
+    { "key": "insurance", "name": "Health Insurance" },
+    { "key": "finding-care", "name": "Finding Care" },
+    { "key": "family", "name": "Accompanying Family" },
+    { "key": "pre-departure", "name": "Pre-departure" }
+  ],
+  "sources": [
+    {
+      "name": "CDC Travelers' Health - Ecuador, including the Galapagos Islands (Traveler View)",
+      "url": "https://wwwnc.cdc.gov/travel/destinations/traveler/none/ecuador"
+    },
+    {
+      "name": "CDC Travelers' Health - Travel to High Altitudes",
+      "url": "https://wwwnc.cdc.gov/travel/page/travel-to-high-altitudes"
+    },
+    {
+      "name": "CDC Yellow Book 2026 - High-Altitude Travel and Altitude Illness",
+      "url": "https://www.cdc.gov/yellow-book/hcp/environmental-hazards-risks/high-altitude-travel-and-altitude-illness.html"
+    },
+    {
+      "name": "CDC Travelers' Health - Traveling Abroad with Medicine",
+      "url": "https://wwwnc.cdc.gov/travel/page/travel-abroad-with-medicine"
+    },
+    {
+      "name": "CDC Travelers' Health - Getting Health Care During Travel",
+      "url": "https://wwwnc.cdc.gov/travel/page/getting-health-care-during-travel"
+    },
+    {
+      "name": "CDC Travelers' Health - Travel Insurance",
+      "url": "https://wwwnc.cdc.gov/travel/page/insurance"
+    },
+    {
+      "name": "Ministerio de Salud Publica del Ecuador (MSP) - Requisitos de ingreso al Ecuador",
+      "url": "https://www.salud.gob.ec/requisitos-de-ingreso-al-ecuador/"
+    },
+    {
+      "name": "Ministerio de Salud Publica del Ecuador (MSP) - Fiebre Amarilla",
+      "url": "https://www.salud.gob.ec/fiebre-amarilla/"
+    }
+  ],
+  "resources": [
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "healthcare",
+      "title": "Recommended vaccinations before relocating to Quito",
+      "resource_type": "guide",
+      "summary": "CDC recommends Hepatitis A and typhoid for travelers to Ecuador, alongside routine vaccines and measles (MMR). Yellow fever is NOT recommended for Quito - it is scoped only to lower-elevation Amazon-region travel.",
+      "body": "Per the CDC Ecuador destination page, plan a visit with your doctor or a travel-health clinic at least a month before departure (CDC's medicine page suggests 4-6 weeks) so the whole family can get any needed vaccines.\n\nWhat CDC recommends for Ecuador:\n- Routine vaccines: be up to date on all routine vaccines (e.g., chickenpox, DTaP/Tdap/Td, flu, MMR, polio, shingles as applicable).\n- Measles (MMR): CDC advises all international travelers be fully vaccinated against measles before travel, including an early dose for infants 6-11 months.\n- Hepatitis A: recommended for unvaccinated travelers 1 year or older going to Ecuador (infants 6-11 months should also be vaccinated; that dose does not count toward the routine 2-dose series).\n- Typhoid: consider it - CDC says get it if you might travel to areas with poor sanitation and unsafe water (including rural areas), spend a month or more in Ecuador, or visit friends or relatives. A long-term relocation to Quito meets the 'a month or more' consideration.\n- Hepatitis B: recommended for unvaccinated travelers younger than 60 traveling to Ecuador.\n\nImportant scoping for Quito: Quito (the capital) sits above 2,300 m, and CDC states yellow fever vaccine is NOT recommended for travel limited to areas above 2,300 m, including the cities of Quito and Guayaquil and the Galapagos. See the dedicated yellow-fever resource in this bundle for full detail. CDC also notes there is no malaria transmission in Quito, so routine malaria pills are not indicated for the city itself.\n\nThis is general destination guidance, not a personal prescription. Confirm each family member's schedule with a licensed provider or travel-health clinic.",
+      "source_url": "https://wwwnc.cdc.gov/travel/destinations/traveler/none/ecuador",
+      "source_name": "CDC Travelers' Health - Ecuador, including the Galapagos Islands (Traveler View)",
+      "tags": ["vaccinations", "pre-departure", "family", "finding-care"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "healthcare",
+      "title": "Yellow fever: only for Amazon-region travel, not for Quito",
+      "resource_type": "guide",
+      "summary": "Yellow fever vaccine is scoped to lower-elevation Amazon-region provinces east of the Andes, not to Quito. Both CDC and Ecuador's Ministry of Health frame it this way.",
+      "body": "Do not treat yellow fever as a blanket requirement for moving to Quito. Both the U.S. CDC and Ecuador's Ministerio de Salud Publica (MSP) scope it narrowly to jungle/Amazon-region risk zones.\n\nWhat CDC says (Ecuador destination page):\n- Recommended for travelers 9 months and older going to areas below 2,300 m (7,550 ft) elevation, east of the Andes, in the provinces of Morona-Santiago, Napo, Orellana, Pastaza, Sucumbios, Tungurahua, and Zamora-Chinchipe.\n- Generally NOT recommended for travel limited to areas below 2,300 m west of the Andes (Esmeraldas, Guayas, Los Rios, Manabi, Santa Elena, Santo Domingo de los Tsachilas, and designated areas of several other provinces).\n- NOT recommended for travel limited to areas above 2,300 m, the cities of Quito or Guayaquil, or the Galapagos.\n\nWhat MSP says:\n- MSP considers the Amazon Region (Orellana, Sucumbios, Pastaza, Napo, Morona Santiago, Zamora Chinchipe) and the province of Esmeraldas as endemic yellow-fever risk zones, and urges travelers visiting THOSE zones to get vaccinated at least 10 days before arrival. The vaccine is free at MSP health centers.\n- MSP notes urban areas below 1,650 m are not considered endemic (no documented yellow-fever activity).\n\nPractical takeaway for Abraham's family: relocation to Quito itself does not call for yellow-fever vaccination. If the family later plans trips into the Amazon lowlands listed above, get vaccinated at least 10 days before that trip (MSP), and note the vaccine is recommended from about 9-12 months of age per the sources (CDC: 9 months+; MSP: applied from 12 to 59 months... MSP states 12 months to 59 years for lifetime protection). Confirm timing and eligibility with a provider before any Amazon travel.",
+      "source_url": "https://wwwnc.cdc.gov/travel/destinations/traveler/none/ecuador",
+      "source_name": "CDC Travelers' Health - Ecuador, including the Galapagos Islands (Traveler View)",
+      "tags": ["yellow-fever", "vaccinations", "pre-departure", "family"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "healthcare",
+      "title": "Ecuador Ministry of Health: yellow fever scoped to risk zones (official)",
+      "resource_type": "official_link",
+      "summary": "Ecuador's MSP official pages confirming yellow-fever vaccination is directed at Amazon-region and Esmeraldas travelers, with the vaccine free at MSP health centers.",
+      "body": "Official Ecuadorian government reference confirming how yellow fever is scoped in-country:\n\n- 'Requisitos de ingreso al Ecuador' (MSP): the Ministry considers the Amazon Region (Orellana, Sucumbios, Pastaza, Napo, Morona Santiago, Zamora Chinchipe) and Esmeraldas as endemic risk zones and urges national and foreign tourists visiting those zones to vaccinate against yellow fever 10 days before arrival. The vaccine is available at all MSP health centers nationwide. The page also references the Traveler Health Declaration for arrivals with certain symptoms.\n- 'Fiebre Amarilla' (MSP): describes the jungle Amazon provinces plus Esmeraldas as endemic zones, notes urban areas below 1,650 m are not considered endemic, and states the yellow-fever vaccine and international certificate are provided free at MSP establishments.\n\nUse this as the authoritative Ecuadorian source when confirming that Quito residence does not, by itself, require yellow-fever vaccination.",
+      "source_url": "https://www.salud.gob.ec/requisitos-de-ingreso-al-ecuador/",
+      "source_name": "Ministerio de Salud Publica del Ecuador (MSP) - Requisitos de ingreso al Ecuador",
+      "tags": ["yellow-fever", "vaccinations", "pre-departure"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "healthcare",
+      "title": "Altitude acclimatisation for Quito (~2,850 m) - the non-obvious reality",
+      "resource_type": "guide",
+      "summary": "Quito sits around 2,850 m. CDC guidance puts the altitude-illness risk threshold near 2,450 m (8,000 ft), so arriving families should ascend gradually, rest on arrival, and watch for acute mountain sickness.",
+      "body": "A detail many relocating families overlook: Quito is one of the highest capital cities in the world, at roughly 2,850 m (about 9,350 ft). Flying in from near-sea-level Seattle is an abrupt ascent, and CDC guidance treats this altitude band as a real health consideration - not just a comfort issue.\n\nWhy it matters (CDC):\n- CDC's Travel to High Altitudes page: at elevations of 8,000 ft (about 2,440 m) and above you may be at risk for altitude illness, caused by lower oxygen levels.\n- CDC Yellow Book (2026): any unacclimatized traveler going to a sleeping altitude of 2,450 m (8,000 ft) or above - and sometimes lower - is at risk for altitude illness. Quito's ~2,850 m is within this at-risk band. Children are as susceptible as adults; training and fitness do not reduce risk.\n\nPractical acclimatisation steps (from CDC):\n- Ascend gradually where possible; avoid going from low elevation to a sleeping altitude above 2,750 m (9,000 ft) in a single day. Since a direct Seattle-Quito flight does exactly that, plan a gentle first few days.\n- Take it easy on arrival: avoid alcohol and heavy exercise for at least the first 48 hours; do only mild activity.\n- If you regularly use caffeine, keep using it to avoid a withdrawal headache that can be confused with an altitude headache.\n- Learn the symptoms of acute mountain sickness (AMS): headache, tiredness, loss of appetite, nausea, vomiting; young children may just seem fussy. Mild AMS can be managed with rest and pain relief and usually eases within a couple of days. Do not go higher until symptoms resolve.\n- Know the red flags: worsening symptoms, confusion, loss of coordination, extreme drowsiness (possible HACE) or shortness of breath, weakness, cough (possible HAPE) require immediate descent and medical care.\n- Medicines (e.g., acetazolamide) can help speed acclimatisation or prevent/treat altitude illness if a rapid ascent is unavoidable - discuss with your doctor before you fly, especially for children, pregnant travelers, and anyone with heart, lung, or other chronic conditions. People with certain conditions (e.g., sickle cell anemia, severe pulmonary hypertension) should not travel to high elevations.\n\nBecause the whole family is relocating (not doing a short trek), the acute acclimatisation window is mainly the first 3-5 days after arrival - plan a light schedule for that period.",
+      "source_url": "https://wwwnc.cdc.gov/travel/page/travel-to-high-altitudes",
+      "source_name": "CDC Travelers' Health - Travel to High Altitudes",
+      "tags": ["altitude", "family", "pre-departure"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "healthcare",
+      "title": "Altitude acclimatisation checklist (first days in Quito)",
+      "resource_type": "checklist_item",
+      "summary": "A short arrival checklist drawn from CDC's altitude acclimatisation tips, adapted for a family landing in Quito (~2,850 m) from sea level.",
+      "body": "First-days-in-Quito altitude checklist (from CDC acclimatisation tips):\n- [ ] Plan a light schedule for the first 3-5 days - the acute acclimatisation window.\n- [ ] No alcohol and no heavy exercise for at least the first 48 hours; keep activity mild.\n- [ ] Stay hydrated and rest; if you use caffeine regularly, keep using it to avoid a withdrawal headache.\n- [ ] Watch each family member (including children) for AMS: headache, tiredness, poor appetite, nausea, vomiting; fussiness in young kids.\n- [ ] Do not ascend further (e.g., day trips to higher Andean spots) while anyone still has symptoms.\n- [ ] Descend and seek care immediately for red-flag symptoms: confusion, loss of coordination, extreme drowsiness, shortness of breath, weakness, or persistent cough.\n- [ ] Before departure, ask your doctor whether preventive altitude medicine (e.g., acetazolamide) is appropriate for anyone in the family, and clear anyone with heart/lung/chronic conditions or pregnancy for high-altitude living.",
+      "source_url": "https://www.cdc.gov/yellow-book/hcp/environmental-hazards-risks/high-altitude-travel-and-altitude-illness.html",
+      "source_name": "CDC Yellow Book 2026 - High-Altitude Travel and Altitude Illness",
+      "tags": ["altitude", "family", "pre-departure"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "healthcare",
+      "title": "Carry medical records and repeat prescriptions correctly",
+      "resource_type": "guide",
+      "summary": "Bring immunization records and a portable medical summary, pack medicines in labeled original containers with copies of prescriptions (generic names), and confirm your medicines are legal in Ecuador before you fly.",
+      "body": "For a long-term move, the whole family should carry their health history and enough medication to bridge the transition. CDC's guidance:\n\nMedical records and a health-info card:\n- Bring a copy of your official immunization records when you travel.\n- Prepare a card that identifies each person's blood type, chronic illnesses, current medicines, and allergies - ideally also available in the local language (Spanish for Ecuador). Consider a MedicAlert bracelet for anyone with serious conditions.\n\nRepeat prescriptions and medicines:\n- Because you'll be gone more than 30 days, talk to your provider about how to get enough medicine - some insurers only pay for a 30-day supply at a time, so plan refills or a documented supply ahead of the move.\n- Keep medicines in their original, labeled containers, clearly labeled with the person's full name, provider's name, generic and brand name, and exact dosage.\n- Bring copies of all written prescriptions, including generic names. Leave a copy at home with a friend or relative in case you lose yours or need an emergency refill.\n- Pack medications in carry-on luggage in case checked bags are lost or delayed, and take extra in case of travel delays.\n- Ask your prescriber for a note if anyone uses controlled substances or injectables such as insulin or EpiPens.\n- If crossing time zones, dose by time since last dose, not local clock time.\n\nLegality check before you fly:\n- Each country has its own medicine laws; drugs common in the U.S. may be restricted or controlled in Ecuador. Check with Ecuador's embassy (and any layover countries) to confirm your medicines are permitted, and carry a prescription or a medical certificate from your provider. If a medicine isn't allowed, ask your provider about alternatives and a letter describing the condition and treatment plan.\n\nBuying medicine locally: counterfeit drugs are common in some countries, so rely on medicine you bring from home; only buy locally in a genuine emergency.",
+      "source_url": "https://wwwnc.cdc.gov/travel/page/travel-abroad-with-medicine",
+      "source_name": "CDC Travelers' Health - Traveling Abroad with Medicine",
+      "tags": ["prescriptions", "medical-records", "pre-departure", "family"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "healthcare",
+      "title": "Private / international health insurance for the cover gap",
+      "resource_type": "guide",
+      "summary": "Your U.S. insurance likely won't cover care in Ecuador, and national health systems often don't cover non-citizens. CDC recommends securing travel/international health insurance (and considering medical-evacuation cover) before you go.",
+      "body": "CDC is explicit that U.S. medical insurance may not cover care abroad, and that even countries with nationalized health care may not cover people who are not citizens - so plan for a coverage gap when you first arrive, before any local affiliation is in place.\n\nWhat CDC recommends:\n- Find out whether your current U.S. health insurance covers medical care abroad. Travelers are usually responsible for paying hospital and other medical costs out of pocket at most destinations.\n- If your coverage isn't adequate, consider a short-term supplemental / travel health insurance policy. Look for a policy that pays hospitals directly, and check for exclusions (e.g., pre-existing conditions, adventure activities).\n- Travel health insurance is especially important if you have an existing health condition or are traveling for more than 6 months - both likely relevant for a family relocation.\n- Consider medical evacuation insurance if care may not be up to U.S. standards or you'll travel to remote areas (e.g., Amazon trips); emergency medical transport can otherwise cost more than $100,000. Make sure any evac policy includes a 24-hour physician support center.\n- CDC lists insurance information resources including the U.S. Department of State, International SOS, and the International Association for Medical Assistance to Travelers (IAMAT). CDC does not endorse any specific provider.\n\nHow this maps to Abraham's move: keep continuous private/international health cover in force from arrival until local coverage begins, so the family is never uninsured during the transition. (Note: the specifics and timing of Ecuador's public social-security health affiliation, IESS, are governed by Ecuadorian authorities and are not addressed by CDC - see this bundle's README for that gap. Confirm IESS eligibility and start dates through official Ecuadorian channels.)",
+      "source_url": "https://wwwnc.cdc.gov/travel/page/insurance",
+      "source_name": "CDC Travelers' Health - Travel Insurance",
+      "tags": ["insurance", "pre-departure", "family"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "healthcare",
+      "title": "Finding medical care in Quito",
+      "resource_type": "guide",
+      "summary": "Make a plan for getting care before you arrive: know that you may pay out of pocket, use the U.S. embassy and reputable travel-medicine directories to locate providers, and keep emergency contacts handy.",
+      "body": "CDC advises making a plan for how you'll get health care abroad before you travel - especially important for families, people with underlying conditions, and long-term stays.\n\nHow to find and access care (from CDC's Getting Health Care During Travel page):\n- Expect to pay out of pocket for medical services in many destinations, so have insurance and payment arranged (see the insurance resource in this bundle).\n- The nearest U.S. embassy or consulate can help you locate medical services and can assist in emergencies 24/7 (U.S. Department of State: 888-407-4747, or 202-501-4444 from overseas). Enroll in the Department of State's Smart Traveler Enrollment Program (STEP) so the U.S. government knows where you are and can reach you in an emergency.\n- Use reputable directories to find providers:\n  - International Society of Travel Medicine (ISTM) - directory of travel-medicine professionals in more than 80 countries.\n  - International Association for Medical Assistance to Travelers (IAMAT) - network of physicians, hospitals, and clinics.\n  - CDC's Find a Clinic tool for pre-travel vaccine/medicine needs.\n- Carry a health-info card (blood type, chronic conditions, medicines, allergies) in Spanish for local providers, and keep copies of prescriptions with generic names.\n- CDC does not endorse any particular provider or insurer, and accreditation does not guarantee outcomes - use directories as a starting point and verify locally.\n\nFor everyday and urgent care in Quito specifically, use the embassy and the ISTM/IAMAT directories above to identify vetted providers on arrival.",
+      "source_url": "https://wwwnc.cdc.gov/travel/page/getting-health-care-during-travel",
+      "source_name": "CDC Travelers' Health - Getting Health Care During Travel",
+      "tags": ["finding-care", "insurance", "family", "pre-departure"],
+      "status": "draft"
+    },
+    {
+      "country_code": "EC",
+      "city_name": "Quito",
+      "category_key": "healthcare",
+      "title": "Tip: book your pre-departure travel-health visit 4-6 weeks out",
+      "resource_type": "tip",
+      "summary": "Schedule a family travel-health appointment at least 4-6 weeks before departure so vaccines have time to take effect and any needed medicines can be arranged.",
+      "body": "CDC advises making a travel-health appointment at least 4-6 weeks before you leave (the Ecuador destination page says visit your doctor at least a month before your trip). This lead time lets vaccines take effect, allows multi-dose series to be started, and gives your provider time to sort out repeat prescriptions and any altitude medicine. Bring your itinerary and each family member's immunization records to the visit.",
+      "source_url": "https://wwwnc.cdc.gov/travel/page/travel-abroad-with-medicine",
+      "source_name": "CDC Travelers' Health - Traveling Abroad with Medicine",
+      "tags": ["pre-departure", "vaccinations", "family"],
+      "status": "draft"
+    }
+  ],
+  "events": []
+}

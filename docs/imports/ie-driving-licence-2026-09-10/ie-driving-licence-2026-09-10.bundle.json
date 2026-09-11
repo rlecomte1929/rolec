@@ -1,0 +1,87 @@
+{
+  "categories": [
+    { "key": "transport", "name": "Transport" }
+  ],
+  "tags": [
+    { "key": "driving-licence", "name": "Driving licence" },
+    { "key": "licence-exchange", "name": "Licence exchange" },
+    { "key": "eu-eea", "name": "EU/EEA" },
+    { "key": "recognised-states", "name": "Recognised states" },
+    { "key": "ndls", "name": "NDLS" },
+    { "key": "theory-test", "name": "Theory test" },
+    { "key": "third-country-national", "name": "Third-country national" }
+  ],
+  "sources": [
+    { "key": "ndls", "name": "NDLS", "url": "https://www.ndls.ie/" },
+    { "key": "rsa", "name": "RSA", "url": "https://www.rsa.ie/" },
+    { "key": "citizensinformation", "name": "Citizens Information", "url": "https://www.citizensinformation.ie/" }
+  ],
+  "resources": [
+    {
+      "country_code": "IE",
+      "city_name": "Dublin",
+      "category_key": "transport",
+      "title": "Exchange your Spanish (EU) licence for an Irish one — direct exchange",
+      "resource_type": "guide",
+      "summary": "Spain is an EU/EEA state, so a valid Spanish licence can be directly exchanged for an Irish licence, online or at an NDLS centre.",
+      "body": "Spain is listed among the EU/EEA member states whose driving licences Ireland accepts for direct exchange, so a Venezuelan national holding a valid SPANISH licence can exchange it for an equivalent Irish licence — no theory or driving test required. You can drive in Ireland on a valid EU/EEA licence for as long as it remains valid; if you wish to swap it for an Irish licence you must do so within 10 YEARS of that licence's expiry. Apply online via ndls.ie (or in person at any of the 34 NDLS centres by appointment). For the ONLINE route you need: a Public Services Card (PSC) and verified MyGovID; your current/most recent EU/EEA licence (posted to NDLS after applying — failure to submit it means the application is rejected); proof of address dated within the last 6 months if it differs from the address on your PSC record; PROOF THAT YOU ARE NORMALLY RESIDENT IN IRELAND, which is specifically required where your place of birth and nationality are outside the EU/EEA/Switzerland/UK/Northern Ireland (this applies to a Venezuelan-born applicant); a completed medical report form dated within one month if required in your case; a CPC certificate if you are a professional driver; and the €65 fee (free if aged 70+). NDLS may need to contact Spain to confirm the licence's validity, which can add several weeks. Note the EU 'code 95' CPC does not transfer automatically — professional drivers apply separately to the RSA.",
+      "source_url": "https://www.ndls.ie/licensed-driver/exchange-my-foreign-driving-licence.html",
+      "source_name": "NDLS",
+      "tags": ["driving-licence", "licence-exchange", "eu-eea", "ndls", "third-country-national"],
+      "status": "draft"
+    },
+    {
+      "country_code": "IE",
+      "city_name": "Dublin",
+      "category_key": "transport",
+      "title": "Recognised states for licence exchange — Venezuela is NOT listed",
+      "resource_type": "guide",
+      "summary": "Ireland exchanges licences from EU/EEA states and a fixed list of recognised states; Venezuela does not appear on the published list.",
+      "body": "Ireland allows a foreign licence to be exchanged for an Irish one only if it was issued by (a) an EU/EEA member state, or (b) a 'recognised state' with which Ireland has an exchange agreement. The recognised-states list published by Citizens Information is: Australia; Canada (only from the provinces of Alberta, British Columbia, Manitoba, New Brunswick, Newfoundland and Labrador, Ontario and Saskatchewan); Georgia; Gibraltar; Guernsey; Isle of Man; Japan; Jersey; Moldova; South Africa; Republic of Korea (South Korea); Switzerland; New Zealand; Northern Ireland; Taiwan; and the UK. VENEZUELA DOES NOT APPEAR ON THIS PUBLISHED LIST of recognised states (nor is it an EU/EEA state). Both NDLS and RSA state the same principle in their own words: where a licence was issued by a country Ireland has no exchange agreement with, Ireland cannot exchange it and the holder must instead go through the steps to become a qualified driver in Ireland. So a licence issued by VENEZUELA cannot be exchanged. (A holder of a valid Spanish EU licence should use the EU direct-exchange path instead — see the separate resource.) Also note: if a first licence came from a non-recognised country and was later swapped for a licence in a recognised country, it still cannot be exchanged for an Irish one.",
+      "source_url": "https://www.citizensinformation.ie/en/travel-and-recreation/motoring/driver-licensing/exchanging-foreign-driving-permit/",
+      "source_name": "Citizens Information",
+      "tags": ["recognised-states", "licence-exchange", "third-country-national"],
+      "status": "draft"
+    },
+    {
+      "country_code": "IE",
+      "city_name": "Dublin",
+      "category_key": "transport",
+      "title": "Driving on a Venezuelan licence and the full licensing route (theory + driving test)",
+      "resource_type": "guide",
+      "summary": "As a non-recognised licence, a Venezuelan licence lets you drive as a visitor for up to 12 months with an IDP; residents must take the theory test and driving test.",
+      "body": "Because a Venezuelan licence is neither EU/EEA nor from a recognised state, it CANNOT be exchanged. As a visitor you may drive in Ireland for up to 12 months if your Venezuelan licence is current and valid AND you also hold an international driving permit (IDP) from your country. If you plan to stay in Ireland for more than 12 months (which a relocation is), you must apply for an Irish driving licence by going through the FULL driver-licensing process. That means: sit and pass the Driver Theory Test first; then apply for a learner permit; then complete the required Essential Driver Training (EDT) lessons and pass the practical driving test. Citizens Information notes one concession for people whose licence is from a non-recognised country: once you have your learner permit you only need to take 6 EDT lessons instead of the usual 12. Only a FULL foreign driving licence can ever be exchanged — foreign learner permits cannot be used to drive in Ireland or exchanged. 'Normally/ordinarily resident' means living in Ireland for at least 185 days in a calendar year; once you become resident you should begin this process rather than continue relying on the visitor allowance.",
+      "source_url": "https://www.citizensinformation.ie/en/travel-and-recreation/motoring/driver-licensing/exchanging-foreign-driving-permit/",
+      "source_name": "Citizens Information",
+      "tags": ["theory-test", "driving-licence", "third-country-national"],
+      "status": "draft"
+    },
+    {
+      "country_code": "IE",
+      "city_name": "Dublin",
+      "category_key": "transport",
+      "title": "RSA overview: exchange deadline from taking up residence",
+      "resource_type": "tip",
+      "summary": "RSA confirms EU/EEA licences exchange within 10 years of expiry, and that residents must exchange or re-qualify once they take up normal residence.",
+      "body": "The Road Safety Authority (RSA) confirms the same two-path framework on its official 'Foreign Licences' page. For an EU/EEA licence (such as a Spanish one) you can drive in Ireland until it expires and then must exchange it for an Irish one; if you want to exchange it for an equivalent Irish licence you must do so within 10 years of the licence expiring. For a licence from any state OUTSIDE the EU/EEA, you may drive as a visitor for up to one year provided it is current and valid, but ONCE YOU TAKE UP NORMAL RESIDENCE in Ireland you must either exchange it for an Irish licence (only possible if it is from a recognised state) or apply for a new one via the full process. RSA also states plainly that where a licence was issued by a country Ireland has no exchange agreement with, Ireland cannot exchange it and you must follow the steps to become a licensed driver in Ireland — which is the situation for a Venezuelan licence. Online EU/EEA exchange requires a PSC, verified MyGovID, your licence (posted in), proof of residence if born/nationality outside the EU/EEA, any required medical report, and the €65 fee (free at 70+).",
+      "source_url": "https://www.rsa.ie/services/licensed-drivers/driving-licence/exchange-foreign-licence",
+      "source_name": "RSA",
+      "tags": ["licence-exchange", "eu-eea", "recognised-states"],
+      "status": "draft"
+    },
+    {
+      "country_code": "IE",
+      "city_name": "Dublin",
+      "category_key": "transport",
+      "title": "Where to apply (NDLS) and documents required, including proof of residence",
+      "resource_type": "checklist_item",
+      "summary": "How and where to apply to NDLS to exchange a licence, and the exact documents an EU exchange requires.",
+      "body": "Applications to exchange a foreign licence are handled by the National Driver Licence Service (NDLS). You can apply two ways: ONLINE at ndls.ie, or IN PERSON at any of the 34 NDLS centres nationwide (by appointment). Documents for an EU/EEA exchange: (online) a Public Services Card and verified MyGovID; your current or most recent EU/EEA licence, which must be posted to NDLS after you apply (if you do not submit it, the exchange is rejected); proof of address dated within the last 6 months if it differs from your PSC record; proof that you are normally resident in Ireland if your place of birth and nationality are outside the EU/EEA/Switzerland/UK/Northern Ireland; a completed medical report form dated within one month if required; a CPC certificate for professional drivers if needed; and the €65 fee (free if 70+). For an in-person application you instead bring your PPSN proof, photographic ID, the licence, and the same address/residence/medical documents. If you are exchanging a licence from a RECOGNISED state (not applicable to Venezuela), a completed eyesight report is also required. NDLS may contact the issuing authority to confirm validity, which can delay issue by several weeks. Where a foreign licence is expired, or a category has no start date, NDLS also requires an ORIGINAL Letter of Entitlement / Driver Statement from the issuing authority, submitted within 6 months (scans/faxes/emails are not accepted).",
+      "source_url": "https://www.ndls.ie/licensed-driver/exchange-my-foreign-driving-licence.html",
+      "source_name": "NDLS",
+      "tags": ["ndls", "licence-exchange", "driving-licence", "third-country-national"],
+      "status": "draft"
+    }
+  ],
+  "events": []
+}

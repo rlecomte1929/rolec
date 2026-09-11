@@ -1,0 +1,100 @@
+{
+  "categories": [
+    { "key": "healthcare", "name": "Healthcare" }
+  ],
+  "tags": [
+    { "key": "pre-departure", "name": "Pre-departure" },
+    { "key": "vaccinations", "name": "Vaccinations" },
+    { "key": "prescriptions", "name": "Prescriptions" },
+    { "key": "controlled-drugs", "name": "Controlled drugs" },
+    { "key": "gp-registration", "name": "GP registration" },
+    { "key": "eligibility", "name": "Eligibility" },
+    { "key": "medical-records", "name": "Medical records" },
+    { "key": "third-country-national", "name": "Third-country national" }
+  ],
+  "sources": [
+    { "key": "hse", "name": "HSE", "url": "https://www2.hse.ie/" },
+    { "key": "citizensinformation", "name": "Citizens Information", "url": "https://www.citizensinformation.ie/" }
+  ],
+  "resources": [
+    {
+      "country_code": "IE",
+      "city_name": "Dublin",
+      "category_key": "healthcare",
+      "title": "Carrying repeat prescriptions and controlled medicines into Ireland",
+      "resource_type": "guide",
+      "summary": "How EU prescriptions work in Ireland and the Schengen Article 75 certificate you need to carry controlled medicines from Spain.",
+      "body": "Under EU rules a prescription from a doctor in one EU/EEA country (including Spain) is valid in Ireland, provided it contains the required details: your full first name and surname (not initials) and date of birth; the prescriber's full name, professional qualification, contact details, work address (including country) and signature; the date issued; and the product's common (non-brand) name, format, quantity, strength and dosage. Not all of these details appear on a standard Irish prescription, so before you travel ask your Spanish doctor to confirm all of them are included, and ask for a PAPER copy — prescriptions generally cannot be emailed across borders, and Ireland's Healthmail e-prescription system only works within Ireland. Note that certain products, including controlled drugs such as strong opioid-based painkillers and certain sedatives, should NOT be prescribed in another EEA state for dispensing in Ireland. Carrying controlled medicines: if you are resident in the Schengen Area (Spain is) and travel to Ireland with a medicine that is a Schedule II or Schedule III controlled drug, you MUST carry a Schengen Article 75 Certificate. You obtain it from your own country's 'competent authority' (in Spain this could be a Ministry of Health body, agency, pharmacist or doctor — ask the Spanish authorities/your embassy who issues it). You need a SEPARATE certificate for each controlled drug, and may bring up to a 30-day supply for personal use. Queries about personal medication can be emailed to Ireland's Health Products Regulatory Authority at enforcementcontrol@hpra.ie.",
+      "source_url": "https://www.citizensinformation.ie/en/health/drugs-and-medicines/cross-border-prescriptions/",
+      "source_name": "Citizens Information",
+      "tags": ["prescriptions", "controlled-drugs", "pre-departure"],
+      "status": "draft"
+    },
+    {
+      "country_code": "IE",
+      "city_name": "Dublin",
+      "category_key": "healthcare",
+      "title": "Bringing medicines through Irish customs (personal use)",
+      "resource_type": "tip",
+      "summary": "Customs rules on personal medicines and the strict prohibition on controlled substances at Irish points of entry.",
+      "body": "Customs officers carry out selective checks at all air and sea points of entry to Ireland. For medicines: it is an OFFENCE to import or carry on your person controlled substances (drugs) when travelling to or from Ireland — examples given include cannabis, cocaine, heroin and amphetamines — and the Customs National Drugs Team operates detector-dog units at airports and ferry ports. This is why legitimately prescribed controlled medicines must be carried with the correct documentation (see the cross-border prescriptions guide: original labelled containers plus the Schengen Article 75 certificate for Schedule II/III drugs, one per medicine, up to a 30-day supply). Travelling from Madrid you are arriving from within the EU, so standard EU customs allowances apply and there is no duty/VAT on personal goods already taxed in Spain; but the drugs prohibition applies regardless of where you travel from. If you have any doubt about a specific medicine, confirm the rules before travelling with the HPRA (enforcementcontrol@hpra.ie) or the Irish embassy.",
+      "source_url": "https://www.citizensinformation.ie/en/travel-and-recreation/travel-to-ireland/customs-regulations-for-travellers/",
+      "source_name": "Citizens Information",
+      "tags": ["controlled-drugs", "pre-departure"],
+      "status": "draft"
+    },
+    {
+      "country_code": "IE",
+      "city_name": "Dublin",
+      "category_key": "healthcare",
+      "title": "Your entitlement to Irish public health services (ordinary residence)",
+      "resource_type": "guide",
+      "summary": "How eligibility works for a non-EU family: entitlement is based on ordinary residence, not nationality, and dependants are assessed separately.",
+      "body": "Entitlement to Irish public health services is based on ORDINARY RESIDENCE, not citizenship or PRSI/tax payments. You are ordinarily resident if you have been living in Ireland for at least a year, or you intend to live here for at least one year. Any person, regardless of nationality, whom the HSE accepts as ordinarily resident gets either full eligibility (Category 1 — medical card holders: free GP care, prescribed medicines subject to a per-item charge, public hospital services, and specified dental/optical/aural, maternity/infant and community services) or limited eligibility (Category 2 — no medical card: you pay for GP visits and for prescribed medicines, though the Drug Payment Scheme caps monthly medicine costs; public hospital care is free or reduced-cost with possible statutory charges). IMPORTANT for a Venezuelan third-country national with family: for non-EU nationals, establishing YOUR eligibility does not automatically make your dependants eligible — dependants may separately have to satisfy the ordinary-residence test. To prove ordinary residence the HSE may ask for documents dated within the last 12 months, such as proof of property purchase or rental (as principal residence), a bank/credit-union statement, a current utility bill, a car or home insurance policy in your name, or an official government document (e.g. a Revenue notice of assessment). Since a general work/family move does not usually qualify for portable EU cover, plan to join the Irish public system once ordinarily resident.",
+      "source_url": "https://www.citizensinformation.ie/en/health/health-system/entitlement-to-public-health-services/",
+      "source_name": "Citizens Information",
+      "tags": ["eligibility", "third-country-national", "pre-departure"],
+      "status": "draft"
+    },
+    {
+      "country_code": "IE",
+      "city_name": "Dublin",
+      "category_key": "healthcare",
+      "title": "Bring your medical records and immunisation history; registering with an Irish GP",
+      "resource_type": "checklist_item",
+      "summary": "What to gather before departure and how to find and register with a GP in Ireland.",
+      "body": "Before leaving Spain, ask your doctor for a copy of your medical records, your prescriptions, and your immunisation records — it is much easier to access care in Ireland if you arrive with the necessary documents from the country you lived in. If you have been seeing a hospital consultant or specialist, ask them to send a copy of your records to your Irish GP; if you are not yet registered with a GP, you can have records transferred after you arrive and register. In Ireland your family doctor is a GP (General Practitioner) and is normally the first doctor you see for non-emergency issues and the gateway to hospital/specialist referral. Use the HSE's online 'Find a GP' search tool to locate a local practice (in Dublin there are many listed). Note that you generally must PAY to see a GP as a private patient (costs vary by practice, so check directly) unless you hold a medical card or GP visit card, which let you see the GP free of charge. GP practices choose whether they take new private patients and/or medical-card/GP-visit-card patients, so contact practices directly to confirm they are accepting new patients.",
+      "source_url": "https://www.citizensinformation.ie/en/returning-to-ireland/looking-after-your-health/accessing-healthcare-on-your-return-to-ireland/",
+      "source_name": "Citizens Information",
+      "tags": ["medical-records", "gp-registration", "pre-departure"],
+      "status": "draft"
+    },
+    {
+      "country_code": "IE",
+      "city_name": "Dublin",
+      "category_key": "healthcare",
+      "title": "Find and register with a GP in Dublin (HSE tool)",
+      "resource_type": "official_link",
+      "summary": "The official HSE 'Find a GP' directory to locate a Dublin practice to register with.",
+      "body": "The HSE provides an official 'Find a GP in Ireland' search tool where you can search by place (name or address) or use your current location to list nearby GP practices, including contact phone numbers, addresses and (where available) email and website. The directory covers the whole country (over 1,500 results nationally) and includes many Dublin practices — for example, listings appear for Dublin addresses such as Donnybrook (D04). Use this to shortlist practices near your new Dublin address, then phone them directly to ask whether they are accepting new patients (private, or medical-card/GP-visit-card) and what fees apply. Registering with a GP is the practical first step to accessing non-emergency care, repeat prescriptions and referrals once you arrive.",
+      "source_url": "https://www2.hse.ie/services/find-a-gp/",
+      "source_name": "HSE",
+      "tags": ["gp-registration", "pre-departure"],
+      "status": "draft"
+    },
+    {
+      "country_code": "IE",
+      "city_name": "Dublin",
+      "category_key": "healthcare",
+      "title": "Vaccination schedule in Ireland and catch-up for accompanying children",
+      "resource_type": "guide",
+      "summary": "Ireland's childhood immunisation schedule, free catch-up doses, and MMR guidance — useful for aligning a moving family's records.",
+      "body": "Ireland has no vaccination requirement for entry, but the HSE strongly advises keeping to the recommended schedule; bring your children's immunisation records so an Irish GP can identify any gaps. Childhood vaccines under the Primary Childhood Immunisation Schedule and School Immunisation Programme are FREE. Key milestones on the schedule include: at 2, 4 and 6 months the '6-in-1' (diphtheria, tetanus, whooping cough, polio, Hib and Hepatitis B) plus PCV (pneumococcal), Meningococcal B and oral rotavirus doses; at 12 months MMR (measles, mumps, rubella) and Men B (plus chickenpox/varicella for babies born on/after 1 Oct 2024); at 13 months Men C and PCV; the nasal flu vaccine for children aged 2-17 in winter; at 4-5 years the '4-in-1' and second MMR; and in the first year of second-level school the Tdap booster, MenACWY booster and HPV vaccine. If a child has missed a dose, ask your GP for a free catch-up appointment. MMR notes: a free MMR is available if a child missed a dose, and also for adults aged 18-46 who have not had 2 doses; if vaccination records cannot be found, it is not harmful to have MMR again; adults born in Ireland before 1978 are likely already immune to measles. Children travelling can get an early MMR from 6-11 months of age. Vaccination is not compulsory — discuss any concerns with your GP.",
+      "source_url": "https://www.citizensinformation.ie/en/health/health-services/children-s-health/vaccinations-for-children/",
+      "source_name": "Citizens Information",
+      "tags": ["vaccinations", "pre-departure"],
+      "status": "draft"
+    }
+  ],
+  "events": []
+}

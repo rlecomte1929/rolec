@@ -1,0 +1,16 @@
+{
+  "batch_id": "ie-es-return-2026-09-10",
+  "corridor": "IE-ES",
+  "origin_country_code": "IE",
+  "destination_country_code": "ES",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "record_count": 9,
+  "non_obvious_count": 5,
+  "needs_lawyer_review_count": 2,
+  "artifact": "ie-es-return-2026-09-10.ndjson",
+  "sha256": "ee6a62e7d055fd32c3ac4f4f9a43344d31fd4399a022990c4efdfd4cd7f2281b",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "scope": "Official-source return/repatriation requirements for the reverse Ireland->Spain corridor (with an optional Venezuela consular leg) for a Venezuelan third-country national. Host-exit facts for Ireland cover Revenue leaving-Ireland admin and employment cessation, split-year treatment in the year of departure, the 183/280-day Irish residence test with 3-year ordinary residence, and lifelong retention of the PPS number (revenue.ie, citizensinformation.ie). Home-re-entry facts for Spain cover the obligation to re-register in the Madrid padron with TCN document requirements, obtaining/using the Social Security Number (NUSS) to re-affiliate, and re-establishing Spanish tax residence under the 183-day rule (madrid.es, seg-social.gob.es, agenciatributaria.gob.es). The Venezuela leg covers the consular registry as a census/duty and precondition for consular procedures (gob.ve). destination_country is set per-record (IE for host-exit, ES for home-re-entry, VE for Venezuela). Treaty tie-breaker and residence conclusions are flagged for lawyer review. Candidate-only: review_status=pending, verification_status=representative."
+}

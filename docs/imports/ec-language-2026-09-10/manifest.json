@@ -1,0 +1,17 @@
+{
+ "batch_id": "ec-language-2026-09-10",
+ "slug": "ec-language-2026-09-10",
+ "corridor": "US-EC",
+ "phase": "P6",
+ "package_type": "language",
+ "generated_at": "2026-09-11T00:00:00Z",
+ "providers_file": "1789135865403_96r9pfkn.csv",
+ "providers_count": 1,
+ "rejects_count": 4,
+ "sha256": {
+  "providers_csv": "aa6e3743b926898783e5fdb6b29ba8b9853c41251cc5a615910eeb7c107bbeff",
+  "rejects_csv": "dc4bfd21e300f56f30c6074b4afe9e16c0c17a91c1c72b6c95a79ccf59942caa",
+  "manifest": "b2d179f797b37e5b06eacd3adfc40b7fab65b86109d29100c8468ea4b9afe6e6",
+  "readme": "970f934504aaa1f88eb3f182f2c9fbe969cc6f2cc847267fd9199632be54c081"
+ }
+}

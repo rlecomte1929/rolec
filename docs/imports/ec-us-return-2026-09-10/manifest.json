@@ -1,0 +1,16 @@
+{
+  "batch_id": "ec-us-return-2026-09-10",
+  "corridor": "EC-US",
+  "origin_country_code": "EC",
+  "destination_country_code": "US",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "record_count": 9,
+  "non_obvious_count": 4,
+  "needs_lawyer_review_count": 2,
+  "artifact": "ec-us-return-2026-09-10.ndjson",
+  "sha256": "ac4ae36538ad4ac19fabfa06950255d66d066cf32853c2b58abe113c576fb2b8",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "scope": "REVERSE corridor EC->US (Ecuador -> Seattle, Washington). Abraham persona: US citizen returning home. Host-exit obligations in Ecuador (SRI RUC suspension/cancellation, IESS de-registration and residual cover) and home-re-entry obligations in the US (end of FEIE / resume worldwide IRS filing, re-establish Washington state residency, Social Security payments on return). Official sources only: sri.gob.ec, iess.gob.ec (EC); irs.gov, ssa.gov, dol.wa.gov (US, official Washington state government domain). Candidate-only; all tax determinations flagged needs_lawyer_review."
+}

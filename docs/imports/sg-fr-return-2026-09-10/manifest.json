@@ -1,0 +1,23 @@
+{
+  "batch_id": "sg-fr-return-2026-09-10",
+  "corridor": "SG-FR",
+  "origin_country_code": "SG",
+  "destination_country_code": "FR",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "record_count": 7,
+  "non_obvious_count": 6,
+  "needs_lawyer_review_count": 0,
+  "artifact": "sg-fr-return-2026-09-10.ndjson",
+  "sha256": "b5cd04a6cc219130934879d6a69c578c579f3511fe5e7575b7c7c7f7ad8b77ad",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "scope": "SG->FR repatriation skeleton (highest-value facts). MIXED AUDIENCE: three host-exit (Singapore) obligations for Adrien as a non-EEA EP holder (IRAS tax clearance via Form IR21 at least 1 month before last day; employer EP cancellation within 1 week of departure, which also cancels family Dependant's Passes; no CPF to unwind because CPF is only for SCs/SPRs) and four home-re-entry (France) obligations for him as an EEA national (notify the non-residents tax office of the new French address; check/adapt the prelevement a la source rate to avoid the default rate; the return-year income-declaration split via 2042-NR + 2042; re-affiliate to French Assurance maladie via form S1106/PUMa). destination_country is set to the ISO-2 country where each obligation applies (SG for host-exit, FR for home-re-entry). nationality per audience: SG-exit = non-EEA, FR-re-entry = EEA (never null). Tax facts mapped to the EMPLOYMENT pillar per loader convention. All records candidate-only, awaiting human/lawyer verification.",
+  "sources": [
+    { "name": "Inland Revenue Authority of Singapore (IRAS)", "authority": "official" },
+    { "name": "Ministry of Manpower (MOM)", "authority": "official" },
+    { "name": "service-public.gouv.fr (DILA)", "authority": "official" },
+    { "name": "impots.gouv.fr", "authority": "official" }
+  ],
+  "source_access_notes": "IRAS is JavaScript-rendered; the IR21 verbatim quote was captured from an official-domain (iras.gov.sg) search excerpt and must be re-confirmed on the live page (quote_verbatim_confirmed=false). The MOM EP-cancellation and CPF pages, and the two service-public.gouv.fr pages (F31443 retour d'expatriation, F32824 assurance maladie au retour), all scraped cleanly and their quotes are verbatim from the live pages. ameli.fr is not scrapable from this egress, so the health re-affiliation fact is sourced to service-public.gouv.fr instead. The F32824 verbatim procedure is published for returns from the EEE/EU/Switzerland/UK; Adrien returns from Singapore (a non-EEA country) - the same first-hour-worked professional-activity affiliation applies, but the non-working PUMa 3-month-residence condition and any 'autre pays' specifics should be confirmed."
+}

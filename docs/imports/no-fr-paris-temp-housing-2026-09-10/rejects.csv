@@ -1,0 +1,3 @@
+provider_name,siren,address_paris,arrondissement,website,min_stay_nights,corporate_booking,sirene_verified,platform_vetting_status,rejection_reason
+Edgar Suites,,,,https://www.edgarsuites.com/,,,false,pending,"SIRENE lookup could not be completed this run (recherche-entreprises API returned no text through the scraper; annuaire search timed out). Operating-entity SIREN not verified - excluded pending verification."
+Fraser Suites Le Claridge Champs-Elysees,,,,https://paris.frasershospitality.com/,,,false,pending,"No SIRENE match returned for the operating entity in this run. Unverified - excluded pending confirmation of the French operating company SIREN."

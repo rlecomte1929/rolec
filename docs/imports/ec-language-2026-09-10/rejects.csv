@@ -1,0 +1,5 @@
+corridor,service_category,source_name,source_url,rejection_reason,notes
+US-EC,language,SETEC - operadores de capacitacion (registro parcial),https://www.setec.gob.ec/,incomplete_source_data,SETEC operadores export returned partial/incomplete data; language schools not fully enumerable.
+US-EC,language,Berlitz Quito / generic language-school web listings,,unverified_no_accreditation,No official accreditation register entry found (not on Instituto Cervantes SACIC list).
+US-EC,language,Bipo & Toni's Academy (Quito),,unverified_no_accreditation,Language school found via web search but not present on any official accreditation register.
+US-EC,language,Simon Bolivar Spanish School (Quito),,unverified_no_accreditation,Not on Instituto Cervantes SACIC accredited-centres list; could not verify accreditation.

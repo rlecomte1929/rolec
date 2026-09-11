@@ -1,0 +1,25 @@
+{
+  "batch_id": "fr-departure-2026-09-10",
+  "corridor": "FR-SG",
+  "origin_country_code": "FR",
+  "destination_country_code": "FR",
+  "nationality_class": "EU_EEA",
+  "target_table": "public.requirement_items",
+  "record_count": 8,
+  "non_obvious_count": 6,
+  "needs_lawyer_review_count": 1,
+  "artifact": "fr-departure-2026-09-10.ndjson",
+  "sha256": "ccff444dcb6c828aa5565309195467336a3d2943bdf1eef2d9d3339e72210eb0",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "status_all": "draft",
+  "platform_vetting_status_all": "pending",
+  "scope": "France-departure (origin-side) requirement facts for a departing French tax resident on the FR->SG corridor (Paris->Singapore), French national. Net-new origin-side facts for this corridor. Covers: transfer of tax residence / change-of-address declaration and SIP-NR handover; departure-year 2042-NR split filing; loss of attachment to the French social security regime on taking expatriate status; optional CFE health cover; A1/detachement certificate scope (EU/EEA/CH only) with an explicit needs_lawyer_review flag on the FR-SG totalization position (no bilateral social security convention); expatriate unemployment-scheme 8-day affiliation deadline; CAF family-benefit cessation when the family accompanies the mover.",
+  "sources_used": [
+    "impots.gouv.fr (Je pars vivre a l'etranger, quelles demarches)",
+    "service-public.gouv.fr F55 (Salarie expatrie a l'etranger)",
+    "service-public.gouv.fr F3155 (Salarie detache a l'etranger)",
+    "caf.fr (Je pars vivre a l'etranger)"
+  ],
+  "source_access_notes": "ameli.fr returned no scrapable text (HTTP 403 / empty body) from this egress; the health-cessation fact was therefore sourced from the whitelisted service-public.gouv.fr F55 page instead. The FR-SG no-convention position is corroborated by French Senate written question n.00126 (2022) but the fact source_url is kept to the whitelisted service-public.gouv.fr F3155 page and the item is flagged needs_lawyer_review."
+}

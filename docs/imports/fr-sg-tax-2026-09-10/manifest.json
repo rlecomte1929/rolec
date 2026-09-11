@@ -1,0 +1,21 @@
+{
+  "batch_id": "fr-sg-tax-2026-09-10",
+  "corridor": "FR-SG",
+  "origin_country_code": "FR",
+  "destination_country_code": "SG",
+  "nationality_class": "THIRD_COUNTRY",
+  "target_table": "public.requirement_items",
+  "record_count": 6,
+  "non_obvious_count": 4,
+  "needs_lawyer_review_count": 1,
+  "artifact": "fr-sg-tax-2026-09-10.ndjson",
+  "sha256": "dcd70297c8630bcd7617b51076b600bb50c2817a2f29d846f574f62bd1b1c7e9",
+  "review_status_all": "pending",
+  "verification_status_all": "representative",
+  "scope": "Singapore-side (destination) individual income-tax obligations for Adrien, a French national relocating on an Employment Pass. Covers tax residency (183-day rule), non-resident employment-income rates (higher of 15% flat or progressive resident rates), the annual filing obligation and 18 April e-file deadline, the absence of CPF for EP holders (CPF only for SCs/SPRs), the France-Singapore DTA (flagged needs_lawyer_review), and employer tax clearance via Form IR21 on exit. Tax facts mapped to the EMPLOYMENT pillar per loader convention. All records candidate-only, awaiting human/lawyer verification.",
+  "sources": [
+    { "name": "Inland Revenue Authority of Singapore (IRAS)", "authority": "official" },
+    { "name": "Ministry of Manpower (MOM)", "authority": "official" }
+  ],
+  "source_access_notes": "IRAS pages are JavaScript-rendered: both the platform scraper and the AI fetch tool returned only site navigation chrome for the individual-income-tax-rates, working-out-my-tax-residency, non-residents and IR21 pages. The verbatim evidence quotes were obtained from official-domain (iras.gov.sg) search excerpts of those same pages and must be re-confirmed against the live IRAS pages before operational use (quote_verbatim_confirmed=false on every record). The MOM CPF page (mom.gov.sg) scraped cleanly and the CPF-eligibility quote is verbatim from the live page. The France-Singapore DTA fact is sourced to the IRAS List of DTAs and flagged needs_lawyer_review=true because the applicable relief is residency- and case-specific."
+}

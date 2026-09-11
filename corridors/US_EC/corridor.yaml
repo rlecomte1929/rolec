@@ -8,8 +8,11 @@
 # landing unservable (as IE→ES and IE did before it).
 #
 # The eligibility pathway step-graph (the temporary-residence / professional-visa
-# route) is authoring TODO: corridor_registry is fallback-safe, so the corridor loads
-# without a `pathways:` section.
+# route) is authored at pathways/PROFESSIONAL_RESIDENCE_2026/v1.yaml — REPRESENTATIVE,
+# sourced from the corridor's own reviewed/representative requirement_items (professional
+# & work-dependency residence visas, e-VISAS, cédula/orden de cedulación, RUC/SRI, SUT,
+# IESS, apostille, tourist-work bar) plus the delivered us-departure candidate facts.
+# facts.yaml (fact→step binding) is authored AFTER the facts load, when the refs resolve.
 #
 # STATUS: authoring. Nothing here is counsel-verified; nothing may render as legal
 # advice in ReloPass's own voice. Ecuador (Cancillería / Ministerio del Trabajo / SRI)
@@ -33,5 +36,14 @@ corridor:
     task_key: "immigration_answer"
 
   sla:
-    at_risk_window_days: 30
+    # DERIVED from the PROFESSIONAL_RESIDENCE_2026 step graph's pre-arrival runway
+    # (longest path to the TRAVEL_TO_EC arrival anchor):
+    #   VISA_APPLICATION 21 + VISA_GRANTED 14 + TRAVEL_TO_EC 1 = 36.
+    # Durations are estimates pending agent confirmation; re-derive rather than hand-edit.
+    at_risk_window_days: 36
     at_risk_pct: 80
+
+  # Eligibility Corridor Agent pathways (REPRESENTATIVE content).
+  pathways:
+    - id: "PROFESSIONAL_RESIDENCE_2026"
+      file: "pathways/PROFESSIONAL_RESIDENCE_2026/v1.yaml"

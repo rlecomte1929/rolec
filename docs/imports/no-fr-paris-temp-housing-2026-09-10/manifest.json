@@ -1,0 +1,40 @@
+{
+ "batch_id": "no-fr-paris-temp-housing-2026-09-10",
+ "package_id": "D-P3",
+ "slug": "no-fr-paris-temp-housing-2026-09-10",
+ "package_type": "vendor_csv",
+ "corridor": "NO-FR",
+ "use_case": "1-3 month corporate relocation temp housing, Paris",
+ "persona": "Denis",
+ "generated_at": "2026-09-11",
+ "counts": {
+  "providers_accepted": 4,
+  "providers_rejected": 2,
+  "sirene_verified": 4
+ },
+ "constraints": {
+  "platform_vetting_status": "pending",
+  "db_writes": 0,
+  "webhook_calls": 0
+ },
+ "sirene_source": "annuaire-entreprises.data.gouv.fr (verified 2026-09-11)",
+ "files": [
+  {
+   "filename": "no-fr-paris-temp-housing-2026-09-10-providers.csv",
+   "sha256": "228537057c64bb9c8e3fb453a7fea21646a03d23d18ed2d64528d269b22cd610",
+   "bytes": 811,
+   "data_rows": 4
+  },
+  {
+   "filename": "no-fr-paris-temp-housing-2026-09-10-rejects.csv",
+   "sha256": "343f5388cfe4f5f926440a676a791f368a6004c1fbae3d6f541c02b62b575900",
+   "bytes": 664,
+   "data_rows": 2
+  },
+  {
+   "filename": "no-fr-paris-temp-housing-2026-09-10-README.md",
+   "sha256": "d313a554ee72bc1b9fa5fba72a50264a4acc541415479d031725ec2b8a76a3c5",
+   "bytes": 2205
+  }
+ ]
+}

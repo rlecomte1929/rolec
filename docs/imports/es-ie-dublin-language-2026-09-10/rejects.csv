@@ -1,0 +1,4 @@
+corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry,reject_reason
+XX-IE,language,Patrick's English Academy,https://patricksenglish.ie/,QQI/ACELS TrustEd Ireland,https://www.trustedireland.ie/trusted-providers/english-language-education-institutions,QQI,,,not Dublin: registered/main campus is Cork (30 South Terrace, Cork)
+XX-IE,language,Bridge Mills Galway Language Centre,,QQI/ACELS TrustEd Ireland,https://www.trustedireland.ie/trusted-providers/english-language-education-institutions,QQI,,,not Dublin: located in Galway
+XX-IE,language,Atlas Language School,https://atlaslanguageschool.com/,,,ACELS,,,"tier-3: own-site claims ACELS/EAQUALS but could not confirm on an official register page (ACELS recognisedproviders list is JS-driven/unreadable; ILEP closed; not on TrustEd Ireland listing)"
