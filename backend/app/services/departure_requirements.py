@@ -1,38 +1,59 @@
 """Departure (home-country exit) requirements → pre-departure roadmap steps.
 
-The mirror of ``requirements_builder``, keyed on the ORIGIN country. A mover's
-home-country exit obligations — Spain's baja del padrón, the Seguridad Social baja,
-the AEAT tax-exit — live in ``public.requirement_items`` too, keyed on the origin
-country. Nothing served them: the requirements engine is destination-keyed
-(``requirements_builder`` fetches by ``dest_country``) and the employee roadmap reads
-the corridor *pathway* files, not the DB. So a corridor whose pathway authors no
-origin-exit steps (ES→IE's CSEP is Ireland-arrival only) had no way to surface its
-home-exit obligations even though they exist as researched, reviewed rows.
+Surfaces a mover's home-country EXIT obligations into the pre-departure track for a
+corridor whose pathway authors no origin-exit steps (ES→IE's CSEP is Ireland-arrival
+only). Reads the APPROVED origin-country requirement_items — ``crud.list_requirements``
+is THE publication gate, so nothing unreviewed leaks — and returns lightweight records
+for ``roadmap_builder`` to shape into pre-departure steps.
 
-This reads the APPROVED origin-country requirement_items — ``crud.list_requirements``
-is THE publication gate, so nothing unreviewed leaks — nationality-gates them the same
-way the destination path does, and returns lightweight records for
-``roadmap_builder`` to shape into pre-departure steps.
+**Direction gate — requirement_items are destination/arrival-framed.** A row keyed on
+country X states what you do when X is your DESTINATION (register on the padrón, enrol in
+social security, get a health card). Read naively, an origin-country row inverts: serving
+Spain's arrival rows as Andrea's *departure* steps would tell her to REGISTER in the
+country she is LEAVING. Direction is carried in the id — ``<C>:<ORIGIN>-<DEST>:<key>``
+(``ES:IE-ES:empadronamiento_...`` is the IE→ES corridor, Spain the DESTINATION). A row is
+a genuine exit obligation only when the mover's origin is its corridor's ORIGIN
+(``ES:ES-IE:...``); reverse-corridor rows and un-parseable ids are withheld. Until a
+corridor-tagged departure batch lands, this correctly returns nothing and the generic
+pre-departure skeleton stands.
 
 Deterministic and dependency-light (crud + the country/purpose/nationality resolvers),
 so it never widens the serving/LLM-isolation closure. Fail-safe by construction: any
-missing input or DB issue returns ``[]``, which leaves the generic pre-departure
-skeleton exactly as it was.
+missing input or DB issue returns ``[]``.
 """
 from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
 from .. import crud
 from . import nationality_class
-from .requirements_country_key import resolve_catalog_country
+from .requirements_country_key import resolve_catalog_country, to_iso_alpha2
 from .requirements_purpose_key import to_purpose
 
 log = logging.getLogger(__name__)
+
+#: A requirement id's corridor segment: ``<ORIGIN>-<DEST>`` in ISO alpha-2.
+_CORRIDOR_SEG = re.compile(r"^([A-Za-z]{2})-([A-Za-z]{2})$")
+
+
+def _corridor_origin_iso(row_id: str) -> Optional[str]:
+    """The ORIGIN ISO of the corridor encoded in a requirement id, or ``None``.
+
+    Ids are ``<COUNTRY>:<CORRIDOR>:<key>`` with ``<CORRIDOR>`` = ``<ORIGIN>-<DEST>``
+    (``ES:IE-ES:empadronamiento_...`` → ``IE``). ``None`` when the second segment is not
+    a ``<XX>-<YY>`` corridor (e.g. a topic-keyed id) — the caller treats that as
+    undeterminable and withholds the row.
+    """
+    parts = (row_id or "").split(":")
+    if len(parts) < 3:
+        return None
+    m = _CORRIDOR_SEG.match(parts[1])
+    return m.group(1).upper() if m else None
 
 
 def _mover_nationality(draft: Dict[str, Any]) -> Optional[str]:
@@ -73,9 +94,17 @@ def departure_requirement_records(db: Session, case: Dict[str, Any]) -> List[Dic
             return []
 
         mover_class = nationality_class.classify(_mover_nationality(draft), origin_raw)
+        origin_iso = to_iso_alpha2(origin_raw)
 
         records: List[Dict[str, Any]] = []
         for r in rows:
+            # DIRECTION GATE (see module docstring): keep a row only when the mover's
+            # origin is its corridor's ORIGIN — a genuine EXIT obligation. A row where the
+            # origin is the corridor's DESTINATION is reverse-corridor arrival-in-origin
+            # content and would invert the meaning; un-parseable ids are withheld too. An
+            # unresolved origin ISO withholds everything (fail-safe).
+            if origin_iso is None or _corridor_origin_iso(r.id) != origin_iso:
+                continue
             nat_json = getattr(r, "applies_to_nationality_classes_json", None)
             classes = json.loads(nat_json) if nat_json else None
             # None ⇒ applies to all classes. A scoped row applies only when the mover's
