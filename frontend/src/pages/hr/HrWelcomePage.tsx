@@ -84,9 +84,9 @@ export function HrWelcomePage() {
           />
           <WelcomeStepCard
             step={3}
-            title="Curate your provider list"
+            title="Curate your service providers"
             description="Choose which moving companies, housing services, and immigration specialists appear in your cases."
-            href="/hr/provider-grid"
+            href={`${buildRoute('hrServiceProviders')}?tab=vendor`}
           />
         </div>
 
@@ -127,9 +127,9 @@ export function HrWelcomePage() {
         />
         <WelcomeStepCard
           step={3}
-          title="Curate your provider list"
+          title="Curate your service providers"
           description="Choose which moving companies, housing services, and immigration specialists appear in your cases."
-          href="/hr/provider-grid"
+          href={`${buildRoute('hrServiceProviders')}?tab=vendor`}
         />
       </div>
 

@@ -92,7 +92,7 @@ describe('HrWelcomePage — test-drive HR', () => {
     renderPage();
     expect(screen.getByText(/configure your company/i)).toBeInTheDocument();
     expect(screen.getByText(/build your relocation policy/i)).toBeInTheDocument();
-    expect(screen.getByText(/curate your provider list/i)).toBeInTheDocument();
+    expect(screen.getByText(/curate your service providers/i)).toBeInTheDocument();
     expect(screen.getByText(/optional — the full hr setup/i)).toBeInTheDocument();
   });
 
@@ -103,7 +103,7 @@ describe('HrWelcomePage — test-drive HR', () => {
     expect(screen.getByRole('heading', { level: 2, name: /optional — the full hr setup/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: /configure your company/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: /build your relocation policy/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: /curate your provider list/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /curate your service providers/i })).toBeInTheDocument();
     expectNoSkippedHeadingLevel(container);
   });
 
@@ -124,6 +124,13 @@ describe('HrWelcomePage — real HR', () => {
     expect(screen.queryByTestId('hr-welcome-create-case')).toBeNull();
   });
 
+  it('sends step 3 to Service Providers vendor curation, not the legacy grid', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    const links = screen.getAllByRole('link', { name: /get started/i });
+    expect(links[2]).toHaveAttribute('href', '/hr/service-providers?tab=vendor');
+  });
+
   it('puts an h2 above the setup cards so h3 titles do not skip a level', () => {
     signedInAs('marie.dupont@acme-corp.com');
     const { container } = renderPage();
@@ -131,7 +138,7 @@ describe('HrWelcomePage — real HR', () => {
     expect(screen.getByRole('heading', { level: 2, name: /how it works/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: /configure your company/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: /build your relocation policy/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: /curate your provider list/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /curate your service providers/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: /ready to open your first case/i })).toBeInTheDocument();
     expectNoSkippedHeadingLevel(container);
   });
