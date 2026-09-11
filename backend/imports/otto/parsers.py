@@ -216,6 +216,12 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     # (pmlp.gov.lv migration, vid.gov.lv tax, vsaa.gov.lv social insurance); Lithuania `.gov.lt`
     # (plus migracija.lrv.lt / vmi.lt / sodra.lt on bare `.lt` — hosts below).
     "gov.hr", "gov.si", "gov.sk", "gov.lv", "gov.lt",
+    # Tier-1 destination GB — devolved governments. `gov.uk` (above) covers UK-wide and English
+    # services, but health, housing, schooling and some registration are devolved: Scotland
+    # publishes on `.gov.scot` / `mygov.scot` and Wales on `.gov.wales` / `llyw.cymru` (the
+    # Welsh-language domain). None of these end in `.gov.uk`, so a Scottish or Welsh settle-in
+    # fact scored UNOFFICIAL — the same too-narrow-allowlist failure as the clusters above.
+    "gov.scot", "mygov.scot", "gov.wales", "llyw.cymru",
 )
 
 #: Statutory bodies whose domain does not advertise itself as governmental. These publish the
@@ -279,8 +285,22 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Germany. `bund.de` covers the federal portal, but the bodies that actually publish the
     # rule mostly do not sit under it: the BZSt issues the tax ID, service.berlin.de is the
     # Land of Berlin's own service catalogue for the Anmeldung, and Rundfunkbeitrag is the
-    # body that levies the broadcasting fee it describes.
-    "bzst.de", "service.berlin.de", "rundfunkbeitrag.de",
+    # body that levies the broadcasting fee it describes. ELSTER is the official tax-filing
+    # portal (Finanzverwaltung) and the Zoll (customs) publishes the vehicle/goods/pet import
+    # rules — both statutory, neither under `bund.de`.
+    "bzst.de", "service.berlin.de", "rundfunkbeitrag.de", "elster.de", "zoll.de",
+    # Netherlands (Tier-1 destination). The suffix rule only recognises `overheid.nl` (the law
+    # database wetten.overheid.nl), so every core Dutch authority scored UNOFFICIAL: the IND
+    # (Immigration & Naturalisation Service) publishes the residence rules, the Belastingdienst
+    # the tax/BSN rules, the SVB the social-insurance/AOW rules, UWV the work-permit (TWV) rules,
+    # and rijksoverheid.nl / government.nl is the central-government portal (NL/EN). None sit
+    # under `overheid.nl` — an NL batch would be rejected almost in full without these.
+    "ind.nl", "belastingdienst.nl", "svb.nl", "uwv.nl", "rijksoverheid.nl", "government.nl",
+    # United Kingdom — the NHS publishes health-entitlement and GP-registration rules on
+    # `nhs.uk`, which does not end in `.gov.uk`; it is the health analogue of the whitelisted
+    # `hse.ie`. Already-landed GB facts cite it; adding it keeps future GB batches from
+    # rejecting the health pillar.
+    "nhs.uk",
     # Spain. Only the `gob.es` suffix was recognised, so every statutory body that does not
     # sit under it scored UNOFFICIAL and was rejected outright — which is every Spain-side
     # fact in an ES->IE deliverable. `boe.es` is the starkest: the Boletín Oficial del Estado
