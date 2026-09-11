@@ -89,17 +89,27 @@ export const DiscoverSection: React.FC = () => {
 
   return (
     <Card padding="lg" className="mb-6">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2">
         <h2 className="text-lg font-semibold text-[#0b2b43]">Discover suppliers</h2>
         <div className="flex items-center gap-2 text-xs text-[#6b7280]">
           {status && !isOff && (
             <span>{status.daily_remaining}/{status.daily_limit} searches left today · up to {status.max_results}/search</span>
           )}
           {isOff
-            ? <Badge variant="neutral" size="sm">discovery off</Badge>
+            ? <Badge variant="neutral" size="sm">maps search off</Badge>
             : <Badge variant="success" size="sm">{status!.provider}</Badge>}
         </div>
       </div>
+      <p className="mb-4 text-sm text-[#64748b]">
+        Search maps for real businesses in a city, then import selected ones into the review
+        queue. This is a maps search, not the automatic lookup used by Find providers below.
+      </p>
+      {isOff && (
+        <p className="mb-3 text-sm text-[#64748b]">
+          Maps search is not configured on this environment. You can still open cities and
+          review HR requests on this page.
+        </p>
+      )}
       {error && <div className="mb-3"><Alert variant="error">{error}</Alert></div>}
       {info && <div className="mb-3"><Alert variant="success">{info}</Alert></div>}
 

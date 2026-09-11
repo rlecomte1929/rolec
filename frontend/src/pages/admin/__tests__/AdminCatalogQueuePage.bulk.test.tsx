@@ -76,7 +76,7 @@ describe('AdminCatalogQueuePage bulk actions (AIQ-1894)', () => {
 
     fireEvent.click(screen.getByLabelText(/select all pending/i));
     fireEvent.click(
-      screen.getByRole('button', { name: /approve & allowlist \(2\)/i }),
+      screen.getByRole('button', { name: /approve city \(2\)/i }),
     );
 
     await waitFor(() =>

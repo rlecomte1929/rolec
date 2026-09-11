@@ -7,6 +7,7 @@ Phase 2h adds the per-row promote/demote/remove admin UI surface.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -268,9 +269,13 @@ def fill_demand_gap(
         destination_city=city,
         country=country,
     )
+    # True only when the lookup would actually call the LLM. scraped_count=0
+    # with lookup_ran=False is "not configured", not an empty search result.
+    lookup_ran = catalog_scraper._enabled() and bool(os.getenv("OPENAI_API_KEY"))
     return {
         "allowlisted": True,
         "scraped_count": len(rows),
+        "lookup_ran": lookup_ran,
         "category": category,
         "city": city,
         "country": country,
