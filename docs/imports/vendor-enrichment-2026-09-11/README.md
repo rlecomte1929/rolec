@@ -33,3 +33,23 @@ approved-cap tripwire on every run).
   ES/legal_admin `vc-*` contact-email coverage **0 → 13** (of 20), phone **0 → 15**. 0 overwrites.
   **Approved-cap tripwire UNCHANGED: 1283** (vetting untouched); caps by status still approved 1283 /
   pending 8 / rejected 3.
+
+## Batch #2 — NL/housing_agencies contact (`enrich-xx-nl-housing-contact-2026-09-11`)
+- Source (GCS): `src/enrich-xx-nl-housing-contact.ndjson` (+ `manifest_nl-housing-contact.json`). Landing:
+  `src/enrich-xx-nl-housing-contact.LANDING.ndjson` (schema-mapped, no exclusions). Target: `nl-housing-target.csv`
+  (10 approved NL/housing_agencies makelaars missing `contact_email`, all own-domain).
+- Otto: **10 attempted / 10 filled**. Keys ⊆ target ✓. Phones all +31 E.164.
+- **Verification:** 5 emails domain-matched; **3 blank** (Broersma, Pim de Jong, Ramon Mossel — no published email /
+  contact-form only, honestly left blank, phone filled); **2 landed with a vetter note** (genuine firm contacts, NOT
+  third-party aggregators like the Pleitex case): **E&V Amsterdam Zuid** `netherlands@engelvoelkers.com` (E&V's own
+  brand domain, but the NL *country* inbox, not office-specific) and **JLG Real Estate** `info@jlg.nl` (the firm's own
+  `.nl`, published on its jlgrealestate.com site — cross-TLD but genuine). No holds.
+- **Landed (fill-empty):** **17 fields across 10 suppliers** — 7 `contact_email` + 10 `contact_phone`.
+  NL/housing_agencies `vc-*` contact-email coverage **1 → 8** (of 11), phone **→ 11**. 0 overwrites.
+  **Approved-cap tripwire UNCHANGED: 1283**; caps by status still approved 1283 / pending 8 / rejected 3.
+
+## Enrichment progress (running)
+Contact fills so far: **20 `contact_email` + 25 `contact_phone`** across 2 cells (ES/legal, NL/housing), on
+already-approved/live suppliers, fill-empty, 0 overwrites, vetting untouched throughout. Queue: CZ/housing → AU/legal →
+GB/legal → SE/housing → CA/tax → (banks last). Movers parked (FIDI, no websites to scrape). ~1,090 suppliers still
+lack an email at the start of the pivot — this is the RFQ-loop unblock, one city×category batch at a time.

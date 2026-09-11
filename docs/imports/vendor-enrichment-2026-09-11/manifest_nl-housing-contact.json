@@ -1,0 +1,33 @@
+{
+  "batch_id": "enrich-xx-nl-housing-contact-2026-09-11",
+  "generated_at": "2026-09-11T00:00:00Z",
+  "total_attempted": 10,
+  "total_filled": 10,
+  "fully_filled": 7,
+  "phone_only": 3,
+  "partially_filled": [
+    {
+      "supplier_id": "vc-dbfcb970-ee54-41d9-87eb-a6828f0e8079",
+      "name": "Broersma Werken en Wonen",
+      "reason": "email Cloudflare-protected on site; phone only (+31203059777 is the Broersma Wonen division line)"
+    },
+    {
+      "supplier_id": "vc-d34c3d0a-9b73-4ea1-b924-57bca44a352f",
+      "name": "Pim de Jong Makelaars",
+      "reason": "no email published anywhere on site; phone only"
+    },
+    {
+      "supplier_id": "vc-b48b2c34-9e19-4cd2-9c96-b5185a68b18b",
+      "name": "Ramon Mossel Makelaardij",
+      "reason": "email Cloudflare-protected on site; phone only"
+    }
+  ],
+  "unfilled": [],
+  "flags": [
+    {
+      "supplier_id": "vc-068f1a2b-51c7-4a31-b95f-0be1a41347ab",
+      "name": "Engel & Völkers Amsterdam Zuid",
+      "flag": "Email 'netherlands@engelvoelkers.com' is the Netherlands-level franchise email shown in the Amsterdam Zuid office page footer — not a dedicated Amsterdam Zuid address. Phone +31207162418 is the direct Amsterdam Zuid office line."
+    }
+  ]
+}
