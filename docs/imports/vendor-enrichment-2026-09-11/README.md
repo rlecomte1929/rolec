@@ -48,8 +48,20 @@ approved-cap tripwire on every run).
   NL/housing_agencies `vc-*` contact-email coverage **1 → 8** (of 11), phone **→ 11**. 0 overwrites.
   **Approved-cap tripwire UNCHANGED: 1283**; caps by status still approved 1283 / pending 8 / rejected 3.
 
+## Batch #3 — CZ/housing_agencies contact (`enrich-xx-cz-housing-contact-2026-09-11`)
+- Source (GCS): `src/enrich-xx-cz-housing-contact.ndjson` (+ `manifest_cz-housing-contact.json`). Landing:
+  `src/enrich-xx-cz-housing-contact.LANDING.ndjson` (schema-mapped; emails lowercased; MAXIMA dropped — no data).
+  Target: `cz-housing-target.csv` (9 approved CZ/housing firms missing `contact_email`, all own-domain).
+- Otto: **9 attempted / 8 filled**. Keys ⊆ target ✓. Phones +420 E.164.
+- **Verification:** all 6 emails domain-matched (no aggregator hits). E&V Prague + Svoboda & Williams = phone-only
+  (brand-office / form-only email — honest). **MAXIMA REALITY** returned no email *and* no phone → dropped (fill-empty
+  would no-op; honestly empty, not invented). Normalised `Hello@MHrelocations.cz` → lowercase at land.
+- **Landed (fill-empty):** **14 fields across 8 suppliers** — 6 `contact_email` + 8 `contact_phone`.
+  CZ/housing_agencies `vc-*` contact-email coverage **→ 6** (of 9), phone **→ 8**. 0 overwrites.
+  **Approved-cap tripwire UNCHANGED: 1283**; caps by status still approved 1283 / pending 8 / rejected 3.
+
 ## Enrichment progress (running)
-Contact fills so far: **20 `contact_email` + 25 `contact_phone`** across 2 cells (ES/legal, NL/housing), on
-already-approved/live suppliers, fill-empty, 0 overwrites, vetting untouched throughout. Queue: CZ/housing → AU/legal →
-GB/legal → SE/housing → CA/tax → (banks last). Movers parked (FIDI, no websites to scrape). ~1,090 suppliers still
-lack an email at the start of the pivot — this is the RFQ-loop unblock, one city×category batch at a time.
+Contact fills so far: **26 `contact_email` + 33 `contact_phone`** across 3 cells (ES/legal, NL/housing, CZ/housing), on
+already-approved/live suppliers, fill-empty, 0 overwrites, vetting untouched throughout. Queue: AU/legal → GB/legal →
+SE/housing → CA/tax → (banks last). Movers parked (FIDI, no websites to scrape). ~1,090 suppliers still lacked an email
+at the start of the pivot — this is the RFQ-loop unblock, one city×category batch at a time.

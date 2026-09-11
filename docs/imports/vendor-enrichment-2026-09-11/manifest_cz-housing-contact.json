@@ -1,0 +1,28 @@
+{
+  "batch_id": "enrich-xx-cz-housing-contact-2026-09-11",
+  "generated_at": "2026-09-11",
+  "total_attempted": 9,
+  "total_filled": 8,
+  "notes": "total_filled = suppliers with at least one contact field successfully extracted. Two suppliers have phone only (email not found or Cloudflare-protected). One supplier row present in NDJSON with no contact fields (MAXIMA REALITY — site unreachable).",
+  "unfilled": [
+    {
+      "supplier_id": "vc-2df03ecf-26ad-4520-a507-7cfc2a044cc0",
+      "name": "MAXIMA REALITY, s.r.o.",
+      "reason": "Site returned no text on all fetch attempts (3 tries across main URL and /kontakty path); JavaScript-only render with no static content accessible to scraper."
+    }
+  ],
+  "partial_email_only": [
+    {
+      "supplier_id": "vc-68cdda55-1e52-4a69-aa6f-b10544c68a1d",
+      "name": "Česká EuV Commercial (Engel & Völkers Prague)",
+      "missing": "contact_email",
+      "reason": "No email address published on the engelvoelkers.com/cz site; /kontakty/ returns 404 but global footer exposes phone only."
+    },
+    {
+      "supplier_id": "vc-04153bb6-1880-4ccd-80b4-22b0039614f7",
+      "name": "SVOBODA & WILLIAMS s.r.o.",
+      "missing": "contact_email",
+      "reason": "Email address is Cloudflare email-protection encoded (rendered as [email protected] by scraper); requires JS execution to decode — cannot extract without guessing."
+    }
+  ]
+}
