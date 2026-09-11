@@ -91,6 +91,15 @@ canonical form), so it is not a raw-bytes match by design. Manifest schema is le
 (`slug` + `providers_count`, no per-category self-assessment) — noted for the reviewer; the vendor
 loader reads `providers.csv`, not the manifest.
 
+> **Gate fix applied.** Otto's re-run manifests carried the batch id under `slug` and omitted the
+> contract's `batch_id`, so `scripts/check_otto_batches.py` failed ("manifest batch_id matches the
+> directory name — None"). A `batch_id` key equal to the directory name (the value already present as
+> `slug`) was added to each of the 4 manifests — a mechanical normalization, no content changed;
+> providers/rejects/README stay byte-identical and sha-verified. Consequence: the manifest's own
+> `sha256.manifest` self-hash is now stale (it covered the pre-normalization bytes). **Feedback for
+> Otto:** the metadata-regen path should emit `batch_id` (= dir name), not `slug`, or every future
+> vendor batch from it will fail this gate.
+
 | Batch (slug) | Accepted | Rejects | Note |
 |---|--:|--:|---|
 | ec-quito-temp-housing-2026-09-10 (AB-P3) | 0 | 5 | **honest-zero** — EC registers WAF/JS-blocked |
