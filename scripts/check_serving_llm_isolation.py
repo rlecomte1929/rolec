@@ -461,8 +461,9 @@ def check(root: Path) -> Tuple[int, str]:
         return 2, "\n".join(lines)
 
     report = (
-        f"[serving-llm-isolation] OK — {len(SERVING_ROOTS)} serving roots, "
-        f"{len(closure)} reachable modules, no path to an LLM gateway or SDK."
+        f"[serving-llm-isolation] OK — {len(SERVING_ROOTS)} serving roots + "
+        f"{len(FILL_ROOTS)} fill root(s), {len(closure)} reachable modules, "
+        f"no path to an LLM gateway or SDK."
     )
     for err in sorted(parse_errors):
         report = (

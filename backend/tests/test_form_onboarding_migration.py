@@ -10,5 +10,5 @@ def test_migration_is_additive_only():
 
 def test_migration_timestamp_beats_repo_max():
     ts = M.name[:14]
-    others = sorted(p.name[:14] for p in M.parent.glob("*.sql"))
-    assert ts == others[-1], "migration timestamp must be the repo max"
+    others = [p.name[:14] for p in M.parent.glob("*.sql") if p.name != M.name]
+    assert ts >= max(others), "migration timestamp must be at least the repo max"

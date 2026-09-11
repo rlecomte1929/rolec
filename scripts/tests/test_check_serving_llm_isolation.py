@@ -358,6 +358,18 @@ def test_fill_root_catches_llm_import_from_form_prefill_service():
         "the live fill path must be a protected root"
 
 
+def test_a_fill_root_that_is_itself_a_boundary_is_caught(repo, monkeypatch):
+    """Mechanism test for the fill path, analogous to
+    test_a_serving_root_that_is_itself_a_boundary_is_caught above: membership in
+    FILL_ROOTS alone proves nothing about whether check() actually walks it. A synthetic
+    fill root that imports an LLM gateway directly must fail the guard."""
+    monkeypatch.setattr(guard, "FILL_ROOTS", ("backend.app.services.fill_engine",))
+    make_module(repo, "backend.app.services.fill_engine", "import anthropic\n")
+    code, report = guard.check(repo)
+    assert code == 1, report
+    assert "fill_engine" in report and "anthropic" in report
+
+
 # ─── reconciliation vs the validated reference ──────────────────────────────
 #
 # Gaps found by semantically diffing this implementation against the reference
