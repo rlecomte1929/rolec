@@ -161,9 +161,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
 
   const sbRole = sidebarRole(role);
   const userInitials = deriveInitials(name || identity || 'RP');
-  const showEmployeeBanner =
-    sbRole !== 'ADMIN' && isEmployeeRole && !employeeAssignmentLoading && linkedCount === 0;
   const onEmployeeDashboard = location.pathname === ROUTE_DEFS.employeeDashboard.path;
+  const showEmployeeBanner =
+    sbRole !== 'ADMIN' &&
+    isEmployeeRole &&
+    !employeeAssignmentLoading &&
+    linkedCount === 0 &&
+    !onEmployeeDashboard;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800">

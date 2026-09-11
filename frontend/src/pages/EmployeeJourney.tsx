@@ -7,6 +7,7 @@ import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeNoCaseOnboarding';
+import { EMPLOYEE_CASE_LINK_INSTRUCTION } from '../features/employee-journey/employeeCaseLinkCopy';
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { getAuthItem } from '../utils/demo';
@@ -611,7 +612,7 @@ export const EmployeeJourney: React.FC = () => {
       ? 'Open a case or pick up where you left off.'
       : hasPendingOnly
         ? 'Accept your pending case below, then open it to get started.'
-        : 'Enter the case code from HR to link your case. A case HR set up for your verified email links automatically when you sign in.';
+        : 'Your case appears here once it is linked.';
 
   return (
     <AppShell title={shellTitle} subtitle={shellSubtitle} wide>
@@ -701,7 +702,7 @@ export const EmployeeJourney: React.FC = () => {
               ? 'Your active cases are below. If HR sent you a separate code, use manual entry at the bottom.'
               : hasPendingOnly
                 ? 'HR has set up a case for you. Accept it below to get started.'
-                : 'Sign in with the email HR used for your move, or enter the case code HR sent you.'}
+                : 'No case is linked yet.'}
           </p>
         </Card>
       ) : null}
@@ -869,15 +870,9 @@ export const EmployeeJourney: React.FC = () => {
 
       {!assignmentLoading && showPrimaryManualClaimPage ? (
         <Card padding="lg" className="mb-6 border border-[#cbd5e1]">
-          <div className="text-lg font-semibold text-[#0b2b43]">No relocation assigned yet</div>
-          <p className="text-sm text-[#4b5563] mt-2">
-            Ask your HR team to create your case. Once they do, it appears here automatically — no code needed.
-          </p>
-          <div className="mt-6 border-t border-[#e2e8f0] pt-5 text-base font-semibold text-[#0b2b43]">
-            Already have a case code from HR?
-          </div>
-          <p className="text-sm text-[#4b5563] mt-1">
-            Enter the email HR used and the code HR sent you.
+          <div className="text-lg font-semibold text-[#0b2b43]">Link your case</div>
+          <p data-testid="employee-case-link-instruction" className="text-sm text-[#4b5563] mt-2">
+            {EMPLOYEE_CASE_LINK_INSTRUCTION}
           </p>
           <ManualClaimInstructions signedInPrincipal={signedInPrincipal} />
           <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
