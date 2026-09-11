@@ -23,7 +23,8 @@ from backend.app.services import fact_dictionary as fd
 
 _ROOT = Path(__file__).resolve().parents[2]
 _PDF = _ROOT / "docs" / "form-autofill" / "artifacts" / "es_ex17_F94803.pdf"
-_MIGRATION = _ROOT / "supabase" / "migrations" / "20261136000000_es_ex17_tie_acroform_fields.sql"
+_MIG_DIR = _ROOT / "supabase" / "migrations"
+FORM = "ES_ex17_v2024"
 
 # ES field ids carry spaces/accents, so match any single-quoted run (no escaped quotes in the seed).
 _ROW = re.compile(
@@ -33,12 +34,13 @@ _ROW = re.compile(
 
 
 def _mappings():
-    text = _MIGRATION.read_text(encoding="utf-8")
-    return [
-        {"form_field_id": fid, "form_field_label": label, "vault_field_path": vault,
-         "format_rule": fmt or None, "exact_match_required": exact == "TRUE"}
-        for fid, label, vault, fmt, exact in _ROW.findall(text)
-    ]
+    """All ES_ex17 form_field_mappings across every es_ex17 migration (text + split-DOB)."""
+    out = []
+    for f in sorted(_MIG_DIR.glob("*es_ex17*.sql")):
+        for fid, label, vault, fmt, exact in _ROW.findall(f.read_text(encoding="utf-8")):
+            out.append({"form_field_id": fid, "form_field_label": label, "vault_field_path": vault,
+                        "format_rule": fmt or None, "exact_match_required": exact == "TRUE"})
+    return out
 
 
 def _fact_governs(vault_path: str) -> bool:
@@ -56,6 +58,9 @@ _PROFILE = {
     "passport_number": "ab 123 4567",
     "nationality": "Senegalese",
     "place_of_birth": "Dakar",
+    "date_of_birth": "1990-05-12",
+    "gender": "female",
+    "marital_status": "married",
 }
 
 
@@ -83,8 +88,14 @@ class EsEx17RealPdfFill(unittest.TestCase):
         ungoverned = [m["vault_field_path"] for m in self.mappings if not _fact_governs(m["vault_field_path"])]
         self.assertEqual(ungoverned, [], f"vault paths not governed by Build B: {ungoverned}")
 
-    def test_full_fill_lands_text_fields_in_the_real_form(self):
+    def test_full_fill_lands_text_dob_and_radios_in_the_real_form(self):
+        # The production path: text mappings (incl. the split-DOB date-part rules) + choice groups
+        # (Sexo / Estado Civil single radios).
         field_values, report = fps.build_fill_plan(self.mappings, _PROFILE)
+        choice_values, choice_report = fps.build_choice_fill(FORM, _PROFILE)
+        field_values.update(choice_values)
+        report.extend(choice_report)
+
         filled = fps.fill_acroform(self.pdf_bytes, field_values)
         report, _pdf_count, _unmapped = fps.reconcile_report_against_pdf(filled, report)
 
@@ -92,10 +103,22 @@ class EsEx17RealPdfFill(unittest.TestCase):
         self.assertEqual(not_in_pdf, [], f"mapped fields that did not land in the real EX-17: {not_in_pdf}")
 
         fields = PdfReader(io.BytesIO(filled)).get_fields() or {}
-        self.assertEqual(str(fields.get("1er Apellido", {}).get("/V")), "Diallo")
-        self.assertEqual(str(fields.get("Nombre", {}).get("/V")), "Awa")
-        self.assertEqual(str(fields.get("PASAPORTE", {}).get("/V")), "AB1234567")       # passport_format
-        self.assertEqual(str(fields.get("Nacionalidad", {}).get("/V")), "SENEGALESE")   # uppercase
+
+        def _v(name):
+            return str(fields.get(name, {}).get("/V"))
+
+        # text
+        self.assertEqual(_v("1er Apellido"), "Diallo")
+        self.assertEqual(_v("Nombre"), "Awa")
+        self.assertEqual(_v("PASAPORTE"), "AB1234567")     # passport_format
+        self.assertEqual(_v("Nacionalidad"), "SENEGALESE")  # uppercase
+        # split date of birth (1990-05-12) → three boxes, day/month zero-padded, year 4-digit
+        self.assertEqual(_v("Dia_Nacimiento"), "12")
+        self.assertEqual(_v("Mes_Nacimiento"), "05")
+        self.assertEqual(_v("Año_Nacimiento"), "1990")
+        # single-radio fields set to the Spanish export value
+        self.assertEqual(_v("Sexo"), "/Mujer")            # female
+        self.assertEqual(_v("Estado Civil"), "/Casado")   # married
 
 
 if __name__ == "__main__":

@@ -91,5 +91,39 @@ class ChoiceFillEndToEnd(unittest.TestCase):
         self.assertFalse(_on("applicantMaritalCEL"))
 
 
+class DatePartFormatRules(unittest.TestCase):
+    """A stored date fills a form that splits it across day/month/year boxes (ES EX-17)."""
+
+    def test_date_parts(self):
+        self.assertEqual(fps.apply_format_rule("1990-05-12", "date_day"), "12")
+        self.assertEqual(fps.apply_format_rule("1990-05-12", "date_month"), "05")   # zero-padded
+        self.assertEqual(fps.apply_format_rule("1990-05-12", "date_year"), "1990")
+        self.assertEqual(fps.apply_format_rule("07/03/2001", "date_day"), "07")     # dd/mm/yyyy input
+
+    def test_unparseable_date_passes_through(self):
+        self.assertEqual(fps.apply_format_rule("not a date", "date_day"), "not a date")
+
+
+class SingleRadioField(unittest.TestCase):
+    """The ES EX-17 shape: one radio field set to a Spanish export value (not one checkbox each)."""
+
+    ES = "ES_ex17_v2024"
+
+    def test_gender_and_marital_set_the_field_to_the_export_value(self):
+        vals, _ = fps.build_choice_fill(self.ES, {"gender": "female", "marital_status": "married"})
+        self.assertEqual(vals, {"Sexo": "/Mujer", "Estado Civil": "/Casado"})
+
+    def test_value_with_no_option_on_the_form_sets_nothing(self):
+        # The EX-17 marital radio has no "other"; an unmatched value must set nothing, not guess.
+        vals, report = fps.build_choice_fill(self.ES, {"marital_status": "in a civil partnership"})
+        self.assertEqual(vals, {})
+        self.assertTrue(any(r.status == fps.STATUS_BLANK and r.form_field_id == "Estado Civil" for r in report))
+
+    def test_missing_value_sets_nothing(self):
+        vals, report = fps.build_choice_fill(self.ES, {"gender": ""})
+        self.assertEqual(vals, {})
+        self.assertTrue(report and report[0].status == fps.STATUS_BLANK)
+
+
 if __name__ == "__main__":
     unittest.main()

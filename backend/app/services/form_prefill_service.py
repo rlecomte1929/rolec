@@ -169,6 +169,14 @@ def apply_format_rule(value: Any, rule: Optional[str]) -> str:
         if parsed is None:
             return s
         return parsed.strftime("%d/%m/%Y") if rule == "dd/mm/yyyy" else parsed.strftime("%Y-%m-%d")
+    # Date-part rules: one stored date fills a form that splits it across day/month/year boxes
+    # (e.g. the Spanish EX-17's Dia_/Mes_/Año_Nacimiento). Day/month are zero-padded; year is 4-digit.
+    if rule in ("date_day", "date_month", "date_year"):
+        parsed = _parse_date(s)
+        if parsed is None:
+            return s
+        return {"date_day": f"{parsed.day:02d}", "date_month": f"{parsed.month:02d}",
+                "date_year": f"{parsed.year:04d}"}[rule]
     return s
 
 
@@ -299,10 +307,21 @@ def _canonical_choice(vault_path: str, value: Any) -> Optional[str]:
     return None
 
 
-# form_id → vault_field_path → { canonical option code → button form_field_id }.
-# The button ids are the real FR CERFA AcroForm names (docs/form-autofill/artifacts/
-# fr_cerfa_14571-05_acroform_fields.json). Add a form's groups here to make its radios fillable.
-CHOICE_GROUPS: Dict[str, Dict[str, Dict[str, str]]] = {
+@dataclass(frozen=True)
+class RadioField:
+    """A SINGLE AcroForm radio field whose one value selects the option — the Spanish EX-17 shape
+    (``Sexo`` = ``/Hombre``|``/Mujer``). Distinct from the FR CERFA's one-independent-checkbox-per-
+    option groups. ``values`` maps a canonical option code to the field's AcroForm export value."""
+
+    field_id: str
+    values: Dict[str, str]
+
+
+# A choice group is EITHER a {code -> button form_field_id} dict — one independent checkbox per
+# option, ticked with CHECKBOX_ON (FR CERFA) — OR a RadioField — one field set to an export value
+# (ES EX-17). build_choice_fill handles both. Add a form's groups here to make its radios fillable.
+CHOICE_GROUPS: Dict[str, "Dict[str, Dict[str, str] | RadioField]"] = {
+    # FR CERFA: one independent checkbox per option (real names from the committed field artifact).
     "FR_cerfa_14571_v2024": {
         "gender": {
             "M": "applicantGenderM",
@@ -318,6 +337,18 @@ CHOICE_GROUPS: Dict[str, Dict[str, Dict[str, str]]] = {
             "OTHER": "applicantMaritalAUT",
         },
     },
+    # ES EX-17: a single radio field per group, set to a Spanish export value (verified from the
+    # real PDF). The form has no "other" option, so an unmatched value sets nothing (never guess).
+    "ES_ex17_v2024": {
+        "gender": RadioField("Sexo", {"M": "/Hombre", "F": "/Mujer"}),
+        "marital_status": RadioField("Estado Civil", {
+            "SINGLE": "/Soltero",
+            "MARRIED": "/Casado",
+            "WIDOWED": "/Viudo",
+            "DIVORCED": "/Divorciado",
+            "SEPARATED": "/Separado",
+        }),
+    },
 }
 
 
@@ -327,34 +358,54 @@ def build_choice_fill(
 ) -> Tuple[Dict[str, str], List[FieldFillStatus]]:
     """Resolve the radio/checkbox GROUPS declared for ``form_id`` from the vault profile.
 
-    Returns (button_values, report): ``button_values`` ticks exactly the selected button
-    (``{button_field_id: CHECKBOX_ON}``) and leaves the rest of the group untouched (so they
-    stay unchecked); ``report`` carries one row per group. A group whose vault value is missing
-    is reported STATUS_BLANK and ticks nothing — never guess a protected attribute.
+    Returns (field_values, report). For a checkbox group, ticks exactly the selected button
+    (``{button_field_id: CHECKBOX_ON}``) and leaves the rest unchecked; for a RadioField, sets the
+    one field to the option's export value (``{field_id: "/Hombre"}``). ``report`` carries one row
+    per group; a group whose vault value is missing — or whose value has no option on this form —
+    is reported STATUS_BLANK and sets nothing (never guess a protected attribute).
     """
     groups = CHOICE_GROUPS.get(form_id, {})
-    button_values: Dict[str, str] = {}
+    field_values: Dict[str, str] = {}
     report: List[FieldFillStatus] = []
 
-    for vault_path, code_to_button in groups.items():
+    for vault_path, group in groups.items():
+        target_field = (
+            group.field_id if isinstance(group, RadioField)
+            else (group.get("OTHER") or next(iter(group.values())))
+        )
         raw = profile.get(vault_path)
         if raw is None or (isinstance(raw, str) and raw.strip() == ""):
             report.append(FieldFillStatus(
-                form_field_id=code_to_button.get("OTHER") or next(iter(code_to_button.values())),
-                vault_field_path=vault_path, label=vault_path, status=STATUS_BLANK, value=None,
+                form_field_id=target_field, vault_field_path=vault_path, label=vault_path,
+                status=STATUS_BLANK, value=None,
             ))
             continue
-        code = _canonical_choice(vault_path, raw)
-        button = code_to_button.get(code) or code_to_button.get("OTHER")
-        if not button:
-            continue
-        button_values[button] = CHECKBOX_ON
-        report.append(FieldFillStatus(
-            form_field_id=button, vault_field_path=vault_path, label=vault_path,
-            status=STATUS_FILLED, value=code,
-        ))
 
-    return button_values, report
+        code = _canonical_choice(vault_path, raw)
+        if isinstance(group, RadioField):
+            export = group.values.get(code)
+            if not export:  # no matching option on this form (e.g. an OTHER value) — set nothing
+                report.append(FieldFillStatus(
+                    form_field_id=group.field_id, vault_field_path=vault_path, label=vault_path,
+                    status=STATUS_BLANK, value=None,
+                ))
+                continue
+            field_values[group.field_id] = export
+            report.append(FieldFillStatus(
+                form_field_id=group.field_id, vault_field_path=vault_path, label=vault_path,
+                status=STATUS_FILLED, value=code,
+            ))
+        else:
+            button = group.get(code) or group.get("OTHER")
+            if not button:
+                continue
+            field_values[button] = CHECKBOX_ON
+            report.append(FieldFillStatus(
+                form_field_id=button, vault_field_path=vault_path, label=vault_path,
+                status=STATUS_FILLED, value=code,
+            ))
+
+    return field_values, report
 
 
 # ---------------------------------------------------------------------------
