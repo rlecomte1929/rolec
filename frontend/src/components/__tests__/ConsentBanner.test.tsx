@@ -8,7 +8,7 @@
  *   • a returning visitor who already decided is never asked again
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { ConsentBanner } from '../ConsentBanner';
 import { getAnalyticsConsent } from '../../analytics';
@@ -108,6 +108,18 @@ describe('ConsentBanner', () => {
     store.set('relopass_role', 'HR');
     renderBanner();
     expect(screen.getByRole('dialog', { name: /analytics consent/i })).toBeInTheDocument();
+  });
+
+  // Regression: ISSUE-003 — /qa 2026-09-12. Fixed banner covered HR Command
+  // Center CTA and profile save on 375px. Report:
+  // .gstack/qa-reports/qa-report-relopass-com-2026-09-12.md
+  it('pads the document so page actions sit above the banner', async () => {
+    const { unmount } = renderBanner();
+    await waitFor(() => {
+      expect(document.body.style.paddingBottom).toBe('96px');
+    });
+    unmount();
+    expect(document.body.style.paddingBottom).toBe('');
   });
 
   // AIQ-1678: the banner mounts ONCE at the app root and never remounts, so it must

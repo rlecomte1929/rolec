@@ -30,7 +30,20 @@ export function ConsentBanner() {
     if (getAnalyticsConsent() === null) setVisible(true);
   }, []);
 
-  if (isAdmin || !visible) return null;
+  const show = visible && !isAdmin;
+
+  // Keep page actions (HR Command Center CTA, profile save) above the fixed
+  // band. Without this the banner covers the primary button on 375px.
+  useEffect(() => {
+    if (!show) return;
+    const prev = document.body.style.paddingBottom;
+    document.body.style.paddingBottom = '96px';
+    return () => {
+      document.body.style.paddingBottom = prev;
+    };
+  }, [show]);
+
+  if (!show) return null;
 
   function handleAccept() {
     grantAnalyticsConsent();
@@ -67,10 +80,10 @@ export function ConsentBanner() {
         </p>
 
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={handleDecline}>
+          <Button variant="ghost" className="min-h-11 px-3" onClick={handleDecline}>
             Decline
           </Button>
-          <Button variant="primary" size="sm" onClick={handleAccept}>
+          <Button variant="primary" className="min-h-11 px-3" onClick={handleAccept}>
             Accept analytics
           </Button>
         </div>
