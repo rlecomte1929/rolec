@@ -22,7 +22,8 @@ import { TrustBlock } from '../features/services/TrustBlock';
 import { ServiceGroupSection } from '../features/services/ServiceGroupSection';
 import { StickyContinueBar } from '../features/services/StickyContinueBar';
 import { ServicesNavRibbon } from '../features/services/ServicesNavRibbon';
-import { SERVICE_CONFIG, type ServiceItem, type ServiceKey } from '../features/services/serviceConfig';
+import { SERVICE_CONFIG, enabledServicesForHousehold, type ServiceItem, type ServiceKey } from '../features/services/serviceConfig';
+import { getCaseDetailsByAssignmentId } from '../api/caseDetails';
 import { useServicesFlow } from '../features/services/ServicesFlowContext';
 import {
   SERVICES_DISPLAY_CURRENCIES,
@@ -151,6 +152,20 @@ export const ProvidersPage: React.FC = () => {
     enabled: !assignmentLoading && !!assignmentId && !needsPicker,
     retry: 1,
   });
+
+  const caseDetailsQuery = useQuery({
+    queryKey: ['employee', 'case-details', assignmentId],
+    queryFn: () => getCaseDetailsByAssignmentId(assignmentId!),
+    enabled: !assignmentLoading && !!assignmentId && !needsPicker,
+    retry: 1,
+  });
+  const hasPartner = Boolean(
+    caseDetailsQuery.data?.data?.case?.draft?.familyMembers?.spouse,
+  );
+  const visibleServices = useMemo(
+    () => enabledServicesForHousehold(hasPartner),
+    [hasPartner],
+  );
 
   const svcPolicy: Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>> | null =
     policyCtxQuery.data ?? null;
@@ -513,7 +528,7 @@ export const ProvidersPage: React.FC = () => {
             </div>
             <ServiceGroupSection
               group="before"
-              items={ENABLED_SERVICES.filter((s) => s.group === 'before')}
+              items={visibleServices.filter((s) => s.group === 'before')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
               policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}
@@ -521,7 +536,7 @@ export const ProvidersPage: React.FC = () => {
             />
             <ServiceGroupSection
               group="arrival"
-              items={ENABLED_SERVICES.filter((s) => s.group === 'arrival')}
+              items={visibleServices.filter((s) => s.group === 'arrival')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
               policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}
@@ -529,7 +544,7 @@ export const ProvidersPage: React.FC = () => {
             />
             <ServiceGroupSection
               group="settle"
-              items={ENABLED_SERVICES.filter((s) => s.group === 'settle')}
+              items={visibleServices.filter((s) => s.group === 'settle')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
               policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}

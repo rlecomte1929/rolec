@@ -212,6 +212,8 @@ export interface Spouse {
   wantsToWork?: boolean | null;
   occupation?: string;
   educationLevel?: string;
+  employment?: string;
+  languageLevel?: string;
 }
 
 export interface Passport {
@@ -419,6 +421,8 @@ export interface FamilyMemberDTO {
   relationship?: string;
   nationality?: string;
   wantsToWork?: boolean;
+  employment?: string;
+  languageLevel?: string;
 }
 
 export interface FamilyMembersDTO {

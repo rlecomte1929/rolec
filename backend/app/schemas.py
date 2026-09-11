@@ -33,6 +33,8 @@ class FamilyMemberDTO(BaseModel):
     relationship: Optional[str] = None
     nationality: Optional[str] = None
     wantsToWork: Optional[bool] = None
+    employment: Optional[str] = None
+    languageLevel: Optional[str] = None
 
 
 class FamilyMembersDTO(BaseModel):

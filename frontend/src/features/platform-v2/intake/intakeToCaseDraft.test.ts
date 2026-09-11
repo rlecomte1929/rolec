@@ -56,12 +56,17 @@ describe('intakeToCaseDraft', () => {
         { id: 'self', kind: 'self' },
         // 'Yes' (capital) is the real value the intake <select> emits — a
         // lowercase fixture here previously masked the case-sensitive bug.
-        { id: 'p', kind: 'partner', name: 'Priya', needs_work_permit: 'Yes' },
+        { id: 'p', kind: 'partner', name: 'Priya', needs_work_permit: 'Yes', employment: 'Working', lang_level: 'Conversational' },
         { id: 'c', kind: 'child', dob: '2018-04-01' },
       ] as unknown as IntakeData['members'],
     }));
     expect(withDeps.relocationBasics?.hasDependents).toBe(true);
-    expect(withDeps.familyMembers?.spouse).toMatchObject({ fullName: 'Priya', wantsToWork: true });
+    expect(withDeps.familyMembers?.spouse).toMatchObject({
+      fullName: 'Priya',
+      wantsToWork: true,
+      employment: 'Working',
+      languageLevel: 'Conversational',
+    });
     expect(withDeps.familyMembers?.children).toEqual([{ dateOfBirth: '2018-04-01', relationship: 'child' }]);
   });
 

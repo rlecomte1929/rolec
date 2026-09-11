@@ -69,6 +69,11 @@ def test_estimate_endpoint_returns_full_hr_policy_caps(monkeypatch):
     monkeypatch.setattr(cr, "_case_service_estimates", lambda cid: {})
     monkeypatch.setattr(cr, "SessionLocal", lambda: contextlib.nullcontext(None))
     monkeypatch.setattr(cr.crud, "get_case", lambda sess, cid: None)  # NO services selected
+    empty_spend = {"by_currency": {}, "lines": [], "has_spend": False}
+    monkeypatch.setattr(
+        "backend.app.services.case_spend.committed_spend_for_case",
+        lambda *a, **k: empty_spend,
+    )
 
     app.dependency_overrides[auth_deps.get_current_user] = lambda: {"id": "emp-1", "role": "EMPLOYEE", "company": "co-1"}
     try:
@@ -82,6 +87,10 @@ def test_estimate_endpoint_returns_full_hr_policy_caps(monkeypatch):
     # The FULL published list is present even though no service was selected (the reported gap).
     assert {c["name"] for c in body["hr_policy_caps"]} == {"Housing allowance", "Visa support"}
     assert "categories" in body  # existing data still returned (no regression)
+    assert "spouse_support_drawdown" in body
+    dd = body["spouse_support_drawdown"]
+    assert dd["has_cap"] is False
+    assert dd["remaining"] is None
 
 
 def test_injected_caps_avoid_a_second_fetch(monkeypatch):

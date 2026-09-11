@@ -37,6 +37,8 @@ export function intakeToCaseDraft(data: IntakeData): Partial<CaseDraftDTO> {
         ? {
             fullName: partner.name || undefined,
             wantsToWork: partner.needs_work_permit?.toLowerCase() === 'yes' || undefined,
+            employment: partner.employment || undefined,
+            languageLevel: partner.lang_level || undefined,
           }
         : undefined,
       children: childMembers.map((c) => ({

@@ -87,13 +87,16 @@ def test_partner_and_children_derived_from_members():
     draft = _complete_snake_draft()
     draft["members"] = [
         {"id": "self", "kind": "self"},
-        {"id": "p", "kind": "partner", "name": "Sam Dupont", "needs_work_permit": "yes"},
+        {"id": "p", "kind": "partner", "name": "Sam Dupont", "needs_work_permit": "yes",
+         "employment": "Working", "lang_level": "Beginner"},
         {"id": "c1", "kind": "child", "dob": "2018-05-01"},
     ]
     converted = intake_draft_to_case_draft(draft)
     assert converted["relocationBasics"]["hasDependents"] is True
     assert converted["familyMembers"]["spouse"]["fullName"] == "Sam Dupont"
     assert converted["familyMembers"]["spouse"]["wantsToWork"] is True
+    assert converted["familyMembers"]["spouse"]["employment"] == "Working"
+    assert converted["familyMembers"]["spouse"]["languageLevel"] == "Beginner"
     assert converted["familyMembers"]["children"] == [
         {"dateOfBirth": "2018-05-01", "relationship": "child"}
     ]
