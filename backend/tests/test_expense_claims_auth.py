@@ -5,6 +5,7 @@ import os
 import sys
 import unittest
 import uuid
+from types import SimpleNamespace
 from unittest import mock
 
 os.environ.setdefault("RELOPASS_QUERY_COUNTER_OFF", "1")
@@ -95,6 +96,13 @@ class ExpenseClaimAuthTests(unittest.TestCase):
         )
         self.case_access_patcher.start()
         self.addCleanup(self.case_access_patcher.stop)
+        self.resolve_patcher = mock.patch.object(
+            router_module.db,
+            "resolve_case_ids",
+            side_effect=lambda cid, request_id=None: SimpleNamespace(canonical_case_id=cid),
+        )
+        self.resolve_patcher.start()
+        self.addCleanup(self.resolve_patcher.stop)
         self.hr_company_patcher = mock.patch.object(
             router_module.db, "get_hr_company_id", return_value=None
         )

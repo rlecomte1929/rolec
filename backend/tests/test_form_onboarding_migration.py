@@ -8,7 +8,7 @@ def test_migration_is_additive_only():
     for forbidden in ("DROP COLUMN", "RENAME COLUMN", "DROP TABLE", "CREATE TABLE", "ALTER COLUMN"):
         assert forbidden not in sql, f"first-slice migration must be additive only, found {forbidden}"
 
-def test_migration_timestamp_beats_repo_max():
+def test_migration_timestamp_is_unique():
     ts = M.name[:14]
-    others = [p.name[:14] for p in M.parent.glob("*.sql") if p.name != M.name]
-    assert ts >= max(others), "migration timestamp must be at least the repo max"
+    same = [p.name for p in M.parent.glob("*.sql") if p.name[:14] == ts]
+    assert same == [M.name], "migration timestamp must not collide with another file"

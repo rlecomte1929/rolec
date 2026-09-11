@@ -89,6 +89,14 @@ class ExpenseClaimRead(BaseModel):
     lines: List[ExpenseClaimLineRead] = []
 
 
+def _canonical_case_id(case_id: str) -> str:
+    """AIQ-1704: path may carry assignment id; ledger is keyed on canonical case id."""
+    ids = db.resolve_case_ids(case_id)
+    if ids is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return ids.canonical_case_id
+
+
 def _caller_company_id(user: Dict[str, Any]) -> str:
     uid = user.get("id")
     profile = db.get_profile_record(uid) if uid else None
@@ -290,6 +298,7 @@ def create_expense_claim(
 ) -> Dict[str, Any]:
     company_id = _caller_company_id(user)
     require_case_access(case_id, user)
+    case_id = _canonical_case_id(case_id)
     if body.status not in CREATE_STATUSES:
         raise HTTPException(status_code=400, detail="status must be draft or submitted")
     actor_id = user["id"]
@@ -345,6 +354,7 @@ def list_expense_claims_for_case(
 ) -> List[Dict[str, Any]]:
     company_id = _caller_company_id(user)
     require_case_access(case_id, user)
+    case_id = _canonical_case_id(case_id)
     with db.engine.begin() as conn:
         rows = conn.execute(
             text(
