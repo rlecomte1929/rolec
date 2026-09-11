@@ -49,8 +49,9 @@ def make_module(root: Path, dotted: str, body: str = "") -> Path:
 
 @pytest.fixture()
 def repo(tmp_path, monkeypatch):
-    """A miniature repo with ONE serving root, so unit tests are hermetic."""
+    """A miniature repo with ONE serving root and NO fill roots, so unit tests are hermetic."""
     monkeypatch.setattr(guard, "SERVING_ROOTS", ("backend.app.services.serving_engine",))
+    monkeypatch.setattr(guard, "FILL_ROOTS", ())
     make_module(tmp_path, "backend.app.services.serving_engine", "x = 1\n")
     return tmp_path
 
@@ -347,6 +348,14 @@ def test_real_repo_closure_is_not_suspiciously_small():
         f"serving closure collapsed to {len(closure)} modules — the import graph is "
         f"probably not resolving; a clean result here would be meaningless"
     )
+
+
+def test_fill_root_catches_llm_import_from_form_prefill_service():
+    # A mapper module that imports an LLM gateway, reachable from the fill path, must FAIL the guard.
+    import importlib
+    mod = importlib.import_module("scripts.check_serving_llm_isolation")
+    assert "backend.app.services.form_prefill_service" in (mod.SERVING_ROOTS + mod.FILL_ROOTS), \
+        "the live fill path must be a protected root"
 
 
 # ─── reconciliation vs the validated reference ──────────────────────────────
