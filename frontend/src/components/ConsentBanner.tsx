@@ -32,14 +32,19 @@ export function ConsentBanner() {
 
   const show = visible && !isAdmin;
 
-  // Keep page actions (HR Command Center CTA, profile save) above the fixed
-  // band. Without this the banner covers the primary button on 375px.
+  // Keep page actions above the full-width mobile band. Desktop uses a
+  // floating card, so extra body padding would just open a hole at the bottom.
   useEffect(() => {
     if (!show) return;
-    const prev = document.body.style.paddingBottom;
-    document.body.style.paddingBottom = '96px';
+    const mq = window.matchMedia('(max-width: 767px)');
+    const apply = () => {
+      document.body.style.paddingBottom = mq.matches ? '96px' : '';
+    };
+    apply();
+    mq.addEventListener('change', apply);
     return () => {
-      document.body.style.paddingBottom = prev;
+      mq.removeEventListener('change', apply);
+      document.body.style.paddingBottom = '';
     };
   }, [show]);
 
@@ -62,7 +67,7 @@ export function ConsentBanner() {
       aria-live="polite"
       className="fixed bottom-0 inset-x-0 z-50 border-t border-[#d7e2e8] bg-white shadow-lg md:bottom-4 md:left-4 md:right-auto md:inset-x-auto md:max-w-md md:rounded-lg md:border"
     >
-      <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-3 px-4 py-3 sm:flex-row sm:items-center md:max-w-none">
+      <div className="mx-auto flex max-w-5xl flex-col items-stretch gap-3 px-4 py-3 md:max-w-none">
         <p className="text-sm leading-relaxed text-[#0b2b43]">
           We use privacy-first product analytics to improve ReloPass. No personal data
           is included in the events we collect, and analytics data is stored on EU
