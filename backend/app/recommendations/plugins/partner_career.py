@@ -22,6 +22,9 @@ class PartnerCareerCriteria(BaseModel):
 class PartnerCareerPlugin(BasePlugin):
     key = "partner_career"
     title = "Partner Career Support"
+    # Candidate stubs until HR curates real vendors. Advisory so HR gating
+    # does not hide the dataset as an empty "HR is finalizing" slate.
+    advisory = True
 
     @property
     def CriteriaModel(self) -> type:

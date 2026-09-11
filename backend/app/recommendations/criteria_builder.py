@@ -165,13 +165,15 @@ def _apply_service_shaping(
     elif service_key == "spouse":
         spouse = out.pop("_spouse", None) or {}
         if isinstance(spouse, dict):
-            emp = spouse.get("employment")
-            if emp:
-                out["employment"] = emp
-            lang = spouse.get("languageLevel") or spouse.get("language_level")
-            if lang:
-                out["language_level"] = lang
-            if "wantsToWork" in spouse:
+            if not out.get("employment"):
+                emp = spouse.get("employment")
+                if emp:
+                    out["employment"] = emp
+            if not out.get("language_level"):
+                lang = spouse.get("languageLevel") or spouse.get("language_level")
+                if lang:
+                    out["language_level"] = lang
+            if "wants_to_work" not in out and "wantsToWork" in spouse:
                 out["wants_to_work"] = spouse.get("wantsToWork")
 
     return out
@@ -236,6 +238,12 @@ def build_criteria_for_assignment(
         "ins_family": "family_coverage",
         "elec_green": "green_preference",
         "elec_flex": "contract_flexibility",
+        "pet_species": "species",
+        "pet_count": "count",
+        "pet_specific_needs": "specific_needs",
+        "spouse_employment": "employment",
+        "spouse_language": "language_level",
+        "spouse_wants_to_work": "wants_to_work",
     }
     result: Dict[str, Dict[str, Any]] = {}
 

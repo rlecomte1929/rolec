@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { enabledServicesForHousehold, SERVICE_CONFIG } from '../serviceConfig';
+import { enabledServicesForHousehold, SERVICE_CONFIG, WIZARD_SERVICE_KEYS } from '../serviceConfig';
 
 describe('enabledServicesForHousehold', () => {
   it('includes spouse only when a partner is present', () => {
@@ -13,5 +13,9 @@ describe('enabledServicesForHousehold', () => {
     const spouse = SERVICE_CONFIG.find((s) => s.key === 'spouse');
     expect(spouse?.enabled).toBe(true);
     expect(spouse?.backendKey).toBe('partner_career');
+  });
+
+  it('includes spouse in the preferences/recommendations wizard keys', () => {
+    expect(WIZARD_SERVICE_KEYS).toContain('spouse');
   });
 });

@@ -29,6 +29,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   language_integration: 'Language',
   legal_admin: 'Legal & Admin',
   tax_finance: 'Tax & Finance',
+  pets: 'Pets',
+  partner_career: 'Partner career support',
 };
 
 export const ServicesRecommendations: React.FC = () => {

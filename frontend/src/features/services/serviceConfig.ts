@@ -118,6 +118,11 @@ export function canonicalServiceKey(category: string): string {
   return BACKEND_KEY_TO_CANONICAL[category] ?? category;
 }
 
+/** Service keys that participate in Preferences + Recommendations (enabled + backend plugin). */
+export const WIZARD_SERVICE_KEYS: ServiceKey[] = SERVICE_CONFIG.filter(
+  (s) => s.enabled && Boolean(s.backendKey),
+).map((s) => s.key);
+
 /** Enabled catalog tiles for this household. Spouse is hidden unless a partner exists. */
 export function enabledServicesForHousehold(hasPartner: boolean): ServiceItem[] {
   return SERVICE_CONFIG.filter((svc) => {

@@ -25,6 +25,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   banks: 'Banks',
   insurance: 'Insurance',
   electricity: 'Electricity',
+  pets: 'Pets',
+  partner_career: 'Partner career support',
 };
 
 export const ServicesEstimate: React.FC = () => {

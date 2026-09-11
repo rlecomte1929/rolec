@@ -40,6 +40,47 @@ def test_partner_career_in_recommendation_whitelists():
     from backend.app.recommendations.criteria_builder import SERVICE_KEY_TO_BACKEND
 
     assert SERVICE_KEY_TO_BACKEND.get("spouse") == "partner_career"
+    from backend.app.recommendations.plugins.partner_career import PartnerCareerPlugin
+
+    assert PartnerCareerPlugin.advisory is True
+
+
+def test_partner_career_questions_registered():
+    from backend.app.services.question_schema import get_questions_for_services
+
+    qs = [q.question_key for q in get_questions_for_services(["spouse"])]
+    assert qs == ["spouse_employment", "spouse_language", "spouse_wants_to_work"], qs
+
+
+def test_spouse_saved_answers_win_over_case_profile():
+    from backend.app.recommendations.criteria_builder import build_criteria_for_assignment
+
+    out = build_criteria_for_assignment(
+        assignment_id="a1",
+        case_id="c1",
+        selected_services=["spouse"],
+        saved_answers={
+            "spouse_employment": "Student",
+            "spouse_language": "Fluent",
+            "spouse_wants_to_work": False,
+        },
+        case_context={
+            "destCity": "Berlin",
+            "destCountry": "DE",
+            "familyMembers": {
+                "spouse": {
+                    "fullName": "Priya",
+                    "employment": "Working",
+                    "languageLevel": "Beginner",
+                    "wantsToWork": True,
+                }
+            },
+        },
+    )
+    crit = out["partner_career"]
+    assert crit["employment"] == "Student"
+    assert crit["language_level"] == "Fluent"
+    assert crit["wants_to_work"] is False
 
 
 def test_spouse_criteria_shape_employment_and_language():

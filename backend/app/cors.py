@@ -7,7 +7,9 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Vite fallback ports 3002–3005 for local dev.
+# Vite fallback ports 3002–3005 for local dev. Include 127.0.0.1 as well as
+# localhost: browsers treat those as different Origins, and `vite --host 127.0.0.1`
+# otherwise fails CORS against an API that only listed localhost.
 _DEFAULT_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
@@ -16,6 +18,13 @@ _DEFAULT_ORIGINS = [
     "http://localhost:3004",
     "http://localhost:3005",
     "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002",
+    "http://127.0.0.1:3003",
+    "http://127.0.0.1:3004",
+    "http://127.0.0.1:3005",
+    "http://127.0.0.1:5173",
     "https://relopass.com",
     "https://www.relopass.com",
 ]
