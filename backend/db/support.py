@@ -386,9 +386,12 @@ class SupportMixin:
         request_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
+            # Compare as text: notifications.user_id is uuid in prod, but HR
+            # ReloPass ids are legacy strings (seed-hr-testingapril). Equality
+            # without ::text 500s the bell: invalid input syntax for type uuid.
             q = (
                 "SELECT id, created_at, assignment_id, case_id, type, title, body, metadata, read_at "
-                "FROM notifications WHERE user_id = :uid"
+                "FROM notifications WHERE user_id::text = :uid"
             )
             if only_unread:
                 q += " AND read_at IS NULL"
@@ -406,7 +409,7 @@ class SupportMixin:
         with self.engine.connect() as conn:
             row = self._exec(
                 conn,
-                "SELECT COUNT(*) FROM notifications WHERE user_id = :uid AND read_at IS NULL",
+                "SELECT COUNT(*) FROM notifications WHERE user_id::text = :uid AND read_at IS NULL",
                 {"uid": user_id},
                 op_name="count_unread_notifications",
                 request_id=request_id,
@@ -417,7 +420,7 @@ class SupportMixin:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             result = conn.execute(text(
-                "UPDATE notifications SET read_at = :ra WHERE id = :id AND user_id = :uid"
+                "UPDATE notifications SET read_at = :ra WHERE id = :id AND user_id::text = :uid"
             ), {"ra": now, "id": notification_id, "uid": user_id})
         return result.rowcount > 0
 
