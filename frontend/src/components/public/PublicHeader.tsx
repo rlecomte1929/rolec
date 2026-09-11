@@ -13,6 +13,8 @@ const PUBLIC_NAV = [
   { key: 'platform', label: 'Platform', path: ROUTE_DEFS.platform.path },
   { key: 'why', label: 'Why ReloPass', path: ROUTE_DEFS.why.path },
   { key: 'howItWorks', label: 'How it works', path: ROUTE_DEFS.howItWorks.path },
+  // In-page anchor into the home page's Value-creation section (Landing scrolls to #value).
+  { key: 'value', label: 'Value', path: '/#value' },
   { key: 'access', label: 'Get started', path: ROUTE_DEFS.access.path },
 ] as const;
 
