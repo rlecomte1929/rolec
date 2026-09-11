@@ -352,9 +352,34 @@ CHOICE_GROUPS: Dict[str, "Dict[str, Dict[str, str] | RadioField]"] = {
 }
 
 
+def load_choice_groups(
+    form_id: str,
+    mappings: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, object]:
+    """Resolve a form's choice groups from field_kind/transform_spec rows, falling back to the
+    in-code CHOICE_GROUPS when the DB carries none (keeps FR/ES filling before the seed applies)."""
+    rows = [m for m in (mappings or []) if m.get("field_kind") in ("single_radio", "checkbox_option")]
+    if not rows:
+        return CHOICE_GROUPS.get(form_id, {})
+    groups: Dict[str, object] = {}
+    for m in rows:
+        vault = m["vault_field_path"]
+        spec = m.get("transform_spec") or {}
+        if m["field_kind"] == "single_radio":
+            groups[vault] = RadioField(m["form_field_id"], dict(spec.get("values") or {}))
+        else:  # checkbox_option
+            existing = groups.get(vault)
+            if not isinstance(existing, dict):
+                existing = {}
+                groups[vault] = existing
+            existing[spec["code"]] = m["form_field_id"]
+    return groups
+
+
 def build_choice_fill(
     form_id: str,
     profile: Dict[str, Any],
+    groups: Optional[Dict[str, object]] = None,
 ) -> Tuple[Dict[str, str], List[FieldFillStatus]]:
     """Resolve the radio/checkbox GROUPS declared for ``form_id`` from the vault profile.
 
@@ -363,8 +388,12 @@ def build_choice_fill(
     one field to the option's export value (``{field_id: "/Hombre"}``). ``report`` carries one row
     per group; a group whose vault value is missing — or whose value has no option on this form —
     is reported STATUS_BLANK and sets nothing (never guess a protected attribute).
+
+    ``groups`` defaults to the in-code CHOICE_GROUPS for ``form_id`` when not given (``None``) —
+    this is the live FR/ES fill path and must stay behaviour-identical. Pass the result of
+    ``load_choice_groups`` to fill from data-driven field_kind/transform_spec rows instead.
     """
-    groups = CHOICE_GROUPS.get(form_id, {})
+    groups = CHOICE_GROUPS.get(form_id, {}) if groups is None else groups
     field_values: Dict[str, str] = {}
     report: List[FieldFillStatus] = []
 
@@ -618,11 +647,16 @@ def get_available_forms(corridor_to: str, visa_type: str) -> List[FormDefinition
 
 
 def _load_field_mappings(form_id: str) -> List[Dict[str, Any]]:
+    """All field_field_mappings rows for ``form_id`` — text AND choice (single_radio /
+    checkbox_option) rows alike. ``generate_prefilled_pdf`` splits the two by ``field_kind``
+    itself (see there) rather than this doing two round-trips, so both the text plan and
+    ``load_choice_groups`` are fed from this one query."""
     with db.engine.begin() as conn:
         rows = conn.execute(
             text("""
                 SELECT form_field_id, form_field_label, vault_field_path,
-                       format_rule, exact_match_required, max_length
+                       format_rule, exact_match_required, max_length,
+                       field_kind, transform_spec
                 FROM public.form_field_mappings
                 WHERE form_id = :form_id
                 ORDER BY form_field_id
@@ -630,6 +664,11 @@ def _load_field_mappings(form_id: str) -> List[Dict[str, Any]]:
             {"form_id": form_id},
         ).mappings().all()
     return [dict(r) for r in rows]
+
+
+# field_kind values that describe a choice group (radio/checkbox) rather than a plain text field —
+# these must never reach build_fill_plan (the text plan) or be rendered as literal text.
+_CHOICE_FIELD_KINDS = ("single_radio", "checkbox_option")
 
 
 # ---------------------------------------------------------------------------
@@ -680,10 +719,19 @@ def generate_prefilled_pdf(
     if not mappings:
         raise ValueError(f"No field mappings found for form_id '{form_id}'.")
 
-    field_values, report = build_fill_plan(mappings, employee_profile)
+    # Choice rows (field_kind single_radio/checkbox_option) describe a group, not a plain text
+    # field — keep them out of the text plan; load_choice_groups handles them separately below.
+    text_mappings = [m for m in mappings if m.get("field_kind") not in _CHOICE_FIELD_KINDS]
+    choice_mappings = [m for m in mappings if m.get("field_kind") in _CHOICE_FIELD_KINDS]
+
+    field_values, report = build_fill_plan(text_mappings, employee_profile)
 
     # Radio/checkbox groups (gender, marital status) — one vault value ticks one button.
-    choice_values, choice_report = build_choice_fill(form_id, employee_profile)
+    # load_choice_groups falls back to the in-code CHOICE_GROUPS when the DB carries no choice
+    # rows yet (true today — the seed migration is a separate task), so this is a no-op change
+    # in behaviour until that data lands.
+    groups = load_choice_groups(form_id, choice_mappings)
+    choice_values, choice_report = build_choice_fill(form_id, employee_profile, groups)
     field_values.update(choice_values)
     report.extend(choice_report)
 
