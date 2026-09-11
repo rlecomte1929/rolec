@@ -99,9 +99,25 @@ approved-cap tripwire on every run).
   SE/housing_agencies `vc-*` contact-email coverage **→ 4** (of 7), phone **→ 5**. 0 overwrites.
   **Approved-cap tripwire UNCHANGED: 1291**; caps by status approved 1291 / pending 0 / rejected 3.
 
-## Enrichment progress (running)
-Contact fills so far: **38 `contact_email` + 51 `contact_phone`** across 6 cells (ES/legal, NL/housing, CZ/housing,
-AU/legal, GB/legal, SE/housing), on already-approved/live suppliers, fill-empty, 0 overwrites, vetting untouched
-throughout. **109 of ~1,166 `vc-*` suppliers now carry a contact_email** (up from ~76 at the pivot). Queue: CA/tax
-(last register-cell) → then banks (deprioritised — big institutions, generic addresses). Movers parked (FIDI, no
-websites). One city×category batch at a time — the RFQ-loop unblock.
+## Batch #7 — CA/tax_finance contact (`enrich-xx-ca-tax-contact-2026-09-11`)
+- Source (GCS): `src/enrich-xx-ca-tax-contact.ndjson` (+ `manifest_ca-tax-contact.json`). Landing:
+  `src/enrich-xx-ca-tax-contact.LANDING.ndjson` (schema-mapped; emails lowercased). Target: `ca-tax-target.csv`
+  (7 approved CA/tax firms missing `contact_email`, all own-domain).
+- Otto: **7 attempted / 5 filled**. Keys ⊆ target ✓. Phones +1 E.164.
+- **Verification:** Fuller Landau + Maroof (after lowercasing `Canada@MaroofHS.com`) domain-matched; **GTA Accounting**
+  `tax@gtaaccountinggroup.com` (group domain vs gtaaccounting.ca site) and **Trowbridge** `info@trowbridge.ca` (CA domain
+  vs trowbridgeglobal.com site) = firm-owned alternate domains, genuine, landed with a note. MNP phone-only. **Baker
+  Tilly Canada + BDO Canada** omitted upstream (big-firm national sites, no direct contact — not invented). No aggregators.
+- **Landed (fill-empty):** **9 fields across 5 suppliers** — 4 `contact_email` + 5 `contact_phone`.
+  CA/tax_finance `vc-*` contact-email coverage **→ 4**, phone **→ 5**. 0 overwrites.
+  **Approved-cap tripwire UNCHANGED: 1291**.
+- ⚠ Landed after an out-of-band removal of the landing worktree (recreated from `origin` at 98bb8e2b — nothing lost,
+  every prior batch was already pushed; re-fetched CA/tax and re-verified before landing).
+
+## ✅ Register-cell enrichment queue COMPLETE (7 cells)
+Contact fills: **42 `contact_email` + 56 `contact_phone`** across 7 cells (ES/legal, NL/housing, CZ/housing, AU/legal,
+GB/legal, SE/housing, CA/tax), on already-approved/live suppliers, fill-empty, 0 overwrites, vetting untouched
+throughout. **113 of ~1,166 `vc-*` suppliers now carry a contact_email** (up from ~76 at the pivot). The clean
+register cells (legal / housing / tax — the RFQ-relevant categories) are done. **Only BANKS remain** (deprioritised:
+big institutions, generic/country addresses) — held for a founder banks-vs-pause decision. Movers parked (FIDI, no
+websites to scrape).

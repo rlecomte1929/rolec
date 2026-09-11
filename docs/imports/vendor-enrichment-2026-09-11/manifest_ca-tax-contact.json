@@ -1,0 +1,17 @@
+{
+  "batch_id": "enrich-xx-ca-tax-contact-2026-09-11",
+  "total_attempted": 7,
+  "total_filled": 5,
+  "unfilled": [
+    {
+      "supplier_id": "vc-e161fb50-56b1-40ec-9879-6606bc7e8649",
+      "name": "Baker Tilly Canada",
+      "reason": "All contact subpages return 404 on bakertilly.ca; no email or phone published anywhere on site. Thin national umbrella site — member firms hold their own contact details, not the national coordinating entity."
+    },
+    {
+      "supplier_id": "vc-57dee62c-5b7c-4de7-8d30-a8802bdffb84",
+      "name": "BDO Canada LLP",
+      "reason": "bdo.ca/en-ca/contact renders a web form only — no email address or phone number is published anywhere on the site; location office pages also return 404."
+    }
+  ]
+}
