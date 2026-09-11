@@ -160,8 +160,14 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
 
   const sbRole = sidebarRole(role);
   const userInitials = deriveInitials(name || identity || 'RP');
+  const onEmployeeSurface =
+    location.pathname.startsWith('/employee') || location.pathname.startsWith('/journey');
   const showEmployeeBanner =
-    sbRole !== 'ADMIN' && isEmployeeRole && !employeeAssignmentLoading && linkedCount === 0;
+    onEmployeeSurface &&
+    sbRole !== 'ADMIN' &&
+    isEmployeeRole &&
+    !employeeAssignmentLoading &&
+    linkedCount === 0;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800">
@@ -221,7 +227,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
             onClick={() => setMobileNavOpen(true)}
             aria-label="Open navigation menu"
             aria-expanded={mobileNavOpen}
-            className="md:hidden grid h-9 w-9 shrink-0 place-items-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+            className="md:hidden grid h-11 w-11 shrink-0 place-items-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -260,8 +266,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
 
         {showEmployeeBanner && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-sm text-amber-900 shrink-0">
-            <span className="mr-2">⏳</span>
-            Your account isn&apos;t linked to a relocation case yet — most features are on hold.
+            Your account isn&apos;t linked to a relocation case yet. Most features are on hold.
             If HR set one up for your email, open the <strong>Dashboard</strong> to accept it (a case for your verified email links automatically).
           </div>
         )}
