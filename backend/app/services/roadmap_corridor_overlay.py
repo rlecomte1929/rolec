@@ -67,6 +67,22 @@ _TRACK_BY_STEP: Dict[str, str] = {
     "REVENUE_REGISTRATION": "settlement",
     "BANK_ACCOUNT": "settlement",
     "HEALTH_SETUP": "settlement",
+
+    # NO→FR (RETURNING_EEA_CITIZEN) Phase-A — Norwegian exit admin. These are
+    # home-country DEPARTURE obligations, not French settlement; without an entry here
+    # they fell to the `settlement` default and rendered under "Settlement" (settle in
+    # France) rather than "Pre-departure". Their real home is the roadmap's pre-departure
+    # track (roadmap_builder._build_predeparture_track), the mirror of the return track.
+    "A0_DEPART_NO": "predeparture",
+    "A1_FOLKEREGISTER": "predeparture",
+    "A2_PRESERVE_BANKID": "predeparture",
+    "A3_NO_TAX_RESIDENCE": "predeparture",
+    "A4_EXIT_YEAR_RETURN": "predeparture",
+    "A5_FOLKETRYGDEN_EXIT": "predeparture",
+    "A6_HELFO_EHIC": "predeparture",
+    "A7_PRESERVE_PENSION": "predeparture",
+    "A8_NOTIFY_NAV": "predeparture",
+    "A9_BANKING_UTILITIES": "predeparture",
 }
 
 #: Steps that exist only because the mover is a third-country national. An EEA national on this
@@ -101,6 +117,13 @@ _SUPERSEDES: Dict[str, Tuple[str, ...]] = {
     "IRP_REGISTRATION": ("police",),
     "FAMILY_REGISTRATION": ("spouse-permit",),
     "PPSN": ("tax",),
+    # NO→FR authored exit steps replace the generic pre-departure placeholders they
+    # detail, so a mover never sees both "De-register from {home}" and the specific
+    # "Report the move to Folkeregisteret" side by side.
+    "A1_FOLKEREGISTER": ("predep-deregister",),
+    "A4_EXIT_YEAR_RETURN": ("predep-tax",),
+    "A5_FOLKETRYGDEN_EXIT": ("predep-social",),
+    "A9_BANKING_UTILITIES": ("predep-financial",),
 }
 
 #: Exception cases that presuppose the third-country path, and must therefore be withheld from

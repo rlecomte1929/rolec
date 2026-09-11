@@ -509,6 +509,118 @@ def _build_return_track(case: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _build_predeparture_track(case: Dict[str, Any]) -> Dict[str, Any]:
+    """Pre-departure track — the home-country obligations to close before leaving.
+
+    The front half of the round-trip and the mirror of ``_build_return_track``: home
+    tax residency, de-registration from the home population/municipal register, the
+    social-security & health switch-over, and winding down home finances. Generic and
+    ``locked``; where a corridor authors its own origin-exit steps (e.g. NO→FR's
+    Folkeregister / folketrygden / exit-year return), ``_apply_corridor_overlay`` routes
+    them into this track and supersedes the matching placeholders below — the same
+    overlay mechanism the outbound tracks use. Omitted for a same-country move
+    (see ``_predeparture_track_applies``).
+    """
+    draft = case.get("draft", {})
+    basics = draft.get("relocationBasics", {})
+    origin_country = basics.get("originCountry") or basics.get("origin_country") or "home country"
+
+    steps = [
+        {
+            "n": 1,
+            "key": "predep-review",
+            "title": "Plan your departure",
+            "status": "locked",
+            "owner": "You + HR",
+            "where": "ReloPass",
+            "time": "~2 months before move",
+            "cost": "—",
+            "depends": None,
+            "line": "Work through the home-country obligations to close before you leave — some have deadlines tied to your departure date.",
+            "subs": [
+                "Confirm your departure date",
+                "List home registrations, tax and social-security to close",
+                "Check which items have a deadline tied to leaving",
+            ],
+        },
+        {
+            "n": 2,
+            "key": "predep-tax",
+            "title": f"Close tax residency in {origin_country}",
+            "status": "locked",
+            "owner": "You",
+            "where": f"{origin_country} tax authority",
+            "time": "Varies",
+            "cost": "—",
+            "depends": "Departure planning",
+            "line": "Notify the home tax authority of your move and check any exit-year filing — tax residence may not end on the physical move.",
+            "subs": [
+                "Notify the home tax authority of your departure",
+                "Check whether an exit-year or split-year return is due",
+                "Keep the access you need to file remotely after leaving",
+            ],
+        },
+        {
+            "n": 3,
+            "key": "predep-deregister",
+            "title": f"De-register from {origin_country}",
+            "status": "locked",
+            "owner": "You",
+            "where": f"{origin_country} authorities",
+            "time": "Varies",
+            "cost": "—",
+            "depends": "Departure planning",
+            "line": "Report your move abroad to the home population / municipal register where one exists — some carry a short deadline after departure.",
+            "subs": [
+                "Report the move abroad to the population / municipal register",
+                "Note any deadline tied to your departure date",
+                "Keep proof of de-registration for the destination",
+            ],
+        },
+        {
+            "n": 4,
+            "key": "predep-social",
+            "title": "Transfer social security & health cover",
+            "status": "locked",
+            "owner": "You",
+            "where": "Home social-security body",
+            "time": "Varies",
+            "cost": "—",
+            "depends": "Departure planning",
+            "line": "Move social-security and health cover to the destination scheme, and mind the gap so you are never uninsured in between.",
+            "subs": [
+                "End or transfer home social-security membership",
+                "Handle your EHIC / certificate of coverage",
+                "Line up destination cover so there is no gap",
+            ],
+        },
+        {
+            "n": 5,
+            "key": "predep-financial",
+            "title": "Preserve financial access & wind down accounts",
+            "status": "locked",
+            "owner": "You",
+            "where": f"{origin_country}",
+            "time": "Varies",
+            "cost": "—",
+            "depends": "Departure planning",
+            "line": "Wind down home accounts and utilities — but keep one account open until any tax refund or final settlement clears.",
+            "subs": [
+                "Keep one home account open for refunds / final settlement",
+                "Redirect or close utilities and subscriptions",
+                "Update addresses and payment methods",
+            ],
+        },
+    ]
+
+    return {
+        "id": "predeparture",
+        "name": "Pre-departure",
+        "icon": "departure",
+        "steps": steps,
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Requirements gating
 # ─────────────────────────────────────────────────────────────────────────────
@@ -552,6 +664,19 @@ def _return_track_applies(draft: Dict[str, Any]) -> bool:
     return at != "PERMANENT"
 
 
+def _predeparture_track_applies(draft: Dict[str, Any]) -> bool:
+    """Pre-departure home-exit obligations apply to every cross-border move.
+
+    Omitted only for a same-country (domestic) move, which has no home country to
+    leave. A missing origin or destination keeps the track — fail-open toward showing
+    the full arc, mirroring ``_return_track_applies``.
+    """
+    basics = draft.get("relocationBasics") or {}
+    origin = (basics.get("originCountry") or basics.get("origin_country") or "").strip().upper()
+    dest = (basics.get("destCountry") or basics.get("dest_country") or "").strip().upper()
+    return not (origin and dest and origin == dest)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
@@ -573,6 +698,10 @@ def derive_roadmap(case: Dict[str, Any]) -> Dict[str, Any]:
     # Build tracks. AIQ-972: the Visa & Permit track is requirements-driven —
     # omitted for EU/EEA free-movement and domestic moves (no visa/permit needed).
     tracks: List[Dict[str, Any]] = []
+    # Front half of the round-trip — the home-country obligations to close before
+    # leaving. First in the arc; omitted for a same-country move (nothing to leave).
+    if _predeparture_track_applies(draft):
+        tracks.append(_build_predeparture_track(case))
     if _visa_track_required(draft):
         tracks.append(_build_visa_track(case))
     tracks.append(_build_civil_track(case))
@@ -587,6 +716,8 @@ def derive_roadmap(case: Dict[str, Any]) -> Dict[str, Any]:
 
     # Outcome labels
     outcomes = ["Right to live and work in destination", "Civil registration complete"]
+    if _predeparture_track_applies(draft):
+        outcomes.insert(0, "Home-country obligations closed")
     if has_spouse:
         outcomes.append("Partner registered")
     if has_kids:
