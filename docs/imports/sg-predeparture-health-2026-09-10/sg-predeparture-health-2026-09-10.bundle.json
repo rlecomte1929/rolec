@@ -1,0 +1,125 @@
+{
+  "batch_id": "sg-predeparture-health-2026-09-10",
+  "corridor": "FR-SG",
+  "categories": [
+    { "key": "healthcare", "name": "Healthcare", "description": "Pre-departure and on-arrival health tasks for a move to Singapore" }
+  ],
+  "tags": [
+    { "key": "medical_exam", "name": "Medical examination" },
+    { "key": "medication_import", "name": "Bringing medication" },
+    { "key": "controlled_substance", "name": "Controlled substance" },
+    { "key": "health_insurance", "name": "Health insurance" },
+    { "key": "employment_pass", "name": "Employment Pass" },
+    { "key": "dependants_pass", "name": "Dependant's Pass" },
+    { "key": "gp_transfer", "name": "Transferring care" },
+    { "key": "non_obvious", "name": "Non-obvious" }
+  ],
+  "sources": [
+    { "name": "Ministry of Manpower (MOM)", "url": "https://www.mom.gov.sg", "authority": "official" },
+    { "name": "Health Sciences Authority (HSA)", "url": "https://www.hsa.gov.sg", "authority": "official" },
+    { "name": "Ministry of Health (MOH)", "url": "https://www.moh.gov.sg", "authority": "official" }
+  ],
+  "resources": [
+    {
+      "country_code": "SG",
+      "city_name": "Singapore",
+      "category_key": "healthcare",
+      "title": "Will you need a medical examination for your Employment Pass?",
+      "resource_type": "guide",
+      "summary": "Whether an EP candidate must sit a medical examination is decided per case and stated on the In-Principle Approval (IPA) letter; if required, it is done after arrival in Singapore.",
+      "body": "When an Employment Pass is approved, MOM issues an In-Principle Approval (IPA) letter. MOM states that the IPA 'States whether the candidate needs to go for a medical examination after their arrival in Singapore.' The candidate should, after arriving, 'Complete any required medical examinations.' Do not book or pay for a medical exam before you know whether MOM requires one - check the IPA first. If required, the exam is carried out by a Singapore-registered doctor after arrival.",
+      "source_url": "https://www.mom.gov.sg/passes-and-permits/employment-pass/apply-for-a-pass",
+      "source_name": "Ministry of Manpower (MOM)",
+      "tags": ["medical_exam", "employment_pass"],
+      "status": "draft"
+    },
+    {
+      "country_code": "SG",
+      "city_name": "Singapore",
+      "category_key": "healthcare",
+      "title": "Dependant's Pass: who is eligible and the medical form",
+      "resource_type": "guide",
+      "summary": "To bring a spouse and children under 21 on a Dependant's Pass, the EP holder must earn a fixed monthly salary of at least $6,000; the DP application may require a completed medical examination form.",
+      "body": "MOM eligibility for a Dependant's Pass: 'You can apply for a Dependant's Pass for your family if you meet all these requirements: Hold an Employment Pass or S Pass. Earn a minimum fixed monthly salary of $6,000.' Eligible family members are a 'Legally married spouse' and 'Unmarried children under 21 years old, including legally adopted children.' The DP application step can require a 'Completed medical examination form or medical declaration form.' For Adrien's accompanying family this salary threshold and the medical form should be confirmed against the current MOM page before travel.",
+      "source_url": "https://www.mom.gov.sg/passes-and-permits/dependants-pass/eligibility",
+      "source_name": "Ministry of Manpower (MOM)",
+      "tags": ["medical_exam", "dependants_pass"],
+      "status": "draft"
+    },
+    {
+      "country_code": "SG",
+      "city_name": "Singapore",
+      "category_key": "healthcare",
+      "title": "Bringing your prescription medication into Singapore (3-month rule)",
+      "resource_type": "guide",
+      "summary": "You may bring up to a 3-month supply of non-prohibited, non-controlled medication without approval, but you must carry a valid prescription/doctor's letter and keep everything in original, labelled packaging.",
+      "body": "HSA: 'You may bring up to 3 months' supply if no approval is needed and the medication is not prohibited. You are required to carry with you a copy of a valid prescription/doctor's letter from your country of residence. Each medication should be in their original container/packaging and also labelled with the patient name, medication name and quantity by the dispensing pharmacy.' Imports exceeding a 3-month supply are not allowed, and you may not carry medication for anyone other than immediate family members for whom it was prescribed. Bring a doctor's letter listing every medication for both yourself and any accompanying family member.",
+      "source_url": "https://www.hsa.gov.sg/travelling-with-medication-and-medical-devices/personal-medications/",
+      "source_name": "Health Sciences Authority (HSA)",
+      "tags": ["medication_import"],
+      "status": "draft"
+    },
+    {
+      "country_code": "SG",
+      "city_name": "Singapore",
+      "category_key": "healthcare",
+      "title": "Controlled-substance medication needs HSA approval before you fly",
+      "resource_type": "checklist_item",
+      "summary": "If any of your medicines contain controlled substances, you must apply to HSA for approval before arrival - and submit the application at least 2 weeks before you land.",
+      "body": "HSA: 'You must apply for approval if you intend to bring personal medications which contain controlled substances.' Check the active ingredients against Appendix A of HSA's Document Guide. Application requires medical documentation (prescription/doctor's letter with patient and prescriber details, medication name, dose, frequency and total quantity) and photographs of the product. HSA advises: 'Submit your application at least 2 weeks before your arrival in Singapore to ensure adequate processing time.' Approvals are tied to your stated arrival date - if travel plans change you must reapply. This is a common non-obvious ambush: a routine home prescription (e.g. certain sleep, ADHD, or strong painkiller medicines) can be a controlled substance in Singapore.",
+      "source_url": "https://www.hsa.gov.sg/travelling-with-medication-and-medical-devices/personal-medications/",
+      "source_name": "Health Sciences Authority (HSA)",
+      "tags": ["medication_import", "controlled_substance", "non_obvious"],
+      "status": "draft"
+    },
+    {
+      "country_code": "SG",
+      "city_name": "Singapore",
+      "category_key": "healthcare",
+      "title": "Medications that are prohibited entirely",
+      "resource_type": "tip",
+      "summary": "Some products cannot be brought in at all - including anything containing cannabis extracts, medication in chewing-gum form, and cell/tissue/gene therapy products.",
+      "body": "HSA: 'Personal imports of the following are not permitted under any circumstances: Medications containing prohibited substances which are listed in the Fourth Schedule to the Misuse of Drugs Regulations (e.g. cannabis and products containing cannabis extracts); Medications in chewing gum form; Medications classified as Cell, Tissue and Gene Therapy Products (CTGTP) e.g. stem cells.' CBD/cannabis products that are legal in France are prohibited in Singapore - do not pack them.",
+      "source_url": "https://www.hsa.gov.sg/travelling-with-medication-and-medical-devices/personal-medications/",
+      "source_name": "Health Sciences Authority (HSA)",
+      "tags": ["medication_import", "non_obvious"],
+      "status": "draft"
+    },
+    {
+      "country_code": "SG",
+      "city_name": "Singapore",
+      "category_key": "healthcare",
+      "title": "Private health insurance: EP holders are not on MediShield Life",
+      "resource_type": "guide",
+      "summary": "Singapore's national health insurance (MediShield Life) covers only Citizens and Permanent Residents, so an Employment Pass holder and their family need private health insurance to close the cover gap.",
+      "body": "MOH: 'MediShield Life is a basic health insurance scheme that protects all Singapore Citizens and Permanent Residents against large medical bills, regardless of age or health conditions.' On eligibility MOH states: 'All Singapore Citizens and Permanent Residents, including the very old and those who have pre-existing conditions.' An Employment Pass holder is neither a Citizen nor a PR, so they are not covered by MediShield Life and do not receive the same subsidised care. Arrange private/expat health insurance for yourself and any Dependant's Pass family members to cover the period from arrival. (Note: unlike Work Permit/S Pass holders, DP holders do not require their employer to provide medical insurance - confirm what, if anything, your employer's package includes.)",
+      "source_url": "https://www.moh.gov.sg/managing-expenses/schemes-and-subsidies/medishield-life/medishield-life/",
+      "source_name": "Ministry of Health (MOH)",
+      "tags": ["health_insurance", "employment_pass", "non_obvious"],
+      "status": "draft"
+    },
+    {
+      "country_code": "SG",
+      "city_name": "Singapore",
+      "category_key": "healthcare",
+      "title": "Finding a GP after you arrive",
+      "resource_type": "tip",
+      "summary": "If you cannot get HSA approval in time or run out of medication, you can consult a Singapore Medical Council-registered doctor locally; use HealthHub or GPGoWhere to find a clinic.",
+      "body": "HSA advises that if a medication approval cannot be processed in time, 'you may consult a medical practitioner registered with the Singapore Medical Council when you are in Singapore for medical advice and to obtain your medication or suitable substitutes locally. You can view the directory of licensed healthcare service providers on HealthHub or locate General Practitioner (GP) clinics using GPGoWhere.' Use these official directories to register with a GP for ongoing care and repeat prescriptions once you have settled.",
+      "source_url": "https://www.hsa.gov.sg/travelling-with-medication-and-medical-devices/personal-medications/",
+      "source_name": "Health Sciences Authority (HSA)",
+      "tags": ["gp_transfer"],
+      "status": "draft"
+    }
+  ],
+  "events": [
+    {
+      "title": "Submit HSA controlled-medication approval application",
+      "when_relative": "At least 2 weeks before arrival in Singapore",
+      "category_key": "healthcare",
+      "source_url": "https://www.hsa.gov.sg/travelling-with-medication-and-medical-devices/personal-medications/",
+      "source_name": "Health Sciences Authority (HSA)",
+      "status": "draft"
+    }
+  ]
+}

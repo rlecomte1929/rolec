@@ -1,0 +1,28 @@
+{
+  "batch_id": "es-ie-dublin-medical-2026-09-10",
+  "corridor": "XX-IE",
+  "categories": [
+    {
+      "service_category": "medical",
+      "register": "HSE 'Find a GP' official directory (hse.ie)",
+      "denominator": 30,
+      "accepted": 6,
+      "rejected": 0,
+      "confidence": "medium",
+      "notes": "source_url is the HSE directory page on which each practice actually appears (by name + Eircode). website_url filled only where independently confirmed; blank otherwise. HSE Find a GP does NOT publish whether a practice accepts new patients or takes private/expat patients without a PPSN — that attribute could NOT be verified from the register; contact each clinic to confirm. Medical Council register lists individual doctors not practices, so HSE was used as provenance though accreditation_body is recorded as Medical Council per brief. No personal emails used (GDPR)."
+    }
+  ],
+  "files": {
+    "providers.csv": {
+      "records": 6,
+      "sha256": "f5eb023663f527901198d04deb521e580464f6561c1029f53cd1ce392b95803d"
+    },
+    "rejects.csv": {
+      "records": 0,
+      "sha256": "52e27c497e2cfd6ab60510abdf6a80ca54a914723df9d7fe498ac2b7df024110"
+    }
+  },
+  "total_accepted": 6,
+  "total_rejected": 0,
+  "platform_vetting_status": "pending"
+}

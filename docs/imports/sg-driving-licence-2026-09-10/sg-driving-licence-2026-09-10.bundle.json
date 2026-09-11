@@ -1,0 +1,91 @@
+{
+  "batch_id": "sg-driving-licence-2026-09-10",
+  "corridor": "FR-SG",
+  "categories": [
+    { "key": "transport", "name": "Transport", "description": "Driving and licence tasks for a move to Singapore" }
+  ],
+  "tags": [
+    { "key": "driving_licence", "name": "Driving licence" },
+    { "key": "licence_conversion", "name": "Licence conversion" },
+    { "key": "basic_theory_test", "name": "Basic Theory Test" },
+    { "key": "deadline", "name": "Deadline" },
+    { "key": "employment_pass", "name": "Employment Pass" },
+    { "key": "non_obvious", "name": "Non-obvious" }
+  ],
+  "sources": [
+    { "name": "Singapore Police Force / Traffic Police", "url": "https://www.police.gov.sg/Knowledge-Hub/Traffic/Traffic-Matters/Singapore-Driving-Licence", "authority": "official" },
+    { "name": "Traffic Police Foreign Licence Conversion pre-assessment (form.gov.sg)", "url": "https://form.gov.sg/63d22456f2bd6c0012319c64", "authority": "official" }
+  ],
+  "resources": [
+    {
+      "country_code": "SG",
+      "city_name": null,
+      "category_key": "transport",
+      "title": "Can Adrien drive on his French licence, and for how long?",
+      "resource_type": "guide",
+      "summary": "A foreigner may drive in Singapore on a valid foreign driving licence for a limited period, but a resident staying beyond 12 months is required to convert, and anyone who drives for work must convert within 6 months of their work pass being issued.",
+      "body": "The Traffic Police's Foreign Licence Conversion pre-assessment states: 'Foreigners residing in Singapore for a period exceeding 12 months are required to convert' their foreign driving licence. The Traffic Police also state: 'If you want to drive for work, you will need to obtain a Singapore driving licence within 6 months from the date of issue of your work passes.' Practical read for Adrien (Employment Pass holder relocating, not a short visit): he can initially drive on his valid French licence, but he must convert to a Singapore licence once he is resident beyond 12 months - and much sooner (within 6 months of his EP being issued) if he intends to drive for work. Carry the physical French licence; if it is not in English, check the Traffic Police checklist for whether an official English translation is required before you rely on it.",
+      "source_url": "https://form.gov.sg/63d22456f2bd6c0012319c64",
+      "source_name": "Traffic Police Foreign Licence Conversion pre-assessment (form.gov.sg)",
+      "tags": ["driving_licence", "licence_conversion", "deadline", "employment_pass", "non_obvious"],
+      "status": "draft"
+    },
+    {
+      "country_code": "SG",
+      "city_name": null,
+      "category_key": "transport",
+      "title": "Converting a French licence requires passing the Basic Theory Test - France is not exempt",
+      "resource_type": "checklist_item",
+      "summary": "To convert a foreign licence you must pass the Singapore Basic Theory Test (BTT). The Traffic Police do not publish any list of countries exempt from the BTT, so a French licence holder must sit and pass it.",
+      "body": "The Traffic Police conversion criteria require applicants to 'Pass the Basic Theory Test (BTT) in Singapore' and hold 'A valid foreign driver licence.' On the specific question of whether France is exempt: the Traffic Police page does NOT identify any countries as exempt from the BTT requirement. In other words, no BTT exemption is published for France - Adrien should plan to study for and pass the BTT as part of converting his French licence. (This BTT-exemption status was read from the official Traffic Police page; because that page is script-rendered, re-confirm against police.gov.sg before relying on it operationally.)",
+      "source_url": "https://www.police.gov.sg/Knowledge-Hub/Traffic/Traffic-Matters/Singapore-Driving-Licence",
+      "source_name": "Singapore Police Force / Traffic Police",
+      "tags": ["licence_conversion", "basic_theory_test", "non_obvious"],
+      "status": "draft"
+    },
+    {
+      "country_code": "SG",
+      "city_name": null,
+      "category_key": "transport",
+      "title": "Where and how to apply to convert",
+      "resource_type": "official_link",
+      "summary": "Start with the Traffic Police's online Foreign Licence Pre-assessment, then book an appointment to convert your foreign driving licence after passing the BTT.",
+      "body": "The Traffic Police direct applicants to first complete the Foreign Licence Pre-assessment checklist online, then book an appointment to convert the foreign driving licence. The route is: (1) complete the online Foreign Licence Pre-assessment; (2) pass the Basic Theory Test; (3) book the Traffic Police conversion appointment and attend with the required documents. Apply via the Singapore Police Force e-services (Book Appointment to Convert Foreign Driving Licence).",
+      "source_url": "https://www.police.gov.sg/E-Services/Book-Appointment-to-Convert-Foreign-Driving-Licence",
+      "source_name": "Singapore Police Force / Traffic Police",
+      "tags": ["licence_conversion"],
+      "status": "draft"
+    },
+    {
+      "country_code": "SG",
+      "city_name": null,
+      "category_key": "transport",
+      "title": "Documents to bring to the conversion appointment",
+      "resource_type": "checklist_item",
+      "summary": "The Traffic Police publish a documents checklist for converting a foreign driving licence; bring your pass, FIN card, passport, a passport-size photograph and your valid foreign licence.",
+      "body": "The Traffic Police's 'Checklist of Documents for Conversion of Other Foreign Driving Licence' lists items including a passport-size photograph, your work pass / long-term pass, FIN card and passport, and your valid foreign driving licence. Confirm the current, full checklist on the official Traffic Police page before your appointment, as document requirements can change. (Note: the checklist is published as a PDF on police.gov.sg; it could not be fully scraped from this run, so treat the item list as indicative and verify against the live checklist.)",
+      "source_url": "https://www.police.gov.sg/-/media/SPF/Advisories/Checklist-of-Documents-for-Conversion-of-Other-Foreign-Driving-Licence.pdf",
+      "source_name": "Singapore Police Force / Traffic Police",
+      "tags": ["licence_conversion"],
+      "status": "draft"
+    }
+  ],
+  "events": [
+    {
+      "title": "Convert French licence to a Singapore licence (if driving for work)",
+      "when_relative": "Within 6 months of the Employment Pass being issued",
+      "category_key": "transport",
+      "source_url": "https://www.police.gov.sg/Knowledge-Hub/Traffic/Traffic-Matters/Singapore-Driving-Licence",
+      "source_name": "Singapore Police Force / Traffic Police",
+      "status": "draft"
+    },
+    {
+      "title": "Conversion required for residents (general)",
+      "when_relative": "Before residing in Singapore beyond 12 months",
+      "category_key": "transport",
+      "source_url": "https://form.gov.sg/63d22456f2bd6c0012319c64",
+      "source_name": "Traffic Police Foreign Licence Conversion pre-assessment (form.gov.sg)",
+      "status": "draft"
+    }
+  ]
+}

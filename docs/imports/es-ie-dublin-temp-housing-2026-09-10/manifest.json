@@ -1,0 +1,28 @@
+{
+  "batch_id": "es-ie-dublin-temp-housing-2026-09-10",
+  "corridor": "XX-IE",
+  "categories": [
+    {
+      "service_category": "temp_accommodation",
+      "register": "Failte Ireland official quality-assured accommodation directory (Discover Ireland)",
+      "denominator": 10,
+      "accepted": 6,
+      "rejected": 0,
+      "confidence": "high",
+      "notes": "Each accepted listing's Failte Ireland page was fetched and shows the firm + accreditation statement. Three Staycity properties share one operator/site but are separately Failte-Ireland-approved. accreditation_number/expiry not published on the directory, left blank. Failte Ireland Short-Term Letting register is not yet open (pending legislation), so Discover Ireland is the usable provenance."
+    }
+  ],
+  "files": {
+    "providers.csv": {
+      "records": 6,
+      "sha256": "af906b0d5f0aeb5ed05ecc73ba9e7940efa95b0f57e17c4b03c87ff1d06dfc87"
+    },
+    "rejects.csv": {
+      "records": 0,
+      "sha256": "52e27c497e2cfd6ab60510abdf6a80ca54a914723df9d7fe498ac2b7df024110"
+    }
+  },
+  "total_accepted": 6,
+  "total_rejected": 0,
+  "platform_vetting_status": "pending"
+}

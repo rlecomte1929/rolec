@@ -1,0 +1,28 @@
+{
+  "batch_id": "es-ie-dublin-tax-advisors-2026-09-10",
+  "corridor": "ES-IE",
+  "categories": [
+    {
+      "service_category": "tax_finance",
+      "register": "Irish Tax Institute member directory / Chartered Accountants Ireland Find-a-Firm (both attempted)",
+      "denominator": 0,
+      "accepted": 0,
+      "rejected": 2,
+      "confidence": "n/a",
+      "notes": "Honest zero. Both required official registers were inaccessible at fetch time (2026-09-11): the ITI 'Find a CTA' search is temporarily offline for a database update, and CAI's main site returned a maintenance page while its Firms Directory renders results client-side (no fetchable listing). No firm names captured, so none invented. Both register-level blocks recorded in rejects.csv. Retry once ITI search is restored and CAI exits maintenance (CAI likely needs a headless/browser fetch)."
+    }
+  ],
+  "files": {
+    "providers.csv": {
+      "records": 0,
+      "sha256": "4a7361e7603fc55bbbdf2c0b3d81665199e4640bcec6da5b4b5aab6819f02fbb"
+    },
+    "rejects.csv": {
+      "records": 2,
+      "sha256": "adb880c28819cd78eac7f5c874f9962819e98324d07971f0b506ef1d109e3e4c"
+    }
+  },
+  "total_accepted": 0,
+  "total_rejected": 2,
+  "platform_vetting_status": "pending"
+}
