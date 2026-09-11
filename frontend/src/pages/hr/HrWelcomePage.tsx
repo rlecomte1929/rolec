@@ -81,6 +81,7 @@ export function HrWelcomePage() {
             title="Configure your company"
             description="Add your company name, size, default destination, and key contacts. This pre-fills every case you open."
             href="/hr/company-profile"
+            ctaLabel="Open company profile →"
           />
           <WelcomeStepCard
             step={2}
@@ -89,12 +90,14 @@ export function HrWelcomePage() {
             // AIQ-1599: land on the policy OVERVIEW (default 'policy' tab), not straight
             // into the builder — the builder stays reachable via its own tab there.
             href="/hr/policy"
+            ctaLabel="Open policy →"
           />
           <WelcomeStepCard
             step={3}
             title="Curate your service providers"
             description="Choose which moving companies, housing services, and immigration specialists appear in your cases."
             href={`${buildRoute('hrServiceProviders')}?tab=vendor`}
+            ctaLabel="Open service providers →"
           />
         </div>
 
@@ -129,6 +132,7 @@ export function HrWelcomePage() {
           description="Add your company name, size, default destination, and key contacts. This pre-fills every case you open."
           href="/hr/company-profile"
           badge="Start here"
+          ctaLabel="Open company profile →"
         />
         <WelcomeStepCard
           step={2}
@@ -137,12 +141,14 @@ export function HrWelcomePage() {
           // AIQ-1599: land on the policy OVERVIEW (default 'policy' tab), not straight
           // into the builder — the builder stays reachable via its own tab there.
           href="/hr/policy"
+          ctaLabel="Open policy →"
         />
         <WelcomeStepCard
           step={3}
           title="Curate your service providers"
           description="Choose which moving companies, housing services, and immigration specialists appear in your cases."
           href={`${buildRoute('hrServiceProviders')}?tab=vendor`}
+          ctaLabel="Open service providers →"
         />
       </div>
 

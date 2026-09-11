@@ -138,8 +138,24 @@ describe('HrWelcomePage — real HR', () => {
   it('sends step 3 to Service Providers vendor curation, not the legacy grid', () => {
     signedInAs('marie.dupont@acme-corp.com');
     renderPage();
-    const links = screen.getAllByRole('link', { name: /get started/i });
+    const links = screen.getAllByRole('link');
     expect(links[2]).toHaveAttribute('href', '/hr/service-providers?tab=vendor');
+    expect(links[2]).toHaveAccessibleName(/service providers/i);
+  });
+
+  it('gives each setup link a unique name that matches the destination H1', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    expect(screen.getByRole('link', { name: 'Open company profile →' })).toHaveAttribute(
+      'href',
+      '/hr/company-profile',
+    );
+    expect(screen.getByRole('link', { name: 'Open policy →' })).toHaveAttribute('href', '/hr/policy');
+    expect(screen.getByRole('link', { name: 'Open service providers →' })).toHaveAttribute(
+      'href',
+      '/hr/service-providers?tab=vendor',
+    );
+    expect(screen.queryAllByRole('link', { name: /get started/i })).toHaveLength(0);
   });
 
   it('puts an h2 above the setup cards so h3 titles do not skip a level', () => {

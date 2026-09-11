@@ -11,6 +11,8 @@ interface WelcomeStepCardProps {
   note?: string; // optional footnote below the card
   /** When false, the card has no Get started link (later welcome steps). */
   showCta?: boolean;
+  /** Visible + accessible CTA. Required when several cards share a page. */
+  ctaLabel?: string;
 }
 
 /**
@@ -18,7 +20,16 @@ interface WelcomeStepCardProps {
  * the "Get started →" link navigates — so reading the card can't trigger an
  * accidental full-card navigation, and the link stays keyboard-accessible.
  */
-export function WelcomeStepCard({ step, title, description, href, badge, note, showCta = true }: WelcomeStepCardProps) {
+export function WelcomeStepCard({
+  step,
+  title,
+  description,
+  href,
+  badge,
+  note,
+  showCta = true,
+  ctaLabel = 'Get started →',
+}: WelcomeStepCardProps) {
   return (
     <div>
       <Card className="hover:border-accent-200 transition-colors duration-150">
@@ -42,7 +53,7 @@ export function WelcomeStepCard({ step, title, description, href, badge, note, s
             to={href}
             className="inline-flex min-h-6 shrink-0 items-center self-center text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
           >
-            Get started →
+            {ctaLabel}
           </Link>
           ) : null}
         </div>

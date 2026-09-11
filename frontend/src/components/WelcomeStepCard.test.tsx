@@ -19,4 +19,20 @@ describe('WelcomeStepCard', () => {
     expect(link.className).toContain('min-h-6');
     expect(link.className).toContain('text-sm');
   });
+
+  it('uses a distinct ctaLabel as the accessible name', () => {
+    render(
+      <MemoryRouter>
+        <WelcomeStepCard
+          step={1}
+          title="Configure your company"
+          description="Add your company name."
+          href="/hr/company-profile"
+          ctaLabel="Open company profile →"
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Open company profile →' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /get started/i })).toBeNull();
+  });
 });
