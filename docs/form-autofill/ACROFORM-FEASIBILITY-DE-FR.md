@@ -174,3 +174,20 @@ parser. A zero from a byte grep means nothing.
    prefilling an edition the other government portal has superseded. That is a content-accuracy
    decision, not a technical one — do not resolve it by picking whichever file happens to be
    fillable.
+
+---
+
+# Follow-up (2026-09-11) — mapping re-seeded against the real field names
+
+Consequence 2 above ("Re-seeding the mapping against the real names is now unblocked; that is its
+own task") is **done**. `supabase/migrations/20261135000000_fr_cerfa_14571_real_acroform_fields.sql`
+replaces the 12 fictional French ids with the real France-Visas `*05` AcroForm field names
+(`applicantSurname`, `travelDocNumber`, …), mapped to the vault columns the Build B fact dictionary
+governs. Only the **9 plain-text (`/Tx`) fields** that map to a governed vault path are seeded; the
+gender and marital-status **radio-button (`/Btn`) groups** need a value→export-value layer the fill
+pipeline does not yet have and are a deliberate follow-up. `backend/tests/test_fr_cerfa_real_acroform.py`
+locks every seeded `form_field_id` to the committed artifact and proves a fill lands all nine.
+
+Still open (needs the browser, France-Visas 403s non-browser fetchers): upload the real `*05` PDF to
+the `form-templates` bucket as `FR_cerfa_14571_v2024.pdf`. The edition caveat (5) is unchanged and
+still Romain's call.
