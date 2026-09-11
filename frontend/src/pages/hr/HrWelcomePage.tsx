@@ -116,7 +116,7 @@ export function HrWelcomePage() {
   }
 
   return (
-    <WelcomeShell onSkip={handleSkip} hideSkip>
+    <WelcomeShell onSkip={handleSkip} hideSkip wide>
       <p className="text-sm font-medium text-accent-600 uppercase tracking-wide mb-2">Welcome to ReloPass</p>
       <h1 className="text-2xl font-semibold text-navy-800 mb-3">Set up your company workspace</h1>
       <p className="text-sm text-slate-600 mb-10 max-w-lg">
@@ -124,61 +124,68 @@ export function HrWelcomePage() {
         these in any order — or come back to them later.
       </p>
 
-      <h2 className="text-base font-semibold text-navy-800 mb-4">How it works</h2>
-      <div className="flex flex-col gap-4">
-        <WelcomeStepCard
-          step={1}
-          title="Configure your company"
-          description="Add your company name, size, default destination, and key contacts. This pre-fills every case you open."
-          href="/hr/company-profile"
-          badge="Start here"
-          ctaLabel="Open company profile →"
-          emphasized
-        />
-        <WelcomeStepCard
-          step={2}
-          title="Build your relocation policy"
-          description="Define tiers, budgets, and eligibility rules. The policy engine applies them automatically to each case."
-          // AIQ-1599: land on the policy OVERVIEW (default 'policy' tab), not straight
-          // into the builder — the builder stays reachable via its own tab there.
-          href="/hr/policy"
-          ctaLabel="Open policy →"
-        />
-        <WelcomeStepCard
-          step={3}
-          title="Curate your service providers"
-          description="Choose which moving companies, housing services, and immigration specialists appear in your cases."
-          href={`${buildRoute('hrServiceProviders')}?tab=vendor`}
-          ctaLabel="Open service providers →"
-        />
+      <div
+        data-testid="hr-welcome-layout"
+        className="grid grid-cols-1 gap-10 min-[960px]:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)] min-[960px]:items-start"
+      >
+        <div>
+          <h2 className="text-base font-semibold text-navy-800 mb-4">How it works</h2>
+          <div className="flex flex-col gap-4">
+            <WelcomeStepCard
+              step={1}
+              title="Configure your company"
+              description="Add your company name, size, default destination, and key contacts. This pre-fills every case you open."
+              href="/hr/company-profile"
+              badge="Start here"
+              ctaLabel="Open company profile →"
+              emphasized
+            />
+            <WelcomeStepCard
+              step={2}
+              title="Build your relocation policy"
+              description="Define tiers, budgets, and eligibility rules. The policy engine applies them automatically to each case."
+              // AIQ-1599: land on the policy OVERVIEW (default 'policy' tab), not straight
+              // into the builder — the builder stays reachable via its own tab there.
+              href="/hr/policy"
+              ctaLabel="Open policy →"
+            />
+            <WelcomeStepCard
+              step={3}
+              title="Curate your service providers"
+              description="Choose which moving companies, housing services, and immigration specialists appear in your cases."
+              href={`${buildRoute('hrServiceProviders')}?tab=vendor`}
+              ctaLabel="Open service providers →"
+            />
+          </div>
+        </div>
+
+        <aside>
+          {leaving ? (
+            <div className="fixed top-0 inset-x-0 z-[70] h-0.5 bg-accent-500" role="progressbar" aria-label="Opening page" />
+          ) : null}
+          <h2 className="text-base font-semibold text-navy-800 mb-1">Ready to open your first case?</h2>
+          <p className="text-sm text-slate-600 mb-4">
+            You can skip setup for now and start a case directly. The setup steps will remain accessible in the
+            sidebar at any time.
+          </p>
+          <LoadingButton
+            variant="primary"
+            onClick={handleGoToDashboard}
+            loading={leaving}
+            loadingLabel="Opening…"
+          >
+            Open the mobility command center
+          </LoadingButton>
+          <button
+            type="button"
+            onClick={handleSkip}
+            disabled={leaving}
+            className="mt-3 inline-flex min-h-6 items-center text-sm text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-60"
+          >
+            Open Cases
+          </button>
+        </aside>
       </div>
-
-      <div className="my-10 border-t border-slate-100" />
-
-      {leaving ? (
-        <div className="fixed top-0 inset-x-0 z-[70] h-0.5 bg-accent-500" role="progressbar" aria-label="Opening page" />
-      ) : null}
-      <h2 className="text-base font-semibold text-navy-800 mb-1">Ready to open your first case?</h2>
-      <p className="text-sm text-slate-600 mb-4">
-        You can skip setup for now and start a case directly. The setup steps will remain accessible in the
-        sidebar at any time.
-      </p>
-      <LoadingButton
-        variant="primary"
-        onClick={handleGoToDashboard}
-        loading={leaving}
-        loadingLabel="Opening…"
-      >
-        Open the mobility command center
-      </LoadingButton>
-      <button
-        type="button"
-        onClick={handleSkip}
-        disabled={leaving}
-        className="mt-3 inline-flex min-h-6 items-center text-sm text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-60"
-      >
-        Open Cases
-      </button>
     </WelcomeShell>
   );
 }

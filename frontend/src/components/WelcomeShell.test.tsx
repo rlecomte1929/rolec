@@ -31,6 +31,19 @@ describe('WelcomeShell', () => {
     expect(screen.queryByRole('button', { name: /open cases|skip/i })).not.toBeInTheDocument();
   });
 
+  it('can widen the content column for a two-pane HR layout', () => {
+    render(
+      <MemoryRouter>
+        <WelcomeShell onSkip={() => undefined} hideSkip wide>
+          <p>welcome</p>
+        </WelcomeShell>
+      </MemoryRouter>,
+    );
+    const column = screen.getByTestId('welcome-shell').querySelector('.animate-fade-in');
+    expect(column?.className).toContain('max-w-5xl');
+    expect(column?.className).not.toContain('max-w-2xl');
+  });
+
   it('reserves bottom space for the analytics consent banner', () => {
     render(
       <MemoryRouter>
