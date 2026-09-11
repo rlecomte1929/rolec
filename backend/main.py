@@ -209,6 +209,7 @@ from .app.recommendations.router import router as recommendations_router
 from .app.recommendations.admin_debug import router as admin_recommendations_debug_router
 from .app.routers import suppliers as suppliers_router
 from .app.routers import exception_requests as exception_requests_router
+from .app.routers import expense_claims as expense_claims_router  # [AIQ-2271]
 from .app.routers import services_state as services_state_router
 from .app.routers import admin_catalog as admin_catalog_router
 from .app.routers import hr_catalog as hr_catalog_router
@@ -857,6 +858,7 @@ app.include_router(admin_corrections_router.router)  # [AIQ-554] GET /api/admin/
 app.include_router(admin_reconciliation_router.router)  # WS1 1.5 — /api/admin/reconciliation (before remaining inline /api/admin/*)
 app.include_router(crons_router.router)  # [P4-4] cron endpoints
 app.include_router(exception_requests_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(expense_claims_router.router)  # [AIQ-2271] expense claims ledger
 app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
 app.include_router(hr_company_invites_router.router)  # [AIQ-2094] HR raises a colleague invite

@@ -486,3 +486,18 @@ def promote_hr_vendors_cron(
 
     result = promote_hr_vendors(threshold=threshold, dry_run=dry_run, actor_id="cron")
     return {"ok": True, **result}
+
+
+@router.post("/refresh-fx-rates")
+def refresh_fx_rates_cron(request: Request) -> Dict[str, Any]:
+    """[AIQ-2271] Snapshot public USD FX rates (Frankfurter/ECB). No PII.
+
+    Authoring/cron layer only — serving reads ``fx_rates`` via fx_service
+    fallback, never this HTTP client.
+    """
+    _verify_cron_secret(request)
+    from ...database import db
+    from ..services.fx_rate_refresh import refresh_fx_rates
+
+    with db.engine.begin() as conn:
+        return refresh_fx_rates(conn)

@@ -11,13 +11,17 @@ need display_currency param on the estimate endpoint so HR and employee see
 the same number."
 
 When the frontend later opts into the converted fields, both tiers display
-identical values — same source of truth. Pulling live rates is a Phase 2
-follow-up; the current rates match the frontend's table exactly so client +
-server agree today.
+identical values — same source of truth. Live rates are snapshotted into
+``fx_rates`` by a cron in the authoring layer ([AIQ-2271]); this module
+reads that table when a connection is passed and otherwise uses the
+hardcoded table so ``convert_usd_to_display`` stays pure.
 """
 from __future__ import annotations
 
-from typing import Dict, Optional
+from datetime import date, datetime
+from typing import Any, Dict, Optional, Tuple
+
+from sqlalchemy import text
 
 # Keep this in sync with frontend/src/features/services/servicesCurrency.ts
 USD_TO: Dict[str, float] = {
@@ -72,6 +76,78 @@ def default_currency_for_country(country: Optional[str]) -> str:
     return normalize_display_currency(code)
 
 
+def usd_to_table(conn: Any = None) -> Dict[str, float]:
+    """USD→quote table: latest ``fx_rates`` snapshot, else the hardcoded fallback."""
+    rates = dict(USD_TO)
+    if conn is None:
+        return rates
+    try:
+        row = conn.execute(
+            text(
+                "SELECT as_of_date FROM fx_rates WHERE UPPER(base_currency) = 'USD' "
+                "ORDER BY as_of_date DESC LIMIT 1"
+            )
+        ).first()
+        if not row:
+            return rates
+        as_of = row[0]
+        result = conn.execute(
+            text(
+                "SELECT quote_currency, rate FROM fx_rates "
+                "WHERE UPPER(base_currency) = 'USD' AND as_of_date = :d"
+            ),
+            {"d": as_of},
+        )
+        for quote, rate in result:
+            q = str(quote or "").strip().upper()
+            if q:
+                rates[q] = float(rate)
+        rates["USD"] = 1.0
+        return rates
+    except Exception:
+        return dict(USD_TO)
+
+
+def rate_between(from_currency: str, to_currency: str, conn: Any = None) -> Optional[float]:
+    """Units of ``to`` per 1 unit of ``from``. Same-currency is 1.0. None if unknown."""
+    a = str(from_currency or "").strip().upper()
+    b = str(to_currency or "").strip().upper()
+    if not a or not b:
+        return None
+    if a == b:
+        return 1.0
+    table = usd_to_table(conn)
+    if a not in table or b not in table:
+        return None
+    src = table[a]
+    if not src:
+        return None
+    return table[b] / src
+
+
+def snapshot_as_of(conn: Any = None) -> Optional[date]:
+    """Date of the latest USD snapshot, or None when falling back to hardcoded."""
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            text(
+                "SELECT as_of_date FROM fx_rates WHERE UPPER(base_currency) = 'USD' "
+                "ORDER BY as_of_date DESC LIMIT 1"
+            )
+        ).first()
+        if not row or row[0] is None:
+            return None
+        val = row[0]
+        if isinstance(val, datetime):
+            return val.date()
+        if isinstance(val, date):
+            return val
+        return date.fromisoformat(str(val)[:10])
+    except Exception:
+        return None
+
+
 def convert_usd_to_display(usd: Optional[float], display_currency: str) -> Optional[float]:
     """
     Convert a USD-denominated amount to the display currency.
@@ -79,9 +155,27 @@ def convert_usd_to_display(usd: Optional[float], display_currency: str) -> Optio
     Returns None when input is None (so callers can pass through optional
     fields without juggling sentinels). Currencies without a known rate
     fall back to USD (no-op) to mirror the frontend's silent fallback.
+
+    Pure: uses the hardcoded table only so tests stay deterministic.
     """
     if usd is None:
         return None
     cur = normalize_display_currency(display_currency)
     rate = USD_TO.get(cur, 1.0)
     return float(usd) * rate
+
+
+def convert_with_snapshot(
+    amount: float,
+    from_currency: str,
+    to_currency: str,
+    conn: Any = None,
+) -> Tuple[Optional[float], Optional[float], Optional[date]]:
+    """Return (amount_in_to, rate_from_to, snapshot_date). Rate 1.0 when same currency."""
+    rate = rate_between(from_currency, to_currency, conn)
+    if rate is None:
+        return None, None, snapshot_as_of(conn)
+    as_of = snapshot_as_of(conn)
+    if as_of is None:
+        as_of = date.today()
+    return float(amount) * rate, rate, as_of
