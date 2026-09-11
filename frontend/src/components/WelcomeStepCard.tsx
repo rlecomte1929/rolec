@@ -40,7 +40,7 @@ export function WelcomeStepCard({ step, title, description, href, badge, note, s
           {showCta ? (
           <Link
             to={href}
-            className="shrink-0 self-center text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
+            className="inline-flex min-h-6 shrink-0 items-center self-center text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
           >
             Get started →
           </Link>

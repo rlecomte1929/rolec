@@ -71,6 +71,7 @@ describe('ConsentBanner', () => {
     renderBanner();
     expect(screen.getByRole('dialog', { name: /analytics consent/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /accept analytics/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /privacy policy/i }).className).toContain('min-h-6');
   });
 
   it('Accept persists "granted" and dismisses the banner', () => {

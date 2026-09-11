@@ -17,6 +17,7 @@ describe('WelcomeShell', () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole('button', { name: 'Open Cases →' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open Cases →' }).className).toContain('min-h-6');
   });
 
   it('can hide the top skip so the page owns a single bottom exit', () => {

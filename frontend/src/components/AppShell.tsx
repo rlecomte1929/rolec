@@ -55,7 +55,7 @@ const LogoutButton: React.FC = () => {
         }
       }}
       disabled={isLoggingOut}
-      className="text-xs text-slate-500 hover:text-slate-800 disabled:opacity-60"
+      className="inline-flex min-h-6 items-center text-xs text-slate-500 hover:text-slate-800 disabled:opacity-60"
     >
       {isLoggingOut ? 'Logging out…' : 'Log out'}
     </Button>

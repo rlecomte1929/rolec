@@ -33,7 +33,7 @@ export function WelcomeShell({
         <div className="w-full max-w-2xl flex justify-end mb-8">
           <button
             onClick={onSkip}
-            className="text-sm text-slate-500 hover:text-slate-700 hover:underline transition-colors"
+            className="inline-flex min-h-6 items-center text-sm text-slate-500 hover:text-slate-700 hover:underline transition-colors"
           >
             {skipLabel}
           </button>

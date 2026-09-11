@@ -104,7 +104,7 @@ export function HrWelcomePage() {
           type="button"
           onClick={handleGoToDashboard}
           disabled={leaving}
-          className="text-sm text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-60"
+          className="inline-flex min-h-6 items-center text-sm text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-60"
         >
           {leaving ? 'Opening…' : 'Open the mobility command center'}
         </button>
@@ -168,7 +168,7 @@ export function HrWelcomePage() {
         type="button"
         onClick={handleSkip}
         disabled={leaving}
-        className="mt-3 block text-sm text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-60"
+        className="mt-3 inline-flex min-h-6 items-center text-sm text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-60"
       >
         Open Cases
       </button>

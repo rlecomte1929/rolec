@@ -98,7 +98,7 @@ export function ConsentBanner() {
                white — below AA. This banner is a public surface, so it takes the marketing
                accent (#197b78, 5.07:1). One node, but it renders on every public route via
                App.tsx, which is why an axe sweep reported it 12 times. */
-            className="font-medium text-marketing-accent underline underline-offset-2 hover:text-[#167572]"
+            className="inline-flex min-h-6 items-center font-medium text-marketing-accent underline underline-offset-2 hover:text-[#167572]"
           >
             Privacy policy
           </Link>
