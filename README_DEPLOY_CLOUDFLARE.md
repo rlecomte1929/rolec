@@ -16,8 +16,20 @@ Pages already handles deployment; no Wrangler deploy command is required.
 
 The hosted frontend must point to a reachable backend and the backend must allow the frontend origin.
 
-1) **Cloudflare Pages env vars** (frontend):
-   - `VITE_API_URL=https://<your-backend-host>`
+1) **Cloudflare Pages env vars** (frontend) — Production **and** Preview scopes:
+
+   Required for the SPA to mount (`frontend/src/config/env.ts` throws before
+   `ReactDOM.createRoot()` if either Supabase var is missing; the page then
+   stays as inert prerendered HTML — GitHub #2285):
+
+   - `VITE_API_URL=https://api.relopass.com`
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+
+   These are public, client-side values (the anon key is already in the
+   production bundle and is subject to Supabase RLS). They are also committed
+   in `frontend/.env.production` so Pages builds work even when the dashboard
+   vars are unset. Dashboard values still override the file when present.
 
 2) **Backend env vars** (FastAPI):
    - `CORS_ORIGINS=https://<your-pages-domain>,http://localhost:5173`
