@@ -1,0 +1,46 @@
+{
+ "batch_id": "no-departure-2026-09-10",
+ "package_id": "D-P1",
+ "slug": "no-departure-2026-09-10",
+ "package_type": "facts_ndjson",
+ "corridor": "NO-FR",
+ "nationality": "Norwegian (EEA)",
+ "phase": "departure",
+ "persona": "Denis",
+ "generated_at": "2026-09-11",
+ "counts": {
+  "facts": 16,
+  "non_obvious_flag_true": 15,
+  "needs_lawyer_review_true": 8
+ },
+ "constraints": {
+  "review_status": "pending",
+  "verification_status": "representative",
+  "db_writes": 0,
+  "webhook_calls": 0
+ },
+ "evidence_resource": {
+  "date": "2026-09-11",
+  "reason": "delivery-gate evidence-citation check: 4 source_urls were front doors / language roots",
+  "facts_deeplinked": [
+   "no_dep_sipsi_posted_declaration",
+   "no_dep_otp_pension",
+   "no_dep_helfo_ehic",
+   "no_dep_car_export_customs"
+  ],
+  "fact_keys_stable": true
+ },
+ "files": [
+  {
+   "filename": "no-departure-2026-09-10.ndjson",
+   "sha256": "5e31d07d46ff4f62c4c71f37ccb8d4fa7499dc6cddd5d86ebf545fbe6e66d172",
+   "bytes": 13155,
+   "records": 16
+  },
+  {
+   "filename": "no-departure-2026-09-10-README.md",
+   "sha256": "c1f4721833cef207acb3b296308f2dcb2535e32ae0a7cbedd6348d740f6961d3",
+   "bytes": 2589
+  }
+ ]
+}

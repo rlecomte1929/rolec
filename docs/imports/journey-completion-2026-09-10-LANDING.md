@@ -24,7 +24,7 @@ facts batches. Everything is candidate-only: facts `review_status=pending` /
 `platform_vetting_status=pending`. **Nothing is served; the human lawyer gate at
 `/admin/countries` (facts) and the vetting queue (vendors) remain.**
 
-## Landed (candidate-only) — 31 batches, 173 items
+## Landed (candidate-only) — 33 batches, 201 items — all 4 personas complete
 
 *(21 in the first pull below + 4 Denis packages recovered via Otto's GCS listing + 4 Abraham
 US→EC vendor batches completed from Otto's metadata re-run — see the two sections before "Deferred".)*
@@ -123,17 +123,12 @@ flag; the byte-perfect `1789155617167_a7kffdbu.csv` is used.)*
   D-P4 medical (honest-zero), D-P6 language, D-P7 dual-career (from the listing) + **D-P3
   no-fr-paris-temp-housing** (4 accepted/2 rejects) and **D-P5 no-fr-driving-licence** (7 resources,
   from the re-run #134437, content sha256-verified, `batch_id` normalized).
-  - **RETURNED TO OTTO (fail the evidence-citation gate — real defect, not staged):**
-    - **D-P1 `no-departure-2026-09-10`** (16 facts) — 4 source_urls are homepages/language-roots:
-      `no_dep_sipsi_posted_declaration` (sipsi.travail.gouv.fr/), `no_dep_otp_pension`
-      (norskpensjon.no/), `no_dep_helfo_ehic` (helfo.no/en), `no_dep_car_export_customs`
-      (douane.gouv.fr/).
-    - **D-P10 `fr-no-return-2026-09-10`** (12 facts) — 3 source_urls are homepages/language-roots:
-      `fr_no_ret_cpam_carte_vitale` (ameli.fr/), `fr_no_ret_pension_portability` (agirc-arrco.fr/),
-      `fr_no_ret_helfo_fastlege` (helsenorge.no/en/).
-    Each needs a **deep-link source_url that states the rule** (not the site front door). Content
-    sha256 are known (D-P1 `1675f73a…`, D-P10 `b50b2768…`) but the batches are held out of the PR
-    until Otto re-sources those citations — deep-links cannot be invented here.
+  - **D-P1 `no-departure-2026-09-10`** (16 facts) and **D-P10 `fr-no-return-2026-09-10`** (12 facts)
+    initially failed the evidence-citation gate (7 source_urls were homepages/language-roots) and were
+    returned to Otto. **Now RESOLVED:** Otto re-sourced all 7 with deep links that state the rule, each
+    carrying a fresh verbatim `evidence_quote`; fact_keys unchanged. Re-pulled, all 6 files
+    sha256-verified, 0 offending source_urls, gate PASS — **landed** (batch_id normalized). Denis is
+    complete (8/8 packages).
 - **Abraham US→EC vendor batches — RESOLVED (#134438).** Metadata re-run delivered full filenames;
   all 4 batches completed and landed (see the Abraham vendor section above). No longer outstanding.
 - **Abraham Job C (#134263)** — all honest-zeros (Quito registers WAF/JS-blocked); no content to load.

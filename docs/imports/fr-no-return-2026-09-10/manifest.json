@@ -1,0 +1,44 @@
+{
+ "batch_id": "fr-no-return-2026-09-10",
+ "package_id": "D-P10",
+ "slug": "fr-no-return-2026-09-10",
+ "package_type": "facts_ndjson",
+ "corridor": "FR-NO",
+ "phase": "return",
+ "persona": "Denis",
+ "generated_at": "2026-09-11",
+ "counts": {
+  "facts": 12,
+  "non_obvious_flag_true": 10,
+  "needs_lawyer_review_true": 5
+ },
+ "constraints": {
+  "review_status": "pending",
+  "verification_status": "representative",
+  "db_writes": 0,
+  "webhook_calls": 0
+ },
+ "evidence_resource": {
+  "date": "2026-09-11",
+  "reason": "delivery-gate evidence-citation check: 3 source_urls were front doors / language roots",
+  "facts_deeplinked": [
+   "fr_no_ret_cpam_carte_vitale",
+   "fr_no_ret_pension_portability",
+   "fr_no_ret_helfo_fastlege"
+  ],
+  "fact_keys_stable": true
+ },
+ "files": [
+  {
+   "filename": "fr-no-return-2026-09-10.ndjson",
+   "sha256": "76f00980a59fa2f0a1142ed3f4ace4b5522b79ac17cd2bde693ee28c65d5e422",
+   "bytes": 9031,
+   "records": 12
+  },
+  {
+   "filename": "fr-no-return-2026-09-10-README.md",
+   "sha256": "a1cb8fbd7901852361666efc3dafc06e9d8b846b5a7bd65e1e357931a94b97d8",
+   "bytes": 2410
+  }
+ ]
+}
