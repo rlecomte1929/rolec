@@ -4,7 +4,8 @@ import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { authAPI } from '../api/client';
 import { useBrandingConfig } from '../hooks/useBrandingConfig';
 import { getNavigationError } from '../navigation/safeNavigate';
-import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
+import { buildRoute, homeRouteKeyForRole, ROUTE_DEFS } from '../navigation/routes';
+import { employeeUnlinkedActionCopy } from './employeeUnlinkedBanner';
 import { useRegisterNav } from '../navigation/registry';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { setPreferredEmployeeAssignmentId } from '../utils/employeeAssignmentScope';
@@ -162,6 +163,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
   const userInitials = deriveInitials(name || identity || 'RP');
   const showEmployeeBanner =
     sbRole !== 'ADMIN' && isEmployeeRole && !employeeAssignmentLoading && linkedCount === 0;
+  const onEmployeeDashboard = location.pathname === ROUTE_DEFS.employeeDashboard.path;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800">
@@ -262,7 +264,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-sm text-amber-900 shrink-0">
             <span className="mr-2">⏳</span>
             Your account isn&apos;t linked to a relocation case yet — most features are on hold.
-            If HR set one up for your email, open the <strong>Dashboard</strong> to accept it (a case for your verified email links automatically).
+            If HR set one up for your email, {employeeUnlinkedActionCopy(onEmployeeDashboard)}
+            {' '}(a case for your verified email links automatically).
           </div>
         )}
 
