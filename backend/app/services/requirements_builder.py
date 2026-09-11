@@ -339,6 +339,11 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                     if getattr(item, "applies_to_nationality_classes_json", None)
                     else None
                 ),
+                "appliesToRegimes": (
+                    json.loads(item.applies_to_regimes_json)
+                    if getattr(item, "applies_to_regimes_json", None)
+                    else None
+                ),
                 "verificationStatus": getattr(item, "verification_status", None),
                 # Served-with-a-caveat: flagged needs_lawyer_review AND not attested.
                 "legalReviewPending": lawyer_review_gate.legal_review_pending(
@@ -348,6 +353,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                         getattr(item, "citations_json", None),
                         getattr(item, "applies_to_assignment_types_json", None),
                         getattr(item, "applies_to_nationality_classes_json", None),
+                        getattr(item, "applies_to_regimes_json", None),
                     ),
                 ),
                 # getattr-defaulted like its neighbours: test_public_corridor.py feeds
@@ -393,6 +399,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
         attestedAt=item.get("attestedAt"),
                     nonObvious=item.get("nonObvious"),
                     timing=item.get("timing"),
+                    appliesToRegimes=item.get("appliesToRegimes"),
                     outcomeType=outcome_type,
                     reason=item.get("reason"),
                 )

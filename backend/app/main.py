@@ -56,6 +56,7 @@ from .routers import (
     exception_requests,
     expense_claims,
     hr_analytics,
+    hr_duty_of_care,
     hr_case_summary,
     hr_onboarding,
     hr_case_audit,
@@ -184,6 +185,7 @@ def create_app() -> FastAPI:
     app.include_router(research_requests.router)  # [AIQ-1349 P2] research-request intake
     app.include_router(hr_coordination.router)
     app.include_router(hr_analytics.router)
+    app.include_router(hr_duty_of_care.router)  # AIQ-2268 — GET /api/hr/duty-of-care
     app.include_router(hr_case_summary.router)  # AIQ-1697 — AI case summary proxy
     app.include_router(hr_onboarding.router)  # AIQ-1223c — deterministic onboarding inference
     # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.

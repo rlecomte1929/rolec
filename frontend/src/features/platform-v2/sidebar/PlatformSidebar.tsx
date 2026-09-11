@@ -75,6 +75,7 @@ function defaultSections(): NavSection[] {
         { id: 'policy-benefits', name: 'Policy & benefits', to: r('hrPolicy') },
         { id: 'policy-reality', name: 'Policy vs. Reality', to: r('hrAnalytics'), badge: { label: 'NEW', tone: 'new' } },
         { id: 'exceptions', name: 'Exceptions', to: r('hrReview') },
+        { id: 'duty-of-care', name: 'Duty of care', to: r('hrDutyOfCare') },
       ],
     },
     {
