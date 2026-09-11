@@ -223,6 +223,7 @@ def build_case_plan_email(case_id: str) -> Dict[str, str]:
     """Return {subject, title, body} for a case's plan email. No email IO."""
     import json as _json
     from ..roadmap_builder import derive_roadmap   # app/services/roadmap_builder.py
+    from ..departure_requirements import departure_requirement_records  # app/services/departure_requirements.py
     from ...db import SessionLocal                 # app/db.py
     from ... import crud                           # app/crud.py
 
@@ -230,8 +231,12 @@ def build_case_plan_email(case_id: str) -> Dict[str, str]:
         case = crud.get_case(session, case_id)
         draft = _json.loads(getattr(case, "draft_json", None) or "{}") if case else {}
         status = getattr(case, "status", None) if case else None
+        case_dict = {"id": case_id, "status": status, "draft": draft}
+        # The same origin-country exit-requirement enrichment the roadmap endpoints apply,
+        # so the plan email's Pre-departure section matches the in-app roadmap.
+        dep_reqs = departure_requirement_records(session, case_dict)
 
-    roadmap = derive_roadmap({"id": case_id, "status": status, "draft": draft})
+    roadmap = derive_roadmap(case_dict, departure_requirements=dep_reqs)
     milestones = gather_case_milestones(case_id)
     return {
         "subject": "Your ReloPass relocation plan",

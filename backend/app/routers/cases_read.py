@@ -41,6 +41,7 @@ from ..db import SessionLocal
 from ..services.roadmap_entitlement import assert_roadmap_access
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
+from ..services.departure_requirements import departure_requirement_records
 from ..services.roadmap_projection import project_tracks, track_label_for_form
 from ..services.confidence_mapping import tier_to_confidence
 from ..services.localised_labels import localised_label
@@ -1255,7 +1256,11 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
                 created_by=user.get("auth_uuid") or user.get("id"),
             )
             return candidate
-    return derive_roadmap(case_dict)
+    # Enrich the pre-departure track with the mover's approved origin-country exit
+    # requirements (fetched here; derive_roadmap itself stays DB-free).
+    with SessionLocal() as db:
+        _dep_reqs = departure_requirement_records(db, case_dict)
+    return derive_roadmap(case_dict, departure_requirements=_dep_reqs)
 
 
 @router.get("/{case_id}/roadmap/tracks", response_model=RoadmapTracksResponse)

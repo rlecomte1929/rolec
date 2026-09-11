@@ -17,6 +17,7 @@ from ..services.relocation_plan_view_service import invalidate_relocation_plan_c
 from ..services.research import run_country_research
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
+from ..services.departure_requirements import departure_requirement_records
 from ..services.trigger_engine import fire_roadmap_events
 from ..services.prefill_engine import run_prefill_for_dependents
 from ..services.audit_log_service import (
@@ -319,7 +320,11 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
         "status": case.status,
         "draft": draft,
     }
-    return derive_roadmap(case_dict)
+    # Enrich the pre-departure track with the mover's approved origin-country exit
+    # requirements (fetched here; derive_roadmap itself stays DB-free).
+    with SessionLocal() as db:
+        _dep_reqs = departure_requirement_records(db, case_dict)
+    return derive_roadmap(case_dict, departure_requirements=_dep_reqs)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
