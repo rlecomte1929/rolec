@@ -1,6 +1,8 @@
-from typing import List, Literal, Optional, Set
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel
+
+from .plan_scope import ALL_PHASES, REPATRIATION_PHASES, active_phases_for_case_type
 
 
 # ── S3 SPIKE: extended CaseType ───────────────────────────────────────────────
@@ -23,12 +25,12 @@ CaseType = Literal[
     "repatriation",         # returning to home country after a foreign assignment
 ]
 
-# Phases that can be suppressed per case type.
-# Kept here so plan_scope.py can import a single source of truth.
+# Phases suppressed relative to ALL_PHASES. Must agree with plan_scope:
+# repatriation drops immigration and adds ``return`` via REPATRIATION_PHASES.
 SUPPRESSED_PHASES: dict = {
     "domestic_move":        {"immigration"},
     "short_term_project":   {"logistics", "post_arrival"},
-    "repatriation":         {"immigration"},           # repat has its own admin_reinstatement phase
+    "repatriation":         set(ALL_PHASES) - set(REPATRIATION_PHASES),
 }
 
 Priority = Literal["high", "medium", "low"]
@@ -54,8 +56,6 @@ class CaseClassification(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-
-_ALL_PHASES = ["pre_departure", "immigration", "logistics", "arrival", "post_arrival"]
 
 
 def _normalize(value: Optional[str]) -> Optional[str]:
@@ -92,9 +92,12 @@ def _derive_move_type(
 
 
 def _active_phases_for(case_type: CaseType) -> List[str]:
-    """Return the ordered list of plan phases active for this case type."""
-    suppressed: Set[str] = SUPPRESSED_PHASES.get(case_type, set())
-    return [p for p in _ALL_PHASES if p not in suppressed]
+    """Return the ordered list of plan phases active for this case type.
+
+    Delegates to plan_scope so repatriation's additive ``return`` phase cannot
+    drift from REPATRIATION_PHASES.
+    """
+    return active_phases_for_case_type(case_type)
 
 
 def _normalize_employment_type(value: Optional[str]) -> Optional[str]:

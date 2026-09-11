@@ -94,6 +94,33 @@ class TestPhaseGating:
         assert "task_visa_docs_prep" in types
         assert "task_temp_housing" in types
         assert "task_settling_in" in types
+        assert "task_return_review" not in types
+
+    def test_repatriation_seeds_return_phase(self):
+        result = compute_default_milestones(
+            case_id="test-repat",
+            contract_type="repatriation",
+        )
+        types = _milestone_types(result)
+        assert "task_return_review" in types
+        assert "task_return_closeout" in types
+        assert "task_visa_docs_prep" not in types
+
+    def test_permanent_transfer_has_no_return_phase(self):
+        result = compute_default_milestones(
+            case_id="test-perm",
+            contract_type="permanent_transfer",
+        )
+        types = _milestone_types(result)
+        assert "task_return_review" not in types
+
+    def test_domestic_move_has_no_return_phase(self):
+        result = compute_default_milestones(
+            case_id="test-dom-return",
+            contract_type="domestic_move",
+        )
+        types = _milestone_types(result)
+        assert "task_return_review" not in types
 
     def test_unknown_contract_type_is_backward_compatible(self):
         result = compute_default_milestones(

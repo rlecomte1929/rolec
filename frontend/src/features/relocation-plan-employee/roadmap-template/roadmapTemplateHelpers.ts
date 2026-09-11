@@ -3,7 +3,7 @@
  * Pure functions over the plan-view DTO — no fetching, no React.
  */
 import type { LucideIcon } from 'lucide-react';
-import { User, Stamp, Package, PlaneTakeoff, Home, MapPin } from 'lucide-react';
+import { User, Stamp, Package, PlaneTakeoff, Home, MapPin, Undo2 } from 'lucide-react';
 import type {
   RelocationPlanPhaseDTO,
   RelocationPlanPhaseTaskDTO,
@@ -23,6 +23,7 @@ const PHASE_ICON: Record<string, LucideIcon> = {
   arrival: PlaneTakeoff,
   post_arrival: Home,
   settlement: Home,
+  return: Undo2,
 };
 export function phaseIcon(phaseKey: string): LucideIcon {
   return PHASE_ICON[phaseKey] ?? MapPin;
