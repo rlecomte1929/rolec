@@ -9,6 +9,8 @@ interface SectionProps {
   /** Fill viewport and center content vertically (for hero sections) */
   fillViewport?: boolean;
   className?: string;
+  /** Optional DOM id — used as an in-page anchor target (e.g. nav "Value" → #value). */
+  id?: string;
 }
 
 export const Section: React.FC<SectionProps> = ({
@@ -17,6 +19,7 @@ export const Section: React.FC<SectionProps> = ({
   background = 'transparent',
   fillViewport = false,
   className = '',
+  id,
 }) => {
   const spacingClass =
     spacing === 'lg'
@@ -41,7 +44,7 @@ export const Section: React.FC<SectionProps> = ({
           : '';
 
   return (
-    <section className={`${spacingClass} ${viewportClass} ${bgClass} ${className}`.trim()}>
+    <section id={id} className={`${spacingClass} ${viewportClass} ${bgClass} ${className}`.trim()}>
       {children}
     </section>
   );
