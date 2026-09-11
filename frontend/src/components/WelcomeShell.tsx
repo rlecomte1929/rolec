@@ -3,6 +3,7 @@ import { AppShell } from './AppShell';
 
 interface WelcomeShellProps {
   onSkip: () => void; // called when the user clicks the "skip" link
+  skipLabel?: string;
   children: React.ReactNode;
 }
 
@@ -14,7 +15,11 @@ interface WelcomeShellProps {
  * the low-weight skip link. No AppShell title is passed — each welcome page supplies
  * its own eyebrow + headline as the heading.
  */
-export function WelcomeShell({ onSkip, children }: WelcomeShellProps) {
+export function WelcomeShell({
+  onSkip,
+  skipLabel = 'Skip, go to dashboard →',
+  children,
+}: WelcomeShellProps) {
   return (
     <AppShell>
       <div
@@ -27,7 +32,7 @@ export function WelcomeShell({ onSkip, children }: WelcomeShellProps) {
             onClick={onSkip}
             className="text-sm text-slate-500 hover:text-slate-700 hover:underline transition-colors"
           >
-            Skip, go to dashboard →
+            {skipLabel}
           </button>
         </div>
 

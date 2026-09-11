@@ -258,7 +258,7 @@ const SECTIONS: NavSection[] = [
       // centre's `noCasesYet` empty-state CTA ("Import your team roster") and the
       // back-link on its own detail page, so the roster became unreachable the moment
       // a company had one case and the empty state stopped rendering.
-      { id: 'relocations', label: 'Relocations', hint: 'Case list and the new-relocation form', to: ROUTE_DEFS.hrDashboard.path, exact: true },
+      { id: 'relocations', label: 'Cases', hint: 'Case list and the new-relocation form', to: ROUTE_DEFS.hrDashboard.path, exact: true },
       { id: 'employees', label: 'Employees', hint: 'Your team roster', to: ROUTE_DEFS.hrEmployees.path, exact: true },
       { id: 'risk', label: 'Risk', to: ROUTE_DEFS.hrRisk.path, exact: true },
       { id: 'duty-of-care', label: 'Duty of care', to: ROUTE_DEFS.hrDutyOfCare.path, exact: true },

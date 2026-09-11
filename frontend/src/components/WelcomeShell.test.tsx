@@ -8,6 +8,17 @@ vi.mock('./AppShell', () => ({
 }));
 
 describe('WelcomeShell', () => {
+  it('uses the skip label that names the real destination', () => {
+    render(
+      <MemoryRouter>
+        <WelcomeShell onSkip={() => undefined} skipLabel="Open Cases →">
+          <p>welcome</p>
+        </WelcomeShell>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('button', { name: 'Open Cases →' })).toBeInTheDocument();
+  });
+
   it('reserves bottom space for the analytics consent banner', () => {
     render(
       <MemoryRouter>

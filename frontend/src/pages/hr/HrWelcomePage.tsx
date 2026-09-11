@@ -50,7 +50,7 @@ export function HrWelcomePage() {
 
   if (isTestDrive) {
     return (
-      <WelcomeShell onSkip={handleSkip}>
+      <WelcomeShell onSkip={handleSkip} skipLabel="Open Cases →">
         <p className="text-sm font-medium text-accent-600 uppercase tracking-wide mb-2">Welcome to ReloPass</p>
         <h1 className="text-2xl font-semibold text-navy-800 mb-3">Open your first relocation case</h1>
         <p className="text-sm text-slate-600 mb-6 max-w-lg">
@@ -93,14 +93,14 @@ export function HrWelcomePage() {
         <div className="my-10 border-t border-slate-100" />
 
         <Button variant="secondary" onClick={handleGoToDashboard}>
-          Go to the Command Center →
+          Open the mobility command center →
         </Button>
       </WelcomeShell>
     );
   }
 
   return (
-    <WelcomeShell onSkip={handleSkip}>
+    <WelcomeShell onSkip={handleSkip} skipLabel="Open Cases →">
       <p className="text-sm font-medium text-accent-600 uppercase tracking-wide mb-2">Welcome to ReloPass</p>
       <h1 className="text-2xl font-semibold text-navy-800 mb-3">Set up your company workspace</h1>
       <p className="text-sm text-slate-600 mb-10 max-w-lg">
@@ -141,7 +141,7 @@ export function HrWelcomePage() {
         sidebar at any time.
       </p>
       <Button variant="primary" onClick={handleGoToDashboard}>
-        Go to the Command Center →
+        Open the mobility command center →
       </Button>
     </WelcomeShell>
   );
