@@ -64,6 +64,18 @@ export const isCoordinatorEnabled = (): boolean =>
 export const isTriggerFixEnabled = (): boolean =>
   isOn(import.meta.env.VITE_FEATURE_FEEDBACK_FIX);
 
+/**
+ * Employee AcroForm auto-fill page (form-fill Phase 1). Surfaces
+ * `/employee/case/:caseId/immigration/forms`, where the employee generates a pre-filled copy of
+ * the real government visa form (e.g. the France-Visas CERFA) from their case data and downloads
+ * it. Kept OFF until the official form PDFs are uploaded to the `form-templates` bucket — until
+ * then generate-form 404s per form (no template), which the page reports honestly.
+ *
+ * Set `VITE_ENABLE_IMMIGRATION_FORMS=true` to surface the page + its entry link.
+ */
+export const isImmigrationFormsEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_ENABLE_IMMIGRATION_FORMS);
+
 // [AIQ-2142] The roadmap paywall is no longer a client build flag. Whether a case's roadmap
 // is gated is served as data by GET /api/payment/status/:caseId (`entitlement`), decided by
 // the server behind its own RELOPASS_ROADMAP_PAYWALL_ENABLED switch. The client reads that

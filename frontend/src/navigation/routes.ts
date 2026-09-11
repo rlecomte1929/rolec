@@ -43,6 +43,8 @@ export const ROUTE_DEFS = {
   employeeCaseIntake: { path: '/employee/case/:caseId/intake', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** Immigration intake flow (consent → OCR → interview). */
   employeeCaseImmigration: { path: '/employee/case/:caseId/immigration', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  /** [form-fill Phase 1] Auto-fill the real government visa AcroForm (CERFA, …) from case data. */
+  employeeCaseImmigrationForms: { path: '/employee/case/:caseId/immigration/forms', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** [IMM-19] GDPR data-management screen (view / export / delete). */
   employeeCaseMyData: { path: '/employee/case/:caseId/my-data', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   // [P1-5] Dossier & Forms list view
