@@ -15,6 +15,7 @@ import { ChangelogBell } from './ChangelogBell';
 import { NotificationsBell } from './NotificationsBell';
 import { RoleSwitcher } from './RoleSwitcher';
 import { Breadcrumb } from './Breadcrumb';
+import { shouldShowAppShellBreadcrumb } from './breadcrumbVisibility';
 import { Button } from './antigravity/Button';
 import { CompanyBrand } from './CompanyBrand';
 import { FeedbackWidget } from './FeedbackWidget';
@@ -310,7 +311,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
           >
             {title && (
               <div className="mb-6">
-                <Breadcrumb section={section} title={title} homeHref={homeHref} parent={parent} className="mb-3" />
+                {shouldShowAppShellBreadcrumb(parent) ? (
+                  <Breadcrumb section={section} title={title} homeHref={homeHref} parent={parent} className="mb-3" />
+                ) : null}
                 <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
                 {subtitle && <p className="text-sm text-slate-500 mt-1 text-pretty break-words">{subtitle}</p>}
               </div>
