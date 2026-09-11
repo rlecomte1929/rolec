@@ -60,8 +60,22 @@ approved-cap tripwire on every run).
   CZ/housing_agencies `vc-*` contact-email coverage **→ 6** (of 9), phone **→ 8**. 0 overwrites.
   **Approved-cap tripwire UNCHANGED: 1283**; caps by status still approved 1283 / pending 8 / rejected 3.
 
+## Batch #4 — AU/legal_admin contact (`enrich-xx-au-legal-contact-2026-09-11`)
+- Source (GCS): `src/enrich-xx-au-legal-contact.ndjson` (+ `manifest_au-legal-contact.json`). Landing:
+  `src/enrich-xx-au-legal-contact.LANDING.ndjson` (schema-mapped; emails lowercased). Target: `au-legal-target.csv`
+  (8 approved AU migration firms missing `contact_email`, all own-domain).
+- Otto: **8 attempted / 7 filled**. Keys ⊆ target ✓. Phones +61 E.164.
+- **Verification:** all 5 emails domain-matched (incl. the `.com.au` firms — #2263 keys them distinctly). Ajuria +
+  Australian Immigration Centre = phone-only (form-only email). **Bay Migration Solution** omitted upstream (no email
+  *or* phone on baymigration.com.au — Otto dropped the row rather than emit blanks; not invented). No aggregator hits.
+- **Landed (fill-empty):** **12 fields across 7 suppliers** — 5 `contact_email` + 7 `contact_phone`.
+  AU/legal_admin `vc-*` contact-email coverage **→ 5** (of 8), phone **→ 7**. 0 overwrites.
+  **Approved-cap tripwire UNCHANGED: 1291** (the founder approved the prior 8 pending — BR/legal 3 + FI/housing 5 —
+  between batches #3 and #4, so the approved baseline moved 1283 → 1291 and pending drained to 0; enrichment itself
+  changed no vetting state).
+
 ## Enrichment progress (running)
-Contact fills so far: **26 `contact_email` + 33 `contact_phone`** across 3 cells (ES/legal, NL/housing, CZ/housing), on
-already-approved/live suppliers, fill-empty, 0 overwrites, vetting untouched throughout. Queue: AU/legal → GB/legal →
-SE/housing → CA/tax → (banks last). Movers parked (FIDI, no websites to scrape). ~1,090 suppliers still lacked an email
-at the start of the pivot — this is the RFQ-loop unblock, one city×category batch at a time.
+Contact fills so far: **31 `contact_email` + 40 `contact_phone`** across 4 cells (ES/legal, NL/housing, CZ/housing,
+AU/legal), on already-approved/live suppliers, fill-empty, 0 overwrites, vetting untouched throughout. Queue:
+GB/legal → SE/housing → CA/tax → (banks last). Movers parked (FIDI, no websites to scrape). ~1,090 suppliers lacked an
+email at the start of the pivot — this is the RFQ-loop unblock, one city×category batch at a time.
