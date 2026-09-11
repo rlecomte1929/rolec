@@ -210,7 +210,8 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
       ref={containerRef}
       data-html2canvas-ignore
       onMouseDown={(e) => e.stopPropagation()}
-      className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2"
+      className="fixed right-4 z-40 flex flex-col items-end gap-2"
+      style={{ bottom: 'calc(1rem + var(--consent-banner-offset, 0px))' }}
     >
       {/* Annotation modal — fullscreen via portal, shown when a capture/upload is ready */}
       {shotStep === 'annotate' && rawCapture && (
