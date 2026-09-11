@@ -29,6 +29,10 @@ import type { CaseRequirementsDTO, RequirementItemDTO } from '../../../types';
  */
 export type RequirementsAudience = 'employee' | 'hr';
 
+const PILLAR_LABELS: Record<string, string> = {
+  SOCIAL_SECURITY: 'Social security & pension',
+};
+
 interface CopyPack {
   heading: string;
   subheading: string;
@@ -267,7 +271,9 @@ export const DestinationRequirements: React.FC<{
             {Object.keys(grouped).length > 0 && <ImmigrationDisclaimer />}
             {Object.entries(grouped).map(([pillar, items]) => (
               <div key={pillar}>
-                <div className="text-sm font-semibold text-[#0b2b43] mb-3">{pillar}</div>
+                <div className="text-sm font-semibold text-[#0b2b43] mb-3">
+                  {PILLAR_LABELS[pillar] ?? pillar}
+                </div>
                 <RequirementList items={items} />
               </div>
             ))}

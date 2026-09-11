@@ -58,6 +58,7 @@ export function intakeToCaseDraft(data: IntakeData): Partial<CaseDraftDTO> {
         data.expected_duration_months != null ? Number(data.expected_duration_months) : undefined,
       // AIQ-1603: single-select commute preference → public.cases.commute_preference.
       commutePreference: data.commute_preference || undefined,
+      socialSecurityRegime: data.social_security_regime || undefined,
     },
   };
 }

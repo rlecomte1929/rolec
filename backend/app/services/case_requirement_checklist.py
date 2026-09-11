@@ -29,6 +29,8 @@ from ...database import db
 
 log = logging.getLogger(__name__)
 
+FILING_STATUSES = ("not_required", "required", "filed", "issued", "expired")
+
 # Postgres wants an explicit cast for a uuid column bound from a Python str; SQLite has no
 # uuid type and rejects the CAST. Same switch test_drive.py uses for funnel_events.
 _IS_SQLITE = (db_config.DATABASE_URL or "").startswith("sqlite")
@@ -50,6 +52,8 @@ def _row_to_state(row: Any) -> Dict[str, Any]:
             except Exception:  # noqa: BLE001
                 d[k] = str(v)
     d["completed"] = bool(d.get("completed"))
+    if "filing_status" not in d:
+        d["filing_status"] = None
     return d
 
 
@@ -63,7 +67,7 @@ def get_state(case_id: str) -> Dict[str, Dict[str, Any]]:
     with db.engine.connect() as conn:
         rows = conn.execute(
             text(
-                "SELECT requirement_id, completed, completed_by, completed_at "
+                "SELECT requirement_id, completed, completed_by, completed_at, filing_status "
                 f"FROM case_requirement_checklist_state WHERE case_id = {_CASE}"
             ),
             {"case_id": str(case_id)},
@@ -77,6 +81,7 @@ def set_state(
     requirement_id: str,
     completed: bool,
     actor_id: Optional[str] = None,
+    filing_status: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Upsert one requirement's completion state. Idempotent on (case_id, requirement_id).
 
@@ -91,12 +96,15 @@ def set_state(
         conn.execute(
             text(
                 "INSERT INTO case_requirement_checklist_state "
-                f"(id, case_id, requirement_id, completed, completed_at, completed_by) "
-                f"VALUES ({_ID}, {_CASE}, :requirement_id, :completed, {stamp_at}, {stamp_by}) "
+                f"(id, case_id, requirement_id, completed, completed_at, completed_by, filing_status) "
+                f"VALUES ({_ID}, {_CASE}, :requirement_id, :completed, {stamp_at}, {stamp_by}, "
+                ":filing_status) "
                 "ON CONFLICT (case_id, requirement_id) DO UPDATE SET "
                 "completed = EXCLUDED.completed, "
                 "completed_at = EXCLUDED.completed_at, "
                 "completed_by = EXCLUDED.completed_by, "
+                "filing_status = COALESCE(EXCLUDED.filing_status, "
+                "case_requirement_checklist_state.filing_status), "
                 f"updated_at = {now_fn}"
             ),
             {
@@ -105,11 +113,12 @@ def set_state(
                 "requirement_id": str(requirement_id),
                 "completed": bool(completed),
                 "actor_id": str(actor_id) if actor_id else None,
+                "filing_status": filing_status,
             },
         )
         row = conn.execute(
             text(
-                "SELECT requirement_id, completed, completed_by, completed_at "
+                "SELECT requirement_id, completed, completed_by, completed_at, filing_status "
                 f"FROM case_requirement_checklist_state "
                 f"WHERE case_id = {_CASE} AND requirement_id = :requirement_id"
             ),
@@ -117,5 +126,5 @@ def set_state(
         ).mappings().first()
     return _row_to_state(row) if row else {
         "requirement_id": requirement_id, "completed": completed,
-        "completed_at": None, "completed_by": None,
+        "completed_at": None, "completed_by": None, "filing_status": filing_status,
     }

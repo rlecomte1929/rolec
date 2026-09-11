@@ -182,6 +182,8 @@ def _apply_requirement_item_update(db: Session, existing: models.RequirementItem
         existing.applies_to_assignment_types_json = payload["applies_to_assignment_types_json"]
     if "applies_to_nationality_classes_json" in payload:
         existing.applies_to_nationality_classes_json = payload["applies_to_nationality_classes_json"]
+    if "applies_to_regimes_json" in payload:
+        existing.applies_to_regimes_json = payload["applies_to_regimes_json"]
     if "verification_status" in payload:
         existing.verification_status = payload["verification_status"]
     # non_obvious / timing were added by 20261103000000 and this update branch never

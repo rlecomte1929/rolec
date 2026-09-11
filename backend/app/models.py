@@ -135,6 +135,9 @@ class RequirementItem(Base):
     # (["THIRD_COUNTRY"]). NULL ⇒ applies to all. Stops the non-EEA visa track
     # being served to an EU/EEA national. See services/nationality_class.py.
     applies_to_nationality_classes_json = Column(Text, nullable=True)
+    # Optional JSON array of social-security regimes this requirement applies to
+    # (["posted"]). NULL ⇒ applies to all. Fail-open, same contract as assignment type.
+    applies_to_regimes_json = Column(Text, nullable=True)
     # AIQ-1349: provenance level (representative / corpus_grounded / expert_verified).
     # Describes how well-sourced the content is. It is a DISPLAY BADGE, not a gate — no read
     # path filters on it. Use review_status below to decide what is served.
