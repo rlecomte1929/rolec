@@ -265,9 +265,10 @@ def build_fill_plan(
 # scalar text pipeline (build_fill_plan) cannot express. These map a normalised vault
 # value to the one button to tick.
 
-# AcroForm on-state for an independent checkbox (reportlab's default export value).
-# VERIFY against the real CERFA PDF when it lands: a government form may use a custom
-# on-state name (e.g. "/1", "/On"); if so, record it per group rather than assuming "/Yes".
+# Sentinel meaning "tick this checkbox". build_choice_fill emits it; fill_acroform translates it
+# to the field's REAL on-state read from the template (_resolve_checkbox_states), because the
+# on-state is template-specific — the real FR CERFA uses /On, reportlab synthetic forms use /Yes.
+# The value is "/Yes" only so a synthetic-form fill still lands if resolution is somehow skipped.
 CHECKBOX_ON = "/Yes"
 
 
@@ -370,6 +371,36 @@ class TemplateNotFillableError(RuntimeError):
     """
 
 
+def _checkbox_on_state(field: Any) -> Optional[str]:
+    """The 'checked' export value of a checkbox field, read from the template — the first of its
+    states that is not /Off. None if the field isn't a checkbox or exposes no states."""
+    if not isinstance(field, dict) or field.get("/FT") != "/Btn":
+        return None
+    for state in field.get("/_States_") or []:
+        if state != "/Off":
+            return state
+    return None
+
+
+def _resolve_checkbox_states(
+    field_values: Dict[str, str],
+    template_fields: Dict[str, Any],
+) -> Dict[str, str]:
+    """Rewrite the CHECKBOX_ON sentinel to each checkbox's real on-state (from the template).
+
+    Leaves text values and non-checkbox fields untouched; if a checkbox exposes no resolvable
+    on-state the sentinel is left as-is (reconcile_report_against_pdf then flags it honestly
+    rather than the caller assuming a tick that never landed)."""
+    resolved = dict(field_values)
+    for name, value in field_values.items():
+        if value != CHECKBOX_ON:
+            continue
+        on = _checkbox_on_state(template_fields.get(name))
+        if on:
+            resolved[name] = on
+    return resolved
+
+
 def fill_acroform(template_bytes: bytes, field_values: Dict[str, str]) -> bytes:
     """Fill the AcroForm fields of a PDF template and return the new PDF bytes.
 
@@ -392,6 +423,12 @@ def fill_acroform(template_bytes: bytes, field_values: Dict[str, str]) -> bytes:
             "template has no AcroForm fields (flattened or scanned PDF) — it cannot be "
             "pre-filled; nothing was written"
         )
+
+    # Resolve checkbox on-states. build_choice_fill emits the CHECKBOX_ON sentinel to mean "tick
+    # this box"; the actual on-state is template-specific (the real FR CERFA uses /On, reportlab
+    # /Yes, others vary). Translate the sentinel to THIS field's real on-state so the tick lands;
+    # a hardcoded value silently misses (update_page_form_field_values drops an unknown state).
+    field_values = _resolve_checkbox_states(field_values, template_fields)
 
     writer = PdfWriter()
     writer.append(reader)
