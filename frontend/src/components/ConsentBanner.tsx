@@ -36,14 +36,17 @@ export function ConsentBanner() {
   // floating card, so extra body padding would just open a hole at the bottom.
   useEffect(() => {
     if (!show) return;
-    const mq = window.matchMedia('(max-width: 767px)');
+    const mq = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(max-width: 767px)')
+      : null;
     const apply = () => {
-      document.body.style.paddingBottom = mq.matches ? '96px' : '';
+      const compact = mq ? mq.matches : true;
+      document.body.style.paddingBottom = compact ? '96px' : '';
     };
     apply();
-    mq.addEventListener('change', apply);
+    mq?.addEventListener('change', apply);
     return () => {
-      mq.removeEventListener('change', apply);
+      mq?.removeEventListener('change', apply);
       document.body.style.paddingBottom = '';
     };
   }, [show]);
