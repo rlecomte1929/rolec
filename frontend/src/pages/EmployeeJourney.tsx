@@ -8,6 +8,7 @@ import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeNoCaseOnboarding';
 import {
+  assignmentStatusPillCopy,
   EMPLOYEE_CASE_CODE_EXAMPLE,
   EMPLOYEE_CASE_LINK_INSTRUCTION,
 } from '../features/employee-journey/employeeCaseLinkCopy';
@@ -580,30 +581,30 @@ export const EmployeeJourney: React.FC = () => {
     if (hasLinked) {
       return (
         <Badge variant="success" size="sm">
-          {linkedCount === 1 ? 'Linked to you: 1 case' : `Linked to you: ${linkedCount} cases`}
+          {assignmentStatusPillCopy('linked')}
         </Badge>
       );
     }
     if (hasPendingOnly) {
       return (
         <Badge variant="info" size="sm">
-          {pendingCount === 1 ? 'Pending assignment to link' : `${pendingCount} pending assignments to link`}
+          {assignmentStatusPillCopy('pending')}
         </Badge>
       );
     }
     if (linkRec?.linkedContactIds?.length && !(linkRec.attachedAssignmentIds && linkRec.attachedAssignmentIds.length)) {
       return (
         <Badge variant="info" size="sm">
-          Connected: waiting for an assignment from HR
+          {assignmentStatusPillCopy('waiting')}
         </Badge>
       );
     }
     return (
       <Badge variant="neutral" size="sm">
-        No case linked yet: use email HR entered or claim below
+        {assignmentStatusPillCopy('unlinked')}
       </Badge>
     );
-  }, [linkRec, hasLinked, hasPendingOnly, linkedCount, pendingCount]);
+  }, [linkRec, hasLinked, hasPendingOnly]);
 
   const shellTitle = assignmentLoading
     ? 'Welcome'

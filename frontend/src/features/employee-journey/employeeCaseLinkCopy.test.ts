@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { EMPLOYEE_CASE_CODE_EXAMPLE, EMPLOYEE_CASE_LINK_INSTRUCTION } from './employeeCaseLinkCopy';
+import {
+  assignmentStatusPillCopy,
+  EMPLOYEE_CASE_CODE_EXAMPLE,
+  EMPLOYEE_CASE_LINK_INSTRUCTION,
+} from './employeeCaseLinkCopy';
 
 describe('EMPLOYEE_CASE_LINK_INSTRUCTION (AIQ-2288)', () => {
   it('covers auto-link, code entry, and wait-for-HR in one sentence', () => {
@@ -17,5 +21,16 @@ describe('EMPLOYEE_CASE_CODE_EXAMPLE (AIQ-2289)', () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     );
     expect(EMPLOYEE_CASE_CODE_EXAMPLE).not.toMatch(/abc-123/i);
+  });
+});
+
+describe('assignmentStatusPillCopy (AIQ-2291)', () => {
+  it('keeps every pill under 20 characters with no how-to', () => {
+    for (const kind of ['linked', 'pending', 'waiting', 'unlinked'] as const) {
+      const label = assignmentStatusPillCopy(kind);
+      expect(label.length).toBeLessThanOrEqual(20);
+      expect(label).not.toMatch(/claim|email|below|use /i);
+    }
+    expect(assignmentStatusPillCopy('unlinked')).toBe('Not linked');
   });
 });

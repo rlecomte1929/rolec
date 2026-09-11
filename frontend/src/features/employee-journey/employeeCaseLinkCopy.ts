@@ -7,3 +7,13 @@ export const EMPLOYEE_CASE_LINK_INSTRUCTION =
 
 /** Real claim codes are assignment UUIDs (8-4-4-4-12 hex). Shared by helper + placeholder. */
 export const EMPLOYEE_CASE_CODE_EXAMPLE = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
+export type AssignmentStatusPillKind = 'linked' | 'pending' | 'waiting' | 'unlinked';
+
+/** Short badge label — instructions stay in the card body (AIQ-2291). */
+export function assignmentStatusPillCopy(kind: AssignmentStatusPillKind): string {
+  if (kind === 'linked') return 'Linked';
+  if (kind === 'pending') return 'Pending';
+  if (kind === 'waiting') return 'Waiting for HR';
+  return 'Not linked';
+}
