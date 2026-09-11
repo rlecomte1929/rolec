@@ -39,6 +39,7 @@ CREATE TABLE case_requirement_checklist_state (
     completed      INTEGER NOT NULL DEFAULT 0,
     completed_by   TEXT,
     completed_at   TEXT,
+    filing_status  TEXT,
     created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (case_id, requirement_id)
@@ -117,6 +118,19 @@ class ChecklistReadTests(ChecklistFixture):
         csep = next(i for i in view.items if i.id == "req-csep")
         self.assertIs(csep.nonObvious, True)
         self.assertEqual(csep.timing, "before travel")
+
+    def test_filing_status_round_trips(self) -> None:
+        router_mod.set_checklist_item(
+            "assignment-id",
+            router_mod.ChecklistToggle(
+                requirement_id="req-irp", completed=True, filing_status="filed",
+            ),
+            user=self.user,
+        )
+        view = router_mod.get_checklist("assignment-id", user=self.user)
+        irp = next(i for i in view.items if i.id == "req-irp")
+        self.assertEqual(irp.filingStatus, "filed")
+        self.assertTrue(irp.completed)
 
     def test_covered_false_is_distinct_from_an_empty_list(self) -> None:
         self.compute_mock.side_effect = lambda cid: _computed(cid, reqs=[], covered=False)
