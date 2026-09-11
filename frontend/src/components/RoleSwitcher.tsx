@@ -29,6 +29,7 @@ const labelFor = (role: string): string => ROLE_LABELS[normalizeStoredRole(role)
 export const RoleSwitcher: React.FC = () => {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const roles = getStoredRoles();
   const active = getActiveRole();
 
@@ -38,24 +39,34 @@ export const RoleSwitcher: React.FC = () => {
     const target = normalizeStoredRole(next);
     if (busy || target === active || !roles.includes(target)) return;
     setBusy(true);
+    setSwitchError(null);
     try {
       const res = await authAPI.switchRole(target);
       setStoredRoles(res.roles && res.roles.length ? res.roles : roles);
-      const primary = res.primary_role || target;
-      setActiveRole(primary);
-      navigate(roleHomePath(primary));
+      // Honor the role the user picked. primary_role on the response is the
+      // server's default home, not "what I just clicked" — using it here left
+      // the combobox on Employee after choosing View as HR.
+      setActiveRole(target);
+      navigate(roleHomePath(target));
     } catch {
-      /* leave the active role unchanged on failure */
+      setSwitchError('Could not switch role. Try again.');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Select
-      value={active}
-      onChange={(v) => void handleChange(v)}
-      options={roles.map((r) => ({ value: r, label: `View as ${labelFor(r)}` }))}
-    />
+    <div className="flex flex-col items-end">
+      <Select
+        value={active}
+        onChange={(v) => void handleChange(v)}
+        options={roles.map((r) => ({ value: r, label: `View as ${labelFor(r)}` }))}
+      />
+      {switchError ? (
+        <p className="mt-1 max-w-[12rem] text-right text-[11px] text-rose-700" role="alert">
+          {switchError}
+        </p>
+      ) : null}
+    </div>
   );
 };

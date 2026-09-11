@@ -48,7 +48,7 @@ describe('RoleSwitcher', () => {
   it('shows a switcher for a dual-role user and switches + navigates', async () => {
     getStoredRoles.mockReturnValue(['HR', 'EMPLOYEE']);
     getActiveRole.mockReturnValue('HR');
-    switchRole.mockResolvedValue({ roles: ['HR', 'EMPLOYEE'], primary_role: 'EMPLOYEE' });
+    switchRole.mockResolvedValue({ roles: ['HR', 'EMPLOYEE'], primary_role: 'HR' });
 
     render(<RoleSwitcher />);
     const select = screen.getByRole('combobox') as HTMLSelectElement;
@@ -59,5 +59,29 @@ describe('RoleSwitcher', () => {
     await waitFor(() => expect(switchRole).toHaveBeenCalledWith('EMPLOYEE'));
     await waitFor(() => expect(setActiveRole).toHaveBeenCalledWith('EMPLOYEE'));
     expect(navigate).toHaveBeenCalledWith('/employee/dashboard');
+  });
+
+  it('keeps the selected role when the API primary_role disagrees', async () => {
+    getStoredRoles.mockReturnValue(['HR', 'EMPLOYEE']);
+    getActiveRole.mockReturnValue('EMPLOYEE');
+    switchRole.mockResolvedValue({ roles: ['HR', 'EMPLOYEE'], primary_role: 'EMPLOYEE' });
+
+    render(<RoleSwitcher />);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'HR' } });
+
+    await waitFor(() => expect(setActiveRole).toHaveBeenCalledWith('HR'));
+    expect(navigate).toHaveBeenCalledWith('/hr/dashboard');
+  });
+
+  it('shows an error when the switch request fails', async () => {
+    getStoredRoles.mockReturnValue(['HR', 'EMPLOYEE']);
+    getActiveRole.mockReturnValue('EMPLOYEE');
+    switchRole.mockRejectedValue(new Error('nope'));
+
+    render(<RoleSwitcher />);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'HR' } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not switch role');
+    expect(setActiveRole).not.toHaveBeenCalled();
   });
 });
