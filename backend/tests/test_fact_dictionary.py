@@ -6,10 +6,37 @@ firewall. These tests lock its invariants so the spine can't silently regress as
 
 DB-free and LLM-free (reads the module only). See docs/plans/form-fill-integration-build-plan.md.
 """
+import re
 import unittest
 from pathlib import Path
 
 from backend.app.services import fact_dictionary as fd
+
+_SEED = (
+    Path(__file__).resolve().parents[2]
+    / "supabase" / "migrations" / "20260605800000_imm11_form_field_mappings_seed.sql"
+)
+
+
+def _mapping_vault_paths():
+    """(form_field_id, vault_field_path) pairs seeded in form_field_mappings — the real
+    government form fields the registry must be able to resolve a value for."""
+    text = _SEED.read_text(encoding="utf-8")
+    return re.findall(
+        r"'([a-z0-9_]+)'\s*,\s*'[^']+'\s*,\s*'([a-z0-9_]+)'\s*,\s*(?:NULL|'[^']*')\s*,\s*(?:TRUE|FALSE)",
+        text, re.I,
+    )
+
+
+def _resolves(vault_path: str, field_key: str) -> bool:
+    """Registry governs this form field, by prefill_source tail or by field_id — mirrors the
+    coverage audit (scripts/fact_dictionary_coverage.py)."""
+    for f in fd._FACTS:
+        if f.prefill_source and f.prefill_source.split(".")[-1] == vault_path:
+            return True
+        if field_key in f.field_ids or vault_path in f.field_ids:
+            return True
+    return False
 
 
 class FactDictionaryInvariants(unittest.TestCase):
@@ -57,6 +84,15 @@ class FactDictionaryInvariants(unittest.TestCase):
     def test_every_fact_has_a_category(self):
         for f in fd._FACTS:
             self.assertTrue(f.category, f"{f.fact_key} has no category")
+
+    def test_every_form_field_mapping_is_governed(self):
+        # Coverage lock (form-fill Build B, audit §1): every real government-form field seeded in
+        # form_field_mappings must resolve to a governing FactEntry, or a form using it cannot
+        # fill a value. Keeps the dictionary from silently regressing as forms/corridors are added.
+        pairs = _mapping_vault_paths()
+        self.assertTrue(pairs, "form_field_mappings seed parsed no fields — regex or seed drifted")
+        gaps = sorted({v for k, v in pairs if not _resolves(v, k)})
+        self.assertEqual(gaps, [], f"form-field vault paths with no governing FactEntry: {gaps}")
 
     def test_module_is_llm_free(self):
         src = Path(fd.__file__).read_text(encoding="utf-8")
