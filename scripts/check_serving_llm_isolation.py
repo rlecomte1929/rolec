@@ -82,6 +82,13 @@ SERVING_ROOTS: Tuple[str, ...] = (
     "backend.app.services.data_sheet_service",
 )
 
+#: Live PDF fill path. Not a requirement-serving engine, but it writes a GOVERNMENT PDF at request
+#: time (generate_prefilled_pdf), so it must stay LLM-free too — the form-onboarding LLM mapper is
+#: authoring-only and must never be import-reachable from here.
+FILL_ROOTS: Tuple[str, ...] = (
+    "backend.app.services.form_prefill_service",
+)
+
 #: Known LLM gateways, matched on the final module segment so a gateway is caught
 #: wherever it lives. Listed explicitly so a gateway that drops its SDK for raw HTTP
 #: still trips the guard.
@@ -369,7 +376,9 @@ def check(root: Path) -> Tuple[int, str]:
     except ConfigError as exc:
         return 2, f"[serving-llm-isolation] CONFIG ERROR — {exc}"
 
-    missing = [m for m in SERVING_ROOTS if m not in edges]
+    _all_roots = SERVING_ROOTS + FILL_ROOTS
+
+    missing = [m for m in _all_roots if m not in edges]
     if missing:
         lines = [
             "[serving-llm-isolation] CONFIG ERROR — serving root(s) not found on disk:",
@@ -383,14 +392,14 @@ def check(root: Path) -> Tuple[int, str]:
         ]
         return 2, "\n".join(lines)
 
-    root_parse_errors = [e for e in parse_errors if e.split(" ", 1)[0] in SERVING_ROOTS]
+    root_parse_errors = [e for e in parse_errors if e.split(" ", 1)[0] in _all_roots]
     if root_parse_errors:
         lines = ["[serving-llm-isolation] CONFIG ERROR — serving root(s) failed to parse:", ""]
         lines += [f"    {e}" for e in root_parse_errors]
         return 2, "\n".join(lines)
 
     violations: List[Tuple[str, List[str], str]] = []
-    for origin in SERVING_ROOTS:
+    for origin in _all_roots:
         found = find_violation(origin, edges, raw_imports)
         if found:
             chain, reason = found
@@ -421,11 +430,13 @@ def check(root: Path) -> Tuple[int, str]:
         ]
         return 1, "\n".join(lines)
 
-    closure = reachable_from(SERVING_ROOTS, edges)
+    closure = reachable_from(_all_roots, edges)
 
     # A module that failed to parse has NO recorded edges, so the graph beyond it is
     # invisible. Outside the serving closure that is merely untidy; INSIDE it, the
     # guard could print OK while an LLM import hides behind the syntax error. Fatal.
+    # This applies to the fill root exactly as it does to serving roots — a parse
+    # error reachable only from the fill path would otherwise hide an LLM import too.
     broken_by_module = {e.split(" ", 1)[0]: e for e in parse_errors}
     reachable_broken = sorted(set(broken_by_module) & closure)
     if reachable_broken:
@@ -439,7 +450,7 @@ def check(root: Path) -> Tuple[int, str]:
         ]
         for module in reachable_broken:
             reaching = sorted(
-                root for root in SERVING_ROOTS
+                root for root in _all_roots
                 if module in reachable_from([root], edges)
             )
             lines.append(f"    {broken_by_module[module]}")
@@ -450,8 +461,9 @@ def check(root: Path) -> Tuple[int, str]:
         return 2, "\n".join(lines)
 
     report = (
-        f"[serving-llm-isolation] OK — {len(SERVING_ROOTS)} serving roots, "
-        f"{len(closure)} reachable modules, no path to an LLM gateway or SDK."
+        f"[serving-llm-isolation] OK — {len(SERVING_ROOTS)} serving roots + "
+        f"{len(FILL_ROOTS)} fill root(s), {len(closure)} reachable modules, "
+        f"no path to an LLM gateway or SDK."
     )
     for err in sorted(parse_errors):
         report = (
