@@ -2740,6 +2740,16 @@ def get_budget_summary(
     # agreed with estimate) and never sums across currencies (no FX source). A case with no
     # validated quote returns has_spend=False + empty by_currency → an honest empty state.
     from ..services.case_spend import committed_spend_for_case
+    from ..services.expense_claim_drawdown import drawdown_for_case
+
+    # [AIQ-2271] Per-benefit remaining against published caps. Approved/paid lines
+    # only; same-currency or stored-rate; never invent a live FX total.
+    drawdown: List[Dict[str, Any]] = []
+    try:
+        with main_db.engine.connect() as conn:
+            drawdown = drawdown_for_case(conn, case_id, caps_list)
+    except Exception:
+        logger.exception("budget-summary: expense-claim drawdown failed case=%s", case_id)
 
     return {
         "case_id": case_id,
@@ -2748,6 +2758,7 @@ def get_budget_summary(
         # surface everything HR configured even when no matching service is selected.
         "hr_policy_caps": _shape_hr_policy_caps(caps_list),
         "committed_spend": committed_spend_for_case(case_id),
+        "drawdown": drawdown,
     }
 
 

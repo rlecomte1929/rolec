@@ -15,6 +15,7 @@ import { AppShell } from '../../components/AppShell';
 import { Button, Card } from '../../components/antigravity';
 import { BudgetSummaryTable } from '../../features/services/BudgetSummaryTable';
 import { ProcessingTimeCard } from '../../features/services/ProcessingTimeCard';
+import { HrExpenseClaimsCard } from '../../features/services/HrExpenseClaimsCard';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 
@@ -42,6 +43,8 @@ export const HrCaseEstimatePage: React.FC = () => {
         displayCurrency="USD"
         nativeCurrencyForCaps
       />
+
+      <HrExpenseClaimsCard caseId={caseId} />
 
       <ProcessingTimeCard caseId={caseId} />
 

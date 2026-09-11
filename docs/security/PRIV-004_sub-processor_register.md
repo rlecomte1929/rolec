@@ -1,6 +1,6 @@
 # Sub-Processor Register — ReloPass (GDPR Art. 28 & 44)
 
-**Task:** PRIV-004 (AIQ-472) · **Version:** v1.8 · **Last verified:** 2026-07-22 (against `main`)
+**Task:** PRIV-004 (AIQ-472) · **Version:** v1.9 · **Last verified:** 2026-09-11 (against `main`; Frankfurter/ECB added for AIQ-2271)
 **Owner:** Romain Lecomte · **Status:** register complete; DPA signatures pending (human action)
 
 > GDPR Art. 28 requires a signed Data Processing Agreement (DPA) with every sub-processor
@@ -22,8 +22,16 @@
 | **PostHog** | Product analytics (frontend `posthog-js` + **backend server-side events**) + session replay (**replay gated to test-drive only**) | **EU host** (`eu.i.posthog.com`) ✅ | EU Cloud — no transfer | ⬜ Confirm DPA on EU project | `frontend/src/analytics.ts` (`posthog-js`); replay gate `frontend/src/components/TestDriveReplayGate.tsx`; backend `backend/app/posthog_client.py` (`posthog` Python SDK) |
 | **Geoapify** | Address autocomplete for the intake office-address field (AIQ-1607) **and** forward geocoding of the office address for housing recommendations (AIQ-1661) | **EU (Germany)** ✅ | Data in EU — no transfer | ⬜ Confirm/sign DPA on console | `GEOAPIFY_API_KEY`; `geocoding_service.py`, `geocoding.py`, `recommendations/geo.py` |
 | **Stripe** | Payment processing — Stripe Checkout (hosted) + webhook | US parent (Stripe, Inc.); EU contracting entity Stripe Payments Europe Ltd (Ireland) | Stripe DPA (auto-incorporated in the Stripe Services Agreement) + SCCs for US transfer | ⬜ Confirm DPA in Services Agreement — **before live keys** | `stripe>=9,<12`; `payment.py` (checkout), `stripe_webhook.py` (webhook). **On `main` (PR #1626), deployed in Stripe TEST mode** (`sk_test`); **live keys + DPA still human-gated** — no real payment PII processed yet |
+| **Frankfurter / ECB** | Public FX rates snapshot for expense-claim drawdown (authoring/cron only; no PII) | **EU (Frankfurter.app / ECB)** ✅ | Data in EU — no transfer; **no personal data sent** | N/A — public market data, not a processor of personal data | `fx_rate_refresh.py`; `POST /api/crons/refresh-fx-rates`; table `public.fx_rates` |
 
-## Notes & corrections (v1.8)
+## Notes & corrections (v1.9)
+
+- **Frankfurter / ECB added (AIQ-2271).** The expense-claim ledger snapshots FX at submit.
+  ReloPass calls `api.frankfurter.app` from a cron (`fx_rate_refresh.py`) with **no API key and
+  no request body** — only a `from=USD` query. **No names, emails, case ids, or receipt text
+  leave the platform.** Serving reads `public.fx_rates` (or the hardcoded fallback) and never
+  calls the network. Frankfurter is listed for network-egress completeness; it is not a GDPR
+  Art. 28 processor of personal data.
 
 - **Stripe added (payments integration — WIP, 🔴 human-gated; not on `main`, not live).** The roadmap
   paywall uses **Stripe Checkout hosted pages** (`payment.py` creates the session; `stripe_webhook.py`

@@ -46,6 +46,7 @@ import {
   PlaneTakeoff,
   UsersRound,
   Map,
+  LifeBuoy,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -86,6 +87,7 @@ export const NAV_ICONS = {
   relocations: PlaneTakeoff,
   employees: UsersRound,
   risk: ShieldAlert,
+  'duty-of-care': LifeBuoy,
   'policy-builder': PenSquare,
   'policy-benefits': ShieldCheck,
   'policy-reality': Activity,
