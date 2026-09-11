@@ -1,0 +1,270 @@
+# Corridor Agent — FR_SG_EMPLOYMENT_PASS_2026  (France → Singapore, Employment Pass)
+#
+# ⚠️ REPRESENTATIVE / AUTHORING — indicative content, NOT SME-verified, NOT counsel-assured.
+# Nothing in this file may be rendered as legal advice in ReloPass's own voice. Personalised
+# immigration/tax determinations route to a regulated professional. Singapore (MOM / ICA /
+# IRAS) is the binding jurisdiction.
+#
+# PROFILE (the validation case): Adrien Hardy, a FRENCH national (no free-movement right in
+# Singapore — Singapore has no EU-style construct), relocating Paris → Singapore to take a
+# professional role on an Employment Pass (EP). The whole value is the pile of non-obvious
+# traps a French mover will not expect: EP is a two-stage test (salary AND COMPASS points),
+# EP holders are OUTSIDE CPF and MediShield Life, and there is a France–Singapore DTA whose
+# relief depends on tax-residence facts a layperson cannot self-assess.
+#
+# CONTENT SOURCE: authored from the corridor's own reviewed/representative requirement_items
+# already in the product (SINGAPORE rows: EP, COMPASS, S Pass, PEP, IPA, FIN, IRAS, CPF-exempt,
+# Dependant's Pass) plus the delivered candidate facts (fr-departure / fr-sg-tax / sg-fr-return).
+# Every SGD figure below is transcribed from those rows and MUST be reconfirmed against MOM/IRAS
+# before authoritative use. Step durations are ESTIMATES pending agent confirmation — re-derive,
+# do not hand-edit.
+
+corridor_agent:
+  corridor_id: FR_SG_EMPLOYMENT_PASS_2026
+  version: "2026.01"
+  petitioning_party: EMPLOYER   # the employer (or appointed EA) files the EP via EP eService.
+  origin_country_iso3: FRA
+  destination_country_iso3: SGP
+  description: >
+    French national → Singapore on an Employment Pass. No free-movement right applies: a
+    foreigner must qualify for a work pass. EP is a two-stage test — Stage 1 the qualifying
+    salary, Stage 2 the COMPASS points system (≥40). The journey is: job offer → employer EP
+    application (EP eService) → MOM approval + In-Principle Approval (IPA) letter → travel →
+    pass issuance + FIN / biometrics (ICA) → IRAS tax reference → housing, health, family.
+    S Pass and the Personalised Employment Pass surface as alternate routes, not separate
+    corridors.
+
+  applicable_rules:
+    - legal_reference: "Employment of Foreign Manpower Act (EFMA) / MOM work-pass framework"
+      rule_id: SG_EFMA
+      summary: "Governing regime for foreigners working in Singapore; the Employment Pass is issued under it by the Ministry of Manpower (MOM)."
+    - legal_reference: "Employment Pass — eligibility (MOM)"
+      rule_id: SG_EP
+      summary: "Skilled-professional work pass; a two-stage test — Stage 1 qualifying salary, Stage 2 COMPASS. First pass up to 2 years, renewals up to 3."
+    - legal_reference: "COMPASS (Complementarity Assessment Framework, MOM)"
+      rule_id: SG_COMPASS
+      summary: "Stage 2 points system: an EP application must score at least 40 points across criteria including salary, qualifications and firm-level diversity (unless exempted)."
+    - legal_reference: "S Pass (MOM)"
+      rule_id: SG_S_PASS
+      summary: "Mid-level work pass for roles that do not meet EP criteria; fixed monthly salary from S$3,300 (higher with age); subject to quota and Foreign Worker Levy."
+    - legal_reference: "Personalised Employment Pass (PEP, MOM)"
+      rule_id: SG_PEP
+      summary: "Higher-threshold pass not tied to one employer, for high-earning professionals; fixed monthly salary per the MOM current threshold."
+    - legal_reference: "In-Principle Approval (IPA) letter (MOM)"
+      rule_id: SG_IPA
+      summary: "Issued when the EP is approved; functions as a pre-approved single-entry visa for travel to Singapore to complete formalities."
+    - legal_reference: "Immigration & Checkpoints Authority — pass issuance / FIN"
+      rule_id: SG_ICA_FIN
+      summary: "After arrival the pass is issued and the holder registers (fingerprints/photo), receives a Foreign Identification Number (FIN) and a digital work pass."
+    - legal_reference: "Income Tax Act (IRAS)"
+      rule_id: SG_IRAS_TAX
+      summary: "Employment income is taxable; residence turns on the 183-day rule; a tax reference is registered with IRAS. Non-resident employment income is taxed at the higher of 15% or resident rates."
+    - legal_reference: "IRAS tax clearance — Form IR21"
+      rule_id: SG_IR21
+      summary: "On cessation/departure the employer must seek tax clearance (Form IR21) at least one month before the last day; withholds monies pending clearance."
+    - legal_reference: "Central Provident Fund Act — foreigner exclusion"
+      rule_id: SG_CPF_EXEMPT
+      summary: "EP holders neither contribute to nor receive CPF; since 2003 foreigners are barred. No Foreign Worker Levy applies to EP (unlike S Pass / Work Permit)."
+    - legal_reference: "France–Singapore Avoidance of Double Taxation Agreement"
+      rule_id: FR_SG_DTA
+      summary: "May prevent double taxation of the same income, but relief depends on tax-residence facts — a determination for a regulated adviser."
+    - legal_reference: "Dependant's Pass (MOM)"
+      rule_id: SG_DEPENDANT_PASS
+      summary: "Eligible EP holders may sponsor a spouse/children on a Dependant's Pass; a Long-Term Visit Pass covers some other family members."
+
+  required_documents:
+    - PASSPORT_TD3:employee            # valid 6+ months
+    - PASSPORT_TD3:family.spouse?
+    - PASSPORT_TD3:family.children.*
+    - EMPLOYMENT_LETTER_OR_CONTRACT    # role, salary, employer
+    - DEGREE_OR_QUALIFICATION | RELEVANT_EXPERIENCE_EVIDENCE
+    - EP_IN_PRINCIPLE_APPROVAL         # IPA letter issued on approval
+    - TENANCY_AGREEMENT_SG?            # 12-month+ lease (housing / some registrations)
+    - PRIVATE_MEDICAL_INSURANCE_PROOF  # EP holders are outside MediShield Life
+    - MARRIAGE_CERT?                   # Dependant's Pass
+    - BIRTH_CERT:family.children.*
+
+  required_data_points:
+    - key: is_foreigner_no_pr
+      type: bool
+      source: USER_INPUT
+      validations:
+        - "== true"
+    - key: gross_monthly_salary_sgd
+      type: money
+      source: USER_INPUT
+      validations:
+        - ">= corridor.ep_qualifying_salary"
+        - "guaranteed_fixed_only"
+    - key: sector_financial_services
+      type: bool
+      source: USER_INPUT             # sets which EP salary floor applies
+    - key: compass_score
+      type: int
+      source: EXTERNAL_LOOKUP        # MOM COMPASS self-assessment
+      lookup: sg_compass.score
+    - key: has_relevant_degree
+      type: bool
+      source: USER_INPUT
+    - key: sg_tax_resident_183
+      type: bool
+      source: DERIVED                # 183-day rule; drives IRAS rate + DTA relief
+    - key: intended_stay_months
+      type: int
+      source: USER_INPUT
+
+  # Stage-1 EP qualifying salary and the alternate work-pass floors (SGD / month).
+  # Transcribed from the corridor's requirement_items; CONFIRM against MOM before authoritative
+  # use. Ranges rise with age; the values here are the entry (youngest-band) floors.
+  salary_thresholds_sgd_monthly:
+    ep_non_financial_services: 5600     # EP Stage-1 floor, non-financial-services roles (entry band)
+    ep_financial_services: 6200         # EP Stage-1 floor, financial-services roles (entry band)
+    s_pass_floor: 3300                  # S Pass fallback floor
+    pep_floor: PENDING                  # Personalised EP — per MOM current threshold; not transcribed, left PENDING (never invented)
+
+  eligibility_logic:
+    branches:
+      - id: BRANCH_EP_TWO_STAGE
+        label: "Employment Pass — Stage 1 salary + Stage 2 COMPASS"
+        cite: SG_EP
+        requires_all:
+          - is_foreigner_no_pr == true
+          - gross_monthly_salary_sgd >= salary_thresholds_sgd_monthly.ep_qualifying_for_sector
+          - compass_score >= 40
+        verdict_on_pass: ELIGIBLE
+        annotation: "Stage-1 floor is S$5,600/month (S$6,200 financial services) at the youngest band and rises with age; Stage 2 needs ≥40 COMPASS points unless exempted. Confirm current figures with MOM."
+      - id: ALT_S_PASS
+        label: "S Pass — mid-level fallback when EP criteria are not met"
+        cite: SG_S_PASS
+        requires_all:
+          - is_foreigner_no_pr == true
+          - gross_monthly_salary_sgd >= salary_thresholds_sgd_monthly.s_pass_floor
+          - gross_monthly_salary_sgd < salary_thresholds_sgd_monthly.ep_non_financial_services
+        verdict_on_pass: ALTERNATE_PATHWAY
+        annotation: "S Pass is quota-bound and attracts a Foreign Worker Levy — cost/eligibility differ materially from EP. Confirm current floor with MOM."
+      - id: ALT_PEP
+        label: "Personalised Employment Pass — high-earning professionals"
+        cite: SG_PEP
+        requires_all:
+          - is_foreigner_no_pr == true
+        verdict_on_pass: ALTERNATE_PATHWAY
+        annotation: "Not tied to one employer; requires a high fixed monthly salary per the MOM current threshold (left PENDING here — not transcribed). For high earners who want employer mobility."
+    no_branch_verdict: NOT_ELIGIBLE
+
+  exception_cases:
+    - id: EP_HOLDER_NO_CPF
+      condition: "true"
+      cite: SG_CPF_EXEMPT
+      action: SURFACE_AS_ADVISORY
+      hint: >
+        EP holders neither contribute to nor receive CPF (foreigners have been barred since
+        2003), and no Foreign Worker Levy applies to EP. Plan retirement/health provision
+        privately — do not expect a CPF safety net.
+    - id: EP_OUTSIDE_MEDISHIELD
+      condition: "true"
+      cite: SG_EP
+      action: SURFACE_AS_ADVISORY
+      hint: >
+        EP holders are excluded from Singapore's compulsory public health insurance
+        (MediShield Life). Providing medical insurance is at the employer's discretion —
+        confirm cover and arrange private insurance for any gap.
+    - id: FRANCE_SG_DTA
+      condition: "sg_tax_resident_183 == false"
+      cite: FR_SG_DTA
+      action: SURFACE_AS_ALTERNATE_PATHWAY
+      hint: >
+        The France–Singapore double-taxation agreement can prevent being taxed twice, but
+        relief turns on tax-residence facts (the 183-day rule) — a determination for a
+        regulated tax adviser, not a self-assessment.
+    - id: FAMILY_DEPENDANTS
+      condition: "case.has_family_relocating == true"
+      cite: SG_DEPENDANT_PASS
+      action: SPAWN_FAMILY_CASE
+      hint: >
+        An eligible EP holder can sponsor a spouse/children on a Dependant's Pass; some other
+        family members use a Long-Term Visit Pass. Each is a separate MOM application.
+
+  # Step graph — offer → EP application → approval/IPA → travel → issuance/FIN → establishment.
+  step_graph:
+    - step_id: JOB_OFFER_CONTRACT
+      name: "Signed employment offer / contract with a Singapore employer"
+      responsible_party: EMPLOYER
+      expected_duration_days: 14
+      prerequisite_step_ids: []
+
+    - step_id: EP_APPLICATION
+      name: "Employer (or appointed employment agent) applies for the EP via MOM EP eService"
+      responsible_party: EMPLOYER
+      expected_duration_days: 21
+      prerequisite_step_ids: [JOB_OFFER_CONTRACT]
+      cite: SG_EP
+      non_obvious: true
+      non_obvious_note: "The EP is a two-stage test: Stage 1 is the qualifying salary (from S$5,600/month, S$6,200 for financial services, rising with age) and Stage 2 is COMPASS — the application must score at least 40 points. Meeting the salary alone is not enough."
+
+    - step_id: EP_APPROVED_IPA
+      name: "MOM approves the EP and issues the In-Principle Approval (IPA) letter"
+      responsible_party: AUTHORITY_SG_MOM
+      expected_duration_days: 14
+      prerequisite_step_ids: [EP_APPLICATION]
+      cite: SG_IPA
+      non_obvious: true
+      non_obvious_note: "The IPA letter functions as a pre-approved single-entry visa: it lets you travel to Singapore to complete formalities, but the pass itself is only issued after arrival. The IPA is not the pass."
+
+    - step_id: TRAVEL_TO_SG
+      name: "Travel to Singapore (on the IPA)"
+      arrival_anchor: true
+      responsible_party: EMPLOYEE
+      expected_duration_days: 1
+      prerequisite_step_ids: [EP_APPROVED_IPA]
+
+    - step_id: EP_ISSUANCE_FIN
+      name: "Pass issuance — register (fingerprints/photo), receive FIN and the digital work pass"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [TRAVEL_TO_SG]
+      cite: SG_ICA_FIN
+      non_obvious: true
+      non_obvious_note: "After arrival the pass is issued and you register with MOM/ICA — fingerprints and photo — and receive a Foreign Identification Number (FIN) plus a digital work pass. A later change of residential address must be reported to MOM, not ICA."
+
+    - step_id: TAX_REFERENCE_IRAS
+      name: "Register a tax reference with IRAS; understand residence (183-day rule) and rates"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [EP_ISSUANCE_FIN]
+      cite: SG_IRAS_TAX
+      non_obvious: true
+      non_obvious_note: "The EP carries no automatic tax registration. Residence turns on the 183-day rule; a non-resident's employment income is taxed at the higher of a flat 15% or resident rates. File by 18 April if IRAS notifies you."
+
+    - step_id: HOUSING_TENANCY
+      name: "Secure accommodation (12-month+ tenancy agreement)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 21
+      prerequisite_step_ids: [TRAVEL_TO_SG]
+
+    - step_id: HEALTH_SETUP
+      name: "Arrange private health insurance (EP holders are outside MediShield Life)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [TRAVEL_TO_SG]
+      cite: SG_EP
+      non_obvious: true
+      non_obvious_note: "EP holders are excluded from MediShield Life, and employer medical cover is discretionary — arrange private health insurance early so there is no gap on arrival."
+
+    - step_id: FAMILY_REGISTRATION
+      name: "Sponsor accompanying family (Dependant's Pass / Long-Term Visit Pass)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 21
+      prerequisite_step_ids: [EP_ISSUANCE_FIN]
+      conditional_on: "case.has_family_relocating == true"
+      cite: SG_DEPENDANT_PASS
+
+    - step_id: EP_VALIDITY_HORIZON
+      name: "First EP valid up to 2 years; renewals up to 3 years"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 0
+      prerequisite_step_ids: [EP_ISSUANCE_FIN]
+      outcome_type: nothing_to_do
+      advice_boundary: information_only
+      cite: SG_EP
+      non_obvious: true
+      non_obvious_note: "A first Employment Pass is issued for up to 2 years and renewals for up to 3 — plan renewal ahead of expiry. On leaving Singapore the employer must seek IRAS tax clearance (Form IR21) at least a month before the last day and cancel the EP."

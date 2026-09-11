@@ -115,7 +115,13 @@ flag; the byte-perfect `1789155617167_a7kffdbu.csv` is used.)*
 - `scripts/import_otto_facts.py <batch> --dry-run` → `--apply --promote` (facts → `requirement_items`, `pending`).
 - `scripts/import_supplier_candidates.py <csv>` dry-run/apply (vendors → `suppliers`, `pending`). *(loader needs `sqlalchemy`; not installed here.)*
 - `scripts/import_resources.py --bundle <path> --mode draft_only` (resources → `country_resources`, draft). Full validation resolves platform categories/tags against Supabase, unavailable here.
-- Author `corridors/FR_SG/` and `corridors/US_EC/` pathway graphs + `facts.yaml` from these facts (Notion AB-WIRE / AD-WIRE, currently Blocked).
+- ✅ **Pathway graphs AUTHORED** (Notion AB-WIRE / AD-WIRE): `corridors/FR_SG/pathways/EMPLOYMENT_PASS_2026/v1.yaml`
+  and `corridors/US_EC/pathways/PROFESSIONAL_RESIDENCE_2026/v1.yaml`, sourced from the corridors'
+  reviewed/representative `requirement_items` + the delivered facts, wired into each `corridor.yaml`
+  (derived SLA windows: FR_SG 50d, US_EC 36d). Load cleanly (no cycles, one arrival anchor each);
+  `test_corridor_pathways` + `test_corridor_cycle_detection` + `test_corridor_sla` + `test_corridor_feasibility`
+  pass. Still deferred: each corridor's **`facts.yaml`** (fact→step binding) — its refs resolve only
+  after the facts load, so authoring it now would invent refs.
 
 ## Outstanding — needs Otto (not recoverable in-repo)
 
