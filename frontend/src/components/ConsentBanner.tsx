@@ -60,9 +60,9 @@ export function ConsentBanner() {
       role="dialog"
       aria-label="Analytics consent"
       aria-live="polite"
-      className="fixed bottom-0 inset-x-0 z-50 border-t border-[#d7e2e8] bg-white shadow-lg"
+      className="fixed bottom-0 inset-x-0 z-50 border-t border-[#d7e2e8] bg-white shadow-lg md:bottom-4 md:left-4 md:right-auto md:inset-x-auto md:max-w-md md:rounded-lg md:border"
     >
-      <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-3 px-4 py-3 sm:flex-row sm:items-center">
+      <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-3 px-4 py-3 sm:flex-row sm:items-center md:max-w-none">
         <p className="text-sm leading-relaxed text-[#0b2b43]">
           We use privacy-first product analytics to improve ReloPass. No personal data
           is included in the events we collect, and analytics data is stored on EU
