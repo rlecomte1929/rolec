@@ -696,9 +696,7 @@ export const EmployeeJourney: React.FC = () => {
         </div>
       ) : null}
 
-      {!assignmentLoading && showPrimaryManualClaimPage ? <EmployeeNoCaseOnboarding /> : null}
-
-      {!assignmentLoading ? (
+      {!assignmentLoading && !showPrimaryManualClaimPage ? (
         <Card padding="lg" className="mb-6">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <div className="text-lg font-semibold text-[#0b2b43]">Assignment status</div>
@@ -714,7 +712,7 @@ export const EmployeeJourney: React.FC = () => {
         </Card>
       ) : null}
 
-      {!assignmentLoading ? (
+      {!assignmentLoading && !showPrimaryManualClaimPage ? (
         <Card
           id="employee-hub-linked-assignments"
           padding="lg"
@@ -876,9 +874,9 @@ export const EmployeeJourney: React.FC = () => {
       ) : null}
 
       {!assignmentLoading && showPrimaryManualClaimPage ? (
-        <Card padding="lg" className="mb-6 border border-[#cbd5e1]">
-          <div className="text-lg font-semibold text-[#0b2b43]">Link your case</div>
-          <p data-testid="employee-case-link-instruction" className="text-sm text-[#4b5563] mt-2">
+        <Card padding="lg" className="mb-6 border border-[#cbd5e1]" id="employee-unlinked-empty-state">
+          <EmployeeNoCaseOnboarding embedded />
+          <p data-testid="employee-case-link-instruction" className="text-sm text-[#4b5563] mt-4">
             {EMPLOYEE_CASE_LINK_INSTRUCTION}
           </p>
           <ManualClaimInstructions signedInPrincipal={signedInPrincipal} />

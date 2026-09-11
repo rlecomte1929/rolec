@@ -29,4 +29,10 @@ describe('EmployeeNoCaseOnboarding', () => {
     expect(screen.queryByText(/contact your hr team directly/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
+
+  it('can render without its own card so the claim form can host it', () => {
+    const { container } = render(<EmployeeNoCaseOnboarding embedded />);
+    expect(screen.getByTestId('employee-no-case-onboarding')).toBeInTheDocument();
+    expect(container.querySelector('.rounded-xl')).toBeNull();
+  });
 });
