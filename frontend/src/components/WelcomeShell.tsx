@@ -17,7 +17,10 @@ interface WelcomeShellProps {
 export function WelcomeShell({ onSkip, children }: WelcomeShellProps) {
   return (
     <AppShell>
-      <div className="flex flex-col items-center pt-4 pb-12 px-2">
+      <div
+        className="flex flex-col items-center pt-4 px-2 pb-[max(3rem,var(--consent-banner-offset,0px))]"
+        data-testid="welcome-shell"
+      >
         {/* Skip link — top right, low visual weight */}
         <div className="w-full max-w-2xl flex justify-end mb-8">
           <button
