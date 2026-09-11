@@ -13,6 +13,8 @@ interface WelcomeStepCardProps {
   showCta?: boolean;
   /** Visible + accessible CTA. Required when several cards share a page. */
   ctaLabel?: string;
+  /** Stronger treatment for the recommended first step (AIQ-2282). */
+  emphasized?: boolean;
 }
 
 /**
@@ -29,10 +31,17 @@ export function WelcomeStepCard({
   note,
   showCta = true,
   ctaLabel = 'Get started →',
+  emphasized = false,
 }: WelcomeStepCardProps) {
   return (
     <div>
-      <Card className="hover:border-accent-200 transition-colors duration-150">
+      <Card
+        className={
+          emphasized
+            ? 'ring-2 ring-accent-500'
+            : 'hover:border-accent-200 transition-colors duration-150'
+        }
+      >
         <div className="flex items-start gap-4">
           <div className="w-9 h-9 shrink-0 rounded-full bg-navy-800 text-white text-sm font-semibold flex items-center justify-center">
             {step}
@@ -51,7 +60,11 @@ export function WelcomeStepCard({
           {showCta ? (
           <Link
             to={href}
-            className="inline-flex min-h-6 shrink-0 items-center self-center text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
+            className={
+              emphasized
+                ? 'inline-flex shrink-0 items-center self-center rounded-lg bg-navy-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-navy-700 transition-colors'
+                : 'inline-flex min-h-6 shrink-0 items-center self-center text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors'
+            }
           >
             {ctaLabel}
           </Link>

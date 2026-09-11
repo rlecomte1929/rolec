@@ -133,6 +133,7 @@ export function HrWelcomePage() {
           href="/hr/company-profile"
           badge="Start here"
           ctaLabel="Open company profile →"
+          emphasized
         />
         <WelcomeStepCard
           step={2}

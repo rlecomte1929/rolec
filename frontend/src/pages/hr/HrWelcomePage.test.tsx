@@ -158,6 +158,14 @@ describe('HrWelcomePage — real HR', () => {
     expect(screen.queryAllByRole('link', { name: /get started/i })).toHaveLength(0);
   });
 
+  it('emphasizes the Start here card beyond the chip', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    const { container } = renderPage();
+    expect(container.querySelector('.ring-accent-500')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Open company profile →' }).className).toContain('bg-navy-800');
+    expect(screen.getByRole('link', { name: 'Open policy →' }).className).not.toContain('bg-navy-800');
+  });
+
   it('puts an h2 above the setup cards so h3 titles do not skip a level', () => {
     signedInAs('marie.dupont@acme-corp.com');
     const { container } = renderPage();
