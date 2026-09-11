@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/antigravity';
@@ -104,14 +104,16 @@ function claimStateLabel(state: string): string {
   return statusLabel(state);
 }
 
-function ManualClaimInstructions({ signedInPrincipal }: { signedInPrincipal: string | null }) {
+export function ManualClaimInstructions({ signedInPrincipal }: { signedInPrincipal: string | null }) {
+  const headingId = useId();
   return (
     <div
       className="mt-4 rounded-lg border border-[#93c5fd] bg-[#eff6ff] px-4 py-3 text-sm text-[#1e3a5f]"
       role="region"
-      aria-label="How to fill the claim form"
+      aria-labelledby={headingId}
+      data-testid="manual-claim-instructions"
     >
-      <div className="font-semibold text-[#0b2b43] mb-2">How to connect your case</div>
+      <div id={headingId} className="font-semibold text-[#0b2b43] mb-2">How to connect your case</div>
       <ol className="list-decimal pl-5 space-y-2 text-[#334155]">
         <li>
           <strong className="text-[#0b2b43]">Your email:</strong> The work email HR used when they set up your move.
