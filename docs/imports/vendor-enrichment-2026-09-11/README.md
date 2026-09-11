@@ -86,8 +86,22 @@ approved-cap tripwire on every run).
   GB/legal_admin `vc-*` contact-email coverage **→ 4** (of 8), phone **→ 7**. 0 overwrites.
   **Approved-cap tripwire UNCHANGED: 1291**; caps by status approved 1291 / pending 0 / rejected 3.
 
+## Batch #6 — SE/housing_agencies contact (`enrich-xx-se-housing-contact-2026-09-11`)
+- Source (GCS): `src/enrich-xx-se-housing-contact.ndjson` (+ `manifest_se-housing-contact.json`). Landing:
+  `src/enrich-xx-se-housing-contact.LANDING.ndjson` (schema-mapped; emails lowercased). Target: `se-housing-target.csv`
+  (7 approved SE/housing firms missing `contact_email`, all own-domain).
+- Otto: **7 attempted / 5 filled**. Keys ⊆ target ✓. Phones +46 E.164.
+- **Verification:** 3 emails domain-matched (Estate, Quality Living, Victory); **Öresund** `info@oresundfast.se` = the
+  firm's own short-form domain (vs the longer oresundfastighetsformedling.se site) — genuine, landed with a note (like
+  JLG). Våningen & Villan phone-only. **Nordic Relocation Group** + **Residensportalen** omitted upstream (no data,
+  dropped not invented). No aggregator hits.
+- **Landed (fill-empty):** **9 fields across 5 suppliers** — 4 `contact_email` + 5 `contact_phone`.
+  SE/housing_agencies `vc-*` contact-email coverage **→ 4** (of 7), phone **→ 5**. 0 overwrites.
+  **Approved-cap tripwire UNCHANGED: 1291**; caps by status approved 1291 / pending 0 / rejected 3.
+
 ## Enrichment progress (running)
-Contact fills so far: **34 `contact_email` + 46 `contact_phone`** across 5 cells (ES/legal, NL/housing, CZ/housing,
-AU/legal, GB/legal), on already-approved/live suppliers, fill-empty, 0 overwrites, vetting untouched throughout. Queue:
-SE/housing → CA/tax → (banks last). Movers parked (FIDI, no websites to scrape). ~1,090 suppliers lacked an email at the
-start of the pivot — this is the RFQ-loop unblock, one city×category batch at a time.
+Contact fills so far: **38 `contact_email` + 51 `contact_phone`** across 6 cells (ES/legal, NL/housing, CZ/housing,
+AU/legal, GB/legal, SE/housing), on already-approved/live suppliers, fill-empty, 0 overwrites, vetting untouched
+throughout. **109 of ~1,166 `vc-*` suppliers now carry a contact_email** (up from ~76 at the pivot). Queue: CA/tax
+(last register-cell) → then banks (deprioritised — big institutions, generic addresses). Movers parked (FIDI, no
+websites). One city×category batch at a time — the RFQ-loop unblock.
