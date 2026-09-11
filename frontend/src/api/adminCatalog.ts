@@ -89,13 +89,19 @@ export interface DemandGap {
 export const listDemandGaps = (limit = 50): Promise<DemandGap[]> =>
   apiGet(`/api/admin/catalog/demand-gaps?limit=${limit}`);
 
-/** Allowlist the destination and fire the scraper for one (category, city). */
+/** Open the destination and look up providers for one (category, city). */
 export const fillDemandGap = (
   category: string,
   city: string,
   country: string,
-): Promise<{ allowlisted: boolean; scraped_count: number; category: string; city: string; country: string }> =>
-  apiPost('/api/admin/catalog/demand-gaps/fill', { category, city, country });
+): Promise<{
+  allowlisted: boolean;
+  scraped_count: number;
+  lookup_ran?: boolean;
+  category: string;
+  city: string;
+  country: string;
+}> => apiPost('/api/admin/catalog/demand-gaps/fill', { category, city, country });
 
 // CATALOG-4: proactive intake-driven corridors (pre-warm before employees hit gaps).
 export interface IntakeCorridor {
