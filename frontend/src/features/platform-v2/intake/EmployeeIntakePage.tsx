@@ -120,6 +120,8 @@ export interface IntakeData {
   commute_mins: number;
   // AIQ-1603: single-select preferred commute mode (persisted to cases.commute_preference).
   commute_preference: string;
+  /** posted = home-country social security (A1); local = host scheme; unknown = not sure. */
+  social_security_regime: string;
   consent: boolean;
 }
 
@@ -216,6 +218,7 @@ const INITIAL_DATA: IntakeData = {
   expected_duration_months: null,
   commute_mins: 30,
   commute_preference: 'no_preference',
+  social_security_regime: '',
   consent: false,
 };
 
@@ -1408,6 +1411,16 @@ export function EmployeeIntakePage() {
                         { value: 'STA', label: 'Short-term (under 12 months)' },
                         { value: 'LTA', label: 'Long-term (1–5 years)' },
                         { value: 'PERMANENT', label: 'Permanent transfer' },
+                      ]} />
+                  </FieldWrap>
+                  <FieldWrap label="Social security" className="sm:col-span-2"
+                    why="Do you stay on home-country social security/payroll, or transfer to the host scheme? This decides whether an A1 / Certificate of Coverage applies.">
+                    <MultiChip value={data.social_security_regime ? [data.social_security_regime] : []}
+                      onChange={(v) => setField('social_security_regime', v[v.length - 1] || '')}
+                      options={[
+                        { value: 'posted', label: 'Stay on home-country social security' },
+                        { value: 'local', label: 'Transfer to the host scheme' },
+                        { value: 'unknown', label: 'Not sure yet' },
                       ]} />
                   </FieldWrap>
                   {/* AIQ-1349: optional expected length in months →

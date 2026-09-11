@@ -112,6 +112,18 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
                 r.get("title") for r in dropped if r.get("title")
             )
 
+    # Posted (détaché / A1) vs local (expatrié / host scheme). NULL/empty/unknown
+    # on the case ⇒ do not filter (legacy drafts keep the full set). A requirement
+    # with no appliesToRegimes applies to every regime.
+    case_regime = str(assignment.get("socialSecurityRegime") or "").strip().lower() or None
+    if case_regime in ("posted", "local"):
+        dropped = [r for r in expanded if not _applies_to_regime(r, case_regime)]
+        if dropped:
+            expanded = [r for r in expanded if _applies_to_regime(r, case_regime)]
+            flags.setdefault("regimeWaived", []).extend(
+                r.get("title") for r in dropped if r.get("title")
+            )
+
     # Nationality gating. The FRANCE catalog is the non-EEA salaried route (its
     # own seed says "EEA/EU nationals have free movement and need none of this"),
     # but nothing enforced that, so a French citizen relocating home was served
@@ -244,6 +256,19 @@ def _applies_to_assignment_type(requirement: Dict[str, Any], case_assignment_typ
         return True
     norm = {str(a).strip().upper() for a in allowed if str(a).strip()}
     return (not norm) or (case_assignment_type in norm)
+
+
+def _applies_to_regime(requirement: Dict[str, Any], case_regime: str) -> bool:
+    """True when the requirement applies to the case's social-security regime.
+
+    A requirement with no ``appliesToRegimes`` (None/empty) applies to all —
+    same null-means-universal contract as appliesToAssignmentTypes.
+    """
+    allowed = requirement.get("appliesToRegimes")
+    if not allowed:
+        return True
+    norm = {str(a).strip().lower() for a in allowed if str(a).strip()}
+    return (not norm) or (case_regime in norm)
 
 
 def _child_age(date_str: Optional[str]) -> int:
