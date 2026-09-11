@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EMPLOYEE_CASE_LINK_INSTRUCTION } from './employeeCaseLinkCopy';
+import { EMPLOYEE_CASE_CODE_EXAMPLE, EMPLOYEE_CASE_LINK_INSTRUCTION } from './employeeCaseLinkCopy';
 
 describe('EMPLOYEE_CASE_LINK_INSTRUCTION (AIQ-2288)', () => {
   it('covers auto-link, code entry, and wait-for-HR in one sentence', () => {
@@ -8,5 +8,14 @@ describe('EMPLOYEE_CASE_LINK_INSTRUCTION (AIQ-2288)', () => {
     expect(EMPLOYEE_CASE_LINK_INSTRUCTION).toMatch(/wait for an email/i);
     expect(EMPLOYEE_CASE_LINK_INSTRUCTION).not.toMatch(/no code needed/i);
     expect(EMPLOYEE_CASE_LINK_INSTRUCTION).not.toMatch(/ask your hr team to create/i);
+  });
+});
+
+describe('EMPLOYEE_CASE_CODE_EXAMPLE (AIQ-2289)', () => {
+  it('is a UUID-shaped example, not a short abc-123 slug', () => {
+    expect(EMPLOYEE_CASE_CODE_EXAMPLE).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+    expect(EMPLOYEE_CASE_CODE_EXAMPLE).not.toMatch(/abc-123/i);
   });
 });

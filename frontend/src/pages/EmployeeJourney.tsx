@@ -7,7 +7,10 @@ import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeNoCaseOnboarding';
-import { EMPLOYEE_CASE_LINK_INSTRUCTION } from '../features/employee-journey/employeeCaseLinkCopy';
+import {
+  EMPLOYEE_CASE_CODE_EXAMPLE,
+  EMPLOYEE_CASE_LINK_INSTRUCTION,
+} from '../features/employee-journey/employeeCaseLinkCopy';
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { getAuthItem } from '../utils/demo';
@@ -117,7 +120,8 @@ function ManualClaimInstructions({ signedInPrincipal }: { signedInPrincipal: str
           {/* [BUG-260804-1327] Name the source explicitly. Reporters kept trying the short
               Reference shown on the dashboard, which is a display label and is not accepted. */}
           <strong className="text-[#0b2b43]">Code from HR:</strong> The case code in HR&apos;s invitation{' '}
-          <strong className="text-[#0b2b43]">email</strong> (a long series of letters and numbers). The short
+          <strong className="text-[#0b2b43]">email</strong> — a long string of letters and numbers separated
+          by dashes, like <span className="font-mono">{EMPLOYEE_CASE_CODE_EXAMPLE}</span>. The short
           reference shown on a case card is a label, not this code.
         </li>
       </ol>
@@ -467,7 +471,7 @@ export const EmployeeJourney: React.FC = () => {
         reason: 'email_in_assignment_field',
       });
       setError(
-        'That looks like an email address — paste the case code from HR instead. It looks like abc-123-….'
+        `That looks like an email address — paste the case code from HR instead. It looks like ${EMPLOYEE_CASE_CODE_EXAMPLE}.`
       );
       return;
     }
@@ -501,9 +505,9 @@ export const EmployeeJourney: React.FC = () => {
           CLAIM_ASSIGNMENT_NOT_PENDING:
             'This case code is already claimed by another account. If that wasn\'t you, contact your HR team.',
           CLAIM_ASSIGNMENT_IDENTIFIER_MISMATCH:
-            'We couldn\'t find that case code. Double-check the email from HR — codes look like `abc-123-…`.',
+            `We couldn't find that case code. Double-check the email from HR — codes look like ${EMPLOYEE_CASE_CODE_EXAMPLE}.`,
           CLAIM_MISSING_REQUEST_IDENTIFIER:
-            'We couldn\'t find that case code. Double-check the email from HR — codes look like `abc-123-…`.',
+            `We couldn't find that case code. Double-check the email from HR — codes look like ${EMPLOYEE_CASE_CODE_EXAMPLE}.`,
         };
         const friendlyMessage = (code && perModeMessages[code])
           ?? getApiErrorMessage(err, 'Something went wrong linking your case. Please try again or contact HR.');
@@ -888,7 +892,7 @@ export const EmployeeJourney: React.FC = () => {
               value={claimId}
               onChange={setClaimId}
               label="Step 2: Case code from HR"
-              placeholder="The code HR sent you — it looks like abc-123-…"
+              placeholder={EMPLOYEE_CASE_CODE_EXAMPLE}
               fullWidth
             />
           </div>
@@ -951,7 +955,7 @@ export const EmployeeJourney: React.FC = () => {
                   value={claimId}
                   onChange={setClaimId}
                   label="Step 2: Code from HR"
-                  placeholder="The code HR sent you (long string of letters and numbers)"
+                  placeholder={EMPLOYEE_CASE_CODE_EXAMPLE}
                   fullWidth
                 />
               </div>
