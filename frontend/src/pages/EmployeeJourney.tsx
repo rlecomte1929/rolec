@@ -650,7 +650,7 @@ export const EmployeeJourney: React.FC = () => {
               Sign in again
             </Link>
           ) : overviewErrorKind === 'forbidden' ? null : (
-            <Button variant="outline" className="ml-2 mt-2 sm:mt-0" onClick={() => void refetchAssignment()}>
+            <Button variant="ghost" size="sm" className="ml-2 mt-2 sm:mt-0" onClick={() => void refetchAssignment()}>
               Try again
             </Button>
           )}
