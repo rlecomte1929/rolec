@@ -54,6 +54,7 @@ from .routers import (
     provider_ratings,
     hr_vendor_performance,
     exception_requests,
+    expense_claims,
     hr_analytics,
     hr_duty_of_care,
     hr_case_summary,
@@ -227,6 +228,7 @@ def create_app() -> FastAPI:
     app.include_router(immigration_documents.router)  # BL-OCR.2/AIQ-748 — POST /api/immigration/cases/{id}/documents
     app.include_router(immigration_retrieve.router)  # W1/AIQ-835 — POST /api/immigration/retrieve
     app.include_router(exception_requests.router)
+    app.include_router(expense_claims.router)  # [AIQ-2271] expense claims ledger
     app.include_router(relocation_profile.router)
     app.include_router(marketplace.router)
     app.include_router(public_analytics.router)  # [audos-P2] public POST /api/public/track
