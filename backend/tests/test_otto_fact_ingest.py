@@ -695,3 +695,48 @@ def test_admitting_those_did_not_admit_the_whole_fr_or_ie_tld():
     assert classify_source("https://notcleiss.fr/regimes") == UNOFFICIAL
     assert classify_source("https://www.dublin-movers.ie/leap-card-guide") == UNOFFICIAL
     assert classify_source("https://not-dublincity.ie/housing") == UNOFFICIAL
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        # Germany (Tier-1): ELSTER tax-filing portal + Zoll customs, neither under bund.de.
+        "https://www.elster.de/eportal/infoseite/registrierung",
+        "https://www.zoll.de/EN/Private-individuals/Moving-and-inheritance/moving-and-inheritance_node.html",
+        # Netherlands (Tier-1): the core authorities, none under overheid.nl.
+        "https://ind.nl/en/residence-permits",
+        "https://www.belastingdienst.nl/wps/wcm/connect/en/individuals/individuals",
+        "https://www.svb.nl/en/aow-pension",
+        "https://www.uwv.nl/particulieren/",
+        "https://www.rijksoverheid.nl/onderwerpen/immigratie",
+        "https://www.government.nl/topics/immigration",
+        # United Kingdom (Tier-1): NHS health entitlement + devolved Scottish/Welsh governments.
+        "https://www.nhs.uk/nhs-services/gps/how-to-register-with-a-gp-surgery/",
+        "https://www.mygov.scot/register-gp",
+        "https://www.gov.scot/publications/",
+        "https://www.gov.wales/get-help-nhs-costs",
+        "https://www.llyw.cymru/cael-help-gyda-chostau-r-gig",
+    ],
+)
+def test_tier1_gb_de_nl_authorities_are_official(url):
+    """Tier-1 destinations GB/DE/NL: the statutory bodies a mover actually deals with.
+
+    NL is the starkest case — only `overheid.nl` was recognised, so the IND, Belastingdienst,
+    SVB and UWV all scored UNOFFICIAL and `stage()` rejects rather than downgrades, losing the
+    residence/tax/social-security topics outright. GB adds the NHS (health, like `hse.ie`) and
+    the devolved Scottish/Welsh governments; DE adds ELSTER and Zoll. Same too-narrow-allowlist
+    failure the country clusters above record.
+    """
+    assert classify_source(url) == OFFICIAL
+
+
+def test_admitting_the_tier1_authorities_did_not_admit_their_tlds_or_lookalikes():
+    """Named hosts / devolved suffixes, not a blanket `.nl` / `.uk` / `.scot` / `.wales` admission."""
+    # A Dutch relocation blog stays out despite the new ind.nl / belastingdienst.nl hosts.
+    assert classify_source("https://www.expat-in-amsterdam.nl/bsn-guide") == UNOFFICIAL
+    assert classify_source("https://notind.nl/residence") == UNOFFICIAL
+    assert classify_source("https://belastingdienst-help.nl/bsn") == UNOFFICIAL
+    # An NHS lookalike, and generic `.scot` / `.wales` sites, are not the government.
+    assert classify_source("https://www.nhs-advice.uk/register") == UNOFFICIAL
+    assert classify_source("https://relocate.scot/schools") == UNOFFICIAL
+    assert classify_source("https://movetocardiff.wales/renting") == UNOFFICIAL
