@@ -74,8 +74,20 @@ approved-cap tripwire on every run).
   between batches #3 and #4, so the approved baseline moved 1283 → 1291 and pending drained to 0; enrichment itself
   changed no vetting state).
 
+## Batch #5 — GB/legal_admin contact (`enrich-xx-gb-legal-contact-2026-09-11`)
+- Source (GCS): `src/enrich-xx-gb-legal-contact.ndjson` (+ `manifest_gb-legal-contact.json`). Landing:
+  `src/enrich-xx-gb-legal-contact.LANDING.ndjson` (schema-mapped; emails lowercased). Target: `gb-legal-target.csv`
+  (7 approved UK immigration firms missing `contact_email`, all own-domain).
+- Otto: **7 attempted / 6 filled**. Keys ⊆ target ✓. Phones +44 E.164.
+- **Verification:** all 3 emails domain-matched (A Y & J, Bindmans, Gherson). Laura Devine / Magrath Sheldrick / RLegal
+  = phone-only (form-only email). **Fragomen LLP** omitted upstream (global site, no extractable direct London-entity
+  contact — Otto dropped it rather than attribute a general/wrong address; as anticipated). No aggregator hits.
+- **Landed (fill-empty):** **9 fields across 6 suppliers** — 3 `contact_email` + 6 `contact_phone`.
+  GB/legal_admin `vc-*` contact-email coverage **→ 4** (of 8), phone **→ 7**. 0 overwrites.
+  **Approved-cap tripwire UNCHANGED: 1291**; caps by status approved 1291 / pending 0 / rejected 3.
+
 ## Enrichment progress (running)
-Contact fills so far: **31 `contact_email` + 40 `contact_phone`** across 4 cells (ES/legal, NL/housing, CZ/housing,
-AU/legal), on already-approved/live suppliers, fill-empty, 0 overwrites, vetting untouched throughout. Queue:
-GB/legal → SE/housing → CA/tax → (banks last). Movers parked (FIDI, no websites to scrape). ~1,090 suppliers lacked an
-email at the start of the pivot — this is the RFQ-loop unblock, one city×category batch at a time.
+Contact fills so far: **34 `contact_email` + 46 `contact_phone`** across 5 cells (ES/legal, NL/housing, CZ/housing,
+AU/legal, GB/legal), on already-approved/live suppliers, fill-empty, 0 overwrites, vetting untouched throughout. Queue:
+SE/housing → CA/tax → (banks last). Movers parked (FIDI, no websites to scrape). ~1,090 suppliers lacked an email at the
+start of the pivot — this is the RFQ-loop unblock, one city×category batch at a time.
