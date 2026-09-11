@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '../../components/antigravity/Button';
+import { LoadingButton } from '../../components/antigravity/LoadingButton';
 import { WelcomeShell } from '../../components/WelcomeShell';
 import { WelcomeStepCard } from '../../components/WelcomeStepCard';
 import { buildRoute } from '../../navigation/routes';
@@ -28,25 +29,24 @@ export function HrWelcomePage() {
   const navigate = useNavigate();
   const userId = getAuthItem('relopass_user_id') ?? '';
   const isTestDrive = looksLikeTestEmail(getAuthItem('relopass_email'));
+  const [leaving, setLeaving] = useState(false);
 
-  const handleSkip = () => {
+  useEffect(() => {
+    void import('../HrDashboard');
+    void import('../../features/platform-v2/mobility-control/MobilityControlCenterV2Page');
+  }, []);
+
+  const leave = (to: string) => {
+    if (leaving) return;
+    setLeaving(true);
     markWelcomeSeen(userId);
     void persistWelcomeSeen().catch(() => {});
-    navigate('/hr/dashboard');
+    navigate(to);
   };
 
-  const handleGoToDashboard = () => {
-    markWelcomeSeen(userId);
-    void persistWelcomeSeen().catch(() => {});
-    navigate('/hr/command-center');
-  };
-
-  // AIQ-1571: straight to the one real case form, via the ?new=1 deep link AIQ-1568 added.
-  const handleCreateCase = () => {
-    markWelcomeSeen(userId);
-    void persistWelcomeSeen().catch(() => {});
-    navigate(`${buildRoute('hrDashboard')}?new=1`);
-  };
+  const handleSkip = () => leave('/hr/dashboard');
+  const handleGoToDashboard = () => leave('/hr/command-center');
+  const handleCreateCase = () => leave(`${buildRoute('hrDashboard')}?new=1`);
 
   if (isTestDrive) {
     return (
@@ -57,9 +57,17 @@ export function HrWelcomePage() {
           Your company and route are already set up for this test — you can go straight to the case, add the
           employee, and hand it off. That is the part worth your time.
         </p>
-        <Button variant="primary" onClick={handleCreateCase} data-testid="hr-welcome-create-case">
+        {leaving ? (
+          <div className="fixed top-0 inset-x-0 z-[70] h-0.5 bg-accent-500" role="progressbar" aria-label="Opening page" />
+        ) : null}
+        <LoadingButton
+          variant="primary"
+          onClick={handleCreateCase}
+          loading={leaving}
+          loadingLabel="Opening…"
+        >
           Create your first case →
-        </Button>
+        </LoadingButton>
 
         <div className="my-10 border-t border-slate-100" />
 
@@ -95,9 +103,10 @@ export function HrWelcomePage() {
         <button
           type="button"
           onClick={handleGoToDashboard}
-          className="text-sm text-slate-500 hover:text-slate-700 hover:underline"
+          disabled={leaving}
+          className="text-sm text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-60"
         >
-          Open the mobility command center
+          {leaving ? 'Opening…' : 'Open the mobility command center'}
         </button>
       </WelcomeShell>
     );
@@ -139,18 +148,27 @@ export function HrWelcomePage() {
 
       <div className="my-10 border-t border-slate-100" />
 
+      {leaving ? (
+        <div className="fixed top-0 inset-x-0 z-[70] h-0.5 bg-accent-500" role="progressbar" aria-label="Opening page" />
+      ) : null}
       <h2 className="text-base font-semibold text-navy-800 mb-1">Ready to open your first case?</h2>
       <p className="text-sm text-slate-600 mb-4">
         You can skip setup for now and start a case directly. The setup steps will remain accessible in the
         sidebar at any time.
       </p>
-      <Button variant="primary" onClick={handleGoToDashboard}>
+      <LoadingButton
+        variant="primary"
+        onClick={handleGoToDashboard}
+        loading={leaving}
+        loadingLabel="Opening…"
+      >
         Open the mobility command center
-      </Button>
+      </LoadingButton>
       <button
         type="button"
         onClick={handleSkip}
-        className="mt-3 block text-sm text-slate-500 hover:text-slate-700 hover:underline"
+        disabled={leaving}
+        className="mt-3 block text-sm text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-60"
       >
         Open Cases
       </button>

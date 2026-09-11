@@ -81,7 +81,7 @@ describe('HrWelcomePage — test-drive HR', () => {
   it('the case CTA goes straight to the one real case form', () => {
     signedInAs('hr-a1b2@probe.test');
     renderPage();
-    fireEvent.click(screen.getByTestId('hr-welcome-create-case'));
+    fireEvent.click(screen.getByRole('button', { name: /create your first case/i }));
     // The ?new=1 deep link AIQ-1568 added — the form is local state, so this is the seam.
     expect(mockNavigate).toHaveBeenCalledWith('/hr/dashboard?new=1');
   });
@@ -121,9 +121,18 @@ describe('HrWelcomePage — real HR', () => {
     renderPage();
     expect(screen.getByRole('heading', { name: /set up your company workspace/i })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /open your first relocation case/i })).toBeNull();
-    expect(screen.queryByTestId('hr-welcome-create-case')).toBeNull();
+    expect(screen.queryByRole('button', { name: /create your first case/i })).toBeNull();
     expect(screen.getByRole('button', { name: /open the mobility command center/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^open cases$/i })).toBeInTheDocument();
+  });
+
+  it('shows a pending state within the click of an exit', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /open the mobility command center/i }));
+    expect(screen.getByRole('progressbar', { name: /opening page/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /opening/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^open cases$/i })).toBeDisabled();
   });
 
   it('sends step 3 to Service Providers vendor curation, not the legacy grid', () => {
