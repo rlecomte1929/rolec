@@ -131,6 +131,11 @@ def _base_items(requirements: List[Any]) -> List[Dict[str, Any]]:
                 if getattr(item, "applies_to_nationality_classes_json", None)
                 else None
             ),
+            "appliesToRegimes": (
+                json.loads(item.applies_to_regimes_json)
+                if getattr(item, "applies_to_regimes_json", None)
+                else None
+            ),
             "verificationStatus": getattr(item, "verification_status", None),
             # Served-with-a-caveat: flagged needs_lawyer_review AND not attested. getattr-safe
             # so the SimpleNamespace test rows (which carry no JSON columns) degrade to False.
@@ -141,6 +146,7 @@ def _base_items(requirements: List[Any]) -> List[Dict[str, Any]]:
                     getattr(item, "citations_json", None),
                     getattr(item, "applies_to_assignment_types_json", None),
                     getattr(item, "applies_to_nationality_classes_json", None),
+                    getattr(item, "applies_to_regimes_json", None),
                 ),
             ),
             "attestationStatus": getattr(item, "attestation_status", None),

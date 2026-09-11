@@ -446,6 +446,8 @@ export interface AssignmentContextDTO {
   expectedDurationMonths?: number;
   /** AIQ-1603: single-select commute preference (car/public_transport/bike/walk/no_preference). */
   commutePreference?: string;
+  /** posted | local | unknown — drives A1 / Certificate of Coverage applicability. */
+  socialSecurityRegime?: string;
 }
 
 export interface CaseDraftDTO {
@@ -530,6 +532,8 @@ export interface RequirementItemDTO {
   nonObvious?: boolean | null;
   /** Free-text deadline verbatim from the source ("within 3 months of arrival"). */
   timing?: string | null;
+  /** Which social-security regimes this row applies to. Absent ⇒ all. */
+  appliesToRegimes?: string[] | null;
 }
 
 export interface CountryProfileDTO {

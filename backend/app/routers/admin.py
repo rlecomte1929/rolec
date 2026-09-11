@@ -254,6 +254,7 @@ def _review_dto(
         reviewedAt=getattr(item, "reviewed_at", None),
         appliesToNationalityClasses=_arr(getattr(item, "applies_to_nationality_classes_json", None)),
         appliesToAssignmentTypes=_arr(getattr(item, "applies_to_assignment_types_json", None)),
+        appliesToRegimes=_arr(getattr(item, "applies_to_regimes_json", None)),
         citations=_admin_citation_dtos(_arr(getattr(item, "citations_json", None)), source_map or {}),
         lastVerifiedAt=getattr(item, "last_verified_at", None),
     )

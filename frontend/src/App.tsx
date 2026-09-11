@@ -126,6 +126,7 @@ const HrProviderGridV2 = lazy(() => import('./features/platform-v2/provider-grid
 const HrBacklogPage = lazy(() => import('./features/platform-v2/hr-backlog/HrBacklogPage').then((module) => ({ default: module.HrBacklogPage })));
 const MobilityControlCenterV2Page = lazy(() => import('./features/platform-v2/mobility-control/MobilityControlCenterV2Page').then((module) => ({ default: module.MobilityControlCenterV2Page })));
 const HrRiskDashboardPage = lazy(() => import('./features/platform-v2/mobility-control/HrRiskDashboardPage').then((module) => ({ default: module.HrRiskDashboardPage })));
+const HrDutyOfCareBoard = lazy(() => import('./pages/HrDutyOfCareBoard').then((module) => ({ default: module.HrDutyOfCareBoard })));
 // HrPolicyBuilder lazy import removed — /hr/settings/policy now redirects to
 // /hr/policy?tab=builder via <Navigate> below. HrPolicyBuilderV2Page is
 // imported directly by HrPolicy.tsx for the embedded tab.
@@ -361,6 +362,7 @@ function App() {
         />
         <Route path="/hr/command-center-v2" element={<RequireHrRoute><MobilityControlCenterV2Page /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrRisk.path} element={<RequireHrRoute><HrRiskDashboardPage /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrDutyOfCare.path} element={<RequireHrRoute><HrDutyOfCareBoard /></RequireHrRoute>} />
         <Route path="/hr/command-center-legacy" element={<RequireHrRoute><HrCommandCenter /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrCommandCenterCase.path} element={<RequireHrRoute><HrCommandCenterCaseDetail /></RequireHrRoute>} />
         {/* [MVG-6A] HR — create immigration case */}

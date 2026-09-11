@@ -2768,12 +2768,22 @@ def get_budget_summary(
         committed_spend_for_case,
         spouse_support_drawdown,
     )
+    from ..services.expense_claim_drawdown import drawdown_for_case
 
     committed = committed_spend_for_case(case_id)
     partner_committed = committed_spend_for_case(
         case_id, service_keys=PARTNER_CAREER_SERVICE_KEYS
     )
     cap_amount, cap_currency = _spouse_support_cap_from_benefits(caps_by_key)
+
+    # [AIQ-2271] Per-benefit remaining against published caps. Approved/paid lines
+    # only; same-currency or stored-rate; never invent a live FX total.
+    drawdown: List[Dict[str, Any]] = []
+    try:
+        with main_db.engine.connect() as conn:
+            drawdown = drawdown_for_case(conn, case_id, caps_list)
+    except Exception:
+        logger.exception("budget-summary: expense-claim drawdown failed case=%s", case_id)
 
     return {
         "case_id": case_id,
@@ -2782,6 +2792,7 @@ def get_budget_summary(
         # surface everything HR configured even when no matching service is selected.
         "hr_policy_caps": _shape_hr_policy_caps(caps_list),
         "committed_spend": committed,
+        "drawdown": drawdown,
         "spouse_support_drawdown": spouse_support_drawdown(
             cap_amount=cap_amount,
             cap_currency=cap_currency,

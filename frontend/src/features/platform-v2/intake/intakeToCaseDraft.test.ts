@@ -42,6 +42,14 @@ describe('intakeToCaseDraft', () => {
     expect(intakeToCaseDraft(makeIntake()).assignmentContext?.assignmentType).toBeUndefined();
   });
 
+  it('maps social_security_regime onto assignmentContext.socialSecurityRegime', () => {
+    const posted = intakeToCaseDraft(makeIntake({ social_security_regime: 'posted' } as Partial<IntakeData>));
+    expect(posted.assignmentContext?.socialSecurityRegime).toBe('posted');
+    const local = intakeToCaseDraft(makeIntake({ social_security_regime: 'local' } as Partial<IntakeData>));
+    expect(local.assignmentContext?.socialSecurityRegime).toBe('local');
+    expect(intakeToCaseDraft(makeIntake()).assignmentContext?.socialSecurityRegime).toBeUndefined();
+  });
+
   it('leaves empty fields undefined (so the backend deep-merge keeps existing values)', () => {
     const d = intakeToCaseDraft(makeIntake({ dest_country: 'DE' }));
     expect(d.relocationBasics?.destCountry).toBe('DE');

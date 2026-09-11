@@ -214,6 +214,10 @@ def to_fact_row(
             "beam_candidate_uid": candidate.get("candidate_uid"),
             "beam_pass_frequency": candidate.get("pass_frequency"),
             "beam_confidence_band": candidate.get("confidence_band"),
+            "regimes": (candidate.get("applies_to") or {}).get("regimes")
+            or candidate.get("applies_to_regimes"),
+            "owner": (candidate.get("applies_to") or {}).get("owner")
+            or candidate.get("owner"),
         },
         # Only a human-researched source can carry a quote; see the docstring.
         evidence_quote=(

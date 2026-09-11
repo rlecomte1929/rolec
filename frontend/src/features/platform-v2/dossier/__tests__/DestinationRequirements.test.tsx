@@ -120,6 +120,41 @@ describe('the happy path', () => {
     expect(screen.getByText('RESIDENCE')).toBeTruthy();
   });
 
+  it('renders SOCIAL_SECURITY under a friendly section label', async () => {
+    getRequirements.mockResolvedValue(
+      dto({
+        requirements: [
+          item({
+            id: 'a1',
+            pillar: 'SOCIAL_SECURITY',
+            title: 'A1 / Portable Document for posted workers',
+            owner: 'EMPLOYER',
+          }),
+        ],
+      }),
+    );
+    render(<DestinationRequirements caseId="c1" />);
+    await waitFor(() => expect(screen.getByText('A1 / Portable Document for posted workers')).toBeTruthy());
+    expect(screen.getByText('Social security & pension')).toBeTruthy();
+    expect(screen.queryByText('SOCIAL_SECURITY')).toBeNull();
+  });
+
+  it('uses the same social-security label for the HR audience', async () => {
+    getRequirements.mockResolvedValue(
+      dto({
+        requirements: [
+          item({
+            id: 'a1',
+            pillar: 'SOCIAL_SECURITY',
+            title: 'A1 / Portable Document for posted workers',
+          }),
+        ],
+      }),
+    );
+    render(<DestinationRequirements caseId="c1" audience="hr" />);
+    await waitFor(() => expect(screen.getByText('Social security & pension')).toBeTruthy());
+  });
+
   it('shows that the corridor is not ready when the catalog fails sufficiency', async () => {
     getRequirements.mockResolvedValue(
       dto({

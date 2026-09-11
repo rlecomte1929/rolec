@@ -75,6 +75,10 @@ const STATUS_STYLES: Record<BudgetSummaryStatus, { label: string; className: str
     label: 'Pending estimate',
     className: 'bg-slate-50 text-slate-600 ring-slate-200',
   },
+  not_comparable: {
+    label: 'Not comparable',
+    className: 'bg-slate-50 text-slate-600 ring-slate-200',
+  },
 };
 
 function StatusBadge({ status }: { status: BudgetSummaryStatus }) {

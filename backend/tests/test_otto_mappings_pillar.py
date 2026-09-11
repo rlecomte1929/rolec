@@ -123,5 +123,26 @@ class ResolveEndToEndPillarTests(unittest.TestCase):
         self.assertIn("disagree on applies_to.pillar", result.reason)
 
 
+class ResolveOwnerAndRegimeTests(unittest.TestCase):
+    def test_stated_owner_and_regimes_are_carried(self):
+        fact = _fact("SOCIAL_SECURITY")
+        fact.applies_to["owner"] = "EMPLOYER"
+        fact.applies_to["regimes"] = ["posted"]
+        draft = mappings.resolve(
+            _entity(topic_key="FR-DE:a1", title="A1 / Portable Document for posted workers"),
+            [fact],
+        )
+        self.assertNotIsInstance(draft, mappings.Unmapped)
+        self.assertEqual(draft.payload["owner"], "EMPLOYER")
+        self.assertEqual(draft.payload["applies_to_regimes_json"], '["posted"]')
+        self.assertEqual(draft.payload["pillar"], "SOCIAL_SECURITY")
+
+    def test_default_owner_stays_employee_when_unspecified(self):
+        draft = mappings.resolve(_entity(), [_fact(), _fact(fact_key="k2")])
+        self.assertNotIsInstance(draft, mappings.Unmapped)
+        self.assertEqual(draft.payload["owner"], "EMPLOYEE")
+        self.assertNotIn("applies_to_regimes_json", draft.payload)
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

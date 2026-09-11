@@ -69,6 +69,22 @@ def test_unknown_keys_survive_the_assignment_type_filter():
     assert expanded[0][_UNKNOWN_KEY] == {"nested": ["value"]}
 
 
+def test_unknown_keys_survive_the_regime_filter():
+    kept = _item(id="kept", appliesToRegimes=["posted"])
+    dropped = _item(id="dropped", title="Local-only", appliesToRegimes=["local"])
+
+    draft = _draft("LTA")
+    draft["assignmentContext"]["socialSecurityRegime"] = "posted"
+    _required, expanded, flags = apply_rules(draft, [kept, dropped])
+
+    assert [i["id"] for i in expanded] == ["kept"]
+    assert "Local-only" in flags["regimeWaived"]
+    assert expanded[0]["non_obvious"] is True
+    assert expanded[0]["timing"] == "within 8 days of arrival"
+    assert expanded[0][_UNKNOWN_KEY] == {"nested": ["value"]}
+    assert expanded[0]["appliesToRegimes"] == ["posted"]
+
+
 def test_unknown_keys_survive_the_nationality_filter():
     """Same, through the nationality gate — which also APPENDS a synthesised item."""
     kept = _item(id="kept", appliesToNationalityClasses=["EU_EEA"])
