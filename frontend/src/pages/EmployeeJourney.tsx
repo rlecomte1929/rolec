@@ -162,6 +162,7 @@ export const EmployeeJourney: React.FC = () => {
     linkedSummaries,
     pendingSummaries,
     overviewError,
+    overviewErrorKind,
   } = useEmployeeAssignment();
   const [error, setError] = useState('');
   const [claimId, setClaimId] = useState('');
@@ -633,9 +634,18 @@ export const EmployeeJourney: React.FC = () => {
       {!assignmentLoading && overviewError ? (
         <Alert variant="warning" className="mb-6" title="Could not load assignments">
           {overviewError}{' '}
-          <Button variant="outline" className="ml-2 mt-2 sm:mt-0" onClick={() => void refetchAssignment()}>
-            Try again
-          </Button>
+          {overviewErrorKind === 'unauthorized' ? (
+            <Link
+              to="/auth?mode=login&reason=session_expired"
+              className="ml-2 mt-2 inline-flex min-h-6 items-center text-sm font-medium text-accent-600 hover:text-accent-700 sm:mt-0"
+            >
+              Sign in again
+            </Link>
+          ) : overviewErrorKind === 'forbidden' ? null : (
+            <Button variant="outline" className="ml-2 mt-2 sm:mt-0" onClick={() => void refetchAssignment()}>
+              Try again
+            </Button>
+          )}
         </Alert>
       ) : null}
 

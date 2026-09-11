@@ -10,6 +10,7 @@ import {
   shouldLoadEmployeeAssignmentOverview,
 } from '../utils/employeeAssignmentScope';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
+import { classifyOverviewLoadError, type OverviewLoadKind } from '../utils/overviewLoadError';
 
 const CURRENT_ASSIGNMENT_CACHE_KEY = 'employee:current-assignment';
 const ASSIGNMENTS_OVERVIEW_CACHE_KEY = 'employee:assignments-overview';
@@ -32,6 +33,8 @@ interface EmployeeAssignmentContextValue {
   pendingSummaries: EmployeePendingOverviewRow[];
   /** Bootstrap failed (overview unreachable). */
   overviewError: string | null;
+  /** Why overview failed — drives the recovery action on the dashboard. */
+  overviewErrorKind?: OverviewLoadKind | null;
   refetch: () => Promise<void>;
 }
 
@@ -45,6 +48,7 @@ const defaultValue: EmployeeAssignmentContextValue = {
   linkedSummaries: [],
   pendingSummaries: [],
   overviewError: null,
+  overviewErrorKind: null,
   refetch: async () => {},
 };
 
@@ -138,9 +142,9 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
 
   const authed = isEmployee && token;
   const isLoading = shouldFetch && query.isLoading;
-  const overviewError = query.isError
-    ? 'Overview did not load. Check your connection and refresh.'
-    : null;
+  const overviewFailure = query.isError ? classifyOverviewLoadError(query.error) : null;
+  const overviewError = overviewFailure?.message ?? null;
+  const overviewErrorKind = overviewFailure?.kind ?? null;
 
   return (
     <EmployeeAssignmentContext.Provider
@@ -154,6 +158,7 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
         linkedSummaries: authed ? linked : EMPTY_LINKED,
         pendingSummaries: authed ? pending : EMPTY_PENDING,
         overviewError: authed ? overviewError : null,
+        overviewErrorKind: authed ? overviewErrorKind : null,
         refetch,
       }}
     >
