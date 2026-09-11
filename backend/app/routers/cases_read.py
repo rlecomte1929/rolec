@@ -2414,6 +2414,30 @@ _SERVICE_BENEFIT_KEYS: Dict[str, List[str]] = {
 }
 
 
+def _spouse_support_cap_from_benefits(caps_by_key: Dict[str, Dict[str, Any]]) -> tuple:
+    """Sum SPOUSE_SUPPORT-mapped benefit caps when they share a currency. Else not comparable."""
+    from ..services.policy_config_cap_compare import NORMALIZED_CURRENCY_AMOUNT
+
+    total: Optional[float] = None
+    currency: Optional[str] = None
+    for key in _SERVICE_BENEFIT_KEYS.get("spouse", []):
+        cap = caps_by_key.get(key)
+        if not (
+            cap
+            and cap.get("normalized_cap_type") == NORMALIZED_CURRENCY_AMOUNT
+            and cap.get("normalized_amount") is not None
+        ):
+            continue
+        amt = float(cap["normalized_amount"])
+        ccy = (cap.get("currency_code") or "").strip().upper() or None
+        if currency and ccy and currency != ccy:
+            return None, None
+        currency = ccy or currency
+        total = (total or 0.0) + amt
+    return total, currency
+
+
+
 def _canonical_case_id_or_404(case_id: str) -> str:
     """Resolve any id form a route may carry — the assignment PK, the case_id, or
     the canonical_case_id — to the canonical case id that case-keyed tables
@@ -2739,8 +2763,18 @@ def get_budget_summary(
     # "budget" above, from real rows only. Never totals case_services.estimated_cost (mixes
     # agreed with estimate) and never sums across currencies (no FX source). A case with no
     # validated quote returns has_spend=False + empty by_currency → an honest empty state.
-    from ..services.case_spend import committed_spend_for_case
+    from ..services.case_spend import (
+        PARTNER_CAREER_SERVICE_KEYS,
+        committed_spend_for_case,
+        spouse_support_drawdown,
+    )
     from ..services.expense_claim_drawdown import drawdown_for_case
+
+    committed = committed_spend_for_case(case_id)
+    partner_committed = committed_spend_for_case(
+        case_id, service_keys=PARTNER_CAREER_SERVICE_KEYS
+    )
+    cap_amount, cap_currency = _spouse_support_cap_from_benefits(caps_by_key)
 
     # [AIQ-2271] Per-benefit remaining against published caps. Approved/paid lines
     # only; same-currency or stored-rate; never invent a live FX total.
@@ -2757,8 +2791,13 @@ def get_budget_summary(
         # AIQ-1551: the full list of the company's published CAPs, so the estimate page can
         # surface everything HR configured even when no matching service is selected.
         "hr_policy_caps": _shape_hr_policy_caps(caps_list),
-        "committed_spend": committed_spend_for_case(case_id),
+        "committed_spend": committed,
         "drawdown": drawdown,
+        "spouse_support_drawdown": spouse_support_drawdown(
+            cap_amount=cap_amount,
+            cap_currency=cap_currency,
+            committed=partner_committed,
+        ),
     }
 
 

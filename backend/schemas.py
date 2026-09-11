@@ -85,6 +85,8 @@ class Spouse(BaseModel):
     wantsToWork: Optional[bool] = None
     occupation: Optional[str] = None
     educationLevel: Optional[str] = None
+    employment: Optional[str] = None
+    languageLevel: Optional[str] = None
 
 
 # Passport model

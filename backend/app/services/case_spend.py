@@ -20,32 +20,55 @@ which the surfaces render as an honest empty state — never a 0 that reads as a
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from ...database import db as main_db
 
+PARTNER_CAREER_SERVICE_KEYS = ("spouse", "partner_career")
 
-def committed_spend_for_case(case_id: str) -> Dict[str, Any]:
+
+def committed_spend_for_case(
+    case_id: str, *, service_keys: Optional[Sequence[str]] = None
+) -> Dict[str, Any]:
     """Committed spend for ONE case, from its validated RFQ quotes. Per-currency subtotals only.
 
     `case_id` must be the canonical case id — the id `rfqs.case_id` carries. The budget-summary
     caller resolves it (`_canonical_case_id_or_404`) before calling, so a stale/assignment id can
     never silently read an empty selection here.
+
+    When ``service_keys`` is set, only quotes whose RFQ has an ``rfq_items.service_key`` in that
+    list are counted (Option A partner-career drawdown).
     """
-    sql = text(
-        """
-        SELECT r.validated_quote_id AS quote_id, q.vendor_id, q.total_amount, q.currency,
-               r.validated_at
-        FROM rfqs r
-        JOIN quotes q ON q.id = r.validated_quote_id
-        WHERE r.case_id = :cid AND r.validated_quote_id IS NOT NULL
-        ORDER BY r.validated_at
-        """
-    )
+    if service_keys:
+        sql = text(
+            """
+            SELECT DISTINCT r.validated_quote_id AS quote_id, q.vendor_id, q.total_amount,
+                   q.currency, r.validated_at
+            FROM rfqs r
+            JOIN quotes q ON q.id = r.validated_quote_id
+            JOIN rfq_items i ON i.rfq_id = r.id
+            WHERE r.case_id = :cid AND r.validated_quote_id IS NOT NULL
+              AND i.service_key IN :keys
+            ORDER BY r.validated_at
+            """
+        ).bindparams(bindparam("keys", expanding=True))
+        params: Dict[str, Any] = {"cid": str(case_id), "keys": list(service_keys)}
+    else:
+        sql = text(
+            """
+            SELECT r.validated_quote_id AS quote_id, q.vendor_id, q.total_amount, q.currency,
+                   r.validated_at
+            FROM rfqs r
+            JOIN quotes q ON q.id = r.validated_quote_id
+            WHERE r.case_id = :cid AND r.validated_quote_id IS NOT NULL
+            ORDER BY r.validated_at
+            """
+        )
+        params = {"cid": str(case_id)}
     with main_db.engine.connect() as conn:
-        rows = conn.execute(sql, {"cid": str(case_id)}).mappings().all()
+        rows = conn.execute(sql, params).mappings().all()
     return _summarise(rows)
 
 
@@ -123,3 +146,49 @@ def _iso(value: Any) -> Optional[str]:
         return None
     iso = getattr(value, "isoformat", None)
     return iso() if callable(iso) else str(value)
+
+
+def spouse_support_drawdown(
+    *,
+    cap_amount: Optional[float],
+    cap_currency: Optional[str],
+    committed: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Cap − committed for SPOUSE_SUPPORT, same-currency only. Never invents FX or a fake 0.
+
+    ``committed`` is the payload from ``committed_spend_for_case`` (optionally filtered).
+    """
+    cap_ccy = (cap_currency or "").strip().upper() or None
+    has_cap = cap_amount is not None
+    by_currency = committed.get("by_currency") or {}
+    has_spend = bool(committed.get("has_spend")) and bool(by_currency)
+    out: Dict[str, Any] = {
+        "has_cap": has_cap,
+        "has_spend": has_spend,
+        "cap_amount": str(cap_amount) if cap_amount is not None else None,
+        "cap_currency": cap_ccy,
+        "committed_by_currency": dict(by_currency),
+        "comparable": False,
+        "remaining": None,
+        "remaining_currency": None,
+    }
+    if not has_cap:
+        return out
+    spent = None
+    if cap_ccy and cap_ccy in by_currency:
+        spent = _to_decimal(by_currency[cap_ccy])
+    elif has_spend and len(by_currency) == 1:
+        only_ccy = next(iter(by_currency))
+        if only_ccy != cap_ccy:
+            return out
+        spent = _to_decimal(by_currency[only_ccy])
+    elif not has_spend:
+        spent = Decimal("0")
+    if spent is None or cap_amount is None:
+        return out
+    remaining = Decimal(str(cap_amount)) - spent
+    out["comparable"] = True
+    out["remaining"] = str(remaining)
+    out["remaining_currency"] = cap_ccy
+    return out
+

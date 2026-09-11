@@ -391,6 +391,45 @@ def _bank() -> List[ServiceQuestionDef]:
             placeholder="e.g. large breed, medical needs, quarantine questions",
             criteria_key="specific_needs",
         ),
+        # Spouse / partner career — same option values as intake.
+        ServiceQuestionDef(
+            question_key="spouse_employment",
+            label="Partner employment status",
+            type="select",
+            service_category="spouse",
+            options=[
+                QuestionOption(value="Working", label="Working"),
+                QuestionOption(value="Not working", label="Not working"),
+                QuestionOption(value="Student", label="Student"),
+            ],
+            default="Working",
+            prefill_source="case.familyMembers.spouse.employment",
+            criteria_key="employment",
+        ),
+        ServiceQuestionDef(
+            question_key="spouse_language",
+            label="Partner language level at destination",
+            type="select",
+            service_category="spouse",
+            options=[
+                QuestionOption(value="Fluent", label="Fluent"),
+                QuestionOption(value="Conversational", label="Conversational"),
+                QuestionOption(value="Beginner", label="Beginner"),
+                QuestionOption(value="None", label="None"),
+            ],
+            default="Beginner",
+            prefill_source="case.familyMembers.spouse.languageLevel",
+            criteria_key="language_level",
+        ),
+        ServiceQuestionDef(
+            question_key="spouse_wants_to_work",
+            label="Partner wants to work or look for work at destination",
+            type="checkbox",
+            service_category="spouse",
+            default=True,
+            prefill_source="case.familyMembers.spouse.wantsToWork",
+            criteria_key="wants_to_work",
+        ),
     ]
 
 
