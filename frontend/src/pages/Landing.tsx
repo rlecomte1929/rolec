@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { PublicLayout } from '../components/public';
 import {
   Section,
@@ -10,14 +11,15 @@ import {
   CTAButton,
   TrustDifferentiation,
   FadeIn,
+  ValueCreationSection,
 } from '../components/marketing';
 import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { useDemoBooking } from '../hooks/useDemoBooking';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { emitMarketingEvent, readUtm } from '../analytics';
-import { landingContent } from './landing/landingContent';
 import { imgDimensions } from '../lib/publicImageDimensions';
+import { landingContent } from './landing/landingContent';
 
 let landingViewEmitted = false;
 
@@ -92,6 +94,18 @@ export const Landing: React.FC = () => {
 
   const { open: openDemoBooking } = useDemoBooking();
   const c = landingContent;
+  const location = useLocation();
+
+  // "Value" header tab links to /#value; scroll the section into view when the
+  // hash is present (on fresh load and on same-page hash navigation). The
+  // section carries scroll-mt so it lands below the sticky header.
+  useEffect(() => {
+    if (location.hash !== '#value') return;
+    const el = document.getElementById('value');
+    if (!el) return;
+    const raf = requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    return () => cancelAnimationFrame(raf);
+  }, [location.hash]);
 
   useEffect(() => {
     // Module-scoped, not a ref: Landing remounts on a NotFoundRedirect bounce and under
@@ -249,6 +263,21 @@ export const Landing: React.FC = () => {
           />
           </div>
         </FadeIn>
+      </Section>
+
+      {/* 4b. VALUE CREATION: interactive "Both Sides of the Move" walkthrough.
+          Anchor target for the header "Value" tab (Landing scrolls to #value). */}
+      <Section id="value" spacing="lg" background="transparent" className="scroll-mt-24">
+        <FadeIn>
+          <SectionHeader
+            eyebrow="Value creation"
+            title="The value ReloPass creates — for HR and for the employee"
+            align="center"
+          />
+        </FadeIn>
+        <div className="mt-10 sm:mt-12">
+          <ValueCreationSection />
+        </div>
       </Section>
 
       {/* 5. FINAL CTA: Centered, compact, decisive.
