@@ -7,12 +7,12 @@ import { Button } from '../../../components/antigravity/Button';
 import { CountrySelect } from '../../../components/antigravity/CountrySelect';
 import type { CompanyProfilePayload } from '../../../types';
 import { Breadcrumb } from '../../../components/Breadcrumb';
-import { useCompanyProfileForm } from './useCompanyProfileForm';
-import type { SectionKey } from './useCompanyProfileForm';
 // Country of incorporation is an identity field → full ISO list. The default
 // destination is a relocation destination → restricted list (AIQ-1341).
 import { COUNTRY_OPTIONS } from '../../policy-config/countryList';
 import { DESTINATION_COUNTRIES } from '../../../utils/countries';
+import { useCompanyProfileForm } from './useCompanyProfileForm';
+import type { SectionKey } from './useCompanyProfileForm';
 
 const INDUSTRIES = [
   'Technology', 'Financial Services', 'Professional Services',
@@ -296,9 +296,9 @@ export function CompanyProfileForm({
                   render={({ field }) => (
                     <Input unstyled
                       value={field.value}
-                      onChange={(v) => field.onChange(v.replace(/^https?:\/\//, ''))}
+                      onChange={(v) => field.onChange(v.replace(/^https?:\/\//i, '').replace(/^\s+/, ''))}
                       onBlur={field.onBlur}
-                      className={`${inputCx} pl-[60px]`}
+                      className={`${inputCx} pl-[4.5rem]`}
                       placeholder="aurora-energy.com"
                     />
                   )}

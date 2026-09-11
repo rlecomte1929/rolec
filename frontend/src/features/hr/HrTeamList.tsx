@@ -559,7 +559,7 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, on
                                 </>
                               ) : (
                                 <>
-                                  <p className="text-xs font-mono text-gray-500 truncate">{emp.profile_id.slice(0, 20)}…</p>
+                                  <p className="text-sm font-medium text-[#0b2b43]">Name not on file</p>
                                   <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] rounded bg-[#FAEEDA] text-[#854F0B]">Profile pending</span>
                                 </>
                               )}

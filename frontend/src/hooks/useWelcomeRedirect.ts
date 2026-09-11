@@ -23,9 +23,12 @@ export function useWelcomeRedirect(welcomeRoute: string, opts?: { skip?: boolean
   const navigate = useNavigate();
   const skip = opts?.skip ?? false;
   useEffect(() => {
-    if (skip) return;
+    if (skip) {
+      return;
+    }
     const userId = getAuthItem('relopass_user_id') ?? '';
-    if (userId && !hasSeenWelcome(userId)) {
+    const seen = userId ? hasSeenWelcome(userId) : false;
+    if (userId && !seen) {
       navigate(welcomeRoute, { replace: true });
     }
     // navigate + welcomeRoute are stable (react-router + constant literal),

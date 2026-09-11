@@ -63,7 +63,6 @@ export const HrDashboard: React.FC = () => {
   // effect deps) → bounce the first-login HR to /hr/welcome after all. A latched value keeps
   // `skip` stable for the whole mount, so the redirect stays suppressed.
   const [wantsNewCase] = useState(() => new URLSearchParams(window.location.search).get('new') === '1');
-  useWelcomeRedirect('/hr/welcome', { skip: wantsNewCase });
   const { setSelectedCaseId } = useSelectedCase();
   // AIQ-1223e: A/B arm for inference-based onboarding. 'inferred' shows the
   // suggested-setup surface; anything else (control / error / disabled) keeps
@@ -175,6 +174,12 @@ export const HrDashboard: React.FC = () => {
     { search: searchDebounced, status: appliedStatus, destination: appliedDestination },
     routePerfStartedAt,
   );
+
+  // An HR tenant that already has cases is not first-login: do not replace-redirect
+  // /hr/dashboard → /hr/welcome. Skip while the list is still loading so a cold
+  // fetch cannot bounce them before total is known (AIQ-1590 latch pattern).
+  const skipWelcome = wantsNewCase || isLoading || assignmentsError || total > 0;
+  useWelcomeRedirect('/hr/welcome', { skip: skipWelcome });
 
   // Parity with the old loadAssignments, which cleared any transient mutation/
   // validation error at the start of every fetch.

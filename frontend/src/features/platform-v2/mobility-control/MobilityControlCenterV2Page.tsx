@@ -381,6 +381,14 @@ export function MobilityControlCenterV2Page() {
   // filtered-but-non-empty result (that keeps the plain table string).
   const noCasesYet = !loading && cases.length === 0;
 
+  const healthQuery = useQuery({
+    queryKey: ['hr', 'case-health'],
+    queryFn: ({ signal }) => hrAPI.getCaseHealth({ signal }),
+    staleTime: 60_000,
+  });
+  const behindCases = useMemo(() => healthQuery.data?.cases ?? [], [healthQuery.data?.cases]);
+  const behindCount = healthQuery.data ? behindCases.length : null;
+
   // Parker-J: classical data-to-text exec summary (LLM-free, env-flag gated
   // server-side). Dependent on the resolved companyId. Null = provider deferred
   // to LLM (env flag) or unavailable.
@@ -424,15 +432,36 @@ export function MobilityControlCenterV2Page() {
   // is active, recompute them from the filtered rows so the whole dashboard stays
   // coherent; with no filter, fall back to the backend KPIs.
   const displayKpis = useMemo(() => {
-    if (!filterActive) return kpis;
-    const completed = filteredCases.filter((c) => COMPLETED_STATUSES.has((c.status ?? '').toLowerCase())).length;
+    const behindIds = new Set(behindCases.map((c) => c.case_id));
+    const rowIsAtRisk = (c: CommandCenterCaseRow) =>
+      c.riskStatus === 'red' ||
+      c.riskStatus === 'yellow' ||
+      behindIds.has(c.caseId || '') ||
+      behindIds.has(c.id);
+
+    if (filterActive) {
+      const completed = filteredCases.filter((c) => COMPLETED_STATUSES.has((c.status ?? '').toLowerCase())).length;
+      return {
+        activeCases: filteredCases.length - completed,
+        atRiskCount: filteredCases.filter(rowIsAtRisk).length,
+        completedCount: completed,
+        budgetOverrunsCount: filteredCases.filter((c) => (c.budgetEstimated ?? 0) > (c.budgetLimit ?? 0) && (c.budgetLimit ?? 0) > 0).length,
+      };
+    }
+    if (!kpis) {
+      if (behindCount == null) return kpis;
+      return {
+        activeCases: 0,
+        atRiskCount: behindCount,
+        completedCount: 0,
+        budgetOverrunsCount: 0,
+      };
+    }
     return {
-      activeCases: filteredCases.length - completed,
-      atRiskCount: filteredCases.filter((c) => c.riskStatus === 'red' || c.riskStatus === 'yellow').length,
-      completedCount: completed,
-      budgetOverrunsCount: filteredCases.filter((c) => (c.budgetEstimated ?? 0) > (c.budgetLimit ?? 0) && (c.budgetLimit ?? 0) > 0).length,
+      ...kpis,
+      atRiskCount: Math.max(kpis.atRiskCount, behindCount ?? 0),
     };
-  }, [filterActive, kpis, filteredCases]);
+  }, [filterActive, kpis, filteredCases, behindCases, behindCount]);
 
   // ── Derived sidebar data ──────────────────────────────────────────────────
   // Aggregate the (filtered) case list into a corridor histogram keyed by
@@ -453,17 +482,33 @@ export function MobilityControlCenterV2Page() {
   }, [filteredCases]);
 
   const riskFeed = useMemo(() => {
-    return filteredCases
-      .filter((c) => c.riskStatus && c.riskStatus !== 'green')
+    const behindIds = new Set(behindCases.map((c) => c.case_id));
+    const fromCases = filteredCases
+      .filter(
+        (c) =>
+          (c.riskStatus && c.riskStatus !== 'green') ||
+          behindIds.has(c.caseId || '') ||
+          behindIds.has(c.id),
+      )
       .sort((a, b) => {
-        // red first, then yellow
         if (a.riskStatus === b.riskStatus) return 0;
         if (a.riskStatus === 'red') return -1;
         if (b.riskStatus === 'red') return 1;
         return 0;
       })
       .slice(0, 5);
-  }, [filteredCases]);
+    if (fromCases.length > 0) return fromCases;
+    // Cases endpoint can fail while behind-schedule still loads (partial dashboard).
+    return behindCases.slice(0, 5).map((c) => ({
+      id: c.case_id,
+      caseId: c.case_id,
+      employeeIdentifier: c.milestone_title || c.stage || 'Behind schedule',
+      status: 'behind',
+      riskStatus: c.severity === 'critical' ? 'red' : 'yellow',
+      tasksDonePercent: 0,
+      updatedAt: null,
+    }));
+  }, [filteredCases, behindCases]);
 
   // AIQ-1109: "Mobility spend" is the sum of each active case's ESTIMATED
   // relocation budget (`budgetEstimated`), shown against the total policy budget
@@ -678,9 +723,9 @@ export function MobilityControlCenterV2Page() {
           <Kpi
             label="At risk"
             value={displayKpis?.atRiskCount ?? (loading ? '…' : 0)}
-            sub="Delayed by 5+ days"
+            sub="Behind a milestone due date"
             tone="warning"
-            title="Flagged when a provider task is more than 5 days past its due date."
+            title="Cases past a milestone target date, plus assignments flagged red or yellow."
             progress={displayKpis?.activeCases ? Math.min(100, ((displayKpis.atRiskCount ?? 0) / displayKpis.activeCases) * 100) : 0}
           />
           <Kpi

@@ -29,6 +29,11 @@ const SECTION_FIELDS: Record<SectionKey, (keyof CompanyProfileFormValues)[]> = {
   branding: [],
 };
 
+/** Host-only website: strip protocol and surrounding space for the https:// overlay. */
+export function sanitizeWebsiteHost(value: string): string {
+  return value.trim().replace(/^https?:\/\//i, '').trim();
+}
+
 export function emptyValues(): CompanyProfileFormValues {
   return {
     name: '', legal_name: '', industry: '', size_band: '', website: '',
@@ -50,7 +55,7 @@ export function valuesFromCompany(company: Record<string, unknown> | null): Comp
     legal_name:                  pick('legal_name', 'legalName'),
     industry:                    pick('industry', 'industry'),
     size_band:                   pick('size_band', 'sizeBand'),
-    website:                     pick('website', 'website'),
+    website:                     sanitizeWebsiteHost(pick('website', 'website')),
     country:                     pick('country', 'country'),
     hq_city:                     pick('hq_city', 'hqCity'),
     address:                     pick('address', 'address'),
@@ -70,7 +75,7 @@ export function valuesToPayload(values: CompanyProfileFormValues): CompanyProfil
     legal_name:                  opt(values.legal_name),
     industry:                    opt(values.industry),
     size_band:                   opt(values.size_band),
-    website:                     opt(values.website),
+    website:                     opt(sanitizeWebsiteHost(values.website)),
     country:                     opt(values.country),
     hq_city:                     opt(values.hq_city),
     address:                     opt(values.address),

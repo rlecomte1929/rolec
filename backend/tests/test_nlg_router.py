@@ -109,6 +109,24 @@ def test_load_company_kpis_builds_nonempty_set(monkeypatch):
     assert "Active cases" in summary
 
 
+def test_load_company_kpis_uses_behind_schedule_when_risk_flags_are_zero(monkeypatch):
+    monkeypatch.setattr(
+        nlg.db, "get_command_center_kpis",
+        lambda company_id=None, hr_user_id=None: {
+            "activeCases": 30, "atRiskCount": 0,
+            "attentionNeededCount": 0, "completedCount": 0,
+        },
+    )
+    monkeypatch.setattr(
+        "backend.app.services.case_health_scan.list_behind_cases_for_company",
+        lambda company_id: [{"case_id": "a"}, {"case_id": "b"}, {"case_id": "c"}],
+    )
+    kpis = nlg.load_company_kpis("co-1")
+    labels = {k.label: k.current for k in kpis.kpis}
+    assert labels["At-risk cases"] == 3
+    assert labels["Cases needing attention"] == 3
+
+
 def test_load_company_kpis_failure_is_safe(monkeypatch):
     """A failure in the aggregator degrades to an empty set, never raises."""
     def _boom(*a, **k):

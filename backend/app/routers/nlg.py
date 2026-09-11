@@ -75,10 +75,23 @@ def load_company_kpis(company_id: str) -> d2t.KPISet:
     kpis = []
     try:
         agg = db.get_command_center_kpis(company_id=company_id) or {}
+        behind_n = 0
+        try:
+            from ..services.case_health_scan import list_behind_cases_for_company
+
+            behind_n = len(list_behind_cases_for_company(company_id) or [])
+        except Exception:
+            logger.warning(
+                "exec-summary behind-schedule count failed for company_id=%s",
+                company_id,
+                exc_info=True,
+            )
+        at_risk = max(int(agg.get("atRiskCount") or 0), behind_n)
+        attention = max(int(agg.get("attentionNeededCount") or 0), behind_n)
         kpi_specs = (
             ("active_cases", "Active cases", agg.get("activeCases")),
-            ("at_risk", "At-risk cases", agg.get("atRiskCount")),
-            ("attention_needed", "Cases needing attention", agg.get("attentionNeededCount")),
+            ("at_risk", "At-risk cases", at_risk),
+            ("attention_needed", "Cases needing attention", attention),
             ("completed_ytd", "Completed this year", agg.get("completedCount")),
         )
         for key, label, value in kpi_specs:
