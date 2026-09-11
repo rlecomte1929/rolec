@@ -1,0 +1,70 @@
+{
+  "_meta": {
+    "table": "public.form_field_mappings",
+    "purpose": "Expected field-mapping content per real government form. The nightly seed/prod parity guard (scripts/check_seed_prod_parity.py) asserts PROD holds exactly this set of (field_kind, form_field_id) rows per form, failing on MISSING (a seed migration that never applied) or STALE (superseded rows a re-seed migration should have replaced) entries.",
+    "why": "Form-fill seed migrations are merged to the repo but applied to prod out-of-band (no apply-on-merge; the applier is jammed). Three merged form-fill migrations silently never reached prod for months — FR served stale fictional field ids, ES had none — and nothing caught it: the fill tests use fixtures, the ledger isn't reconciled, and a row-COUNT check passes on stale data. This manifest is the source of truth the guard compares live prod against.",
+    "de_caveat": "DE_blue_card_v2024's field ids are the current prod baseline; their correctness against a real DE AcroForm is separately UNVERIFIED. The guard checks presence/stability (that these rows exist and none silently change), not fidelity to a real PDF.",
+    "maintenance": "When a form's field mappings change via a migration, update this manifest in the SAME PR so the nightly guard reflects the new intended state."
+  },
+  "form_field_mappings": {
+    "FR_cerfa_14571_v2024": {
+      "text": [
+        "applicantSurname",
+        "applicantFirstname",
+        "applicantDateOfBirth",
+        "applicantPlaceOfBirth",
+        "applicantNationality",
+        "travelDocNumber",
+        "travelDocDateOfIssue",
+        "travelDocValidUntil",
+        "applicantOccupation"
+      ],
+      "checkbox_option": [
+        "applicantGenderM",
+        "applicantGenderF",
+        "applicantGenderOther",
+        "applicantMaritalCEL",
+        "applicantMaritalMAR",
+        "applicantMaritalSEP",
+        "applicantMaritalDIV",
+        "applicantMaritalVEU",
+        "applicantMaritalAUT"
+      ]
+    },
+    "ES_ex17_v2024": {
+      "text": [
+        "1er Apellido",
+        "Nombre",
+        "PASAPORTE",
+        "Nacionalidad",
+        "Lugar",
+        "Dia_Nacimiento",
+        "Mes_Nacimiento",
+        "Año_Nacimiento"
+      ],
+      "single_radio": [
+        "Sexo",
+        "Estado Civil"
+      ]
+    },
+    "DE_blue_card_v2024": {
+      "text": [
+        "date_of_birth",
+        "employer_name",
+        "employment_start_date",
+        "family_name",
+        "gender",
+        "given_names",
+        "gross_annual_salary",
+        "job_title",
+        "marital_status",
+        "nationality",
+        "passport_country",
+        "passport_expiry",
+        "passport_issue_date",
+        "passport_number",
+        "place_of_birth"
+      ]
+    }
+  }
+}

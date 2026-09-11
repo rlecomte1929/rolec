@@ -245,7 +245,7 @@ class EmployeeFormPrefillTest(unittest.TestCase):
                 patch(f"{_FORMS_MOD}._log_access"):
             resp = self.client.post(
                 "/api/employee/cases/case-a/immigration/generate-form",
-                json={"form_id": "blue_card_fill"},
+                json={"form_id": "FR_cerfa_14571_v2024"},
             )
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
@@ -253,6 +253,25 @@ class EmployeeFormPrefillTest(unittest.TestCase):
         self.assertEqual(body["fill_report"]["filled_count"], 2)
         # The vault is loaded scoped to the CALLER's own id, never the path.
         mock_profile.assert_called_once_with("case-a", "user-emp")
+
+    def test_generate_rejects_a_non_fillable_form(self) -> None:
+        # Defense in depth: even past ownership + consent + profile, a direct POST naming a
+        # synthetic/non-fillable form (DE_blue_card_v2024 has no real PDF) must 404 without
+        # decrypting the passport or generating anything.
+        with patch(f"{_FORMS_MOD}.require_case_access", return_value={}), \
+                patch(f"{_FORMS_MOD}._check_consent", return_value=True), \
+                patch(f"{_FORMS_MOD}._load_profile_for_case_employee",
+                      return_value={"id": "prof-1"}), \
+                patch(f"{_FORMS_MOD}._decrypt_passport") as mock_decrypt, \
+                patch(f"{_FORMS_MOD}.generate_prefilled_pdf") as mock_gen:
+            resp = self.client.post(
+                "/api/employee/cases/case-a/immigration/generate-form",
+                json={"form_id": "DE_blue_card_v2024"},
+            )
+        self.assertEqual(resp.status_code, 404)
+        self.assertIn("not available", resp.json()["detail"].lower())
+        mock_gen.assert_not_called()      # never reached the fill for a synthetic form
+        mock_decrypt.assert_not_called()  # and never decrypted the passport for it
 
 
 if __name__ == "__main__":
