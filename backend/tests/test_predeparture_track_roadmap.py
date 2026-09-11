@@ -92,5 +92,48 @@ class PredepartureTrackTests(unittest.TestCase):
         self.assertIn("predep-review", generic_keys, "the planning step is never superseded")
 
 
+def _dep_req(id, title, desc="Do the thing.", non_obvious=True, pillar="IDENTITY", timing=None):
+    return {"id": id, "pillar": pillar, "title": title, "description": desc, "non_obvious": non_obvious, "timing": timing}
+
+
+class DepartureRequirementsInjectionTests(unittest.TestCase):
+    """derive_roadmap(..., departure_requirements=...) — the Andrea (ES→IE) content path.
+
+    Uses fixtures, so it exercises the injection without a DB (the DB read lives in the
+    endpoints, not derive_roadmap).
+    """
+
+    def test_origin_requirements_supersede_generic_and_appear(self) -> None:
+        reqs = [
+            _dep_req("es-baja-padron", "Baja del padrón"),
+            _dep_req("es-aeat-exit", "AEAT tax exit", non_obvious=False, pillar="EMPLOYMENT"),
+        ]
+        predep = _predep(derive_roadmap(_case(origin="ES", dest="IE"), departure_requirements=reqs))
+        keys = {s["key"] for s in predep["steps"]}
+        self.assertIn("origin-req-es-baja-padron", keys)
+        self.assertIn("origin-req-es-aeat-exit", keys)
+        for gone in ("predep-tax", "predep-deregister", "predep-social", "predep-financial"):
+            self.assertNotIn(gone, keys, f"{gone} placeholder should be superseded by real requirements")
+        self.assertIn("predep-review", keys, "the planning step is never superseded")
+        baja = next(s for s in predep["steps"] if s["key"] == "origin-req-es-baja-padron")
+        self.assertTrue(baja["nonObvious"])
+        self.assertEqual(baja["status"], "locked")
+        self.assertEqual(baja["owner"], "You")
+
+    def test_pathway_authored_exit_steps_win_over_requirement_items(self) -> None:
+        # NO→FR authors its own exit steps; injected requirement_items must not double-serve.
+        reqs = [_dep_req("no-folkereg", "Report move to Folkeregisteret")]
+        predep = _predep(derive_roadmap(_case(origin="NO", dest="FR", nationality="FR"), departure_requirements=reqs))
+        keys = {s["key"] for s in predep["steps"]}
+        self.assertNotIn("origin-req-no-folkereg", keys, "pathway wins; requirement_items skipped")
+        self.assertIn("corridor-a1_folkeregister", keys, "authored pathway steps remain")
+
+    def test_no_departure_requirements_keeps_generic_skeleton(self) -> None:
+        for reqs in (None, []):
+            keys = {s["key"] for s in _predep(derive_roadmap(_case(origin="ES", dest="IE"), departure_requirements=reqs))["steps"]}
+            self.assertIn("predep-tax", keys)
+            self.assertIn("predep-deregister", keys)
+
+
 if __name__ == "__main__":
     unittest.main()

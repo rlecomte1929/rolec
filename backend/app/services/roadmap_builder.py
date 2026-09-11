@@ -681,10 +681,19 @@ def _predeparture_track_applies(draft: Dict[str, Any]) -> bool:
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
-def derive_roadmap(case: Dict[str, Any]) -> Dict[str, Any]:
+def derive_roadmap(
+    case: Dict[str, Any],
+    *,
+    departure_requirements: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     """
     Pure function: takes a wizard case dict (same shape as GET /api/cases/{id})
     and returns a RoadmapResponse dict.
+
+    ``departure_requirements`` (optional) are approved origin-country requirement
+    records — see ``departure_requirements.departure_requirement_records`` — injected by
+    DB-having callers to enrich the pre-departure track. Left ``None`` in the pure unit
+    tests, which run without a database.
 
     Equivalent to ``window.PATHWAY_V2.deriveTimeline`` in the frontend prototype.
     """
@@ -745,6 +754,14 @@ def derive_roadmap(case: Dict[str, Any]) -> Dict[str, Any]:
         advisories = overlay["advisories"]
         # The authored critical path beats a guess keyed off the destination country.
         time_estimate = overlay["time_estimate"]
+
+    # Origin-country exit requirements (approved requirement_items) enrich the
+    # pre-departure track. Runs AFTER the corridor overlay so it can defer to a pathway
+    # that authored its own home-exit steps (NO→FR) and only fills the gap for corridors
+    # that did not (ES→IE). None keeps derive_roadmap DB-free for the pure unit tests.
+    if departure_requirements:
+        origin_country = basics.get("originCountry") or basics.get("origin_country") or "home country"
+        _apply_departure_requirements(tracks, departure_requirements, origin_country)
 
     return {
         "totals": {
@@ -816,6 +833,54 @@ def _apply_corridor_overlay(
             "nonObvious": bool(step.get("non_obvious")),
             "nonObviousNote": step.get("non_obvious_note") or None,
             "provenance": step["provenance"],
+        })
+
+
+def _apply_departure_requirements(
+    tracks: List[Dict[str, Any]],
+    departure_requirements: List[Dict[str, Any]],
+    origin_country: str,
+) -> None:
+    """Inject approved home-country exit requirements into the pre-departure track.
+
+    They replace the generic home-exit placeholders (predep-tax / -deregister / -social /
+    -financial) the way an authored corridor step does — real, reviewed obligations
+    supersede the scaffold; the planning step (predep-review) stays.
+
+    **The pathway wins.** If the corridor already authored its own origin-exit steps —
+    the overlay leaves them as ``corridor-`` keys in this track (NO→FR's Folkeregister /
+    folketrygden block) — those are the richer, sequenced source and these
+    requirement_items would only duplicate them, so injection is skipped. This is the
+    fallback source for corridors whose pathway authored no home-exit steps (ES→IE).
+    """
+    predep = next((t for t in tracks if t.get("id") == "predeparture"), None)
+    if predep is None or not departure_requirements:
+        return
+    if any(str(s.get("key", "")).startswith("corridor-") for s in predep.get("steps", [])):
+        return  # the corridor's own authored exit steps win; don't double-serve
+
+    generic_exit = {"predep-tax", "predep-deregister", "predep-social", "predep-financial"}
+    predep["steps"] = [s for s in predep.get("steps", []) if s.get("key") not in generic_exit]
+
+    for req in departure_requirements:
+        existing = predep["steps"]
+        existing.append({
+            "n": len(existing) + 1,
+            "key": f"origin-req-{str(req['id']).lower()}",
+            "title": req["title"],
+            "status": "locked",
+            "owner": "You",
+            "where": f"{origin_country} authorities",
+            "time": req.get("timing") or None,
+            "cost": None,
+            "depends": "Departure planning",
+            "line": req.get("description") or req["title"],
+            "subs": [],
+            "nonObvious": bool(req.get("non_obvious")),
+            "nonObviousNote": None,
+            # Origin requirement_items are REPRESENTATIVE and reviewed but not
+            # counsel-assured; that must survive to the UI, as the corridor overlay's does.
+            "provenance": {"origin_requirements": True, "verification": "representative"},
         })
 
 
