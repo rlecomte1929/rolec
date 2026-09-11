@@ -28,6 +28,7 @@ export interface DutyOfCareCase {
   case_id: string;
   company_id: string | null;
   employee_id: string | null;
+  employee_name: string | null;
   host_country: string | null;
   home_country: string | null;
   expected_start_date: string | null;

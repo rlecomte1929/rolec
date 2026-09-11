@@ -7,7 +7,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Vite fallback ports 3002–3005 for local dev.
+# Vite fallback ports 3001–3010 for local dev (a second checkout often lands on 3010).
 _DEFAULT_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
@@ -15,6 +15,11 @@ _DEFAULT_ORIGINS = [
     "http://localhost:3003",
     "http://localhost:3004",
     "http://localhost:3005",
+    "http://localhost:3006",
+    "http://localhost:3007",
+    "http://localhost:3008",
+    "http://localhost:3009",
+    "http://localhost:3010",
     "http://localhost:5173",
     "https://relopass.com",
     "https://www.relopass.com",

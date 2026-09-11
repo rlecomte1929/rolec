@@ -21,6 +21,7 @@ class DutyOfCareCase(BaseModel):
     case_id: str
     company_id: Optional[str] = None
     employee_id: Optional[str] = None
+    employee_name: Optional[str] = None
     host_country: Optional[str] = None
     home_country: Optional[str] = None
     expected_start_date: Optional[str] = None

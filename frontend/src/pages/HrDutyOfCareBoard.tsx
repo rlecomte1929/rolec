@@ -52,6 +52,9 @@ export function HrDutyOfCareBoard() {
   });
 
   const cases = q.data?.cases ?? [];
+  const allUnknown =
+    cases.length > 0 &&
+    cases.every((row) => row.overall === 'unknown' && isUntracked(row.permit.status));
 
   return (
     <AppShell
@@ -62,6 +65,12 @@ export function HrDutyOfCareBoard() {
       {q.isError && (
         <Alert variant="error" title="Could not load the board" className="mb-4">
           Try again. The board is company-scoped on the server; a failure here is not an all-clear.
+        </Alert>
+      )}
+      {allUnknown && (
+        <Alert variant="info" title="No tracked permit or checklist data yet" className="mb-4">
+          Unknown means ReloPass has not recorded that signal for the case — it is not an all-clear.
+          A1, medical, and insurance are not tracked in this version.
         </Alert>
       )}
 
@@ -104,7 +113,7 @@ export function HrDutyOfCareBoard() {
                         className="font-medium text-[#0b2b43] underline-offset-2 hover:underline"
                         to={buildRoute('hrCaseSummary', { caseId: row.case_id })}
                       >
-                        {row.employee_id || row.case_id}
+                        {row.employee_name || row.employee_id || row.case_id}
                       </Link>
                       <div className="text-xs text-slate-500">
                         {[row.home_country, row.host_country].filter(Boolean).join(' → ')}

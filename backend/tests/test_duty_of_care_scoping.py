@@ -43,6 +43,15 @@ CREATE TABLE relocation_cases (
     status TEXT,
     archived_at TEXT
 );
+CREATE TABLE case_assignments (
+    id TEXT PRIMARY KEY,
+    case_id TEXT,
+    canonical_case_id TEXT,
+    employee_identifier TEXT,
+    employee_first_name TEXT,
+    employee_last_name TEXT,
+    expected_start_date TEXT
+);
 CREATE TABLE immigration_cases (
     id TEXT PRIMARY KEY,
     case_id TEXT,
@@ -166,6 +175,15 @@ def _seed_two_companies(conn):
             "('imm-b', 'case-b', 'work_permit', 'granted', '2026-09-01')"
         )
     )
+    conn.execute(
+        text(
+            "INSERT INTO case_assignments "
+            "(id, case_id, canonical_case_id, employee_identifier, "
+            " employee_first_name, employee_last_name, expected_start_date) VALUES "
+            "('asg-a', 'case-a', 'case-a', 'a@co-a.com', 'Ada', 'Alpha', NULL),"
+            "('asg-b', 'case-b', 'case-b', 'b@co-b.com', 'Bea', 'Beta', NULL)"
+        )
+    )
 
 
 class TestCompanyScopingSql:
@@ -185,6 +203,8 @@ class TestCompanyScopingSql:
         assert "case-b" not in ids_a
         assert ids_b == {"case-b"}
         assert "case-a" not in ids_b
+        assert rows_a[0]["employee_name"] == "Ada Alpha"
+        assert rows_b[0]["employee_name"] == "Bea Beta"
 
 
 @pytest.fixture

@@ -27,7 +27,37 @@ _BOARD_SQL = text(
         rc.employee_id           AS employee_id,
         rc.host_country          AS host_country,
         rc.home_country           AS home_country,
-        rc.expected_start_date    AS expected_start_date,
+        COALESCE(
+            rc.expected_start_date,
+            (
+                SELECT ca.expected_start_date
+                  FROM case_assignments ca
+                 WHERE CAST(
+                           COALESCE(NULLIF(TRIM(ca.canonical_case_id), ''), ca.case_id)
+                           AS TEXT
+                       ) = CAST(rc.id AS TEXT)
+                 LIMIT 1
+            )
+        ) AS expected_start_date,
+        (
+            SELECT COALESCE(
+                NULLIF(
+                    TRIM(
+                        COALESCE(ca.employee_first_name, '')
+                        || ' '
+                        || COALESCE(ca.employee_last_name, '')
+                    ),
+                    ''
+                ),
+                NULLIF(TRIM(ca.employee_identifier), '')
+            )
+              FROM case_assignments ca
+             WHERE CAST(
+                       COALESCE(NULLIF(TRIM(ca.canonical_case_id), ''), ca.case_id)
+                       AS TEXT
+                   ) = CAST(rc.id AS TEXT)
+             LIMIT 1
+        ) AS employee_name,
         rc.status                AS status,
         ic.permit_expiry_date     AS permit_expiry_date,
         ic.permit_type            AS permit_type,
@@ -37,7 +67,8 @@ _BOARD_SQL = text(
         COALESCE(ck.item_count, 0) AS checklist_item_count,
         COALESCE(ck.completed_count, 0) AS checklist_completed_count
     FROM relocation_cases rc
-    LEFT JOIN immigration_cases ic ON ic.case_id = rc.id
+    LEFT JOIN immigration_cases ic
+           ON CAST(ic.case_id AS TEXT) = CAST(rc.id AS TEXT)
     LEFT JOIN (
         SELECT a.case_id AS case_id,
                MAX(CASE WHEN r.severity = 'critical' THEN 1 ELSE 0 END)
@@ -46,14 +77,14 @@ _BOARD_SQL = text(
           JOIN compliance_rules r ON r.id = a.rule_id
          WHERE a.status = 'open'
          GROUP BY a.case_id
-    ) al ON al.case_id = rc.id
+    ) al ON CAST(al.case_id AS TEXT) = CAST(rc.id AS TEXT)
     LEFT JOIN (
         SELECT case_id,
                COUNT(*) AS item_count,
                SUM(CASE WHEN completed THEN 1 ELSE 0 END) AS completed_count
           FROM case_requirement_checklist_state
          GROUP BY case_id
-    ) ck ON ck.case_id = rc.id
+    ) ck ON CAST(ck.case_id AS TEXT) = CAST(rc.id AS TEXT)
     WHERE rc.company_id = :company_id
       AND (rc.archived_at IS NULL)
       AND (rc.status IS NULL OR rc.status NOT IN ('closed', 'rejected'))
@@ -205,6 +236,7 @@ def row_to_payload(
     case_id: str,
     company_id: str,
     employee_id: Optional[str],
+    employee_name: Optional[str],
     host_country: Optional[str],
     home_country: Optional[str],
     expected_start: Optional[date],
@@ -214,6 +246,7 @@ def row_to_payload(
         "case_id": str(case_id),
         "company_id": str(company_id) if company_id is not None else None,
         "employee_id": str(employee_id) if employee_id is not None else None,
+        "employee_name": (employee_name or "").strip() or None,
         "host_country": host_country,
         "home_country": home_country,
         "expected_start_date": expected_start.isoformat() if expected_start else None,
@@ -253,6 +286,7 @@ def classify_db_row(raw: Mapping[str, Any], today: date) -> dict[str, Any]:
         case_id=str(raw["case_id"]),
         company_id=str(raw.get("company_id") or ""),
         employee_id=raw.get("employee_id"),
+        employee_name=raw.get("employee_name"),
         host_country=raw.get("host_country"),
         home_country=raw.get("home_country"),
         expected_start=_as_date(raw.get("expected_start_date")),
