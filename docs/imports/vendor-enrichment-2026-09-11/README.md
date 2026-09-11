@@ -121,3 +121,25 @@ throughout. **113 of ~1,166 `vc-*` suppliers now carry a contact_email** (up fro
 register cells (legal / housing / tax — the RFQ-relevant categories) are done. **Only BANKS remain** (deprioritised:
 big institutions, generic/country addresses) — held for a founder banks-vs-pause decision. Movers parked (FIDI, no
 websites to scrape).
+
+## Capitals wave (2026-09-11) — founder call: don't pause, enrich the main capitals
+Founder's direct call (via the relay thread): resume the lane targeting the main-capital countries, RFQ categories
+(legal/housing/tax), skip banks/movers, skip the 7 done cells. **Wave size: 21 cells / ~122 suppliers** (website +
+missing email). Biggest: **Rome IT/housing = 45** (chunked ~15 to avoid a big-batch stall), then CZ/tax 8, GB/tax 6,
+CZ/legal 5, GB/housing 5, DK/tax 5, FI/housing 5, and a 1-4 tail across FI/FR/PT/DK/NL/AT/IE/NO/CZ.
+**New aggregator rule (IT):** an `immobiliare.it` / `idealista.it` / `casa.it` "website" is a PORTAL PROFILE → skip
+(portal contact, not the firm's), same as Pleitex. Firm-OWNED alternate domains (branded gmail, hyphen/short variants,
+brand-office inboxes like Coldwell/E&V) are landed; THIRD-PARTY network domains (REPLAT) are held like portals.
+
+### Batch #8 — IT/housing_agencies contact, chunk 1/3 (`enrich-xx-it-housing-contact-2026-09-11-c1`)
+- Source (GCS): `src/enrich-xx-it-housing-c1-contact.ndjson` (+ `manifest_it-housing-c1-contact.json`). Landing:
+  `src/enrich-xx-it-housing-c1-contact.LANDING.ndjson`. Target: `it-housing-target.csv` (full 45-firm IT/housing list).
+- Otto: **14 attempted / 13 filled**. Keys ⊆ target ✓. Phones +39 E.164.
+- **Verification:** portal rule WORKED — **Erre Emme** (immobiliare.it profile) correctly skipped upstream. 9 emails
+  domain-matched; 360° (`studio360res@gmail.com`, branded gmail) + Boom Rome (`valentino@boom-rome.com`, hyphen variant)
+  + Coldwell Banker (`info@coldwellbanker.it`, brand-office inbox) landed as genuine; Appartamenti Bologna phone-only;
+  Chiusano omitted (no data). **FGIMMOBILIARE email HELD** — `replat45301@replat.com` is a third-party REPLAT network
+  domain (agent-specific but not firm-owned), same bar as portals; its phone was kept.
+- **Landed (fill-empty):** **23 fields across 13 suppliers** — 11 `contact_email` + 12 `contact_phone`. IT/housing_agencies
+  `vc-*` contact-email coverage **→ 11**, phone **→ 12**. 0 overwrites. **Approved-cap tripwire UNCHANGED: 1291.**
+- **Wave running total: 53 `contact_email` + 68 `contact_phone`; 124 of ~1,166 `vc-*` suppliers now carry an email.**

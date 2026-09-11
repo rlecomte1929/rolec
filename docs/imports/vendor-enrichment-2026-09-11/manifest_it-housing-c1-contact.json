@@ -1,0 +1,35 @@
+{
+  "batch_id": "enrich-xx-it-housing-contact-2026-09-11-c1",
+  "generated_at": "2026-09-11",
+  "total_attempted": 14,
+  "total_filled": 13,
+  "skipped": [
+    {
+      "supplier_id": "vc-c3567a49-961a-491e-a7e1-abb4fb39b3bc",
+      "name": "Erre Emme Servizi Immobiliari",
+      "reason": "Portal profile on immobiliare.it — not the firm own domain; contact would be the portal's, not the firm's. No independent website found."
+    }
+  ],
+  "not_filled": [
+    {
+      "supplier_id": "vc-eabd77fd-5c71-490e-8a06-5a0f2dd8f9bb",
+      "name": "Chiusano & C. Immobiliare",
+      "reason": "www.chiusano.it returned no text on 3 fetch attempts (including force=true). Neither email nor phone extracted — row omitted."
+    }
+  ],
+  "partial_rows": [
+    {
+      "supplier_id": "vc-ce67796c-e742-488e-8e6a-102ab6f9c02b",
+      "note": "phone only — no public email found on appartamentibologna.com (contact sub-page 404, homepage phone published without email)"
+    },
+    {
+      "supplier_id": "vc-5d3c6032-1ed2-416a-b715-475b3cefa6a0",
+      "note": "email only — no phone number published on coldwellbanker.it/contatti"
+    }
+  ],
+  "notes": [
+    "vc-1abb20e0: phone recorded verbatim from site as +3908118086858 (081 Naples area code + 8-digit local — unusual length, kept as published)",
+    "vc-90767645: Rome primary office used (info@exclusivere.it, +39063218355); Milan/Naples offices carry separate emails/phones",
+    "vc-bf467bfb: email valentino@boom-rome.com and WhatsApp +393313251961 are the only public contacts on boomrome.com/contact"
+  ]
+}
