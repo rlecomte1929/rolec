@@ -618,21 +618,48 @@ def visa_types_for_corridor(corridor_to: str) -> List[str]:
     return [r["visa_type"] for r in rows]
 
 
-def get_available_forms(corridor_to: str, visa_type: str) -> List[FormDefinition]:
-    """Forms with at least one field mapping for this corridor/visa combination."""
-    with db.engine.begin() as conn:
-        rows = conn.execute(
-            text("""
-                SELECT form_id, form_name, corridor_to, visa_type,
-                       MAX(form_url) AS form_url, COUNT(*) AS field_count
-                FROM public.form_field_mappings
-                WHERE corridor_to = :corridor_to AND visa_type = :visa_type
-                GROUP BY form_id, form_name, corridor_to, visa_type
-                ORDER BY form_name
-            """),
-            {"corridor_to": corridor_to, "visa_type": visa_type},
-        ).mappings().all()
+#: Form ids with a genuine, sourced, fillable government AcroForm behind them — the ONLY
+#: forms offered to users. Synthetic/demo stand-ins carry field mappings but must never be
+#: offered: DE_blue_card_v2024 has no authentic equivalent — Germany's Blue Card process is
+#: online (VIDEX generates a completed PDF as OUTPUT, not a blank fillable input), see
+#: docs/form-autofill/ACROFORM-FEASIBILITY-DE-FR.md — and NO_datasheet_v2026 is the data
+#: sheet, not an AcroForm. Add a form here only once a real fillable PDF has been verified.
+FILLABLE_FORM_IDS: "frozenset[str]" = frozenset({
+    "FR_cerfa_14571_v2024",   # France — CERFA 14571*05 (France-Visas)
+    "ES_ex17_v2024",          # Spain — EX-17 / TIE (PAG F94803)
+})
 
+
+def _available_form_rows(corridor_to: str, visa_type: str) -> List[Dict[str, Any]]:
+    """Aggregate form_field_mappings rows (one per form_id) for a corridor/visa.
+
+    Split out from get_available_forms so the fillable-only filter is unit-testable
+    without a live DB.
+    """
+    with db.engine.begin() as conn:
+        return [
+            dict(r)
+            for r in conn.execute(
+                text("""
+                    SELECT form_id, form_name, corridor_to, visa_type,
+                           MAX(form_url) AS form_url, COUNT(*) AS field_count
+                    FROM public.form_field_mappings
+                    WHERE corridor_to = :corridor_to AND visa_type = :visa_type
+                    GROUP BY form_id, form_name, corridor_to, visa_type
+                    ORDER BY form_name
+                """),
+                {"corridor_to": corridor_to, "visa_type": visa_type},
+            ).mappings().all()
+        ]
+
+
+def get_available_forms(corridor_to: str, visa_type: str) -> List[FormDefinition]:
+    """Fillable forms with at least one field mapping for this corridor/visa combination.
+
+    Only genuinely fillable government AcroForms (``FILLABLE_FORM_IDS``) are offered.
+    Synthetic stand-ins (e.g. ``DE_blue_card_v2024``) and non-fill forms carry mappings but
+    are excluded — a user must never be offered a form there is no real PDF to fill.
+    """
     return [
         FormDefinition(
             form_id=r["form_id"],
@@ -642,7 +669,8 @@ def get_available_forms(corridor_to: str, visa_type: str) -> List[FormDefinition
             field_count=int(r["field_count"]),
             form_url=r["form_url"],
         )
-        for r in rows
+        for r in _available_form_rows(corridor_to, visa_type)
+        if r["form_id"] in FILLABLE_FORM_IDS
     ]
 
 
