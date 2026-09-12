@@ -44,6 +44,12 @@ function openMyReports() {
 }
 
 describe('FeedbackWidget', () => {
+  it('lifts above the consent banner via the shared CSS offset', () => {
+    render(<FeedbackWidget userId="u1" />);
+    const fab = screen.getByLabelText('Give feedback').parentElement;
+    expect(fab?.style.bottom).toContain('--consent-banner-offset');
+  });
+
   it('submits via the backend API (with diagnostics) and shows success', async () => {
     mockSubmit.mockResolvedValue({ ok: true, report_id: 'BUG-x' });
     render(<FeedbackWidget userId="u1" />);

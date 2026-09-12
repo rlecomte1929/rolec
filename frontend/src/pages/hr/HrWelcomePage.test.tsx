@@ -81,7 +81,7 @@ describe('HrWelcomePage — test-drive HR', () => {
   it('the case CTA goes straight to the one real case form', () => {
     signedInAs('hr-a1b2@probe.test');
     renderPage();
-    fireEvent.click(screen.getByTestId('hr-welcome-create-case'));
+    fireEvent.click(screen.getByRole('button', { name: /create your first case/i }));
     // The ?new=1 deep link AIQ-1568 added — the form is local state, so this is the seam.
     expect(mockNavigate).toHaveBeenCalledWith('/hr/dashboard?new=1');
   });
@@ -92,9 +92,9 @@ describe('HrWelcomePage — test-drive HR', () => {
     renderPage();
     expect(screen.getByText(/configure your company/i)).toBeInTheDocument();
     expect(screen.getByText(/build your relocation policy/i)).toBeInTheDocument();
-    expect(screen.getByText(/curate your provider list/i)).toBeInTheDocument();
+    expect(screen.getByText(/curate your service providers/i)).toBeInTheDocument();
     expect(screen.getByText(/optional — the full hr setup/i)).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /get started/i })[2]).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open service providers →' })).toHaveAttribute(
       'href',
       '/hr/service-providers?tab=vendor',
     );
@@ -107,7 +107,7 @@ describe('HrWelcomePage — test-drive HR', () => {
     expect(screen.getByRole('heading', { level: 2, name: /optional — the full hr setup/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: /configure your company/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: /build your relocation policy/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: /curate your provider list/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /curate your service providers/i })).toBeInTheDocument();
     expectNoSkippedHeadingLevel(container);
   });
 
@@ -125,11 +125,59 @@ describe('HrWelcomePage — real HR', () => {
     renderPage();
     expect(screen.getByRole('heading', { name: /set up your company workspace/i })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /open your first relocation case/i })).toBeNull();
-    expect(screen.queryByTestId('hr-welcome-create-case')).toBeNull();
-    expect(screen.getAllByRole('link', { name: /get started/i })[2]).toHaveAttribute(
+    expect(screen.queryByRole('button', { name: /create your first case/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /open the mobility command center/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^open cases$/i })).toBeInTheDocument();
+  });
+
+  it('shows a pending state within the click of an exit', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /open the mobility command center/i }));
+    expect(screen.getByRole('progressbar', { name: /opening page/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /opening/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^open cases$/i })).toBeDisabled();
+  });
+
+  it('sends step 3 to Service Providers vendor curation, not the legacy grid', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    const links = screen.getAllByRole('link');
+    expect(links[2]).toHaveAttribute('href', '/hr/service-providers?tab=vendor');
+    expect(links[2]).toHaveAccessibleName(/service providers/i);
+  });
+
+  it('gives each setup link a unique name that matches the destination H1', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    expect(screen.getByRole('link', { name: 'Open company profile →' })).toHaveAttribute(
+      'href',
+      '/hr/company-profile',
+    );
+    expect(screen.getByRole('link', { name: 'Open policy →' })).toHaveAttribute('href', '/hr/policy');
+    expect(screen.getByRole('link', { name: 'Open service providers →' })).toHaveAttribute(
       'href',
       '/hr/service-providers?tab=vendor',
     );
+    expect(screen.queryAllByRole('link', { name: /get started/i })).toHaveLength(0);
+  });
+
+  it('places the first-case CTA beside the steps from 960px up', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    const layout = screen.getByTestId('hr-welcome-layout');
+    expect(layout.className).toContain('grid-cols-1');
+    expect(layout.className).toContain('min-[960px]:grid-cols-');
+    expect(layout.querySelector('aside')).not.toBeNull();
+    expect(screen.getByRole('heading', { name: /ready to open your first case/i })).toBeInTheDocument();
+  });
+
+  it('emphasizes the Start here card beyond the chip', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    const { container } = renderPage();
+    expect(container.querySelector('.ring-accent-500')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Open company profile →' }).className).toContain('bg-navy-800');
+    expect(screen.getByRole('link', { name: 'Open policy →' }).className).not.toContain('bg-navy-800');
   });
 
   it('puts an h2 above the setup cards so h3 titles do not skip a level', () => {
@@ -139,7 +187,7 @@ describe('HrWelcomePage — real HR', () => {
     expect(screen.getByRole('heading', { level: 2, name: /how it works/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: /configure your company/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: /build your relocation policy/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: /curate your provider list/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /curate your service providers/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: /ready to open your first case/i })).toBeInTheDocument();
     expectNoSkippedHeadingLevel(container);
   });

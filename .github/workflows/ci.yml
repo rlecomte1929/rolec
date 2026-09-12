@@ -127,6 +127,7 @@ jobs:
               - 'backend/seeds/facts/**'
               - 'corridors/**'
               - 'scripts/check_corridor_facts.py'
+              - 'scripts/check_corridor_anchor.py'
               - 'scripts/corridor_facts_allowlist.txt'
               - 'backend/imports/otto/parsers.py'
             # This filter gates FIVE jobs: RLS coverage, Storage bucket, Migration ledger
@@ -757,6 +758,9 @@ jobs:
     # from pytest by scripts/tests/test_check_corridor_facts.py in the backend-tests job,
     # where every check is proven to go red against a planted violation.
     # See backend/seeds/facts/README.md.
+    #
+    # Same job also runs check_corridor_anchor.py (DS-007): YAML-only corridor PRs skip
+    # backend-tests, so demand-pull has to live here. Fail path: scripts/tests.
     name: Corridor fact-pack gate
     needs: changes
     if: needs.changes.outputs.corridor_facts == 'true'
@@ -779,6 +783,11 @@ jobs:
             --root . \
             --run-date "$(date -u +%F)" \
             --json corridor-facts-gate.json
+      # Demand-pull: new corridors/*/corridor.yaml must name a real case. A YAML-only
+      # PR does not run backend-tests, so this job is the PR-time gate. Pytest still
+      # plants the fail path in scripts/tests/test_check_corridor_anchor.py.
+      - name: Check corridor demand-pull anchors
+        run: python scripts/check_corridor_anchor.py --root .
       - name: Upload gate report
         if: always()
         uses: actions/upload-artifact@v7

@@ -39,6 +39,7 @@ from backend.imports.otto.parsers import (
     TIER_AUTO,
     TIER_REVIEW,
     UNOFFICIAL,
+    FactIngestRecord,
     FactRowError,
     classify_source,
     read_jsonl,
@@ -510,6 +511,28 @@ def test_a_missing_required_field_names_the_line_and_the_field(tmp_path):
     path = _write(tmp_path, [_record(), _record(fact_key="", entity_topic_key="other")])
     with pytest.raises(FactRowError, match="line 2.*fact_key"):
         read_jsonl(path, batch_id="b1")
+
+
+def test_applies_to_must_be_an_object(tmp_path):
+    path = _write(tmp_path, [_record(applies_to=["not", "an", "object"])])
+    with pytest.raises(FactRowError, match="applies_to must be an object"):
+        read_jsonl(path, batch_id="b1")
+
+
+def test_ingest_schema_allows_research_extra_keys(tmp_path):
+    """Otto extras (research flags) must not fail the pydantic gate."""
+    path = _write(tmp_path, [_record(needs_lawyer_review=True, researcher_pass=3)])
+    rows, rejections = read_jsonl(path, batch_id="b1")
+    assert rejections == []
+    assert len(rows) == 1
+
+
+def test_source_url_may_be_a_source_records_uuid():
+    """HttpUrl would reject these; live citations include source_records UUIDs."""
+    uid = "a1c9e349-0000-4000-8000-000000000001"
+    parsed = FactIngestRecord.model_validate(_record(source_url=uid))
+    assert parsed.source_url == uid
+
 
 
 def test_malformed_json_stops_the_read_rather_than_importing_the_readable_half(tmp_path):

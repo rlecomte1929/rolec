@@ -20,6 +20,7 @@ import type {
   MoverRecommendation,
 } from '../types';
 import { signOutSupabase } from './supabaseAuth';
+import { SESSION_EXPIRED_HREF, shouldRedirectOnUnauthorized } from './sessionExpired';
 
 // VITE_API_URL:
 //   - Development: leave unset so axios hits same-origin `/api` (Vite proxy → :8000)
@@ -215,8 +216,6 @@ api.interceptors.response.use(
     }
     const status = err?.response?.status;
     const url = err?.config?.url ?? '';
-    const isAuthEndpoint = /\/api\/auth\/(login|register)$/.test(url);
-    const isDebugEndpoint = /\/api\/debug\//.test(url);
 
     // B13 fix: when the API is completely unreachable (network error, DNS failure,
     // or timeout), fire a window event so any mounted banner can surface the error.
@@ -231,7 +230,13 @@ api.interceptors.response.use(
       }
     }
 
-    if (status === 401 && !isAuthEndpoint && !isDebugEndpoint) {
+    if (
+      shouldRedirectOnUnauthorized({
+        status: status ?? 0,
+        requestUrl: url,
+        currentPath: typeof window !== 'undefined' ? window.location.pathname || '' : '',
+      })
+    ) {
       try {
         const d = typeof err?.response?.data?.detail === 'string'
           ? err.response.data.detail
@@ -243,10 +248,8 @@ api.interceptors.response.use(
       invalidateApiCache('employee:current-assignment');
       invalidateApiCache('employee:assignments-overview');
       clearAuthItems();
-      const path = window.location.pathname || '';
-      if (!path.startsWith('/auth') && path !== '/' && path !== '') {
-        window.location.href = '/auth?mode=login&reason=session_expired';
-      }
+      void signOutSupabase();
+      window.location.href = SESSION_EXPIRED_HREF;
     }
     return Promise.reject(err);
   }
@@ -516,16 +519,22 @@ export default api;
  * to the login page with a session-expired reason parameter.
  */
 function handle401Redirect(response: Response): void {
-  if (response.status !== 401) return;
+  if (
+    !shouldRedirectOnUnauthorized({
+      status: response.status,
+      requestUrl: response.url,
+      currentPath: typeof window !== 'undefined' ? window.location.pathname || '' : '',
+    })
+  ) {
+    return;
+  }
   try {
     clearAuthItems();
   } catch {
     // ignore — localStorage may be unavailable
   }
-  const path = window.location.pathname || '';
-  if (!path.startsWith('/auth') && path !== '/' && path !== '') {
-    window.location.href = '/auth?mode=login&reason=session_expired';
-  }
+  void signOutSupabase();
+  window.location.href = SESSION_EXPIRED_HREF;
 }
 
 function buildApiError(response: Response, bodyText: string) {

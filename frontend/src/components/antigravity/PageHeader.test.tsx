@@ -15,7 +15,7 @@ describe('PageHeader', () => {
     renderWithRouter(<PageHeader title="Companies" subtitle="Manage employers" eyebrow="Admin console" />);
     expect(screen.getByRole('heading', { level: 1, name: 'Companies' })).toBeInTheDocument();
     expect(screen.getByText('Manage employers')).toBeInTheDocument();
-    expect(screen.getByText('Admin console')).toBeInTheDocument();
+    expect(screen.getByText('Admin console')).toHaveClass('text-xs');
   });
 
   it('renders breadcrumbs in a nav landmark; the last crumb is aria-current and not a link', () => {

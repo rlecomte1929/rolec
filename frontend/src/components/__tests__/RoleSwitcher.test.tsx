@@ -51,12 +51,23 @@ describe('RoleSwitcher', () => {
     switchRole.mockResolvedValue({ roles: ['HR', 'EMPLOYEE'], primary_role: 'EMPLOYEE' });
 
     render(<RoleSwitcher />);
-    const select = screen.getByRole('combobox') as HTMLSelectElement;
-    expect(select).toBeInTheDocument();
-
-    fireEvent.change(select, { target: { value: 'EMPLOYEE' } });
+    expect(screen.getByRole('group', { name: 'View as' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'HR' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Employee' }));
 
     await waitFor(() => expect(switchRole).toHaveBeenCalledWith('EMPLOYEE'));
+    await waitFor(() => expect(setActiveRole).toHaveBeenCalledWith('EMPLOYEE'));
+    expect(navigate).toHaveBeenCalledWith('/employee/dashboard');
+  });
+
+  it('keeps the picked role when the server echoes ADMIN as primary', async () => {
+    getStoredRoles.mockReturnValue(['ADMIN', 'EMPLOYEE']);
+    getActiveRole.mockReturnValue('ADMIN');
+    switchRole.mockResolvedValue({ roles: ['ADMIN', 'EMPLOYEE'], primary_role: 'ADMIN' });
+
+    render(<RoleSwitcher />);
+    fireEvent.click(screen.getByRole('button', { name: 'Employee' }));
+
     await waitFor(() => expect(setActiveRole).toHaveBeenCalledWith('EMPLOYEE'));
     expect(navigate).toHaveBeenCalledWith('/employee/dashboard');
   });

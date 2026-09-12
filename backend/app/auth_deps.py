@@ -234,6 +234,19 @@ def _held_roles(user: Dict[str, Any]) -> List[str]:
     return [r for r in (user.get("roles") or [user.get("role")]) if r]
 
 
+def role_forbidden(required: UserRole) -> HTTPException:
+    """403 for a wrong-role identity. 401 stays reserved for invalid/expired tokens.
+
+    `detail` is a plain string on purpose. A structured {code, message} body was
+    tried and reverted: 76 frontend files read `data.detail` and only 10 route it
+    through utils/apiDetail, so an object detail renders as a React child and
+    white-screens the page (HrBacklogPage.tsx:137 is the proven case). Nothing in
+    frontend/src reads a code today — classifyOverviewLoadError branches on HTTP
+    status. Reintroduce a code only once the consumers are normalised.
+    """
+    return HTTPException(status_code=403, detail="Insufficient permissions")
+
+
 def require_role(role: UserRole):
     """Return a FastAPI dependency that requires *role*. ADMIN users pass all role checks."""
     def dependency(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
@@ -243,7 +256,7 @@ def require_role(role: UserRole):
             return user
         if role.value in _held_roles(user):
             return user
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
+        raise role_forbidden(role)
     return dependency
 
 def require_hr_or_employee(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:

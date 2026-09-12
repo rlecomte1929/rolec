@@ -633,24 +633,28 @@ def grade(row: FactRow) -> FactRow:
 
 
 def _to_row(rec: Dict[str, Any], batch_id: str, lineno: int) -> FactRow:
-    missing = [k for k in REQUIRED_FIELDS if not str(rec.get(k) or "").strip()]
-    if missing:
-        raise FactRowError(f"missing required field(s): {', '.join(missing)}")
+    from pydantic import ValidationError
 
-    applies_to = rec.get("applies_to")
-    if applies_to is not None and not isinstance(applies_to, dict):
-        raise FactRowError(f"applies_to must be an object, got {type(applies_to).__name__}")
+    from backend.imports.otto.ingest_record import (
+        FactIngestRecord,
+        factrow_error_from_pydantic,
+    )
 
-    fact_type = str(rec.get("fact_type") or "other").strip().lower()
+    try:
+        parsed = FactIngestRecord.model_validate(rec)
+    except ValidationError as exc:
+        raise factrow_error_from_pydantic(exc) from exc
+
+    fact_type = str(parsed.fact_type or "other").strip().lower()
     if fact_type not in KNOWN_FACT_TYPES:
         fact_type = "other"
 
     try:
-        fact_text = validate_ingest_text(rec.get("fact_text"), field="fact_text")
+        fact_text = validate_ingest_text(parsed.fact_text, field="fact_text")
         if not fact_text:
             raise FactRowError("missing required field(s): fact_text")
         evidence_quote = validate_ingest_text(
-            rec.get("evidence_quote"),
+            parsed.evidence_quote,
             field="evidence_quote",
             checksum=rec.get("quote_sha256"),
         )
@@ -658,18 +662,18 @@ def _to_row(rec: Dict[str, Any], batch_id: str, lineno: int) -> FactRow:
         raise
 
     row = FactRow(
-        destination_country=str(rec["destination_country"]).strip().upper(),
-        entity_topic_key=str(rec["entity_topic_key"]).strip(),
-        fact_key=str(rec["fact_key"]).strip(),
+        destination_country=parsed.destination_country.upper(),
+        entity_topic_key=parsed.entity_topic_key,
+        fact_key=parsed.fact_key,
         fact_text=fact_text,
-        source_url=str(rec["source_url"]).strip(),
+        source_url=parsed.source_url,
         batch_id=batch_id,
-        entity_title=str(rec.get("entity_title") or "").strip()
-        or _humanise(str(rec["entity_topic_key"])),
+        entity_title=(parsed.entity_title or "").strip()
+        or _humanise(parsed.entity_topic_key),
         fact_type=fact_type,
-        applies_to=applies_to,
+        applies_to=parsed.applies_to,
         evidence_quote=evidence_quote,
-        confidence=str(rec.get("confidence") or "medium").strip().lower(),
+        confidence=str(parsed.confidence or "medium").strip().lower(),
     )
     row.source_class = classify_source(row.source_url)
     return grade(row)
@@ -725,3 +729,16 @@ def read_jsonl(path: Path, *, batch_id: str) -> Tuple[List[FactRow], List[str]]:
             rows.append(row)
 
     return rows, rejections
+
+
+def __getattr__(name: str) -> Any:
+    """Load the Pydantic ingest model only when callers ask for it.
+
+    `classify_source` must import without pydantic so the corridor fact-pack
+    gate (PyYAML-only) can use the official-host classifier.
+    """
+    if name == "FactIngestRecord":
+        from backend.imports.otto.ingest_record import FactIngestRecord
+
+        return FactIngestRecord
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

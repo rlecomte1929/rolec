@@ -94,3 +94,22 @@ def test_service_is_pure_no_db_imports():
     src = Path(rfe.__file__).read_text()
     for forbidden in ("import sqlalchemy", "from sqlalchemy", "supabase", "from ..database", "from ...database", "from backend.database"):
         assert forbidden not in src, f"pure extractor must not reference {forbidden!r}"
+
+
+def test_waf_403_skips_the_llm(monkeypatch):
+    """A blocked government source is an empty extract, not a raised request."""
+    llm_calls: list[str] = []
+
+    async def _complete(*, system, user, json_object=False):
+        llm_calls.append("llm")
+        return _ok_json()
+
+    async def _blocked(url, *, timeout=30.0):
+        return ""
+
+    monkeypatch.setattr(rfe, "complete_text", _complete)
+    monkeypatch.setattr(rfe, "fetch_url_content", _blocked)
+    facts = asyncio.run(rfe.extract_requirement_facts("https://gov.example/waf"))
+    assert facts == []
+    assert llm_calls == []
+
