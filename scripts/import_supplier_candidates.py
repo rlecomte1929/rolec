@@ -92,8 +92,17 @@ def main() -> int:
         # internally, so promotion cannot share the staging transaction.
         from sqlalchemy.orm import sessionmaker
 
+        # [ANDREA-P1] Scope promotion to what THIS CSV staged. `promote()` has always
+        # supported `run_ids`, but the script never passed them, so `--promote` on a
+        # 6-row Dublin batch previewed "484 supplier(s)" — every unpromoted candidate
+        # from every harvest since 2026-08 would have been swept into the vetting queue.
+        staged_run_ids = sorted({r.run_id for r in results if getattr(r, "run_id", "")})
         with sessionmaker(bind=engine)() as session:
-            n, skipped, problems = promote(session, dry_run=not args.promote)
+            n, skipped, problems = promote(
+                session,
+                dry_run=not args.promote,
+                run_ids=staged_run_ids if args.apply else None,
+            )
             print()
             print(f"promote:    {n} supplier(s) -> vetting queue (platform_vetting_status='pending')")
             if skipped:

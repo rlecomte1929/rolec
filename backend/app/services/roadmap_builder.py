@@ -18,6 +18,7 @@ import logging
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
+from .household import children_of, display_name, has_children, has_partner
 from .immigration_regime import ImmigrationRegimeRouter
 from .requirements_purpose_key import assignment_type_from_purpose
 from .roadmap_corridor_overlay import corridor_overlay
@@ -34,13 +35,15 @@ _NO_VISA_REGIMES = frozenset({"eu_free_movement", "domestic"})
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _initials(name: str) -> str:
-    parts = [p for p in name.split() if p]
+def _initials(name: Optional[str]) -> str:
+    # [ANDREA-P1] None-safe: HR intake stores ``fullName: null`` for members whose name
+    # is not known yet; ``None.split()`` here took the entire roadmap down with a 500.
+    parts = [p for p in str(name or "").split() if p]
     return "".join(p[0].upper() for p in parts[:2])
 
 
-def _first_name(name: str) -> str:
-    return name.split()[0] if name else ""
+def _first_name(name: Optional[str]) -> str:
+    return str(name).split()[0] if name else ""
 
 
 def _age_from_dob(dob: Optional[str]) -> Optional[int]:
@@ -129,9 +132,7 @@ def _build_civil_track(case: Dict[str, Any]) -> Dict[str, Any]:
     draft = case.get("draft", {})
     basics = draft.get("relocationBasics", {})
     origin = basics.get("originCountry", "origin country")
-    family = draft.get("familyMembers", {})
-    marital = family.get("maritalStatus", "solo")
-    has_spouse = marital in ("partner", "partner_kids")
+    has_spouse = has_partner(draft)
 
     subs_birth = [
         "Obtain apostilled birth certificate",
@@ -169,10 +170,9 @@ def _build_civil_track(case: Dict[str, Any]) -> Dict[str, Any]:
 def _build_family_track(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Family track — only present when dependents exist."""
     draft = case.get("draft", {})
-    family = draft.get("familyMembers", {})
-    marital = family.get("maritalStatus", "solo")
-    has_spouse = marital in ("partner", "partner_kids")
-    has_kids = marital in ("partner_kids", "kids_only")
+    family = draft.get("familyMembers") or {}
+    has_spouse = has_partner(draft)
+    has_kids = has_children(draft)
 
     if not has_spouse and not has_kids:
         return None
@@ -182,7 +182,7 @@ def _build_family_track(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     if has_spouse:
         spouse = family.get("spouse") or {}
-        spouse_name = spouse.get("fullName", "Your partner")
+        spouse_name = display_name(spouse.get("fullName"), "Your partner")
         steps.append({
             "n": n,
             "key": "spouse-permit",
@@ -208,13 +208,11 @@ def _build_family_track(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         n += 1
 
     if has_kids:
-        children = family.get("children") or []
-        # Include known family from HR if no children set yet
-        known_children = (draft.get("knownFamily") or {}).get("children") or []
-        all_kids = children if children else known_children
+        # children_of() prefers the household block and falls back to HR's knownFamily.
+        all_kids = children_of(draft)
 
-        for child in all_kids:
-            child_name = child.get("fullName", "Child")
+        for idx, child in enumerate(all_kids, start=1):
+            child_name = display_name(child.get("fullName"), f"Child {idx}")
             dob = child.get("dateOfBirth")
             age = _age_from_dob(dob)
             age_label = f", {age}" if age is not None else ""
@@ -257,9 +255,7 @@ def _build_settlement_track(case: Dict[str, Any]) -> Dict[str, Any]:
     """Settlement track — housing, police reg, tax, school, settle-in."""
     draft = case.get("draft", {})
     basics = draft.get("relocationBasics", {})
-    family = draft.get("familyMembers", {})
-    marital = family.get("maritalStatus", "solo")
-    has_kids = marital in ("partner_kids", "kids_only")
+    has_kids = has_children(draft)
     housing_pref = basics.get("housingPreference")
     dest_city = basics.get("destCity", "destination city")
     dest_country = basics.get("destCountry", "destination country")
@@ -321,11 +317,9 @@ def _build_settlement_track(case: Dict[str, Any]) -> Dict[str, Any]:
     ]
 
     if has_kids:
-        children = family.get("children") or []
-        known_children = (draft.get("knownFamily") or {}).get("children") or []
-        all_kids = children if children else known_children
+        all_kids = children_of(draft)
         first_child = all_kids[0] if all_kids else {}
-        child_name = _first_name(first_child.get("fullName", "child"))
+        child_name = _first_name(display_name(first_child.get("fullName"), "child"))
 
         steps.append({
             "n": 8,
@@ -699,10 +693,8 @@ def derive_roadmap(
     """
     draft = case.get("draft", {})
     basics = draft.get("relocationBasics", {})
-    family = draft.get("familyMembers", {})
-    marital = family.get("maritalStatus", "solo")
-    has_kids = marital in ("partner_kids", "kids_only")
-    has_spouse = marital in ("partner", "partner_kids")
+    has_kids = has_children(draft)
+    has_spouse = has_partner(draft)
 
     # Build tracks. AIQ-972: the Visa & Permit track is requirements-driven —
     # omitted for EU/EEA free-movement and domestic moves (no visa/permit needed).

@@ -97,6 +97,8 @@ WEIGHTS: Dict[str, Dict[str, float]] = {
     "language_integration": {"rating": 0.7, "availability": 0.3},
     "pets": {"rating": 0.7, "availability": 0.3},
     "partner_career": {"rating": 0.7, "availability": 0.3},
+    # [ANDREA-P1] serviced / short-stay housing bridge
+    "temp_accommodation": {"rating": 0.4, "availability": 0.2, "family_fit": 0.2, "stay_fit": 0.2},
 }
 
 

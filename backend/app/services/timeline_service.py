@@ -713,6 +713,49 @@ def _corridor_milestones(
     return rows, supersedes
 
 
+def _departure_milestones(case_draft: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """[ANDREA-P1] Home-country EXIT obligations as pre-departure milestones.
+
+    ``roadmap_builder`` (the legacy track view) already injects the approved origin-country
+    ``requirement_items`` via ``departure_requirements.departure_requirement_records`` — but the
+    milestone-backed plan the employee page actually renders never did, so Andrea's Spain
+    exits (padrón baja, Modelo 030/247/210, A1) were visible on ``/roadmap`` and absent from
+    ``/relocation-plans/{id}/view``. Same source, same direction gate, same fail-safe: any
+    missing input or DB issue yields ``[]`` and the generic scaffold stands.
+
+    Named ``pre_departure_origin_{NN}`` — parsed by relocation_plan_service into the
+    pre_departure phase, with its own marker because these are reviewed catalog rows, not
+    corridor pathway steps and not AI output.
+    """
+    try:
+        from ..db import SessionLocal
+        from .departure_requirements import departure_requirement_records
+
+        with SessionLocal() as db:
+            records = departure_requirement_records(db, {"draft": case_draft or {}})
+    except Exception:  # noqa: BLE001 — never break milestone generation
+        return []
+    rows: List[Dict[str, Any]] = []
+    for idx, req in enumerate(records, start=1):
+        title = str(req.get("title") or "").strip()
+        if not title:
+            continue
+        rows.append(
+            {
+                "milestone_type": f"pre_departure_origin_{idx:02d}",
+                "title": title,
+                "description": (req.get("description") or None),
+                "sort_order": 400 + idx,
+                "target_date": None,
+                "status": "pending",
+                "owner": "employee",
+                "criticality": "high" if req.get("non_obvious") else "normal",
+                "notes": None,
+            }
+        )
+    return rows
+
+
 def build_return_milestones(end: Optional[date]) -> List[Dict[str, Any]]:
     """Return-phase operational rows, optionally dated from ``end``.
 
@@ -894,6 +937,8 @@ def compute_default_milestones(
         )
 
     result.extend(corridor_rows)
+    # [ANDREA-P1] approved origin-country exit obligations (fail-safe, may be empty)
+    result.extend(_departure_milestones(case_draft))
 
     # ── Inject family workstream milestones (S5) ─────────────────────────────
     if family_profile:
