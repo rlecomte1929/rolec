@@ -1,0 +1,180 @@
+{
+  "meta": {
+    "generated": "2026-09-12",
+    "source_book": "CS50x Lec 4: Memory",
+    "source_url": "https://cs50.harvard.edu/x/2024/notes/4/",
+    "product": "ReloPass",
+    "framework": "CS50 Memory / Pointer model → corridor catalog reliability",
+    "grounding_notes": "Original draft named requirement_facts as the Case Command read path, WorkspaceDB as source of truth, and a 30-day CDN edge cache. ReloPass serves public.requirement_items via requirements_builder; Render is workers=1. This file is the corrected export.",
+    "briefs_markdown": "docs/plans/cs50x-memory-p1-briefs-2026-09-12.md",
+    "notion_cards": {
+      "RP-MEM-007": {"aiq": "AIQ-2302", "url": "https://app.notion.com/p/3d9887c64d48816197c0e562834f7f70"},
+      "RP-MEM-002": {"aiq": "AIQ-2303", "url": "https://app.notion.com/p/3d9887c64d4881d88cfdc834cb08e05c"},
+      "RP-MEM-001": {"aiq": "AIQ-2304", "url": "https://app.notion.com/p/3d9887c64d4881198d13e15033b9b7cb"},
+      "RP-MEM-003": {"aiq": "AIQ-2305", "url": "https://app.notion.com/p/3d9887c64d48810ab374de6b5062d036"}
+    }
+  },
+  "recon": {
+    "served_table": "public.requirement_items",
+    "serve_gate": "review_status=approved",
+    "builder": "backend/app/services/requirements_builder.py",
+    "last_verified_at": "already NOT NULL on RequirementItem",
+    "requirement_facts_role": "extract/admin/knowledge-doc pipeline, not Case Command reads",
+    "parked_related_cards": [
+      {
+        "title": "[Architecture] Cache compiled corridor requirements + explicit invalidation on rule change",
+        "status": "Parked",
+        "priority": "P2",
+        "url": "https://app.notion.com/3bf887c64d48811687a0d9a368c265cf"
+      },
+      {
+        "title": "[AI/ML] Add per-requirement verified_at + days_since_last_verified freshness metric and a staleness queue that visibly downgrades decaying nodes",
+        "status": "Parked",
+        "priority": "P2",
+        "url": "https://app.notion.com/3bf887c64d488153a80feab7edd40df7"
+      },
+      {
+        "title": "[Data Quality] Resilient source fetching (httpx timeouts/retries, per-fact try/except, abort partial corridor)",
+        "status": "Parked",
+        "priority": "P2",
+        "url": "https://app.notion.com/3bf887c64d4881fbb815db43d07f36f4"
+      },
+      {
+        "title": "Invalidate attested items on source drift — attested → stale, never the reverse",
+        "status": "Parked",
+        "priority": "P3",
+        "url": "https://app.notion.com/3c1887c64d488117a392c145b73fff79"
+      }
+    ]
+  },
+  "proposals": [
+    {
+      "id": "RP-MEM-001",
+      "title": "Compiled requirement_items catalog cache (in-process, short TTL)",
+      "cs50_analogy": "Heap allocation — malloc once, reuse across calls rather than re-allocating on every request",
+      "description": "Cache the compiled approved catalog from requirements_builder keyed by country_code + purpose + catalog generation token. Render has no CDN edge; TTL is minutes to hours, not 30 days. Must ship with RP-MEM-003.",
+      "why_now": "Repeated Case Command / employee requirement lookups hit Postgres for a catalog that changes on lawyer review, not per request. A short TTL plus invalidation keeps the read fast without serving a month-old snapshot.",
+      "deliverables": [
+        "In-process cache key: country_code + purpose + generation token",
+        "TTL: minutes–hours, configurable, not 30 days",
+        "Cache miss → existing compile → store → return",
+        "Log cache_hit vs cache_miss; same PR as RP-MEM-003"
+      ],
+      "technical_area": "Backend / requirements_builder",
+      "priority": "P1",
+      "complexity": "Medium",
+      "stage": "v0",
+      "in_scope_this_export": true,
+      "existing_overlap": "Parked P2 architecture card on compiled corridor cache. No in-process catalog cache in requirements_builder today. Do not cache requirement_facts."
+    },
+    {
+      "id": "RP-MEM-002",
+      "title": "Requirement decay monitor on last_verified_at",
+      "cs50_analogy": "Valgrind for memory leaks — unfreed allocations accumulate silently; stale served rules do the same",
+      "description": "Flag approved requirement_items older than a pillar review cycle. Prefer a code-side cycle map (no migration). Stale items stay served but labeled. Do not add last_verified_at to requirement_facts; the column already exists on requirement_items.",
+      "why_now": "The catalog is the product. Decay that is invisible becomes a wrong timeline for a paying HR user.",
+      "deliverables": [
+        "Helper: is_stale(item, now) using last_verified_at + pillar cycle",
+        "CLI or admin GET: count + breakdown by country_code",
+        "Tests: 100-day-old item flagged; fresh not flagged; still served if approved",
+        "Optional tiny admin widget; not required for v0"
+      ],
+      "technical_area": "Backend report + optional Admin GET",
+      "priority": "P1",
+      "complexity": "Medium",
+      "stage": "v0",
+      "in_scope_this_export": true,
+      "existing_overlap": "last_verified_at already on RequirementItem. attestation_status already has stale. Parked P2 freshness-queue card. WorkspaceDB requirement_decay_queue is empty research mirror — do not use."
+    },
+    {
+      "id": "RP-MEM-003",
+      "title": "Invalidate catalog cache on requirement_items write",
+      "cs50_analogy": "free() is mandatory after malloc() — cache entries must be explicitly dropped when the underlying item changes",
+      "description": "On INSERT/UPDATE/review_status/promote of requirement_items, drop or bump generation for that country_code. Next builder call misses and reflects the change. Same PR as RP-MEM-001. No background recompile queue for in-process cache.",
+      "why_now": "A cached approved catalog shown after a lawyer edit is a trust failure.",
+      "deliverables": [
+        "Hook crud + review/attest promote paths",
+        "Per-country invalidation (not global flush unless keyed that way)",
+        "Tests: write → miss → new payload; other country untouched"
+      ],
+      "technical_area": "Backend hooks / crud",
+      "priority": "P1",
+      "complexity": "Medium",
+      "stage": "v0",
+      "in_scope_this_export": true,
+      "depends_on": ["RP-MEM-001"],
+      "existing_overlap": "Parked P2 cache+invalidation card and Parked P3 attested→stale on source drift (orthogonal axis)."
+    },
+    {
+      "id": "RP-MEM-004",
+      "title": "Dependency chain integrity validator",
+      "cs50_analogy": "Dangling pointer — depends_on pointing at a deleted entity",
+      "description": "Out of P1 scope. Corridor packs already walk depends_on, dangling refs, and cycles in scripts/check_corridor_facts.py check_graph(). Authoring UI + GET /corridors/:id/dependency-health would be a later increment on the pack checker, not a new graph store.",
+      "why_now": "Skipped for this export.",
+      "deliverables": [],
+      "technical_area": "Authoring pipeline",
+      "priority": "P2",
+      "complexity": "Medium",
+      "stage": "v0",
+      "in_scope_this_export": false,
+      "existing_overlap": "scripts/check_corridor_facts.py check_graph() already implements dangling refs + cycles on packs."
+    },
+    {
+      "id": "RP-MEM-005",
+      "title": "Shared requirement entity library",
+      "cs50_analogy": "Pointer reuse vs copying whole blocks",
+      "description": "Out of P1 scope. Do not create global_requirement_facts. Served rows live in requirement_items with country_code + purpose + title uniqueness. Shared-entity collapse is a later schema design, not Demo Day.",
+      "why_now": "Skipped.",
+      "deliverables": [],
+      "technical_area": "Schema + authoring",
+      "priority": "P2",
+      "complexity": "High",
+      "stage": "v1",
+      "in_scope_this_export": false,
+      "existing_overlap": "uq_requirement_items_country_purpose_title. No shared-entity table."
+    },
+    {
+      "id": "RP-MEM-006",
+      "title": "Evidence quote integrity enforcement",
+      "cs50_analogy": "Buffer overflow — silently truncated legal quotes",
+      "description": "Already shipped. backend/app/services/evidence_quote_validator.py (AIQ-1956) rejects column-cap cuts, U+FFFD, checksum mismatches. Otto ingest tests reject truncated quotes.",
+      "why_now": "Skipped — do not re-ticket.",
+      "deliverables": [],
+      "technical_area": "Ingest",
+      "priority": "P2",
+      "complexity": "Low-Medium",
+      "stage": "shipped",
+      "in_scope_this_export": false,
+      "existing_overlap": "evidence_quote_validator.py; test_otto_fact_ingest.py test_truncated_evidence_quote_is_rejected_not_stored; test_evidence_quote_validator.py"
+    },
+    {
+      "id": "RP-MEM-007",
+      "title": "Source fetch NULL-check (official ingest)",
+      "cs50_analogy": "malloc() returning NULL must be checked — failed fetch is NULL",
+      "description": "immigration/fetcher.py already returns FetchedDoc.ok and does not persist a placeholder body. official_ingest_service.ingest_url_to_knowledge_doc still upserts text_content=excerpt or '' on fetch_failed. Close that gap; audit other writers.",
+      "why_now": "Empty fetched bodies read as sourced. Lowest-complexity trust fix before Demo Day.",
+      "deliverables": [
+        "official_ingest: fetch_failed does not store empty body as evidence",
+        "Tests for 4xx/empty vs success path",
+        "Log source_host + failure_reason"
+      ],
+      "technical_area": "Backend ingest",
+      "priority": "P1",
+      "complexity": "Low",
+      "stage": "v0",
+      "in_scope_this_export": true,
+      "existing_overlap": "backend/imports/immigration/fetcher.py is the correct contract. Parked P2 resilient fetching card. backfill_fact_evidence.py already maps ok=false to fetch_failed."
+    }
+  ],
+  "summary": {
+    "total_proposals": 7,
+    "p1_count": 4,
+    "p2_count": 3,
+    "p1_in_this_export": ["RP-MEM-007", "RP-MEM-002", "RP-MEM-001", "RP-MEM-003"],
+    "skipped_already_shipped": ["RP-MEM-006"],
+    "skipped_already_has_pack_checker": ["RP-MEM-004"],
+    "skipped_too_large": ["RP-MEM-005"],
+    "stage_v0": 4,
+    "core_theme": "Memory-safe programs check NULL, free on mutation, and do not serve dangling pointers. ReloPass analog: failed fetches are not evidence, approved items have visible decay, compiled catalogs are reused only with write-time invalidation. Serve requirement_items, not requirement_facts."
+  }
+}

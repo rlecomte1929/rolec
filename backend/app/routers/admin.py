@@ -349,6 +349,9 @@ def review_country_requirement(
         )
         db.commit()
         db.refresh(item)
+        from ..services.requirement_catalog_cache import invalidate_country
+
+        invalidate_country(item.country_code, item_id=item.id, reason="requirement_item_review")
         source_map = {
             record.id: record
             for record in crud.list_sources(db, (item.country_code or "").upper())

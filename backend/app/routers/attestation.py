@@ -39,7 +39,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -629,10 +629,13 @@ def _apply_promotion(
     firm = req.reviewer_org or sig.signer_org or sig.signer_name
     stamped = _now()
     promoted: List[str] = []
+    countries: Set[str] = set()
     for row in approved:
         item = db.get(RequirementItem, row.requirement_item_id)
         if item is None:
             continue
+        if item.country_code:
+            countries.add(item.country_code)
         item.attestation_status = "attested"
         item.attested_at = stamped
         item.attested_by = firm
@@ -669,6 +672,10 @@ def _apply_promotion(
         )
 
     db.commit()
+    from ..services.requirement_catalog_cache import invalidate_country
+
+    for country in countries:
+        invalidate_country(country, reason="attestation_promote")
     return AttestationPromoteResultDTO(
         request_id=str(req.id),
         promoted_item_ids=promoted,

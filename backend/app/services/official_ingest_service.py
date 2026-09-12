@@ -39,10 +39,18 @@ OFFICIAL_DOMAINS: Dict[str, list[str]] = {
 }
 
 
+_LOGIN_PATH_MARKERS = ("/login", "/signin", "/sign-in", "/sso")
+
+
 def _is_allowed_domain(url: str, destination_country: str) -> bool:
     host = urlparse(url).netloc.lower()
     allowed = OFFICIAL_DOMAINS.get(destination_country.upper(), [])
     return any(host.endswith(domain) for domain in allowed)
+
+
+def _looks_like_login_url(url: str) -> bool:
+    path = urlparse(url).path.lower()
+    return any(marker in path for marker in _LOGIN_PATH_MARKERS)
 
 
 def _fetch_html(url: str, destination_country: str) -> Tuple[str, str]:
@@ -50,6 +58,8 @@ def _fetch_html(url: str, destination_country: str) -> Tuple[str, str]:
     resp = requests.get(url, headers=headers, timeout=15, stream=True, allow_redirects=True)
     resp.raise_for_status()
     final_url = resp.url
+    if _looks_like_login_url(final_url):
+        raise ValueError("Redirected to a login page")
     if not _is_allowed_domain(final_url, destination_country):
         raise ValueError("Redirected to a non-official domain")
     content_type = (resp.headers.get("Content-Type") or "").lower()
@@ -167,6 +177,23 @@ def ingest_url_to_knowledge_doc(
     except Exception as exc:
         fetch_status = "fetch_failed"
         fetch_error = str(exc)
+        host = urlparse(final_url or url).netloc
+        log.warning(
+            "official_ingest: fetch_failed host=%s reason=%s url=%s",
+            host,
+            fetch_error,
+            url,
+        )
+        # RP-MEM-007: a failed fetch is NULL. knowledge_docs.text_content is NOT NULL,
+        # so we must not upsert excerpt="" — that body later reads as sourced evidence.
+        # Match immigration/fetcher.py: no placeholder row, no fact promotion.
+        return {
+            "doc_id": None,
+            "rule_id": None,
+            "fetch_status": fetch_status,
+            "facts_created": 0,
+            "error": fetch_error,
+        }
 
     pack = db.ensure_knowledge_pack(destination_country, domain_area)
     doc = db.upsert_knowledge_doc_by_url(
