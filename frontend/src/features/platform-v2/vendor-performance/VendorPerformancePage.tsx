@@ -997,7 +997,7 @@ export function VendorPerformancePage({ embedded = false }: { embedded?: boolean
     </div>
   );
 
-  return embedded ? inner : <AppShell>{inner}</AppShell>;
+  return embedded ? inner : <AppShell hideHeading section="HR Operations" title="Vendor performance">{inner}</AppShell>;
 }
 
 export default VendorPerformancePage;

@@ -13,7 +13,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Re
 
 from ..auth_deps import get_current_user, require_assignment_visibility, require_hr_or_employee
 from ...database import db as _db
-from .criteria_builder import _flatten_saved_answers, build_criteria_for_assignment
+from .criteria_builder import _flatten_saved_answers, build_criteria_for_assignment, SERVICE_KEY_TO_BACKEND
 from .engine import recommend, recommend_debug
 
 log = logging.getLogger(__name__)
@@ -145,9 +145,10 @@ def post_recommendations_batch(
     if not selected_keys:
         services = db.list_case_services(assignment["id"])
         selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
-    valid_svc = {
-        "housing", "schools", "movers", "banks", "insurances", "electricity", "pets", "spouse",
-    }
+    # [ANDREA-P1.1] Derive from the single mapping instead of a second hard-coded set: the
+    # settle-in tiles (temp_accommodation, medical, language) were selectable and saved but
+    # silently dropped here, so the Recommendations page showed no tab for them at all.
+    valid_svc = set(SERVICE_KEY_TO_BACKEND.keys())
     selected_keys = [k for k in selected_keys if k in valid_svc]
 
     if not selected_keys:

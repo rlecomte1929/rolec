@@ -128,6 +128,19 @@ class TestNormalizationAndClustering(unittest.TestCase):
             "https://www.banque-france.fr/fr/a-votre-service/particuliers/droit-au-compte-bancaire"
         ) == OFFICIAL
 
+    def test_norwegian_statutory_bodies_are_official(self):
+        # First live FR→NO run dropped a 5/5 driving-licence fact + schooling facts as "unofficial"
+        # because these statutory bodies were missing from the allowlist.
+        from backend.imports.otto.parsers import OFFICIAL, classify_source
+        for url in (
+            "https://www.vegvesen.no/en/driving-licences/",           # Statens vegvesen (roads)
+            "https://www.udir.no/regelverk/",                          # Directorate for Education
+            "https://www.regjeringen.no/en/topics/",                   # the Government
+            "https://www.oslo.kommune.no/skole-og-utdanning/",         # Oslo municipality
+            "https://www.bergen.kommune.no/",                          # any NO municipality (suffix)
+        ):
+            assert classify_source(url) == OFFICIAL, url
+
     def test_topic_alias_collapses_variants(self):
         # Same fact, same text, but the topic key drifted between passes.
         T = "An EU or EEA citizen is not required to hold a residence permit to live in France."

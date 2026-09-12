@@ -118,7 +118,19 @@ unit-tested in `backend/tests/test_rpx_consensus.py`.
 
 Each pass is one research worker's output for a corridor, as FactRow JSONL (`destination_country,
 entity_topic_key, fact_key, fact_text, source_url`, plus `evidence_quote`, `fact_type`,
-`applies_to`, `confidence`). Keep each worker task **small and single-corridor** and deliver a file
+`applies_to`, `confidence`).
+
+`applies_to.status` must use the **serving-purpose vocabulary**, not free text: `professional` /
+`worker` / `employee` / `salaried` → `employment`; `student` → `study`; `family` → `family`;
+`any` → `other`. A status outside this set is *refused* at promote time (it would land
+`purpose='other'` and be invisible to the corridor reader), so the worker must emit one of these.
+
+After staging, facts sit at `status='new'` and reach `public.requirement_items` only through two
+human gates, neither of which the pipeline bypasses: a reviewer approves `new → ready` at
+`/admin/requirement-facts` (which is when `promote()` writes the row, at `review_status='pending'`),
+then the lawyer gate at `/admin/countries` approves it for serving.
+
+Keep each worker task **small and single-corridor** and deliver a file
 (Otto's proven mode) — never a long interactive chat. The passes must be **independent** (do not
 seed pass 2 with pass 1's output) or the consensus signal is worthless. Claude Code is the wired
 applier that pulls the pass files, runs this merge, and loads the result; the Audos→GitHub sync

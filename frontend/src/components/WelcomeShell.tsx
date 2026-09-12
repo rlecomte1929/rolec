@@ -28,7 +28,7 @@ export function WelcomeShell({
   children,
 }: WelcomeShellProps) {
   return (
-    <AppShell>
+    <AppShell hideHeading title="Welcome">
       <div
         className="flex flex-col items-center pt-4 px-2 pb-[max(3rem,var(--consent-banner-offset,0px))]"
         data-testid="welcome-shell"

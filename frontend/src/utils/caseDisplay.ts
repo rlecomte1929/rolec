@@ -33,3 +33,13 @@ export function orEmptyLabel(
   const v = (value ?? '').trim();
   return v ? { text: v, isEmpty: false } : { text: label, isEmpty: true };
 }
+
+/** Destination missing or the case has not left "not started". */
+export function isInactiveOrIncompleteCase(assignment: {
+  status: string;
+  case?: { host_country?: string } | null;
+}): boolean {
+  const destEmpty = !(assignment.case?.host_country || '').trim();
+  const notStarted = assignment.status === 'assigned' || assignment.status === 'created';
+  return destEmpty || notStarted;
+}

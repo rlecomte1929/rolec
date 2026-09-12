@@ -165,12 +165,19 @@ def upsert_item(
                 "source, active, external_id, created_at, updated_at, "
                 "created_by_user_id"
             )
+            # [AIQ-2095 follow-up] `active` is BOOLEAN on Postgres. The literal `1` only
+            # works on SQLite (CI); on production every INSERT raised
+            # "column active is of type boolean but expression is of type integer",
+            # the best-effort wrapper in supplier_registry swallowed it, and NO approved
+            # supplier ever received a catalog master (measured 2026-09-12: 0 masters for
+            # 15 freshly approved Dublin capabilities, schools/legal/tax also at 0).
             vals = (
                 ":id, :category, :city, :country, :name, :attr, "
-                ":source, 1, :eid, :now, :now, :actor"
+                ":source, :active, :eid, :now, :now, :actor"
             )
             params = {
                 "id": row_id,
+                "active": True,
                 "category": category,
                 "city": city,
                 "country": country,
