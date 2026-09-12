@@ -114,7 +114,26 @@ def main() -> int:
     ap.add_argument("--batch-id", required=True, help="batch id, used for output filenames")
     ap.add_argument("--out-dir", default=".", help="where to write the three deliverables (default: cwd)")
     ap.add_argument("--n-passes", type=int, help="override pass count (default: number of files read)")
+    ap.add_argument(
+        "--embed",
+        action="store_true",
+        help="cluster facts by embedding cosine similarity instead of token overlap — higher "
+             "yield (merges the same fact across drifted topic keys and phrasing). Uses the "
+             "repo's default embedder (OpenAI text-embedding-3-small; needs OPENAI_API_KEY). "
+             "The consensus module stays LLM-free; the embedder is wired here, in the adapter.",
+    )
+    ap.add_argument("--embed-threshold", type=float, default=0.86,
+                    help="cosine threshold for --embed clustering (default 0.86; higher = stricter)")
     args = ap.parse_args()
+
+    embed_fn = None
+    if args.embed:
+        # Lazy import: only the adapter touches the embedder, so consensus.py imports no LLM SDK.
+        from backend.app.services.embeddings import get_default_embedder
+        _embedder = get_default_embedder()
+        embed_fn = _embedder.embed_batch
+        print(f"embedding mode: {getattr(_embedder, 'name', type(_embedder).__name__)} "
+              f"(threshold {args.embed_threshold})\n")
 
     files = _resolve_pass_files(args.passes)
     if not files:
@@ -127,7 +146,8 @@ def main() -> int:
         print(f"  {f}  ({len(rows)} fact(s))")
     print()
 
-    result = merge_passes(passes, n_passes=args.n_passes)
+    result = merge_passes(passes, n_passes=args.n_passes,
+                          embed_fn=embed_fn, embed_threshold=args.embed_threshold)
     n = args.n_passes if args.n_passes is not None else len(files)
     ev = evaluate_consensus(result)
 

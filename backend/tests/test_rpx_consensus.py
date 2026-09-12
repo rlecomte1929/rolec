@@ -175,5 +175,47 @@ class TestNormalizationAndClustering(unittest.TestCase):
         assert len(r.consensus) == 2
 
 
+class TestEmbeddingClustering(unittest.TestCase):
+    """Opt-in embedding path: merges the same fact across drifted topic keys + differing phrasing
+    that deterministic token-Jaccard misses. embed_fn is injected (no network in tests)."""
+
+    @staticmethod
+    def _embed(mapping):
+        return lambda texts: [mapping[t] for t in texts]
+
+    # token-distinct texts, so the deterministic base separates them and the embedding-merge
+    # (not token overlap) is what's actually under test.
+    A = "alpha bravo charlie delta echo"
+    B = "foxtrot golf hotel india juliet"
+
+    def test_embedding_merges_across_topic_drift(self):
+        # Same concept, DIFFERENT topic keys the alias map won't unify, low token overlap,
+        # near-identical vectors → the embedding-merge should combine them into one 5/5 cluster.
+        a = fact(dc="NO", topic="scheme_registration", key="k1", text=self.A)
+        b = fact(dc="NO", topic="police_registration_eu", key="k2", text=self.B)
+        embed = self._embed({self.A: [1.0, 0.0, 0.0], self.B: [0.98, 0.02, 0.0]})
+        r = merge_passes([[a], [b]], embed_fn=embed, embed_threshold=0.9)
+        assert len(r.consensus) == 1
+        assert r.consensus[0]["applies_to"]["pass_count"] == 2
+        # The deterministic path can't merge them (different topics, low token overlap):
+        assert len(merge_passes([[a], [b]]).consensus) == 0
+
+    def test_embedding_never_reduces_below_deterministic(self):
+        # Orthogonal vectors → the embedding-merge must NOT combine distinct facts, and must not
+        # fragment what deterministic grouped. This is the guarantee the augment design provides.
+        a = fact(dc="NO", topic="t1", key="k1", text=self.A)
+        b = fact(dc="NO", topic="t2", key="k2", text=self.B)
+        embed = self._embed({self.A: [1.0, 0.0, 0.0], self.B: [0.0, 1.0, 0.0]})
+        r = merge_passes([[a], [b]], embed_fn=embed, embed_threshold=0.86)
+        assert len(r.consensus) == 0
+        assert len(r.needs_review) == 2  # each 1/2, official+verbatim → low-band rescue
+
+    def test_embedding_path_still_enforces_sourcing_gate(self):
+        a = fact(dc="NO", text=self.A, url=UNOFFICIAL_URL)
+        r = merge_passes([[a]], embed_fn=self._embed({self.A: [1.0, 0.0, 0.0]}))
+        assert len(r.gaps) == 1
+        assert "unofficial" in r.gaps[0]["reason"].lower()
+
+
 if __name__ == "__main__":
     unittest.main()
