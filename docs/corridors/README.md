@@ -22,6 +22,12 @@ would not stop a load.
 Existing profiles are grandfathered (`scripts/check_corridor_anchor.py`). Served facts still
 fail closed: `requirements_builder` reads only `review_status = 'approved'`.
 
+**Do not approve `requirement_items` until a CVR is filled.** A corridor is CVR-complete
+when a markdown file under `docs/corridors/<slug>/` has section 6 (relief moment) **Response**
+set to Yes or No — not a blank template. Check with
+`python3 scripts/check_corridor_cvr.py --corridor IE_ES` (registry id, not a country code).
+IE→ES fails that check today; that is why its 25 rows stay `pending`.
+
 ```yaml
 corridor:
   id: "XX_YY"
