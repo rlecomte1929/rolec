@@ -9,8 +9,8 @@
   "non_obvious_count": 7,
   "needs_lawyer_review_count": 1,
   "artifact": "es-departure-2026-09-10.ndjson",
-  "sha256": "a3d1c2ec44ef4db8ee00bfd941738d28e67edb44da9dd3f94f68cd3c15727ab3",
+  "sha256": "67ef55cff8d339ffd82ce0c42b680c788e750da348a95ded84ba3bae63117d13",
   "review_status_all": "pending",
   "verification_status_all": "representative",
-  "scope": "Official-source departure requirements for a Venezuelan third-country national leaving Madrid, Spain on a professional employment move to Ireland (ES->IE corridor). Covers municipal de-registration from the Madrid padron (madrid.es), Spanish Social Security posted-worker mechanics and the A1/TA.300 certificate for those kept on a Spanish contract (seg-social.es), and the AEAT tax-exit / non-resident transition: fiscal-domicile change via Modelo 030, early non-resident withholding via Modelo 247, the 183-day residence rule with no mid-year split, and the non-resident IRNR self-assessment Modelo 210 (agenciatributaria.gob.es). Facts are verbatim-sourced from official government hosts only; legal/tax determinations are flagged for lawyer review. Candidate-only: review_status=pending, verification_status=representative."
+  "scope": "Official-source departure requirements for a Venezuelan third-country national leaving Madrid, Spain on a professional employment move to Ireland (ES->IE corridor). Covers municipal de-registration from the Madrid padron (madrid.es), Spanish Social Security posted-worker mechanics and the A1/TA.300 certificate for those kept on a Spanish contract (seg-social.es), and the AEAT tax-exit / non-resident transition: fiscal-domicile change via Modelo 030, early non-resident withholding via Modelo 247, the 183-day residence rule with no mid-year split, and the non-resident IRNR self-assessment Modelo 210 (agenciatributaria.gob.es). Facts are verbatim-sourced from official government hosts only; legal/tax determinations are flagged for lawyer review. Candidate-only: review_status=pending, verification_status=representative. Evidence quotes verbatim-confirmed against source pages by ReloPass specialist review on 2026-09-12."
 }

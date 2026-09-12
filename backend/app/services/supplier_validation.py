@@ -23,6 +23,7 @@ VALID_SERVICE_CATEGORIES = frozenset({
     "language_integration",
     "legal_admin",
     "tax_finance",
+    "temp_accommodation",  # [ANDREA-P1] serviced / short-stay housing before the lease
     "general",  # fallback
 })
 

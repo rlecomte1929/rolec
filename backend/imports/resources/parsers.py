@@ -292,7 +292,10 @@ def parse_json_categories(data: List[Dict[str, Any]]) -> List[ImportCategory]:
     out: List[ImportCategory] = []
     for i, d in enumerate(data):
         key = _trim(d.get("key"))
-        label = _trim(d.get("label"))
+        # [ANDREA-P1] Otto resource bundles (journey-completion brief §3.B) ship `name`;
+        # the contract says `label`. Accept both so the bundle's own categories/tags are not
+        # silently dropped (every resource row then failed "Category ... not found").
+        label = _trim(d.get("label")) or _trim(d.get("name"))
         if not key or not label:
             continue
         out.append(ImportCategory(
@@ -311,7 +314,10 @@ def parse_json_tags(data: List[Dict[str, Any]]) -> List[ImportTag]:
     out: List[ImportTag] = []
     for i, d in enumerate(data):
         key = _trim(d.get("key"))
-        label = _trim(d.get("label"))
+        # [ANDREA-P1] Otto resource bundles (journey-completion brief §3.B) ship `name`;
+        # the contract says `label`. Accept both so the bundle's own categories/tags are not
+        # silently dropped (every resource row then failed "Category ... not found").
+        label = _trim(d.get("label")) or _trim(d.get("name"))
         if not key or not label:
             continue
         out.append(ImportTag(
