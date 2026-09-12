@@ -36,6 +36,23 @@ corridor:
 
 See [`backend/docs/adr-003-access-pattern-structures.md`](../../backend/docs/adr-003-access-pattern-structures.md).
 
+## CVR gate: no approval without a filled relief section
+
+Do not flip a corridor's `requirement_items` to `review_status='approved'` without a Case
+Verification Report whose **section 6 Response is Yes or No**. The empty template is not a
+CVR. There is no `corridor.status=live` column and no `cvr_records` table — the artifact
+under `docs/corridors/<slug>/` is the gate.
+
+```bash
+python3 scripts/check_corridor_cvr.py --corridor IE_ES
+```
+
+`--corridor` is the pair id (`IE_ES`), not a destination `country_code` (Ireland is the
+origin of more than one corridor). Exit 1 means the docs dir is missing or section 6 is
+blank (IE→ES today). Exit 0 means some markdown file in that directory has Response filled.
+`requirements_builder` still serves only `review_status='approved'`; this script does not
+write that column.
+
 ## Documented corridors
 
 | corridor | records | served? | CVR | docs |
