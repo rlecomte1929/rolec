@@ -7,6 +7,8 @@ import {
 } from '../../features/immigration/ImmigrationAnswerPanel';
 import { MoveAtAGlance } from '../../features/immigration/MoveAtAGlance';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import { NoCaseLinkedEmptyState } from '../../components/employee/NoCaseLinkedEmptyState';
+import { resolveOverviewState } from '../../features/employee-journey/overviewResolution';
 import api, { servicesAPI } from '../../api/client';
 
 /**
@@ -17,13 +19,28 @@ import api, { servicesAPI } from '../../api/client';
  * anonymised applicant context (Slice 3), and pre-fills the corridor from the case (MVP).
  */
 export const ImmigrationAssistantPage: React.FC = () => {
-  const { primaryCaseId, assignmentId } = useEmployeeAssignment();
+  const {
+    primaryCaseId,
+    assignmentId,
+    linkedCount,
+    isLoading: assignmentLoading,
+    overviewError,
+    overviewDegraded,
+    pendingCount,
+  } = useEmployeeAssignment();
+  const { unresolved: overviewUnresolved } = resolveOverviewState({
+    overviewError,
+    overviewDegraded,
+    linkedCount,
+    pendingCount,
+  });
+  const noCaseLinked = !assignmentLoading && !overviewUnresolved && linkedCount === 0;
   const [caseContext, setCaseContext] = useState<ImmigrationCaseContext | undefined>(undefined);
   const [resolved, setResolved] = useState(false);
 
   useEffect(() => {
     let active = true;
-    if (!assignmentId) {
+    if (!assignmentId || noCaseLinked) {
       setResolved(true);
       return;
     }
@@ -62,16 +79,22 @@ export const ImmigrationAssistantPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [assignmentId, primaryCaseId]);
+  }, [assignmentId, noCaseLinked, primaryCaseId]);
 
   return (
     <AppShell title="Relocation Assistant" subtitle="Grounded answers about your move and your company's benefits">
       <Container maxWidth="xl" className="py-8 space-y-4">
+        {noCaseLinked ? (
+          <NoCaseLinkedEmptyState explanation="Select a case to ask immigration questions for this relocation." />
+        ) : (
+          <>
         <MoveAtAGlance caseId={primaryCaseId} />
         {resolved ? (
           <ImmigrationAnswerPanel caseId={primaryCaseId} caseContext={caseContext} />
         ) : (
           <p className="text-sm text-slate-500">Loading your move details…</p>
+        )}
+          </>
         )}
       </Container>
     </AppShell>

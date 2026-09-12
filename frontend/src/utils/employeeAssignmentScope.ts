@@ -44,6 +44,22 @@ export function caseIdForAssignment(
 }
 
 /**
+ * First case_id the employee actually owns among `candidates` (URL, last-selected,
+ * primary). Never returns a stale localStorage / HR-viewed UUID when this account
+ * has no linked assignment (AIQ-2358 / AIQ-2359).
+ */
+export function ownedEmployeeCaseId(
+  linkedSummaries: EmployeeLinkedOverviewRow[],
+  candidates: Array<string | null | undefined>,
+): string | null {
+  for (const candidate of candidates) {
+    const id = caseIdForAssignment(linkedSummaries, candidate ?? null);
+    if (id) return id;
+  }
+  return linkedSummaries[0]?.case_id ?? null;
+}
+
+/**
  * The case_id to PERSIST case-scoped state against (services-state), or `null`
  * when it cannot be safely resolved yet.
  *

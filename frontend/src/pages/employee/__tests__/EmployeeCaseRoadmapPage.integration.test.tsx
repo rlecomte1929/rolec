@@ -51,7 +51,22 @@ vi.mock('../../../api/cases', () => ({
 // unlocked so these tests exercise the roadmap render, not the paywall gate — the same
 // state production sees while the server-side paywall is off.
 vi.mock('../../../utils/paymentStatus', () => ({
-  fetchRoadmapUnlocked: vi.fn().mockResolvedValue(true),
+  fetchRoadmapUnlocked: () => Promise.resolve(true),
+}));
+vi.mock('../../../contexts/EmployeeAssignmentContext', () => ({
+  useEmployeeAssignment: () => ({
+    assignmentId: 'a1',
+    primaryCaseId: 'c1',
+    primaryAssignmentCompany: null,
+    isLoading: false,
+    linkedCount: 1,
+    pendingCount: 0,
+    linkedSummaries: [{ assignment_id: 'a1', case_id: 'c1' }],
+    pendingSummaries: [],
+    overviewError: null,
+    overviewDegraded: false,
+    refetch: async () => {},
+  }),
 }));
 
 const READY_PLAN: RelocationPlanViewResponseDTO = {

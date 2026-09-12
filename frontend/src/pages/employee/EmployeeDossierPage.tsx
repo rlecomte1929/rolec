@@ -15,6 +15,9 @@ import { Button } from '../../components/antigravity/Button';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
 import { ROUTE_DEFS } from '../../navigation/routes';
 import { AppShell } from '../../components/AppShell';
+import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import { resolveOverviewState } from '../../features/employee-journey/overviewResolution';
+import { NoCaseLinkedEmptyState } from '../../components/employee/NoCaseLinkedEmptyState';
 import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
 import { fetchRelocationPlanView } from '../../api/relocationPlanView';
 import { Alert, isSourceStale } from '../../components/antigravity';
@@ -82,6 +85,24 @@ export const EmployeeDossierPage: React.FC = () => {
   const caseId = useValidatedParams(caseParamsSchema, {
     redirectTo: ROUTE_DEFS.employeeDashboard.path,
   })?.caseId;
+  const {
+    linkedCount,
+    isLoading: assignmentLoading,
+    overviewError,
+    overviewDegraded,
+    pendingCount,
+  } = useEmployeeAssignment();
+  const { unresolved: overviewUnresolved } = resolveOverviewState({
+    overviewError,
+    overviewDegraded,
+    linkedCount,
+    pendingCount,
+  });
+  const storedRole =
+    typeof localStorage === 'undefined' ? null : localStorage.getItem('relopass_role');
+  const isAdmin = (storedRole || '').toUpperCase() === 'ADMIN';
+  const noCaseLinked =
+    !isAdmin && !assignmentLoading && !overviewUnresolved && linkedCount === 0;
   const [searchParams, setSearchParams] = useSearchParams();
   // [P1-6] When the Roadmap "Documents" chip links here it appends
   // ?roadmap_step=<stepId>; scope the list to that step's forms until cleared.
@@ -96,15 +117,20 @@ export const EmployeeDossierPage: React.FC = () => {
   const [roadmapValidated, setRoadmapValidated] = useState(true);
 
   useEffect(() => {
-    if (!caseId) return;
+    if (!caseId || noCaseLinked) return;
     let cancelled = false;
     fetchRelocationPlanView(caseId, { role: 'employee' })
       .then((p) => { if (!cancelled) setRoadmapValidated(!!p.roadmap_validated); })
       .catch(() => { if (!cancelled) setRoadmapValidated(true); });
     return () => { cancelled = true; };
-  }, [caseId]);
+  }, [caseId, noCaseLinked]);
 
   const load = useCallback(async () => {
+    if (noCaseLinked) {
+      setLoading(false);
+      setForms([]);
+      return;
+    }
     if (!caseId) {
       setError('Missing case id in URL.');
       setLoading(false);
@@ -122,7 +148,7 @@ export const EmployeeDossierPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [caseId]);
+  }, [caseId, noCaseLinked]);
 
   useEffect(() => {
     void load();
@@ -260,6 +286,10 @@ export const EmployeeDossierPage: React.FC = () => {
   return (
     <AppShell>
       <div className="max-w-5xl mx-auto px-6 py-8">
+        {noCaseLinked ? (
+          <NoCaseLinkedEmptyState explanation="Select a case to access forms for this relocation." />
+        ) : (
+        <>
         {/* Header */}
         <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -470,6 +500,8 @@ export const EmployeeDossierPage: React.FC = () => {
           </div>
         )}
         </div>
+        </>
+        )}
       </div>
     </AppShell>
   );

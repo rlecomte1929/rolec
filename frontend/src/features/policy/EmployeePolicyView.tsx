@@ -21,6 +21,7 @@ import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Alert, Button, Card } from '../../components/antigravity';
+import { NoCaseLinkedEmptyState } from '../../components/employee/NoCaseLinkedEmptyState';
 import { employeeAPI, policyConfigMatrixAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
@@ -222,13 +223,7 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
 
   if (!assignmentLoading && !assignmentId && linkedCount === 0) {
     return (
-      <Card padding="lg" className="border-[#e2e8f0]">
-        <p className="text-sm font-medium text-[#0b2b43] mb-1">No company linked yet</p>
-        <p className="text-sm text-[#64748b]">
-          Your company&apos;s relocation policy will appear here automatically once HR links your account to an assignment.
-          No action is needed on your part — you&apos;ll be able to view your full benefit entitlements as soon as they&apos;ve set it up.
-        </p>
-      </Card>
+      <NoCaseLinkedEmptyState explanation="Your company policy appears here once a case is linked to this account." />
     );
   }
 

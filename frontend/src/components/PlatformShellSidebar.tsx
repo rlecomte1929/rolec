@@ -9,6 +9,7 @@ import { getAdminNotificationCounts, type AdminNotificationCounts } from '../api
 import { getUnreadMessageCount } from '../api/messageNotifications';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { ownedEmployeeCaseId } from '../utils/employeeAssignmentScope';
 import { swallow } from '../lib/errorTracking';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
@@ -215,9 +216,22 @@ const SECTIONS: NavSection[] = [
       // empty (buttons disabled, no items) — the same distrust-training problem
       // AIQ-914 fixed for the other items. Re-add a `dynamic` badge once a real
       // roadmap-item count is exposed to the sidebar. (AIQ-979)
-      { id: 'roadmap', label: 'Roadmap', to: ROUTE_DEFS.employeeDashboard.path },
+      {
+        id: 'roadmap',
+        label: 'Roadmap',
+        to: ROUTE_DEFS.employeeDashboard.path,
+        // fix: AIQ-2359 — never emit another user's case UUID when this account is unlinked
+        hidden: ({ linkedCount, role, assignmentsLoading }) =>
+          role !== 'ADMIN' && !assignmentsLoading && linkedCount === 0,
+      },
       { id: 'documents', label: 'Tasks', hint: 'Documents and actions requested by your HR team', to: ROUTE_DEFS.employeeTaskPage.path },
-      { id: 'dossier', label: 'Dossier & forms', to: ROUTE_DEFS.employeeDashboard.path },
+      {
+        id: 'dossier',
+        label: 'Dossier & forms',
+        to: ROUTE_DEFS.employeeDashboard.path,
+        hidden: ({ linkedCount, role, assignmentsLoading }) =>
+          role !== 'ADMIN' && !assignmentsLoading && linkedCount === 0,
+      },
       { id: 'service-providers', label: 'Services', hint: 'Choose services and see recommended providers for your move', to: ROUTE_DEFS.services.path },
       { id: 'benefit-comparison', label: 'Benefit comparison', to: ROUTE_DEFS.employeeBenefitsComparison.path },
       { id: 'immigration-qa', label: 'Immigration Q&A', hint: 'Grounded, cited answers to immigration questions for your corridor', to: ROUTE_DEFS.employeeImmigrationAssistant.path },
@@ -761,7 +775,9 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
   // even from /employee/dashboard where there is no case in the URL and nothing was selected yet.
   const { selectedCaseId } = useSelectedCase();
   const { linkedCount, primaryCaseId, linkedSummaries, isLoading: assignmentsLoading } = useEmployeeAssignment();
-  const effectiveCaseId = urlCaseId ?? selectedCaseId ?? primaryCaseId;
+  // Only a case the employee owns. localStorage / URL UUIDs from an HR session must
+  // not become Roadmap/Dossier hrefs for an unlinked account (AIQ-2359).
+  const effectiveCaseId = ownedEmployeeCaseId(linkedSummaries, [urlCaseId, selectedCaseId, primaryCaseId]);
 
   // Resolve the active linked case (by case_id or assignment_id) so the employee
   // journey-progress mini indicator can read its intake_step/status. Falls back to
