@@ -228,6 +228,16 @@ export default function CaseGate({
         ))}
       </div>
 
+      <div className="mb-4 p-4 rounded-xl border border-[var(--space-border-default)] bg-[var(--space-surface-card)]">
+        <h4 className="text-sm font-semibold text-[var(--space-text-primary)] mb-1">
+          Why not just ask ChatGPT?
+        </h4>
+        <p className="text-xs text-[var(--space-text-secondary)] leading-relaxed">
+          Chat tools generate plausible checklists. ReloPass looks up requirements a lawyer
+          has confirmed against primary sources. The D-number window is a lookup, not a guess.
+        </p>
+      </div>
+
       {/* Blurred remainder of the roadmap */}
       <div className="relative rounded-2xl overflow-hidden border border-[var(--space-border-default)] mb-4" aria-hidden="true">
         <div className="max-h-72 overflow-hidden blur-[6px] select-none pointer-events-none opacity-70">

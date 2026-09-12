@@ -128,6 +128,16 @@ export const RoadmapPaywallGate: React.FC<RoadmapPaywallGateProps> = ({
         </ul>
       </div>
 
+      <div className="rounded-xl border border-navy-100 bg-navy-50/60 p-5 mb-6">
+        <h3 className="font-semibold text-navy-800 mb-2">Why not just ask ChatGPT?</h3>
+        <p className="text-sm text-slate-700">
+          General-purpose chat tools generate plausible checklists. They do not look up the
+          lawyer-reviewed requirement catalog ReloPass serves. A confident answer that omits
+          the D-number timing window is still a week-seven problem. Every served requirement
+          has a source and a publication gate — this is a lookup, not a generated essay.
+        </p>
+      </div>
+
       {/* Error state */}
       {error ? (
         <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
