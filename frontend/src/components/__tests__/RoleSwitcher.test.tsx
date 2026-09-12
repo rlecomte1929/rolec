@@ -60,4 +60,16 @@ describe('RoleSwitcher', () => {
     await waitFor(() => expect(setActiveRole).toHaveBeenCalledWith('EMPLOYEE'));
     expect(navigate).toHaveBeenCalledWith('/employee/dashboard');
   });
+
+  it('keeps the picked role when the server echoes ADMIN as primary', async () => {
+    getStoredRoles.mockReturnValue(['ADMIN', 'EMPLOYEE']);
+    getActiveRole.mockReturnValue('ADMIN');
+    switchRole.mockResolvedValue({ roles: ['ADMIN', 'EMPLOYEE'], primary_role: 'ADMIN' });
+
+    render(<RoleSwitcher />);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'EMPLOYEE' } });
+
+    await waitFor(() => expect(setActiveRole).toHaveBeenCalledWith('EMPLOYEE'));
+    expect(navigate).toHaveBeenCalledWith('/employee/dashboard');
+  });
 });
