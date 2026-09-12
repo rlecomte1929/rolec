@@ -9435,6 +9435,13 @@ def create_rfq(
                     result.get("id"), req_id, exc_info=True)
         not_contacted.append({"supplier": "All suppliers", "reason": "we could not send the requests"})
 
+    # [AIQ-2370] Tell the employee the RFQ went out (in-app + outbox). Best-effort.
+    try:
+        from .app.services.rfq_notifications import notify_rfq_sent
+        notify_rfq_sent(str(result.get("id")), contacted=contacted, not_contacted=not_contacted)
+    except Exception:
+        log.warning("create_rfq: rfq_sent notification failed rfq=%s", result.get("id"), exc_info=True)
+
     # [AIQ-1520] Tell the caller who was left out. Silently dropping a vendor the employee
     # deliberately shortlisted is exactly the kind of quiet data loss this phase exists to end.
     # [AIQ-1521] `contacted` / `not_contacted` say what actually reached a supplier, so the UI can
@@ -9574,6 +9581,12 @@ def propose_quote(
     updated = db.set_rfq_preferred_quote(rfq_id, quote_id, user.get("id"), request_id=request_id)
     if not updated:
         raise HTTPException(status_code=404, detail="RFQ not found")
+    # [AIQ-2370] Employee proposed → HR can validate. Once per RFQ (idempotent).
+    try:
+        from .app.services.rfq_notifications import notify_quotes_ready
+        notify_quotes_ready(rfq_id)
+    except Exception:
+        log.warning("propose_quote: quotes_ready notification failed rfq=%s", rfq_id, exc_info=True)
     return {"ok": True, "rfq": updated}
 
 
@@ -9647,6 +9660,12 @@ def accept_quote(
         )
     except Exception:
         pass
+    # [AIQ-2370] Tell the employee HR validated a quote. Best-effort.
+    try:
+        from .app.services.rfq_notifications import notify_quote_validated
+        notify_quote_validated(rfq_id, quote_id)
+    except Exception:
+        log.warning("accept_quote: quote_validated notification failed rfq=%s", rfq_id, exc_info=True)
     return {"ok": True, "quote": result.get("quote"), "validation": result}
 
 

@@ -1,0 +1,2798 @@
+{
+  "schema_version": "1.0",
+  "common": {
+    "quote_header_fields": [
+      {
+        "key": "total_price",
+        "label": "Total price",
+        "type": "money",
+        "required": true,
+        "help": "All-in total for the scope described in the brief.",
+        "validation": "Positive number, up to 2 decimal places."
+      },
+      {
+        "key": "currency",
+        "label": "Currency",
+        "type": "currency",
+        "required": true,
+        "help": "ISO 4217 currency code for the quoted total.",
+        "validation": "Must be a value from the supported currency list."
+      },
+      {
+        "key": "valid_until",
+        "label": "Quote valid until",
+        "type": "date",
+        "required": true,
+        "help": "Date after which this price is no longer guaranteed.",
+        "validation": "Must be at least 14 days from today."
+      },
+      {
+        "key": "notes",
+        "label": "Additional notes",
+        "type": "textarea",
+        "required": false,
+        "help": "Scope exclusions, assumptions, or anything not captured in line items.",
+        "validation": "Max 1000 characters."
+      }
+    ],
+    "coverage_confirmation_fields": [
+      {
+        "key": "covers_route",
+        "label": "Can you cover this route?",
+        "type": "boolean",
+        "required": true,
+        "help": "Confirm you operate between the origin and destination shown in the brief.",
+        "validation": "Must be answered."
+      },
+      {
+        "key": "covers_date",
+        "label": "Available around the target date?",
+        "type": "boolean",
+        "required": true,
+        "help": "Confirm availability within two weeks either side of the target date.",
+        "validation": "Must be answered."
+      },
+      {
+        "key": "missing_info",
+        "label": "Anything missing or unclear?",
+        "type": "textarea",
+        "required": false,
+        "help": "List any information you need before this quote can be confirmed.",
+        "validation": "Max 500 characters."
+      }
+    ],
+    "supplier_contact_fields": [
+      {
+        "key": "contact_name",
+        "label": "Contact name",
+        "type": "text",
+        "required": true,
+        "help": "Name of the person submitting this quote.",
+        "validation": "Max 100 characters."
+      },
+      {
+        "key": "contact_email",
+        "label": "Business email",
+        "type": "text",
+        "required": true,
+        "help": "The company will use this address if your quote is selected.",
+        "validation": "Valid email format."
+      },
+      {
+        "key": "contact_phone",
+        "label": "Phone number",
+        "type": "text",
+        "required": false,
+        "help": "International format preferred, e.g. +33 1 23 45 67 89.",
+        "validation": "Max 30 characters."
+      },
+      {
+        "key": "company_registration",
+        "label": "Company registration number",
+        "type": "text",
+        "required": false,
+        "help": "Local company registration or trade licence number.",
+        "validation": "Max 50 characters."
+      }
+    ],
+    "currencies": [
+      "EUR",
+      "GBP",
+      "USD",
+      "NOK",
+      "SGD",
+      "AED",
+      "CHF",
+      "SEK",
+      "DKK",
+      "AUD",
+      "CAD",
+      "HKD"
+    ],
+    "default_validity_days": 30
+  },
+  "services": [
+    {
+      "service_key": "movers",
+      "supplier_type": "International removals or freight forwarding company",
+      "brief_fields": [
+        {
+          "key": "move_from_city",
+          "label": "Origin city",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Madrid",
+          "why_the_supplier_needs_it": "Collection location and routing."
+        },
+        {
+          "key": "move_from_country",
+          "label": "Origin country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Spain",
+          "why_the_supplier_needs_it": "Export customs rules and corridor pricing."
+        },
+        {
+          "key": "move_to_city",
+          "label": "Destination city",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Dublin",
+          "why_the_supplier_needs_it": "Delivery location."
+        },
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Ireland",
+          "why_the_supplier_needs_it": "Import customs rules and corridor pricing."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Target move date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Required loading and delivery window."
+        },
+        {
+          "key": "household_adults",
+          "label": "Adults in household",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": false,
+          "example": "2",
+          "why_the_supplier_needs_it": "Volume proxy when m3 is unknown."
+        },
+        {
+          "key": "household_children",
+          "label": "Children (count and ages)",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "2 children, ages 4 and 7",
+          "why_the_supplier_needs_it": "Additional furniture items such as children's beds."
+        },
+        {
+          "key": "has_pets",
+          "label": "Pets",
+          "source": "case",
+          "type": "boolean",
+          "required_for_quote": false,
+          "example": "Yes",
+          "why_the_supplier_needs_it": "Pet crates or special handling may apply."
+        },
+        {
+          "key": "origin_property_type",
+          "label": "Origin property type",
+          "source": "employee_answer",
+          "type": "select",
+          "options": [
+            "Apartment",
+            "House",
+            "Studio",
+            "Villa",
+            "Other"
+          ],
+          "required_for_quote": true,
+          "example": "Apartment",
+          "why_the_supplier_needs_it": "Determines access and loading method."
+        },
+        {
+          "key": "origin_floor",
+          "label": "Origin floor",
+          "source": "employee_answer",
+          "type": "integer",
+          "required_for_quote": false,
+          "example": "3",
+          "why_the_supplier_needs_it": "Affects labour cost if no lift."
+        },
+        {
+          "key": "origin_lift",
+          "label": "Lift at origin",
+          "source": "employee_answer",
+          "type": "boolean",
+          "required_for_quote": false,
+          "example": "Yes",
+          "why_the_supplier_needs_it": "Affects labour cost and equipment."
+        },
+        {
+          "key": "destination_property_type",
+          "label": "Destination property type",
+          "source": "employee_answer",
+          "type": "select",
+          "options": [
+            "Apartment",
+            "House",
+            "Studio",
+            "Villa",
+            "Other",
+            "Not yet confirmed"
+          ],
+          "required_for_quote": false,
+          "example": "House",
+          "why_the_supplier_needs_it": "Determines delivery access method."
+        },
+        {
+          "key": "destination_floor",
+          "label": "Destination floor",
+          "source": "employee_answer",
+          "type": "integer",
+          "required_for_quote": false,
+          "example": "1",
+          "why_the_supplier_needs_it": "Affects labour cost at delivery."
+        },
+        {
+          "key": "destination_lift",
+          "label": "Lift at destination",
+          "source": "employee_answer",
+          "type": "boolean",
+          "required_for_quote": false,
+          "example": "No",
+          "why_the_supplier_needs_it": "Affects labour cost and equipment at delivery."
+        },
+        {
+          "key": "volume_m3",
+          "label": "Estimated volume (m3)",
+          "source": "employee_answer",
+          "type": "integer",
+          "required_for_quote": false,
+          "example": "25",
+          "why_the_supplier_needs_it": "Primary input for transport cost."
+        },
+        {
+          "key": "special_items",
+          "label": "Special items",
+          "source": "employee_answer",
+          "type": "textarea",
+          "required_for_quote": false,
+          "example": "Upright piano, large artwork",
+          "why_the_supplier_needs_it": "Special packing, crating, or equipment required."
+        },
+        {
+          "key": "storage_needed",
+          "label": "Storage needed",
+          "source": "employee_answer",
+          "type": "boolean",
+          "required_for_quote": false,
+          "example": "No",
+          "why_the_supplier_needs_it": "Determines whether a storage line is in scope."
+        },
+        {
+          "key": "packing_service",
+          "label": "Full packing service needed",
+          "source": "employee_answer",
+          "type": "boolean",
+          "required_for_quote": false,
+          "example": "Yes",
+          "why_the_supplier_needs_it": "Determines whether packing labour and materials are in scope."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "MOV_PACKING",
+          "label": "Packing and materials",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Varies with volume and number of special items.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "MOV_TRANSPORT",
+          "label": "Transport / shipping",
+          "required": true,
+          "unit": "flat",
+          "typical_range_note": "Largest single line for most moves; varies by route and volume.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "MOV_UNPACKING",
+          "label": "Unpacking service",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Typically a fraction of the packing cost.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "MOV_STORAGE",
+          "label": "Storage",
+          "required": false,
+          "unit": "per_month",
+          "typical_range_note": "Per month; confirm minimum period required.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "MOV_INSURANCE",
+          "label": "Goods in transit insurance",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Typically a percentage of declared goods value.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "MOV_CUSTOMS",
+          "label": "Customs clearance",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "May not apply for intra-EU moves.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "MOV_SPECIAL",
+          "label": "Special items handling",
+          "required": false,
+          "unit": "per_item",
+          "typical_range_note": "Pianos, artwork, and fragile items are the most common.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "MOV_OTHER",
+          "label": "Other",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Catch-all for unlisted charges; should be minimal.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "estimated_transit_days",
+          "label": "Estimated transit days",
+          "type": "integer",
+          "required": true,
+          "help": "Working days from collection to delivery, excluding storage.",
+          "validation": "Positive integer."
+        },
+        {
+          "key": "packing_included",
+          "label": "Full packing included in total",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether packing labour and materials are in the total.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "insurance_cover_amount",
+          "label": "Insurance cover limit",
+          "type": "money",
+          "required": false,
+          "help": "Maximum declared value covered under goods in transit insurance.",
+          "validation": "Positive number if provided."
+        },
+        {
+          "key": "cancellation_terms",
+          "label": "Cancellation terms",
+          "type": "textarea",
+          "required": false,
+          "help": "Notice period and charges if the move is cancelled or rescheduled.",
+          "validation": "Max 300 characters."
+        },
+        {
+          "key": "access_restrictions_noted",
+          "label": "Access restrictions priced in",
+          "type": "boolean",
+          "required": false,
+          "help": "Confirm whether access issues at origin or destination are priced in.",
+          "validation": "No constraint."
+        }
+      ],
+      "comparison_keys": [
+        "MOV_TRANSPORT",
+        "estimated_transit_days",
+        "insurance_cover_amount",
+        "packing_included",
+        "valid_until"
+      ],
+      "red_flags": [
+        "MOV_TRANSPORT is absent or zero",
+        "total_price is less than the sum of all non-OTHER line items",
+        "insurance_cover_amount is empty and MOV_INSURANCE is non-zero",
+        "estimated_transit_days is not provided",
+        "valid_until is less than 14 days from today"
+      ]
+    },
+    {
+      "service_key": "housing",
+      "supplier_type": "Lettings agency or relocation housing consultant",
+      "brief_fields": [
+        {
+          "key": "move_to_city",
+          "label": "Destination city",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Dublin",
+          "why_the_supplier_needs_it": "Defines the search area."
+        },
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Ireland",
+          "why_the_supplier_needs_it": "Determines tenancy law and required documentation."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Target move-in date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Sets the required availability date."
+        },
+        {
+          "key": "assignment_duration_months",
+          "label": "Assignment length (months)",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "24",
+          "why_the_supplier_needs_it": "Determines minimum lease term needed."
+        },
+        {
+          "key": "household_adults",
+          "label": "Adults in household",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "2",
+          "why_the_supplier_needs_it": "Determines minimum bedroom count."
+        },
+        {
+          "key": "household_children",
+          "label": "Children (count and ages)",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "2 children, ages 4 and 7",
+          "why_the_supplier_needs_it": "May affect bedroom count and school-proximity search."
+        },
+        {
+          "key": "has_pets",
+          "label": "Pets",
+          "source": "case",
+          "type": "boolean",
+          "required_for_quote": true,
+          "example": "Yes",
+          "why_the_supplier_needs_it": "Restricts search to pet-friendly listings."
+        },
+        {
+          "key": "min_bedrooms",
+          "label": "Minimum bedrooms required",
+          "source": "employee_answer",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "3",
+          "why_the_supplier_needs_it": "Core search parameter."
+        },
+        {
+          "key": "furnished_preference",
+          "label": "Furnished preference",
+          "source": "employee_answer",
+          "type": "select",
+          "options": [
+            "Furnished",
+            "Unfurnished",
+            "Either"
+          ],
+          "required_for_quote": false,
+          "example": "Furnished",
+          "why_the_supplier_needs_it": "Filters property type and affects monthly cost."
+        },
+        {
+          "key": "preferred_areas",
+          "label": "Preferred areas or districts",
+          "source": "employee_answer",
+          "type": "textarea",
+          "required_for_quote": false,
+          "example": "South Dublin, within 5 km of city centre",
+          "why_the_supplier_needs_it": "Narrows the search area."
+        },
+        {
+          "key": "max_monthly_budget",
+          "label": "Max monthly budget",
+          "source": "employee_answer",
+          "type": "money",
+          "required_for_quote": false,
+          "example": "3000",
+          "why_the_supplier_needs_it": "Upper rent limit; flag if below market rate for this area."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "HSG_MONTHLY_RENT",
+          "label": "Monthly rent",
+          "required": true,
+          "unit": "per_month",
+          "typical_range_note": "Primary recurring cost; highly location-dependent.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "HSG_AGENCY_FEE",
+          "label": "Agency or finder's fee",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Often one to two months' rent; varies by market.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "HSG_DEPOSIT",
+          "label": "Security deposit",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Typically one to two months' rent; usually refundable.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "HSG_ADMIN",
+          "label": "Admin or referencing fee",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Flat charge for tenancy checks and paperwork.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "HSG_OTHER",
+          "label": "Other",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Any one-off cost not captured above.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "available_from_date",
+          "label": "Property available from",
+          "type": "date",
+          "required": true,
+          "help": "Earliest date the property can be occupied.",
+          "validation": "Must be on or before the target move-in date."
+        },
+        {
+          "key": "bedrooms",
+          "label": "Bedrooms in property offered",
+          "type": "integer",
+          "required": true,
+          "help": "Actual bedroom count in the property being quoted.",
+          "validation": "Positive integer."
+        },
+        {
+          "key": "property_type",
+          "label": "Property type",
+          "type": "select",
+          "options": [
+            "Apartment",
+            "House",
+            "Studio",
+            "Duplex",
+            "Other"
+          ],
+          "required": true,
+          "help": "Type of property being quoted.",
+          "validation": "Must select one."
+        },
+        {
+          "key": "furnished",
+          "label": "Furnished",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether the property is let furnished.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "pets_allowed",
+          "label": "Pets allowed",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether the landlord accepts pets in this property.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "min_lease_months",
+          "label": "Minimum lease term (months)",
+          "type": "integer",
+          "required": true,
+          "help": "Minimum tenancy the landlord will accept.",
+          "validation": "Positive integer."
+        },
+        {
+          "key": "utilities_included",
+          "label": "Utilities included in rent",
+          "type": "boolean",
+          "required": false,
+          "help": "Confirm whether gas, electricity, and water are included.",
+          "validation": "No constraint."
+        }
+      ],
+      "comparison_keys": [
+        "HSG_MONTHLY_RENT",
+        "HSG_AGENCY_FEE",
+        "available_from_date",
+        "bedrooms",
+        "pets_allowed"
+      ],
+      "red_flags": [
+        "available_from_date is after the target move-in date",
+        "pets_allowed is false and has_pets is true",
+        "min_lease_months exceeds assignment_duration_months",
+        "HSG_MONTHLY_RENT exceeds company policy cap",
+        "valid_until is less than 14 days from today"
+      ]
+    },
+    {
+      "service_key": "temp_accommodation",
+      "supplier_type": "Serviced apartment provider or short-term letting agent",
+      "brief_fields": [
+        {
+          "key": "move_to_city",
+          "label": "Destination city",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Dublin",
+          "why_the_supplier_needs_it": "Defines the required location."
+        },
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Ireland",
+          "why_the_supplier_needs_it": "Confirms jurisdiction and pricing context."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Check-in date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Required check-in date."
+        },
+        {
+          "key": "household_adults",
+          "label": "Adults",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "2",
+          "why_the_supplier_needs_it": "Determines minimum sleeping capacity."
+        },
+        {
+          "key": "household_children",
+          "label": "Children (count and ages)",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "1 child, age 5",
+          "why_the_supplier_needs_it": "May require additional sleeping or childproofing."
+        },
+        {
+          "key": "has_pets",
+          "label": "Pets",
+          "source": "case",
+          "type": "boolean",
+          "required_for_quote": true,
+          "example": "No",
+          "why_the_supplier_needs_it": "Restricts search to pet-friendly properties."
+        },
+        {
+          "key": "duration_weeks",
+          "label": "Duration required (weeks)",
+          "source": "employee_answer",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "4",
+          "why_the_supplier_needs_it": "Sets the booking period for pricing and availability."
+        },
+        {
+          "key": "workspace_needed",
+          "label": "Dedicated workspace needed",
+          "source": "employee_answer",
+          "type": "boolean",
+          "required_for_quote": false,
+          "example": "Yes",
+          "why_the_supplier_needs_it": "Determines whether a desk and chair are required in the unit."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "TMP_RATE",
+          "label": "Accommodation rate",
+          "required": true,
+          "unit": "per_month",
+          "typical_range_note": "State whether this is a weekly or monthly rate in the notes field.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "TMP_CLEANING",
+          "label": "Cleaning fee",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "May be charged per stay or per week; clarify in notes.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "TMP_UTILITIES",
+          "label": "Utilities (if not included)",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Leave blank if utilities are included in the rate.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "TMP_PARKING",
+          "label": "Parking",
+          "required": false,
+          "unit": "per_month",
+          "typical_range_note": "Only include if parking is a separate charge.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "TMP_OTHER",
+          "label": "Other",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Any one-off or unlisted charge.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "accommodation_type",
+          "label": "Accommodation type",
+          "type": "select",
+          "options": [
+            "Serviced apartment",
+            "Hotel room",
+            "Hotel suite",
+            "Extended-stay hotel",
+            "Other"
+          ],
+          "required": true,
+          "help": "Type of accommodation being offered.",
+          "validation": "Must select one."
+        },
+        {
+          "key": "available_from_date",
+          "label": "Available from",
+          "type": "date",
+          "required": true,
+          "help": "Earliest check-in date for this unit.",
+          "validation": "Must be on or before the target check-in date."
+        },
+        {
+          "key": "rate_billing_period",
+          "label": "Rate billing period",
+          "type": "select",
+          "options": [
+            "Per night",
+            "Per week",
+            "Per month"
+          ],
+          "required": true,
+          "help": "The period the TMP_RATE figure covers.",
+          "validation": "Must select one."
+        },
+        {
+          "key": "min_stay_nights",
+          "label": "Minimum stay (nights)",
+          "type": "integer",
+          "required": true,
+          "help": "Minimum booking length the provider requires.",
+          "validation": "Positive integer."
+        },
+        {
+          "key": "pets_allowed",
+          "label": "Pets allowed",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether pets are accepted in this unit.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "internet_included",
+          "label": "Internet included",
+          "type": "boolean",
+          "required": false,
+          "help": "Confirm whether Wi-Fi is included at no extra cost.",
+          "validation": "No constraint."
+        },
+        {
+          "key": "cancellation_terms",
+          "label": "Cancellation terms",
+          "type": "textarea",
+          "required": false,
+          "help": "Notice period and charges if the booking is cancelled.",
+          "validation": "Max 300 characters."
+        }
+      ],
+      "comparison_keys": [
+        "TMP_RATE",
+        "rate_billing_period",
+        "available_from_date",
+        "min_stay_nights",
+        "pets_allowed"
+      ],
+      "red_flags": [
+        "available_from_date is after the target check-in date",
+        "pets_allowed is false and has_pets is true",
+        "min_stay_nights converted to weeks exceeds duration_weeks requested",
+        "TMP_RATE after normalisation to weekly rate exceeds company policy cap",
+        "valid_until is less than 14 days from today"
+      ]
+    },
+    {
+      "service_key": "schools",
+      "supplier_type": "International school, school placement agency, or admissions consultant",
+      "brief_fields": [
+        {
+          "key": "move_to_city",
+          "label": "Destination city",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Dublin",
+          "why_the_supplier_needs_it": "Determines which schools are in scope."
+        },
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Ireland",
+          "why_the_supplier_needs_it": "Confirms the national education system context."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Required start date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Determines which academic term the child must enter."
+        },
+        {
+          "key": "household_children",
+          "label": "Children (count and ages)",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "2 children, ages 8 and 11",
+          "why_the_supplier_needs_it": "Determines year groups and number of placements needed."
+        },
+        {
+          "key": "curriculum_preference",
+          "label": "Curriculum preference",
+          "source": "employee_answer",
+          "type": "select",
+          "options": [
+            "IB",
+            "British",
+            "American",
+            "French",
+            "German",
+            "Local national",
+            "No preference"
+          ],
+          "required_for_quote": false,
+          "example": "British",
+          "why_the_supplier_needs_it": "Narrows the shortlist to compatible schools."
+        },
+        {
+          "key": "language_of_instruction",
+          "label": "Language of instruction",
+          "source": "employee_answer",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "English",
+          "why_the_supplier_needs_it": "Ensures the child can follow lessons from day one."
+        },
+        {
+          "key": "school_type_preference",
+          "label": "School type preference",
+          "source": "employee_answer",
+          "type": "select",
+          "options": [
+            "International private",
+            "State / public",
+            "Either"
+          ],
+          "required_for_quote": false,
+          "example": "International private",
+          "why_the_supplier_needs_it": "Determines whether state-funded options are in scope."
+        },
+        {
+          "key": "special_requirements",
+          "label": "Special educational needs",
+          "source": "employee_answer",
+          "type": "textarea",
+          "required_for_quote": false,
+          "example": "Learning support for dyslexia",
+          "why_the_supplier_needs_it": "Determines whether additional support services are needed."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "SCH_SEARCH_FEE",
+          "label": "School search service fee",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "One-off fee charged by placement consultants for the search.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "SCH_APPLICATION",
+          "label": "Application support fee",
+          "required": false,
+          "unit": "per_item",
+          "typical_range_note": "Per school application; clarify number of schools in notes.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "SCH_REGISTRATION",
+          "label": "Registration or enrolment fee",
+          "required": false,
+          "unit": "per_item",
+          "typical_range_note": "One-off fee payable to the school on acceptance; per child.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "SCH_ANNUAL_TUITION",
+          "label": "Annual tuition",
+          "required": false,
+          "unit": "per_item",
+          "typical_range_note": "Per child per year; wide range depending on school and city.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "SCH_TRANSPORT",
+          "label": "School transport",
+          "required": false,
+          "unit": "per_month",
+          "typical_range_note": "Per month per child where a school bus service applies.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "SCH_OTHER",
+          "label": "Other",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Uniform, materials, or unlisted charges.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "school_names",
+          "label": "School name(s) in this quote",
+          "type": "textarea",
+          "required": true,
+          "help": "Name every school included in this quote.",
+          "validation": "Required; max 300 characters."
+        },
+        {
+          "key": "curricula_covered",
+          "label": "Curriculum offered",
+          "type": "text",
+          "required": true,
+          "help": "State the curriculum or curricula the school follows.",
+          "validation": "Max 200 characters."
+        },
+        {
+          "key": "age_range",
+          "label": "Age range covered",
+          "type": "text",
+          "required": true,
+          "help": "e.g. 4 to 18 years.",
+          "validation": "Max 50 characters."
+        },
+        {
+          "key": "admission_start_date",
+          "label": "Earliest admission date",
+          "type": "date",
+          "required": true,
+          "help": "Earliest date the school can accept the child.",
+          "validation": "Must be a valid date."
+        },
+        {
+          "key": "availability_confirmed",
+          "label": "Place availability confirmed",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm a place is available for the child's year group.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "sen_support",
+          "label": "Learning support available",
+          "type": "boolean",
+          "required": false,
+          "help": "Confirm whether the school offers SEN or learning support.",
+          "validation": "No constraint."
+        }
+      ],
+      "comparison_keys": [
+        "SCH_ANNUAL_TUITION",
+        "SCH_SEARCH_FEE",
+        "admission_start_date",
+        "curricula_covered",
+        "availability_confirmed"
+      ],
+      "red_flags": [
+        "availability_confirmed is false",
+        "admission_start_date is after the target move date",
+        "age_range does not cover all children listed in the brief",
+        "SCH_ANNUAL_TUITION exceeds company policy cap",
+        "valid_until is less than 14 days from today"
+      ]
+    },
+    {
+      "service_key": "banks",
+      "supplier_type": "Retail or international bank offering accounts to relocating employees",
+      "brief_fields": [
+        {
+          "key": "move_to_city",
+          "label": "Destination city",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Dublin",
+          "why_the_supplier_needs_it": "Confirms the bank operates in the required city."
+        },
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Ireland",
+          "why_the_supplier_needs_it": "Determines local account type and regulatory requirements."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Target arrival date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Sets the date by which the account must be active."
+        },
+        {
+          "key": "employee_nationality",
+          "label": "Employee nationality",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Venezuelan",
+          "why_the_supplier_needs_it": "Some banks restrict account opening by nationality."
+        },
+        {
+          "key": "visa_route_label",
+          "label": "Visa or permit type",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Critical Skills Employment Permit",
+          "why_the_supplier_needs_it": "Banks may require a specific permit type for eligibility."
+        },
+        {
+          "key": "household_adults",
+          "label": "Adults requiring accounts",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": false,
+          "example": "2",
+          "why_the_supplier_needs_it": "Determines how many accounts are in scope."
+        },
+        {
+          "key": "account_types_needed",
+          "label": "Account types required",
+          "source": "employee_answer",
+          "type": "textarea",
+          "required_for_quote": false,
+          "example": "Current account for salary, savings account",
+          "why_the_supplier_needs_it": "Determines the product scope of the quote."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "BNK_SETUP_FEE",
+          "label": "Account setup fee",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "One-off charge; many banks waive this for relocating employees.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "BNK_MONTHLY_FEE",
+          "label": "Monthly maintenance fee",
+          "required": false,
+          "unit": "per_month",
+          "typical_range_note": "Recurring fee; varies by account tier.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "BNK_TRANSFER_FEE",
+          "label": "International transfer fee",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Per transaction; state whether this is SEPA or SWIFT.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "BNK_OTHER",
+          "label": "Other fees",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Card issuance or other one-off charges.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "account_types_offered",
+          "label": "Account types offered",
+          "type": "textarea",
+          "required": true,
+          "help": "List all account types included in this quote.",
+          "validation": "Max 300 characters."
+        },
+        {
+          "key": "activation_days",
+          "label": "Days to account activation",
+          "type": "integer",
+          "required": true,
+          "help": "Working days from application to an active account number.",
+          "validation": "Positive integer."
+        },
+        {
+          "key": "pre_arrival_application",
+          "label": "Pre-arrival application available",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether the employee can apply before arriving.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "accepts_non_resident",
+          "label": "Accepts non-resident applicants",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether the bank accepts applicants before residency is established.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "online_banking_available",
+          "label": "Online banking available",
+          "type": "boolean",
+          "required": false,
+          "help": "Confirm whether the account includes online banking.",
+          "validation": "No constraint."
+        },
+        {
+          "key": "fx_margin_percent",
+          "label": "FX margin (%)",
+          "type": "text",
+          "required": false,
+          "help": "Margin above mid-market rate for currency conversions.",
+          "validation": "Numeric; max 10 characters."
+        }
+      ],
+      "comparison_keys": [
+        "BNK_SETUP_FEE",
+        "BNK_MONTHLY_FEE",
+        "activation_days",
+        "pre_arrival_application",
+        "accepts_non_resident"
+      ],
+      "red_flags": [
+        "accepts_non_resident is false",
+        "activation_days means the account will not be ready before the target arrival date",
+        "pre_arrival_application is false and activation_days is high",
+        "BNK_SETUP_FEE exceeds company policy cap",
+        "valid_until is less than 14 days from today"
+      ]
+    },
+    {
+      "service_key": "insurance",
+      "supplier_type": "International health, contents, or combined relocation insurance provider",
+      "brief_fields": [
+        {
+          "key": "move_from_country",
+          "label": "Origin country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Spain",
+          "why_the_supplier_needs_it": "Determines whether prior cover can be extended or replaced."
+        },
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Ireland",
+          "why_the_supplier_needs_it": "Sets the jurisdiction for the policy."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Cover start date needed",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Cover must be in force by this date."
+        },
+        {
+          "key": "assignment_duration_months",
+          "label": "Assignment length (months)",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "24",
+          "why_the_supplier_needs_it": "Determines policy term."
+        },
+        {
+          "key": "household_adults",
+          "label": "Adults to be covered",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "2",
+          "why_the_supplier_needs_it": "Determines number of insured persons."
+        },
+        {
+          "key": "household_children",
+          "label": "Children to be covered (count, ages)",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "1 child, age 5",
+          "why_the_supplier_needs_it": "Children may be added to a family plan."
+        },
+        {
+          "key": "employee_nationality",
+          "label": "Employee nationality",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "Norwegian",
+          "why_the_supplier_needs_it": "Affects eligibility for certain policy types."
+        },
+        {
+          "key": "coverage_types_needed",
+          "label": "Coverage types required",
+          "source": "employee_answer",
+          "type": "textarea",
+          "required_for_quote": true,
+          "example": "International health, personal contents",
+          "why_the_supplier_needs_it": "Defines the scope of the policy to be quoted."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "INS_HEALTH_PREMIUM",
+          "label": "Health insurance premium",
+          "required": false,
+          "unit": "per_month",
+          "typical_range_note": "Per month for all insured persons; note whether family or per-person rate.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "INS_CONTENTS_PREMIUM",
+          "label": "Contents insurance premium",
+          "required": false,
+          "unit": "per_month",
+          "typical_range_note": "Per month; depends on declared value of contents.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "INS_LIABILITY_PREMIUM",
+          "label": "Liability insurance premium",
+          "required": false,
+          "unit": "per_month",
+          "typical_range_note": "Personal liability cover; optional.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "INS_EXCESS",
+          "label": "Policy excess / deductible",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Amount the insured pays per claim; higher excess usually reduces premium.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "INS_OTHER",
+          "label": "Other",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Policy setup fee or document issuance; should be minimal.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "cover_start_date",
+          "label": "Cover start date",
+          "type": "date",
+          "required": true,
+          "help": "Date from which the policy is active.",
+          "validation": "Must be on or before the target move date."
+        },
+        {
+          "key": "coverage_types_included",
+          "label": "Coverage types included",
+          "type": "textarea",
+          "required": true,
+          "help": "List every type of coverage included: health, contents, liability, etc.",
+          "validation": "Max 400 characters."
+        },
+        {
+          "key": "health_cover_limit",
+          "label": "Health cover limit",
+          "type": "money",
+          "required": false,
+          "help": "Maximum benefit per person per year for health claims.",
+          "validation": "Positive number if provided."
+        },
+        {
+          "key": "contents_cover_limit",
+          "label": "Contents cover limit",
+          "type": "money",
+          "required": false,
+          "help": "Maximum declared value of contents covered.",
+          "validation": "Positive number if provided."
+        },
+        {
+          "key": "pre_existing_covered",
+          "label": "Pre-existing conditions covered",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether pre-existing conditions are covered under this policy.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "cancellation_terms",
+          "label": "Cancellation terms",
+          "type": "textarea",
+          "required": false,
+          "help": "Notice period and charges if the policy is cancelled early.",
+          "validation": "Max 300 characters."
+        }
+      ],
+      "comparison_keys": [
+        "INS_HEALTH_PREMIUM",
+        "health_cover_limit",
+        "INS_EXCESS",
+        "pre_existing_covered",
+        "cover_start_date"
+      ],
+      "red_flags": [
+        "cover_start_date is after the target move date",
+        "pre_existing_covered is false",
+        "health_cover_limit is not provided when INS_HEALTH_PREMIUM is non-zero",
+        "INS_HEALTH_PREMIUM exceeds company policy cap",
+        "valid_until is less than 14 days from today"
+      ]
+    },
+    {
+      "service_key": "immigration",
+      "supplier_type": "Immigration law firm or regulated visa and work permit consultancy",
+      "brief_fields": [
+        {
+          "key": "move_from_country",
+          "label": "Origin country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Spain",
+          "why_the_supplier_needs_it": "Determines which travel documents and apostilles are needed."
+        },
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Ireland",
+          "why_the_supplier_needs_it": "Sets the immigration jurisdiction."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Target start date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Sets the deadline for permit processing."
+        },
+        {
+          "key": "employee_nationality",
+          "label": "Employee nationality",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Venezuelan",
+          "why_the_supplier_needs_it": "Nationality is the primary determinant of visa route and eligibility."
+        },
+        {
+          "key": "visa_route_label",
+          "label": "Expected visa or permit type",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Critical Skills Employment Permit",
+          "why_the_supplier_needs_it": "Confirms the scope of the application."
+        },
+        {
+          "key": "assignment_duration_months",
+          "label": "Assignment length (months)",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "24",
+          "why_the_supplier_needs_it": "Determines whether a short-stay or long-stay permit is needed."
+        },
+        {
+          "key": "household_adults",
+          "label": "Adults requiring permits",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": false,
+          "example": "2",
+          "why_the_supplier_needs_it": "Determines whether spouse or partner permits are in scope."
+        },
+        {
+          "key": "household_children",
+          "label": "Children (count and ages)",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "1 child, age 7",
+          "why_the_supplier_needs_it": "Determines whether child permits or re-entry visas are needed."
+        },
+        {
+          "key": "dependants_requiring_permit",
+          "label": "Dependants requiring a permit",
+          "source": "employee_answer",
+          "type": "integer",
+          "required_for_quote": false,
+          "example": "1",
+          "why_the_supplier_needs_it": "Separates principal applicant cost from dependant application cost."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "IMM_PROFESSIONAL_FEES",
+          "label": "Professional / legal fees",
+          "required": true,
+          "unit": "flat",
+          "typical_range_note": "The firm's service fee for the principal applicant; varies by permit type.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "IMM_GOVT_FEES",
+          "label": "Government filing fees",
+          "required": true,
+          "unit": "flat",
+          "typical_range_note": "State fees paid to the immigration authority; pass-through costs.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "IMM_DEPENDANT_FEE",
+          "label": "Dependant application fee",
+          "required": false,
+          "unit": "per_item",
+          "typical_range_note": "Per dependant; note whether this includes professional and government fees.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "IMM_TRANSLATION",
+          "label": "Document translation",
+          "required": false,
+          "unit": "per_item",
+          "typical_range_note": "Per document requiring certified translation.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "IMM_COURIER",
+          "label": "Courier and document handling",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "May not apply for fully digital processes.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "IMM_OTHER",
+          "label": "Other",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Apostille, biometrics, or any unlisted disbursement.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "permit_type_quoted",
+          "label": "Permit type quoted",
+          "type": "text",
+          "required": true,
+          "help": "State the exact permit or visa type this quote covers.",
+          "validation": "Max 200 characters."
+        },
+        {
+          "key": "processing_time_weeks",
+          "label": "Estimated processing time (weeks)",
+          "type": "integer",
+          "required": true,
+          "help": "Total weeks from full document submission to decision.",
+          "validation": "Positive integer."
+        },
+        {
+          "key": "includes_dependants",
+          "label": "Dependants included in quote",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether dependant applications are covered by this quote.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "govt_fees_itemised",
+          "label": "Government fees shown separately",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm government fees appear as a line item distinct from professional fees.",
+          "validation": "Must be true."
+        },
+        {
+          "key": "regulated_body",
+          "label": "Regulated body or bar membership",
+          "type": "text",
+          "required": false,
+          "help": "State the regulatory body the firm is registered with, if any.",
+          "validation": "Max 200 characters."
+        },
+        {
+          "key": "employer_hr_support",
+          "label": "Employer HR support included",
+          "type": "boolean",
+          "required": false,
+          "help": "Confirm whether employer-side compliance support is in scope.",
+          "validation": "No constraint."
+        }
+      ],
+      "comparison_keys": [
+        "IMM_PROFESSIONAL_FEES",
+        "IMM_GOVT_FEES",
+        "processing_time_weeks",
+        "includes_dependants",
+        "regulated_body"
+      ],
+      "red_flags": [
+        "processing_time_weeks means the permit will not be ready by the target move date",
+        "IMM_GOVT_FEES is zero or absent",
+        "govt_fees_itemised is false",
+        "IMM_PROFESSIONAL_FEES exceeds company policy cap",
+        "regulated_body is not provided",
+        "valid_until is less than 14 days from today"
+      ]
+    },
+    {
+      "service_key": "tax",
+      "supplier_type": "International tax advisory firm or licensed tax consultant",
+      "brief_fields": [
+        {
+          "key": "move_from_country",
+          "label": "Origin country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Norway",
+          "why_the_supplier_needs_it": "Determines which tax authority the employee is detaching from."
+        },
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "France",
+          "why_the_supplier_needs_it": "Determines which tax authority the employee is entering and applicable treaty."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Target move date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Determines split-year treatment and tax-year boundaries."
+        },
+        {
+          "key": "assignment_duration_months",
+          "label": "Assignment duration (months)",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "24",
+          "why_the_supplier_needs_it": "Distinguishes temporary assignment from permanent relocation; affects treaty residency rules."
+        },
+        {
+          "key": "employee_nationality",
+          "label": "Employee nationality",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Norwegian",
+          "why_the_supplier_needs_it": "Some treaties apply differently based on nationality; affects tie-breaker rules."
+        },
+        {
+          "key": "visa_route_label",
+          "label": "Visa / work permit route",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "Salarié détaché",
+          "why_the_supplier_needs_it": "Posted-worker or secondment status triggers different social security and PE risk rules."
+        },
+        {
+          "key": "has_trailing_obligations",
+          "label": "Any prior-year filings expected in origin country?",
+          "source": "employee_answer",
+          "type": "boolean",
+          "required_for_quote": false,
+          "example": "Yes",
+          "why_the_supplier_needs_it": "Determines whether origin-country filing is in scope."
+        },
+        {
+          "key": "equity_or_bonus",
+          "label": "Equity or bonus expected during assignment?",
+          "source": "employee_answer",
+          "type": "boolean",
+          "required_for_quote": false,
+          "example": "Yes",
+          "why_the_supplier_needs_it": "Cross-border equity sourcing adds material scope to tax return preparation."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "TAX_DEPARTURE",
+          "label": "Tax departure / exit analysis (origin country)",
+          "required": true,
+          "unit": "flat",
+          "typical_range_note": "Varies by country complexity.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "TAX_ARRIVAL",
+          "label": "Tax arrival / entry analysis (destination country)",
+          "required": true,
+          "unit": "flat",
+          "typical_range_note": "Varies by treaty and residency rules.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "TAX_RETURN_ORIGIN",
+          "label": "Tax return preparation, origin country (per year)",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Per filing year in scope.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "TAX_RETURN_DEST",
+          "label": "Tax return preparation, destination country (per year)",
+          "required": true,
+          "unit": "flat",
+          "typical_range_note": "Per filing year in scope.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "TAX_HYPO",
+          "label": "Hypothetical tax calculation (if applicable)",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Relevant for tax-equalised assignments.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "TAX_SOCIAL_SEC",
+          "label": "Social security / A1 / totalisation advisory",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Often bundled; flag separately if not.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "TAX_OTHER",
+          "label": "Other (describe in notes)",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Equity sourcing, wealth tax, PE risk memo, etc.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "years_in_scope",
+          "label": "Number of tax years in scope",
+          "type": "integer",
+          "required": true,
+          "help": "Total filing years covered by this quote.",
+          "validation": "Minimum 1."
+        },
+        {
+          "key": "social_security_included",
+          "label": "Social security / totalisation advisory included?",
+          "type": "boolean",
+          "required": true,
+          "help": "State explicitly; this is commonly excluded.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "pe_risk_review_included",
+          "label": "Permanent establishment risk review included?",
+          "type": "boolean",
+          "required": true,
+          "help": "PE risk memo is a frequent add-on.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "treaty_countries",
+          "label": "Tax treaty countries covered",
+          "type": "text",
+          "required": true,
+          "help": "List the bilateral treaty pairing your quote addresses.",
+          "validation": "Max 200 characters."
+        },
+        {
+          "key": "engagement_start",
+          "label": "Earliest engagement start date",
+          "type": "date",
+          "required": true,
+          "help": "When can advisory work begin?",
+          "validation": "Must not be after target move date."
+        },
+        {
+          "key": "licensed_jurisdictions",
+          "label": "Licensed / authorised in jurisdictions",
+          "type": "text",
+          "required": true,
+          "help": "Name the countries where your firm holds authorisation.",
+          "validation": "Max 300 characters."
+        }
+      ],
+      "comparison_keys": [
+        "TAX_RETURN_DEST",
+        "TAX_DEPARTURE",
+        "social_security_included",
+        "pe_risk_review_included",
+        "years_in_scope"
+      ],
+      "red_flags": [
+        "Social security advisory excluded but corridor has active totalisation agreement",
+        "PE risk review excluded for assignments over 12 months",
+        "Quote does not cover the full number of split tax years implied by the move date",
+        "valid_until earlier than the target move date",
+        "No mention of the applicable bilateral tax treaty"
+      ]
+    },
+    {
+      "service_key": "language",
+      "supplier_type": "Language training provider (corporate or individual tutor)",
+      "brief_fields": [
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "France",
+          "why_the_supplier_needs_it": "Determines the target language."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Target move date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Determines how many weeks of pre-move training are feasible."
+        },
+        {
+          "key": "household_adults",
+          "label": "Number of adults in household",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "2",
+          "why_the_supplier_needs_it": "Determines whether a group or family package applies."
+        },
+        {
+          "key": "household_children",
+          "label": "Children (count and ages)",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "2 children, ages 7 and 10",
+          "why_the_supplier_needs_it": "Children's tuition is sometimes bundled or quoted separately."
+        },
+        {
+          "key": "training_format",
+          "label": "Preferred training format",
+          "source": "employee_answer",
+          "type": "select",
+          "required_for_quote": true,
+          "example": "Online live",
+          "why_the_supplier_needs_it": "In-person, online live, and self-paced have different pricing structures."
+        },
+        {
+          "key": "current_level",
+          "label": "Current level in target language",
+          "source": "employee_answer",
+          "type": "select",
+          "required_for_quote": true,
+          "example": "A1 (beginner)",
+          "why_the_supplier_needs_it": "Starting level determines number of hours needed to reach target."
+        },
+        {
+          "key": "target_level",
+          "label": "Target proficiency level",
+          "source": "employee_answer",
+          "type": "select",
+          "required_for_quote": false,
+          "example": "B1 (intermediate)",
+          "why_the_supplier_needs_it": "Required to scope total hours and course structure."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "LNG_EMPLOYEE",
+          "label": "Employee tuition (hours)",
+          "required": true,
+          "unit": "per_hour",
+          "typical_range_note": "Rate per 60-minute session.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "LNG_PARTNER",
+          "label": "Partner / spouse tuition (hours)",
+          "required": false,
+          "unit": "per_hour",
+          "typical_range_note": "May differ from employee rate.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "LNG_CHILDREN",
+          "label": "Children tuition (per child, hours)",
+          "required": false,
+          "unit": "per_hour",
+          "typical_range_note": "Children's sessions are typically shorter.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "LNG_MATERIALS",
+          "label": "Course materials and assessment",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Books, placement test, progress reports.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "LNG_OTHER",
+          "label": "Other (describe in notes)",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Exam fees, immersion days, etc.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "total_hours_proposed",
+          "label": "Total hours proposed (employee)",
+          "type": "integer",
+          "required": true,
+          "help": "Number of tuition hours in the quoted package.",
+          "validation": "Minimum 1."
+        },
+        {
+          "key": "session_duration_mins",
+          "label": "Standard session duration (minutes)",
+          "type": "integer",
+          "required": true,
+          "help": "Typical lesson length on which the hourly rate is based.",
+          "validation": "Between 30 and 120."
+        },
+        {
+          "key": "delivery_mode",
+          "label": "Delivery mode",
+          "type": "select",
+          "required": true,
+          "options": [
+            "Online live",
+            "In-person",
+            "Blended",
+            "Self-paced"
+          ],
+          "help": "How sessions are delivered.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "cancellation_notice_hours",
+          "label": "Cancellation notice required (hours)",
+          "type": "integer",
+          "required": true,
+          "help": "Hours of notice required to avoid a late-cancellation charge.",
+          "validation": "Positive integer."
+        },
+        {
+          "key": "pre_move_sessions_available",
+          "label": "Sessions available before move date?",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether training can start before the employee relocates.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "progress_reporting",
+          "label": "Progress reporting included?",
+          "type": "boolean",
+          "required": false,
+          "help": "Monthly or end-of-package report to HR.",
+          "validation": "Must be answered."
+        }
+      ],
+      "comparison_keys": [
+        "LNG_EMPLOYEE",
+        "total_hours_proposed",
+        "delivery_mode",
+        "pre_move_sessions_available",
+        "LNG_PARTNER"
+      ],
+      "red_flags": [
+        "No pre-move sessions available when move date is within 4 weeks",
+        "Partner tuition excluded when household_adults is 2 and policy cap is per-household",
+        "valid_until earlier than the target move date",
+        "total_hours_proposed inconsistent with stated current-to-target level gap"
+      ]
+    },
+    {
+      "service_key": "medical",
+      "supplier_type": "International health insurance broker or corporate health plan provider",
+      "brief_fields": [
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Ireland",
+          "why_the_supplier_needs_it": "Determines local healthcare system rules and mandatory vs. supplemental cover needs."
+        },
+        {
+          "key": "move_from_country",
+          "label": "Origin country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Spain",
+          "why_the_supplier_needs_it": "Determines existing entitlements (e.g. EHIC portability, S1 form)."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Target move date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Cover must start on or before this date."
+        },
+        {
+          "key": "assignment_duration_months",
+          "label": "Assignment duration (months)",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "18",
+          "why_the_supplier_needs_it": "Short-term vs. long-term plans differ significantly in price and scope."
+        },
+        {
+          "key": "household_adults",
+          "label": "Number of adults to cover",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "2",
+          "why_the_supplier_needs_it": "Family plan pricing depends on number of adults."
+        },
+        {
+          "key": "household_children",
+          "label": "Children (count and ages)",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "1 child, age 5",
+          "why_the_supplier_needs_it": "Children's premiums and cover tiers differ by age."
+        },
+        {
+          "key": "employee_nationality",
+          "label": "Employee nationality",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "Venezuelan",
+          "why_the_supplier_needs_it": "Non-EEA nationals may not have access to reciprocal public health entitlements."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "MED_EMPLOYEE",
+          "label": "Employee premium (per month)",
+          "required": true,
+          "unit": "per_month",
+          "typical_range_note": "Monthly cost for primary insured.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "MED_PARTNER",
+          "label": "Partner / spouse premium (per month)",
+          "required": false,
+          "unit": "per_month",
+          "typical_range_note": "Additional adult on same policy.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "MED_CHILD",
+          "label": "Child premium per child (per month)",
+          "required": false,
+          "unit": "per_month",
+          "typical_range_note": "Per dependent child.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "MED_SETUP",
+          "label": "Policy setup / administration fee",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "One-off enrolment charge.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "MED_OTHER",
+          "label": "Other (describe in notes)",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Dental riders, optical, maternity add-ons.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "plan_name",
+          "label": "Plan name / product reference",
+          "type": "text",
+          "required": true,
+          "help": "The insurer's product name or tier.",
+          "validation": "Max 100 characters."
+        },
+        {
+          "key": "insurer_name",
+          "label": "Underwriting insurer",
+          "type": "text",
+          "required": true,
+          "help": "Name of the insurance company underwriting this policy.",
+          "validation": "Max 150 characters."
+        },
+        {
+          "key": "cover_start_date",
+          "label": "Earliest cover start date",
+          "type": "date",
+          "required": true,
+          "help": "The date from which the policy can be activated.",
+          "validation": "Must be on or before target move date."
+        },
+        {
+          "key": "annual_limit",
+          "label": "Annual benefit limit (per person)",
+          "type": "money",
+          "required": true,
+          "help": "Maximum reimbursable per insured per year.",
+          "validation": "Positive number."
+        },
+        {
+          "key": "deductible",
+          "label": "Annual deductible / excess (per person)",
+          "type": "money",
+          "required": true,
+          "help": "Amount the insured pays before insurance activates.",
+          "validation": "Zero or positive."
+        },
+        {
+          "key": "pre_existing_covered",
+          "label": "Pre-existing conditions covered?",
+          "type": "boolean",
+          "required": true,
+          "help": "State clearly; common source of disputes.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "dental_optical_included",
+          "label": "Dental and optical included?",
+          "type": "boolean",
+          "required": true,
+          "help": "Flag if excluded so HR can arrange separately.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "maternity_included",
+          "label": "Maternity cover included?",
+          "type": "boolean",
+          "required": false,
+          "help": "Relevant if employee or partner is of childbearing age.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "cancellation_terms",
+          "label": "Cancellation / early termination terms",
+          "type": "textarea",
+          "required": true,
+          "help": "What happens if the assignment ends early.",
+          "validation": "Max 500 characters."
+        }
+      ],
+      "comparison_keys": [
+        "MED_EMPLOYEE",
+        "annual_limit",
+        "deductible",
+        "pre_existing_covered",
+        "cover_start_date"
+      ],
+      "red_flags": [
+        "Cover start date is after target move date",
+        "Pre-existing conditions excluded without disclosure",
+        "Annual limit below destination country's typical major-treatment cost",
+        "No cancellation terms provided for a fixed-term assignment",
+        "valid_until earlier than the target move date"
+      ]
+    },
+    {
+      "service_key": "pets",
+      "supplier_type": "International pet relocation agent or licensed pet transport company",
+      "brief_fields": [
+        {
+          "key": "move_from_country",
+          "label": "Origin country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Spain",
+          "why_the_supplier_needs_it": "Determines export documentation requirements."
+        },
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Ireland",
+          "why_the_supplier_needs_it": "Ireland is non-Schengen; specific TRACES and tapeworm treatment rules apply."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Target move date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Determines feasibility of pre-travel health certificate and treatment timelines."
+        },
+        {
+          "key": "pet_count",
+          "label": "Number of pets",
+          "source": "employee_answer",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "2",
+          "why_the_supplier_needs_it": "Pricing is per animal; some routes cap the number."
+        },
+        {
+          "key": "pet_species_breeds",
+          "label": "Species and breed(s)",
+          "source": "employee_answer",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "1 dog (Labrador, 30 kg), 1 cat (domestic short-hair, 4 kg)",
+          "why_the_supplier_needs_it": "Breed restrictions, crate size, and airline acceptance vary by species and breed."
+        },
+        {
+          "key": "pet_microchipped",
+          "label": "Pets microchipped (ISO 11784)?",
+          "source": "employee_answer",
+          "type": "boolean",
+          "required_for_quote": true,
+          "example": "Yes",
+          "why_the_supplier_needs_it": "ISO microchip is mandatory for most international moves; missing one adds cost."
+        },
+        {
+          "key": "pet_vaccinated_rabies",
+          "label": "Rabies vaccination up to date?",
+          "source": "employee_answer",
+          "type": "boolean",
+          "required_for_quote": true,
+          "example": "Yes",
+          "why_the_supplier_needs_it": "Determines whether a re-vaccination is needed before travel."
+        },
+        {
+          "key": "employee_nationality",
+          "label": "Employee nationality",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "Venezuelan",
+          "why_the_supplier_needs_it": "Non-EU origin pets travelling with non-EU nationals may face different rules."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "PET_TRANSPORT",
+          "label": "Transport per pet (origin to destination, door-to-airport-to-door)",
+          "required": true,
+          "unit": "per_item",
+          "typical_range_note": "Per animal, inclusive of crate and cargo handling.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "PET_VET_CERT",
+          "label": "Official veterinary health certificate (per pet)",
+          "required": true,
+          "unit": "per_item",
+          "typical_range_note": "Includes TRACES documentation where applicable.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "PET_QUARANTINE",
+          "label": "Quarantine (if required, per pet per night)",
+          "required": false,
+          "unit": "per_item",
+          "typical_range_note": "Only applicable for certain destination countries.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "PET_CRATE",
+          "label": "IATA-approved crate (per pet, if not supplied)",
+          "required": false,
+          "unit": "per_item",
+          "typical_range_note": "Crate must meet airline specs.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "PET_MICROCHIP",
+          "label": "Microchipping (per pet, if not already done)",
+          "required": false,
+          "unit": "per_item",
+          "typical_range_note": "Required if pet is not already microchipped.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "PET_RABIES_VAX",
+          "label": "Rabies vaccination / booster (per pet, if required)",
+          "required": false,
+          "unit": "per_item",
+          "typical_range_note": "Required if not current; timing affects travel eligibility.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "PET_TAPEWORM",
+          "label": "Tapeworm treatment (per pet, where destination requires it)",
+          "required": false,
+          "unit": "per_item",
+          "typical_range_note": "Ireland requires treatment 1–5 days before arrival.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "PET_OTHER",
+          "label": "Other (describe in notes)",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Handling fees, storage, pet insurance during transit.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "traces_handled",
+          "label": "TRACES documentation handled by you?",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether you manage the TRACES notification for non-Schengen destinations.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "airline_confirmed",
+          "label": "Airline / carrier confirmed for this route?",
+          "type": "boolean",
+          "required": true,
+          "help": "Some carriers do not accept pets; confirm booking is possible.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "cabin_or_cargo",
+          "label": "Cabin or cargo?",
+          "type": "select",
+          "required": true,
+          "options": [
+            "Cabin",
+            "Cargo, accompanied",
+            "Cargo, unaccompanied",
+            "Not yet determined"
+          ],
+          "help": "Determines handling chain and welfare obligations.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "lead_time_days_needed",
+          "label": "Minimum lead time required from booking (days)",
+          "type": "integer",
+          "required": true,
+          "help": "How many days in advance the process must start.",
+          "validation": "Positive integer."
+        },
+        {
+          "key": "vet_cert_included",
+          "label": "Official vet certificate cost included in quote?",
+          "type": "boolean",
+          "required": true,
+          "help": "Clarifies whether PET_VET_CERT is bundled or listed separately.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "quarantine_risk",
+          "label": "Any quarantine risk for this route?",
+          "type": "boolean",
+          "required": true,
+          "help": "Flag if destination may require quarantine and under what conditions.",
+          "validation": "Must be answered."
+        }
+      ],
+      "comparison_keys": [
+        "PET_TRANSPORT",
+        "traces_handled",
+        "airline_confirmed",
+        "lead_time_days_needed",
+        "quarantine_risk"
+      ],
+      "red_flags": [
+        "Lead time required exceeds days remaining before target move date",
+        "TRACES documentation not handled, employee must arrange with an OTRACE-registered vet",
+        "Airline carrier not confirmed for the route",
+        "Tapeworm treatment not listed for Ireland destination",
+        "Quarantine risk flagged but no cost estimate provided",
+        "valid_until earlier than the target move date"
+      ]
+    },
+    {
+      "service_key": "spouse_career",
+      "supplier_type": "Relocation-specialist career coaching or outplacement firm",
+      "brief_fields": [
+        {
+          "key": "move_to_city",
+          "label": "Destination city",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Dublin",
+          "why_the_supplier_needs_it": "Local job market knowledge and network are city-specific."
+        },
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Ireland",
+          "why_the_supplier_needs_it": "Determines work-permit requirements for the partner and applicable labour market."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Target move date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Determines how many pre-move coaching sessions are feasible."
+        },
+        {
+          "key": "assignment_duration_months",
+          "label": "Assignment duration (months)",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": false,
+          "example": "18",
+          "why_the_supplier_needs_it": "Short assignments may not warrant full career-transition programme."
+        },
+        {
+          "key": "partner_work_permit_needed",
+          "label": "Does the partner need a work permit?",
+          "source": "employee_answer",
+          "type": "boolean",
+          "required_for_quote": true,
+          "example": "Yes",
+          "why_the_supplier_needs_it": "Work permit status shapes which services are relevant and what timeline is realistic."
+        },
+        {
+          "key": "partner_sector",
+          "label": "Partner's professional sector",
+          "source": "employee_answer",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "Marketing",
+          "why_the_supplier_needs_it": "Sector-specific networks and local demand vary."
+        },
+        {
+          "key": "partner_years_experience",
+          "label": "Partner's years of professional experience",
+          "source": "employee_answer",
+          "type": "integer",
+          "required_for_quote": false,
+          "example": "8",
+          "why_the_supplier_needs_it": "Determines appropriate coaching tier and market positioning."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "SPC_ASSESSMENT",
+          "label": "Career and skills assessment",
+          "required": true,
+          "unit": "flat",
+          "typical_range_note": "Initial evaluation of partner's background and local market fit.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "SPC_COACHING",
+          "label": "One-to-one coaching sessions (per session)",
+          "required": true,
+          "unit": "per_hour",
+          "typical_range_note": "Rate per 60-minute session.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "SPC_CV_LINKEDIN",
+          "label": "CV / LinkedIn profile rewrite for destination market",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Adapts format and language to local hiring norms.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "SPC_JOB_SEARCH",
+          "label": "Structured job search support (fixed-term package)",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Includes employer introductions, application review.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "SPC_PERMIT_ADVISORY",
+          "label": "Work permit / right-to-work advisory (if applicable)",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Not legal advice; high-level pathway guidance only.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "SPC_OTHER",
+          "label": "Other (describe in notes)",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Networking events, language-for-work sessions, etc.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "programme_duration_weeks",
+          "label": "Programme duration (weeks)",
+          "type": "integer",
+          "required": true,
+          "help": "Total length of the support package.",
+          "validation": "Minimum 1."
+        },
+        {
+          "key": "sessions_included",
+          "label": "Number of coaching sessions included",
+          "type": "integer",
+          "required": true,
+          "help": "Total one-to-one sessions in the quoted package.",
+          "validation": "Minimum 1."
+        },
+        {
+          "key": "delivery_mode",
+          "label": "Delivery mode",
+          "type": "select",
+          "required": true,
+          "options": [
+            "Online",
+            "In-person",
+            "Blended"
+          ],
+          "help": "How coaching sessions are delivered.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "local_market_expertise",
+          "label": "Local market expertise in destination city?",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether your firm has active networks in the destination city.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "permit_advisory_included",
+          "label": "Work permit advisory included?",
+          "type": "boolean",
+          "required": true,
+          "help": "State clearly; confirm whether SPC_PERMIT_ADVISORY is in scope.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "success_guarantee",
+          "label": "Any outcome guarantee or extension clause?",
+          "type": "textarea",
+          "required": false,
+          "help": "Some providers offer extended support if the partner does not find a role within the programme.",
+          "validation": "Max 400 characters."
+        }
+      ],
+      "comparison_keys": [
+        "SPC_COACHING",
+        "sessions_included",
+        "programme_duration_weeks",
+        "local_market_expertise",
+        "permit_advisory_included"
+      ],
+      "red_flags": [
+        "No local market expertise in destination city",
+        "Programme ends before the employee's start date, partner unsupported on arrival",
+        "Work permit advisory excluded when partner_work_permit_needed is true",
+        "valid_until earlier than the target move date",
+        "Sessions included fewer than 3 for a programme spanning more than 8 weeks"
+      ]
+    },
+    {
+      "service_key": "utilities",
+      "supplier_type": "Relocation concierge or utilities setup service (energy, broadband, water, council tax)",
+      "brief_fields": [
+        {
+          "key": "move_to_city",
+          "label": "Destination city",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Dublin",
+          "why_the_supplier_needs_it": "Utility providers and local taxes are city/region-specific."
+        },
+        {
+          "key": "move_to_country",
+          "label": "Destination country",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": true,
+          "example": "Ireland",
+          "why_the_supplier_needs_it": "Determines which utility markets and tariff structures apply."
+        },
+        {
+          "key": "target_move_date",
+          "label": "Target move date",
+          "source": "case",
+          "type": "date",
+          "required_for_quote": true,
+          "example": "2026-11-15",
+          "why_the_supplier_needs_it": "Utilities must be active on or before move-in date."
+        },
+        {
+          "key": "property_type",
+          "label": "Property type",
+          "source": "employee_answer",
+          "type": "select",
+          "required_for_quote": true,
+          "example": "Apartment",
+          "why_the_supplier_needs_it": "Determines which utilities are tenant-managed vs. included in rent."
+        },
+        {
+          "key": "household_adults",
+          "label": "Number of adults in household",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": true,
+          "example": "2",
+          "why_the_supplier_needs_it": "Affects recommended energy tariff size and broadband data needs."
+        },
+        {
+          "key": "household_children",
+          "label": "Children in household",
+          "source": "case",
+          "type": "text",
+          "required_for_quote": false,
+          "example": "1 child, age 7",
+          "why_the_supplier_needs_it": "Larger households may need higher-capacity plans."
+        },
+        {
+          "key": "assignment_duration_months",
+          "label": "Assignment duration (months)",
+          "source": "case",
+          "type": "integer",
+          "required_for_quote": false,
+          "example": "18",
+          "why_the_supplier_needs_it": "Short-term assignments may require contract-free tariffs."
+        }
+      ],
+      "quote_line_template": [
+        {
+          "code": "UTL_SERVICE_FEE",
+          "label": "Utilities setup service fee (all utilities)",
+          "required": true,
+          "unit": "flat",
+          "typical_range_note": "One-off concierge fee for researching and activating all utilities on the employee's behalf.",
+          "maps_to_policy_cap": true
+        },
+        {
+          "code": "UTL_ELECTRICITY",
+          "label": "Electricity, recommended tariff setup",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Admin cost of account activation; ongoing tariff billed by provider directly.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "UTL_GAS",
+          "label": "Gas, recommended tariff setup",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Only applicable where gas is tenant-managed.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "UTL_BROADBAND",
+          "label": "Broadband, recommended plan setup",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Admin cost of booking installation; ongoing plan billed by provider directly.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "UTL_COUNCIL_TAX",
+          "label": "Council tax / local tax registration",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Registration with local authority; ongoing charges billed by authority.",
+          "maps_to_policy_cap": false
+        },
+        {
+          "code": "UTL_OTHER",
+          "label": "Other (describe in notes)",
+          "required": false,
+          "unit": "flat",
+          "typical_range_note": "Water, TV licence, waste collection, etc.",
+          "maps_to_policy_cap": false
+        }
+      ],
+      "quote_extra_fields": [
+        {
+          "key": "utilities_in_scope",
+          "label": "Utilities included in this quote",
+          "type": "text",
+          "required": true,
+          "help": "List every utility this quote covers (e.g. electricity, gas, broadband, council tax).",
+          "validation": "Max 300 characters."
+        },
+        {
+          "key": "utilities_excluded",
+          "label": "Utilities explicitly excluded",
+          "type": "text",
+          "required": true,
+          "help": "List any utilities not covered so HR can arrange separately.",
+          "validation": "Max 300 characters."
+        },
+        {
+          "key": "activation_guaranteed_by",
+          "label": "All utilities active by (date)",
+          "type": "date",
+          "required": true,
+          "help": "The date by which all in-scope utilities will be live.",
+          "validation": "Must be on or before target move date."
+        },
+        {
+          "key": "ongoing_management_included",
+          "label": "Ongoing account management included?",
+          "type": "boolean",
+          "required": true,
+          "help": "Confirm whether switching or dispute support is included after setup.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "contract_free_tariffs",
+          "label": "Contract-free tariffs available?",
+          "type": "boolean",
+          "required": false,
+          "help": "Important for short-term assignments; avoids early-termination penalties.",
+          "validation": "Must be answered."
+        },
+        {
+          "key": "cancellation_terms",
+          "label": "Cancellation / scope reduction terms",
+          "type": "textarea",
+          "required": true,
+          "help": "What happens if the move is delayed or cancelled after setup has begun.",
+          "validation": "Max 400 characters."
+        }
+      ],
+      "comparison_keys": [
+        "UTL_SERVICE_FEE",
+        "utilities_in_scope",
+        "activation_guaranteed_by",
+        "ongoing_management_included",
+        "contract_free_tariffs"
+      ],
+      "red_flags": [
+        "Activation guaranteed date is after target move date",
+        "Utilities excluded list is empty, assume full scope, which may not be accurate",
+        "No contract-free tariffs available for an assignment under 12 months",
+        "valid_until earlier than the target move date",
+        "UTL_SERVICE_FEE covers fewer utilities than utilities_in_scope lists"
+      ]
+    }
+  ],
+  "rendering_rules": {
+    "brief_unknown_value_text": "Not specified",
+    "line_total_rule": "The quote total must equal the sum of all line items. If the total exceeds the sum, the difference must appear as a line item with code ending in _OTHER. Any unexplained gap between the total and the sum of lines is a validation error.",
+    "max_lines": 20,
+    "attachment_policy": "A single PDF attachment up to 10 MB may be uploaded alongside the structured form as supplementary detail. The PDF is stored for HR reference but does not replace the structured fields. Structured fields are the authoritative record for comparison and policy checking."
+  },
+  "review_notes": {
+    "reviewed_by": "Aside, 2026-09-12",
+    "source": "Otto (Audos) in two batches; merged and validated against the brief contract",
+    "post_processing": [
+      "Removed company_policy_cap from brief_fields on 6 services: the cap is HR-only and must never reach a supplier (price anchoring + policy leak). Use it in comparison/red_flags only.",
+      "Em dashes replaced with commas."
+    ],
+    "open_items": [
+      "schools, banks, insurance have no required quote line; decide the mandatory line per service before building the form",
+      "10 labels exceed 40 chars (tax, pets, spouse_career); shorten in the UI copy pass"
+    ]
+  }
+}

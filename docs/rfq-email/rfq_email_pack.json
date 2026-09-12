@@ -1,0 +1,321 @@
+{
+  "pack_version": "1.0",
+  "locale": "en",
+  "global_rules": {
+    "from": "ReloPass <noreply@relopass.com>",
+    "reply_to_policy": "All emails in this pack set reply-to support@relopass.com. Replies must never route to the employee, HR user, or supplier directly.",
+    "subject_max_chars": 60,
+    "html_style_rules": [
+      "inline styles only",
+      "max-width 560px",
+      "single CTA button",
+      "table for brief rows"
+    ],
+    "escaping_rule": "every variable is HTML-escaped by the backend; templates must not rely on raw HTML inside variables"
+  },
+  "templates": [
+    {
+      "id": "supplier_rfq_invite",
+      "audience": "supplier",
+      "trigger": "RFQ is dispatched and a unique magic link is minted for this supplier.",
+      "timing": "immediately",
+      "do_not_send_when": [],
+      "subject": "Quote request: {{move_from}} to {{move_to}}",
+      "preheader": "No account needed. Review the brief and submit your quote by {{respond_by}}.",
+      "body_text": "Hello {{supplier_name}},\n\nReloPass is a relocation platform used by companies to manage employee moves. A company on our platform is requesting a quote for the following services: {{service_labels}}.\n\nReference: {{rfq_ref}}\nRespond by: {{respond_by}}\n\nMOVE BRIEF\n\n{{brief_rows}}\n\nWHAT WE NEED FROM YOU\n\n1. Confirm that you cover this route and are available around the target move date.\n2. Provide your total price. An itemised breakdown is helpful but not required.\n3. State how long your quote will remain valid.\n4. Flag anything missing or unclear in the brief so we can follow up.\n\nNo account is needed. Your link is private and expires in {{link_expires_days}} days. One submission is allowed per link. After you submit, the company will review all received quotes and be in touch if they decide to proceed.\n\nSubmit your quote: {{magic_link}}\n\nFor questions: {{support_email}}\n\nReloPass",
+      "body_html": "<body style=\"margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 16px;\"><table cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#fff;border-radius:8px;border:1px solid #e2e8f0;\"><tr><td style=\"padding:20px 32px;background:#0b2b43;border-radius:8px 8px 0 0;\"><span style=\"font-size:20px;font-weight:700;color:#fff;\">ReloPass</span></td></tr><tr><td style=\"padding:32px;\"><h1 style=\"margin:0 0 6px 0;font-size:22px;color:#0b2b43;\">Quote request</h1><p style=\"margin:0 0 4px 0;font-size:13px;color:#64748b;\">Reference: {{rfq_ref}}</p><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">Respond by: {{respond_by}}</p><p style=\"margin:0 0 16px 0;font-size:15px;color:#334155;\">Hello {{supplier_name}},</p><p style=\"margin:0 0 16px 0;font-size:15px;color:#334155;\">ReloPass is a relocation platform used by companies to manage employee moves. A company on our platform is requesting a quote for: <strong>{{service_labels}}</strong>.</p><h2 style=\"margin:24px 0 10px 0;font-size:15px;color:#0b2b43;\">Move brief</h2>{{brief_rows_table}}<h2 style=\"margin:24px 0 10px 0;font-size:15px;color:#0b2b43;\">What we need from you</h2><p style=\"margin:0 0 6px 0;font-size:14px;color:#334155;\">1. Confirm that you cover this route and are available around the target move date.</p><p style=\"margin:0 0 6px 0;font-size:14px;color:#334155;\">2. Provide your total price. An itemised breakdown is helpful but not required.</p><p style=\"margin:0 0 6px 0;font-size:14px;color:#334155;\">3. State how long your quote will remain valid.</p><p style=\"margin:0 0 20px 0;font-size:14px;color:#334155;\">4. Flag anything missing or unclear in the brief so we can follow up.</p><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">No account is needed. Your link is private and expires in {{link_expires_days}} days. One submission is allowed per link.</p><table cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 0 24px 0;\"><tr><td style=\"background:#1f8e8b;border-radius:4px;\"><a href=\"{{magic_link}}\" style=\"display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#fff;text-decoration:none;\">Submit your quote</a></td></tr></table><p style=\"margin:0;font-size:14px;color:#334155;\">After you submit, the company will review all received quotes and be in touch if they decide to proceed.</p></td></tr><tr><td style=\"padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;\"><p style=\"margin:0;font-size:12px;color:#64748b;\">Transactional email from ReloPass. Questions? <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a></p></td></tr></table></td></tr></table></body>",
+      "cta": {
+        "label": "Submit your quote",
+        "url_variable": "magic_link"
+      },
+      "variables_used": [
+        "rfq_ref",
+        "supplier_name",
+        "service_labels",
+        "brief_rows",
+        "move_from",
+        "move_to",
+        "respond_by",
+        "link_expires_days",
+        "magic_link",
+        "support_email"
+      ],
+      "fallbacks": {
+        "move_from": "(origin not confirmed)",
+        "move_to": "(destination not confirmed)",
+        "supplier_name": "there"
+      },
+      "rationale": "The primary outreach that orients an unfamiliar supplier to the platform, presents the full move brief, and gives clear instructions for submitting a compliant quote."
+    },
+    {
+      "id": "supplier_rfq_reminder",
+      "audience": "supplier",
+      "trigger": "Two days before respond_by and the supplier has not yet submitted a quote for this RFQ.",
+      "timing": "T-2 days before respond_by",
+      "do_not_send_when": [
+        "supplier has already submitted a quote for this RFQ",
+        "the RFQ has been closed or withdrawn"
+      ],
+      "subject": "Quote due in {{reminder_days_left}} days: {{rfq_ref}}",
+      "preheader": "Your unique link is still open. Submit before {{respond_by}} to be considered.",
+      "body_text": "Hello {{supplier_name}},\n\nThis is a reminder that a quote request is still open and waiting for your response.\n\nReference: {{rfq_ref}}\nRoute: {{move_from}} to {{move_to}}\nRespond by: {{respond_by}}\nDays remaining: {{reminder_days_left}}\n\nYour link is private and expires in {{link_expires_days}} days. One submission is allowed per link.\n\nSubmit your quote: {{magic_link}}\n\nIf you cannot quote for this request, no action is needed. The request will close automatically after the deadline.\n\nFor questions: {{support_email}}\n\nReloPass",
+      "body_html": "<body style=\"margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 16px;\"><table cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#fff;border-radius:8px;border:1px solid #e2e8f0;\"><tr><td style=\"padding:20px 32px;background:#0b2b43;border-radius:8px 8px 0 0;\"><span style=\"font-size:20px;font-weight:700;color:#fff;\">ReloPass</span></td></tr><tr><td style=\"padding:32px;\"><h1 style=\"margin:0 0 6px 0;font-size:22px;color:#0b2b43;\">Reminder: quote due in {{reminder_days_left}} days</h1><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">Reference: {{rfq_ref}}</p><p style=\"margin:0 0 16px 0;font-size:15px;color:#334155;\">Hello {{supplier_name}},</p><p style=\"margin:0 0 24px 0;font-size:15px;color:#334155;\">A quote request is still open and waiting for your response.</p><table width=\"100%\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f8fafc;border-radius:4px;margin:0 0 24px 0;\"><tr><td style=\"font-size:13px;color:#64748b;width:40%;\">Route</td><td style=\"font-size:13px;color:#334155;\">{{move_from}} to {{move_to}}</td></tr><tr><td style=\"font-size:13px;color:#64748b;\">Respond by</td><td style=\"font-size:13px;color:#334155;\">{{respond_by}}</td></tr><tr><td style=\"font-size:13px;color:#64748b;\">Days remaining</td><td style=\"font-size:13px;font-weight:700;color:#0b2b43;\">{{reminder_days_left}}</td></tr></table><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">Your link is private and expires in {{link_expires_days}} days. One submission is allowed per link.</p><table cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 0 24px 0;\"><tr><td style=\"background:#1f8e8b;border-radius:4px;\"><a href=\"{{magic_link}}\" style=\"display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#fff;text-decoration:none;\">Submit your quote</a></td></tr></table><p style=\"margin:0;font-size:14px;color:#64748b;\">If you cannot quote for this request, no action is needed. The request will close automatically after the deadline.</p></td></tr><tr><td style=\"padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;\"><p style=\"margin:0;font-size:12px;color:#64748b;\">Transactional email from ReloPass. Questions? <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a></p></td></tr></table></td></tr></table></body>",
+      "cta": {
+        "label": "Submit your quote",
+        "url_variable": "magic_link"
+      },
+      "variables_used": [
+        "rfq_ref",
+        "supplier_name",
+        "move_from",
+        "move_to",
+        "respond_by",
+        "reminder_days_left",
+        "link_expires_days",
+        "magic_link",
+        "support_email"
+      ],
+      "fallbacks": {
+        "move_from": "(origin not confirmed)",
+        "move_to": "(destination not confirmed)",
+        "supplier_name": "there"
+      },
+      "rationale": "A single, polite nudge sent two days before the deadline reduces no-response rates without becoming spam."
+    },
+    {
+      "id": "supplier_quote_received_ack",
+      "audience": "supplier",
+      "trigger": "Supplier successfully submits a quote via their magic link.",
+      "timing": "immediately",
+      "do_not_send_when": [],
+      "subject": "Quote received: {{rfq_ref}}",
+      "preheader": "Your quote has been logged. The company will review it and be in touch if they proceed.",
+      "body_text": "Hello {{supplier_name}},\n\nWe have received your quote for reference {{rfq_ref}}.\n\nWHAT WE RECEIVED\n\nTotal: {{quote_total}} {{quote_currency}}\nValid until: {{quote_valid_until}}\n\nITEMISED LINES\n\n{{quote_lines}}\n\nWHAT HAPPENS NEXT\n\nThe company will review all received quotes and make a selection. If they choose your quote, we will notify you and the company will be in touch to discuss next steps.\n\nNo further action is needed from you at this stage.\n\nFor questions: {{support_email}}\n\nReloPass",
+      "body_html": "<body style=\"margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 16px;\"><table cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#fff;border-radius:8px;border:1px solid #e2e8f0;\"><tr><td style=\"padding:20px 32px;background:#0b2b43;border-radius:8px 8px 0 0;\"><span style=\"font-size:20px;font-weight:700;color:#fff;\">ReloPass</span></td></tr><tr><td style=\"padding:32px;\"><h1 style=\"margin:0 0 6px 0;font-size:22px;color:#0b2b43;\">Quote received</h1><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">Reference: {{rfq_ref}}</p><p style=\"margin:0 0 24px 0;font-size:15px;color:#334155;\">Hello {{supplier_name}}, we have logged your quote.</p><h2 style=\"margin:0 0 10px 0;font-size:15px;color:#0b2b43;\">What we received</h2><table width=\"100%\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f8fafc;border-radius:4px;margin:0 0 16px 0;\"><tr><td style=\"font-size:13px;color:#64748b;width:40%;\">Total</td><td style=\"font-size:13px;font-weight:700;color:#0b2b43;\">{{quote_total}} {{quote_currency}}</td></tr><tr><td style=\"font-size:13px;color:#64748b;\">Valid until</td><td style=\"font-size:13px;color:#334155;\">{{quote_valid_until}}</td></tr></table>{{quote_lines_table}}<h2 style=\"margin:24px 0 10px 0;font-size:15px;color:#0b2b43;\">What happens next</h2><p style=\"margin:0 0 16px 0;font-size:14px;color:#334155;\">The company will review all received quotes and make a selection. If they choose your quote, we will notify you and the company will be in touch to discuss next steps.</p><p style=\"margin:0;font-size:14px;color:#64748b;\">No further action is needed from you at this stage.</p></td></tr><tr><td style=\"padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;\"><p style=\"margin:0;font-size:12px;color:#64748b;\">Transactional email from ReloPass. Questions? <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a></p></td></tr></table></td></tr></table></body>",
+      "cta": {
+        "label": "View your submission",
+        "url_variable": "magic_link"
+      },
+      "variables_used": [
+        "rfq_ref",
+        "supplier_name",
+        "quote_total",
+        "quote_currency",
+        "quote_valid_until",
+        "quote_lines",
+        "magic_link",
+        "support_email"
+      ],
+      "fallbacks": {
+        "quote_lines": "",
+        "supplier_name": "there"
+      },
+      "rationale": "Gives the supplier a submission receipt so they have a record of what was logged and do not need to follow up to confirm receipt."
+    },
+    {
+      "id": "supplier_quote_selected",
+      "audience": "supplier",
+      "trigger": "HR validates this supplier's quote, closing the RFQ.",
+      "timing": "immediately",
+      "do_not_send_when": [],
+      "subject": "Your quote has been selected: {{rfq_ref}}",
+      "preheader": "The company has selected your quote and will be in touch to discuss next steps.",
+      "body_text": "Hello {{supplier_name}},\n\nThe company has selected your quote for reference {{rfq_ref}}.\n\nA representative from the company will contact you directly to discuss how to proceed. We do not have a timeline for their outreach, but they have been notified.\n\nIf you have not heard from them within a reasonable time, contact us at {{support_email}} and we will assist.\n\nThank you for responding through ReloPass.\n\nReloPass",
+      "body_html": "<body style=\"margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 16px;\"><table cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#fff;border-radius:8px;border:1px solid #e2e8f0;\"><tr><td style=\"padding:20px 32px;background:#0b2b43;border-radius:8px 8px 0 0;\"><span style=\"font-size:20px;font-weight:700;color:#fff;\">ReloPass</span></td></tr><tr><td style=\"padding:32px;\"><h1 style=\"margin:0 0 6px 0;font-size:22px;color:#0b2b43;\">Your quote has been selected</h1><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">Reference: {{rfq_ref}}</p><p style=\"margin:0 0 16px 0;font-size:15px;color:#334155;\">Hello {{supplier_name}},</p><p style=\"margin:0 0 16px 0;font-size:15px;color:#334155;\">The company has selected your quote for this request.</p><p style=\"margin:0 0 24px 0;font-size:14px;color:#334155;\">A representative from the company will contact you directly to discuss how to proceed. If you have not heard from them within a reasonable time, contact us at <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a> and we will assist.</p><table cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 0 24px 0;\"><tr><td style=\"background:#1f8e8b;border-radius:4px;\"><a href=\"{{magic_link}}\" style=\"display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#fff;text-decoration:none;\">View your submission</a></td></tr></table><p style=\"margin:0;font-size:14px;color:#64748b;\">Thank you for responding through ReloPass.</p></td></tr><tr><td style=\"padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;\"><p style=\"margin:0;font-size:12px;color:#64748b;\">Transactional email from ReloPass. Questions? <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a></p></td></tr></table></td></tr></table></body>",
+      "cta": {
+        "label": "View your submission",
+        "url_variable": "magic_link"
+      },
+      "variables_used": [
+        "rfq_ref",
+        "supplier_name",
+        "magic_link",
+        "support_email"
+      ],
+      "fallbacks": {
+        "supplier_name": "there"
+      },
+      "rationale": "Closes the loop with the winning supplier so they know they were chosen and understand the company will contact them directly; does not promise a contract."
+    },
+    {
+      "id": "supplier_rfq_closed",
+      "audience": "supplier",
+      "trigger": "HR validates a different supplier's quote, or the RFQ is withdrawn, and this supplier previously received an invite.",
+      "timing": "immediately",
+      "do_not_send_when": [
+        "this supplier's quote was the one selected (they receive supplier_quote_selected instead)"
+      ],
+      "subject": "Update on your quote request: {{rfq_ref}}",
+      "preheader": "This request has been filled. No further action is needed from you.",
+      "body_text": "Hello {{supplier_name}},\n\nThe request {{rfq_ref}} has now closed. No further action is needed from you.\n\nWe appreciate your time and hope to work with you on future requests.\n\nFor questions: {{support_email}}\n\nReloPass",
+      "body_html": "<body style=\"margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 16px;\"><table cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#fff;border-radius:8px;border:1px solid #e2e8f0;\"><tr><td style=\"padding:20px 32px;background:#0b2b43;border-radius:8px 8px 0 0;\"><span style=\"font-size:20px;font-weight:700;color:#fff;\">ReloPass</span></td></tr><tr><td style=\"padding:32px;\"><h1 style=\"margin:0 0 6px 0;font-size:22px;color:#0b2b43;\">Request closed</h1><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">Reference: {{rfq_ref}}</p><p style=\"margin:0 0 16px 0;font-size:15px;color:#334155;\">Hello {{supplier_name}},</p><p style=\"margin:0 0 24px 0;font-size:15px;color:#334155;\">The request {{rfq_ref}} has now closed. No further action is needed from you.</p><p style=\"margin:0 0 24px 0;font-size:14px;color:#64748b;\">We appreciate your time and hope to work with you on future requests.</p><table cellpadding=\"0\" cellspacing=\"0\"><tr><td style=\"background:#1f8e8b;border-radius:4px;\"><a href=\"{{magic_link}}\" style=\"display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#fff;text-decoration:none;\">View request</a></td></tr></table></td></tr><tr><td style=\"padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;\"><p style=\"margin:0;font-size:12px;color:#64748b;\">Transactional email from ReloPass. Questions? <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a></p></td></tr></table></td></tr></table></body>",
+      "cta": {
+        "label": "View request",
+        "url_variable": "magic_link"
+      },
+      "variables_used": [
+        "rfq_ref",
+        "supplier_name",
+        "magic_link",
+        "support_email"
+      ],
+      "fallbacks": {
+        "supplier_name": "there"
+      },
+      "rationale": "Closes the loop with non-selected suppliers so they know they can stop waiting, without disclosing which supplier won or why."
+    },
+    {
+      "id": "employee_rfq_sent",
+      "audience": "employee",
+      "trigger": "Employee submits an RFQ and the platform dispatches it to the selected suppliers.",
+      "timing": "immediately",
+      "do_not_send_when": [],
+      "subject": "Your RFQ has been sent: {{rfq_ref}}",
+      "preheader": "Suppliers have until {{respond_by}} to respond. Track quotes at your dashboard.",
+      "body_text": "Hello {{employee_first_name}},\n\nYour relocation quote request has been sent.\n\nReference: {{rfq_ref}}\nServices: {{service_labels}}\nSuppliers contacted: {{recipients_count}}\nRespond by: {{respond_by}}\n\nSUPPLIERS CONTACTED\n\n{{contacted_supplier_names}}\n\nSERVICES NOT COVERED\n\nThe following services could not be routed to a supplier at this time:\n\n{{not_contacted}}\n\nQuotes will appear in your dashboard as they arrive. You will receive an email each time one is submitted. If any uncovered services need attention, speak with your HR contact.\n\nTrack your quotes: {{employee_rfq_url}}\n\nFor questions: {{support_email}}\n\nReloPass",
+      "body_html": "<body style=\"margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 16px;\"><table cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#fff;border-radius:8px;border:1px solid #e2e8f0;\"><tr><td style=\"padding:20px 32px;background:#0b2b43;border-radius:8px 8px 0 0;\"><span style=\"font-size:20px;font-weight:700;color:#fff;\">ReloPass</span></td></tr><tr><td style=\"padding:32px;\"><h1 style=\"margin:0 0 6px 0;font-size:22px;color:#0b2b43;\">Your RFQ has been sent</h1><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">Reference: {{rfq_ref}}</p><p style=\"margin:0 0 24px 0;font-size:15px;color:#334155;\">Hello {{employee_first_name}}, your relocation quote request has been sent.</p><table width=\"100%\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f8fafc;border-radius:4px;margin:0 0 24px 0;\"><tr><td style=\"font-size:13px;color:#64748b;width:40%;\">Services</td><td style=\"font-size:13px;color:#334155;\">{{service_labels}}</td></tr><tr><td style=\"font-size:13px;color:#64748b;\">Suppliers contacted</td><td style=\"font-size:13px;color:#334155;\">{{recipients_count}}</td></tr><tr><td style=\"font-size:13px;color:#64748b;\">Respond by</td><td style=\"font-size:13px;color:#334155;\">{{respond_by}}</td></tr></table><h2 style=\"margin:0 0 8px 0;font-size:15px;color:#0b2b43;\">Suppliers contacted</h2><p style=\"margin:0 0 20px 0;font-size:14px;color:#334155;\">{{contacted_supplier_names}}</p><h2 style=\"margin:0 0 8px 0;font-size:15px;color:#0b2b43;\">Services not covered</h2><p style=\"margin:0 0 6px 0;font-size:13px;color:#64748b;\">The following services could not be routed to a supplier at this time:</p><p style=\"margin:0 0 24px 0;font-size:14px;color:#334155;\">{{not_contacted}}</p><p style=\"margin:0 0 24px 0;font-size:14px;color:#334155;\">Quotes will appear in your dashboard as they arrive. You will receive an email each time one is submitted. If any uncovered services need attention, speak with your HR contact.</p><table cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 0 0 0;\"><tr><td style=\"background:#1f8e8b;border-radius:4px;\"><a href=\"{{employee_rfq_url}}\" style=\"display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#fff;text-decoration:none;\">Track your quotes</a></td></tr></table></td></tr><tr><td style=\"padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;\"><p style=\"margin:0;font-size:12px;color:#64748b;\">Transactional email from ReloPass. Questions? <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a></p></td></tr></table></td></tr></table></body>",
+      "cta": {
+        "label": "Track your quotes",
+        "url_variable": "employee_rfq_url"
+      },
+      "variables_used": [
+        "rfq_ref",
+        "employee_first_name",
+        "service_labels",
+        "recipients_count",
+        "contacted_supplier_names",
+        "not_contacted",
+        "respond_by",
+        "employee_rfq_url",
+        "support_email"
+      ],
+      "fallbacks": {
+        "contacted_supplier_names": "No suppliers were successfully contacted.",
+        "not_contacted": "None"
+      },
+      "rationale": "Confirms which suppliers were reached and which services could not be covered so the employee can flag gaps with HR before the deadline passes."
+    },
+    {
+      "id": "employee_quote_received",
+      "audience": "employee",
+      "trigger": "A supplier submits a quote for this employee's RFQ.",
+      "timing": "immediately",
+      "do_not_send_when": [],
+      "subject": "New quote from {{supplier_name}}",
+      "preheader": "You have {{quotes_received_count}} of {{recipients_count}} quotes. Compare them in your dashboard.",
+      "body_text": "Hello {{employee_first_name}},\n\n{{supplier_name}} has submitted a quote for your move.\n\nReference: {{rfq_ref}}\nSupplier: {{supplier_name}}\nTotal: {{quote_total}} {{quote_currency}}\nValid until: {{quote_valid_until}}\nQuotes received so far: {{quotes_received_count}} of {{recipients_count}}\n\nYou can view and compare all received quotes in your dashboard. If you have a preference, you can flag it there for your HR team to review.\n\nView your quotes: {{employee_quotes_url}}\n\nFor questions: {{support_email}}\n\nReloPass",
+      "body_html": "<body style=\"margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 16px;\"><table cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#fff;border-radius:8px;border:1px solid #e2e8f0;\"><tr><td style=\"padding:20px 32px;background:#0b2b43;border-radius:8px 8px 0 0;\"><span style=\"font-size:20px;font-weight:700;color:#fff;\">ReloPass</span></td></tr><tr><td style=\"padding:32px;\"><h1 style=\"margin:0 0 6px 0;font-size:22px;color:#0b2b43;\">New quote received</h1><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">Reference: {{rfq_ref}}</p><p style=\"margin:0 0 16px 0;font-size:15px;color:#334155;\">Hello {{employee_first_name}},</p><p style=\"margin:0 0 24px 0;font-size:15px;color:#334155;\"><strong>{{supplier_name}}</strong> has submitted a quote for your move.</p><table width=\"100%\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f8fafc;border-radius:4px;margin:0 0 24px 0;\"><tr><td style=\"font-size:13px;color:#64748b;width:40%;\">Supplier</td><td style=\"font-size:13px;color:#334155;\">{{supplier_name}}</td></tr><tr><td style=\"font-size:13px;color:#64748b;\">Total</td><td style=\"font-size:13px;font-weight:700;color:#0b2b43;\">{{quote_total}} {{quote_currency}}</td></tr><tr><td style=\"font-size:13px;color:#64748b;\">Valid until</td><td style=\"font-size:13px;color:#334155;\">{{quote_valid_until}}</td></tr><tr><td style=\"font-size:13px;color:#64748b;\">Quotes received</td><td style=\"font-size:13px;color:#334155;\">{{quotes_received_count}} of {{recipients_count}}</td></tr></table><p style=\"margin:0 0 24px 0;font-size:14px;color:#334155;\">You can view and compare all received quotes in your dashboard. If you have a preference, you can flag it there for your HR team to review.</p><table cellpadding=\"0\" cellspacing=\"0\"><tr><td style=\"background:#1f8e8b;border-radius:4px;\"><a href=\"{{employee_quotes_url}}\" style=\"display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#fff;text-decoration:none;\">View your quotes</a></td></tr></table></td></tr><tr><td style=\"padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;\"><p style=\"margin:0;font-size:12px;color:#64748b;\">Transactional email from ReloPass. Questions? <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a></p></td></tr></table></td></tr></table></body>",
+      "cta": {
+        "label": "View your quotes",
+        "url_variable": "employee_quotes_url"
+      },
+      "variables_used": [
+        "rfq_ref",
+        "employee_first_name",
+        "supplier_name",
+        "quote_total",
+        "quote_currency",
+        "quote_valid_until",
+        "quotes_received_count",
+        "recipients_count",
+        "employee_quotes_url",
+        "support_email"
+      ],
+      "fallbacks": {},
+      "rationale": "Keeps the employee informed in real time as quotes arrive so they can flag a preference before HR is prompted to validate."
+    },
+    {
+      "id": "employee_quote_validated",
+      "audience": "employee",
+      "trigger": "HR validates one quote, closing the RFQ.",
+      "timing": "immediately",
+      "do_not_send_when": [],
+      "subject": "Quote approved for your move: {{rfq_ref}}",
+      "preheader": "Your HR team has approved a supplier. Next steps will come from them or the supplier.",
+      "body_text": "Hello {{employee_first_name}},\n\nYour HR team has approved a quote for your upcoming move.\n\nReference: {{rfq_ref}}\nSelected supplier: {{validated_supplier_name}}\nApproved amount: {{quote_total}} {{quote_currency}}\n\nWHAT HAPPENS NEXT\n\nYour HR team or the supplier will be in touch with you directly to confirm arrangements. You do not need to pay anything yourself at this stage unless your HR team tells you otherwise.\n\nIf you have questions about next steps, contact your HR team directly or reach us at {{support_email}}.\n\nReloPass",
+      "body_html": "<body style=\"margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 16px;\"><table cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#fff;border-radius:8px;border:1px solid #e2e8f0;\"><tr><td style=\"padding:20px 32px;background:#0b2b43;border-radius:8px 8px 0 0;\"><span style=\"font-size:20px;font-weight:700;color:#fff;\">ReloPass</span></td></tr><tr><td style=\"padding:32px;\"><h1 style=\"margin:0 0 6px 0;font-size:22px;color:#0b2b43;\">Quote approved</h1><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">Reference: {{rfq_ref}}</p><p style=\"margin:0 0 16px 0;font-size:15px;color:#334155;\">Hello {{employee_first_name}},</p><p style=\"margin:0 0 24px 0;font-size:15px;color:#334155;\">Your HR team has approved a quote for your upcoming move.</p><table width=\"100%\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f8fafc;border-radius:4px;margin:0 0 24px 0;\"><tr><td style=\"font-size:13px;color:#64748b;width:40%;\">Selected supplier</td><td style=\"font-size:13px;font-weight:700;color:#0b2b43;\">{{validated_supplier_name}}</td></tr><tr><td style=\"font-size:13px;color:#64748b;\">Approved amount</td><td style=\"font-size:13px;font-weight:700;color:#0b2b43;\">{{quote_total}} {{quote_currency}}</td></tr></table><h2 style=\"margin:0 0 10px 0;font-size:15px;color:#0b2b43;\">What happens next</h2><p style=\"margin:0 0 16px 0;font-size:14px;color:#334155;\">Your HR team or the supplier will be in touch with you directly to confirm arrangements. You do not need to pay anything yourself at this stage unless your HR team tells you otherwise.</p><p style=\"margin:0 0 24px 0;font-size:14px;color:#64748b;\">If you have questions about next steps, contact your HR team or reach us at <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a>.</p><table cellpadding=\"0\" cellspacing=\"0\"><tr><td style=\"background:#1f8e8b;border-radius:4px;\"><a href=\"{{employee_quotes_url}}\" style=\"display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#fff;text-decoration:none;\">View approved quote</a></td></tr></table></td></tr><tr><td style=\"padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;\"><p style=\"margin:0;font-size:12px;color:#64748b;\">Transactional email from ReloPass. Questions? <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a></p></td></tr></table></td></tr></table></body>",
+      "cta": {
+        "label": "View approved quote",
+        "url_variable": "employee_quotes_url"
+      },
+      "variables_used": [
+        "rfq_ref",
+        "employee_first_name",
+        "validated_supplier_name",
+        "quote_total",
+        "quote_currency",
+        "employee_quotes_url",
+        "support_email"
+      ],
+      "fallbacks": {
+        "validated_supplier_name": "the selected supplier"
+      },
+      "rationale": "Tells the employee who was chosen and what to expect next so they are not left in uncertainty after HR acts."
+    },
+    {
+      "id": "hr_quotes_ready",
+      "audience": "hr",
+      "trigger": "First of three conditions met for this RFQ: all recipients have responded, OR respond_by has passed with at least one quote received, OR the employee has proposed a preferred quote.",
+      "timing": "immediately when the first trigger condition is met; sent once per RFQ, not once per quote",
+      "do_not_send_when": [
+        "hr_quotes_ready has already been sent for this RFQ",
+        "zero quotes have been received and respond_by has not yet passed"
+      ],
+      "subject": "{{quotes_received_count}} quote(s) ready to review",
+      "preheader": "Review the submitted quotes and validate one to proceed with the move.",
+      "body_text": "Hello {{hr_first_name}},\n\nQuotes are ready for review for {{employee_full_name}}'s relocation.\n\nReference: {{rfq_ref}}\nQuotes received: {{quotes_received_count}} of {{recipients_count}}\n\nOpen the validation screen to compare quotes side by side. Once you validate one, the selected supplier will be notified, all other quotes will be closed, and {{employee_first_name}} will be informed.\n\nReview and validate: {{hr_rfq_url}}\n\nFor questions: {{support_email}}\n\nReloPass",
+      "body_html": "<body style=\"margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 16px;\"><table cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#fff;border-radius:8px;border:1px solid #e2e8f0;\"><tr><td style=\"padding:20px 32px;background:#0b2b43;border-radius:8px 8px 0 0;\"><span style=\"font-size:20px;font-weight:700;color:#fff;\">ReloPass</span></td></tr><tr><td style=\"padding:32px;\"><h1 style=\"margin:0 0 6px 0;font-size:22px;color:#0b2b43;\">Quotes ready to review</h1><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">Reference: {{rfq_ref}}</p><p style=\"margin:0 0 16px 0;font-size:15px;color:#334155;\">Hello {{hr_first_name}},</p><p style=\"margin:0 0 24px 0;font-size:15px;color:#334155;\">Quotes are ready for review for <strong>{{employee_full_name}}</strong>'s relocation.</p><table width=\"100%\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f8fafc;border-radius:4px;margin:0 0 24px 0;\"><tr><td style=\"font-size:13px;color:#64748b;width:40%;\">Quotes received</td><td style=\"font-size:13px;font-weight:700;color:#0b2b43;\">{{quotes_received_count}} of {{recipients_count}}</td></tr></table><p style=\"margin:0 0 16px 0;font-size:14px;color:#334155;\">Open the validation screen to compare quotes side by side. Once you validate one, the selected supplier will be notified, all other quotes will be closed, and {{employee_first_name}} will be informed.</p><table cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 0 0 0;\"><tr><td style=\"background:#1f8e8b;border-radius:4px;\"><a href=\"{{hr_rfq_url}}\" style=\"display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#fff;text-decoration:none;\">Review and validate</a></td></tr></table></td></tr><tr><td style=\"padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;\"><p style=\"margin:0;font-size:12px;color:#64748b;\">Transactional email from ReloPass. Questions? <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a></p></td></tr></table></td></tr></table></body>",
+      "cta": {
+        "label": "Review and validate",
+        "url_variable": "hr_rfq_url"
+      },
+      "variables_used": [
+        "rfq_ref",
+        "hr_first_name",
+        "employee_full_name",
+        "employee_first_name",
+        "quotes_received_count",
+        "recipients_count",
+        "hr_rfq_url",
+        "support_email"
+      ],
+      "fallbacks": {
+        "employee_full_name": "the employee",
+        "employee_first_name": "the employee"
+      },
+      "rationale": "Prompts HR to act as soon as quotes are available or the deadline passes so the validation step does not stall the employee's move planning."
+    },
+    {
+      "id": "hr_rfq_no_response",
+      "audience": "hr",
+      "trigger": "respond_by has passed and zero quotes were received for this RFQ.",
+      "timing": "immediately when respond_by passes and quotes_received_count is zero",
+      "do_not_send_when": [
+        "at least one quote has been received",
+        "hr_quotes_ready has already been sent for this RFQ"
+      ],
+      "subject": "No quotes received yet: {{rfq_ref}}",
+      "preheader": "No suppliers responded by the deadline. You can re-send the RFQ or add new suppliers.",
+      "body_text": "Hello {{hr_first_name}},\n\nThe deadline for {{rfq_ref}} has passed and no quotes were received.\n\nEmployee: {{employee_full_name}}\nServices: {{service_labels}}\nDeadline passed: {{respond_by}}\n\nWHAT YOU CAN DO\n\n1. Re-send the RFQ to the same suppliers with an extended deadline.\n2. Add new suppliers from the approved list and send a fresh RFQ.\n3. Contact the suppliers directly to ask whether they intend to respond.\n\nOpen the RFQ to take action: {{hr_rfq_url}}\n\nFor questions: {{support_email}}\n\nReloPass",
+      "body_html": "<body style=\"margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 16px;\"><table cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#fff;border-radius:8px;border:1px solid #e2e8f0;\"><tr><td style=\"padding:20px 32px;background:#0b2b43;border-radius:8px 8px 0 0;\"><span style=\"font-size:20px;font-weight:700;color:#fff;\">ReloPass</span></td></tr><tr><td style=\"padding:32px;\"><h1 style=\"margin:0 0 6px 0;font-size:22px;color:#0b2b43;\">No quotes received</h1><p style=\"margin:0 0 24px 0;font-size:13px;color:#64748b;\">Reference: {{rfq_ref}}</p><p style=\"margin:0 0 16px 0;font-size:15px;color:#334155;\">Hello {{hr_first_name}},</p><p style=\"margin:0 0 24px 0;font-size:15px;color:#334155;\">The deadline for <strong>{{rfq_ref}}</strong> has passed and no quotes were received.</p><table width=\"100%\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;background:#f8fafc;border-radius:4px;margin:0 0 24px 0;\"><tr><td style=\"font-size:13px;color:#64748b;width:40%;\">Employee</td><td style=\"font-size:13px;color:#334155;\">{{employee_full_name}}</td></tr><tr><td style=\"font-size:13px;color:#64748b;\">Services</td><td style=\"font-size:13px;color:#334155;\">{{service_labels}}</td></tr><tr><td style=\"font-size:13px;color:#64748b;\">Deadline</td><td style=\"font-size:13px;color:#334155;\">{{respond_by}}</td></tr></table><h2 style=\"margin:0 0 10px 0;font-size:15px;color:#0b2b43;\">What you can do</h2><p style=\"margin:0 0 6px 0;font-size:14px;color:#334155;\">1. Re-send the RFQ to the same suppliers with an extended deadline.</p><p style=\"margin:0 0 6px 0;font-size:14px;color:#334155;\">2. Add new suppliers from the approved list and send a fresh RFQ.</p><p style=\"margin:0 0 24px 0;font-size:14px;color:#334155;\">3. Contact the suppliers directly to ask whether they intend to respond.</p><table cellpadding=\"0\" cellspacing=\"0\"><tr><td style=\"background:#1f8e8b;border-radius:4px;\"><a href=\"{{hr_rfq_url}}\" style=\"display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#fff;text-decoration:none;\">Open the RFQ</a></td></tr></table></td></tr><tr><td style=\"padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;\"><p style=\"margin:0;font-size:12px;color:#64748b;\">Transactional email from ReloPass. Questions? <a href=\"mailto:{{support_email}}\" style=\"color:#1f8e8b;\">{{support_email}}</a></p></td></tr></table></td></tr></table></body>",
+      "cta": {
+        "label": "Open the RFQ",
+        "url_variable": "hr_rfq_url"
+      },
+      "variables_used": [
+        "rfq_ref",
+        "hr_first_name",
+        "employee_full_name",
+        "service_labels",
+        "respond_by",
+        "hr_rfq_url",
+        "support_email"
+      ],
+      "fallbacks": {
+        "employee_full_name": "the employee"
+      },
+      "rationale": "Alerts HR immediately when the deadline passes with no quotes so they can take corrective action before the employee's move timeline slips."
+    }
+  ],
+  "sequence_diagram_text": "RFQ Created\n  T+0  supplier_rfq_invite       -> each supplier (immediately on dispatch)\n  T+0  employee_rfq_sent         -> employee (immediately on dispatch)\n\n  [Supplier submits a quote]\n       supplier_quote_received_ack -> that supplier (immediately)\n       employee_quote_received     -> employee (immediately)\n\n  [Employee proposes a preferred quote (any time before respond_by passes)]\n       hr_quotes_ready            -> HR (immediately, if not already sent for this RFQ)\n\n  [All recipients have responded (before respond_by)]\n       hr_quotes_ready            -> HR (immediately, if not already sent for this RFQ)\n\n  T-2 days before respond_by\n       supplier_rfq_reminder      -> each supplier that has not yet submitted (if RFQ still open)\n\n  respond_by passes\n    If >= 1 quote received and hr_quotes_ready not yet sent:\n       hr_quotes_ready            -> HR (immediately)\n    If 0 quotes received:\n       hr_rfq_no_response         -> HR (immediately)\n\n  [HR validates one quote]\n       supplier_quote_selected    -> the winning supplier (immediately)\n       supplier_rfq_closed        -> all other invited suppliers (immediately)\n       employee_quote_validated   -> employee (immediately)\n       RFQ is now closed."
+}

@@ -182,6 +182,35 @@ def submit_supplier_quote(
         "AIQ-1521 SUPPLIER QUOTED rfq=%s vendor=%s total=%s %s",
         recipient["rfq_id"], recipient["vendor_id"], payload.total_amount, payload.currency,
     )
+    # [AIQ-2370] The live path is this magic-link submit, not require_vendor. Tell
+    # employee + HR, and emit the analytics event that used to live only on the dead route.
+    try:
+        from ..services.analytics_service import emit_event, EVENT_QUOTE_RECEIVED
+        rfq_row = db.get_rfq(str(recipient["rfq_id"])) or {}
+        emit_event(
+            EVENT_QUOTE_RECEIVED,
+            case_id=rfq_row.get("case_id"),
+            extra={
+                "rfq_id": str(recipient["rfq_id"]),
+                "vendor_id": str(recipient["vendor_id"]),
+                "quote_id": quote.get("id"),
+                "total_amount": payload.total_amount,
+                "currency": payload.currency,
+            },
+        )
+    except Exception:
+        log.warning(
+            "supplier_rfq: quote_received analytics failed rfq=%s",
+            recipient["rfq_id"], exc_info=True,
+        )
+    try:
+        from ..services.rfq_notifications import notify_quote_received
+        notify_quote_received(str(recipient["rfq_id"]), quote)
+    except Exception:
+        log.warning(
+            "supplier_rfq: quote_received notification failed rfq=%s",
+            recipient["rfq_id"], exc_info=True,
+        )
     return {"ok": True, "quote_id": quote.get("id")}
 
 

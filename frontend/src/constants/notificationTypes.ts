@@ -18,6 +18,11 @@ export const NOTIFICATION_TYPES = {
   // fired to the EMPLOYEE when HR approves/rejects their exception. The other half of the
   // loop — before this, HR decided and nobody told the person who asked.
   POLICY_EXCEPTION_DECIDED: 'POLICY_EXCEPTION_DECIDED',
+  // [AIQ-2370] RFQ loop — in-app bell types (must match backend rfq_notifications.py).
+  RFQ_SENT: 'rfq.sent',
+  RFQ_QUOTE_RECEIVED: 'rfq.quote_received',
+  RFQ_QUOTES_READY: 'rfq.quotes_ready',
+  RFQ_QUOTE_VALIDATED: 'rfq.quote_validated',
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
@@ -58,6 +63,25 @@ export function getNotificationTarget(
   // nothing about exceptions.
   if (notification.type === NOTIFICATION_TYPES.POLICY_EXCEPTION_DECIDED) {
     return '/employee/benefits';
+  }
+
+  if (notification.type === NOTIFICATION_TYPES.RFQ_QUOTES_READY) {
+    const caseId = notification.case_id || notification.assignment_id;
+    if (!caseId) return '/hr';
+    return `/hr/employee-dashboard?caseId=${caseId}`;
+  }
+
+  if (
+    notification.type === NOTIFICATION_TYPES.RFQ_SENT ||
+    notification.type === NOTIFICATION_TYPES.RFQ_QUOTE_RECEIVED ||
+    notification.type === NOTIFICATION_TYPES.RFQ_QUOTE_VALIDATED
+  ) {
+    const assignmentId = notification.assignment_id || notification.case_id;
+    if (!assignmentId) return '/';
+    if (role === 'HR') {
+      return `/hr/employee-dashboard?caseId=${assignmentId}`;
+    }
+    return `/employee/case/${assignmentId}/services`;
   }
 
   const assignmentId = notification.assignment_id || notification.case_id;

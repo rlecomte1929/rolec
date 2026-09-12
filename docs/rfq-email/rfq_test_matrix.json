@@ -1,0 +1,613 @@
+{
+  "version": "1.0",
+  "environments": [
+    {
+      "name": "staging",
+      "flags_expected": {
+        "RELOPASS_SUPPLIER_EMAIL_LIVE": "on",
+        "SUPPLIER_RFQ_EMAIL_ENABLED": "on",
+        "RELOPASS_OUTBOX_ALLOWED_DOMAINS": "@probe.test,@staging-corp.test"
+      },
+      "test_inboxes_needed": [
+        "supplier-verified: verified-supplier@staging-corp.test",
+        "supplier-bounce-target: bounce+test@staging-corp.test (configure Resend test bounce address)",
+        "supplier-webmail: blocked-supplier@gmail.com (guard check only, never receives real mail)",
+        "hr-user: hr@probe.test",
+        "employee: employee@probe.test",
+        "catch-all: dev-catch-all@staging-corp.test"
+      ]
+    },
+    {
+      "name": "production",
+      "flags_expected": {
+        "RELOPASS_SUPPLIER_EMAIL_LIVE": "off",
+        "SUPPLIER_RFQ_EMAIL_ENABLED": "off",
+        "RELOPASS_OUTBOX_ALLOWED_DOMAINS": "@probe.test"
+      },
+      "test_inboxes_needed": [
+        "smoke-test supplier: an engineer-controlled inbox at a real domain before go-live flip",
+        "hr smoke-test user: hr@[first-customer-domain] after allowlist is widened"
+      ]
+    }
+  ],
+  "test_cases": [
+    {
+      "id": "RFQ-T01",
+      "area": "supplier_dispatch",
+      "title": "All 4 guards pass: supplier email dispatched",
+      "preconditions": [
+        "Supplier record has a verified corporate email address on file",
+        "Triggering user account is not a test persona",
+        "RELOPASS_SUPPLIER_EMAIL_LIVE and SUPPLIER_RFQ_EMAIL_ENABLED are both on"
+      ],
+      "steps": [
+        "1. Employee creates an RFQ referencing the qualifying supplier via the app.",
+        "2. Engineer checks Resend activity log and the supplier_rfq_sends DB table.",
+        "3. Supplier checks their inbox."
+      ],
+      "expected": [
+        "Resend API returns 200 and records one delivery event for the supplier address.",
+        "DB row in supplier_rfq_sends shows status='dispatched' with a non-null sent_at timestamp.",
+        "Supplier inbox receives an email from noreply@relopass.com containing a unique magic-link URL."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T02",
+      "area": "supplier_dispatch",
+      "title": "Guard 1 fail: supplier has no email address on record",
+      "preconditions": [
+        "Supplier record exists but contact_email is null or empty",
+        "All other guards would pass if an address were present"
+      ],
+      "steps": [
+        "1. Employee creates an RFQ referencing the addressless supplier.",
+        "2. Engineer inspects the guard evaluation log and HR in-app inbox."
+      ],
+      "expected": [
+        "No Resend API call is made; Resend activity log shows no new event.",
+        "HR in-app inbox receives: 'Supplier [name] has no contact email on record. Add one to enable email quoting.'",
+        "Magic link is minted and delivered to the employee in-app inbox only."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T03",
+      "area": "supplier_dispatch",
+      "title": "Guard 2 fail: supplier email exists but is not verified",
+      "preconditions": [
+        "Supplier record has contact_email populated but email_verified is false",
+        "All other guards would pass"
+      ],
+      "steps": [
+        "1. Employee creates an RFQ referencing the unverified supplier.",
+        "2. Engineer inspects guard log and HR in-app inbox."
+      ],
+      "expected": [
+        "No Resend API call is made.",
+        "HR in-app inbox receives: 'Supplier [name] email address is unverified. Verify the address or type an override to enable email quoting.'",
+        "Magic link delivered to the employee in-app inbox only."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T04",
+      "area": "supplier_dispatch",
+      "title": "Guard 3 fail: supplier email is on a personal webmail domain",
+      "preconditions": [
+        "Supplier contact_email is at gmail.com, hotmail.com, outlook.com, yahoo.com, icloud.com, or protonmail.com",
+        "Address is marked verified; all other guards would pass"
+      ],
+      "steps": [
+        "1. Employee creates an RFQ referencing the webmail supplier.",
+        "2. Engineer checks guard log and HR in-app inbox."
+      ],
+      "expected": [
+        "No Resend API call is made.",
+        "HR in-app inbox receives: 'Supplier [name] uses a personal email domain. Type a corporate address to proceed.'",
+        "Magic link delivered to the employee in-app inbox only."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T05",
+      "area": "supplier_dispatch",
+      "title": "Guard 4 fail: triggering user is a test persona; link minted but not emailed",
+      "preconditions": [
+        "Triggering account email ends in @probe.test or @testco.com",
+        "Supplier record passes guards 1 through 3"
+      ],
+      "steps": [
+        "1. Test persona employee creates an RFQ referencing a qualifying supplier.",
+        "2. Engineer checks Resend activity log, supplier_rfq_sends table, and the test persona employee in-app inbox."
+      ],
+      "expected": [
+        "No Resend API call is made; Resend activity log shows no new event.",
+        "Magic link JWT is minted and stored in the DB with sent_at null.",
+        "Magic link is delivered to the employee in-app inbox instead of the supplier email address."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T06",
+      "area": "supplier_link",
+      "title": "Magic link first open sets status to viewed; second open produces no duplicate side effects",
+      "preconditions": [
+        "Supplier has received a valid unexpired magic link via email",
+        "Link has not been opened before"
+      ],
+      "steps": [
+        "1. Supplier clicks the magic link; engineer queries the rfq_links DB row.",
+        "2. Supplier opens the same URL a second time in a new browser tab."
+      ],
+      "expected": [
+        "After first open: DB row shows status='viewed' with first_opened_at populated.",
+        "After second open: page loads normally; DB status remains 'viewed'; no additional DB writes; no duplicate analytics or notification events fired."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T07",
+      "area": "supplier_link",
+      "title": "Expired magic link refused",
+      "preconditions": [
+        "Magic link JWT was issued more than 14 days ago (simulate via DB timestamp manipulation or test-clock offset)"
+      ],
+      "steps": [
+        "1. Supplier navigates to the expired magic link URL.",
+        "2. Engineer checks server validation log for the JWT expiry result."
+      ],
+      "expected": [
+        "Server returns HTTP 410; page shows 'This link has expired. Ask HR to resend the quote request.'",
+        "No DB row status change occurs; no notification is sent."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T08",
+      "area": "supplier_link",
+      "title": "Revoked magic link refused on every request",
+      "preconditions": [
+        "A magic link was issued and subsequently revoked (HR re-sent the RFQ or cancelled it)",
+        "Supplier retained the original URL"
+      ],
+      "steps": [
+        "1. Supplier navigates to the revoked magic link URL.",
+        "2. Engineer checks server revocation lookup in the DB."
+      ],
+      "expected": [
+        "Server hashes the presented token, finds no matching active row, returns HTTP 410.",
+        "Page shows 'This link is no longer valid.' No quote form is rendered."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T09",
+      "area": "supplier_link",
+      "title": "Re-sent link: old link refused; new link works",
+      "preconditions": [
+        "Supplier received an initial magic link that has not yet been used"
+      ],
+      "steps": [
+        "1. HR re-sends the RFQ to the supplier via the app.",
+        "2. Supplier attempts to use the original now-invalidated URL.",
+        "3. Supplier opens the new URL from the second email."
+      ],
+      "expected": [
+        "Old link returns HTTP 410: token hash no longer matches an active DB row.",
+        "New link loads the supplier quote form successfully.",
+        "DB shows exactly one active link row for this RFQ-supplier pair."
+      ],
+      "priority": "P0",
+      "automatable": false
+    },
+    {
+      "id": "RFQ-T10",
+      "area": "supplier_form",
+      "title": "Quote submitted: employee and HR notified; second submit on same link refused",
+      "preconditions": [
+        "Supplier has an open unexpired unsubmitted magic link",
+        "Employee and HR account domains are in RELOPASS_OUTBOX_ALLOWED_DOMAINS"
+      ],
+      "steps": [
+        "1. Supplier fills the quote form and submits via the magic link.",
+        "2. Supplier submits the same form a second time using the same link.",
+        "3. Cron drains notification_outbox; engineer checks employee and HR inboxes."
+      ],
+      "expected": [
+        "First submit: HTTP 200; DB row status='submitted'; one quote record created.",
+        "Second submit: HTTP 409; response indicates link already used; no duplicate quote row created.",
+        "Employee and HR each receive exactly one notification email referencing the RFQ."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T11",
+      "area": "hr_notify",
+      "title": "HR validates a quote: winner, losers, and employee receive correct emails; addressless supplier skipped",
+      "preconditions": [
+        "At least two suppliers submitted quotes; one additional invited supplier has no email on record",
+        "Winning and losing supplier addresses are verified corporate addresses"
+      ],
+      "steps": [
+        "1. HR selects the winning quote and confirms validation in the app.",
+        "2. Engineer waits for cron to drain notification_outbox and checks all inboxes.",
+        "3. Engineer queries supplier_rfq_sends for the addressless supplier."
+      ],
+      "expected": [
+        "Winning supplier receives email: 'Your quote for [RFQ reference] has been selected.'",
+        "Each losing supplier with a valid address receives: 'Thank you for quoting on [RFQ reference]. Another supplier was selected.'",
+        "Employee receives notification: 'Your RFQ [reference] has a validated quote.'",
+        "No outbound attempt exists for the addressless supplier; HR in-app inbox notes the skip with supplier name."
+      ],
+      "priority": "P0",
+      "automatable": false
+    },
+    {
+      "id": "RFQ-T12",
+      "area": "reminders",
+      "title": "Reminder fires at T-2 days with no quote; skipped after deadline passes; skipped for already-replied supplier",
+      "preconditions": [
+        "RFQ has three supplier links: one already submitted, one not yet submitted, respond_by in exactly 2 days",
+        "A second RFQ has one open supplier link whose respond_by has already passed"
+      ],
+      "steps": [
+        "1. Engineer triggers the reminder cron job or advances the test clock to T-2 days.",
+        "2. Engineer checks Resend activity log and notification_outbox."
+      ],
+      "expected": [
+        "Reminder email sent only to the supplier who has not responded and whose RFQ is 2 days from deadline.",
+        "No reminder sent to the supplier who already submitted a quote on the same RFQ.",
+        "No reminder sent for the overdue RFQ whose respond_by has already passed."
+      ],
+      "priority": "P1",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T13",
+      "area": "security",
+      "title": "HTML injection in supplier name and employee free text renders as plain text in all emails and on the supplier page",
+      "preconditions": [
+        "Supplier record name is set to: <a href=\"[evil.example/%22](http://evil.example\")>click here</a>",
+        "Employee RFQ free-text field contains: <script>alert('xss')</script>"
+      ],
+      "steps": [
+        "1. Employee creates an RFQ using the injected supplier name and free-text content.",
+        "2. Engineer opens the raw HTML source of the supplier email and inspects the rendered supplier page DOM."
+      ],
+      "expected": [
+        "Email HTML source shows angle brackets entity-encoded (&lt;a href=...&gt;) with no active hyperlink rendered in any email client.",
+        "Supplier page renders the script tag as visible escaped text; browser developer tools confirm no alert fired and no injected element in the DOM.",
+        "No raw HTML executes in any email client or browser preview for either field."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T14",
+      "area": "data_protection",
+      "title": "No employee name, email, or employer name reaches the supplier",
+      "preconditions": [
+        "RFQ created by an employee with a distinct full name and a recognizable employer name in their profile"
+      ],
+      "steps": [
+        "1. Engineer inspects the full rendered HTML of the supplier email including headers and body.",
+        "2. Engineer decodes the magic link JWT payload and inspects the supplier page DOM."
+      ],
+      "expected": [
+        "No occurrence of the employee full name, email address, or employer name in email headers, body, or supplier page content.",
+        "JWT payload contains only RFQ reference ID and link metadata; no user-identifying fields.",
+        "Supplier page title matches the configured marketing page title, not any internal or employer-specific text."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T15",
+      "area": "deliverability",
+      "title": "SPF, DKIM, and DMARC alignment for noreply@relopass.com via Resend",
+      "preconditions": [
+        "relopass.com DNS records are live and the Resend sending domain is verified"
+      ],
+      "steps": [
+        "1. Engineer runs dig TXT relopass.com and dig TXT _dmarc.relopass.com.",
+        "2. Engineer sends a test email through Resend and inspects the Authentication-Results header in a received message."
+      ],
+      "expected": [
+        "SPF TXT record includes Resend sending IP ranges; MX Toolbox SPF check returns pass.",
+        "Received email contains a DKIM-Signature header with d=relopass.com aligned with the From domain.",
+        "DMARC record present with at least p=quarantine; both SPF and DKIM align with relopass.com."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T16",
+      "area": "deliverability",
+      "title": "Hard bounce webhook: supplier address marked not contacted; employee receives in-app notification",
+      "preconditions": [
+        "A supplier email was dispatched to an address that will hard-bounce (Resend test bounce address or a non-existent mailbox)"
+      ],
+      "steps": [
+        "1. Engineer triggers a hard bounce via Resend test tooling or a known-bad address.",
+        "2. Engineer checks the supplier_rfq_sends DB row and employee in-app inbox after the webhook fires."
+      ],
+      "expected": [
+        "Resend delivers a bounce webhook event to the registered endpoint; server responds HTTP 200.",
+        "DB row for that send updated to status='bounced'; supplier contact record flagged with bounced_at timestamp.",
+        "Employee in-app inbox receives: 'The email to supplier [name] bounced. Their address may be incorrect.'"
+      ],
+      "priority": "P0",
+      "automatable": false
+    },
+    {
+      "id": "RFQ-T17",
+      "area": "deliverability",
+      "title": "Complaint webhook: supplier address flagged; no further emails sent to that address",
+      "preconditions": [
+        "A supplier email was sent and a complaint webhook event is ready to be posted (Resend complaint simulation)"
+      ],
+      "steps": [
+        "1. Engineer posts a synthetic complaint webhook event to the registered endpoint.",
+        "2. Engineer attempts to trigger a second email send to the same address."
+      ],
+      "expected": [
+        "Complaint handler marks the supplier contact record with complained=true and a complaint_at timestamp.",
+        "Any subsequent send attempt to that address is blocked before the Resend API call; guard log records 'address on complaint list'."
+      ],
+      "priority": "P1",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T18",
+      "area": "supplier_dispatch",
+      "title": "Idempotency: client RFQ create retry does not dispatch a duplicate email",
+      "preconditions": [
+        "Network conditions are simulated such that the client retries the RFQ create request after the server committed the first insert"
+      ],
+      "steps": [
+        "1. Engineer sends two identical RFQ create requests with the same idempotency key in quick succession.",
+        "2. Engineer checks Resend activity log and the supplier_rfq_sends DB table."
+      ],
+      "expected": [
+        "Exactly one DB row exists for the RFQ-supplier pair; the second request returns the existing record with no new insert.",
+        "Resend activity log shows exactly one outbound email to the supplier address."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T19",
+      "area": "employee_notify",
+      "title": "Outbox allowlist: employee at a real corporate domain receives notifications only after allowlist is widened",
+      "preconditions": [
+        "RELOPASS_OUTBOX_ALLOWED_DOMAINS is set to @probe.test only",
+        "Employee account is at @first-customer.com, which is not in the current allowlist"
+      ],
+      "steps": [
+        "1. Supplier submits a quote; cron drains notification_outbox.",
+        "2. Engineer adds @first-customer.com to RELOPASS_OUTBOX_ALLOWED_DOMAINS; cron drains again."
+      ],
+      "expected": [
+        "After step 1: no email reaches @first-customer.com; notification_outbox row shows status='skipped' with reason 'domain not allowlisted'.",
+        "After step 2: notification is delivered to the employee address; outbox row status updated to 'sent'."
+      ],
+      "priority": "P0",
+      "automatable": true
+    },
+    {
+      "id": "RFQ-T20",
+      "area": "supplier_form",
+      "title": "Timezone: respond_by shown consistently across supplier email, supplier page, and HR dashboard",
+      "preconditions": [
+        "RFQ created with respond_by stored as UTC in the DB",
+        "Supplier is in CET and HR user is in UTC to maximize potential divergence"
+      ],
+      "steps": [
+        "1. HR views the RFQ deadline on the HR dashboard in their local timezone.",
+        "2. Supplier opens the magic link and views the deadline on the supplier page.",
+        "3. Engineer inspects the deadline string in the supplier email plain-text and HTML parts."
+      ],
+      "expected": [
+        "HR dashboard shows respond_by in HR local timezone with an explicit timezone label.",
+        "Supplier page shows respond_by resolving to the same absolute UTC instant, with timezone label.",
+        "Email body shows respond_by with explicit UTC offset or timezone abbreviation; no ambiguous bare date-time string."
+      ],
+      "priority": "P1",
+      "automatable": false
+    },
+    {
+      "id": "RFQ-T21",
+      "area": "supplier_dispatch",
+      "title": "HR overrides supplier address with a corporate email: email dispatched and override logged",
+      "preconditions": [
+        "Supplier record has a webmail address (fails guard 3) or an unverified address (fails guard 2)"
+      ],
+      "steps": [
+        "1. HR types a valid corporate override address in the supplier email field and confirms the RFQ send.",
+        "2. Engineer checks supplier_rfq_sends and Resend activity log."
+      ],
+      "expected": [
+        "Email dispatched to the override address; DB row records override_address and override_by (HR user ID).",
+        "Guard log shows guards 2 and 3 bypassed with reason 'human_override'; guards 1 and 4 still evaluated normally."
+      ],
+      "priority": "P1",
+      "automatable": false
+    },
+    {
+      "id": "RFQ-T22",
+      "area": "supplier_form",
+      "title": "Supplier page: analytics consent dialog present before tracking fires; marketing page title shown",
+      "preconditions": [
+        "Supplier navigates to a valid magic link in a fresh browser session with no prior consent cookie"
+      ],
+      "steps": [
+        "1. Supplier opens the magic link; engineer monitors network requests and inspects the DOM.",
+        "2. Engineer inspects the browser tab title and HTML title tag."
+      ],
+      "expected": [
+        "Analytics consent dialog renders before any tracking or analytics network requests are initiated.",
+        "Browser tab title and HTML title tag match the configured marketing page title with no internal app name or employer-identifying text."
+      ],
+      "priority": "P2",
+      "automatable": true
+    }
+  ],
+  "go_live_checklist": [
+    {
+      "step": "Confirm SPF, DKIM, and DMARC records are live and passing for relopass.com on Resend sending infrastructure",
+      "owner": "engineer",
+      "how_to_verify": "Run dig TXT relopass.com and dig TXT _dmarc.relopass.com; send a test email and confirm Authentication-Results header shows pass for SPF, DKIM, and DMARC",
+      "blocking": true
+    },
+    {
+      "step": "Confirm Resend bounce webhook endpoint is registered, reachable, and updates the DB on receipt",
+      "owner": "engineer",
+      "how_to_verify": "Trigger a Resend test bounce event from the dashboard; verify supplier_rfq_sends status flips to 'bounced' and employee in-app notification fires",
+      "blocking": true
+    },
+    {
+      "step": "Confirm Resend complaint webhook endpoint is registered and marks the supplier contact record with complained=true",
+      "owner": "engineer",
+      "how_to_verify": "Post a synthetic complaint event to the endpoint; query the supplier contact record and confirm complained=true with a complaint_at timestamp",
+      "blocking": true
+    },
+    {
+      "step": "Widen RELOPASS_OUTBOX_ALLOWED_DOMAINS to include the first customer email domain before their HR user is onboarded",
+      "owner": "ops",
+      "how_to_verify": "Set the env var to include @[first-customer-domain]; trigger a test notification and confirm the outbox row shows status='sent'",
+      "blocking": true
+    },
+    {
+      "step": "Run all P0 staging test cases (RFQ-T01 through RFQ-T19 excluding P1 and P2 cases) and confirm zero failures",
+      "owner": "engineer",
+      "how_to_verify": "Test run report attached to the go-live ticket with all P0 rows marked pass",
+      "blocking": true
+    },
+    {
+      "step": "Verify no employee PII appears in any outbound supplier email by inspecting staging smoke-test email raw source",
+      "owner": "engineer",
+      "how_to_verify": "Open raw email source; search for employee full name, email address, and employer name; confirm zero matches",
+      "blocking": true
+    },
+    {
+      "step": "Confirm idempotency key or deduplication mechanism is active on the RFQ create endpoint in production",
+      "owner": "engineer",
+      "how_to_verify": "Replay the production smoke-test RFQ create request twice; confirm Resend shows one email and the DB has one supplier_rfq_sends row",
+      "blocking": true
+    },
+    {
+      "step": "Flip RELOPASS_SUPPLIER_EMAIL_LIVE to on in the production environment",
+      "owner": "founder",
+      "how_to_verify": "Confirm the env var in the production config console; create a new RFQ and verify Resend activity log records a send rather than the in-app fallback",
+      "blocking": true
+    },
+    {
+      "step": "Set SUPPLIER_RFQ_EMAIL_ENABLED to on for the relevant RFQ type in production",
+      "owner": "founder",
+      "how_to_verify": "Create a live RFQ for the first customer and confirm Resend activity log shows exactly one outbound event for the qualifying supplier",
+      "blocking": true
+    },
+    {
+      "step": "Send a controlled smoke-test RFQ to an engineer-controlled supplier inbox in production and confirm full end-to-end delivery",
+      "owner": "engineer",
+      "how_to_verify": "Engineer receives the supplier email from noreply@relopass.com; magic link opens and quote form renders; quote submission triggers employee and HR notifications",
+      "blocking": true
+    },
+    {
+      "step": "Query the DB for any open RFQs created before the flag flip to identify supplier links still on in-app fallback delivery",
+      "owner": "engineer",
+      "how_to_verify": "SQL count of supplier_rfq_sends rows where sent_at is null and created_at is before the flag change timestamp; close or re-issue any found",
+      "blocking": false
+    },
+    {
+      "step": "Confirm Resend account sending plan daily and monthly caps exceed projected first-month RFQ volume with headroom",
+      "owner": "founder",
+      "how_to_verify": "Resend account dashboard shows plan limits; projected send count for month 1 is below 50% of the daily cap",
+      "blocking": false
+    }
+  ],
+  "watch_outs": [
+    {
+      "risk": "RELOPASS_OUTBOX_ALLOWED_DOMAINS defaults to @probe.test only; a first real customer gets no employee or HR notification emails until this is updated",
+      "why_it_matters": "HR and employees will see quotes appear in the DB but receive no email notifications, causing missed deadlines and confusion about whether the system is working",
+      "mitigation": "Add the customer domain to RELOPASS_OUTBOX_ALLOWED_DOMAINS before enabling email for that customer; make it a named per-customer onboarding step, not a one-time global setting",
+      "severity": "high"
+    },
+    {
+      "risk": "Re-sending an RFQ mints a new token and invalidates the old one, but the original email is already sitting in the supplier inbox",
+      "why_it_matters": "Supplier clicks the original email link days later, sees a rejection page with no explanation that a replacement was sent, and may abandon the process entirely",
+      "mitigation": "Set the rejection page copy to: 'This link was replaced. Check your inbox for a newer message from noreply@relopass.com.' Log the re-send timestamp on the supplier_rfq_sends row so HR can confirm timing if the supplier complains",
+      "severity": "high"
+    },
+    {
+      "risk": "JWT secret rotation invalidates all in-flight magic links across every open RFQ simultaneously",
+      "why_it_matters": "A routine secret rotation during an active quoting period silently expires all supplier links, producing a wave of rejection pages with no automated recovery path",
+      "mitigation": "Do not rotate the JWT signing secret while RFQs are open. Implement a 24-hour overlap window where the old secret is still accepted, or switch to storing only the token hash in the DB so revocation is independent of the signing secret",
+      "severity": "high"
+    },
+    {
+      "risk": "Winner notification email bounces after HR validates the quote; HR receives no feedback and assumes delivery succeeded",
+      "why_it_matters": "The winning supplier never learns their quote was selected; the move stalls while HR assumes the supplier was notified",
+      "mitigation": "Route post-validation bounce events to HR in-app inbox: 'Winner notification to [supplier name] bounced. Contact them directly.' Treat absence of a bounce within 48 hours as provisional confirmation, not as proof of delivery",
+      "severity": "high"
+    },
+    {
+      "risk": "Idempotency is not enforced at the DB level and a client network retry dispatches a duplicate email to the supplier",
+      "why_it_matters": "Supplier receives two magic links for the same RFQ; they may submit two quotes creating validation ambiguity, or they may distrust the product on first contact",
+      "mitigation": "Enforce a unique constraint on (rfq_id, supplier_id) in supplier_rfq_sends. Require a client-supplied idempotency key on the RFQ create endpoint. Validate with the two-rapid-request staging test before go-live",
+      "severity": "high"
+    },
+    {
+      "risk": "Legitimate small suppliers who use Gmail or another webmail domain are permanently blocked by guard 3 with no self-serve resolution path visible to HR",
+      "why_it_matters": "HR cannot send RFQs to real suppliers and may not know the override flow exists, stalling the quoting process",
+      "mitigation": "Surface the guard 3 rejection in HR UI with an inline affordance: 'This address is on a personal domain. Type a corporate address to proceed.' Document the override flow in the HR onboarding guide",
+      "severity": "medium"
+    },
+    {
+      "risk": "Reminder cron job fails silently (exception swallowed or job not scheduled) and no reminders are sent for an entire quoting cycle",
+      "why_it_matters": "HR expects reminder pressure on unresponsive suppliers; without it, RFQs expire with zero quotes and deadlines are missed without warning",
+      "mitigation": "Add structured error logging and an alert rule: if the reminder cron fires on a day with active open RFQs but sends zero reminders, notify the on-call owner. Test the cron failure mode explicitly in staging",
+      "severity": "medium"
+    },
+    {
+      "risk": "respond_by stored as a naive datetime without timezone information renders different deadlines in different server or client locales",
+      "why_it_matters": "Supplier sees a deadline that does not match what HR set, leading to disputes over whether a quote was submitted on time and eroding trust in the platform",
+      "mitigation": "Store respond_by as a UTC timestamp with explicit UTC marker in the DB. Render in all UI and email contexts with both local time and UTC offset shown. Add a staging test that creates an RFQ from a CET locale and verifies the supplier email shows the correct UTC-aligned value",
+      "severity": "medium"
+    },
+    {
+      "risk": "Test persona guard matches only on email suffixes @probe.test and @testco.com; a tester who uses a different suffix bypasses the guard and triggers real Resend sends to real supplier addresses",
+      "why_it_matters": "Real suppliers receive unexpected test emails that appear legitimate, polluting supplier relationships before the product is ready and inflating send counts",
+      "mitigation": "Add an is_test_user boolean column to user accounts as the authoritative guard signal rather than relying solely on email suffix matching. Require explicit flagging when provisioning any test account",
+      "severity": "medium"
+    },
+    {
+      "risk": "Resend complaint rate exceeds the provider threshold and the relopass.com sending domain is suspended",
+      "why_it_matters": "All supplier and notification emails stop being delivered with no in-product fallback; recovery requires manual intervention with Resend support",
+      "mitigation": "Block all future sends to a complained address immediately on webhook receipt. Monitor Resend complaint rate dashboard weekly. Maintain a secondary Resend subaccount or sending domain ready for emergency failover",
+      "severity": "medium"
+    },
+    {
+      "risk": "SUPPLIER_RFQ_EMAIL_ENABLED selects email mode at RFQ creation time; existing open RFQs created before the flag was enabled will always use in-app fallback delivery even after go-live",
+      "why_it_matters": "A cohort of suppliers with open links before the flag flip never receives emails, creating a mixed delivery state that is difficult to audit or explain to HR",
+      "mitigation": "Document clearly that the flag affects new RFQ creation only. Before go-live, run the DB query from the checklist to find pre-flag open RFQs and either close them or re-issue them under the new flag state",
+      "severity": "medium"
+    },
+    {
+      "risk": "Supplier page title, Open Graph meta tag, or any page header inadvertently includes the HR company name or internal workspace branding",
+      "why_it_matters": "Supplier can infer the identity of the HR firm from page metadata before seeing any content, breaking the confidentiality guarantee that only the RFQ brief reaches them",
+      "mitigation": "Pin all supplier-facing page titles and meta tags to the ReloPass marketing page title at the component level. Add a data-protection regression test that renders the supplier page and asserts zero matches for any known employer identifier in the DOM and headers",
+      "severity": "medium"
+    }
+  ]
+}
