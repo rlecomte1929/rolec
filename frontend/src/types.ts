@@ -935,6 +935,8 @@ export interface AdminCompany {
   assignments_count?: number;
   /** Primary HR contact name, or first HR user, or null */
   primary_contact_name?: string | null;
+  /** AIQ-2327: synthetic QA tenant, shown only when "Show test data" is on. */
+  is_test?: boolean;
 }
 
 export interface AdminProfile {

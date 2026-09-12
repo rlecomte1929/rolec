@@ -27,18 +27,23 @@ def list_leads(
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     limit: int = Query(200, ge=1, le=500),
+    include_test: bool = Query(False, description="AIQ-2327: include synthetic is_test leads"),
     _admin: dict = Depends(require_admin),
 ) -> Dict[str, Any]:
     s = SessionLocal()
     try:
         q = s.query(Lead)
+        total_q = s.query(func.count(Lead.id))
+        if not include_test:
+            q = q.filter(Lead.is_test.is_(False))
+            total_q = total_q.filter(Lead.is_test.is_(False))
         if status:
             q = q.filter(Lead.status == status)
         if search:
             like = f"%{search.lower()}%"
             q = q.filter(func.lower(Lead.email).like(like))
         rows = q.order_by(desc(Lead.created_at)).limit(limit).all()
-        total = s.query(func.count(Lead.id)).scalar() or 0
+        total = total_q.scalar() or 0
         domains = {d for (d,) in s.query(ProspectCandidate.company_domain)
                    .filter(ProspectCandidate.company_domain.isnot(None)).all()}
         return {"total": total, "leads": [_to_out(r, domains).model_dump() for r in rows]}

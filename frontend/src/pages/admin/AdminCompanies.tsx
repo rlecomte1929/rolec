@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
-import { Card, Button } from '../../components/antigravity';
+import { Card, Button, Badge } from '../../components/antigravity';
 import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
 import type { AdminCompany, CompanyPlanTier } from '../../types';
@@ -633,6 +633,7 @@ export const AdminCompanies: React.FC = () => {
                         {c.missing_from_companies_table ? (
                           <span className="text-xs text-amber-600">Not in registry</span>
                         ) : null}
+                        {c.is_test ? <Badge variant="neutral" size="sm">test</Badge> : null}
                       </div>
                     </td>
                     <td className="py-3 pr-4">

@@ -323,10 +323,13 @@ def list_prospects(
     min_score: Optional[int] = Query(None, ge=0, le=100),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    include_test: bool = Query(False, description="AIQ-2327: include synthetic is_test prospects"),
     _: dict = Depends(require_admin),
 ) -> Dict[str, Any]:
     with SessionLocal() as db:
         q = db.query(ProspectCandidate)
+        if not include_test:
+            q = q.filter(ProspectCandidate.is_test.is_(False))
         if status:
             if status not in VALID_STATUSES:
                 raise HTTPException(status_code=400, detail="invalid status filter")

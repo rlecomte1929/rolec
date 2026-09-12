@@ -19,6 +19,7 @@ from backend.db.test_data_filter import (  # noqa: E402
     exclude_test_companies,
     exclude_test_people,
     looks_like_test_company,
+    looks_like_test_email,
     strip_verify_prefix,
 )
 
@@ -83,6 +84,58 @@ class TestDataFilterTests(unittest.TestCase):
             f"SELECT email FROM people WHERE email = 'hr@testcompany.com' AND {exclude_test_people('email')}"
         ).fetchall()
         self.assertEqual(len(rows), 1)
+
+
+class ExtendedSeederFilterTests(unittest.TestCase):
+    """AIQ-2327 — the newer seeder families the AIQ-913 filter predates."""
+
+    def setUp(self):
+        self.con = sqlite3.connect(":memory:")
+        self.con.executescript(
+            """
+            CREATE TABLE companies (name TEXT);
+            INSERT INTO companies (name) VALUES
+              ('Google'), ('Google Dublin'), ('Testing April'), ('Meridian Capital'),
+              ('Google IE Q1786637682758'), ('Google Ireland T18-A-1786634420882'),
+              ('CPY Abe Romo'), ('VCo 1786634558409'), ('WCo 1786634597516'),
+              ('Company 1'), ('TestCompany'), ('YvesTestCompany');
+            CREATE TABLE people (email TEXT);
+            INSERT INTO people (email) VALUES
+              ('real.person@acme.com'), ('romain_lecomte@hotmail.com'),
+              ('qa-proj-relopass-com-mtajn62l@reloulexei.resend.app'),
+              ('jane.smith@example.com'), ('roma+t18empb_1789@hotmail.com'),
+              ('roma+emp_run_5@hotmail.com');
+            """
+        )
+
+    def tearDown(self):
+        self.con.close()
+
+    def test_new_seeder_companies_excluded_demo_kept(self):
+        rows = self.con.execute(
+            f"SELECT name FROM companies WHERE {exclude_test_companies('name')}"
+        ).fetchall()
+        names = {r[0] for r in rows}
+        self.assertEqual(names, {"Google", "Google Dublin", "Testing April", "Meridian Capital"})
+
+    def test_new_seeder_emails_excluded_real_kept(self):
+        rows = self.con.execute(
+            f"SELECT email FROM people WHERE {exclude_test_people('email')}"
+        ).fetchall()
+        emails = {r[0] for r in rows}
+        # The real address + Romain's own un-aliased hotmail survive.
+        self.assertEqual(emails, {"real.person@acme.com", "romain_lecomte@hotmail.com"})
+
+    def test_write_time_classifiers(self):
+        for bad in ("Google IE Q1786637682758", "Google Ireland T18-A-1786634420882",
+                    "CPY Abe Romo", "VCo 1786634558409", "Company 1", "YvesTestCompany"):
+            self.assertTrue(looks_like_test_company(bad), bad)
+        for good in ("Google", "Google Dublin", "Testing April", "Meridian Capital"):
+            self.assertFalse(looks_like_test_company(good), good)
+        for bad in ("qa-proj-x@reloulexei.resend.app", "jane@example.com",
+                    "roma+t18empb_1@hotmail.com", "roma+emp_run_5@hotmail.com"):
+            self.assertTrue(looks_like_test_email(bad), bad)
+        self.assertFalse(looks_like_test_email("romain_lecomte@hotmail.com"))
 
 
 class StripVerifyPrefixTests(unittest.TestCase):

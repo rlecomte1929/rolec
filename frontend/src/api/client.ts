@@ -128,6 +128,24 @@ api.interceptors.request.use((config) => {
     tStart: typeof performance !== 'undefined' ? performance.now() : Date.now(),
   };
 
+  // AIQ-2327: when the admin "Show test data" toggle is on, surface synthetic
+  // is_test rows across EVERY admin list in one place — append include_test=true to
+  // admin GETs. Off by default; wrapped so a missing localStorage never breaks a call.
+  try {
+    const method = (config.method || 'get').toLowerCase();
+    const url = config.url || '';
+    if (
+      method === 'get' &&
+      url.includes('/api/admin/') &&
+      typeof localStorage !== 'undefined' &&
+      localStorage.getItem('admin_show_test_data') === 'true'
+    ) {
+      config.params = { ...(config.params as Record<string, unknown> | undefined), include_test: true };
+    }
+  } catch {
+    /* localStorage unavailable (private mode / jsdom) — leave the request unchanged */
+  }
+
   return config;
 });
 
