@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { displayNameOrEmail, orEmptyLabel } from './caseDisplay';
+import { displayNameOrEmail, isInactiveOrIncompleteCase, orEmptyLabel } from './caseDisplay';
 
 describe('displayNameOrEmail', () => {
   it('prefers the display name when present', () => {
@@ -28,5 +28,27 @@ describe('orEmptyLabel', () => {
     const r = orEmptyLabel(undefined, 'Destination not set');
     expect(r.text).not.toBe('-');
     expect(r.text.toLowerCase()).not.toContain('tbd');
+  });
+});
+
+describe('isInactiveOrIncompleteCase', () => {
+  it('flags destination-not-set rows', () => {
+    expect(isInactiveOrIncompleteCase({ status: 'awaiting_intake', case: { host_country: '' } })).toBe(true);
+  });
+  it('flags not-started statuses even with a destination', () => {
+    expect(
+      isInactiveOrIncompleteCase({
+        status: 'assigned',
+        case: { host_country: 'Spain' },
+      }),
+    ).toBe(true);
+  });
+  it('leaves an in-progress case with a destination unmarked', () => {
+    expect(
+      isInactiveOrIncompleteCase({
+        status: 'awaiting_intake',
+        case: { host_country: 'Spain' },
+      }),
+    ).toBe(false);
   });
 });
