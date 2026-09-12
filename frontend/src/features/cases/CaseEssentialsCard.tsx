@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Button, Card } from '../../components/antigravity';
 import type { AssignmentDetail } from '../../types';
+import { caseCodeForDisplay } from './caseCode';
 import { deriveCaseEssentials } from './caseEssentials';
 
 type Props = {
@@ -31,7 +32,7 @@ export const CaseEssentialsCard: React.FC<Props> = ({
   ];
 
   const copyAssignmentId = async () => {
-    const id = assignment.id?.trim();
+    const id = caseCodeForDisplay(assignment.id);
     if (!id) return;
     try {
       await navigator.clipboard.writeText(id);
@@ -41,6 +42,7 @@ export const CaseEssentialsCard: React.FC<Props> = ({
       /* clipboard unavailable */
     }
   };
+  const caseCode = caseCodeForDisplay(assignment.id);
 
   return (
     <Card padding="md" className="border border-[#e2e8f0] shadow-sm">
@@ -63,16 +65,16 @@ export const CaseEssentialsCard: React.FC<Props> = ({
 
         <div className="pt-1 border-t border-[#e2e8f0]">
           <div className="text-[11px] font-medium text-[#64748b] uppercase tracking-wide">
-            Reference
+            Case code
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span
               className="text-sm font-mono font-semibold text-[#0b2b43] break-all"
-              title={assignment.id}
+              title="Paste this into Link a case — Copy puts the same value on the clipboard"
             >
-              {assignment.id ? assignment.id.slice(-8).toUpperCase() : '-'}
+              {caseCode || '-'}
             </span>
-            {assignment.id ? (
+            {caseCode ? (
               <Button
                 type="button"
                 variant="outline"
