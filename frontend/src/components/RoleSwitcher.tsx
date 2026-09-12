@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Select } from './antigravity/Select';
+import { Button } from './antigravity/Button';
 import { authAPI } from '../api/client';
 import {
   getStoredRoles,
@@ -25,6 +25,8 @@ const labelFor = (role: string): string => ROLE_LABELS[normalizeStoredRole(role)
  * different role calls POST /api/auth/switch-role, updates the cached active
  * role, and navigates to that role's home (roleHomePath). The server is the
  * boundary — it 403s any role the user does not actually hold.
+ *
+ * AIQ-2295: segmented pills, not the heavy antigravity Select.
  */
 export const RoleSwitcher: React.FC = () => {
   const navigate = useNavigate();
@@ -41,9 +43,11 @@ export const RoleSwitcher: React.FC = () => {
     try {
       const res = await authAPI.switchRole(target);
       setStoredRoles(res.roles && res.roles.length ? res.roles : roles);
-      const primary = res.primary_role || target;
-      setActiveRole(primary);
-      navigate(roleHomePath(primary));
+      // Trust the role the user picked. An allowlisted admin's switch-role
+      // payload used to echo primary_role=ADMIN (login contract), which sent
+      // View as Employee straight back to the admin home.
+      setActiveRole(target);
+      navigate(roleHomePath(target));
     } catch {
       /* leave the active role unchanged on failure */
     } finally {
@@ -52,10 +56,31 @@ export const RoleSwitcher: React.FC = () => {
   };
 
   return (
-    <Select
-      value={active}
-      onChange={(v) => void handleChange(v)}
-      options={roles.map((r) => ({ value: r, label: `View as ${labelFor(r)}` }))}
-    />
+    <div
+      role="group"
+      aria-label="View as"
+      className="inline-flex items-center gap-0.5 rounded-md bg-slate-100 p-0.5"
+    >
+      {roles.map((role) => {
+        const selected = role === active;
+        return (
+          <Button
+            key={role}
+            unstyled
+            type="button"
+            disabled={busy}
+            aria-pressed={selected}
+            onClick={() => void handleChange(role)}
+            className={`min-h-6 rounded px-2 text-xs font-medium transition-colors disabled:opacity-60 ${
+              selected
+                ? 'bg-white text-navy-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {labelFor(role)}
+          </Button>
+        );
+      })}
+    </div>
   );
 };

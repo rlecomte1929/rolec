@@ -1,8 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from './antigravity/Button';
 import { getAnalyticsConsent, grantAnalyticsConsent, revokeAnalyticsConsent } from '../analytics';
 import { useIsAdmin } from '../features/admin/useIsAdmin';
+
+const CONSENT_BANNER_ATTR = 'data-consent-banner';
+const CONSENT_BANNER_OFFSET_VAR = '--consent-banner-offset';
+
+function publishConsentBannerMetrics(heightPx: number | null) {
+  const root = document.documentElement;
+  if (heightPx == null) {
+    root.removeAttribute(CONSENT_BANNER_ATTR);
+    root.style.removeProperty(CONSENT_BANNER_OFFSET_VAR);
+    return;
+  }
+  root.setAttribute(CONSENT_BANNER_ATTR, 'open');
+  root.style.setProperty(CONSENT_BANNER_OFFSET_VAR, `${heightPx}px`);
+}
 
 /**
  * GDPR analytics consent banner.
@@ -25,12 +39,35 @@ export function ConsentBanner() {
   useLocation();
   const isAdmin = useIsAdmin();
   const [visible, setVisible] = useState(false);
+  const bannerRef = useRef<HTMLDivElement>(null);
+  const show = visible && !isAdmin;
 
   useEffect(() => {
     if (getAnalyticsConsent() === null) setVisible(true);
   }, []);
 
-  if (isAdmin || !visible) return null;
+  // AIQ-2272: publish height so the Feedback FAB lifts clear of this band,
+  // and so stacking (z-[60]) always wins over the later-in-DOM widget.
+  useEffect(() => {
+    if (!show) {
+      publishConsentBannerMetrics(null);
+      return;
+    }
+    const el = bannerRef.current;
+    const apply = () => publishConsentBannerMetrics(el?.offsetHeight ?? 96);
+    apply();
+    if (!el || typeof ResizeObserver === 'undefined') {
+      return () => publishConsentBannerMetrics(null);
+    }
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      publishConsentBannerMetrics(null);
+    };
+  }, [show]);
+
+  if (!show) return null;
 
   function handleAccept() {
     grantAnalyticsConsent();
@@ -44,10 +81,11 @@ export function ConsentBanner() {
 
   return (
     <div
+      ref={bannerRef}
       role="dialog"
       aria-label="Analytics consent"
       aria-live="polite"
-      className="fixed bottom-0 inset-x-0 z-50 border-t border-[#d7e2e8] bg-white shadow-lg"
+      className="fixed bottom-0 inset-x-0 z-[60] border-t border-[#d7e2e8] bg-white shadow-lg"
     >
       <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-3 px-4 py-3 sm:flex-row sm:items-center">
         <p className="text-sm leading-relaxed text-[#0b2b43]">
@@ -60,7 +98,7 @@ export function ConsentBanner() {
                white — below AA. This banner is a public surface, so it takes the marketing
                accent (#197b78, 5.07:1). One node, but it renders on every public route via
                App.tsx, which is why an axe sweep reported it 12 times. */
-            className="font-medium text-marketing-accent underline underline-offset-2 hover:text-[#167572]"
+            className="inline-flex min-h-6 items-center font-medium text-marketing-accent underline underline-offset-2 hover:text-[#167572]"
           >
             Privacy policy
           </Link>

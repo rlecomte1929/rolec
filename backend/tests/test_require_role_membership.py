@@ -28,6 +28,14 @@ def test_multirole_user_passes_each_held_role():
     assert require_role(UserRole.EMPLOYEE)(user=u) is u
 
 
+def test_wrong_role_employee_gate_uses_not_an_employee_code():
+    u = {"role": "HR", "roles": ["HR"], "is_admin": False}
+    with pytest.raises(HTTPException) as exc:
+        require_role(UserRole.EMPLOYEE)(user=u)
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "NOT_AN_EMPLOYEE"
+
+
 def test_single_role_user_denied_unheld_role():
     u = {"role": "EMPLOYEE", "roles": ["EMPLOYEE"], "is_admin": False}
     with pytest.raises(HTTPException) as exc:

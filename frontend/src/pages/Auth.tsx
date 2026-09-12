@@ -6,6 +6,7 @@ import type { UserRole } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
 import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
+import { formatAuthDocumentTitle } from '../navigation/documentTitle';
 import { getAuthItem, getActiveRole, getStoredRoles } from '../utils/demo';
 import { supabase } from '../api/supabase';
 import { clearAutofillResidueIfStale } from '../utils/clearAutofillResidue';
@@ -81,6 +82,12 @@ export const Auth: React.FC = () => {
   const [inviteDone, setInviteDone] = useState(false);
   // Friendly banner for an expired / already-used / malformed auth link.
   const [linkError, setLinkError] = useState('');
+
+  useEffect(() => {
+    document.title = formatAuthDocumentTitle(
+      inviteMode ? 'invite' : mode === 'register' ? 'register' : 'login',
+    );
+  }, [inviteMode, mode]);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -317,7 +324,16 @@ export const Auth: React.FC = () => {
   // expired-link banner is showing (linkError), or before the mount effect has run
   // on a hash-bearing URL (hashHasAuthPayload) — otherwise a pre-existing session
   // would hijack the invite acceptance flow.
-  if (getAuthItem('relopass_token') && !inviteMode && !linkError && !hashHasAuthPayload) {
+  // AIQ-2285: a session_expired landing must show the login form even if a
+  // leftover token or a Supabase restore re-wrote relopass_*. Never paint the
+  // authenticated app (admin Today, etc.) on a /auth URL.
+  if (
+    getAuthItem('relopass_token') &&
+    !inviteMode &&
+    !linkError &&
+    !hashHasAuthPayload &&
+    !sessionExpired
+  ) {
     const key = homeRouteKeyForRole(heldHomeRole(getStoredRoles(), getActiveRole()));
     if (key !== 'landing') return <Navigate to={buildRoute(key)} replace />;
   }

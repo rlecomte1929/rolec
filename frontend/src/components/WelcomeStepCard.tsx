@@ -11,6 +11,12 @@ interface WelcomeStepCardProps {
   note?: string; // optional footnote below the card
   /** When false, the card has no Get started link (later welcome steps). */
   showCta?: boolean;
+  /** Visible + accessible CTA. Required when several cards share a page. */
+  ctaLabel?: string;
+  /** Stronger treatment for the recommended first step (AIQ-2282). */
+  emphasized?: boolean;
+  /** Total steps on the page — used only in the sr-only "Step N of M" prefix. */
+  stepCount?: number;
 }
 
 /**
@@ -18,12 +24,32 @@ interface WelcomeStepCardProps {
  * the "Get started →" link navigates — so reading the card can't trigger an
  * accidental full-card navigation, and the link stays keyboard-accessible.
  */
-export function WelcomeStepCard({ step, title, description, href, badge, note, showCta = true }: WelcomeStepCardProps) {
+export function WelcomeStepCard({
+  step,
+  title,
+  description,
+  href,
+  badge,
+  note,
+  showCta = true,
+  ctaLabel = 'Get started →',
+  emphasized = false,
+  stepCount = 3,
+}: WelcomeStepCardProps) {
   return (
     <div>
-      <Card className="hover:border-accent-200 transition-colors duration-150">
+      <Card
+        className={
+          emphasized
+            ? 'ring-2 ring-accent-500'
+            : 'hover:border-accent-200 transition-colors duration-150'
+        }
+      >
         <div className="flex items-start gap-4">
-          <div className="w-9 h-9 shrink-0 rounded-full bg-navy-800 text-white text-sm font-semibold flex items-center justify-center">
+          <div
+            className="w-9 h-9 shrink-0 rounded-full bg-navy-800 text-white text-sm font-semibold flex items-center justify-center"
+            aria-hidden="true"
+          >
             {step}
           </div>
           <div className="flex-1 min-w-0">
@@ -34,15 +60,22 @@ export function WelcomeStepCard({ step, title, description, href, badge, note, s
                 </Badge>
               </div>
             )}
-            <h3 className="text-base font-semibold text-navy-800">{title}</h3>
+            <h3 className="text-base font-semibold text-navy-800">
+              <span className="sr-only">Step {step} of {stepCount}. </span>
+              {title}
+            </h3>
             <p className="text-sm text-slate-600 mt-1">{description}</p>
           </div>
           {showCta ? (
           <Link
             to={href}
-            className="shrink-0 self-center text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
+            className={
+              emphasized
+                ? 'inline-flex shrink-0 items-center self-center rounded-lg bg-navy-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-navy-700 transition-colors'
+                : 'inline-flex min-h-6 shrink-0 items-center self-center text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors'
+            }
           >
-            Get started →
+            {ctaLabel}
           </Link>
           ) : null}
         </div>

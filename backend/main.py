@@ -1551,6 +1551,16 @@ async def get_current_user(
     else:
         user["is_admin"] = False
 
+    # AIQ-2285: attach roles[] so require_role can use membership the same way
+    # auth_deps does. role_rows come from get_user_context_by_token.
+    from .app.auth_deps import derive_roles as _derive_roles
+    role_rows = list(user.pop("role_rows", None) or [])
+    user["roles"], user["primary_role"] = _derive_roles(
+        role_rows,
+        user.get("role", UserRole.EMPLOYEE.value),
+        is_admin=bool(user.get("is_admin")),
+    )
+
     request.state.user_id = user["id"]
     return user
 
@@ -1570,11 +1580,15 @@ def _is_admin_user(user: Dict[str, Any]) -> bool:
 def require_role(role: UserRole):
     """Require a specific role. ADMIN users pass all role checks."""
     def dependency(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+        from .app.auth_deps import role_forbidden as _role_forbidden
         user_role = user.get("role")
-        if user_role == UserRole.ADMIN.value:
+        if user_role == UserRole.ADMIN.value or user.get("is_admin"):
+            return user
+        held = [r for r in (user.get("roles") or [user_role]) if r]
+        if role.value in held:
             return user
         if user_role != role.value:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
+            raise _role_forbidden(role)
         return user
     return dependency
 

@@ -104,7 +104,6 @@ export const CompanyBrand: React.FC<CompanyBrandProps> = ({ compact = false }) =
       <span className="text-sm font-medium text-[#0f172a] truncate max-w-[140px]">
         {displayName}
       </span>
-      <span className="text-[#e2e8f0]" aria-hidden>|</span>
     </div>
   );
 };

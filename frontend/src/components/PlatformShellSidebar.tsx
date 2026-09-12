@@ -258,7 +258,7 @@ const SECTIONS: NavSection[] = [
       // centre's `noCasesYet` empty-state CTA ("Import your team roster") and the
       // back-link on its own detail page, so the roster became unreachable the moment
       // a company had one case and the empty state stopped rendering.
-      { id: 'relocations', label: 'Relocations', hint: 'Case list and the new-relocation form', to: ROUTE_DEFS.hrDashboard.path, exact: true },
+      { id: 'relocations', label: 'Cases', hint: 'Case list and the new-relocation form', to: ROUTE_DEFS.hrDashboard.path, exact: true },
       { id: 'employees', label: 'Employees', hint: 'Your team roster', to: ROUTE_DEFS.hrEmployees.path, exact: true },
       { id: 'risk', label: 'Risk', to: ROUTE_DEFS.hrRisk.path, exact: true },
       { id: 'duty-of-care', label: 'Duty of care', to: ROUTE_DEFS.hrDutyOfCare.path, exact: true },
@@ -305,28 +305,28 @@ const INBOX_ITEM = SECTIONS.flatMap((s) => s.items).find((i) => i.id === 'inbox'
 const Badge: React.FC<{ count?: number; variant?: BadgeVariant }> = ({ count, variant = 'count' }) => {
   if (variant === 'new') {
     return (
-      <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-accent-50 text-accent-500 border border-accent-100">
+      <span className="ml-auto px-1.5 py-0.5 rounded text-xs font-bold bg-accent-50 text-accent-700 border border-accent-100">
         NEW
       </span>
     );
   }
   if (variant === 'live') {
     return (
-      <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
+      <span className="ml-auto px-1.5 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
         LIVE
       </span>
     );
   }
   if (!count || count <= 0) return null;
   return (
-    <span className="ml-auto min-w-[1.25rem] px-1 text-center rounded-full bg-slate-200 text-slate-700 text-[10px] font-semibold leading-5">
+    <span className="ml-auto min-w-[1.25rem] px-1 text-center rounded-full bg-slate-200 text-slate-700 text-xs font-semibold leading-5">
       {count > 99 ? '99+' : count}
     </span>
   );
 };
 
 const InboxCount: React.FC<{ count: number }> = ({ count }) => (
-  <span className="ml-auto min-w-[1.25rem] px-1 text-center rounded-full bg-accent-50 text-accent-700 text-[10px] font-semibold leading-5">
+  <span className="ml-auto min-w-[1.25rem] px-1 text-center rounded-full bg-accent-50 text-accent-700 text-xs font-semibold leading-5">
     {count > 99 ? '99+' : count}
   </span>
 );
@@ -352,12 +352,8 @@ const SectionHeading: React.FC<{
       ) : (
         <ChevronDown size={12} className="shrink-0 text-slate-500 group-hover:text-slate-700" aria-hidden="true" />
       )}
-      <span className={`font-semibold tracking-widest uppercase ${
-        label.startsWith('Preview ·')
-          ? 'text-[9px] text-slate-500 group-hover:text-slate-600'
-          : 'text-[10px] text-slate-500 group-hover:text-slate-700'
-      }`}>{label}</span>
-      {count !== undefined && <span className="text-[10px] text-slate-500 font-medium">{count}</span>}
+      <span className="text-xs font-semibold tracking-widest uppercase text-slate-600 group-hover:text-slate-700">{label}</span>
+      {count !== undefined && <span className="text-xs text-slate-600 font-medium">{count}</span>}
     </button>
   );
 };
@@ -382,7 +378,7 @@ const GroupHeading: React.FC<{
     ) : (
       <ChevronDown size={11} className="shrink-0 text-slate-500 group-hover:text-slate-700" aria-hidden="true" />
     )}
-    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 group-hover:text-slate-700">
+    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600 group-hover:text-slate-700">
       {label}
     </span>
   </button>
@@ -944,7 +940,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                 becomes independently draggable. Admin sees all three sections here, so
                 "all sections" is covered from the one place that renders them. */}
             <div className="flex items-center justify-between px-2 pt-3 pb-1">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Edit layout</span>
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Edit layout</span>
               <div className="flex items-center gap-1">
                 <Button
                   unstyled
@@ -966,7 +962,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                 </Button>
               </div>
             </div>
-            <p className="px-2 pb-1 text-[10px] leading-tight text-slate-500">
+            <p className="px-2 pb-1 text-[11px] leading-tight text-slate-500">
               Drag tabs to reorder or move them between sub-groups. Click a group name to rename it.
             </p>
             <React.Suspense fallback={<p className="px-2 py-2 text-[11px] text-slate-500">Loading editor…</p>}>
@@ -999,7 +995,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                   type="button"
                   onClick={() => setEditingLayout(true)}
                   title="Customise the sidebar"
-                  className="flex min-h-11 items-center gap-1 rounded px-2 py-1 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-600"
+                  className="flex min-h-11 items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-600"
                 >
                   <Pencil size={11} /> Edit layout
                 </Button>
@@ -1060,7 +1056,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                 <div className={`group relative flex items-center ${collapsed ? '' : 'gap-0.5'}`}>
                 <Link
                   to={to}
-                  title={item.label}
+                  title={item.hint ?? item.label}
                   aria-current={isActive(item) ? 'page' : undefined}
                   className={`relative flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-sm transition-colors min-h-11 ${
                     collapsed ? 'justify-center px-2 py-2' : 'px-3 py-1.5'
@@ -1077,14 +1073,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
                   />
                   {!collapsed && (
                     <>
-                      <span className="flex-1 min-w-0">
-                        <span className="block truncate">{item.label}</span>
-                        {item.hint && (
-                          <span className="block truncate text-[10px] leading-tight mt-0.5 font-normal text-slate-500 group-hover:text-slate-600">
-                            {item.hint}
-                          </span>
-                        )}
-                      </span>
+                      <span className="flex-1 min-w-0 text-pretty">{item.label}</span>
                       <Badge count={badgeCount} variant={badgeVariant} />
                     </>
                   )}
@@ -1182,7 +1171,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
           >
             <div className="px-2 py-1.5">
               <p className="text-xs font-medium text-slate-900 truncate">{user?.name ?? 'ReloPass'}</p>
-              <p className="text-[10px] text-slate-500 truncate">{user?.role ?? role.toLowerCase()}</p>
+              <p className="text-xs text-slate-600 truncate">{user?.role ?? role.toLowerCase()}</p>
             </div>
             <div className="my-1 border-t border-slate-100" />
             <Button unstyled
@@ -1205,7 +1194,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
             <>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-slate-900 truncate">{user?.name ?? 'ReloPass'}</p>
-                <p className="text-[10px] text-slate-500 truncate">{user?.role ?? role.toLowerCase()}</p>
+                <p className="text-xs text-slate-600 truncate">{user?.role ?? role.toLowerCase()}</p>
               </div>
               <Button unstyled
                 type="button"

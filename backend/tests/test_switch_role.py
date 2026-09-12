@@ -31,6 +31,29 @@ def test_switch_to_held_role_sets_primary_and_returns_roles(monkeypatch):
     assert set(out["roles"]) == {"HR", "EMPLOYEE"}
 
 
+def test_switch_to_held_role_keeps_requested_primary_for_admin(monkeypatch):
+    """AIQ-2285: is_admin must not rewrite View-as-Employee back to ADMIN."""
+    monkeypatch.setattr(authmod.db, "set_primary_role", lambda uid, role: None)
+    monkeypatch.setattr(
+        authmod.db, "get_user_roles",
+        lambda uid: [
+            {"role": "ADMIN", "is_primary": True},
+            {"role": "EMPLOYEE", "is_primary": False},
+            {"role": "HR", "is_primary": False},
+        ],
+    )
+    user = {
+        "id": "u-admin",
+        "role": "ADMIN",
+        "roles": ["ADMIN", "HR", "EMPLOYEE"],
+        "is_admin": True,
+    }
+    out = authmod.switch_role(body={"role": "EMPLOYEE"}, user=user)
+    assert out["primary_role"] == "EMPLOYEE"
+    assert "ADMIN" in out["roles"]
+    assert "EMPLOYEE" in out["roles"]
+
+
 def test_switch_to_unheld_role_is_forbidden():
     user = {"id": "u1", "role": "EMPLOYEE", "roles": ["EMPLOYEE"]}
     with pytest.raises(HTTPException) as exc:
