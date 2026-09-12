@@ -302,6 +302,61 @@ def _bank() -> List[ServiceQuestionDef]:
             default="medium",
             criteria_key="fee_sensitivity",
         ),
+        # [ANDREA-P1] Temporary accommodation (serviced / short-stay bridge before a lease)
+        ServiceQuestionDef(
+            question_key="temp_stay_weeks",
+            label="How many weeks of temporary accommodation do you expect to need?",
+            type="number",
+            service_category="temp_accommodation",
+            default=4,
+            criteria_key="stay_weeks",
+        ),
+        ServiceQuestionDef(
+            question_key="temp_budget_weekly",
+            label="Weekly budget for temporary accommodation (destination currency)",
+            type="number",
+            service_category="temp_accommodation",
+            criteria_key="budget_weekly",
+        ),
+        ServiceQuestionDef(
+            question_key="temp_household_size",
+            label="How many people will stay?",
+            type="number",
+            service_category="temp_accommodation",
+            default=1,
+            prefill_source="case.familySize",
+            criteria_key="household_size",
+        ),
+        # [ANDREA-P1] Medical (GP registration on arrival)
+        ServiceQuestionDef(
+            question_key="medical_languages",
+            label="Preferred languages at the practice",
+            type="multiselect",
+            service_category="medical",
+            options=[
+                QuestionOption(value="en", label="English"),
+                QuestionOption(value="es", label="Spanish"),
+                QuestionOption(value="fr", label="French"),
+                QuestionOption(value="pt", label="Portuguese"),
+            ],
+            default=["en"],
+            criteria_key="preferred_languages",
+        ),
+        # [ANDREA-P1] Language courses (accompanying partner / family)
+        ServiceQuestionDef(
+            question_key="language_level",
+            label="Current level in the destination language",
+            type="select",
+            service_category="language",
+            options=[
+                QuestionOption(value="none", label="None"),
+                QuestionOption(value="basic", label="Basic"),
+                QuestionOption(value="intermediate", label="Intermediate"),
+                QuestionOption(value="advanced", label="Advanced"),
+            ],
+            default="basic",
+            criteria_key="language_level",
+        ),
         # Insurances
         ServiceQuestionDef(
             question_key="ins_type",

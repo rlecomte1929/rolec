@@ -1,4 +1,4 @@
 corridor,service_category,company_name,website_url,source_name,source_url,accreditation_body,accreditation_number,accreditation_expiry
-XX-IE,language,Emerald Cultural Institute,https://www.eci.ie/,QQI/ACELS TrustEd Ireland,https://www.trustedireland.ie/trusted-providers/english-language-education-institutions,QQI,,
-XX-IE,language,International House Dublin,https://ihdublin.com/,QQI/ACELS TrustEd Ireland,https://www.trustedireland.ie/trusted-providers/english-language-education-institutions,QQI,,
-XX-IE,language,Liffey College,https://www.liffeycollege.ie/,QQI/ACELS TrustEd Ireland,https://www.trustedireland.ie/trusted-providers/english-language-education-institutions,QQI,,
+XX-IE,language_integration,Emerald Cultural Institute,https://www.eci.ie/,QQI/ACELS TrustEd Ireland,https://www.trustedireland.ie/trusted-providers/english-language-education-institutions,QQI,,
+XX-IE,language_integration,International House Dublin,https://ihdublin.com/,QQI/ACELS TrustEd Ireland,https://www.trustedireland.ie/trusted-providers/english-language-education-institutions,QQI,,
+XX-IE,language_integration,Liffey College,https://www.liffeycollege.ie/,QQI/ACELS TrustEd Ireland,https://www.trustedireland.ie/trusted-providers/english-language-education-institutions,QQI,,

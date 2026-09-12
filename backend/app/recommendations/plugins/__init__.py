@@ -17,6 +17,7 @@ from .legal_admin import LegalAdminPlugin
 from .tax_finance import TaxFinancePlugin
 from .pets import PetsPlugin
 from .partner_career import PartnerCareerPlugin
+from .temp_accommodation import TempAccommodationPlugin
 
 __all__ = [
     "BasePlugin",
@@ -37,4 +38,5 @@ __all__ = [
     "TaxFinancePlugin",
     "PetsPlugin",
     "PartnerCareerPlugin",
+    "TempAccommodationPlugin",
 ]

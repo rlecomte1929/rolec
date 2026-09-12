@@ -77,6 +77,7 @@ const CATEGORY_MAP: Record<ServiceKey, string> = {
   temp_accommodation: 'housing',
   banks: 'settling_in',
   insurances: 'settling_in',
+  medical: 'settling_in',
   registration: 'settling_in',
   electricity: 'settling_in',
   internet: 'settling_in',

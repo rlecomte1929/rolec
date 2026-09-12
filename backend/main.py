@@ -2966,6 +2966,12 @@ class AdminAssignmentStatusRequest(BaseModel):
     status: str
 
 
+#: Statuses `case_assignments.status` admits (DB CHECK case_assignments_status_check).
+_ASSIGNMENT_STATUSES = frozenset({
+    "created", "assigned", "awaiting_intake", "submitted", "approved", "rejected", "closed", "archived",
+})
+
+
 @app.patch("/api/admin/assignments/{assignment_id}/status")
 def admin_update_assignment_status(
     assignment_id: str,
@@ -2978,6 +2984,13 @@ def admin_update_assignment_status(
     status = (body.status or "").strip()
     if not status:
         raise HTTPException(status_code=400, detail="status is required")
+    # [ANDREA-P1] Mirror the DB CHECK (migration 20261145000000). An unknown status used
+    # to surface as a CheckViolation 500 from the admin UI's "Delete selected".
+    if status not in _ASSIGNMENT_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"status must be one of {sorted(_ASSIGNMENT_STATUSES)}",
+        )
     try:
         db.update_assignment_status(assignment_id, status, request_id=None)
     except Exception as e:
@@ -10596,8 +10609,14 @@ def get_employee_services_policy_context(
                     _host_city = _row.get("host_city")
                     break
         if _company_id:
+            # [ANDREA-P1] The settle-in tiles flipped for the journey-completion demo use the
+            # same curation lock as Pets; keys are the FRONTEND service keys, values the
+            # backend category HR curates.
             payload["curated_availability"] = {
                 "pets": bool(_has_curation(_company_id, "pets", _host_city)),
+                "temp_accommodation": bool(_has_curation(_company_id, "temp_accommodation", _host_city)),
+                "medical": bool(_has_curation(_company_id, "medical", _host_city)),
+                "language": bool(_has_curation(_company_id, "language_integration", _host_city)),
             }
     except Exception as exc:
         log.warning(

@@ -67,6 +67,12 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("centralbank.ie",        "Central Bank of Ireland — Register of Authorised Firms"),
     ("tusla.ie",              "Tusla — Register of Independent Schools"),
     ("psr.ie",                "PSRA — Register of Licensed Property Services Providers"),
+    # [ANDREA-P1] Dublin settle-in registers (journey-completion batches 2026-09-10).
+    ("discoverireland.ie",    "Fáilte Ireland — Discover Ireland approved accommodation"),
+    ("failteireland.ie",      "Fáilte Ireland — Discover Ireland approved accommodation"),
+    ("hse.ie",                "HSE — Find a GP"),
+    ("trustedireland.ie",     "TrustEd Ireland — QQI-authorised English language providers"),
+    ("qqi.ie",                "TrustEd Ireland — QQI-authorised English language providers"),
     # France / Paris (NO-FR) — most expose per-entity pages; Barreau is PUBLIC_REGISTER.
     ("regafi.fr",                     "REGAFI — registre des agents financiers (ACPR / Banque de France)"),
     ("annuaire-education.fr",         "Annuaire de l'Éducation nationale (annuaire-education.fr)"),

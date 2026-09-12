@@ -15,6 +15,7 @@ export type ServiceKey =
   | 'temp_accommodation'
   | 'banks'
   | 'insurances'
+  | 'medical'
   | 'registration'
   | 'electricity'
   | 'internet'
@@ -46,19 +47,23 @@ export const SERVICE_CONFIG: ServiceItem[] = [
   { key: 'movers', title: 'Movers', description: 'International relocation and moving companies', icon: '📦', group: 'before', enabled: true, backendKey: 'movers' },
   { key: 'schools', title: 'Schools / Childcare', description: 'International and local school recommendations', icon: '🎒', group: 'before', enabled: true, backendKey: 'schools' },
   { key: 'pets', title: 'Pets', description: 'Pet relocation, travel documents, and quarantine requirements', icon: '🐾', group: 'before', enabled: true, backendKey: 'pets', requiresCuration: true },
-  { key: 'temp_accommodation', title: 'Temporary accommodation', description: 'Short-term stays before permanent housing', icon: '🏨', group: 'before', enabled: false },
+  // [ANDREA-P1] Journey-completion settle-in tiles. `requiresCuration` keeps each tile
+  // locked until HR has curated >=1 approved vendor for the destination (same pattern as
+  // Pets), so flipping `enabled` never opens a tile onto an empty state.
+  { key: 'temp_accommodation', title: 'Temporary accommodation', description: 'Serviced or short-stay housing to bridge arrival and your lease', icon: '🏨', group: 'before', enabled: true, backendKey: 'temp_accommodation', requiresCuration: true },
   { key: 'visa', title: 'Visa & permits', description: 'Immigration and work permit support', icon: '📋', group: 'before', enabled: false },
   // Upon arrival
   { key: 'banks', title: 'Banking', description: 'Banking and account setup for expats', icon: '🏦', group: 'arrival', enabled: true, backendKey: 'banks' },
   { key: 'electricity', title: 'Utilities: Electricity', description: 'Utilities and electricity retailers', icon: '⚡', group: 'arrival', enabled: true, backendKey: 'electricity' },
   { key: 'insurances', title: 'Insurance', description: 'Health, travel, and life insurance providers', icon: '🛡️', group: 'arrival', enabled: true, backendKey: 'insurance' },
+  { key: 'medical', title: 'GP & medical registration', description: 'Register with a GP practice accepting new patients', icon: '🩺', group: 'arrival', enabled: true, backendKey: 'medical', requiresCuration: true },
   { key: 'internet', title: 'Internet', description: 'Home broadband and connectivity', icon: '📶', group: 'arrival', enabled: false },
   { key: 'mobile', title: 'Mobile plan', description: 'Local SIM and mobile services', icon: '📱', group: 'arrival', enabled: false },
   { key: 'registration', title: 'Registration / ID number / municipality', description: 'Local registration and official paperwork', icon: '📄', group: 'arrival', enabled: false },
   // Settle & thrive
   { key: 'community', title: 'Community / integration', description: 'Connect with local communities', icon: '🤝', group: 'settle', enabled: false },
   { key: 'drivers_license', title: "Driver's license exchange", description: 'Convert your license for local use', icon: '🪪', group: 'settle', enabled: false },
-  { key: 'language', title: 'Language courses', description: 'Learn the local language', icon: '📚', group: 'settle', enabled: false },
+  { key: 'language', title: 'Language courses', description: 'Accredited language schools for you and your family', icon: '📚', group: 'settle', enabled: true, backendKey: 'language_integration', requiresCuration: true },
   { key: 'spouse', title: 'Spouse support', description: 'Employment and integration for partners', icon: '💼', group: 'settle', enabled: true, backendKey: 'partner_career' },
   { key: 'transport', title: 'Transportation pass', description: 'Public transport and mobility', icon: '🚌', group: 'settle', enabled: false },
 ];
