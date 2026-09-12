@@ -18,7 +18,10 @@ test.describe('AIQ-2285 retry / auth coherence', () => {
     );
 
     await page.goto('/employee/dashboard');
-    await expect(page.getByText(/could not load assignments|cannot open employee assignments/i)).toBeVisible();
+    // Heading only — the body also contains "cannot open employee assignments",
+    // so a combined getByText regex is a Playwright strict-mode violation.
+    await expect(page.getByRole('heading', { name: /could not load assignments/i })).toBeVisible();
+    await expect(page.getByText(/this account cannot open employee assignments/i)).toBeVisible();
     await page.getByRole('button', { name: /try again/i }).click();
     await expect(page).toHaveURL(/\/employee\/dashboard/);
     await expect(page.getByRole('heading', { name: /sign in/i })).toHaveCount(0);
