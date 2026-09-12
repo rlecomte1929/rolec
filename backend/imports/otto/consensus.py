@@ -175,33 +175,50 @@ def _cosine(a: List[float], b: List[float]) -> float:
     return 0.0 if na == 0.0 or nb == 0.0 else dot / (na * nb)
 
 
-def _cluster_by_embedding(
-    items: List[Tuple[int, Fact]],
+def _merge_clusters_by_embedding(
+    clusters: List[Dict[str, Any]],
     embed_fn: Callable[[List[str]], List[List[float]]],
     threshold: float,
 ) -> List[Dict[str, Any]]:
-    """Cluster one destination's facts by fact-text embedding cosine similarity (opt-in).
+    """Agglomeratively merge deterministic clusters whose representative facts are semantically
+    equal (embedding cosine >= threshold).
 
-    The higher-yield path: it merges the same fact even when independent passes drift the topic
-    key *and* phrase it differently enough that token overlap misses it, because the embedding
-    captures meaning, not words. ``embed_fn`` is injected — this module imports no LLM SDK, so it
-    stays deterministic-by-default and the serving/LLM isolation guard is unaffected. The
-    threshold is conservative on purpose: a false merge of two distinct compliance facts is worse
-    than an under-count.
+    This runs ON TOP OF the deterministic (topic + token-Jaccard) clustering and only ever
+    *combines* clusters — never splits one — so consensus yield is always >= the deterministic
+    path. That guarantee matters: a global embedding clustering can *fragment* a fact the
+    topic-grouping had correctly grouped (observed live: it cut NO→FR from 3 consensus to 1). This
+    design instead recovers the same fact when passes drift the topic key AND phrase it beyond
+    token overlap, without ever losing a deterministic grouping. ``embed_fn`` is injected — the
+    module imports no LLM SDK. The threshold is conservative: a false merge of two distinct
+    compliance facts is worse than an under-count.
     """
-    ordered = sorted(items, key=lambda pf: (str(pf[1].get("fact_key", "")),
-                                            str(pf[1].get("source_url", "")), pf[0]))
-    vectors = embed_fn([str(f.get("fact_text", "") or "") for _, f in ordered])
-    clusters: List[Dict[str, Any]] = []
-    for (pass_index, fact), vec in zip(ordered, vectors):
-        for c in clusters:
-            if _cosine(vec, c["vec"]) >= threshold:
-                c["passes"].add(pass_index)
-                c["instances"].append(fact)
-                break
-        else:
-            clusters.append({"vec": vec, "passes": {pass_index}, "instances": [fact]})
-    return clusters
+    if len(clusters) < 2:
+        return clusters
+    reps = [_representative(c["instances"]) for c in clusters]
+    vectors = embed_fn([str(r.get("fact_text", "") or "") for r in reps])
+
+    parent = list(range(len(clusters)))
+
+    def find(i: int) -> int:
+        root = i
+        while parent[root] != root:
+            root = parent[root]
+        while parent[i] != root:
+            parent[i], i = root, parent[i]
+        return root
+
+    for i in range(len(clusters)):
+        for j in range(i + 1, len(clusters)):
+            if _cosine(vectors[i], vectors[j]) >= threshold:
+                parent[find(i)] = find(j)
+
+    merged: Dict[int, Dict[str, Any]] = {}
+    for i, c in enumerate(clusters):
+        root = find(i)
+        m = merged.setdefault(root, {"passes": set(), "instances": []})
+        m["passes"] |= c["passes"]
+        m["instances"].extend(c["instances"])
+    return list(merged.values())
 
 
 def _apply_bands(
@@ -274,14 +291,18 @@ def merge_passes(
 
     clusters: List[Dict[str, Any]] = []
     for dc in sorted(by_dest):
+        # Deterministic base: group by canonical topic, cluster each by token Jaccard.
+        by_topic: Dict[str, List[Tuple[int, Fact]]] = {}
+        for pass_index, fact in by_dest[dc]:
+            by_topic.setdefault(_canon_topic(fact.get("entity_topic_key")), []).append((pass_index, fact))
+        dest_clusters: List[Dict[str, Any]] = []
+        for tk in sorted(by_topic):
+            dest_clusters.extend(_cluster_topic(by_topic[tk], sim_threshold))
+        # Opt-in: merge base clusters that are the same fact across drifted topics/phrasing.
+        # Merge-only, so yield is always >= the deterministic base.
         if embed_fn is not None:
-            clusters.extend(_cluster_by_embedding(by_dest[dc], embed_fn, embed_threshold))
-        else:
-            by_topic: Dict[str, List[Tuple[int, Fact]]] = {}
-            for pass_index, fact in by_dest[dc]:
-                by_topic.setdefault(_canon_topic(fact.get("entity_topic_key")), []).append((pass_index, fact))
-            for tk in sorted(by_topic):
-                clusters.extend(_cluster_topic(by_topic[tk], sim_threshold))
+            dest_clusters = _merge_clusters_by_embedding(dest_clusters, embed_fn, embed_threshold)
+        clusters.extend(dest_clusters)
 
     consensus, needs_review, gaps = _apply_bands(clusters, n, middle_floor)
 
