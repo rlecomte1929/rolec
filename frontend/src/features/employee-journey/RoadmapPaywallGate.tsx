@@ -16,9 +16,10 @@
  *     relopass-checkout Audos hook) and return { checkoutUrl }.
  *     See docs/stripe-relopass-package/ for the full spec.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, FlaskConical, Lock, Shield } from 'lucide-react';
 import api from '../../api/client';
+import { trackPaywallImpression, trackPaymentInitiated } from '../../analyticsEvents';
 import { getAuthItem } from '../../utils/demo';
 import { looksLikeTestEmail } from '../../utils/testAccount';
 
@@ -63,7 +64,12 @@ export const RoadmapPaywallGate: React.FC<RoadmapPaywallGateProps> = ({
 
   const destination = [destCity, destCountry].filter(Boolean).join(', ') || 'your destination';
 
+  useEffect(() => {
+    trackPaywallImpression({ assignment_id: assignmentId });
+  }, [assignmentId]);
+
   const handleUnlock = async () => {
+    trackPaymentInitiated({ assignment_id: assignmentId });
     setLoading(true);
     setError(null);
     try {

@@ -22,6 +22,11 @@ vi.mock('../../../../api/client', () => ({
   requirementsAPI: { getSufficiency: (...a: unknown[]) => mockGetSufficiency(...a) },
 }));
 
+const trackCorridorWaitlistIntent = vi.fn();
+vi.mock('../../../../analyticsEvents', () => ({
+  trackCorridorWaitlistIntent: (...a: unknown[]) => trackCorridorWaitlistIntent(...a),
+}));
+
 import { RequirementsSufficiencyPanel } from '../RequirementsSufficiencyPanel';
 
 const CASE_ID = 'case-1';
@@ -70,6 +75,7 @@ const expectPhraseIsNegated = (text: string) => {
 
 beforeEach(() => {
   mockGetSufficiency.mockReset();
+  trackCorridorWaitlistIntent.mockReset();
 });
 
 const renderPanel = () => render(<RequirementsSufficiencyPanel caseId={CASE_ID} />);
@@ -227,6 +233,30 @@ describe('states that must never read as "complete"', () => {
     expect(empty).toHaveTextContent(/we don’t yet hold reviewed requirements/i);
     expect(empty).toHaveTextContent(/this corridor is not ready/i);
     expect(empty).toHaveTextContent(/not.*that nothing is required of you/i);
+  });
+
+  it('empty catalog can register demand without collecting email', async () => {
+    mockGetSufficiency.mockResolvedValue(ok());
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(await screen.findByTestId('sufficiency-waitlist-intent'));
+    expect(trackCorridorWaitlistIntent).toHaveBeenCalledTimes(1);
+    const props = trackCorridorWaitlistIntent.mock.calls[0][0] as Record<string, unknown>;
+    expect(props).toEqual({ corridor: 'NO' });
+    expect(JSON.stringify(props)).not.toMatch(/email|@|name/i);
+    expect(screen.getByTestId('sufficiency-waitlist-recorded')).toHaveTextContent(
+      /we’ve recorded demand for this corridor/i,
+    );
+    expect(screen.queryByTestId('sufficiency-waitlist-intent')).not.toBeInTheDocument();
+  });
+
+  it('does not offer demand-intent when we already hold facts', async () => {
+    mockGetSufficiency.mockResolvedValue(ok({ supporting_requirements: [FACT] }));
+    renderPanel();
+    await screen.findByText(FACT.fact_text);
+    expect(screen.queryByTestId('sufficiency-waitlist-intent')).not.toBeInTheDocument();
+    expect(trackCorridorWaitlistIntent).not.toHaveBeenCalled();
   });
 
   it('distinguishes "no destination set" from "no data for this destination"', async () => {
