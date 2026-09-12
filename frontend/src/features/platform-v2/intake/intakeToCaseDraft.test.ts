@@ -42,6 +42,12 @@ describe('intakeToCaseDraft', () => {
     expect(intakeToCaseDraft(makeIntake()).assignmentContext?.assignmentType).toBeUndefined();
   });
 
+  it('maps work_mode onto assignmentContext.workMode (BUG-260828-87B8)', () => {
+    const nomad = intakeToCaseDraft(makeIntake({ work_mode: 'digital_nomad' } as Partial<IntakeData>));
+    expect(nomad.assignmentContext?.workMode).toBe('digital_nomad');
+    expect(intakeToCaseDraft(makeIntake()).assignmentContext?.workMode).toBeUndefined();
+  });
+
   it('maps social_security_regime onto assignmentContext.socialSecurityRegime', () => {
     const posted = intakeToCaseDraft(makeIntake({ social_security_regime: 'posted' } as Partial<IntakeData>));
     expect(posted.assignmentContext?.socialSecurityRegime).toBe('posted');

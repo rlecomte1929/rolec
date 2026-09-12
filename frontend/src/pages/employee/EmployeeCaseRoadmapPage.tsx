@@ -37,6 +37,11 @@ import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
 import type { RelocationPlanPhaseTaskDTO } from '../../types/relocationPlanView';
 import { track } from '../../analytics';
+import {
+  trackCaseCompleted,
+  trackCaseRoadmapReviewed,
+} from '../../analyticsEvents';
+import { ReliefMomentCapture } from '../../features/employee-journey/ReliefMomentCapture';
 import { resolveRoadmapBuildVariant } from './roadmapBuildVariant';
 import { isRoadmapHeldForHrReview } from './roadmapReleaseGate';
 
@@ -68,6 +73,8 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   // [AIQ-1259b] Policy Assistant ported from the retired /plan page so the
   // affordance survives the Plan→Roadmap consolidation.
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [nonObviousItems, setNonObviousItems] = useState<{ id: string; text: string }[]>([]);
+  const [corridorId, setCorridorId] = useState('unknown');
 
   // H-08 (AIQ-1255): the page had no title — the browser tab + bookmarks were
   // unlabelled. Set a document title for the duration the page is mounted.
@@ -109,6 +116,18 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
       track('journey_step_completed', { step: 'roadmap', case_id: caseId, persona: 'employee' });
     }
   }, [data, caseId]);
+  const caseCompletedRef = useRef(false);
+  useEffect(() => {
+    if (!caseId || !data || caseCompletedRef.current) return;
+    if (data.summary.total_tasks > 0 && data.summary.completion_ratio >= 1) {
+      caseCompletedRef.current = true;
+      trackCaseCompleted({
+        corridor_id: corridorId,
+        case_id: caseId,
+        outcome: 'roadmap_fully_completed',
+      });
+    }
+  }, [caseId, data, corridorId]);
   const runCta = useRelocationPlanCtaHandler(caseId ?? '', { resourceCaseId: data?.case_id });
   const handleCta = (t: RelocationPlanPhaseTaskDTO) => {
     // [AIQ-1252] For document-upload tasks, pass the document key so the dossier
@@ -159,6 +178,28 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
         if (cancelled) return;
         setConfidenceByTitle(buildConfidenceByTitle(res));
         setAdvisories(res.advisories ?? []);
+        const fromSteps = (res.tracks ?? []).flatMap((t) =>
+          t.steps
+            .filter((s) => s.non_obvious)
+            .map((s) => ({ id: s.id, text: s.non_obvious_note || s.title })),
+        );
+        const fromAdvisories = (res.advisories ?? []).map((a) => ({ id: a.id, text: a.text }));
+        const seen = new Set<string>();
+        setNonObviousItems(
+          [...fromSteps, ...fromAdvisories].filter((item) => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+          }),
+        );
+        const corridor = res.advisories?.find((a) => a.provenance?.corridor)?.provenance?.corridor;
+        const resolvedCorridor = corridor || 'unknown';
+        if (corridor) setCorridorId(corridor);
+        trackCaseRoadmapReviewed({
+          corridor_id: resolvedCorridor,
+          case_id: caseId,
+          roadmap_version: 'plan-view',
+        });
       })
       .catch(() => undefined);
     return () => {
@@ -462,6 +503,13 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
             statusOverrides={completion.statusOverrides}
             savingTaskIds={completion.savingTaskIds}
           />
+          {caseId && (
+            <ReliefMomentCapture
+              caseId={caseId}
+              corridorId={corridorId}
+              items={nonObviousItems}
+            />
+          )}
           {completion.error && (
             <div
               role="alert"

@@ -234,6 +234,15 @@ def _held_roles(user: Dict[str, Any]) -> List[str]:
     return [r for r in (user.get("roles") or [user.get("role")]) if r]
 
 
+def role_forbidden(required: UserRole) -> HTTPException:
+    """403 with a machine-readable code. 401 is reserved for invalid/expired tokens."""
+    code = "NOT_AN_EMPLOYEE" if required == UserRole.EMPLOYEE else "INSUFFICIENT_PERMISSIONS"
+    return HTTPException(
+        status_code=403,
+        detail={"code": code, "message": "Insufficient permissions"},
+    )
+
+
 def require_role(role: UserRole):
     """Return a FastAPI dependency that requires *role*. ADMIN users pass all role checks."""
     def dependency(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
@@ -243,7 +252,7 @@ def require_role(role: UserRole):
             return user
         if role.value in _held_roles(user):
             return user
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
+        raise role_forbidden(role)
     return dependency
 
 def require_hr_or_employee(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
