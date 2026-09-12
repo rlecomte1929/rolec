@@ -28,9 +28,14 @@ MANIFEST_PATH = SCRIPTS_DIR / "seed_prod_parity_manifest.json"
 # ─── manifest: shape + the FR/ES/DE contract ────────────────────────────────
 
 
-def test_manifest_loads_and_covers_fr_es_de():
+def test_manifest_loads_and_covers_fr_es_no_de():
     m = guard.load_manifest(MANIFEST_PATH)
-    assert set(m) == {"FR_cerfa_14571_v2024", "ES_ex17_v2024", "DE_blue_card_v2024"}
+    assert set(m) == {
+        "FR_cerfa_14571_v2024",
+        "ES_ex17_v2024",
+        "NO_udi_gp7028_v2024",
+        "DE_blue_card_v2024",
+    }
 
 
 def test_manifest_expected_counts_are_locked():
@@ -42,6 +47,9 @@ def test_manifest_expected_counts_are_locked():
     es = m["ES_ex17_v2024"]
     assert len(es["text"]) == 8 and len(es["single_radio"]) == 2
     assert "Año_Nacimiento" in es["text"] and "Sexo" in es["single_radio"]
+    no = m["NO_udi_gp7028_v2024"]
+    assert len(no["text"]) == 11 and len(no["single_radio"]) == 2
+    assert "Family name" in no["text"] and "Marital status group 1" in no["single_radio"]
     assert len(m["DE_blue_card_v2024"]["text"]) == 15
 
 

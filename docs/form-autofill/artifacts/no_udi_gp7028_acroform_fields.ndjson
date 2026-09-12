@@ -1,0 +1,232 @@
+{"name": "Date", "ft": "/Tx", "tu": "Date"}
+{"name": "DUFnumber", "ft": "/Tx", "tu": "DUF-number"}
+{"name": "Fee paid NOK", "ft": "/Tx", "tu": "Fee paid NOK"}
+{"name": "Picture", "ft": "/Tx", "tu": "Picture"}
+{"name": "Family name", "ft": "/Tx", "tu": "Family name"}
+{"name": "First name", "ft": "/Tx", "tu": "First name"}
+{"name": "Middle name", "ft": "/Tx", "tu": "Middle name"}
+{"name": "If applicable previous name surname", "ft": "/Tx", "tu": "If applicable, previous name/ surname"}
+{"name": "Date of birth daymonthyear", "ft": "/Tx", "tu": "Date of birth (day/month/year)"}
+{"name": "Place of birth", "ft": "/Tx", "tu": "Place of birth"}
+{"name": "Country of birth", "ft": "/Tx", "tu": "Country of birth"}
+{"name": "Ethnicity", "ft": "/Tx", "tu": "Ethnicity"}
+{"name": "Mother tongue", "ft": "/Tx", "tu": "Mother tongue"}
+{"name": "Other languages you speak", "ft": "/Tx", "tu": "Other languages you speak"}
+{"name": "Gender", "ft": "/Btn", "tu": "Gender", "states": ["/Male", "/Female"]}
+{"name": "Profession", "ft": "/Tx", "tu": "Profession"}
+{"name": "Citizenship specify all", "ft": "/Tx", "tu": "Citizenship (specify all)"}
+{"name": "Place and date of last change in marital status", "ft": "/Tx", "tu": "Place and date of last change in marital status"}
+{"name": "Postcode", "ft": "/Tx", "tu": "Postcode"}
+{"name": "Town", "ft": "/Tx", "tu": "Town"}
+{"name": "Telephone number at home", "ft": "/Tx", "tu": "Telephone number at home"}
+{"name": "Email", "ft": "/Tx", "tu": "E-mail"}
+{"name": "Alternative address if the answer to the application is to be sent another place", "ft": "/Tx", "tu": "Alternative address if the answer to the application is to be sent another place"}
+{"name": "Postcode_2", "ft": "/Tx", "tu": "Postcode"}
+{"name": "Town_2", "ft": "/Tx", "tu": "Town"}
+{"name": "Country_2", "ft": "/Tx", "tu": "Country"}
+{"name": "Address in Norway where you live or will live street", "ft": "/Tx", "tu": "Address in Norway where you live or will live (street)"}
+{"name": "Postcode_3", "ft": "/Tx", "tu": "Postcode"}
+{"name": "Town_3", "ft": "/Tx", "tu": "Town"}
+{"name": "Cell phone number in Norway", "ft": "/Tx", "tu": "Cell phone number in Norway"}
+{"name": "Date of arrival in Norway", "ft": "/Tx", "tu": "Date of arrival in Norway"}
+{"name": "Date of entry into the Schengen area", "ft": "/Tx", "tu": "Date of entry into the Schengen area"}
+{"name": "Have you stayed in Norway previously", "ft": "/Btn", "tu": "Have you stayed in Norway previously", "states": ["/Yes", "/No"]}
+{"name": "Have you previously applied for a residence permit in", "ft": "/Btn", "tu": "Have you previously applied for a residence permit in", "states": ["/Yes_2", "/No_2"]}
+{"name": "How long do you want the permit to last", "ft": "/Tx", "tu": "How long do you want the permit to last?"}
+{"name": "From date", "ft": "/Tx", "tu": "From date"}
+{"name": "To date", "ft": "/Tx", "tu": "To date"}
+{"name": "Family name_2", "ft": "/Tx", "tu": "Family name"}
+{"name": "First name_2", "ft": "/Tx", "tu": "First name"}
+{"name": "Middle name_2", "ft": "/Tx", "tu": "Middle name"}
+{"name": "If applicable previous namesurname", "ft": "/Tx", "tu": "If applicable, previous name/surname"}
+{"name": "Date of birth daymonthyear_2", "ft": "/Tx", "tu": "Date of birth (day/month/year)"}
+{"name": "Place of birth_2", "ft": "/Tx", "tu": "Place of birth"}
+{"name": "Country of birth_2", "ft": "/Tx", "tu": "Country of birth"}
+{"name": "Mother tongue_2", "ft": "/Tx", "tu": "Mother tongue"}
+{"name": "Gender_2", "ft": "/Btn", "tu": "Gender", "states": ["/Male_2", "/Female_2"]}
+{"name": "Citizenship specify all_2", "ft": "/Tx", "tu": "Citizenship (specify all)"}
+{"name": "Address", "ft": "/Tx", "tu": "Address"}
+{"name": "Postcode_4", "ft": "/Tx", "tu": "Postcode"}
+{"name": "Town_4", "ft": "/Tx", "tu": "Town"}
+{"name": "Norwegian personal ID number if applicable", "ft": "/Tx", "tu": "Norwegian personal ID number (if applicable)"}
+{"name": "Telephone number", "ft": "/Tx", "tu": "Telephone number"}
+{"name": "Cell phone number", "ft": "/Tx", "tu": "Cell phone number"}
+{"name": "Have you been married previously", "ft": "/Btn", "tu": "Have you been married previously", "states": ["/Yes_4", "/No_4"]}
+{"name": "If yes when year", "ft": "/Tx", "tu": "If yes: when (year)"}
+{"name": "For how long were you married", "ft": "/Tx", "tu": "For how long were you married?"}
+{"name": "Who were you married to", "ft": "/Tx", "tu": "Who were you married to?"}
+{"name": "Employer company name or host family", "ft": "/Tx", "tu": "Employer (company name or host family)"}
+{"name": "Company registration number", "ft": "/Tx", "tu": "Company registration number"}
+{"name": "Address_2", "ft": "/Tx", "tu": "Address"}
+{"name": "Postcode_5", "ft": "/Tx", "tu": "Postcode"}
+{"name": "Town_5", "ft": "/Tx", "tu": "Town"}
+{"name": "Telephone number_2", "ft": "/Tx", "tu": "Telephone number"}
+{"name": "Email address_2", "ft": "/Tx", "tu": "E-mail address"}
+{"name": "Wage in NOK", "ft": "/Tx", "tu": "Wage (in NOK)"}
+{"name": "Type of work job title or key task", "ft": "/Tx", "tu": "Type of work (job title or key task)"}
+{"name": "Which professional areasfields are you qualified in", "ft": "/Tx", "tu": "Which professional areas/fields are you qualified in?"}
+{"name": "Accomplished degree", "ft": "/Tx", "tu": "Accomplished degree"}
+{"name": "Place of studyeducational institution", "ft": "/Tx", "tu": "Place of study/educational institution"}
+{"name": "Company registration number_2", "ft": "/Tx", "tu": "Company registration number"}
+{"name": "Subjectfield of study", "ft": "/Tx", "tu": "Subject/field of study"}
+{"name": "Telephone number_3", "ft": "/Tx", "tu": "Telephone number"}
+{"name": "Name of organisation that arranged your studiesschool place where applicable", "ft": "/Tx", "tu": "Name of organisation that arranged your studies/school place, where applicable"}
+{"name": "School fees amount per term", "ft": "/Tx", "tu": "School fees (amount per term)"}
+{"name": "The reason for your permit Protection asylum Permit on strong humanitarian grounds Other explain", "ft": "/Tx", "tu": "The reason for your permit: Protection (asylum) Permit on strong humanitarian grounds Other, explain:"}
+{"name": "Date of departure from Norway daymonthyearRow1", "ft": "/Tx", "tu": "Date of departure from Norway (day/month/year)_Row_1"}
+{"name": "Entry date to Norway daymonthyearRow1", "ft": "/Tx", "tu": "Entry date to Norway (day/month/year)_Row_1"}
+{"name": "Numbers of days awayRow1", "ft": "/Tx", "tu": "Numbers of days away_Row_1"}
+{"name": "Country visitedRow1", "ft": "/Tx", "tu": "Country visited_Row_1"}
+{"name": "Date of departure from Norway daymonthyearRow2", "ft": "/Tx", "tu": "Date of departure from Norway (day/month/year)_Row_2"}
+{"name": "Entry date to Norway daymonthyearRow2", "ft": "/Tx", "tu": "Entry date to Norway (day/month/year)_Row_2"}
+{"name": "Numbers of days awayRow2", "ft": "/Tx", "tu": "Numbers of days away_Row_2"}
+{"name": "Country visitedRow2", "ft": "/Tx", "tu": "Country visited_Row_2"}
+{"name": "Date of departure from Norway daymonthyearRow3", "ft": "/Tx", "tu": "Date of departure from Norway (day/month/year)_Row_3"}
+{"name": "Entry date to Norway daymonthyearRow3", "ft": "/Tx", "tu": "Entry date to Norway (day/month/year)_Row_3"}
+{"name": "Numbers of days awayRow3", "ft": "/Tx", "tu": "Numbers of days away_Row_3"}
+{"name": "Country visitedRow3", "ft": "/Tx", "tu": "Country visited_Row_3"}
+{"name": "Date of departure from Norway daymonthyearRow4", "ft": "/Tx", "tu": "Date of departure from Norway (day/month/year)_Row_4"}
+{"name": "Entry date to Norway daymonthyearRow4", "ft": "/Tx", "tu": "Entry date to Norway (day/month/year)_Row_4"}
+{"name": "Numbers of days awayRow4", "ft": "/Tx", "tu": "Numbers of days away_Row_4"}
+{"name": "Country visitedRow4", "ft": "/Tx", "tu": "Country visited_Row_4"}
+{"name": "Date of departure from Norway daymonthyearRow5", "ft": "/Tx", "tu": "Date of departure from Norway (day/month/year)_Row_5"}
+{"name": "Entry date to Norway daymonthyearRow5", "ft": "/Tx", "tu": "Entry date to Norway (day/month/year)_Row_5"}
+{"name": "Numbers of days awayRow5", "ft": "/Tx", "tu": "Numbers of days away_Row_5"}
+{"name": "Country visitedRow5", "ft": "/Tx", "tu": "Country visited_Row_5"}
+{"name": "Date of departure from Norway daymonthyearRow6", "ft": "/Tx", "tu": "Date of departure from Norway (day/month/year)_Row_6"}
+{"name": "Entry date to Norway daymonthyearRow6", "ft": "/Tx", "tu": "Entry date to Norway (day/month/year)_Row_6"}
+{"name": "Numbers of days awayRow6", "ft": "/Tx", "tu": "Numbers of days away_Row_6"}
+{"name": "Country visitedRow6", "ft": "/Tx", "tu": "Country visited_Row_6"}
+{"name": "Family name_3", "ft": "/Tx", "tu": "Family name"}
+{"name": "First name_3", "ft": "/Tx", "tu": "First name"}
+{"name": "Date of birth daymonthyear_3", "ft": "/Tx", "tu": "Date of birth (day/month/year)"}
+{"name": "Address_3", "ft": "/Tx", "tu": "Address"}
+{"name": "Postcodeplace", "ft": "/Tx", "tu": "Postcode/-place"}
+{"name": "Country_3", "ft": "/Tx", "tu": "Country"}
+{"name": "Family name first name", "ft": "/Tx", "tu": "Family name, first name"}
+{"name": "Date of birth", "ft": "/Tx", "tu": "Date of birth"}
+{"name": "Resident of country", "ft": "/Tx", "tu": "Resident of (country)"}
+{"name": "Family name first name_2", "ft": "/Tx", "tu": "Family name, first name"}
+{"name": "Date of birth_2", "ft": "/Tx", "tu": "Date of birth"}
+{"name": "Resident of country_2", "ft": "/Tx", "tu": "Resident of (country)"}
+{"name": "Family name first name_3", "ft": "/Tx", "tu": "Family name, first name"}
+{"name": "Date of birth_3", "ft": "/Tx", "tu": "Date of birth"}
+{"name": "Resident of country_3", "ft": "/Tx", "tu": "Resident of (country)"}
+{"name": "Family name first name_4", "ft": "/Tx", "tu": "Family name, first name"}
+{"name": "Date of birth_4", "ft": "/Tx", "tu": "Date of birth"}
+{"name": "Resident of country_4", "ft": "/Tx", "tu": "Resident of (country)"}
+{"name": "Family name first name_5", "ft": "/Tx", "tu": "Family name, first name"}
+{"name": "Date of birth_5", "ft": "/Tx", "tu": "Date of birth"}
+{"name": "Resident of country_5", "ft": "/Tx", "tu": "Resident of (country)"}
+{"name": "Family name first name_6", "ft": "/Tx", "tu": "Family name, first name"}
+{"name": "Date of birth_6", "ft": "/Tx", "tu": "Date of birth"}
+{"name": "Resident of country_6", "ft": "/Tx", "tu": "Resident of (country)"}
+{"name": "Family name first name_7", "ft": "/Tx", "tu": "Family name, first name"}
+{"name": "Date of birth_7", "ft": "/Tx", "tu": "Date of birth"}
+{"name": "Resident of country_7", "ft": "/Tx", "tu": "Resident of (country)"}
+{"name": "Family name first name_8", "ft": "/Tx", "tu": "Family name, first name"}
+{"name": "Date of birth_8", "ft": "/Tx", "tu": "Date of birth"}
+{"name": "Resident of country_8", "ft": "/Tx", "tu": "Resident of (country)"}
+{"name": "Number of children", "ft": "/Tx", "tu": "Number of children"}
+{"name": "Number of sisters", "ft": "/Tx", "tu": "Number of sisters"}
+{"name": "Number of brothers", "ft": "/Tx", "tu": "Number of brothers"}
+{"name": "Number of siblings residing in Norway", "ft": "/Tx", "tu": "Number of siblings residing in Norway"}
+{"name": "If yes in which police districtcountry", "ft": "/Tx", "tu": "If yes, in which police district/country?"}
+{"name": "If yes when and where were you convicted", "ft": "/Tx", "tu": "If yes, when and where were you convicted?"}
+{"name": "Type of offence", "ft": "/Tx", "tu": "Type of offence"}
+{"name": "I am aware that correspondence from the immigration authorities will be sent to my representative", "ft": "/Btn", "tu": "I am aware that correspondence from the immigration authorities will be sent to my representative", "states": ["/Off", "/On"]}
+{"name": "I am aware that my representative will be notified of the decision instead of me", "ft": "/Btn", "tu": "I am aware that my representative will be notified of the decision instead of me", "states": ["/Off", "/On"]}
+{"name": "I give the following person power of attorney to act on my behalf in connection with my application", "ft": "/Btn", "tu": "I give the following person power of attorney to act on my behalf in connection with my application", "states": ["/Off", "/On"]}
+{"name": "Representatives first name", "ft": "/Tx", "tu": "Representative’s first name"}
+{"name": "Postcode_6", "ft": "/Tx", "tu": "Postcode"}
+{"name": "Town_6", "ft": "/Tx", "tu": "Town"}
+{"name": "Country_4", "ft": "/Tx", "tu": "Country"}
+{"name": "Cell phone number_2", "ft": "/Tx", "tu": "Cell phone number"}
+{"name": "I accept to receive information about my case on sms  email", "ft": "/Btn", "tu": "I accept to receive information about my case on sms / e-mail", "states": ["/Off", "/On"]}
+{"name": "Place and date", "ft": "/Tx", "tu": "Place and date"}
+{"name": "Your signature", "ft": "/Tx", "tu": "Your signature"}
+{"name": "Place and date_2", "ft": "/Tx", "tu": "Place and date"}
+{"name": "Parentguardians signature", "ft": "/Tx", "tu": "Parent/guardian’s signature"}
+{"name": "Place and date_3", "ft": "/Tx", "tu": "Place and date"}
+{"name": "Parentguardians signature_2", "ft": "/Tx", "tu": "Parent/guardian’s signature"}
+{"name": "Country", "ft": "/Tx", "tu": "Country"}
+{"name": "Home address", "ft": "/Tx", "tu": "Home address"}
+{"name": "Travel / identity document number", "ft": "/Tx", "tu": "Travel / identity document number"}
+{"name": "Valid until ddmmyy", "ft": "/Tx", "tu": "Valid until (dd/mm/yy)"}
+{"name": "Country of issue", "ft": "/Tx", "tu": "Country of issue"}
+{"name": "Issuing authority", "ft": "/Tx", "tu": "Issuing authority"}
+{"name": "Specify any other persons who are entered in the travel document Use a separate sheet if necessary", "ft": "/Tx", "tu": "Specify any other persons who are entered in the travel document. Use a separate sheet if necessary."}
+{"name": "From month / year", "ft": "/Tx", "tu": "From month / year"}
+{"name": "To month / year", "ft": "/Tx", "tu": "To month / year"}
+{"name": "Other: explain", "ft": "/Tx", "tu": "Other: explain"}
+{"name": "Representatives family name", "ft": "/Tx", "tu": "Representative’s family name"}
+{"name": "Representative's address", "ft": "/Tx", "tu": "Representative's address"}
+{"name": "Marital status group 1", "ft": "/Btn", "tu": "Marital status", "states": ["/Single", "/Married / civil partner", "/Cohabitant", "/Separated", "/Divorced", "/Widow/widower"]}
+{"name": "Reason for the visit", "ft": "/Btn", "tu": "Reason for the visit", "states": ["/Other. Specify", "/Work", "/Tourism"]}
+{"name": "Have you been expelled from Norway previously?", "ft": "/Btn", "tu": "Have you been expelled from Norway previously?", "states": ["/Yes_3", "/No_3"]}
+{"name": "Travel document Group1", "ft": "/Btn", "tu": "Travel document", "states": ["/Passport from country of origin", "/Travel warrant, immigrant's passport or similar", "/No travel document"]}
+{"name": "Previous stays5", "ft": "/Btn", "tu": "If yes, does the prohibition on entry still apply?", "states": ["/No", "/Yes. Please enclose separate application for lifting of the prohibition of entry"]}
+{"name": "PermitGroup1", "ft": "/Btn", "tu": "The application is for a", "states": ["/First time permit", "/Renewal"]}
+{"name": "PermitGroup_2", "ft": "/Btn", "tu": "Relasjon til deg", "states": ["/Spouse/partner", "/Cohabitant", "/Fiancé", "/Biological child", "/Adopted child", "/Foster child", "/Biological/adoptive mother", "/Biological/adoptive fater", "/Other", "/Foster mother", "/Foster father"]}
+{"name": "Will you live at the same address (in the same household) for the whole period of the permit?", "ft": "/Btn", "tu": "Same house?", "states": ["/Yes_5", "/No_5"]}
+{"name": "For first-time application: Will you be supported by the person living in Norway", "ft": "/Btn", "tu": "Be supported?", "states": ["/Yes_6", "/No_6"]}
+{"name": "For renewal: Are you supported by the person living in Norway?", "ft": "/Btn", "tu": "Are you supported?", "states": ["/Yes_7", "/No_7"]}
+{"name": "Changes to working situation?", "ft": "/Btn", "tu": "changes in working situation?", "states": ["/No_8", "/Yes_8"]}
+{"name": "When applying for a residence permit to get married in Norway Please note the date the marriage or partnership is to take place", "ft": "/Tx", "tu": "When applying for a residence permit to get married in Norway: Please note the date the marriage or partnership is to take place."}
+{"name": "WorkGroup2", "ft": "/Btn", "tu": "Employment percentage", "states": ["/100 %", "/Annet %"]}
+{"name": "Employment percentage", "ft": "/Tx", "tu": "Employment percentage"}
+{"name": "WorkGroup3", "ft": "/Btn", "tu": "Education", "states": ["/Primary school", "/Upper secondary school, vocational", "/Upper secondary school, general subjects", "/Supplement to upper secondary education", "/University or college", "/Other"]}
+{"name": "Relevant work experience", "ft": "/Btn", "tu": "First time applicant or changes in working situation?", "states": ["/No_9", "/Yes_9"]}
+{"name": "StudyGroup2", "ft": "/Btn", "tu": "Are you continuing your education at the same institution as before?", "states": ["/No_11", "/Yes_11"]}
+{"name": "StudyGroup3", "ft": "/Btn", "tu": "Funding of stay", "states": ["/Own means", "/Grant", "/Other (explain)"]}
+{"name": "StudyGroup1", "ft": "/Btn", "tu": "Are you following a normal study progression?", "states": ["/Yes_10", "/No_10"]}
+{"name": "ProtectionGroup1", "ft": "/Btn", "tu": "Are you goint to renew the permit you have?", "states": ["/Yes_12", "/No_12"]}
+{"name": "ProtectionGroup2", "ft": "/Btn", "tu": "Are you applying on a new basis?", "states": ["/Yes_13", "/No_13"]}
+{"name": "ProtectionGroup3", "ft": "/Btn", "tu": "The reason for your permit", "states": ["/Protection (asylum)", "/Permit on strong humanitarian grounds", "/Other, explain"]}
+{"name": "TripGroup1", "ft": "/Btn", "tu": "Reason for trip", "states": ["/Business", "/Private"]}
+{"name": "TripGroup2", "ft": "/Btn", "tu": "Reason for the trip", "states": ["/Business", "/Private"]}
+{"name": "TripGroup3", "ft": "/Btn", "tu": "Reason for the trip", "states": ["/Business", "/Private"]}
+{"name": "TripGroup4", "ft": "/Btn", "tu": "Reason for the trip", "states": ["/Business", "/Private"]}
+{"name": "TripGroup5", "ft": "/Btn", "tu": "Reason for the trip", "states": ["/Business", "/Private"]}
+{"name": "TripGroup6", "ft": "/Btn", "tu": "Reason for the trip", "states": ["/Business", "/Private"]}
+{"name": "FamilyGroup1", "ft": "/Btn", "tu": "Gender", "states": ["/Male", "/Female"]}
+{"name": "Also applying1", "ft": "/Btn", "tu": "Also applying", "states": ["/Also applying", "/Off"]}
+{"name": "ParentsGroup1", "ft": "/Btn", "tu": "Gender ", "states": ["/Male", "/Female"]}
+{"name": "ParentsGroup2", "ft": "/Btn", "tu": "Gender_line 2", "states": ["/Male", "/Female"]}
+{"name": "Also applying2", "ft": "/Btn", "tu": "Also applying_2", "states": ["/Off", "/Yes"]}
+{"name": "Also applying3", "ft": "/Btn", "tu": "Also applying line 2", "states": ["/Off", "/also applying"]}
+{"name": "Child number 1", "ft": "/Btn", "tu": "(first line)", "states": ["/Biological / adopted child", "/Foster child", "/Sibling"]}
+{"name": "Child number 2", "ft": "/Btn", "tu": "(second line)", "states": ["/Biological / adopted child", "/Foster child", "/Sibling"]}
+{"name": "Child number 3", "ft": "/Btn", "tu": "(third line)", "states": ["/Biological / adopted child", "/Foster child", "/Sibling"]}
+{"name": "Child number 4", "ft": "/Btn", "tu": "(fourth line)", "states": ["/Biological / adopted child", "/Foster child", "/Sibling"]}
+{"name": "Child number 5", "ft": "/Btn", "tu": "(fifth line)", "states": ["/Biological / adopted child", "/Foster child", "/Sibling"]}
+{"name": "Child number 6", "ft": "/Btn", "tu": "(sixt line)", "states": ["/Biological / adopted child", "/Foster child", "/Sibling"]}
+{"name": "FamilyGroup4", "ft": "/Btn", "tu": "Gender (first line)", "states": ["/Male", "/Female"]}
+{"name": "FamilyGroup5", "ft": "/Btn", "tu": "Gender (second line)", "states": ["/Male", "/Female"]}
+{"name": "FamilyGroup6", "ft": "/Btn", "tu": "Gender (third line)", "states": ["/Male", "/Female"]}
+{"name": "FamilyGroup7", "ft": "/Btn", "tu": "Gender (fourth line)", "states": ["/Male", "/Female"]}
+{"name": "FamilyGroup8", "ft": "/Btn", "tu": "Gender (fifth group)", "states": ["/Male", "/Female"]}
+{"name": "FamilyGroup9", "ft": "/Btn", "tu": "Gender (sixth line)", "states": ["/Male", "/Female"]}
+{"name": "Child number 1 also applying", "ft": "/Btn", "tu": "Child number 1 also applying", "states": ["/Off", "/Yes"]}
+{"name": "Child number 3 also applying", "ft": "/Btn", "tu": "Child number 3 also applying", "states": ["/Off", "/Yes"]}
+{"name": "Child number 4 also applying", "ft": "/Btn", "tu": "Child number 4 also applying", "states": ["/Off", "/Yes"]}
+{"name": "Child number 5 also applying", "ft": "/Btn", "tu": "Child number 5 also applying", "states": ["/Off", "/Yes"]}
+{"name": "Child number 2 also applying", "ft": "/Btn", "tu": "Child number 2 also applying", "states": ["/Off", "/Yes"]}
+{"name": "Child number 6 also applying", "ft": "/Btn", "tu": "Child number 6 also applying", "states": ["/Off", "/Yes"]}
+{"name": "CriminalOffencesGroup1", "ft": "/Btn", "tu": "Charged with a criminal offence?", "states": ["/Yes_14", "/No_14"]}
+{"name": "CriminalOffencesGroup2", "ft": "/Btn", "tu": "Ever convicted of a criminal offence in Norway or abroad?", "states": ["/Yes_15", "/No_15"]}
+{"name": "Prison (days)", "ft": "/Tx", "tu": "Prison (days)"}
+{"name": "CriminalOffencesGroup3", "ft": "/Btn", "tu": "Sentence"}
+{"name": "CriminalOffencesGroup4", "ft": "/Btn", "tu": "Served the sentence/paid the fine or is the probation period over?", "states": ["/Yes_16", "/No_16, explain"]}
+{"name": "RemarksGroup2", "ft": "/Btn", "tu": "Has the child been given the opportunity to give an opinion?", "states": ["/Yes_18", "/No_18"]}
+{"name": "RemarksGroup3", "ft": "/Btn", "tu": "Has an interview/talk been held with the child?", "states": ["/Yes_19", "/No_19"]}
+{"name": "Have you served the sentence/paid the fine (or is the probation period over)?", "ft": "/Tx", "tu": "Have you served the sentence/paid the fine (or is the probation period over)?"}
+{"name": "RemarksGroup1", "ft": "/Btn", "tu": "Has the child been told what the application relates to?", "states": ["/Yes_17", "/No_17"]}
+{"name": "If yes state when and for how long", "ft": "/Tx", "tu": "If yes, state when and for how long"}
+{"name": "State other reason", "ft": "/Tx", "tu": "State other reason"}
+{"name": "If no, explain why you will not be supported by the person living in Norway", "ft": "/Tx", "tu": "If no, explain why you will not be supported by the person living in Norway"}
+{"name": "Reason for not living in the same household for the whole period of the permit", "ft": "/Tx", "tu": "No. State the following reason for not staying in the same household for the whole period of the permit"}
+{"name": "Fine", "ft": "/Tx", "tu": "Fine, amount"}
+{"name": "Phone number", "ft": "/Tx", "tu": "Phone number"}
+{"name": "E-mail", "ft": "/Tx", "tu": "E-mail"}
+{"name": "Email address", "ft": "/Tx", "tu": "E-mail address"}

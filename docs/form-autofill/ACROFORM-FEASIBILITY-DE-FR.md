@@ -212,3 +212,33 @@ still Romain's call.
   `FR_cerfa_14571_v2024.pdf` (operator-run — the seed script needs the Supabase service key). The
   fill pipeline then serves the real filled visa PDF with no code change. Edition `*05` vs `*06`
   remains Romain's content call.
+
+---
+
+# Follow-up (2026-09-12) — Norway UDI GP7028 is the third fillable AcroForm
+
+Germany is still unsalvageable. France CERFA and Spain EX-17 stay as they were. Norway now has
+one real input form, and only for **skilled worker** (third-country), not for FR→NO EEA.
+
+- **The form is in the repo.** `docs/form-autofill/artifacts/no_udi_gp7028.pdf` (sha256
+  `a75786d22f4c1bb3284e42667b2f4456167e2b2fd4250c1b3df40a2a0fc2196f`, 1,888,429 bytes,
+  `%PDF-1.7`, 7 pages, **232 named AcroForm fields**). Official English edition (udi.no, last
+  modified 2024-06-18):
+  `https://www.udi.no/globalassets/global/skjemaer/application_-for_a_permit_for_residence_or_work_gp7028.pdf`.
+  Raw field dump: `docs/form-autofill/artifacts/no_udi_gp7028_acroform_fields.ndjson` (232 lines).
+- **Seeded mappings:** `NO_udi_gp7028_v2024` is on `FILLABLE_FORM_IDS`. Migration
+  `supabase/migrations/20261143000000_no_udi_gp7028_fields.sql` maps the governed-vault subset
+  only — 11 `/Tx` fields plus Gender and Marital status as single-radio groups (the EX-17
+  shape). Study, criminal history, travel history, children, power of attorney, signatures, and
+  contact stay unmapped. Date of birth is one `/Tx` field, not a day/month/year split.
+- **`visa_type` is `skilled_worker` only.** GP7028 also serves family immigration; that corridor
+  is not seeded. FR→NO EEA (FINDINGS Appendix A.1) is still a data-sheet / portal corridor —
+  there is still no fillable form for police registration, skattekort, or D-number.
+- **Marital radios:** vault `civil_partnership` / `civil partnership` canonicalise to `MARRIED`
+  and tick `/Married / civil partner`. `cohabitant` ticks `/Cohabitant`. Unmatched values
+  (including `OTHER` and gender `X`) set nothing.
+- **Parity lock:** `backend/tests/test_no_udi_gp7028_seed_parity.py` rebuilds `CHOICE_GROUPS`
+  from the seed, matches the 232-field artifact, and fills the committed PDF. Nightly
+  `scripts/seed_prod_parity_manifest.json` locks the 11 text + 2 radio field ids.
+- **Production upload still open:** put `no_udi_gp7028.pdf` into the `form-templates` bucket as
+  `NO_udi_gp7028_v2024.pdf` (operator-run, same as CERFA).

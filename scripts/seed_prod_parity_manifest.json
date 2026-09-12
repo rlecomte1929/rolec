@@ -47,6 +47,25 @@
         "Estado Civil"
       ]
     },
+    "NO_udi_gp7028_v2024": {
+      "text": [
+        "Family name",
+        "First name",
+        "Date of birth daymonthyear",
+        "Place of birth",
+        "Citizenship specify all",
+        "Travel / identity document number",
+        "Valid until ddmmyy",
+        "Country of issue",
+        "Type of work job title or key task",
+        "Employer company name or host family",
+        "Wage in NOK"
+      ],
+      "single_radio": [
+        "Gender",
+        "Marital status group 1"
+      ]
+    },
     "DE_blue_card_v2024": {
       "text": [
         "date_of_birth",

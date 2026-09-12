@@ -4,6 +4,9 @@ Notable changes to the ReloPass backend. Newest first.
 
 ## [Unreleased]
 
+### Added
+- Norway UDI GP7028 (skilled worker) is a fillable AcroForm. Vault `civil_partnership` ticks Married / civil partner.
+
 ### Changed
 - **AUDIT-C1 — `backend/database.py` monolith decomposition (AIQ-664 → AIQ-669).**
   The single ~17,900-line `Database` class was progressively split into

@@ -292,9 +292,11 @@ _GENDER_CODES = {
 _MARITAL_CODES = {
     "single": "SINGLE", "celibataire": "SINGLE", "célibataire": "SINGLE", "unmarried": "SINGLE",
     "married": "MARRIED", "marie": "MARRIED", "marié": "MARRIED", "mariee": "MARRIED", "mariée": "MARRIED",
+    "civil_partnership": "MARRIED", "civil partnership": "MARRIED",
     "separated": "SEPARATED", "separe": "SEPARATED", "séparé": "SEPARATED",
     "divorced": "DIVORCED", "divorce": "DIVORCED", "divorcé": "DIVORCED",
     "widowed": "WIDOWED", "widow": "WIDOWED", "widower": "WIDOWED", "veuf": "WIDOWED", "veuve": "WIDOWED",
+    "cohabitant": "COHABITANT", "cohabiting": "COHABITANT",
 }
 
 
@@ -347,6 +349,19 @@ CHOICE_GROUPS: Dict[str, "Dict[str, Dict[str, str] | RadioField]"] = {
             "WIDOWED": "/Viudo",
             "DIVORCED": "/Divorciado",
             "SEPARATED": "/Separado",
+        }),
+    },
+    # NO UDI GP7028: a single radio field per group, English export values (verified from the
+    # real PDF). Gender has no "other"; unmatched marital values (e.g. OTHER) set nothing.
+    "NO_udi_gp7028_v2024": {
+        "gender": RadioField("Gender", {"M": "/Male", "F": "/Female"}),
+        "marital_status": RadioField("Marital status group 1", {
+            "SINGLE": "/Single",
+            "MARRIED": "/Married / civil partner",
+            "COHABITANT": "/Cohabitant",
+            "SEPARATED": "/Separated",
+            "DIVORCED": "/Divorced",
+            "WIDOWED": "/Widow/widower",
         }),
     },
 }
@@ -598,9 +613,11 @@ def visa_types_for_corridor(corridor_to: str) -> List[str]:
     assuming one:
 
       * exactly one  -> use it
-      * none         -> this corridor has no fillable form (e.g. Norway, which is
-                        a portal/data-sheet corridor) — an empty form list is the
-                        correct answer, not an error
+      * none         -> this corridor has no fillable form — an empty form list is
+                        the correct answer, not an error. Norway still carries
+                        non-fillable ``NO_datasheet_v2026`` rows; fillable GP7028
+                        is ``skilled_worker`` only. If both visa types exist in
+                        mappings, the caller must pass ``visa_type``.
       * more than one -> genuinely ambiguous; the caller must specify
 
     Sorted for deterministic behaviour when a corridor grows a second type.
@@ -627,6 +644,7 @@ def visa_types_for_corridor(corridor_to: str) -> List[str]:
 FILLABLE_FORM_IDS: "frozenset[str]" = frozenset({
     "FR_cerfa_14571_v2024",   # France — CERFA 14571*05 (France-Visas)
     "ES_ex17_v2024",          # Spain — EX-17 / TIE (PAG F94803)
+    "NO_udi_gp7028_v2024",   # Norway — UDI GP7028 (skilled worker; udi.no English edition)
 })
 
 

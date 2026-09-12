@@ -3,8 +3,8 @@
 Regression guard for the discovery that DE_blue_card_v2024 is a synthetic stand-in
 (Germany's Blue Card process is online — the PDF is an output, not a fillable input; see
 docs/form-autofill/ACROFORM-FEASIBILITY-DE-FR.md) yet carried 15 field mappings, so the
-available-forms endpoint would have offered it as a fillable form. Only FR CERFA and ES
-EX-17 are real fillable AcroForms.
+available-forms endpoint would have offered it as a fillable form. Only FR CERFA, ES
+EX-17, and NO UDI GP7028 are real fillable AcroForms.
 
 DB-free: the raw row-fetch (_available_form_rows) is patched, so these assert the
 fillable-only FILTER, not the query.
@@ -27,8 +27,12 @@ def _row(form_id, corridor_to, visa_type, field_count=5):
     }
 
 
-def test_fillable_allowlist_is_exactly_the_two_real_forms():
-    assert fps.FILLABLE_FORM_IDS == {"FR_cerfa_14571_v2024", "ES_ex17_v2024"}
+def test_fillable_allowlist_is_exactly_the_real_forms():
+    assert fps.FILLABLE_FORM_IDS == {
+        "FR_cerfa_14571_v2024",
+        "ES_ex17_v2024",
+        "NO_udi_gp7028_v2024",
+    }
 
 
 def test_synthetic_and_datasheet_forms_are_not_fillable():
@@ -50,6 +54,14 @@ def test_get_available_forms_keeps_the_real_fr_form():
         forms = fps.get_available_forms("FR", "long_stay")
     assert [f.form_id for f in forms] == ["FR_cerfa_14571_v2024"]
     assert forms[0].field_count == 18
+
+
+def test_get_available_forms_keeps_the_real_no_form():
+    rows = [_row("NO_udi_gp7028_v2024", "NO", "skilled_worker", 13)]
+    with mock.patch.object(fps, "_available_form_rows", return_value=rows):
+        forms = fps.get_available_forms("NO", "skilled_worker")
+    assert [f.form_id for f in forms] == ["NO_udi_gp7028_v2024"]
+    assert forms[0].field_count == 13
 
 
 def test_get_available_forms_filters_a_mixed_result():
