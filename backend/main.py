@@ -167,6 +167,7 @@ from .app.routers import admin_rag_eval as admin_rag_eval_router  # [P3-01e] RAG
 from .app.routers import admin_dsar as admin_dsar_router  # GDPR/DSAR desk (dual-layer registration)
 from .app.routers import admin_feature_flags as admin_feature_flags_router  # Feature-flag console (dual-layer registration)
 from .app.routers import admin_exec_overview as admin_exec_overview_router  # Executive dashboard (dual-layer registration)
+from .app.routers import admin_metrics as admin_metrics_router  # [AIQ-2326] Admin KPI SoT (dual-layer registration)
 from .app.routers import admin_test_drive as admin_test_drive_router  # [AIQ-1428] TD-10 admin dashboard (dual-layer registration)
 from .app.routers import admin_work_items as admin_work_items_router  # Mission Control P1 — demands console (dual-layer registration)
 from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer registration (PR #207 §9)
@@ -850,6 +851,7 @@ app.include_router(admin_rag_eval_router.router)  # [P3-01e] /api/admin/rag-eval
 app.include_router(admin_dsar_router.router)  # GDPR/DSAR desk — /api/admin/erasure-requests — dual-layer registration
 app.include_router(admin_feature_flags_router.router)  # Feature-flag console — /api/admin/feature-flags — dual-layer registration
 app.include_router(admin_exec_overview_router.router)  # Executive dashboard — /api/admin/exec-overview — dual-layer registration
+app.include_router(admin_metrics_router.router)  # [AIQ-2326] Admin KPI SoT — /api/admin/metrics/summary — dual-layer registration
 app.include_router(admin_test_drive_router.router)  # [AIQ-1428] TD-10 — /api/admin/test-drive/* — dual-layer registration
 app.include_router(admin_work_items_router.router)  # Mission Control P1 — /api/admin/work-items — dual-layer registration
 app.include_router(conjoint_router.router)  # [Parker-H] PR #207 §9 — dual-layer registration
@@ -2041,6 +2043,16 @@ def list_companies(
     log.info("admin_companies list query=%s include_test=%s count=%s", q, include_test, len(items))
     db.log_audit(user["id"], "READ", "company", None, None, {"query": q})
     return {"companies": items}
+
+
+@app.get("/api/admin/companies/overview")
+def get_companies_overview(user: Dict[str, Any] = Depends(require_admin)):
+    """[AIQ-2326] Companies KPI strip counts, from the shared admin metrics SoT
+    (admin_metrics_service — no duplicated SQL). Declared BEFORE
+    /companies/{company_id} so the literal path 'overview' is matched here and not
+    captured as a company_id — that mismatch was the /companies/overview 500."""
+    from .app.services.admin_metrics_service import build_companies_overview
+    return build_companies_overview()
 
 
 @app.get("/api/admin/companies/{company_id}")
