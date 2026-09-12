@@ -12,13 +12,13 @@ the raw/fetched content.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
 from typing import Any, List, Optional
 
-import httpx
-
+from backend.imports.immigration.fetcher import fetch_html
 from ...crawler.parsers import immigration_page_parser
 from .llm_client import complete_text
 from .pii_masker import mask_pii
@@ -66,11 +66,20 @@ async def fetch_url_content(url: str, *, timeout: float = _FETCH_TIMEOUT_S) -> s
     (measured on skatteetaten.no: `<main>` at ~35,000 chars vs a 24,000-char cap → zero
     facts, every time). The crawler's immigration-page parser strips chrome and keeps
     headings, lists and tables as markdown, which is where requirement semantics live.
+
+    A WAF 403 / timeout is a logged gap, not an exception: the pipeline continues and
+    `extract_requirement_facts` skips the LLM rather than aborting the request.
     """
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        resp = await client.get(url, headers={"User-Agent": "ReloPass-RequirementExtractor/1.0"})
-        resp.raise_for_status()
-        html = resp.text
+    got = await asyncio.to_thread(fetch_html, url, timeout=timeout)
+    if not got.ok:
+        log.warning(
+            "requirement_fact_extractor: fetch failed url=%s status=%s error=%s",
+            url,
+            got.status,
+            got.error,
+        )
+        return ""
+    html = got.html
     parsed = (immigration_page_parser.parse(html).get("text") or "").strip()
     # A JS-only shell parses to nothing; fall back to the raw body rather than returning
     # an empty string, so the caller sees the same "no facts" outcome either way.
@@ -147,7 +156,12 @@ async def extract_requirement_facts(
     ``content`` lets callers (and tests) pass already-fetched text to skip the network.
     PII is masked BEFORE the LLM call — mandatory, no exceptions.
     """
-    raw = content if content is not None else await fetch_url_content(url)
+    if content is not None:
+        raw = content
+    else:
+        raw = await fetch_url_content(url)
+        if not (raw or "").strip():
+            return []
     masked = mask_pii(raw or "")[:_MAX_CONTENT_CHARS]
     user_prompt = _build_user_prompt(masked, corridor, url)
     raw_json = await complete_text(system=_SYSTEM_PROMPT, user=user_prompt, json_object=True)
