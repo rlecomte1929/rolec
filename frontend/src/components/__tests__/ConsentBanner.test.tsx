@@ -64,7 +64,11 @@ describe('ConsentBanner', () => {
     Object.defineProperty(window, 'localStorage', { value: localStorageShim, configurable: true });
     store.clear();
   });
-  afterEach(() => store.clear());
+  afterEach(() => {
+    store.clear();
+    document.documentElement.removeAttribute('data-consent-banner');
+    document.documentElement.style.removeProperty('--consent-banner-offset');
+  });
 
   it('shows for a visitor with no stored decision', () => {
     expect(getAnalyticsConsent()).toBeNull();
@@ -139,6 +143,14 @@ describe('ConsentBanner', () => {
     store.set('relopass_role', 'ADMIN');
     fireEvent.click(screen.getByRole('button', { name: /go admin/i }));
     expect(screen.queryByRole('dialog', { name: /analytics consent/i })).not.toBeInTheDocument();
+  });
+
+  it('is a left card on md+ so it does not share the right FAB dock', () => {
+    renderBanner();
+    const dialog = screen.getByRole('dialog', { name: /analytics consent/i });
+    expect(dialog.className).toContain('z-[60]');
+    expect(dialog.className).toContain('md:left-4');
+    expect(dialog.className).toContain('md:max-w-md');
   });
 
   // AIQ-2272: the Feedback FAB is later in the DOM at the same z-index, so

@@ -51,6 +51,13 @@ vi.mock('../../../utils/paymentStatus', () => ({
   fetchRoadmapUnlocked: (...a: unknown[]) => fetchRoadmapUnlocked(...a),
 }));
 
+const trackPaymentCompleted = vi.fn();
+vi.mock('../../../analyticsEvents', () => ({
+  trackCaseCompleted: vi.fn(),
+  trackCaseRoadmapReviewed: vi.fn(),
+  trackPaymentCompleted: (...a: unknown[]) => trackPaymentCompleted(...a),
+}));
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={['/employee/case/case-1/roadmap']}>
@@ -79,6 +86,7 @@ describe('AIQ-1723 · ?payment=success return path', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     fetchRoadmapUnlocked.mockReset();
+    trackPaymentCompleted.mockReset();
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -120,6 +128,18 @@ describe('AIQ-1723 · ?payment=success return path', () => {
     expect(screen.queryByText('BUY_CTA_PAYWALL')).toBeNull();
   });
 
+  it('fires payment_completed on ?payment=success without email or name', async () => {
+    setQuery('?payment=success');
+    fetchRoadmapUnlocked.mockResolvedValue(true);
+    renderPage();
+    await drainPoll();
+
+    expect(trackPaymentCompleted).toHaveBeenCalledTimes(1);
+    const props = trackPaymentCompleted.mock.calls[0][0] as Record<string, unknown>;
+    expect(props).toEqual({ assignment_id: 'case-1' });
+    expect(JSON.stringify(props)).not.toMatch(/email|@|name/i);
+  });
+
   it('REGRESSION: a normal locked load still shows the buy CTA', async () => {
     setQuery(''); // no payment=success — an ordinary visit to a locked roadmap
     fetchRoadmapUnlocked.mockResolvedValue(false);
@@ -129,5 +149,6 @@ describe('AIQ-1723 · ?payment=success return path', () => {
     // The payment-pending state must NOT leak onto users who never paid.
     expect(screen.getByText('BUY_CTA_PAYWALL')).toBeTruthy();
     expect(screen.queryByText(/still confirming it/i)).toBeNull();
+    expect(trackPaymentCompleted).not.toHaveBeenCalled();
   });
 });

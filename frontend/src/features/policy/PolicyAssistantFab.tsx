@@ -19,6 +19,7 @@
  */
 import React from 'react';
 import { Button } from '../../components/antigravity/Button';
+import { useFeedbackOpen } from '../../components/chromeDock';
 export type PolicyAssistantFabProps = {
   /** Click handler — should toggle the docked shell's open state on
    *  the parent page. */
@@ -49,6 +50,8 @@ export const PolicyAssistantFab: React.FC<PolicyAssistantFabProps> = ({
   // mobile (<lg) we always keep the FAB visible because the bottom-
   // sheet covers the page; the FAB sits behind it but reappears on close.
   const hideClass = isPanelOpen && hideOnPanelOpenLg ? 'lg:hidden' : '';
+  const feedbackOpen = useFeedbackOpen();
+  if (feedbackOpen) return null;
 
   return (
     <Button unstyled

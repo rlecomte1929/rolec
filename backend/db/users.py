@@ -859,6 +859,24 @@ class UsersMixin:
             return
         email_norm = (email or "").strip().lower() or None
         with self.engine.begin() as conn:
+            # RE-10: read the OUTGOING persona before overwriting it. require_role
+            # admits on user_roles membership (AIQ-2285), and the junction was
+            # append-only, so a demoted HR user kept their HR row and with it all
+            # 89 HR-gated routes over their former company.
+            outgoing: Dict[str, str] = {}
+            if user_id:
+                row = conn.execute(
+                    text("SELECT id, role FROM users WHERE id = :id"), {"id": user_id}
+                ).fetchone()
+                if row is not None:
+                    outgoing[row._mapping["id"]] = (row._mapping["role"] or "").strip().upper()
+            if email_norm:
+                for row in conn.execute(
+                    text("SELECT id, role FROM users WHERE LOWER(TRIM(email)) = :email"),
+                    {"email": email_norm},
+                ):
+                    outgoing[row._mapping["id"]] = (row._mapping["role"] or "").strip().upper()
+
             if user_id:
                 conn.execute(
                     text("UPDATE users SET role = :role WHERE id = :id"),
@@ -869,6 +887,28 @@ class UsersMixin:
                     text("UPDATE users SET role = :role WHERE LOWER(TRIM(email)) = :email"),
                     {"role": r, "email": email_norm},
                 )
+
+            # Revoke the superseded persona row. Restricted to HR/ADMIN on purpose:
+            # EMPLOYEE is ALSO granted independently by relocation linkage
+            # (AIQ-1362 link_employee_contact_to_auth_user) and public.user_roles has
+            # no provenance column to tell an independent grant from a stale persona,
+            # so deleting an EMPLOYEE row could strip someone with a live case.
+            # Under-revoking EMPLOYEE is safe; over-revoking it is not. The general
+            # fix needs that column — see the grant-provenance card.
+            for uid, prev in outgoing.items():
+                if prev in ("HR", "ADMIN") and prev != r:
+                    try:
+                        conn.execute(
+                            text(
+                                "DELETE FROM user_roles WHERE user_id = :uid "
+                                "AND UPPER(role) = :prev"
+                            ),
+                            {"uid": uid, "prev": prev},
+                        )
+                    except (OperationalError, ProgrammingError):
+                        # Junction absent (pre-migration / SQLite): the users.role
+                        # change above still stands.
+                        pass
 
     def set_profile_role(self, person_id: str, role: str) -> bool:
         r = (role or "").strip().upper()
