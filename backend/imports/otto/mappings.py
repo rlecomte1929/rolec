@@ -57,6 +57,13 @@ NATIONALITY_CLASSES: Dict[str, List[str]] = {
 #: employment | study | family | other (confirmed against production).
 PURPOSES: Dict[str, str] = {
     "professional": "employment",
+    # Synonyms independent research passes use for a salaried relocation — all 'employment'.
+    # The person's status ("worker") is not the corridor's serving purpose vocabulary, but the
+    # mapping is unambiguous. The gate stays strict: only genuine synonyms are added, so
+    # ambiguous values ("tourist", "visitor", "any") still refuse / route to 'other'.
+    "worker": "employment",
+    "employee": "employment",
+    "salaried": "employment",
     "student": "study",
     "family": "family",
     "any": "other",
