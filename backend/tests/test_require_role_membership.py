@@ -28,12 +28,14 @@ def test_multirole_user_passes_each_held_role():
     assert require_role(UserRole.EMPLOYEE)(user=u) is u
 
 
-def test_wrong_role_employee_gate_uses_not_an_employee_code():
+def test_wrong_role_employee_gate_is_403_with_string_detail():
+    """detail stays a plain string — an object detail white-screens the ~66
+    frontend call sites that render data.detail directly."""
     u = {"role": "HR", "roles": ["HR"], "is_admin": False}
     with pytest.raises(HTTPException) as exc:
         require_role(UserRole.EMPLOYEE)(user=u)
     assert exc.value.status_code == 403
-    assert exc.value.detail["code"] == "NOT_AN_EMPLOYEE"
+    assert isinstance(exc.value.detail, str)
 
 
 def test_single_role_user_denied_unheld_role():
