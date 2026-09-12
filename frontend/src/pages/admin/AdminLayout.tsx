@@ -11,6 +11,7 @@ import { PlatformShellSidebar } from '../../components/PlatformShellSidebar';
 import { FeedbackWidget } from '../../components/FeedbackWidget';
 import { authAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
+import { formatAdminDocumentTitle } from '../../navigation/documentTitle';
 
 interface Props {
   title?: string;
@@ -37,6 +38,10 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
   useEffect(() => {
     setMobileNavOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    document.title = formatAdminDocumentTitle(title);
+  }, [title]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;

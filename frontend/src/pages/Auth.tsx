@@ -6,6 +6,7 @@ import type { UserRole } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
 import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
+import { formatAuthDocumentTitle } from '../navigation/documentTitle';
 import { getAuthItem, getActiveRole, getStoredRoles } from '../utils/demo';
 import { supabase } from '../api/supabase';
 import { clearAutofillResidueIfStale } from '../utils/clearAutofillResidue';
@@ -81,6 +82,12 @@ export const Auth: React.FC = () => {
   const [inviteDone, setInviteDone] = useState(false);
   // Friendly banner for an expired / already-used / malformed auth link.
   const [linkError, setLinkError] = useState('');
+
+  useEffect(() => {
+    document.title = formatAuthDocumentTitle(
+      inviteMode ? 'invite' : mode === 'register' ? 'register' : 'login',
+    );
+  }, [inviteMode, mode]);
 
   useEffect(() => {
     const hash = window.location.hash;
