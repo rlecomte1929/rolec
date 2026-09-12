@@ -50,3 +50,12 @@ def test_insert_and_update_write_changelog():
     prev = json.loads(rows[1].previous_value)
     assert prev["description"] == "Hold a passport."
     db.close()
+
+
+def test_catalog_write_survives_missing_changelog_table():
+    engine = create_engine("sqlite://", future=True)
+    models.RequirementItem.__table__.create(engine)
+    db = sessionmaker(bind=engine, future=True)()
+    item = crud.create_requirement_item(db, _payload())
+    assert item.id == "req-changelog-1"
+    db.close()

@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Optional
 
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from backend.app import models
@@ -67,7 +68,7 @@ def record_change(
     changed_by: Optional[str] = None,
     change_justification: Optional[str] = None,
     commit: bool = False,
-) -> models.RequirementItemChangelog:
+) -> Optional[models.RequirementItemChangelog]:
     row = models.RequirementItemChangelog(
         change_id=str(uuid.uuid4()),
         requirement_id=requirement_id,
@@ -79,10 +80,23 @@ def record_change(
         changed_at=datetime.now(timezone.utc),
         change_justification=change_justification,
     )
-    db.add(row)
-    if commit:
-        db.commit()
-        db.refresh(row)
+    # SAVEPOINT: a missing table must not abort the caller's requirement_items write.
+    # SQLite tests often create only RequirementItem; prod can lag the ORM until the
+    # out-of-band apply. Same pattern as insert_audit_log.
+    try:
+        with db.begin_nested():
+            db.add(row)
+            db.flush()
+        if commit:
+            db.commit()
+            db.refresh(row)
+    except (OperationalError, ProgrammingError) as ex:
+        log.error(
+            "requirement_item_changelog insert skipped requirement_id=%s: %s",
+            requirement_id,
+            ex,
+        )
+        return None
 
     prev_sev = (previous_value or {}).get("severity")
     new_sev = (new_value or {}).get("severity")
