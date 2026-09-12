@@ -193,7 +193,7 @@ const AdminAccountMenu: React.FC<{ name: string; initials: string }> = ({ name, 
         onClick={() => setOpen((o) => !o)}
         className="flex min-h-11 items-center gap-1.5 pl-1 pr-1.5 py-1 rounded-lg hover:bg-slate-50 transition-colors"
       >
-        <div className="w-7 h-7 rounded-full bg-[#0b2b43] flex items-center justify-center text-[11px] font-bold text-white shrink-0">
+        <div className="w-7 h-7 rounded-full bg-[#0b2b43] flex items-center justify-center text-xs font-bold text-white shrink-0">
           {initials}
         </div>
         <svg className={`w-3 h-3 text-slate-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -205,7 +205,7 @@ const AdminAccountMenu: React.FC<{ name: string; initials: string }> = ({ name, 
         <div role="menu" className="absolute right-0 top-full mt-1 z-30 w-52 rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5">
           <div className="border-b border-slate-100 px-3 py-2">
             <p className="text-sm font-medium text-slate-800 truncate">{name}</p>
-            <p className="text-[11px] text-slate-500">Admin · superuser</p>
+            <p className="text-xs text-slate-600">Admin · superuser</p>
           </div>
           <Button unstyled
             type="button"
@@ -307,7 +307,7 @@ const CompanySwitcher: React.FC = () => {
         disabled={!companies.length}
         className="flex min-h-11 w-full items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <div className={`w-6 h-6 rounded-md ${toneClass} flex items-center justify-center text-[10px] font-bold text-white shrink-0`}>
+        <div className={`w-6 h-6 rounded-md ${toneClass} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
           {initials}
         </div>
         <span className="text-sm font-medium text-slate-800 flex-1 truncate">{displayName}</span>
@@ -343,15 +343,15 @@ const CompanySwitcher: React.FC = () => {
                   onClick={() => handlePick(c)}
                   className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-slate-50 ${isSelected ? 'bg-accent-50' : ''}`}
                 >
-                  <div className={`w-5 h-5 rounded ${toneFromId(c.id)} flex items-center justify-center text-[9px] font-bold text-white shrink-0`}>
+                  <div className={`w-6 h-6 rounded ${toneFromId(c.id)} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
                     {logoInitials(c.name)}
                   </div>
                   <span className="flex-1 truncate font-medium text-slate-800">{c.name}</span>
                   {c.country && (
-                    <span className="text-[10px] text-slate-500">{c.country}</span>
+                    <span className="text-xs text-slate-600">{c.country}</span>
                   )}
                   {isSelected && (
-                    <span className="text-accent-600 text-[11px]" aria-label="selected">✓</span>
+                    <span className="text-accent-600 text-xs" aria-label="selected">✓</span>
                   )}
                 </Button>
               );

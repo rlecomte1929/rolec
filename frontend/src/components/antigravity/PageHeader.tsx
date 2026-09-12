@@ -36,7 +36,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
 }) => (
   <div className={`mb-6 ${className}`}>
     {eyebrow && (
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">{eyebrow}</p>
+      <p className="text-xs font-semibold uppercase tracking-widest text-slate-600 mb-1">{eyebrow}</p>
     )}
     {breadcrumbs && breadcrumbs.length > 0 && (
       <nav aria-label="Breadcrumb" className="mb-1">

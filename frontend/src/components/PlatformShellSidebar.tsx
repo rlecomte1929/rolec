@@ -305,28 +305,28 @@ const INBOX_ITEM = SECTIONS.flatMap((s) => s.items).find((i) => i.id === 'inbox'
 const Badge: React.FC<{ count?: number; variant?: BadgeVariant }> = ({ count, variant = 'count' }) => {
   if (variant === 'new') {
     return (
-      <span className="ml-auto px-1.5 py-0.5 rounded text-[11px] font-bold bg-accent-50 text-accent-500 border border-accent-100">
+      <span className="ml-auto px-1.5 py-0.5 rounded text-xs font-bold bg-accent-50 text-accent-700 border border-accent-100">
         NEW
       </span>
     );
   }
   if (variant === 'live') {
     return (
-      <span className="ml-auto px-1.5 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
+      <span className="ml-auto px-1.5 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
         LIVE
       </span>
     );
   }
   if (!count || count <= 0) return null;
   return (
-    <span className="ml-auto min-w-[1.25rem] px-1 text-center rounded-full bg-slate-200 text-slate-700 text-[11px] font-semibold leading-5">
+    <span className="ml-auto min-w-[1.25rem] px-1 text-center rounded-full bg-slate-200 text-slate-700 text-xs font-semibold leading-5">
       {count > 99 ? '99+' : count}
     </span>
   );
 };
 
 const InboxCount: React.FC<{ count: number }> = ({ count }) => (
-  <span className="ml-auto min-w-[1.25rem] px-1 text-center rounded-full bg-accent-50 text-accent-700 text-[11px] font-semibold leading-5">
+  <span className="ml-auto min-w-[1.25rem] px-1 text-center rounded-full bg-accent-50 text-accent-700 text-xs font-semibold leading-5">
     {count > 99 ? '99+' : count}
   </span>
 );
@@ -352,8 +352,8 @@ const SectionHeading: React.FC<{
       ) : (
         <ChevronDown size={12} className="shrink-0 text-slate-500 group-hover:text-slate-700" aria-hidden="true" />
       )}
-      <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-500 group-hover:text-slate-700">{label}</span>
-      {count !== undefined && <span className="text-[11px] text-slate-500 font-medium">{count}</span>}
+      <span className="text-xs font-semibold tracking-widest uppercase text-slate-600 group-hover:text-slate-700">{label}</span>
+      {count !== undefined && <span className="text-xs text-slate-600 font-medium">{count}</span>}
     </button>
   );
 };
@@ -378,7 +378,7 @@ const GroupHeading: React.FC<{
     ) : (
       <ChevronDown size={11} className="shrink-0 text-slate-500 group-hover:text-slate-700" aria-hidden="true" />
     )}
-    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 group-hover:text-slate-700">
+    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600 group-hover:text-slate-700">
       {label}
     </span>
   </button>
@@ -1171,7 +1171,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
           >
             <div className="px-2 py-1.5">
               <p className="text-xs font-medium text-slate-900 truncate">{user?.name ?? 'ReloPass'}</p>
-              <p className="text-[11px] text-slate-500 truncate">{user?.role ?? role.toLowerCase()}</p>
+              <p className="text-xs text-slate-600 truncate">{user?.role ?? role.toLowerCase()}</p>
             </div>
             <div className="my-1 border-t border-slate-100" />
             <Button unstyled
@@ -1194,7 +1194,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({
             <>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-slate-900 truncate">{user?.name ?? 'ReloPass'}</p>
-                <p className="text-[11px] text-slate-500 truncate">{user?.role ?? role.toLowerCase()}</p>
+                <p className="text-xs text-slate-600 truncate">{user?.role ?? role.toLowerCase()}</p>
               </div>
               <Button unstyled
                 type="button"
