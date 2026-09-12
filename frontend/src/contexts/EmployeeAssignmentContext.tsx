@@ -35,6 +35,8 @@ interface EmployeeAssignmentContextValue {
   overviewError: string | null;
   /** Why overview failed — drives the recovery action on the dashboard. */
   overviewErrorKind?: OverviewLoadKind | null;
+  /** Backend returned 200 but flagged the payload incomplete (`overview_degraded`). */
+  overviewDegraded: boolean;
   refetch: () => Promise<void>;
 }
 
@@ -49,6 +51,7 @@ const defaultValue: EmployeeAssignmentContextValue = {
   pendingSummaries: [],
   overviewError: null,
   overviewErrorKind: null,
+  overviewDegraded: false,
   refetch: async () => {},
 };
 
@@ -145,6 +148,9 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
   const overviewFailure = query.isError ? classifyOverviewLoadError(query.error) : null;
   const overviewError = overviewFailure?.message ?? null;
   const overviewErrorKind = overviewFailure?.kind ?? null;
+  // 200 with an empty payload the backend already knows is wrong. Distinct from a
+  // genuine empty overview, and the counts below cannot tell them apart.
+  const overviewDegraded = Boolean(overview?.overview_degraded);
 
   return (
     <EmployeeAssignmentContext.Provider
@@ -159,6 +165,7 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
         pendingSummaries: authed ? pending : EMPTY_PENDING,
         overviewError: authed ? overviewError : null,
         overviewErrorKind: authed ? overviewErrorKind : null,
+        overviewDegraded: authed ? overviewDegraded : false,
         refetch,
       }}
     >

@@ -219,7 +219,7 @@ export const employeeAPI = {
     });
   },
   /** Compact linked + pending summaries (no case draft hydration). */
-  getAssignmentsOverview: async (): Promise<{ linked: unknown[]; pending: unknown[] }> => {
+  getAssignmentsOverview: async (): Promise<{ linked: unknown[]; pending: unknown[]; overview_degraded?: boolean }> => {
     return cachedRequest('employee:assignments-overview', 60_000, async () => {
       const response = await api.get('/api/employee/assignments/overview');
       return parseResponse(assignmentsOverviewSchema, response.data, 'getAssignmentsOverview');

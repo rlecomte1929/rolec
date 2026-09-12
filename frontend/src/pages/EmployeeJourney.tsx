@@ -7,6 +7,7 @@ import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeNoCaseOnboarding';
+import { resolveOverviewState, OVERVIEW_DEGRADED_MESSAGE } from '../features/employee-journey/overviewResolution';
 import {
   assignmentStatusPillCopy,
   EMPLOYEE_CASE_CODE_EXAMPLE,
@@ -171,6 +172,7 @@ export const EmployeeJourney: React.FC = () => {
     pendingSummaries,
     overviewError,
     overviewErrorKind,
+    overviewDegraded,
   } = useEmployeeAssignment();
   const [error, setError] = useState('');
   const [claimId, setClaimId] = useState('');
@@ -226,8 +228,10 @@ export const EmployeeJourney: React.FC = () => {
 
   const hasLinked = linkedCount > 0;
   const hasPendingOnly = !hasLinked && pendingCount > 0;
-  /** No linked and no auto-detected pending → full assignment-ID / manual claim experience. */
-  const showPrimaryManualClaimPage = !hasLinked && !hasPendingOnly;
+  /** Zero counts mean "no case" only once the overview resolved — a failed or degraded
+   *  load also reports 0, and claiming "no case" there is false, not empty. */
+  const { unresolved: overviewUnresolved, showManualClaim: showPrimaryManualClaimPage, showAssignmentSections } =
+    resolveOverviewState({ overviewError, overviewDegraded, linkedCount, pendingCount });
   const showPendingSection = pendingCount > 0;
   /** Secondary manual path: HR case-code recovery for users who have a pending
    *  invite but no linked case yet. M-02 (AIQ-1263): no longer shown to already-
@@ -381,7 +385,9 @@ export const EmployeeJourney: React.FC = () => {
     const t0 = entryStartedAt.current;
     const scenario = overviewError
       ? 'overview_error'
-      : hasLinked
+      : overviewDegraded
+        ? 'overview_degraded'
+        : hasLinked
         ? 'linked'
         : hasPendingOnly
           ? 'pending_only'
@@ -411,6 +417,7 @@ export const EmployeeJourney: React.FC = () => {
     linkedCount,
     pendingCount,
     overviewError,
+    overviewDegraded,
     showPrimaryManualClaimPage,
     showPendingSection,
   ]);
@@ -639,9 +646,9 @@ export const EmployeeJourney: React.FC = () => {
         <EmployeeAssignmentBootstrapCard title="Checking assignments…" detail="One moment." />
       ) : null}
 
-      {!assignmentLoading && overviewError ? (
+      {!assignmentLoading && overviewUnresolved ? (
         <Alert variant="error" className="mb-6" title="Could not load assignments">
-          {overviewError}{' '}
+          {overviewError ?? OVERVIEW_DEGRADED_MESSAGE}{' '}
           {overviewErrorKind === 'unauthorized' ? (
             <Link
               to="/auth?mode=login&reason=session_expired"
@@ -696,7 +703,7 @@ export const EmployeeJourney: React.FC = () => {
         </div>
       ) : null}
 
-      {!assignmentLoading && !showPrimaryManualClaimPage ? (
+      {!assignmentLoading && showAssignmentSections ? (
         <Card padding="lg" className="mb-6">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <div className="text-lg font-semibold text-[#0b2b43]">Assignment status</div>
@@ -712,7 +719,7 @@ export const EmployeeJourney: React.FC = () => {
         </Card>
       ) : null}
 
-      {!assignmentLoading && !showPrimaryManualClaimPage ? (
+      {!assignmentLoading && showAssignmentSections ? (
         <Card
           id="employee-hub-linked-assignments"
           padding="lg"
