@@ -6503,19 +6503,17 @@ def _resolve_employee_case_id(user_id: str, case_id_override: Optional[str] = No
     Resolve the relocation case_id for the authenticated employee.
 
     Priority:
-      1. Explicit `case_id` query parameter (the active/viewed case — callers should
-         always pass this so tasks are scoped to the case on screen).
+      1. Explicit `case_id` query parameter — only if it belongs to a linked
+         assignment for this user (AIQ-2358: never honor a UUID the caller
+         does not own).
       2. Fallback: the most-recently-UPDATED linked assignment. This matches the
          dashboard's active-case selection (#857), so a no-context request and the
          dashboard agree on "the active case" instead of pinning to list[0].
     """
-    if case_id_override and case_id_override.strip():
-        return case_id_override.strip()
+    from .app.services.employee_case_scope import resolve_employee_case_id
+
     linked = db.list_linked_assignments_for_employee(user_id)
-    if not linked:
-        return None
-    primary = max(linked, key=lambda a: (a.get("updated_at") or a.get("created_at") or ""))
-    return _effective_relocation_case_id(primary) or None
+    return resolve_employee_case_id(linked, case_id_override)
 
 
 @app.get("/api/employee/tasks")

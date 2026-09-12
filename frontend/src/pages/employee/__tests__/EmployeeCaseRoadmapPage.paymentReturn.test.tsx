@@ -50,6 +50,21 @@ const fetchRoadmapUnlocked = vi.fn();
 vi.mock('../../../utils/paymentStatus', () => ({
   fetchRoadmapUnlocked: (...a: unknown[]) => fetchRoadmapUnlocked(...a),
 }));
+vi.mock('../../../contexts/EmployeeAssignmentContext', () => ({
+  useEmployeeAssignment: () => ({
+    assignmentId: 'a1',
+    primaryCaseId: 'case-1',
+    primaryAssignmentCompany: null,
+    isLoading: false,
+    linkedCount: 1,
+    pendingCount: 0,
+    linkedSummaries: [{ assignment_id: 'a1', case_id: 'case-1' }],
+    pendingSummaries: [],
+    overviewError: null,
+    overviewDegraded: false,
+    refetch: async () => {},
+  }),
+}));
 
 const trackPaymentCompleted = vi.fn();
 vi.mock('../../../analyticsEvents', () => ({

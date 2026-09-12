@@ -14,7 +14,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
+import { NoCaseLinkedEmptyState } from '../../components/employee/NoCaseLinkedEmptyState';
 import { Alert, Button, Card } from '../../components/antigravity';
+import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import { ownedEmployeeCaseId } from '../../utils/employeeAssignmentScope';
+import { resolveOverviewState } from '../../features/employee-journey/overviewResolution';
 import { ImmigrationConsentScreen } from '../../features/immigration/ImmigrationConsentScreen';
 import { PassportOCRFlow } from '../../features/immigration/PassportOCRFlow';
 import { ImmigrationInterviewShell } from '../../features/immigration/ImmigrationInterviewShell';
@@ -33,7 +37,25 @@ interface InterviewStatus {
 }
 
 export const ImmigrationPage: React.FC = () => {
-  const { caseId } = useParams<{ caseId: string }>();
+  const { caseId: urlCaseId } = useParams<{ caseId: string }>();
+  const {
+    linkedCount,
+    linkedSummaries,
+    isLoading: assignmentLoading,
+    overviewError,
+    overviewDegraded,
+    pendingCount,
+  } = useEmployeeAssignment();
+  const { unresolved: overviewUnresolved } = resolveOverviewState({
+    overviewError,
+    overviewDegraded,
+    linkedCount,
+    pendingCount,
+  });
+  const noCaseLinked = !assignmentLoading && !overviewUnresolved && linkedCount === 0;
+  const caseId = noCaseLinked
+    ? undefined
+    : ownedEmployeeCaseId(linkedSummaries, [urlCaseId]) ?? undefined;
   const navigate = useNavigate();
   const employeeId = getAuthItem('relopass_user_id') || '';
 
@@ -42,6 +64,7 @@ export const ImmigrationPage: React.FC = () => {
   const [interviewPct, setInterviewPct] = useState(0);
 
   const load = useCallback(async () => {
+    if (assignmentLoading || noCaseLinked) return;
     if (!caseId) { setLoadError('No case ID in URL.'); setStage('error'); return; }
     setStage('loading');
     setLoadError(null);
@@ -75,7 +98,7 @@ export const ImmigrationPage: React.FC = () => {
         setStage('error');
       }
     }
-  }, [caseId]);
+  }, [assignmentLoading, caseId, noCaseLinked]);
 
   useEffect(() => {
     void load();
@@ -90,6 +113,10 @@ export const ImmigrationPage: React.FC = () => {
       title="Immigration intake"
       subtitle="Complete your immigration profile — required to start your visa application."
     >
+      {noCaseLinked ? (
+        <NoCaseLinkedEmptyState explanation="Select a case to access immigration intake for this relocation." />
+      ) : (
+      <>
       {/* Progress indicator strip */}
       {stage !== 'loading' && stage !== 'error' && (
         <div className="flex items-center gap-2 mb-6 text-xs text-[#6b7280]">
@@ -210,6 +237,8 @@ export const ImmigrationPage: React.FC = () => {
             </div>
           </Card>
         </div>
+      )}
+      </>
       )}
     </AppShell>
   );

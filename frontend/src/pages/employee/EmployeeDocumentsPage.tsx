@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
+import { NoCaseLinkedEmptyState } from '../../components/employee/NoCaseLinkedEmptyState';
 import { DocumentsScreen } from '../../features/platform-v2/documents/DocumentsScreen';
 import { useDocuments } from '../../features/platform-v2/documents/useDocuments';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
@@ -36,9 +37,7 @@ export function EmployeeDocumentsPage() {
   if (!caseId && !isLoading) {
     return (
       <AppShell wide>
-        <p style={centeredMessage('#475569')}>
-          No active relocation case found. Please contact your HR team to get started.
-        </p>
+        <NoCaseLinkedEmptyState explanation="Select a case to access documents for this relocation." />
       </AppShell>
     );
   }

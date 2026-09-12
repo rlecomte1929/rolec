@@ -5,10 +5,10 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Button } from '../../components/antigravity/Button';
-import { Badge } from '../../components/antigravity/Badge';
 import type { LucideIcon } from 'lucide-react';
 import { AlertTriangle, BookOpen, Clock, ListChecks } from 'lucide-react';
+import { Button } from '../../components/antigravity/Button';
+import { Badge } from '../../components/antigravity/Badge';
 import { AppShell } from '../../components/AppShell';
 import { buildRoute } from '../../navigation/routes';
 import { servicesAPI, apiGet } from '../../api/client';
@@ -19,6 +19,9 @@ import { PrivacyNotice } from '../../features/privacy/PrivacyNotice';
 import { PRIVACY_NOTICE_VERSION } from '../../features/privacy/privacyNoticeContent';
 import { useSelectedCase } from '../../contexts/SelectedCaseContext';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import { resolveOverviewState } from '../../features/employee-journey/overviewResolution';
+import { ownedEmployeeCaseId } from '../../utils/employeeAssignmentScope';
+import { NoCaseLinkedEmptyState } from '../../components/employee/NoCaseLinkedEmptyState';
 import { assertSafeUrl } from '../../utils/assertSafeUrl';
 import {
   formatAbsoluteDate,
@@ -350,18 +353,28 @@ export const RoadmapStepCard: React.FC<{ step: RoadmapV2Step; caseId?: string | 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export const EmployeeTaskPage: React.FC = () => {
-  // A2: scope tasks to the viewed case so this page never shows another case's
-  // tasks. When no case is selected, getTasks() falls back server-side to the
-  // most-recently-updated case (matching the dashboard's active-case selection).
+  // A2: scope tasks to a case this employee owns. Never send a stale
+  // localStorage UUID (HR last-viewed case) to the tasks or roadmap APIs.
   const { selectedCaseId } = useSelectedCase();
-  const { primaryCaseId } = useEmployeeAssignment();
-  // AIQ-1248b: the roadmap is fetched for the same case the page is scoped to;
-  // fall back to the employee's primary case when nothing is selected. The
-  // case-scoped roadmap route accepts the assignment id (matching how the roadmap
-  // page is linked elsewhere), so selectedCaseId works directly.
-  const roadmapCaseId = selectedCaseId ?? primaryCaseId;
+  const {
+    primaryCaseId,
+    linkedCount,
+    linkedSummaries,
+    isLoading: assignmentLoading,
+    overviewError,
+    overviewDegraded,
+    pendingCount,
+  } = useEmployeeAssignment();
+  const { unresolved: overviewUnresolved } = resolveOverviewState({
+    overviewError,
+    overviewDegraded,
+    linkedCount,
+    pendingCount,
+  });
+  const noCaseLinked = !assignmentLoading && !overviewUnresolved && linkedCount === 0;
+  const roadmapCaseId = ownedEmployeeCaseId(linkedSummaries, [selectedCaseId, primaryCaseId]);
   const queryClient = useQueryClient();
-  const tasksQueryKey = ['employee', 'tasks', selectedCaseId ?? null];
+  const tasksQueryKey = ['employee', 'tasks', roadmapCaseId ?? null];
   // PRIV-005: one-time persistent privacy-notice gate. Submission stays blocked
   // until the current notice version is acknowledged; a version bump re-prompts.
   // Kept as local state so the PrivacyNotice can still toggle it; seeded from
@@ -373,9 +386,10 @@ export const EmployeeTaskPage: React.FC = () => {
   const tasksQuery = useQuery({
     queryKey: tasksQueryKey,
     queryFn: async () => {
-      const res = await servicesAPI.getTasks(selectedCaseId ?? undefined);
+      const res = await servicesAPI.getTasks(roadmapCaseId ?? undefined);
       return res.tasks;
     },
+    enabled: !noCaseLinked,
   });
   const tasks: EmployeeTask[] = tasksQuery.data ?? [];
 
@@ -388,7 +402,7 @@ export const EmployeeTaskPage: React.FC = () => {
       const res = await getCaseRoadmapV2(roadmapCaseId as string);
       return res.tracks.flatMap((t) => t.steps);
     },
-    enabled: Boolean(roadmapCaseId),
+    enabled: Boolean(roadmapCaseId) && !noCaseLinked,
   });
   const roadmapSteps: RoadmapV2Step[] = (roadmapQuery.data ?? []).filter(
     (s) => s.owner === 'employee' && s.status !== 'skipped',
@@ -492,7 +506,9 @@ export const EmployeeTaskPage: React.FC = () => {
           </div>
         )}
 
-        {loading ? (
+        {noCaseLinked ? (
+          <NoCaseLinkedEmptyState explanation="Select a case to access tasks for this relocation." />
+        ) : loading ? (
           <div className="text-center py-16 text-sm text-slate-500">Loading your tasks…</div>
         ) : bothEmpty && !error ? (
           <div className="text-center py-16">

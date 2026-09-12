@@ -4,6 +4,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { logger } from '../lib/logger';
 import { EmployeeScopedAssignmentPicker } from '../components/employee/EmployeeScopedAssignmentPicker';
+import { NoCaseLinkedEmptyState } from '../components/employee/NoCaseLinkedEmptyState';
 import { Alert, Button, Card } from '../components/antigravity';
 import { RefreshButton } from '../components/RefreshButton';
 import { API_BASE_URL, employeeAPI } from '../api/client';
@@ -421,18 +422,15 @@ export const ProvidersPage: React.FC = () => {
   if (!assignmentId) {
     return (
       <AppShell section="Employee" title="Services" subtitle="Select what you need for this move.">
-        <Alert variant="info" className="mb-6">
-          <p className="mb-3">No case linked. Select a case to access services for this relocation.</p>
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={() => navigate(buildRoute('employeeJourney'))}>
-              Start relocation setup
-            </Button>
-            <RefreshButton onClick={() => refetch()} label="Refresh assignment" />
-            <Button variant="outline" onClick={() => navigate(buildRoute('employeeDashboard'))}>
-              Back to Dashboard
-            </Button>
-          </div>
-        </Alert>
+        <NoCaseLinkedEmptyState explanation="Select a case to access services for this relocation.">
+          <Button onClick={() => navigate(buildRoute('employeeJourney'))}>
+            Start relocation setup
+          </Button>
+          <RefreshButton onClick={() => refetch()} label="Refresh assignment" />
+          <Button variant="outline" onClick={() => navigate(buildRoute('employeeDashboard'))}>
+            Back to Dashboard
+          </Button>
+        </NoCaseLinkedEmptyState>
       </AppShell>
     );
   }

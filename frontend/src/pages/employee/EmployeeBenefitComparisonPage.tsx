@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AppShell } from '../../components/AppShell';
+import { NoCaseLinkedEmptyState } from '../../components/employee/NoCaseLinkedEmptyState';
 import { Button, Card, Container } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
@@ -104,13 +105,7 @@ export const EmployeeBenefitComparisonPage: React.FC = () => {
     );
   } else if (!assignmentLoading && !assignmentId && linkedCount === 0) {
     body = (
-      <Card padding="lg" className="border-[#e2e8f0]">
-        <p className="mb-1 text-sm font-medium text-[#0b2b43]">No company linked yet</p>
-        <p className="text-sm text-[#64748b]">
-          Your benefit comparison appears here automatically once HR links your account to an
-          assignment. No action is needed on your part.
-        </p>
-      </Card>
+      <NoCaseLinkedEmptyState explanation="Your benefit comparison appears here once a case is linked to this account." />
     );
   } else if (assignmentLoading || loading) {
     body = (

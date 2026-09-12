@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   caseIdForAssignment,
+  ownedEmployeeCaseId,
   persistableCaseId,
   assignmentIdForScopeId,
   resolveScopedAssignmentId,
@@ -33,6 +34,20 @@ describe('caseIdForAssignment', () => {
 
   it('returns null for a null id', () => {
     expect(caseIdForAssignment(rows, null)).toBeNull();
+  });
+});
+
+describe('ownedEmployeeCaseId (AIQ-2358 / AIQ-2359)', () => {
+  it('ignores a stale candidate when the employee has no linked case', () => {
+    expect(ownedEmployeeCaseId([], ['053c93bb-6ba4-4a7e-a26d-bc05dcfe3abe'])).toBeNull();
+  });
+
+  it('prefers the first owned candidate over later ones', () => {
+    expect(ownedEmployeeCaseId(rows, ['unknown', 'assign-2', 'case-1'])).toBe('case-2');
+  });
+
+  it('falls back to the primary linked case when candidates are empty', () => {
+    expect(ownedEmployeeCaseId(rows, [null, undefined])).toBe('case-1');
   });
 });
 
