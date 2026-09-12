@@ -12,6 +12,7 @@
  */
 
 import { track, getAnalyticsConsent } from './analytics';
+import { trackEvent } from './lib/analytics';
 import { env } from './config/env';
 
 // ─── Server mirror ───────────────────────────────────────────────────────────
@@ -176,6 +177,42 @@ export function trackReliefMomentCaptured(props: {
  * v0 owner: the employee who ticks the last roadmap task.
  * Post-move compliance outcome is still an ops log, not this event.
  */
+/** Paywall seen. No PII — assignment id only. */
+export function trackPaywallImpression(props: { assignment_id: string }): void {
+  track('paywall_impression', props);
+  trackEvent('paywall_impression', props, {
+    entity_type: 'assignment',
+    entity_id: props.assignment_id,
+  });
+}
+
+/** Unlock / checkout click. No PII. */
+export function trackPaymentInitiated(props: { assignment_id: string }): void {
+  track('payment_initiated', props);
+  trackEvent('payment_initiated', props, {
+    entity_type: 'assignment',
+    entity_id: props.assignment_id,
+  });
+}
+
+/** Stripe return `?payment=success`. No PII. Does not claim the webhook landed. */
+export function trackPaymentCompleted(props: { assignment_id: string }): void {
+  track('payment_completed', props);
+  trackEvent('payment_completed', props, {
+    entity_type: 'assignment',
+    entity_id: props.assignment_id,
+  });
+}
+
+/** Empty-catalog demand. Corridor code only — no email or name. */
+export function trackCorridorWaitlistIntent(props: { corridor: string }): void {
+  track('corridor_waitlist_intent', props);
+  trackEvent('corridor_waitlist_intent', props, {
+    entity_type: 'corridor',
+    entity_id: props.corridor,
+  });
+}
+
 export function trackCaseCompleted(props: {
   corridor_id: string;
   case_id: string;
