@@ -94,6 +94,10 @@ describe('HrWelcomePage — test-drive HR', () => {
     expect(screen.getByText(/build your relocation policy/i)).toBeInTheDocument();
     expect(screen.getByText(/curate your provider list/i)).toBeInTheDocument();
     expect(screen.getByText(/optional — the full hr setup/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /get started/i })[2]).toHaveAttribute(
+      'href',
+      '/hr/service-providers?tab=vendor',
+    );
   });
 
   it('nests setup cards as h3 under the optional-setup h2', () => {
@@ -122,6 +126,10 @@ describe('HrWelcomePage — real HR', () => {
     expect(screen.getByRole('heading', { name: /set up your company workspace/i })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /open your first relocation case/i })).toBeNull();
     expect(screen.queryByTestId('hr-welcome-create-case')).toBeNull();
+    expect(screen.getAllByRole('link', { name: /get started/i })[2]).toHaveAttribute(
+      'href',
+      '/hr/service-providers?tab=vendor',
+    );
   });
 
   it('puts an h2 above the setup cards so h3 titles do not skip a level', () => {

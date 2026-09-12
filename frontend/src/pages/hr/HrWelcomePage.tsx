@@ -86,7 +86,7 @@ export function HrWelcomePage() {
             step={3}
             title="Curate your provider list"
             description="Choose which moving companies, housing services, and immigration specialists appear in your cases."
-            href="/hr/provider-grid"
+            href="/hr/service-providers?tab=vendor"
           />
         </div>
 
@@ -129,8 +129,8 @@ export function HrWelcomePage() {
           step={3}
           title="Curate your provider list"
           description="Choose which moving companies, housing services, and immigration specialists appear in your cases."
-          href="/hr/provider-grid"
-        />
+            href="/hr/service-providers?tab=vendor"
+          />
       </div>
 
       <div className="my-10 border-t border-slate-100" />

@@ -448,6 +448,8 @@ export interface AssignmentContextDTO {
   commutePreference?: string;
   /** posted | local | unknown — drives A1 / Certificate of Coverage applicability. */
   socialSecurityRegime?: string;
+  /** employed | self_employed | digital_nomad — intake work-mode (BUG-260828-87B8). */
+  workMode?: string;
 }
 
 export interface CaseDraftDTO {
