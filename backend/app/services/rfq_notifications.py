@@ -86,12 +86,18 @@ def _fill(text: str, variables: Dict[str, Any], fallbacks: Optional[Dict[str, An
     return _TOKEN_RE.sub(repl, text or "")
 
 
-def _copy_for(type_: str, variables: Dict[str, Any]) -> Tuple[str, str]:
-    tpl = _template(_PACK_TEMPLATE_IDS[type_])
-    fallbacks = tpl.get("fallbacks") or {}
-    title = _fill(str(tpl.get("subject") or type_), variables, fallbacks)
-    body = _fill(str(tpl.get("preheader") or tpl.get("body_text") or ""), variables, fallbacks)
-    return title, body
+def _copy_for(type_: str, variables: Dict[str, Any]) -> Tuple[str, str, str]:
+    """Title/body/html from the email pack so in-app and outbox stay identical."""
+    try:
+        from .rfq_email_templates import render
+        rendered = render(_PACK_TEMPLATE_IDS[type_], variables)
+        return rendered["subject"], rendered["text"], rendered["html"]
+    except Exception:
+        tpl = _template(_PACK_TEMPLATE_IDS[type_])
+        fallbacks = tpl.get("fallbacks") or {}
+        title = _fill(str(tpl.get("subject") or type_), variables, fallbacks)
+        body = _fill(str(tpl.get("preheader") or tpl.get("body_text") or ""), variables, fallbacks)
+        return title, body, ""
 
 
 def _first_name(user: Optional[Dict[str, Any]]) -> str:
@@ -265,7 +271,7 @@ def notify_rfq_sent(
             "employee_rfq_url": "",
             "support_email": "support@relopass.com",
         }
-        title, body = _copy_for(TYPE_RFQ_SENT, variables)
+        title, body, html_body = _copy_for(TYPE_RFQ_SENT, variables)
         _notify(
             user_id=employee_id,
             type_=TYPE_RFQ_SENT,
@@ -277,6 +283,7 @@ def notify_rfq_sent(
                 "rfq_id": rfq_id,
                 "contacted": contacted_names,
                 "not_contacted": not_contacted or [],
+                "html_body": html_body,
             },
         )
     except Exception:
@@ -312,11 +319,12 @@ def notify_quote_received(rfq_id: str, quote: Optional[Dict[str, Any]] = None) -
             "employee_quotes_url": "",
             "support_email": "support@relopass.com",
         }
-        title, body = _copy_for(TYPE_QUOTE_RECEIVED, variables)
+        title, body, html_body = _copy_for(TYPE_QUOTE_RECEIVED, variables)
         meta = {
             "rfq_id": rfq_id,
             "quote_id": quote.get("id"),
             "vendor_id": quote.get("vendor_id"),
+            "html_body": html_body,
         }
         case_id = str(rfq.get("case_id") or "") or None
         assignment_id = str((assignment or {}).get("id") or "") or None
@@ -377,7 +385,7 @@ def notify_quotes_ready(rfq_id: str) -> None:
             "hr_rfq_url": "",
             "support_email": "support@relopass.com",
         }
-        title, body = _copy_for(TYPE_QUOTES_READY, variables)
+        title, body, html_body = _copy_for(TYPE_QUOTES_READY, variables)
         _notify(
             user_id=hr_id,
             type_=TYPE_QUOTES_READY,
@@ -385,7 +393,7 @@ def notify_quotes_ready(rfq_id: str) -> None:
             body=body,
             case_id=str(rfq.get("case_id") or "") or None,
             assignment_id=str((assignment or {}).get("id") or "") or None,
-            metadata={"rfq_id": rfq_id},
+            metadata={"rfq_id": rfq_id, "html_body": html_body},
         )
     except Exception:
         log.warning("rfq_notifications: notify_quotes_ready failed rfq=%s", rfq_id, exc_info=True)
@@ -417,7 +425,7 @@ def notify_quote_validated(rfq_id: str, quote_id: Optional[str] = None) -> None:
             "employee_quotes_url": "",
             "support_email": "support@relopass.com",
         }
-        title, body = _copy_for(TYPE_QUOTE_VALIDATED, variables)
+        title, body, html_body = _copy_for(TYPE_QUOTE_VALIDATED, variables)
         _notify(
             user_id=employee_id,
             type_=TYPE_QUOTE_VALIDATED,
@@ -425,7 +433,7 @@ def notify_quote_validated(rfq_id: str, quote_id: Optional[str] = None) -> None:
             body=body,
             case_id=str(rfq.get("case_id") or "") or None,
             assignment_id=str((assignment or {}).get("id") or "") or None,
-            metadata={"rfq_id": rfq_id, "quote_id": quote_id},
+            metadata={"rfq_id": rfq_id, "quote_id": quote_id, "html_body": html_body},
         )
     except Exception:
         log.warning("rfq_notifications: notify_quote_validated failed rfq=%s", rfq_id, exc_info=True)

@@ -52,9 +52,10 @@ class EmailInjectionTests(unittest.TestCase):
         self.assertIn("&lt;img", html)
         self.assertIn("phish.example", html)  # shown to the vendor, but not clickable
 
-        # The ONLY live link in the mail must be ours.
-        self.assertEqual(html.count("<a href="), 1)
+        # The live quote CTA is ours; a mailto to support is also allowed.
+        self.assertGreaterEqual(html.count("<a href="), 1)
         self.assertIn(f'href="{LINK}"', html)
+        self.assertNotIn('<a href="https://phish.example"', html)
 
     def test_the_brief_and_the_deadline_actually_reach_the_vendor(self):
         html = rfq_email_html(
@@ -77,14 +78,35 @@ class EmailInjectionTests(unittest.TestCase):
         self.assertNotIn("\n", subject)  # no header injection
 
     def test_the_subject_degrades_honestly_when_the_route_is_unknown(self):
-        subject = rfq_email_subject([{"label": "Move from", "value": "Not specified"}])
-        self.assertEqual(subject, "A relocation company would like a quote from you")
+        subject = rfq_email_subject(
+            [{"label": "Move from", "value": "Not specified"}],
+            rfq_ref="RFQ-9",
+        )
+        self.assertEqual(subject, "Quote request from a relocating company: RFQ-9")
 
     def test_an_email_with_no_brief_still_renders(self):
         # Legacy / non-movers RFQs have no structured brief. The mail must not break.
         html = rfq_email_html("Allied", LINK)
         self.assertIn("<a href=", html)
         self.assertNotIn("None", html)
+
+    def test_all_pack_templates_escape_supplier_name_and_notes(self):
+        from backend.app.services.rfq_email_templates import load_pack, render
+
+        for tpl in load_pack()["templates"]:
+            out = render(
+                tpl["id"],
+                {
+                    "supplier_name": '<a href=x>y</a>',
+                    "brief_rows": [{"label": "Notes", "value": "<script>alert(1)</script>"}],
+                    "rfq_ref": "RFQ-1",
+                    "magic_link": LINK,
+                    "support_email": "support@relopass.com",
+                },
+            )
+            blob = out["text"] + out["html"]
+            self.assertNotIn("<script>", blob, tpl["id"])
+            self.assertNotIn("<a href=x>", out["html"], tpl["id"])
 
 
 class PersonalDomainGuardTests(unittest.TestCase):

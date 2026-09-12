@@ -123,6 +123,20 @@ class LinkGuardTests(unittest.TestCase):
             self._call(_recipient(quote_submitted_at=datetime.now(tz=timezone.utc)))
         self.assertEqual(ctx.exception.status_code, 409)
 
+    def test_GET_allows_already_quoted_read_only(self):
+        token = generate_supplier_token(
+            recipient_id="rec-1", rfq_id="rfq-1", vendor_id="v-1", email="ops@mover.com"
+        )
+        db = self.mock.MagicMock()
+        conn = db.engine.connect.return_value.__enter__.return_value
+        conn.execute.return_value.mappings.return_value.first.return_value = _recipient(
+            quote_submitted_at=datetime.now(tz=timezone.utc)
+        )
+        with self.mock.patch.object(self.mod, "db", db):
+            got = self.mod.require_supplier_link_read(authorization=f"Bearer {token}")
+        self.assertEqual(got["id"], "rec-1")
+        self.assertTrue(got.get("quote_submitted_at"))
+
     def test_an_EXPIRED_link_is_refused(self):
         with self.assertRaises(HTTPException) as ctx:
             self._call(_recipient(expires_at=datetime.now(tz=timezone.utc) - timedelta(days=1)))
