@@ -11,6 +11,7 @@
 import React from 'react';
 import { HelpCircle } from 'lucide-react';
 import { Button } from '../../components/antigravity/Button';
+import { useFeedbackOpen } from '../../components/chromeDock';
 
 export type SetupAssistantFabProps = {
   onClick: () => void;
@@ -26,6 +27,8 @@ export const SetupAssistantFab: React.FC<SetupAssistantFabProps> = ({
   hideOnPanelOpenLg = true,
 }) => {
   const hideClass = isPanelOpen && hideOnPanelOpenLg ? 'lg:hidden' : '';
+  const feedbackOpen = useFeedbackOpen();
+  if (feedbackOpen) return null;
 
   return (
     <Button unstyled
