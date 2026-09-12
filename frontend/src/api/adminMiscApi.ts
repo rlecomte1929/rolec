@@ -29,6 +29,7 @@ export type ProspectRow = {
   enriched_at: string | null;
   reviewed_at: string | null;
   reviewed_by: string | null;
+  is_test?: boolean;
 };
 
 export const adminProspectsAPI = {
@@ -122,6 +123,7 @@ export interface LeadRow {
   created_at: string;
   updated_at: string;
   matched_prospect: boolean;
+  is_test?: boolean;
 }
 
 export interface LeadStats {

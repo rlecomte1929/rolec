@@ -526,6 +526,9 @@ class ProspectCandidate(Base):
     # Track B: link to the company this prospect was onboarded into (conversion path).
     onboarded_company_id = Column(String, nullable=True)
     onboarded_at = Column(DateTime, nullable=True)
+    # AIQ-2327: synthetic QA rows hidden from admin surfaces by default (migration
+    # 20261146000000 adds the column + backfills prod; default False for real rows).
+    is_test = Column(Boolean, nullable=False, default=False)
 
 
 class Lead(Base):
@@ -549,6 +552,8 @@ class Lead(Base):
     utm_campaign = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    # AIQ-2327: synthetic QA leads hidden from admin surfaces by default.
+    is_test = Column(Boolean, nullable=False, default=False)
 
 
 class QueryAuditLog(Base):

@@ -18,7 +18,10 @@ if _REPO_ROOT not in sys.path:
 from backend.db.test_data_filter import (  # noqa: E402
     exclude_test_companies,
     exclude_test_people,
+    exclude_test_prospects,
     looks_like_test_company,
+    looks_like_test_email,
+    looks_like_test_prospect,
     strip_verify_prefix,
 )
 
@@ -83,6 +86,79 @@ class TestDataFilterTests(unittest.TestCase):
             f"SELECT email FROM people WHERE email = 'hr@testcompany.com' AND {exclude_test_people('email')}"
         ).fetchall()
         self.assertEqual(len(rows), 1)
+
+
+class ExtendedSeederFilterTests(unittest.TestCase):
+    """AIQ-2327 — the newer seeder families the AIQ-913 filter predates."""
+
+    def setUp(self):
+        self.con = sqlite3.connect(":memory:")
+        self.con.executescript(
+            """
+            CREATE TABLE companies (name TEXT);
+            INSERT INTO companies (name) VALUES
+              ('Google'), ('Google Dublin'), ('Testing April'), ('Meridian Capital'),
+              ('GlobalTech SAS'), ('Nexora Labs'), ('SLB Denis'), ('SLB_Denis'), ('Wave1 Tech'),
+              ('Google IE Q1786637682758'), ('Google Ireland T18-A-1786634420882'),
+              ('CPY Abe Romo'), ('VCo 1786634558409'), ('WCo 1786634597516'),
+              ('Company 1'), ('TestCompany'), ('YvesTestCompany');
+            CREATE TABLE people (email TEXT);
+            INSERT INTO people (email) VALUES
+              ('real.person@acme.com'), ('romain_lecomte@hotmail.com'),
+              ('qa-proj-relopass-com-mtajn62l@reloulexei.resend.app'),
+              ('jane.smith@example.com'), ('roma+t18empb_1789@hotmail.com'),
+              ('roma+emp_run_5@hotmail.com');
+            """
+        )
+
+    def tearDown(self):
+        self.con.close()
+
+    def test_new_seeder_companies_excluded_demo_kept(self):
+        rows = self.con.execute(
+            f"SELECT name FROM companies WHERE {exclude_test_companies('name')}"
+        ).fetchall()
+        names = {r[0] for r in rows}
+        self.assertEqual(names, {
+            "Google", "Google Dublin", "Testing April", "Meridian Capital",
+            "GlobalTech SAS", "Nexora Labs", "SLB Denis", "SLB_Denis", "Wave1 Tech",
+        })
+
+    def test_new_seeder_emails_excluded_real_kept(self):
+        rows = self.con.execute(
+            f"SELECT email FROM people WHERE {exclude_test_people('email')}"
+        ).fetchall()
+        emails = {r[0] for r in rows}
+        # The real address + Romain's own un-aliased hotmail survive.
+        self.assertEqual(emails, {"real.person@acme.com", "romain_lecomte@hotmail.com"})
+
+    def test_write_time_classifiers(self):
+        for bad in ("Google IE Q1786637682758", "Google Ireland T18-A-1786634420882",
+                    "CPY Abe Romo", "VCo 1786634558409", "Company 1", "YvesTestCompany"):
+            self.assertTrue(looks_like_test_company(bad), bad)
+        for good in ("Google", "Google Dublin", "Testing April", "Meridian Capital",
+                     "GlobalTech SAS", "Nexora Labs", "Wave1 Tech"):
+            self.assertFalse(looks_like_test_company(good), good)
+        for bad in ("qa-proj-x@reloulexei.resend.app", "jane@example.com",
+                    "roma+t18empb_1@hotmail.com", "roma+emp_run_5@hotmail.com"):
+            self.assertTrue(looks_like_test_email(bad), bad)
+        self.assertFalse(looks_like_test_email("romain_lecomte@hotmail.com"))
+
+    def test_qa_prospects_excluded(self):
+        self.con.executescript(
+            """
+            CREATE TABLE prospects (company_name TEXT);
+            INSERT INTO prospects (company_name) VALUES
+              ('Acme GmbH'), ('QA Corp'), ('Bob Dylan Company'),
+              ('HR Dir @ Acme'), ('A test school');
+            """
+        )
+        rows = self.con.execute(
+            f"SELECT company_name FROM prospects WHERE {exclude_test_prospects('company_name')}"
+        ).fetchall()
+        self.assertEqual({r[0] for r in rows}, {"Acme GmbH"})
+        self.assertTrue(looks_like_test_prospect("QA Corp"))
+        self.assertFalse(looks_like_test_prospect("Acme GmbH"))
 
 
 class StripVerifyPrefixTests(unittest.TestCase):

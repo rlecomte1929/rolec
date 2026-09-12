@@ -97,7 +97,12 @@ export const AdminLeads: React.FC = () => {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-[#f3f4f6] hover:bg-[#f8fafc]">
-                <td className="py-2 pr-3 font-medium text-[#0b2b43]">{r.email}</td>
+                <td className="py-2 pr-3 font-medium text-[#0b2b43]">
+                  <span className="inline-flex items-center gap-1.5">
+                    {r.email}
+                    {r.is_test ? <Badge variant="neutral" size="sm">test</Badge> : null}
+                  </span>
+                </td>
                 <td className="py-2 pr-3 text-[#374151]">{r.company_domain || '—'}</td>
                 <td className="py-2 pr-3 text-[#374151]">{r.source}</td>
                 <td className="py-2 pr-3">{statusBadge(r.status)}</td>

@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '../../components/antigravity/Input';
 import { Button } from '../../components/antigravity/Button';
+import { Switch } from '../../components/antigravity/Switch';
 import { PageHeader } from '../../components/antigravity/PageHeader';
 import { getAuthItem } from '../../utils/demo';
 import { useAdminViewingCompany } from '../../features/admin/AdminViewingCompanyContext';
@@ -33,7 +35,28 @@ function deriveInitials(name: string): string {
 export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, headerRight }) => {
   const userName = getAuthItem('relopass_name') ?? 'Romain';
   const location = useLocation();
+  const queryClient = useQueryClient();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // AIQ-2327: "Show test data" — off by default, persisted per browser. When on, the
+  // axios interceptor appends include_test=true to every admin GET; invalidating the
+  // cache refetches all admin lists so hidden synthetic rows appear (with a "test"
+  // badge) immediately.
+  const [showTestData, setShowTestData] = useState<boolean>(() => {
+    try {
+      return typeof localStorage !== 'undefined' && localStorage.getItem('admin_show_test_data') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const toggleShowTestData = (next: boolean) => {
+    setShowTestData(next);
+    try {
+      localStorage.setItem('admin_show_test_data', next ? 'true' : 'false');
+    } catch {
+      /* private mode — the interceptor simply won't see the flag */
+    }
+    void queryClient.invalidateQueries();
+  };
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -95,8 +118,8 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Top bar */}
-        <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-slate-200 shrink-0">
-          <div className="flex items-center gap-1.5 text-sm text-slate-500">
+        <header className="flex items-center gap-3 px-6 py-3 bg-white border-b border-slate-200 shrink-0 flex-nowrap">
+          <div className="flex min-w-0 items-center gap-1.5 text-sm text-slate-500">
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
@@ -114,9 +137,15 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
               </>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-3">
             {/* SHELL-1 + founder cockpit: removed non-functional Notifications,
                Download, and Ask ReloPass AI — they had no handlers. */}
+            <Switch
+              checked={showTestData}
+              onChange={toggleShowTestData}
+              label="Show test data"
+              className="whitespace-nowrap"
+            />
             <AdminAccountMenu name={userName} initials={deriveInitials(userName)} />
           </div>
         </header>

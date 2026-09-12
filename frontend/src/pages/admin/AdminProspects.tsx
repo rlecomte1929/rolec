@@ -450,7 +450,10 @@ export const AdminProspects: React.FC = () => {
                   tabIndex={0}
                 >
                   <td className="py-2 pr-3">
-                    <div className="font-medium text-[#0b2b43]">{r.company_name}</div>
+                    <div className="font-medium text-[#0b2b43] inline-flex items-center gap-1.5">
+                      {r.company_name}
+                      {r.is_test ? <Badge variant="neutral" size="sm">test</Badge> : null}
+                    </div>
                     {r.company_domain && (
                       <div className="text-xs text-[#6b7280]">{r.company_domain}</div>
                     )}
