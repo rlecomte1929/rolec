@@ -18,9 +18,8 @@ test.describe('AIQ-2285 retry / auth coherence', () => {
     );
 
     await page.goto('/employee/dashboard');
-    // Heading only — the body also contains "cannot open employee assignments",
-    // so a combined getByText regex is a Playwright strict-mode violation.
-    await expect(page.getByRole('heading', { name: /could not load assignments/i })).toBeVisible();
+    // Kind-specific title (forbidden) — not the generic "could not load" heading.
+    await expect(page.getByRole('heading', { name: /this account cannot open assignments/i })).toBeVisible();
     await expect(page.getByText(/this account cannot open employee assignments/i)).toBeVisible();
     // 403 is not transient — retry would loop the same forbidden response.
     await expect(page.getByRole('button', { name: /try again/i })).toHaveCount(0);
@@ -59,7 +58,7 @@ test.describe('AIQ-2285 retry / auth coherence', () => {
     );
 
     await page.goto('/employee/dashboard');
-    await expect(page.getByRole('heading', { name: /could not load assignments/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /something went wrong/i })).toBeVisible();
     await expect(page.locator('#employee-unlinked-empty-state')).toHaveCount(0);
     await expect(page.getByTestId('employee-case-link-instruction')).toHaveCount(0);
     await expect(page.getByText(/assignment status/i)).toHaveCount(0);
