@@ -1,0 +1,267 @@
+{
+  "meta": {
+    "generated": "2026-09-12",
+    "source": {
+      "title": "CS50x Lecture 5: Data Structures",
+      "url": "https://www.youtube.com/watch?v=PmAI76OGE_E",
+      "date": "2026-08-16",
+      "qa_status": "PASS",
+      "source_rating": "A",
+      "word_count": 1300,
+      "type": "typed notes"
+    },
+    "product": "ReloPass — FastAPI + Postgres serving, YAML corridor registry",
+    "version": "1.1-grounded",
+    "note": "Lecture proposals rewritten against the repo. Original v1.0 mapped structures onto WorkspaceDB / requirement_facts / Node.js Map / Redis — none of those serve ReloPass. Each proposal keeps the CS concept so the learning-stack format stays reusable, and adds a grounding object after a repo pass.",
+    "format_lock": "Next book files must include grounding.status (shipped|partial|wont|do), actual_component, actual_paths, and do_not after a repo pass so lecture metaphors cannot invent tables.",
+    "status_legend": {
+      "shipped": "Structure already exists in ReloPass; do not rebuild",
+      "partial": "Data or code exists; a named follow-on remains",
+      "wont": "Lecture structure would be wrong or premature here",
+      "do": "Still worth doing, but only in the actual_component named in grounding"
+    },
+    "repo_facts_verified": {
+      "date": "2026-09-12",
+      "corridor_yaml_profiles": 13,
+      "dossier_serving_table": "public.requirement_items",
+      "requirement_facts_role": "sufficiency only, not the dossier catalog",
+      "evaluate_corridor_case": "out of scope in corridor_persistence.py",
+      "anchor_case_id_column": false
+    }
+  },
+  "proposals": [
+    {
+      "id": "DS-001",
+      "title": "Directed Graph for Corridor Requirement Dependency Chains",
+      "cs_concept": "Directed graph + topological sort",
+      "priority": "P0",
+      "component": "Case Command — corridor authoring engine",
+      "status": "shipped",
+      "problem_solved": "Requirements reference each other. A flat list cannot represent these dependencies, making timeline ordering manual and error-prone.",
+      "description": "Model corridor steps as a DAG: each step lists prerequisite_step_ids. At YAML load, _reject_prerequisite_cycles refuses a circular graph. At schedule time, Kahn's algorithm in _topological_order emits a legal order and raises on a cycle.",
+      "implementation_notes": {
+        "data_shape": "CorridorStep.prerequisite_step_ids in pathway YAML; persisted as rce.steps.prerequisite_step_ids uuid[]",
+        "key_operations": [
+          "cycle detection on YAML load (loader._reject_prerequisite_cycles)",
+          "Kahn topological sort on schedule (scheduler._topological_order)",
+          "schedule_steps forward projection of dates"
+        ],
+        "where": "corridors/<ID>/pathways/*/v1.yaml → backend/relopass/corridors/loader.py + scheduler.py → rce.steps",
+        "lawyer_gate": "Pathway YAML cites rules; serving still only emits review_status='approved' requirement_items. Do not invent a separate edge table for lawyer sign-off."
+      },
+      "relopass_payoff": "Circular authoring fails at load, not a live case. Delay on an upstream step shifts every downstream date.",
+      "effort_estimate": "Already shipped",
+      "stage": "done",
+      "grounding": {
+        "status": "shipped",
+        "actual_component": "Corridor Agent YAML step graph + rce persistence",
+        "actual_paths": [
+          "backend/relopass/corridors/loader.py",
+          "backend/relopass/corridors/scheduler.py",
+          "backend/app/services/corridor_persistence.py",
+          "backend/tests/test_corridor_cycle_detection.py"
+        ],
+        "do_not": "Do not add WorkspaceDB tables requirement_nodes / requirement_edges. The graph already lives in git YAML and rce.steps."
+      }
+    },
+    {
+      "id": "DS-002",
+      "title": "Trie for Corridor-Code Lookup and Prefix Discovery",
+      "cs_concept": "Trie (retrieval tree) — character-by-character key storage",
+      "priority": "P1",
+      "component": "Case Command — corridor selector / expansion map",
+      "status": "wont",
+      "problem_solved": "Finding all corridors originating in FR or autocompleting FR-N becomes a slow full-table scan as the map grows toward ~120 pairs.",
+      "description": "Index corridor codes in a trie keyed on origin/destination prefix. Lookup is O(length of corridor code) regardless of total corridor count.",
+      "implementation_notes": {
+        "key_structure": "Canonical key is ORIGIN_DEST (underscore), loaded into an in-memory dict at first read",
+        "key_operations": ["normalize_corridor_id", "list_corridors linear scan of 13 YAML profiles", "load_corridor_profile O(1) by id via _CACHE"],
+        "where": "backend/app/services/corridor_registry.py — _CACHE dict, not a trie",
+        "memory_note": "13 corridor.yaml files. A trie would add code without a measured win."
+      },
+      "relopass_payoff": "Prefix discovery over 13 YAML profiles is a linear scan of a handful of strings. A trie would add code without a measured win.",
+      "effort_estimate": "None — revisit only if ~120 served corridors exist",
+      "stage": "deferred",
+      "grounding": {
+        "status": "wont",
+        "actual_component": "corridor_registry in-memory dict keyed ORIGIN_DEST",
+        "actual_paths": [
+          "backend/app/services/corridor_registry.py",
+          "corridors/*/corridor.yaml"
+        ],
+        "do_not": "Do not build a trie at current scale. There is no WorkspaceDB corridor table to index."
+      }
+    },
+    {
+      "id": "DS-003",
+      "title": "Hash-Map Serving Index for Requirement Facts",
+      "cs_concept": "Hash table — O(1) average lookup via hash function + chaining",
+      "priority": "P0",
+      "component": "Deterministic rule engine (serving layer)",
+      "status": "wont",
+      "problem_solved": "Serving a case is read-heavy and latency-sensitive. Fetching requirement facts currently requires a DB scan or multi-join query on each case load.",
+      "description": "The original proposal loaded requirement_facts into a Node.js Map or Redis hash keyed {corridor}:{employee_type}:{fact_key}. That table and runtime are not the serving path. Dossier serving is a keyed Postgres filter on public.requirement_items.",
+      "implementation_notes": {
+        "key_format": "Serving key is (country_code, purpose, review_status='approved') on public.requirement_items",
+        "key_operations": ["crud.list_requirements", "requirements_builder dossier", "public_corridor catalog"],
+        "where": "Postgres btree index requirement_items_country_purpose_review_idx (migration 20261030000000)",
+        "collision_note": "Composite SQL key, not a hash-map collision domain. Do not conflate with immigration_requirements (corridor × visa_type)."
+      },
+      "relopass_payoff": "Indexed lookup already exists. A process-local cache is a time–space trade-off only after a measured p95 on list_requirements — not a speculative Redis/Node map.",
+      "effort_estimate": "None until measured",
+      "stage": "deferred",
+      "grounding": {
+        "status": "wont",
+        "actual_component": "public.requirement_items via crud.list_requirements (dossier) and immigration_requirements (entry-visa checklist)",
+        "actual_paths": [
+          "backend/app/crud.py",
+          "backend/app/services/requirements_builder.py",
+          "backend/app/services/immigration_requirement_service.py",
+          "supabase/migrations/20261030000000_requirement_items_review_status.sql"
+        ],
+        "do_not": "Do not invent a serving cache in Node or Redis. Do not key the dossier on {corridor}:{employee_type}:{fact_key} — that conflates the destination-only dossier with the corridor×visa immigration engine. requirement_facts is not the served catalog."
+      }
+    },
+    {
+      "id": "DS-004",
+      "title": "Binary Decision Tree for Compliance Branching Logic",
+      "cs_concept": "Binary search tree — ordered left/right branching",
+      "priority": "P0",
+      "component": "Employee-type branching / eligibility engine",
+      "status": "partial",
+      "problem_solved": "EU citizen → path A vs. non-EU passport → path B is nested if/else in code, making lawyer review impossible without reading source files.",
+      "description": "Pathway YAML already stores eligibility_logic.branches (cited, requires_all, verdict_on_pass). That is a data-driven decision graph, not a BST. Family/STA filters still live in Python rules_engine. evaluate(corridor, case) is still out of scope in corridor_persistence.",
+      "implementation_notes": {
+        "data_shape": "eligibility_logic.branches: [{id, label, cite, requires_all, verdict_on_pass}]",
+        "key_operations": ["load-time structural validation of branch cites", "planned evaluate() walk — not yet wired"],
+        "where": "corridors/<ID>/pathways/*/v1.yaml + backend/relopass/corridors/loader.py; remaining code branches in backend/app/services/rules_engine.py",
+        "trust_architecture": "Cited YAML branches are the lawyer-reviewable claims. Do not externalise them into a BST of left/right child rows."
+      },
+      "relopass_payoff": "Lawyer-reviewable branching already exists as YAML claims with citations. The remaining work is wiring evaluate() and showing the taken branch in HR UI — not a decision_nodes table and not a BST (eligibility is not ordered-search).",
+      "effort_estimate": "Follow-on: evaluate() + HR path display",
+      "stage": "v1 follow-on",
+      "grounding": {
+        "status": "partial",
+        "actual_component": "YAML eligibility_logic + Python rules_engine",
+        "actual_paths": [
+          "backend/relopass/corridors/loader.py",
+          "backend/app/services/rules_engine.py",
+          "backend/app/services/corridor_persistence.py",
+          "backend/tests/test_corridor_in_de_bluecard_2026.py",
+          "corridors/IN_DE/pathways/BLUECARD_2026/v1.yaml"
+        ],
+        "do_not": "Do not store a BST in WorkspaceDB. Do not rewrite rules_engine into left/right child rows. Eligibility is a cited predicate graph, not binary search. Do not wire evaluate() in this backlog pass."
+      }
+    },
+    {
+      "id": "DS-005",
+      "title": "Linked-List Timeline for Ordered Requirement Steps",
+      "cs_concept": "Linked list — O(1) insertion, preserved sequence, no renumbering",
+      "priority": "P1",
+      "component": "Timeline renderer / Move Roadmaps output",
+      "status": "wont",
+      "problem_solved": "A newly discovered step cannot be cheaply inserted into a fixed-index array without renumbering every subsequent step.",
+      "description": "Store timeline steps as a linked/sequenced structure with next_step_id. Inserting a new step is a pointer swap.",
+      "implementation_notes": {
+        "data_shape": "Already: prerequisite_step_ids[] on each step — a DAG, not a singly-linked list",
+        "key_operations": ["insert an edge by editing two YAML lists", "diamond deps (empadronamiento → NIE → housing)"],
+        "where": "Same graph as DS-001",
+        "ux_note": "Authoring insert is add a YAML node plus prerequisite edges, not a next_step_id pointer swap."
+      },
+      "relopass_payoff": "A linked list cannot represent diamond dependencies. The DAG already supports inserting a step without renumbering — add the node and two prerequisite edges.",
+      "effort_estimate": "None — linked list would be a regression",
+      "stage": "wont",
+      "grounding": {
+        "status": "wont",
+        "actual_component": "DAG via prerequisite_step_ids (IE→ES diamond is the worked example)",
+        "actual_paths": [
+          "backend/relopass/corridors/scheduler.py",
+          "backend/tests/test_corridor_ie_es.py"
+        ],
+        "do_not": "Do not add next_step_id overlay tables. A linked list cannot encode a step with two parents."
+      }
+    },
+    {
+      "id": "DS-006",
+      "title": "Access-Pattern-Driven Data Architecture Audit",
+      "cs_concept": "Time–space trade-off — dominant operation dictates the structure",
+      "priority": "P1",
+      "component": "Serving + corridor schema design",
+      "status": "shipped",
+      "problem_solved": "Forcing one shape onto mismatched operations creates slow queries and brittle authoring.",
+      "description": "Audit each access pattern against the structure that actually exists. Document the mapping as an ADR. Do not invent WorkspaceDB tables to match the lecture. ADR-003 records this mapping.",
+      "implementation_notes": {
+        "audit_targets": [
+          "requirement_items — indexed on (country_code, purpose, review_status)",
+          "corridor registry — in-memory dict, prefix = linear scan of 13 profiles",
+          "timeline steps — DAG order via Kahn, not application sort of a flat list",
+          "decision branches — YAML eligibility_logic plus remaining Python in rules_engine"
+        ],
+        "output": "backend/docs/adr-003-access-pattern-structures.md",
+        "where": "backend/docs/adr-003-access-pattern-structures.md — no schema change"
+      },
+      "relopass_payoff": "Prevents the lecture-structure-for-everything anti-pattern (trie, BST, linked list) from compounding across corridors. Creates a defensible, documented data architecture.",
+      "effort_estimate": "Done",
+      "stage": "done",
+      "grounding": {
+        "status": "shipped",
+        "actual_component": "ADR-003",
+        "actual_paths": [
+          "backend/docs/adr-003-access-pattern-structures.md"
+        ],
+        "do_not": "Do not treat WorkspaceDB kg_* names as schema. Verify the live table before writing a load."
+      }
+    },
+    {
+      "id": "DS-007",
+      "title": "Demand-Pull Corridor Schema Growth — Enforce No Over-Allocation",
+      "cs_concept": "Resizing arrays anti-pattern — never pre-allocate unused slots",
+      "priority": "P0",
+      "component": "Corridor authoring — schema governance",
+      "status": "shipped",
+      "problem_solved": "Pre-creating empty requirement rows for unverified corridors wastes schema space and risks an unverified corridor being served if a code path reaches it.",
+      "description": "There is no corridor registry table and no anchor_case_id column. Source of truth is corridors/<ID>/corridor.yaml. Demand-pull is enforced as YAML metadata plus the existing review_status='pending' / serve-only-approved gate. New corridor profiles must declare an anchor (real case). Existing 13 profiles are grandfathered.",
+      "implementation_notes": {
+        "implementation": "corridor.anchor {case_id | case_ref, note} parsed by corridor_registry. scripts/check_corridor_anchor.py fails in the corridor-facts CI job (and in pytest) when a new corridors/*/corridor.yaml lacks case_id/case_ref.",
+        "why_it_matters": "A NOT NULL on a fictional table would not stop a YAML + approved requirement_items load.",
+        "analogy": "The corridor graph grows only when a new verified case is named in git, not when someone pre-allocates empty rows"
+      },
+      "relopass_payoff": "Enforces no-corridor-without-a-real-case at the YAML layer that actually creates corridors. Serving still fail-closes on unapproved items.",
+      "effort_estimate": "Done",
+      "stage": "done",
+      "grounding": {
+        "status": "shipped",
+        "actual_component": "corridors/<ID>/corridor.yaml + review_status publication gate + CI",
+        "actual_paths": [
+          "backend/app/services/corridor_registry.py",
+          "scripts/check_corridor_anchor.py",
+          "scripts/tests/test_check_corridor_anchor.py",
+          ".github/workflows/ci.yml",
+          "docs/corridors/README.md",
+          "backend/app/crud.py"
+        ],
+        "do_not": "Do not ADD COLUMN anchor_case_id NOT NULL on a table that is not the corridor source of truth. Do not pre-create empty requirement_items for unverified corridors."
+      }
+    }
+  ],
+  "sequencing_recommendation": {
+    "immediate_v0": [
+      "DS-006 — shipped: ADR-003",
+      "DS-007 — shipped: YAML anchor + CI gate; grandfather existing 13"
+    ],
+    "near_term_v0_5": [
+      "DS-003 — measure list_requirements p95 before any cache; do not ship Redis/Node"
+    ],
+    "v1": [
+      "DS-004 follow-on — wire evaluate(corridor, case) and show the taken YAML branch in HR UI",
+      "DS-001 — already shipped; no rebuild",
+      "DS-002 — trie only if ~120 served corridors exist"
+    ],
+    "never": [
+      "DS-005 linked-list timeline (regression vs DAG)",
+      "WorkspaceDB requirement_nodes / decision_nodes / timeline_steps tables",
+      "Postgres anchor_case_id NOT NULL on a non-registry table"
+    ]
+  },
+  "key_principle": "CS50 Lec 5: every data structure trades time against space, and the right choice depends on which operation dominates. ReloPass already has four access patterns — fetch-by-key, ordered traversal, dependency resolution, prefix discovery — each already mapped to a structure. The mistake to avoid is forcing a lecture structure (trie, BST, linked list, fictional hash map) onto those operations, or inventing tables whose names came from the lecture rather than from the live schema."
+}
