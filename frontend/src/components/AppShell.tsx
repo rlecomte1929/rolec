@@ -4,7 +4,7 @@ import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { authAPI } from '../api/client';
 import { useBrandingConfig } from '../hooks/useBrandingConfig';
 import { getNavigationError } from '../navigation/safeNavigate';
-import { buildRoute, homeRouteKeyForRole, ROUTE_DEFS } from '../navigation/routes';
+import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { resolveOverviewState } from '../features/employee-journey/overviewResolution';
@@ -15,6 +15,7 @@ import { SetupAssistantFab } from '../features/setup-help/SetupAssistantFab';
 import { SetupAssistantDrawer } from '../features/setup-help/SetupAssistantDrawer';
 import {
   employeeUnlinkedBannerClassName,
+  employeeUnlinkedBannerHasPageEmptyState,
   UNLINKED_BANNER_DISMISS_KEY,
 } from './employeeUnlinkedBanner';
 import { ChangelogBell } from './ChangelogBell';
@@ -173,7 +174,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
 
   const sbRole = sidebarRole(role);
   const userInitials = deriveInitials(name || identity || 'RP');
-  const onEmployeeDashboard = location.pathname === ROUTE_DEFS.employeeDashboard.path;
+  const hideUnlinkedBannerForPage = employeeUnlinkedBannerHasPageEmptyState(location.pathname);
   const [unlinkedBannerDismissed, setUnlinkedBannerDismissed] = useState(() => {
     try {
       return sessionStorage.getItem(UNLINKED_BANNER_DISMISS_KEY) === '1';
@@ -197,7 +198,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
     !employeeAssignmentLoading &&
     !overviewUnresolved &&
     linkedCount === 0 &&
-    !onEmployeeDashboard &&
+    !hideUnlinkedBannerForPage &&
     !unlinkedBannerDismissed;
 
   return (

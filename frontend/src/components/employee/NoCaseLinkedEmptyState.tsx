@@ -8,7 +8,10 @@ import { buildRoute } from '../../navigation/routes';
  * Shared unlinked-case empty state (AIQ-2361). Matches the Services page pattern:
  * "No case linked" + one line of explanation + dashboard CTA.
  */
-export const NoCaseLinkedEmptyState: React.FC<{ explanation: string }> = ({ explanation }) => {
+export const NoCaseLinkedEmptyState: React.FC<{
+  explanation: string;
+  children?: React.ReactNode;
+}> = ({ explanation, children }) => {
   const navigate = useNavigate();
   return (
     <Alert variant="info" className="mb-6">
@@ -18,9 +21,11 @@ export const NoCaseLinkedEmptyState: React.FC<{ explanation: string }> = ({ expl
         <span className="text-slate-500">{explanation}</span>
       </p>
       <div className="flex flex-wrap gap-3">
-        <Button variant="outline" onClick={() => navigate(buildRoute('employeeDashboard'))}>
-          Back to Dashboard
-        </Button>
+        {children ?? (
+          <Button variant="outline" onClick={() => navigate(buildRoute('employeeDashboard'))}>
+            Back to Dashboard
+          </Button>
+        )}
       </div>
     </Alert>
   );

@@ -208,8 +208,7 @@ const SECTIONS: NavSection[] = [
         to: ROUTE_DEFS.employeeIntake.path,
         // Wizard is meaningless without a linked case — hide until the user has one.
         // Admins keep it visible so they can preview the form.
-        hidden: ({ linkedCount, role, assignmentsLoading }) =>
-          role !== 'ADMIN' && !assignmentsLoading && linkedCount === 0,
+        hidden: ({ linkedCount, role }) => role !== 'ADMIN' && linkedCount === 0,
       },
       // No badge: the roadmap item count isn't wired into the sidebar's
       // NotifContext, and the hard-coded '3' showed even when the roadmap was
@@ -221,16 +220,14 @@ const SECTIONS: NavSection[] = [
         label: 'Roadmap',
         to: ROUTE_DEFS.employeeDashboard.path,
         // fix: AIQ-2359 — never emit another user's case UUID when this account is unlinked
-        hidden: ({ linkedCount, role, assignmentsLoading }) =>
-          role !== 'ADMIN' && !assignmentsLoading && linkedCount === 0,
+        hidden: ({ linkedCount, role }) => role !== 'ADMIN' && linkedCount === 0,
       },
       { id: 'documents', label: 'Tasks', hint: 'Documents and actions requested by your HR team', to: ROUTE_DEFS.employeeTaskPage.path },
       {
         id: 'dossier',
         label: 'Dossier & forms',
         to: ROUTE_DEFS.employeeDashboard.path,
-        hidden: ({ linkedCount, role, assignmentsLoading }) =>
-          role !== 'ADMIN' && !assignmentsLoading && linkedCount === 0,
+        hidden: ({ linkedCount, role }) => role !== 'ADMIN' && linkedCount === 0,
       },
       { id: 'service-providers', label: 'Services', hint: 'Choose services and see recommended providers for your move', to: ROUTE_DEFS.services.path },
       { id: 'benefit-comparison', label: 'Benefit comparison', to: ROUTE_DEFS.employeeBenefitsComparison.path },
