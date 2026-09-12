@@ -69,6 +69,11 @@ CATEGORIES: Tuple[str, ...] = (
     "temp_accommodation",
     "medical",
     "language_integration",
+    # [DENIS-NOFR 2026-09-12] Dual-career / spouse employment support. Aligns with the product's
+    # backend service key `partner_career` (frontend serviceConfig `spouse` → backendKey, and
+    # there is a recommendations/partner_career.py plugin). SIRENE evidences these
+    # bilan-de-compétences firms.
+    "partner_career",
 )
 
 
@@ -354,7 +359,7 @@ SOURCES: Tuple[RegistrySource, ...] = (
         tier=2,
         acquisition=Acquisition.HTTP_LISTING,
         corridors=("FR-NO",),
-        categories=("legal_admin", "movers", "housing_agencies", "tax_finance"),
+        categories=("legal_admin", "movers", "housing_agencies", "tax_finance", "partner_career"),
         # One entity per SIREN: annuaire-entreprises.data.gouv.fr/entreprise/<9 digits>.
         entry_url_pattern=r"^https://annuaire-entreprises\.data\.gouv\.fr/entreprise/\d{9}$",
         notes=(
