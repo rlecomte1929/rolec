@@ -29,6 +29,10 @@ SERVICE_KEY_TO_BACKEND: Dict[str, str] = {
     "electricity": "electricity",
     "pets": "pets",
     "spouse": "partner_career",
+    # [ANDREA-P1] settle-in tiles flipped for the journey-completion demo
+    "temp_accommodation": "temp_accommodation",
+    "medical": "medical",
+    "language": "language_integration",
 }
 
 # A frontend service can fan out to more than one backend category. "Housing" surfaces

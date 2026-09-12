@@ -203,8 +203,12 @@ def _resolve_visa_required_advisory(nationality: Optional[str]) -> Optional[str]
 
 
 def _has_family_relocating(draft: Dict[str, Any]) -> bool:
-    family = draft.get("familyMembers") or {}
-    return (family.get("maritalStatus") or "solo") in ("partner", "partner_kids", "kids_only")
+    # [ANDREA-P1] Shared helper: reads the wizard vocabulary AND the plain values HR intake /
+    # contract prefill write (``married`` + a spouse object, children[]), so a family entered
+    # by HR gets the FAMILY_REGISTRATION step and the family advisory too.
+    from .household import has_family_relocating
+
+    return has_family_relocating(draft)
 
 
 def _resolve_pathway(origin: Optional[str], destination: Optional[str]) -> Optional[Tuple[Any, str, str]]:

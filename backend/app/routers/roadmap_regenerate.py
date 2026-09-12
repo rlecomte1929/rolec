@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ..auth_deps import require_admin_or_hr
+from ..services.case_service import resolve_case_forms_case_id
 from ..services.roadmap_regeneration_service import regenerate_case_milestones
 
 log = logging.getLogger(__name__)
@@ -53,6 +54,12 @@ def regenerate_roadmap(
     user: Dict[str, Any] = Depends(require_admin_or_hr),
 ) -> RegenerateResponse:
     from backend.database import db  # imported here to match the legacy DB seam
+
+    # [ANDREA-P1 / AIQ-1776 class] HR pages navigate with the ASSIGNMENT id, but
+    # ``case_milestones`` and the relocation-plan view are keyed by the canonical case id.
+    # Regenerating on the raw path param wrote 16 milestones under the assignment id that
+    # no reader ever loaded (the employee plan stayed at 0 tasks). Key on the resolved id.
+    case_id = resolve_case_forms_case_id(case_id)
 
     try:
         plan = regenerate_case_milestones(db, case_id, apply=not dry_run)

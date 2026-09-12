@@ -41,6 +41,40 @@ log = logging.getLogger(__name__)
 _CORRIDOR_SEG = re.compile(r"^([A-Za-z]{2})-([A-Za-z]{2})$")
 
 
+#: Otto's loader (``backend/imports/otto/executor.promote``) writes UUID ids but stamps every
+#: citation with the batch's ``applies_to.corridor`` (``"ES->IE"``). That is the same
+#: direction signal the id carries for hand-authored rows, so accept it as a fallback
+#: rather than silently withholding every machine-promoted departure batch.
+_CITATION_CORRIDOR = re.compile(r"^\s*([A-Za-z]{2})\s*(?:->|-|\u2192)\s*([A-Za-z]{2})\s*$")
+
+
+def _citation_origin_iso(citations_json: Any) -> Optional[str]:
+    """ORIGIN ISO from the ``corridor`` key on any citation, or ``None``."""
+    if not citations_json:
+        return None
+    try:
+        citations = json.loads(citations_json) if isinstance(citations_json, str) else citations_json
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(citations, list):
+        return None
+    for cite in citations:
+        if not isinstance(cite, dict):
+            continue
+        m = _CITATION_CORRIDOR.match(str(cite.get("corridor") or ""))
+        if m:
+            return m.group(1).upper()
+    return None
+
+
+def _row_origin_iso(row: Any) -> Optional[str]:
+    """Direction of a requirement row: the id's corridor segment, else its citations'."""
+    from_id = _corridor_origin_iso(getattr(row, "id", "") or "")
+    if from_id:
+        return from_id
+    return _citation_origin_iso(getattr(row, "citations_json", None))
+
+
 def _corridor_origin_iso(row_id: str) -> Optional[str]:
     """The ORIGIN ISO of the corridor encoded in a requirement id, or ``None``.
 
@@ -103,7 +137,7 @@ def departure_requirement_records(db: Session, case: Dict[str, Any]) -> List[Dic
             # origin is the corridor's DESTINATION is reverse-corridor arrival-in-origin
             # content and would invert the meaning; un-parseable ids are withheld too. An
             # unresolved origin ISO withholds everything (fail-safe).
-            if origin_iso is None or _corridor_origin_iso(r.id) != origin_iso:
+            if origin_iso is None or _row_origin_iso(r) != origin_iso:
                 continue
             nat_json = getattr(r, "applies_to_nationality_classes_json", None)
             classes = json.loads(nat_json) if nat_json else None

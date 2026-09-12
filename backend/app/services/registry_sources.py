@@ -62,6 +62,13 @@ CATEGORIES: Tuple[str, ...] = (
     "tax_finance",
     "banks",
     "schools",
+    # [ANDREA-P1] Journey-completion settle-in categories (docs/otto/journey-completion-brief
+    # -2026-09-10.md §4.0). `medical` and `language_integration` already existed as plugin /
+    # validation keys; `temp_accommodation` is new end-to-end. Adding here widens
+    # pairs_in_scope() to CORRIDORS x 9 (see test_vendor_harvester).
+    "temp_accommodation",
+    "medical",
+    "language_integration",
 )
 
 
@@ -459,6 +466,43 @@ SOURCES: Tuple[RegistrySource, ...] = (
         notes="Statutory mandatory register — every letting/estate agent in Ireland must hold a "
               "PSRA licence. Search form, no per-entity URL; the licence number is the vetter's "
               "check against the register.",
+    ),
+    # [ANDREA-P1] Dublin settle-in registers cited by the 2026-09-10 journey-completion
+    # vendor batches (docs/imports/es-ie-dublin-{temp-housing,medical,language}-2026-09-10).
+    # Same PUBLIC_REGISTER / tier-2 / staged-`claimed` stance as the five above: the register
+    # is authoritative for the category, the human at /admin/vetting-queue confirms the entry.
+    RegistrySource(
+        name="Fáilte Ireland — Discover Ireland approved accommodation",
+        base_url="https://www.discoverireland.ie/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE",),
+        categories=("temp_accommodation",),
+        notes="Fáilte Ireland is the statutory tourism authority; discoverireland.ie lists its "
+              "approved/registered serviced accommodation. Per-property pages exist but carry no "
+              "registration number; vetter confirms the approval badge on the listing.",
+    ),
+    RegistrySource(
+        name="HSE — Find a GP",
+        base_url="https://www2.hse.ie/services/find-a-gp/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE",),
+        categories=("medical",),
+        notes="HSE (statutory health service) directory of GP practices. Lists practices, not "
+              "Medical Council registration numbers; vetter confirms the practice and whether it "
+              "accepts new patients.",
+    ),
+    RegistrySource(
+        name="TrustEd Ireland — QQI-authorised English language providers",
+        base_url="https://www.trustedireland.ie/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("ES-IE",),
+        categories=("language_integration",),
+        notes="Statutory quality mark (QQI-managed, replaced ACELS/ILEP) for English-language "
+              "providers. Flat provider list, no per-entity URL; vetter confirms the provider "
+              "appears on the authorised list.",
     ),
     # ── France / Paris (NO-FR / Denis, Norway→Paris) ─────────────────────────
     #

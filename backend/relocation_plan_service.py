@@ -123,7 +123,11 @@ def _phase_and_seq_from_synthetic_code(code: str) -> Tuple[str, int]:
     false in a codebase where provenance is the product. Without a marker they would all
     collapse into pre_departure/999 and the CSEP journey would render as one jumbled
     block."""
-    for marker in ("_ai_", "_corridor_"):
+    # [ANDREA-P1] ``{phase}_origin_{NN}``: home-country EXIT obligations sourced from
+    # approved origin-country requirement_items (timeline_service._departure_milestones).
+    # Own marker for the same provenance reason: they are reviewed catalog rows, neither
+    # AI-generated nor a corridor pathway step.
+    for marker in ("_ai_", "_corridor_", "_origin_"):
         if marker in code:
             prefix, _, suffix = code.partition(marker)
             if prefix in PHASE_ORDER:

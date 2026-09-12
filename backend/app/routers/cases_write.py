@@ -172,7 +172,18 @@ def patch_case(
     with SessionLocal() as db:
         # Filter out None sections so partial payloads (e.g. from E2E runner) don't
         # overwrite existing draft sections with null.
-        incoming = {k: v for k, v in patch.model_dump(mode="json").items() if v is not None}
+        # [ANDREA-P1] ``exclude_none=True`` at the LEAF level too. The section filter below
+        # only protected whole sections: a PATCH carrying ``relocationBasics.targetMoveDate``
+        # alone serialised every sibling (originCountry, destCountry, purpose, ...) as an
+        # explicit null, and ``_deep_merge_case_drafts`` faithfully wrote those nulls over
+        # the stored values — one date save wiped the corridor and the requirements went
+        # blank. Partial saves must merge, never erase; clearing a field is an explicit
+        # empty string, not an omission.
+        incoming = {
+            k: v
+            for k, v in patch.model_dump(mode="json", exclude_none=True).items()
+            if v is not None
+        }
         # TD-FIX-7 (AIQ-1510): a test-drive case is pinned to its session's corridor.
         # This is the real tamper surface — the employee intake submits the route here,
         # and a UI lock can be bypassed — so whatever the client sent for origin/
