@@ -148,3 +148,39 @@ export function trackVendorSelected(props: {
 }): void {
   track('vendor_selected', props);
 }
+
+/** Fired once when the employee roadmap plan-view has loaded (RP-K-002). */
+export function trackCaseRoadmapReviewed(props: {
+  corridor_id: string;
+  case_id: string;
+  roadmap_version: string;
+}): void {
+  track('case_roadmap_reviewed', props);
+}
+
+/**
+ * Ranked relief-moment signal. Do not send free-text comments — they can contain PII.
+ * Catalog item ids/titles are safe.
+ */
+export function trackReliefMomentCaptured(props: {
+  corridor_id: string;
+  case_id: string;
+  response_yes_no: boolean;
+  surprising_item_id?: string | null;
+  surprising_item_text?: string | null;
+}): void {
+  track('relief_moment_captured', props);
+}
+
+/**
+ * v0 owner: the employee who ticks the last roadmap task.
+ * Post-move compliance outcome is still an ops log, not this event.
+ */
+export function trackCaseCompleted(props: {
+  corridor_id: string;
+  case_id: string;
+  outcome: string;
+  missed_requirement_ids?: string[];
+}): void {
+  track('case_completed', props);
+}

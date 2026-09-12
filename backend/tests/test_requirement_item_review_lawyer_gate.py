@@ -61,6 +61,7 @@ class RequirementItemLawyerGateTests(unittest.TestCase):
             poolclass=StaticPool,
         )
         models.RequirementItem.__table__.create(self.engine)
+        models.RequirementItemChangelog.__table__.create(self.engine)
         Session = sessionmaker(bind=self.engine)
         patcher = mock.patch.object(admin, "SessionLocal", Session)
         patcher.start()

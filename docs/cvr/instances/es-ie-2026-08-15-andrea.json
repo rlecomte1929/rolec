@@ -1,0 +1,77 @@
+{
+  "cvr_version": "1.0",
+  "cvr_uid": "cvr:ES-IE:2026-08-15:andrea",
+  "corridor_id": "ES-IE",
+  "case_id": null,
+  "case_ref": "andrea-es-ie",
+  "real_case": true,
+  "gold_exemplar": false,
+  "verdict": "fail",
+  "score": 60,
+  "failed_rules": [
+    {
+      "id": "has_reviewer_and_case_ref",
+      "reason": "The report must name a reviewer and the case it was run against, so the evidence is auditable."
+    },
+    {
+      "id": "no_missed_requirements",
+      "reason": "The case hit requirements the corridor failed to surface (requirements_missed = 3)."
+    },
+    {
+      "id": "no_wrong_requirements",
+      "reason": "Requirements were surfaced with the wrong timing, owner or content (requirements_wrong = 3)."
+    }
+  ],
+  "session": {
+    "session_date": "2026-08-15T00:00:00.000Z",
+    "conducted_by": null,
+    "participant_role": "employee",
+    "employee_nationality": null,
+    "employee_type": "non-eea",
+    "origin_country": "ES",
+    "destination_country": "IE",
+    "employer_size_band": null,
+    "move_date": null,
+    "notes": "Markdown report path is cited in WorkspaceDB but missing from the repo. Counts only."
+  },
+  "reviewer": {
+    "name": null,
+    "lawyer_id": null,
+    "verified_by_lawyer": false
+  },
+  "per_requirement": [],
+  "missed_not_in_catalog": [
+    { "what_happened": "Irish rental-market reality", "domain": "housing", "source_found": null, "candidate_topic_key": null },
+    { "what_happened": "Real PPS timeline", "domain": "tax", "source_found": null, "candidate_topic_key": null },
+    { "what_happened": "Pet relocation", "domain": "pets", "source_found": null, "candidate_topic_key": null }
+  ],
+  "sequence_check": [],
+  "outcomes": {
+    "requirements_correct_ids": [],
+    "requirements_wrong_ids": [],
+    "requirements_missed_ids": [],
+    "non_obvious_confirmed_ids": [],
+    "requirements_correct_count": 9,
+    "requirements_wrong_count": 3,
+    "requirements_missed_count": 3,
+    "non_obvious_confirmed_count": 3,
+    "records_approved_ids": [],
+    "records_held_back": [],
+    "corrections_to_apply": "3 wrong: PPS issuance, Dublin accommodation, EU-status implication. Re-file with requirement ids when the markdown is recovered.",
+    "case_outcome": null,
+    "compliance_issues_logged": null
+  },
+  "relief_moment": {
+    "response": true,
+    "surprising_item_id": null,
+    "surprising_item_text": null,
+    "quote": "Nobody told me I would be taxed at 40% while waiting — and I had no idea I would need payslips I could not possibly have yet.",
+    "open_text_comment": null,
+    "posthog_event_verified": false
+  },
+  "legacy": {
+    "workspace_db_table": "case_verification_reports",
+    "report_path": "docs/case-verification-reports/2026-08-15-andrea-es-ie.md",
+    "notes": "Per-requirement ids were never stored on this row — only counts. Do not invent ids."
+  }
+}

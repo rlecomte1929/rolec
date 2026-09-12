@@ -77,9 +77,31 @@ export interface AdminRequirementList {
   scorecard?: KnowledgeScorecard | null;
 }
 
+export interface RequirementItemChangelog {
+  changeId: string;
+  requirementId: string;
+  countryCode?: string | null;
+  changeType: string;
+  previousValue?: Record<string, unknown> | null;
+  newValue?: Record<string, unknown> | null;
+  changedBy?: string | null;
+  changedAt?: string | null;
+  changeJustification?: string | null;
+}
+
 /** Includes unapproved rows — the whole point of the review surface. */
 export async function listCountryRequirements(countryCode: string): Promise<AdminRequirementList> {
   return apiGet(`/api/admin/countries/${countryCode}/requirements`, { headers: adminHeaders() });
+}
+
+export async function listRequirementChangelog(
+  countryCode: string,
+  requirementId: string
+): Promise<RequirementItemChangelog[]> {
+  return apiGet(
+    `/api/admin/countries/${countryCode}/requirements/${requirementId}/changelog`,
+    { headers: adminHeaders() }
+  );
 }
 
 /** Publish or withhold one requirement. Approving is what makes it readable. */

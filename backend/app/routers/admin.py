@@ -335,9 +335,18 @@ def review_country_requirement(
                 ),
             )
 
+        from ..services.requirement_item_changelog import record_field_diff, snapshot_item
+
+        previous_snap = snapshot_item(item)
         item.review_status = status
         item.reviewed_by = str(actor) if actor else None
         item.reviewed_at = datetime.utcnow()
+        record_field_diff(
+            db,
+            item,
+            previous_snap,
+            changed_by=str(actor) if actor else None,
+        )
         db.commit()
         db.refresh(item)
         source_map = {
@@ -355,6 +364,49 @@ def review_country_requirement(
         new_value={"review_status": status, "title": dto.title, "country": dto.id},
     )
     return dto
+
+
+@router.get(
+    "/countries/{country_code}/requirements/{requirement_id}/changelog",
+    response_model=List[schemas.RequirementItemChangelogDTO],
+)
+def list_requirement_changelog(
+    country_code: str,
+    requirement_id: str,
+    user: dict = Depends(require_admin),
+):
+    """Append-only catalog history for one requirement_items row."""
+    from ..services.requirement_item_changelog import list_for_requirement
+
+    with SessionLocal() as db:
+        item = db.get(models.RequirementItem, requirement_id)
+        if item is None or (item.country_code or "").upper() != country_code.strip().upper():
+            raise HTTPException(status_code=404, detail="Requirement not found for this country")
+        rows = list_for_requirement(db, requirement_id)
+
+    def _parse(raw: Optional[str]) -> Optional[dict]:
+        if not raw:
+            return None
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            return None
+        return parsed if isinstance(parsed, dict) else None
+
+    return [
+        schemas.RequirementItemChangelogDTO(
+            changeId=row.change_id,
+            requirementId=row.requirement_id,
+            countryCode=row.country_code,
+            changeType=row.change_type,
+            previousValue=_parse(row.previous_value),
+            newValue=_parse(row.new_value),
+            changedBy=row.changed_by,
+            changedAt=row.changed_at,
+            changeJustification=row.change_justification,
+        )
+        for row in rows
+    ]
 
 
 @router.post(

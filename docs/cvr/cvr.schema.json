@@ -1,0 +1,167 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://relopass.com/schemas/cvr/1.0.json",
+  "title": "ReloPass Case Verification Report",
+  "description": "Unifies the IE→ES Markdown template, WorkspaceDB case_verification_reports (counts), and kg_case_verification_reports (requirement-id arrays). Catalog fields live on requirement_items; this document only points at ids.",
+  "type": "object",
+  "required": [
+    "cvr_version",
+    "cvr_uid",
+    "corridor_id",
+    "session",
+    "outcomes",
+    "relief_moment"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cvr_version": { "type": "string", "const": "1.0" },
+    "cvr_uid": { "type": "string", "minLength": 1 },
+    "corridor_id": {
+      "type": "string",
+      "description": "Canonical corridor key, e.g. FR-NO, ES-IE, NO-FR."
+    },
+    "case_id": { "type": ["string", "null"] },
+    "case_ref": { "type": ["string", "null"] },
+    "real_case": { "type": "boolean" },
+    "gold_exemplar": { "type": "boolean" },
+    "verdict": {
+      "type": "string",
+      "enum": ["pass", "fail", "incomplete"]
+    },
+    "score": { "type": ["number", "null"] },
+    "failed_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "reason"],
+        "properties": {
+          "id": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "session": {
+      "type": "object",
+      "required": ["session_date"],
+      "properties": {
+        "session_date": { "type": "string", "format": "date-time" },
+        "conducted_by": { "type": ["string", "null"] },
+        "participant_role": { "type": ["string", "null"] },
+        "employee_nationality": { "type": ["string", "null"] },
+        "employee_type": { "type": ["string", "null"] },
+        "origin_country": { "type": ["string", "null"] },
+        "destination_country": { "type": ["string", "null"] },
+        "employer_size_band": { "type": ["string", "null"] },
+        "move_date": { "type": ["string", "null"] },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "reviewer": {
+      "type": "object",
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "lawyer_id": { "type": ["string", "null"] },
+        "verified_by_lawyer": { "type": "boolean" }
+      }
+    },
+    "per_requirement": {
+      "type": "array",
+      "description": "One row per catalog requirement_id touched in the session. Do not copy title/citations from the catalog.",
+      "items": {
+        "type": "object",
+        "required": ["requirement_id", "judgment"],
+        "properties": {
+          "requirement_id": { "type": "string" },
+          "topic_key": { "type": ["string", "null"] },
+          "judgment": {
+            "type": "string",
+            "enum": ["correct", "wrong", "missed", "not_shown"]
+          },
+          "knew_it": { "type": ["boolean", "null"] },
+          "is_non_obvious": { "type": ["boolean", "null"] },
+          "reaction_quote": { "type": ["string", "null"] },
+          "what_we_said": { "type": ["string", "null"] },
+          "what_actually_happened": { "type": ["string", "null"] },
+          "action": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "missed_not_in_catalog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["what_happened"],
+        "properties": {
+          "what_happened": { "type": "string" },
+          "domain": { "type": ["string", "null"] },
+          "source_found": { "type": ["string", "null"] },
+          "candidate_topic_key": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "sequence_check": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claim": { "type": "string" },
+          "held": { "type": ["boolean", "null"] }
+        }
+      }
+    },
+    "outcomes": {
+      "type": "object",
+      "required": [
+        "requirements_correct_ids",
+        "requirements_wrong_ids",
+        "requirements_missed_ids",
+        "non_obvious_confirmed_ids"
+      ],
+      "properties": {
+        "requirements_correct_ids": { "type": "array", "items": { "type": "string" } },
+        "requirements_wrong_ids": { "type": "array", "items": { "type": "string" } },
+        "requirements_missed_ids": { "type": "array", "items": { "type": "string" } },
+        "non_obvious_confirmed_ids": { "type": "array", "items": { "type": "string" } },
+        "requirements_correct_count": { "type": ["integer", "null"] },
+        "requirements_wrong_count": { "type": ["integer", "null"] },
+        "requirements_missed_count": { "type": ["integer", "null"] },
+        "non_obvious_confirmed_count": { "type": ["integer", "null"] },
+        "records_approved_ids": { "type": "array", "items": { "type": "string" } },
+        "records_held_back": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requirement_id": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "corrections_to_apply": { "type": ["string", "null"] },
+        "case_outcome": { "type": ["string", "null"] },
+        "compliance_issues_logged": { "type": ["string", "null"] }
+      }
+    },
+    "relief_moment": {
+      "type": "object",
+      "required": ["response"],
+      "properties": {
+        "response": { "type": ["boolean", "null"] },
+        "surprising_item_id": { "type": ["string", "null"] },
+        "surprising_item_text": { "type": ["string", "null"] },
+        "quote": { "type": ["string", "null"] },
+        "open_text_comment": { "type": ["string", "null"], "maxLength": 280 },
+        "posthog_event_verified": { "type": "boolean" }
+      }
+    },
+    "legacy": {
+      "type": "object",
+      "description": "Pointers to pre-schema artifacts. Not a source of truth.",
+      "properties": {
+        "workspace_db_table": { "type": ["string", "null"] },
+        "report_path": { "type": ["string", "null"] },
+        "notes": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
