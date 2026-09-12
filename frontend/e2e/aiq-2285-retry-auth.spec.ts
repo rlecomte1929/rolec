@@ -13,7 +13,7 @@ test.describe('AIQ-2285 retry / auth coherence', () => {
       route.fulfill({
         status: 403,
         contentType: 'application/json',
-        body: JSON.stringify({ detail: { code: 'NOT_AN_EMPLOYEE', message: 'Insufficient permissions' } }),
+        body: JSON.stringify({ detail: 'Insufficient permissions' }),
       }),
     );
 

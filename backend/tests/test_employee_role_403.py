@@ -33,8 +33,7 @@ def test_hr_only_overview_is_403_not_401(monkeypatch):
     client = TestClient(app)
     response = client.get("/api/employee/assignments/overview")
     assert response.status_code == 403
-    detail = response.json()["detail"]
-    assert detail["code"] == "NOT_AN_EMPLOYEE"
+    assert isinstance(response.json()["detail"], str)
 
 
 def test_admin_overview_is_not_rejected_as_expiry(monkeypatch):
@@ -54,4 +53,30 @@ def test_admin_overview_is_not_rejected_as_expiry(monkeypatch):
     client = TestClient(app)
     response = client.get("/api/employee/assignments/overview")
     assert response.status_code == 200
-    assert response.status_code != 401
+
+
+def test_hr_primary_with_employee_junction_is_allowed(monkeypatch):
+    """AIQ-2285 root cause, pinned.
+
+    hr@testingapril.com in production is users.role='HR' with an EMPLOYEE row in
+    public.user_roles. Before the membership fix, main.py's require_role compared
+    users.role only and returned 403 here, which the client could not tell apart
+    from a transport failure. This is the one shape that discriminates the fix:
+    it returns 403 on origin/main and 200 now.
+    """
+    _override({
+        "id": "hr-emp-1",
+        "email": "hr@testingapril.com",
+        "role": "HR",
+        "roles": ["HR", "EMPLOYEE"],
+        "is_admin": False,
+    })
+    monkeypatch.setattr(bm, "_best_effort_reconcile_employee_assignments", lambda **kw: None)
+    monkeypatch.setattr(
+        bm,
+        "build_employee_assignment_overview",
+        lambda *args, **kwargs: {"linked": [], "pending": []},
+    )
+    client = TestClient(app)
+    response = client.get("/api/employee/assignments/overview")
+    assert response.status_code == 200

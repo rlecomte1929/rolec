@@ -235,12 +235,16 @@ def _held_roles(user: Dict[str, Any]) -> List[str]:
 
 
 def role_forbidden(required: UserRole) -> HTTPException:
-    """403 with a machine-readable code. 401 is reserved for invalid/expired tokens."""
-    code = "NOT_AN_EMPLOYEE" if required == UserRole.EMPLOYEE else "INSUFFICIENT_PERMISSIONS"
-    return HTTPException(
-        status_code=403,
-        detail={"code": code, "message": "Insufficient permissions"},
-    )
+    """403 for a wrong-role identity. 401 stays reserved for invalid/expired tokens.
+
+    `detail` is a plain string on purpose. A structured {code, message} body was
+    tried and reverted: 76 frontend files read `data.detail` and only 10 route it
+    through utils/apiDetail, so an object detail renders as a React child and
+    white-screens the page (HrBacklogPage.tsx:137 is the proven case). Nothing in
+    frontend/src reads a code today — classifyOverviewLoadError branches on HTTP
+    status. Reintroduce a code only once the consumers are normalised.
+    """
+    return HTTPException(status_code=403, detail="Insufficient permissions")
 
 
 def require_role(role: UserRole):
