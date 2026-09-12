@@ -13,6 +13,7 @@ import {
   EMPLOYEE_CASE_LINK_INSTRUCTION,
 } from '../features/employee-journey/employeeCaseLinkCopy';
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
+import { overviewLoadAlertTitle } from '../features/employee-journey/overviewLoadError';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { getAuthItem } from '../utils/demo';
 import { hasSeenWelcome } from '../utils/welcomeSeen';
@@ -640,7 +641,7 @@ export const EmployeeJourney: React.FC = () => {
       ) : null}
 
       {!assignmentLoading && overviewError ? (
-        <Alert variant="error" className="mb-6" title="Could not load assignments">
+        <Alert variant="error" className="mb-6" title={overviewLoadAlertTitle(overviewErrorKind)}>
           {overviewError}{' '}
           {overviewErrorKind === 'unauthorized' ? (
             <Link
