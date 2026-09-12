@@ -57,7 +57,7 @@ export const Switch: React.FC<SwitchProps> = ({
   if (!label) return control;
 
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap">
       {control}
       <span id={labelId} className="text-sm text-[#374151]">
         {label}

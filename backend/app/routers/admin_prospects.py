@@ -18,8 +18,10 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import desc
+from sqlalchemy import desc, func, text
+from sqlalchemy.orm import defer
 
+from ...db.test_data_filter import exclude_test_prospects, looks_like_test_prospect, table_has_is_test
 from ..auth_deps import require_admin
 from ..db import SessionLocal
 from ..models import ProspectCandidate
@@ -118,9 +120,18 @@ class ProspectRowOut(BaseModel):
     enriched_at: Optional[datetime]
     reviewed_at: Optional[datetime]
     reviewed_by: Optional[str]
+    is_test: bool = False
 
 
-def _row_to_out(row: ProspectCandidate, *, include_payloads: bool) -> ProspectRowOut:
+def _prospects_query(db):
+    has = table_has_is_test(db, "prospect_candidates")
+    q = db.query(ProspectCandidate)
+    if not has:
+        q = q.options(defer(ProspectCandidate.is_test))
+    return q, has
+
+
+def _row_to_out(row: ProspectCandidate, *, include_payloads: bool, has_is_test: bool) -> ProspectRowOut:
     enriched: Optional[Dict[str, Any]] = None
     raw_input: Optional[Dict[str, Any]] = None
     if include_payloads:
@@ -152,6 +163,7 @@ def _row_to_out(row: ProspectCandidate, *, include_payloads: bool) -> ProspectRo
         enriched_at=row.enriched_at,
         reviewed_at=row.reviewed_at,
         reviewed_by=row.reviewed_by,
+        is_test=bool(row.is_test) if has_is_test else looks_like_test_prospect(row.company_name),
     )
 
 
@@ -327,22 +339,31 @@ def list_prospects(
     _: dict = Depends(require_admin),
 ) -> Dict[str, Any]:
     with SessionLocal() as db:
-        q = db.query(ProspectCandidate)
-        if not include_test:
-            q = q.filter(ProspectCandidate.is_test.is_(False))
-        if status:
-            if status not in VALID_STATUSES:
-                raise HTTPException(status_code=400, detail="invalid status filter")
-            q = q.filter(ProspectCandidate.status == status)
-        if band:
-            q = q.filter(ProspectCandidate.qualification_band == band)
-        if batch_id:
-            q = q.filter(ProspectCandidate.batch_id == batch_id)
-        if min_score is not None:
-            q = q.filter(ProspectCandidate.icp_score >= min_score)
-        total = q.count()
+        entity_q, has_is_test = _prospects_query(db)
+        count_q = db.query(func.count(ProspectCandidate.id))
+
+        def apply_filters(query):
+            if not include_test:
+                if has_is_test:
+                    query = query.filter(ProspectCandidate.is_test.is_(False))
+                else:
+                    query = query.filter(text(exclude_test_prospects("company_name")))
+            if status:
+                if status not in VALID_STATUSES:
+                    raise HTTPException(status_code=400, detail="invalid status filter")
+                query = query.filter(ProspectCandidate.status == status)
+            if band:
+                query = query.filter(ProspectCandidate.qualification_band == band)
+            if batch_id:
+                query = query.filter(ProspectCandidate.batch_id == batch_id)
+            if min_score is not None:
+                query = query.filter(ProspectCandidate.icp_score >= min_score)
+            return query
+
+        entity_q = apply_filters(entity_q)
+        total = apply_filters(count_q).scalar() or 0
         rows = (
-            q.order_by(
+            entity_q.order_by(
                 desc(ProspectCandidate.icp_score.is_(None)),
                 desc(ProspectCandidate.icp_score),
                 desc(ProspectCandidate.created_at),
@@ -356,7 +377,7 @@ def list_prospects(
             "limit": limit,
             "offset": offset,
             "prospects": [
-                _row_to_out(r, include_payloads=False).model_dump(mode="json")
+                _row_to_out(r, include_payloads=False, has_is_test=has_is_test).model_dump(mode="json")
                 for r in rows
             ],
         }
@@ -365,10 +386,11 @@ def list_prospects(
 @router.get("/{prospect_id}", response_model=ProspectRowOut)
 def get_prospect(prospect_id: str, _: dict = Depends(require_admin)) -> ProspectRowOut:
     with SessionLocal() as db:
-        row = db.get(ProspectCandidate, prospect_id)
+        q, has_is_test = _prospects_query(db)
+        row = q.filter(ProspectCandidate.id == prospect_id).first()
         if row is None:
             raise HTTPException(status_code=404, detail="prospect not found")
-        return _row_to_out(row, include_payloads=True)
+        return _row_to_out(row, include_payloads=True, has_is_test=has_is_test)
 
 
 @router.post("/{prospect_id}/triage", response_model=ProspectRowOut)
@@ -393,7 +415,7 @@ def triage_prospect(
         row.reviewed_by = user.get("email") or user.get("id")
         db.commit()
         db.refresh(row)
-        return _row_to_out(row, include_payloads=True)
+        return _row_to_out(row, include_payloads=True, has_is_test=table_has_is_test(db, "prospect_candidates"))
 
 
 @router.post("/{prospect_id}/reenrich", response_model=ProspectRowOut)
@@ -411,7 +433,7 @@ def reenrich_prospect(
         row.enrichment_error = None
         db.commit()
         db.refresh(row)
-        out = _row_to_out(row, include_payloads=True)
+        out = _row_to_out(row, include_payloads=True, has_is_test=table_has_is_test(db, "prospect_candidates"))
     background_tasks.add_task(
         enrich_prospect,
         EnrichmentRequest(

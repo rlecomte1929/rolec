@@ -59,3 +59,39 @@ def test_stats_shape(admin_client):
     assert r.status_code == 200
     body = r.json()
     assert "total" in body and "new_this_week" in body and "by_status" in body
+
+
+def test_list_leads_and_prospects_ok_when_is_test_column_missing(admin_client):
+    """PR-1: readers must 200 if 20261146000000 has not been applied yet."""
+    from sqlalchemy import text
+
+    s = SessionLocal()
+    try:
+        s.execute(text("ALTER TABLE leads DROP COLUMN is_test"))
+        s.execute(text("ALTER TABLE prospect_candidates DROP COLUMN is_test"))
+        s.commit()
+    except Exception as exc:  # pragma: no cover — dialect without DROP COLUMN
+        s.rollback()
+        pytest.skip(f"cannot drop is_test for presence-guard test: {exc}")
+    finally:
+        s.close()
+
+    try:
+        r_leads = admin_client.get("/api/admin/leads")
+        r_prospects = admin_client.get("/api/admin/prospects")
+        assert r_leads.status_code == 200, r_leads.text
+        assert r_prospects.status_code == 200, r_prospects.text
+    finally:
+        s = SessionLocal()
+        try:
+            s.execute(text("ALTER TABLE leads ADD COLUMN is_test BOOLEAN NOT NULL DEFAULT 0"))
+        except Exception:
+            s.rollback()
+        try:
+            s.execute(text(
+                "ALTER TABLE prospect_candidates ADD COLUMN is_test BOOLEAN NOT NULL DEFAULT 0"
+            ))
+        except Exception:
+            s.rollback()
+        s.commit()
+        s.close()

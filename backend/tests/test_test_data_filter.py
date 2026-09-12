@@ -18,8 +18,10 @@ if _REPO_ROOT not in sys.path:
 from backend.db.test_data_filter import (  # noqa: E402
     exclude_test_companies,
     exclude_test_people,
+    exclude_test_prospects,
     looks_like_test_company,
     looks_like_test_email,
+    looks_like_test_prospect,
     strip_verify_prefix,
 )
 
@@ -96,6 +98,7 @@ class ExtendedSeederFilterTests(unittest.TestCase):
             CREATE TABLE companies (name TEXT);
             INSERT INTO companies (name) VALUES
               ('Google'), ('Google Dublin'), ('Testing April'), ('Meridian Capital'),
+              ('GlobalTech SAS'), ('Nexora Labs'), ('SLB Denis'), ('SLB_Denis'), ('Wave1 Tech'),
               ('Google IE Q1786637682758'), ('Google Ireland T18-A-1786634420882'),
               ('CPY Abe Romo'), ('VCo 1786634558409'), ('WCo 1786634597516'),
               ('Company 1'), ('TestCompany'), ('YvesTestCompany');
@@ -116,7 +119,10 @@ class ExtendedSeederFilterTests(unittest.TestCase):
             f"SELECT name FROM companies WHERE {exclude_test_companies('name')}"
         ).fetchall()
         names = {r[0] for r in rows}
-        self.assertEqual(names, {"Google", "Google Dublin", "Testing April", "Meridian Capital"})
+        self.assertEqual(names, {
+            "Google", "Google Dublin", "Testing April", "Meridian Capital",
+            "GlobalTech SAS", "Nexora Labs", "SLB Denis", "SLB_Denis", "Wave1 Tech",
+        })
 
     def test_new_seeder_emails_excluded_real_kept(self):
         rows = self.con.execute(
@@ -130,12 +136,29 @@ class ExtendedSeederFilterTests(unittest.TestCase):
         for bad in ("Google IE Q1786637682758", "Google Ireland T18-A-1786634420882",
                     "CPY Abe Romo", "VCo 1786634558409", "Company 1", "YvesTestCompany"):
             self.assertTrue(looks_like_test_company(bad), bad)
-        for good in ("Google", "Google Dublin", "Testing April", "Meridian Capital"):
+        for good in ("Google", "Google Dublin", "Testing April", "Meridian Capital",
+                     "GlobalTech SAS", "Nexora Labs", "Wave1 Tech"):
             self.assertFalse(looks_like_test_company(good), good)
         for bad in ("qa-proj-x@reloulexei.resend.app", "jane@example.com",
                     "roma+t18empb_1@hotmail.com", "roma+emp_run_5@hotmail.com"):
             self.assertTrue(looks_like_test_email(bad), bad)
         self.assertFalse(looks_like_test_email("romain_lecomte@hotmail.com"))
+
+    def test_qa_prospects_excluded(self):
+        self.con.executescript(
+            """
+            CREATE TABLE prospects (company_name TEXT);
+            INSERT INTO prospects (company_name) VALUES
+              ('Acme GmbH'), ('QA Corp'), ('Bob Dylan Company'),
+              ('HR Dir @ Acme'), ('A test school');
+            """
+        )
+        rows = self.con.execute(
+            f"SELECT company_name FROM prospects WHERE {exclude_test_prospects('company_name')}"
+        ).fetchall()
+        self.assertEqual({r[0] for r in rows}, {"Acme GmbH"})
+        self.assertTrue(looks_like_test_prospect("QA Corp"))
+        self.assertFalse(looks_like_test_prospect("Acme GmbH"))
 
 
 class StripVerifyPrefixTests(unittest.TestCase):

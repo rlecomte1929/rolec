@@ -78,12 +78,9 @@ def exclude_test_people(email_col: str = "email") -> str:
         f"AND {e} NOT LIKE '%@reloulexei.resend.app' "
         f"AND {e} NOT LIKE '%@example.com' "
         f"AND {le} NOT LIKE 'qa-proj-%' "
-        f"AND {le} NOT LIKE '%+t18%@hotmail.com' "
-        f"AND {le} NOT LIKE '%+emp_run%@hotmail.com' "
-        f"AND {le} NOT LIKE '%+hr_run%@hotmail.com' "
-        f"AND {le} NOT LIKE '%+twin%@hotmail.com' "
-        f"AND {le} NOT LIKE '%+dryrun%@hotmail.com' "
-        f"AND {le} NOT LIKE '%+qa%@hotmail.com')"
+        # Any hotmail plus-alias (local-part contains '+'). Never matches
+        # romain_lecomte@hotmail.com — that address has no '+'.
+        f"AND {le} NOT LIKE '%+%@hotmail.com')"
     )
 
 
@@ -114,8 +111,8 @@ _TEST_COMPANY_PREFIXES = (
 # prefixes are handled in looks_like_test_email directly.
 _TEST_EMAIL_DOMAINS = ("@testco.com", "@probe.test", "@reloulexei.resend.app", "@example.com")
 
-# Hotmail plus-alias segments the signup seeders use (roma+t18empb_…@hotmail.com).
-_TEST_HOTMAIL_ALIASES = ("+t18", "+emp_run", "+hr_run", "+twin", "+dryrun", "+qa")
+# Named QA prospect rows that do not contain the substring 'test'.
+_QA_PROSPECT_NAMES = ("QA Corp", "Bob Dylan Company", "HR Dir @ Acme", "HR Dir, Beta Co")
 
 
 def looks_like_test_company(name: "str | None") -> bool:
@@ -145,9 +142,47 @@ def looks_like_test_email(email: "str | None") -> bool:
         return True
     if e.startswith("qa-proj-"):
         return True
-    if e.endswith("@hotmail.com") and any(a in e for a in _TEST_HOTMAIL_ALIASES):
+    if e.endswith("@hotmail.com") and "+" in e.split("@", 1)[0]:
         return True
     return False
+
+
+def exclude_test_prospects(name_col: str = "company_name") -> str:
+    """SQL fragment that is TRUE for real (non-QA) prospect_candidates rows.
+
+    Named QA companies plus a broad '%test%' match. LOWER()+LIKE so it is
+    safe on both Postgres and SQLite. Used as the read-time fallback when the
+    is_test column has not been applied yet.
+    """
+    names = ", ".join("'" + n.replace("'", "''") + "'" for n in _QA_PROSPECT_NAMES)
+    return (
+        f"({name_col} IS NULL OR ("
+        f"{name_col} NOT IN ({names}) "
+        f"AND NOT (LOWER({name_col}) LIKE '%test%')))"
+    )
+
+
+def looks_like_test_prospect(company_name: "str | None") -> bool:
+    """True if a prospect company_name matches a known QA / seeder pattern."""
+    n = (company_name or "").strip()
+    if not n:
+        return False
+    if n in _QA_PROSPECT_NAMES:
+        return True
+    return "test" in n.lower()
+
+
+def table_has_is_test(session: object, table_name: str) -> bool:
+    """Presence-guard used by companies/profiles: `_table_columns` from database.py.
+
+    Routers that read Lead / ProspectCandidate.is_test MUST go through this (or
+    call `_table_columns` themselves) so a deploy-before-apply cannot 500.
+    """
+    from ..database import _table_columns  # lazy: avoid import cycle
+    try:
+        return "is_test" in _table_columns(session.connection(), table_name)  # type: ignore[attr-defined]
+    except Exception:
+        return False
 
 
 # ── Read-time display scrub (AIQ-1325b) ─────────────────────────────────────────

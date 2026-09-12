@@ -42,6 +42,7 @@ class LeadOut(BaseModel):
     created_at: Any
     updated_at: Any
     matched_prospect: bool = False
+    is_test: bool = False
 
 
 class LeadStatsOut(BaseModel):

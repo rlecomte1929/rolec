@@ -13,8 +13,29 @@
 -- read-time filter never un-hides them.
 --
 -- Idempotent: every backfill flips only false → true, so re-runs are no-ops.
--- Demo tenants are provably NOT flagged: 'Testing April' is excluded explicitly, and
--- romain_lecomte@hotmail.com has no '+' alias so the hotmail regex cannot match it.
+-- Demo tenants are provably NOT flagged via an explicit keep-list (below) AND
+-- because romain_lecomte@hotmail.com has no '+' alias so the hotmail regex cannot
+-- match it. Hotmail plus-aliases only: email ~ '^[^+@]+\+[^@]+@hotmail\.com$'.
+--
+-- Flip list (Aside read-only 2026-09-12; 41 company names this UPDATE will flag):
+--   Company 1
+--   CPY Abe Romo
+--   CPY Adrien Hardy
+--   CPY Hernandez Ivan
+--   Google IE Q1786637682758
+--   Google IE S1786637617043
+--   Google IE X1786634643069
+--   Google IE Y1786637756640
+--   Google IE Z1786637732555
+--   Google Ireland T18-A-… (13 rows)
+--   Google Ireland T18-B-… (12 rows)
+--   Test
+--   Test Company
+--   Test Company Inc
+--   TestCompany
+--   YvesTestCompany
+--   VCo 1786634558409
+--   WCo 1786634597516
 
 ALTER TABLE leads                    ADD COLUMN IF NOT EXISTS is_test boolean NOT NULL DEFAULT false;
 ALTER TABLE prospect_candidates      ADD COLUMN IF NOT EXISTS is_test boolean NOT NULL DEFAULT false;
@@ -25,6 +46,17 @@ ALTER TABLE hr_supplier_submissions  ADD COLUMN IF NOT EXISTS is_test boolean NO
 -- Mirrors backend/db/test_data_filter.looks_like_test_company / exclude_test_companies.
 UPDATE companies SET is_test = true
 WHERE is_test = false
+  AND name NOT IN (
+        'Testing April',
+        'Google Dublin',
+        'Google',
+        'GlobalTech SAS',
+        'Meridian Capital',
+        'Nexora Labs',
+        'SLB Denis',
+        'SLB_Denis',
+        'Wave1 Tech'
+      )
   AND (
        name ~ '^Google (IE|Ireland) [A-Z]?\d{10,}'
     OR name ~ '^Google Ireland T18-[A-Z]-'
@@ -46,7 +78,7 @@ WHERE is_test = false
     OR COALESCE(email, '') LIKE '%@example.com'
     OR COALESCE(email, '') LIKE 'qa-proj-%'
     OR (
-         email ~ '^[^+]+\+(t18|emp_run|hr_run|twin|dryrun|qa)[^@]*@hotmail\.com$'
+         email ~ '^[^+@]+\+[^@]+@hotmail\.com$'
          AND email <> 'romain_lecomte@hotmail.com'
        )
   );

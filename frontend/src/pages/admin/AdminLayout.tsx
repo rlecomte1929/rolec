@@ -118,8 +118,8 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Top bar */}
-        <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-slate-200 shrink-0">
-          <div className="flex items-center gap-1.5 text-sm text-slate-500">
+        <header className="flex items-center gap-3 px-6 py-3 bg-white border-b border-slate-200 shrink-0 flex-nowrap">
+          <div className="flex min-w-0 items-center gap-1.5 text-sm text-slate-500">
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
@@ -137,13 +137,14 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
               </>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-3">
             {/* SHELL-1 + founder cockpit: removed non-functional Notifications,
                Download, and Ask ReloPass AI — they had no handlers. */}
             <Switch
               checked={showTestData}
               onChange={toggleShowTestData}
               label="Show test data"
+              className="whitespace-nowrap"
             />
             <AdminAccountMenu name={userName} initials={deriveInitials(userName)} />
           </div>

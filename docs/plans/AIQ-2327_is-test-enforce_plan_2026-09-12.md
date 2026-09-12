@@ -54,3 +54,31 @@ version. A header toggle re-reveals them (with a "test" badge) for debugging.
 → 28 passed. `tsc --noEmit` clean. `vitest run src/pages/admin` → 129 passed.
 (Note: a stale local `ci_test.db` first failed the lead tests — `create_all` can't ALTER an
 existing table; deleting it and re-running is green, and CI starts fresh.)
+
+## Split (step 5 [Cursor] — decided)
+
+Readers must never deploy before the column exists. Two PRs:
+
+- **PR-1** (`feat/admin-is-test-enforce`): this migration + `test_data_filter.py` patterns +
+  `include_test` plumbing + **presence-guarded** ORM reads on `leads` / `prospect_candidates`
+  (if `is_test` is missing, fall back to the read-time pattern filter) + AdminLayout
+  "Show test data" toggle + grey "test" Badge.
+- **PR-2** (`feat/admin-is-test-readers`): created **after** PR-1 is merged **and** the
+  migration is applied to prod. Do not build it on this branch.
+
+## PR-2 TODO (`feat/admin-is-test-readers` — after PR-1 merge + prod apply)
+
+Do not start this branch until Aside has applied `20261146000000_is_test_extend.sql`
+(gated on Romain writing `Authorised: apply 20261146000000_is_test_extend.sql to prod`
+on the card).
+
+- [ ] Unguard `Lead.is_test` / `ProspectCandidate.is_test` ORM reads (drop `defer` +
+      pattern fallback; filter `is_test = false` only).
+- [ ] Add `include_test: bool = False` to **assignments** list endpoint; hide rows whose
+      company/profile is `is_test` unless the flag is on.
+- [ ] Add `include_test` to **feedback** list (filter by reporter profile `is_test`).
+- [ ] Add `include_test` to **supplier-submissions** (`hr_supplier_submissions.is_test`).
+- [ ] Grey "test" Badge on those rows when the toggle is on.
+- [ ] Confirm Today / Executive tenant count equals the visible Companies row count
+      with the toggle off.
+- [ ] Tests: assignments / feedback / supplier-submissions hide QA rows by default.
