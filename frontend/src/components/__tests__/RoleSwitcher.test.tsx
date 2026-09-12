@@ -66,7 +66,7 @@ describe('RoleSwitcher', () => {
     switchRole.mockResolvedValue({ roles: ['ADMIN', 'EMPLOYEE'], primary_role: 'ADMIN' });
 
     render(<RoleSwitcher />);
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'EMPLOYEE' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Employee' }));
 
     await waitFor(() => expect(setActiveRole).toHaveBeenCalledWith('EMPLOYEE'));
     expect(navigate).toHaveBeenCalledWith('/employee/dashboard');
