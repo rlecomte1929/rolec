@@ -9,9 +9,32 @@ real, and they live in different places:
 | Requirement records (the served facts) | `public.requirement_items` — several loaders write it, see [`DATA-PATHS.md`](DATA-PATHS.md) |
 | Documentation, metrics, validation, CVR | `docs/corridors/<id>/` |
 
-Ten corridor profiles exist under `corridors/`: `DE_NO`, `ES_IE`, `ES_NL`, `FR_CH`, `FR_DE`,
-`FR_ES`, `FR_NL`, `FR_NO`, `IE_ES`, `IN_DE`, `NO_FR`. A profile is not the same as a served
-corridor — most have no requirement records behind them yet.
+Thirteen corridor profiles exist under `corridors/` (see `corridor_registry.list_corridors()`).
+A profile is not the same as a served corridor — most have no requirement records behind them yet.
+
+## Demand-pull: no corridor without a real case
+
+Do not pre-create empty `requirement_items` for an unverified pair. The registry lives in git
+(`corridors/<ID>/corridor.yaml`), not a DB table, so a fictional `anchor_case_id NOT NULL`
+would not stop a load.
+
+**New** `corridors/*/corridor.yaml` files must declare an `anchor` naming a real case.
+Existing profiles are grandfathered (`scripts/check_corridor_anchor.py`). Served facts still
+fail closed: `requirements_builder` reads only `review_status = 'approved'`.
+
+```yaml
+corridor:
+  id: "XX_YY"
+  origin_iso: "XX"
+  destination_iso: "YY"
+  display_name: "Origin → Destination"
+  anchor:
+    case_id: "<relocation_cases.id>"   # and/or
+    case_ref: "Named case + corridor + year"
+    note: "Why this pair exists"         # optional
+```
+
+See [`backend/docs/adr-003-access-pattern-structures.md`](../../backend/docs/adr-003-access-pattern-structures.md).
 
 ## Documented corridors
 
@@ -21,6 +44,10 @@ corridor — most have no requirement records behind them yet.
 | FR→NO | `norway.yaml` seed | **no** — seed `pending` | none | [`fr-no/QBR-knowledge-layer.md`](fr-no/QBR-knowledge-layer.md) |
 
 ## Conventions worth knowing before adding one
+
+**Name the anchoring case.** A new `corridor.yaml` without `anchor.case_id` or
+`anchor.case_ref` fails `scripts/check_corridor_anchor.py`. Do not expand that script's
+grandfather set to dodge it.
 
 **Know which loader you are.** A generated migration with `ON CONFLICT (id)` is one of
 several paths into `requirement_items`, and it is the only one that sets `id` itself; the

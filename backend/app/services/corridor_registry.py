@@ -82,6 +82,19 @@ class CorridorPathway:
 
 
 @dataclass(frozen=True)
+class CorridorAnchor:
+    """Demand-pull pointer: a real case that justified creating this profile.
+
+    New corridors/*/corridor.yaml files must declare case_id and/or case_ref
+    (see scripts/check_corridor_anchor.py). Existing profiles are grandfathered
+    and may omit this block. Absent or empty → None (fallback-safe)."""
+
+    case_id: Optional[str] = None
+    case_ref: Optional[str] = None
+    note: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class CorridorProfile:
     corridor_id: str
     origin_iso: Optional[str] = None
@@ -93,6 +106,7 @@ class CorridorProfile:
     intake: Optional[CorridorIntakeConfig] = None
     sla: Optional[CorridorSlaConfig] = None
     pathways: Tuple[CorridorPathway, ...] = ()
+    anchor: Optional[CorridorAnchor] = None
 
 
 def _registry_dir() -> Path:
@@ -181,6 +195,24 @@ def _coerce_pathways(raw: Any) -> Tuple[CorridorPathway, ...]:
     return tuple(out)
 
 
+def _nonempty_str(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s or None
+
+
+def _coerce_anchor(raw: Any) -> Optional[CorridorAnchor]:
+    if not isinstance(raw, Mapping):
+        return None
+    case_id = _nonempty_str(raw.get("case_id"))
+    case_ref = _nonempty_str(raw.get("case_ref"))
+    note = _nonempty_str(raw.get("note"))
+    if case_id is None and case_ref is None and note is None:
+        return None
+    return CorridorAnchor(case_id=case_id, case_ref=case_ref, note=note)
+
+
 def _build_profile(corridor_id: str, doc: Mapping[str, Any]) -> CorridorProfile:
     block = doc.get("corridor") if isinstance(doc.get("corridor"), Mapping) else doc
     aliases_raw = block.get("aliases")
@@ -196,6 +228,7 @@ def _build_profile(corridor_id: str, doc: Mapping[str, Any]) -> CorridorProfile:
         intake=_coerce_intake(block.get("intake")),
         sla=_coerce_sla(block.get("sla")),
         pathways=_coerce_pathways(block.get("pathways")),
+        anchor=_coerce_anchor(block.get("anchor")),
     )
 
 

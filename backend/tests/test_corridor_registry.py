@@ -100,6 +100,31 @@ class FallbackSafetyTests(unittest.TestCase):
         self.assertIsNotNone(p)
         self.assertIsNone(p.retrieval)
 
+    def test_absent_anchor_is_none(self):
+        self._write("XX_YY", "corridor:\n  id: XX_YY\n  origin_iso: XX\n")
+        p = reg.load_corridor_profile("XX_YY")
+        self.assertIsNotNone(p)
+        self.assertIsNone(p.anchor)
+
+    def test_anchor_parses_case_ref_and_note(self):
+        self._write(
+            "XX_YY",
+            "corridor:\n  id: XX_YY\n  anchor:\n    case_ref: Andrea ES→IE\n"
+            "    note: pilot\n",
+        )
+        p = reg.load_corridor_profile("XX_YY")
+        self.assertIsNotNone(p)
+        self.assertIsNotNone(p.anchor)
+        self.assertEqual(p.anchor.case_ref, "Andrea ES→IE")
+        self.assertEqual(p.anchor.note, "pilot")
+        self.assertIsNone(p.anchor.case_id)
+
+    def test_empty_anchor_block_is_none(self):
+        self._write("XX_YY", "corridor:\n  id: XX_YY\n  anchor: {}\n")
+        p = reg.load_corridor_profile("XX_YY")
+        self.assertIsNotNone(p)
+        self.assertIsNone(p.anchor)
+
 
 # --------------------------------------------------------------------------- #
 # Retriever seam                                                              #
