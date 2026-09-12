@@ -89,4 +89,20 @@ describe('RoadmapStepCard — expected / source / timeline', () => {
       '/employee/case/case-1/dossier',
     );
   });
+
+  it('renders source_url as an external Source link with target=_blank', () => {
+    const href = 'https://www.revenue.ie/en/starting-a-business/registering-a-new-business';
+    renderCard({ ...base, source_url: href });
+    const link = screen.getByRole('link', { name: /revenue\.ie/i });
+    expect(link).toHaveAttribute('href', href);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringMatching(/noreferrer/));
+  });
+
+  it('renders no Source href when source_url is missing', () => {
+    renderCard({ ...base, source_url: null });
+    expect(screen.queryByRole('link', { name: /revenue\.ie/i })).not.toBeInTheDocument();
+    const source = screen.getByTestId('task-source');
+    expect(source.querySelector('a[href^="http"]')).toBeNull();
+  });
 });
