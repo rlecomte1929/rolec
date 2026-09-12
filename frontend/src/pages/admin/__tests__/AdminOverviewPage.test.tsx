@@ -4,8 +4,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { adminAPI, adminProspectsAPI } from '../../../api/client';
-import { getReviewSummary } from '../../../api/contentReview';
+import { useAdminMetrics } from '../../../api/adminMetrics';
 import { AdminOverviewPage } from '../AdminOverviewPage';
 
 vi.mock('../AdminLayout', () => ({
@@ -23,14 +22,14 @@ vi.mock('../AdminLayout', () => ({
   ),
 }));
 
-vi.mock('../../../api/client', () => ({
-  adminAPI: {
-    listCompanies: vi.fn(),
-  },
-  adminProspectsAPI: { list: vi.fn() },
-}));
-
-vi.mock('../../../api/contentReview', () => ({ getReviewSummary: vi.fn() }));
+vi.mock('../../../api/adminMetrics', async () => {
+  const actual = await vi.importActual<typeof import('../../../api/adminMetrics')>('../../../api/adminMetrics');
+  return {
+    ...actual,
+    useAdminMetrics: vi.fn(),
+    getAdminMetrics: vi.fn(),
+  };
+});
 
 const mocked = <T,>(fn: T) => fn as T & ReturnType<typeof vi.fn>;
 
@@ -40,6 +39,14 @@ vi.stubGlobal('localStorage', {
   setItem: (key: string, value: string) => storage.set(key, value),
   removeItem: (key: string) => storage.delete(key),
   clear: () => storage.clear(),
+});
+
+const asOf = '2026-09-12T12:00:00.000Z';
+const metric = (value: number, definition: string) => ({
+  value,
+  definition,
+  source: 's',
+  as_of: asOf,
 });
 
 const renderPage = () =>
@@ -63,14 +70,15 @@ describe('AdminOverviewPage metrics', () => {
   });
 
   it('renders today stats and four job doors without a module-card grid', async () => {
-    mocked(adminAPI.listCompanies).mockResolvedValue({ companies: [{}, {}] });
-    mocked(adminProspectsAPI.list).mockResolvedValue({ total: 17, limit: 1, offset: 0, prospects: [] });
-    mocked(getReviewSummary).mockResolvedValue({
-      by_destination: {},
-      totals: { pending: 6 },
-      pending_evidence: {},
-      pending: 6,
-    });
+    mocked(useAdminMetrics).mockReturnValue({
+      data: {
+        as_of: asOf,
+        tenants_total: metric(2, 'Companies on the platform, excluding test tenants.'),
+        content_review_pending: metric(6, 'Requirement facts waiting for a human to review before they are shown.'),
+        prospects_waiting: metric(17, 'People in the outreach pipeline who have not become tenants yet.'),
+      },
+      isLoading: false,
+    } as ReturnType<typeof useAdminMetrics>);
 
     renderPage();
 
@@ -91,17 +99,21 @@ describe('AdminOverviewPage metrics', () => {
     expect(screen.queryByTestId('module-rag-quality')).not.toBeInTheDocument();
     expect(screen.getByTestId('admin-today-subtitle')).toHaveTextContent('What needs attention today');
     expect(screen.queryByText(/Executive and Ops stay nested/i)).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('metric-tenants')).getByTestId('stat-card-definition')).toHaveTextContent(
+      /Companies on the platform, excluding test tenants\. · as of/,
+    );
   });
 
   it('treats a real zero pending review as empty, not as a fake count', async () => {
-    mocked(adminAPI.listCompanies).mockResolvedValue({ companies: [] });
-    mocked(adminProspectsAPI.list).mockResolvedValue({ total: 0, limit: 1, offset: 0, prospects: [] });
-    mocked(getReviewSummary).mockResolvedValue({
-      by_destination: {},
-      totals: { pending: 0 },
-      pending_evidence: {},
-      pending: 0,
-    });
+    mocked(useAdminMetrics).mockReturnValue({
+      data: {
+        as_of: asOf,
+        tenants_total: metric(0, 'Companies on the platform, excluding test tenants.'),
+        content_review_pending: metric(0, 'Requirement facts waiting for a human to review before they are shown.'),
+        prospects_waiting: metric(0, 'People in the outreach pipeline who have not become tenants yet.'),
+      },
+      isLoading: false,
+    } as ReturnType<typeof useAdminMetrics>);
 
     renderPage();
 
@@ -112,20 +124,19 @@ describe('AdminOverviewPage metrics', () => {
     expect(screen.queryByText('1204')).not.toBeInTheDocument();
   });
 
-  it('shows unavailable for failed sources and never renders fabricated fallback counts', async () => {
-    const failure = new Error('offline');
-    mocked(adminAPI.listCompanies).mockRejectedValue(failure);
-    mocked(adminProspectsAPI.list).mockRejectedValue(failure);
-    mocked(getReviewSummary).mockRejectedValue(failure);
+  it('omits tiles when the metric is missing and never renders Unavailable', async () => {
+    mocked(useAdminMetrics).mockReturnValue({
+      data: { as_of: asOf },
+      isLoading: false,
+    } as ReturnType<typeof useAdminMetrics>);
 
     renderPage();
 
-    await waitFor(() =>
-      expect(within(screen.getByTestId('metric-tenants')).getByText('Unavailable')).toBeInTheDocument(),
-    );
-    expect(within(screen.getByTestId('metric-review-open')).getByText('Unavailable')).toBeInTheDocument();
-    expect(within(screen.getByTestId('metric-prospects')).getByText('Unavailable')).toBeInTheDocument();
-    expect(screen.getByTestId('job-doors')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('job-doors')).toBeInTheDocument());
+    expect(screen.queryByTestId('metric-tenants')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('metric-review-open')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('metric-prospects')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unavailable')).not.toBeInTheDocument();
     expect(screen.queryByText('42')).not.toBeInTheDocument();
     expect(screen.queryByText('7')).not.toBeInTheDocument();
   });

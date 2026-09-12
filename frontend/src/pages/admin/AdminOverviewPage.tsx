@@ -1,46 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import {
-  adminAPI,
-  adminProspectsAPI,
-} from '../../api/client';
-import { getReviewSummary } from '../../api/contentReview';
+import { metricTooltip, useAdminMetrics } from '../../api/adminMetrics';
 import { StatCard } from '../../components/admin/overview/StatCard';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 import { AdminLayout } from './AdminLayout';
-
-type OverviewStats = {
-  companies: number | null;
-  contentReviewPending: number | null;
-  prospectsTotal: number | null;
-};
-
-const EMPTY_STATS: OverviewStats = {
-  companies: null,
-  contentReviewPending: null,
-  prospectsTotal: null,
-};
-
-function settledArrayCount<T>(
-  result: PromiseSettledResult<T>,
-  select: (value: T) => unknown,
-): number | null {
-  if (result.status !== 'fulfilled') return null;
-  const rows = select(result.value);
-  return Array.isArray(rows) ? rows.length : null;
-}
-
-function settledNumber<T>(
-  result: PromiseSettledResult<T>,
-  select: (value: T) => unknown,
-): number | null {
-  if (result.status !== 'fulfilled') return null;
-  const value = select(result.value);
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
 
 function JobRow({
   to,
@@ -81,26 +46,12 @@ function JobRow({
 
 export const AdminOverviewPage: React.FC = () => {
   const role = normalizeStoredRole(getAuthItem('relopass_role'));
-
-  const statsQuery = useQuery({
-    queryKey: ['admin', 'overview-stats'],
-    queryFn: async (): Promise<OverviewStats> => {
-      const results = await Promise.allSettled([
-        adminAPI.listCompanies(),
-        getReviewSummary(),
-        adminProspectsAPI.list({ limit: 1 }),
-      ]);
-
-      return {
-        companies: settledArrayCount(results[0], (value) => value.companies),
-        contentReviewPending: settledNumber(results[1], (value) => value.pending),
-        prospectsTotal: settledNumber(results[2], (value) => value.total),
-      };
-    },
-    enabled: role === 'ADMIN',
-  });
-  const stats: OverviewStats = statsQuery.data ?? EMPTY_STATS;
-  const loading = statsQuery.isLoading;
+  const metricsQuery = useAdminMetrics();
+  const metrics = metricsQuery.data;
+  const loading = metricsQuery.isLoading;
+  const tenants = metrics?.tenants_total;
+  const review = metrics?.content_review_pending;
+  const prospects = metrics?.prospects_waiting;
 
   if (role !== 'ADMIN') {
     return (
@@ -110,8 +61,7 @@ export const AdminOverviewPage: React.FC = () => {
     );
   }
 
-  const reviewEmpty = !loading && stats.contentReviewPending === 0;
-  const reviewFailed = !loading && stats.contentReviewPending === null;
+  const reviewEmpty = !loading && review?.value === 0;
 
   return (
     <AdminLayout
@@ -127,29 +77,39 @@ export const AdminOverviewPage: React.FC = () => {
               Coverage
             </Link>
           </div>
-        ) : (
+        ) : review ? (
           <StatCard
             testId="metric-review-open"
             label="Content review pending"
-            value={stats.contentReviewPending}
-            sub={reviewFailed ? 'Source unavailable' : undefined}
+            value={review.value}
             loading={loading}
+            definition={metricTooltip(review)}
           />
-        )}
-        <StatCard
-          testId="metric-tenants"
-          label="Tenants"
-          value={stats.companies}
-          sub={!loading && stats.companies === null ? 'Source unavailable' : undefined}
-          loading={loading}
-        />
-        <StatCard
-          testId="metric-prospects"
-          label="Prospects waiting"
-          value={stats.prospectsTotal}
-          sub={!loading && stats.prospectsTotal === null ? 'Source unavailable' : undefined}
-          loading={loading}
-        />
+        ) : loading ? (
+          <StatCard testId="metric-review-open" label="Content review pending" value={null} loading />
+        ) : null}
+        {tenants ? (
+          <StatCard
+            testId="metric-tenants"
+            label="Tenants"
+            value={tenants.value}
+            loading={loading}
+            definition={metricTooltip(tenants)}
+          />
+        ) : loading ? (
+          <StatCard testId="metric-tenants" label="Tenants" value={null} loading />
+        ) : null}
+        {prospects ? (
+          <StatCard
+            testId="metric-prospects"
+            label="Prospects waiting"
+            value={prospects.value}
+            loading={loading}
+            definition={metricTooltip(prospects)}
+          />
+        ) : loading ? (
+          <StatCard testId="metric-prospects" label="Prospects waiting" value={null} loading />
+        ) : null}
       </div>
 
       {!loading && (
@@ -161,8 +121,8 @@ export const AdminOverviewPage: React.FC = () => {
               label="Catalog"
               destination="Coverage"
               countLabel={
-                stats.contentReviewPending !== null && stats.contentReviewPending > 0
-                  ? `${stats.contentReviewPending} pending`
+                review && review.value > 0
+                  ? `${review.value} pending`
                   : undefined
               }
             />
@@ -177,11 +137,7 @@ export const AdminOverviewPage: React.FC = () => {
               testId="job-door-pipeline"
               label="Pipeline"
               destination="Prospects"
-              countLabel={
-                stats.prospectsTotal !== null && stats.prospectsTotal > 0
-                  ? String(stats.prospectsTotal)
-                  : undefined
-              }
+              countLabel={prospects && prospects.value > 0 ? `${prospects.value}` : undefined}
             />
             <JobRow
               to={buildRoute('adminFeatureFlags')}

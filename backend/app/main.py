@@ -13,6 +13,7 @@ from .routers import (
     admin_dsar,
     admin_feature_flags,
     admin_exec_overview,
+    admin_metrics,
     admin_test_drive,
     admin_marketing_analytics,
     admin_rag_eval,
@@ -271,6 +272,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_dsar.router)  # GDPR/DSAR desk — /api/admin/erasure-requests
     app.include_router(admin_feature_flags.router)  # Feature-flag console — /api/admin/feature-flags
     app.include_router(admin_exec_overview.router)  # Executive dashboard — GET /api/admin/exec-overview
+    app.include_router(admin_metrics.router)  # [AIQ-2326] Admin KPI SoT — GET /api/admin/metrics/summary
     app.include_router(admin_test_drive.router)  # [AIQ-1428] TD-10 — GET /api/admin/test-drive/*
     app.include_router(admin_work_items.router)  # Mission Control P1 — demands console
     # [Parker-H] Conjoint (CBC) company-scoped HR/respondent API

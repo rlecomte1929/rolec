@@ -44,29 +44,42 @@ def _scalar_counts(query: str, params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _growth() -> Dict[str, Any]:
-    data = _scalar_counts(
-        """
-        SELECT (SELECT count(*) FROM public.companies)  AS companies,
-               (SELECT count(*) FROM public.hr_users)   AS hr_users,
-               (SELECT count(*) FROM public.employees)  AS employees,
-               (SELECT count(*) FROM public.companies WHERE created_at >= :since) AS new_companies
-        """,
+    # [AIQ-2326] Read the tenant/people counts from the shared admin metrics SoT so
+    # "Companies" here is the SAME real-tenant number the Companies page shows (it used
+    # to be a raw count(*) of ALL companies incl. test tenants — hence the 71-vs-48
+    # mismatch). new_companies stays a windowed direct count (not an SoT metric).
+    from .admin_metrics_service import tenants_total, hr_users, employees
+    new_companies = _scalar_counts(
+        "SELECT count(*) AS new_companies FROM public.companies WHERE created_at >= :since",
         {"since": _since_iso(30)},
     )
-    return {"available": True, "data_source": "live", **data}
+    return {
+        "available": True,
+        "data_source": "live",
+        "companies": tenants_total().get("value"),
+        "hr_users": hr_users().get("value"),
+        "employees": employees().get("value"),
+        "new_companies": new_companies.get("new_companies"),
+    }
 
 
 def _funnel(window_days: int) -> Dict[str, Any]:
-    data = _scalar_counts(
-        """
-        SELECT (SELECT count(*) FROM public.profiles) AS signups,
-               (SELECT count(*) FROM public.case_assignments WHERE status IN ('awaiting_intake', 'submitted')) AS in_intake,
-               (SELECT count(*) FROM public.case_assignments) AS cases,
-               (SELECT count(*) FROM public.case_assignments WHERE status = 'closed' OR archived_at IS NOT NULL) AS completed
-        """,
+    # [AIQ-2326] signups / cases counts come from the shared admin metrics SoT (same
+    # real-only definitions as everywhere else). in_intake stays a direct count.
+    from .admin_metrics_service import signups, cases_total, cases_closed
+    in_intake = _scalar_counts(
+        "SELECT count(*) AS in_intake FROM public.case_assignments "
+        "WHERE status IN ('awaiting_intake', 'submitted')",
         {},
     )
-    return {"available": True, "data_source": "live", **data}
+    return {
+        "available": True,
+        "data_source": "live",
+        "signups": signups().get("value"),
+        "in_intake": in_intake.get("in_intake"),
+        "cases": cases_total().get("value"),
+        "completed": cases_closed().get("value"),
+    }
 
 
 def _throughput(window_days: int) -> Dict[str, Any]:
