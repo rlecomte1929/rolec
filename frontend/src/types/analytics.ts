@@ -26,6 +26,10 @@ export type EventType =
   | 'user_signed_up'
   // HR buyer actions
   | 'assignment_created'
+  | 'paywall_impression'
+  | 'payment_initiated'
+  | 'payment_completed'
+  | 'corridor_waitlist_intent'
   | 'assignment_submitted'
   | 'assignment_cancelled'
   | 'assignment_completed'

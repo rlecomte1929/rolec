@@ -24,6 +24,7 @@ import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI, policyConfigMatrixAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import { resolveOverviewState } from '../employee-journey/overviewResolution';
 import type {
   PolicyConfigBenefitRow,
   PolicyConfigCategoryBlock,
@@ -129,7 +130,10 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
   assignmentIdOverride,
 }) => {
   const [searchParams] = useSearchParams();
-  const { assignmentId: contextAssignmentId, linkedCount, isLoading: assignmentLoading } = useEmployeeAssignment();
+  const {
+    assignmentId: contextAssignmentId, linkedCount, pendingCount, overviewError, overviewDegraded,
+    isLoading: assignmentLoading,
+  } = useEmployeeAssignment();
   const assignmentId =
     assignmentIdOverride ??
     searchParams.get('assignmentId') ??
@@ -200,6 +204,22 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
   // Friendly holding state while the assignment context is still loading, or if the
   // employee isn't yet linked to a company/assignment. (Must come AFTER all hooks —
   // an early return above them would call the hooks conditionally; LINT-3 rules-of-hooks.)
+  // AIQ-2285/T8: a failed or degraded overview also reports linkedCount 0. Say we
+  // could not load it, never that HR has not linked them.
+  const { unresolved: overviewUnresolved } = resolveOverviewState({
+    overviewError, overviewDegraded, linkedCount, pendingCount,
+  });
+  if (!assignmentLoading && overviewUnresolved && !assignmentId) {
+    return (
+      <Card padding="lg" className="border-[#e2e8f0]">
+        <p className="text-sm font-medium text-[#0b2b43] mb-1">We couldn&apos;t load your policy</p>
+        <p className="text-sm text-[#64748b]">
+          This is usually temporary. Refresh the page to try again.
+        </p>
+      </Card>
+    );
+  }
+
   if (!assignmentLoading && !assignmentId && linkedCount === 0) {
     return (
       <Card padding="lg" className="border-[#e2e8f0]">

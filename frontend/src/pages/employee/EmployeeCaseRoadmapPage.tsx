@@ -40,6 +40,7 @@ import { track } from '../../analytics';
 import {
   trackCaseCompleted,
   trackCaseRoadmapReviewed,
+  trackPaymentCompleted,
 } from '../../analyticsEvents';
 import { ReliefMomentCapture } from '../../features/employee-journey/ReliefMomentCapture';
 import { resolveRoadmapBuildVariant } from './roadmapBuildVariant';
@@ -265,6 +266,9 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     // can lag the browser redirect by a beat. Poll the server status briefly so a just-paid
     // user lands on their roadmap, not the paywall again. Normal loads check once.
     const justPaid = justPaidRef.current;
+    if (justPaid) {
+      trackPaymentCompleted({ assignment_id: caseId });
+    }
     const maxAttempts = justPaid ? 6 : 1; // ~6 × 2.5s ≈ 15s grace for the webhook
     let attempt = 0;
     const check = () => {
