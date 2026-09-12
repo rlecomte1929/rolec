@@ -1,0 +1,177 @@
+{
+  "url": "https://www.udi.no/globalassets/global/skjemaer/employment-certificate-eea_efta-gp7116_e.pdf",
+  "count": 33,
+  "fields": [
+    {
+      "name": "Family name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "First name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Citizenship",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Address in country of origin",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postal code",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postal district",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Address in Norway",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postal code_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postal district_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Name of enterprise responsible employer",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Organisation number",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Employers address",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postal code_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postal district_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Employers contact person",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Personal identity number if the employer is a private individual",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Phone number",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Fax",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Email",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "The person mentioned in section 1 is employed in the position of",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Detailed description of tasks and duties  the nature of the work",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Hours worked per day",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Hours worked per week",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Pay gross hourly or monthly pay in NOK",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Permanently employed from",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Temporarily employed from",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "To",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Employed as needed on call from",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "To_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "State guaranteed minimum number of hours per week",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Place and date",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Employers signature and stamp",
+      "ft": "Tx",
+      "maxLen": null
+    }
+  ],
+  "_provenance": {
+    "extracted": "2026-09-12",
+    "method": "pypdf.get_fields() over the blank AcroForm; /Btn export values resolved via /_States_ then a /Kids -> /AP/N appearance-state walk. Bytes were operator-supplied: in-session egress to web.archive.org and udi.no was policy-blocked (403 at CONNECT), so the intended Wayback 2id_/CDX fetch could not run here; the operator provided the blank forms directly.",
+    "sha256": "5513d18c8f854528551ca86768eba903fccb659f0a4ebc5beaed2eac4370c654",
+    "pdf_bytes": 877865
+  }
+}
