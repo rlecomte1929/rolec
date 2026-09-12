@@ -45,8 +45,6 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
-
 from backend.app.services.evidence_quote_validator import (
     CorruptedEvidenceError,
     validate_ingest_text,
@@ -453,62 +451,6 @@ class FactRowError(ValueError):
     """
 
 
-class FactIngestRecord(BaseModel):
-    """Otto JSONL object at the ingest gate.
-
-    Required keys match `otto_staging.immigration_fact_candidates` NOT NULL columns that
-    the file must supply. Extra keys (``quote_sha256``, research flags) are allowed.
-    ``source_url`` is a string, not HttpUrl: live citations include ``source_records`` UUIDs.
-    """
-
-    model_config = ConfigDict(extra="allow")
-
-    destination_country: str
-    entity_topic_key: str
-    fact_key: str
-    fact_text: str
-    source_url: str
-    entity_title: Optional[str] = None
-    fact_type: Optional[str] = None
-    applies_to: Optional[Dict[str, Any]] = None
-    evidence_quote: Optional[str] = None
-    confidence: Optional[str] = None
-
-    @field_validator(
-        "destination_country",
-        "entity_topic_key",
-        "fact_key",
-        "fact_text",
-        "source_url",
-        mode="before",
-    )
-    @classmethod
-    def _required_nonempty(cls, value: Any) -> str:
-        text = str(value or "").strip()
-        if not text:
-            raise ValueError("required")
-        return text
-
-
-def _factrow_error_from_pydantic(exc: ValidationError) -> FactRowError:
-    """Keep the CLI/test wording: name the field, do not dump a pydantic traceback."""
-    missing: List[str] = []
-    for err in exc.errors():
-        loc = ".".join(str(part) for part in err.get("loc", ()))
-        if loc == "applies_to":
-            inp = err.get("input")
-            return FactRowError(
-                f"applies_to must be an object, got {type(inp).__name__}"
-            )
-        if loc in REQUIRED_FIELDS:
-            if loc not in missing:
-                missing.append(loc)
-    if missing:
-        return FactRowError(f"missing required field(s): {', '.join(missing)}")
-    msg = str(exc.errors()[0].get("msg") or "invalid record")
-    return FactRowError(msg)
-
-
 @dataclass
 class FactRow:
     """One validated fact, ready for `otto_staging.immigration_fact_candidates`."""
@@ -691,10 +633,17 @@ def grade(row: FactRow) -> FactRow:
 
 
 def _to_row(rec: Dict[str, Any], batch_id: str, lineno: int) -> FactRow:
+    from pydantic import ValidationError
+
+    from backend.imports.otto.ingest_record import (
+        FactIngestRecord,
+        factrow_error_from_pydantic,
+    )
+
     try:
         parsed = FactIngestRecord.model_validate(rec)
     except ValidationError as exc:
-        raise _factrow_error_from_pydantic(exc) from exc
+        raise factrow_error_from_pydantic(exc) from exc
 
     fact_type = str(parsed.fact_type or "other").strip().lower()
     if fact_type not in KNOWN_FACT_TYPES:
@@ -780,3 +729,16 @@ def read_jsonl(path: Path, *, batch_id: str) -> Tuple[List[FactRow], List[str]]:
             rows.append(row)
 
     return rows, rejections
+
+
+def __getattr__(name: str) -> Any:
+    """Load the Pydantic ingest model only when callers ask for it.
+
+    `classify_source` must import without pydantic so the corridor fact-pack
+    gate (PyYAML-only) can use the official-host classifier.
+    """
+    if name == "FactIngestRecord":
+        from backend.imports.otto.ingest_record import FactIngestRecord
+
+        return FactIngestRecord
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
