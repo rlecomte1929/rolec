@@ -292,6 +292,7 @@ _GENDER_CODES = {
 _MARITAL_CODES = {
     "single": "SINGLE", "celibataire": "SINGLE", "célibataire": "SINGLE", "unmarried": "SINGLE",
     "married": "MARRIED", "marie": "MARRIED", "marié": "MARRIED", "mariee": "MARRIED", "mariée": "MARRIED",
+    "civil_partnership": "MARRIED", "civil partnership": "MARRIED",
     "separated": "SEPARATED", "separe": "SEPARATED", "séparé": "SEPARATED",
     "divorced": "DIVORCED", "divorce": "DIVORCED", "divorcé": "DIVORCED",
     "widowed": "WIDOWED", "widow": "WIDOWED", "widower": "WIDOWED", "veuf": "WIDOWED", "veuve": "WIDOWED",
@@ -612,9 +613,11 @@ def visa_types_for_corridor(corridor_to: str) -> List[str]:
     assuming one:
 
       * exactly one  -> use it
-      * none         -> this corridor has no fillable form (e.g. Norway, which is
-                        a portal/data-sheet corridor) — an empty form list is the
-                        correct answer, not an error
+      * none         -> this corridor has no fillable form — an empty form list is
+                        the correct answer, not an error. Norway still carries
+                        non-fillable ``NO_datasheet_v2026`` rows; fillable GP7028
+                        is ``skilled_worker`` only. If both visa types exist in
+                        mappings, the caller must pass ``visa_type``.
       * more than one -> genuinely ambiguous; the caller must specify
 
     Sorted for deterministic behaviour when a corridor grows a second type.

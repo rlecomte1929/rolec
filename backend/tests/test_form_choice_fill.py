@@ -38,6 +38,7 @@ class ChoiceResolution(unittest.TestCase):
             ("married", "applicantMaritalMAR"), ("marié", "applicantMaritalMAR"),
             ("separated", "applicantMaritalSEP"), ("divorced", "applicantMaritalDIV"),
             ("widowed", "applicantMaritalVEU"), ("veuve", "applicantMaritalVEU"),
+            ("civil_partnership", "applicantMaritalMAR"),  # same canonical as GP7028
             ("pacsé", "applicantMaritalAUT"),  # unknown → OTHER, never dropped
         ]:
             vals, _ = self._one("marital_status", value)
@@ -113,6 +114,10 @@ class SingleRadioField(unittest.TestCase):
         vals, _ = fps.build_choice_fill(self.ES, {"gender": "female", "marital_status": "married"})
         self.assertEqual(vals, {"Sexo": "/Mujer", "Estado Civil": "/Casado"})
 
+    def test_civil_partnership_maps_to_casado(self):
+        vals, _ = fps.build_choice_fill(self.ES, {"marital_status": "civil_partnership"})
+        self.assertEqual(vals, {"Estado Civil": "/Casado"})
+
     def test_value_with_no_option_on_the_form_sets_nothing(self):
         # The EX-17 marital radio has no "other"; an unmatched value must set nothing, not guess.
         vals, report = fps.build_choice_fill(self.ES, {"marital_status": "in a civil partnership"})
@@ -123,6 +128,32 @@ class SingleRadioField(unittest.TestCase):
         vals, report = fps.build_choice_fill(self.ES, {"gender": ""})
         self.assertEqual(vals, {})
         self.assertTrue(report and report[0].status == fps.STATUS_BLANK)
+
+
+class NoGp7028CivilPartnership(unittest.TestCase):
+    """Vault civil_partnership fills GP7028's combined Married / civil partner radio."""
+
+    NO = "NO_udi_gp7028_v2024"
+
+    def test_civil_partnership_fills_married_radio(self):
+        vals, report = fps.build_choice_fill(self.NO, {"marital_status": "civil_partnership"})
+        self.assertEqual(vals, {"Marital status group 1": "/Married / civil partner"})
+        marital = [r for r in report if r.form_field_id == "Marital status group 1"]
+        self.assertTrue(marital and marital[0].status == fps.STATUS_FILLED)
+
+    def test_space_form_and_cohabitant_and_male(self):
+        vals, _ = fps.build_choice_fill(self.NO, {"marital_status": "civil partnership"})
+        self.assertEqual(vals.get("Marital status group 1"), "/Married / civil partner")
+        vals, _ = fps.build_choice_fill(self.NO, {"marital_status": "cohabitant"})
+        self.assertEqual(vals.get("Marital status group 1"), "/Cohabitant")
+        vals, _ = fps.build_choice_fill(self.NO, {"gender": "male"})
+        self.assertEqual(vals.get("Gender"), "/Male")
+
+    def test_unmatched_marital_and_gender_set_nothing(self):
+        vals, report = fps.build_choice_fill(self.NO, {"marital_status": "other", "gender": "x"})
+        self.assertEqual(vals, {})
+        self.assertTrue(any(r.status == fps.STATUS_BLANK and r.form_field_id == "Marital status group 1" for r in report))
+        self.assertTrue(any(r.status == fps.STATUS_BLANK and r.form_field_id == "Gender" for r in report))
 
 
 if __name__ == "__main__":
