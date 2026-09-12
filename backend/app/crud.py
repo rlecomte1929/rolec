@@ -212,6 +212,9 @@ def _apply_requirement_item_update(db: Session, existing: models.RequirementItem
     )
     db.commit()
     db.refresh(existing)
+    from .services.requirement_catalog_cache import invalidate_country
+
+    invalidate_country(existing.country_code, item_id=existing.id, reason="requirement_item_update")
     return existing
 
 
@@ -293,6 +296,9 @@ def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.Requ
             changed_by="system:create_requirement_item",
             commit=True,
         )
+        from .services.requirement_catalog_cache import invalidate_country
+
+        invalidate_country(item.country_code, item_id=item.id, reason="requirement_item_insert")
         return item
 
     # ON CONFLICT DO NOTHING fired: a concurrent import of the same requirement won the

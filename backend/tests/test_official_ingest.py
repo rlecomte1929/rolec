@@ -114,3 +114,80 @@ def test_llm_failure_falls_back_to_rule_based(monkeypatch):
 
     monkeypatch.setattr(ingest, "extract_requirement_facts", boom)
     assert ingest._llm_facts_for_doc("https://x/", "Some real content here.", corridor="NO") == []
+
+
+def test_failed_fetch_does_not_upsert_empty_evidence(monkeypatch):
+    upserts = []
+
+    def boom_fetch(url, destination_country):
+        raise ValueError("403 Client Error")
+
+    monkeypatch.setattr(ingest, "_fetch_html", boom_fetch)
+    monkeypatch.setattr(ingest.db, "ensure_knowledge_pack", lambda *a, **k: (_ for _ in ()).throw(AssertionError("pack")))
+    monkeypatch.setattr(
+        ingest.db,
+        "upsert_knowledge_doc_by_url",
+        lambda **kw: upserts.append(kw) or {"id": "doc1"},
+    )
+
+    res = ingest.ingest_url_to_knowledge_doc(
+        "https://www.uscis.gov/working-in-the-united-states", "US", "immigration"
+    )
+    assert res["fetch_status"] == "fetch_failed"
+    assert res["doc_id"] is None
+    assert res["facts_created"] == 0
+    assert upserts == []
+
+
+def test_empty_excerpt_does_not_upsert_empty_evidence(monkeypatch):
+    upserts = []
+
+    monkeypatch.setattr(
+        ingest, "_fetch_html", lambda url, dest: (url, "<html><body></body></html>")
+    )
+    monkeypatch.setattr(ingest, "_extract_text", lambda html: ("", ""))
+    monkeypatch.setattr(
+        ingest.db,
+        "upsert_knowledge_doc_by_url",
+        lambda **kw: upserts.append(kw) or {"id": "doc1"},
+    )
+
+    res = ingest.ingest_url_to_knowledge_doc(
+        "https://www.uscis.gov/working-in-the-united-states", "US", "immigration"
+    )
+    assert res["fetch_status"] == "fetch_failed"
+    assert "Empty content" in (res["error"] or "")
+    assert upserts == []
+
+
+def test_login_redirect_is_a_failed_fetch():
+    assert ingest._looks_like_login_url("https://www.uscis.gov/login?next=/foo")
+    assert not ingest._looks_like_login_url("https://www.uscis.gov/working-in-the-united-states")
+
+
+def test_successful_fetch_still_upserts_excerpt_and_hash(monkeypatch):
+    upserts = []
+
+    def fake_upsert(**kwargs):
+        upserts.append(kwargs)
+        return {"id": "doc1", "title": kwargs.get("title"), "content_excerpt": kwargs.get("content_excerpt")}
+
+    monkeypatch.setattr(
+        ingest,
+        "_fetch_html",
+        lambda url, dest: (url, "<html><title>Test</title><body><main>Some content</main></body></html>"),
+    )
+    monkeypatch.setattr(ingest.db, "ensure_knowledge_pack", lambda *a, **k: {"id": "pack1"})
+    monkeypatch.setattr(ingest.db, "upsert_knowledge_doc_by_url", fake_upsert)
+    monkeypatch.setattr(ingest.db, "create_baseline_rule_for_doc", lambda *a, **k: "rule1")
+    monkeypatch.setattr(ingest, "_llm_facts_for_doc", lambda *a, **k: [])
+
+    res = ingest.ingest_url_to_knowledge_doc(
+        "https://www.uscis.gov/working-in-the-united-states", "US", "immigration"
+    )
+    assert res["fetch_status"] == "fetched"
+    assert upserts
+    assert upserts[0]["fetch_status"] == "fetched"
+    assert upserts[0]["text_content"]
+    assert upserts[0]["content_sha256"]
+

@@ -155,6 +155,8 @@ class RequirementItemDTO(BaseModel):
     # Free-text deadline verbatim from the source ("within 8 days of arrival"). None
     # when the source states no deadline.
     timing: Optional[str] = None
+    # Approved row whose last_verified_at is past the pillar review cycle. Still served.
+    stale: Optional[bool] = None
     # Optional JSON-array projection: which social-security regimes this row applies to.
     # None ⇒ every regime (fail-open).
     appliesToRegimes: Optional[List[str]] = None

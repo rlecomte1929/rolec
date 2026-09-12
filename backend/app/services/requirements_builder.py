@@ -19,6 +19,8 @@ from .requirements_purpose_key import (
     to_purpose,
 )
 from .rules_engine import apply_rules
+from .requirement_catalog_cache import get_catalog_rows
+from .requirement_decay import is_stale
 
 log = logging.getLogger(__name__)
 
@@ -278,8 +280,12 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
 
         sources = crud.list_sources(db, dest_country)
         source_map = {record.id: record for record in sources}
-        catalog_rows = crud.list_requirements(
-            db, dest_country, purpose, include_unapproved=True
+        catalog_rows = get_catalog_rows(
+            dest_country,
+            purpose,
+            lambda: crud.list_requirements(
+                db, dest_country, purpose, include_unapproved=True
+            ),
         )
         requirements = [row for row in catalog_rows if (row.review_status or "approved") == "approved"]
         scorecard = score_requirement_rows(catalog_rows, source_map)
@@ -365,6 +371,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
                 # false/None instead of raising. apply_rules carries both through opaquely.
                 "nonObvious": bool(getattr(item, "non_obvious", False)),
                 "timing": getattr(item, "timing", None),
+                "stale": is_stale(item),
             }
             for item in requirements
         ]
@@ -399,6 +406,7 @@ def compute_case_requirements(case_id: str) -> CaseRequirementsDTO:
         attestedAt=item.get("attestedAt"),
                     nonObvious=item.get("nonObvious"),
                     timing=item.get("timing"),
+                    stale=item.get("stale"),
                     appliesToRegimes=item.get("appliesToRegimes"),
                     outcomeType=outcome_type,
                     reason=item.get("reason"),
