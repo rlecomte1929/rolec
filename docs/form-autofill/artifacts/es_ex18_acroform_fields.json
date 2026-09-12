@@ -1,0 +1,542 @@
+{
+  "url": "https://www.inclusion.gob.es/documents/d/migraciones/ex18-formulario-inscripcion-en-el-rce-residencia-ciudadano-de-la-ue-editable",
+  "catalog": "https://www.inclusion.gob.es/web/migraciones/modelos-generales",
+  "filename": "EX18. Formulario inscripción en el RCE, residencia ciudadano de la UE. Editable.pdf",
+  "last_modified": "Wed, 21 May 2025 12:50:56 GMT",
+  "sha256": "68b36df63875b4a9403d1a08088a1d7d9b2463a902f511ce9a8269858056c2e8",
+  "pages": 3,
+  "pdf_version": "1.7",
+  "count": 105,
+  "by_ft": {
+    "Tx": 68,
+    "Btn": 37
+  },
+  "note": "Official Ministerio de Inclusión 'Editable' EX-18. Field names are Acrobat defaults (TextoN / Casilla de verificaciónN); there is no /TU. The imprimible twin from the same catalog has 0 AcroForm fields. Mapping of applicant identity fields uses widget Rect vs printed labels on page 1: Texto1=PASAPORTE, Texto5=1er Apellido, Texto7=Nombre, Texto8/9/10=fecha nacimiento (día/mes/año), Texto11=Lugar, Texto13=Nacionalidad; Casilla2=Sexo H, Casilla3=Sexo M, Casilla4–8=Estado civil S/C/V/D/Sp.",
+  "fields": [
+    {
+      "name": "Texto1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto7",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto8",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto9",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto10",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto11",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto12",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto13",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto14",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto15",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto16",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto17",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto18",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto19",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto20",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto21",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto22",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto23",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto24",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto25",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto26",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto27",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto28",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto29",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto30",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto31",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto32",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto33",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto34",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto35",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto36",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto37",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto38",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto39",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto40",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto41",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto42",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto43",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto44",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto45",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto46",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto47",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto48",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto49",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto50",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto51",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto52",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto53",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto54",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto55",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto56",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto57",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto58",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto59",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto60",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto61",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto62",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto63",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto64",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto65",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto66",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto67",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Texto68",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación1",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación2",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación3",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación4",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación5",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación6",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación7",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación8",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación9",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación10",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación11",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación12",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación13",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación14",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación15",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación16",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación17",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación18",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación19",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación20",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación21",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación22",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación23",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación24",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación25",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación26",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación27",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación28",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación29",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación30",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación31",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación32",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación33",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación34",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación35",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación36",
+      "ft": "Btn",
+      "maxLen": null
+    },
+    {
+      "name": "Casilla de verificación37",
+      "ft": "Btn",
+      "maxLen": null
+    }
+  ]
+}

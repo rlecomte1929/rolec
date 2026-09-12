@@ -349,6 +349,23 @@ CHOICE_GROUPS: Dict[str, "Dict[str, Dict[str, str] | RadioField]"] = {
             "SEPARATED": "/Separado",
         }),
     },
+    # ES EX-18 (EU registration): independent checkboxes like the FR CERFA — Acrobat default
+    # names (Casilla de verificaciónN), on-state /Yes. No "other" option on either group;
+    # unmatched values set nothing (never guess). Casilla 1 (sexo X/indefinido) is unmapped:
+    # it is a legal status recognised in the origin country, not a vault OTHER.
+    "ES_ex18_v2024": {
+        "gender": {
+            "M": "Casilla de verificación2",  # H
+            "F": "Casilla de verificación3",  # M
+        },
+        "marital_status": {
+            "SINGLE": "Casilla de verificación4",      # S
+            "MARRIED": "Casilla de verificación5",     # C
+            "WIDOWED": "Casilla de verificación6",     # V
+            "DIVORCED": "Casilla de verificación7",    # D
+            "SEPARATED": "Casilla de verificación8",   # Sp
+        },
+    },
 }
 
 
@@ -627,6 +644,7 @@ def visa_types_for_corridor(corridor_to: str) -> List[str]:
 FILLABLE_FORM_IDS: "frozenset[str]" = frozenset({
     "FR_cerfa_14571_v2024",   # France — CERFA 14571*05 (France-Visas)
     "ES_ex17_v2024",          # Spain — EX-17 / TIE (PAG F94803)
+    "ES_ex18_v2024",          # Spain — EX-18 / RCE EU registration (inclusión.gob.es editable)
 })
 
 
