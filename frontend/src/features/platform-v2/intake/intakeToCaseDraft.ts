@@ -61,6 +61,7 @@ export function intakeToCaseDraft(data: IntakeData): Partial<CaseDraftDTO> {
       // AIQ-1603: single-select commute preference → public.cases.commute_preference.
       commutePreference: data.commute_preference || undefined,
       socialSecurityRegime: data.social_security_regime || undefined,
+      workMode: data.work_mode || undefined,
     },
   };
 }

@@ -115,7 +115,10 @@ const KNOWN_UNREFERENCED = [
   'caseServicesEstimate', 'caseServicesRecommendations', 'compliance', 'employeeCaseDossierBuild',
   'employeeDocuments', 'employeePolicy', 'employeeRichProfile', 'hrAnalytics',
   'hrCaseDossier', 'hrEmployeeDashboard', 'hrErasureRequests', 'hrPackage',
-  'hrPolicyBuilder', 'hrPolicyDashboard', 'hrPolicyManagement', 'hrReview',
+  'hrPolicyBuilder', 'hrPolicyDashboard', 'hrPolicyManagement',
+  // Welcome CTA now opens /hr/service-providers?tab=vendor; this path stays for bookmarks.
+  'hrProviderGrid',
+  'hrReview',
   'hrReviewCase', 'hrVendorCuration',
   // [AIQ-2189] Reached only from the emailed colleague-invite link — an external entry
   // point, like a magic link — so it has no in-app inbound reference by design.
