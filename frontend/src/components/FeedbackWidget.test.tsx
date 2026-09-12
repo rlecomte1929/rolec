@@ -23,12 +23,17 @@ vi.mock('../analytics', async (importOriginal) => {
 import { submitProductFeedback, getMyReports } from '../api/productFeedback';
 import { track } from '../analytics';
 import { FeedbackWidget } from './FeedbackWidget';
+import { SetupAssistantFab } from '../features/setup-help/SetupAssistantFab';
+import { FEEDBACK_OPEN_ATTR } from './chromeDock';
 
 const mockSubmit = submitProductFeedback as unknown as ReturnType<typeof vi.fn>;
 const mockGetReports = getMyReports as unknown as ReturnType<typeof vi.fn>;
 const mockTrack = track as unknown as ReturnType<typeof vi.fn>;
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  document.documentElement.removeAttribute(FEEDBACK_OPEN_ATTR);
+});
 beforeEach(() => { mockSubmit.mockReset(); mockGetReports.mockReset(); mockTrack.mockReset(); });
 
 function openAndType(text: string) {
@@ -48,6 +53,27 @@ describe('FeedbackWidget', () => {
     render(<FeedbackWidget userId="u1" />);
     const fab = screen.getByLabelText('Give feedback').parentElement;
     expect(fab?.style.bottom).toContain('--consent-banner-offset');
+    expect(fab?.className).toContain('z-50');
+  });
+
+  it('marks the dock as occupied while open and hides the Setup FAB', async () => {
+    render(
+      <>
+        <SetupAssistantFab onClick={() => undefined} />
+        <FeedbackWidget userId="u1" />
+      </>,
+    );
+    expect(screen.getByTestId('setup-assistant-fab')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Give feedback'));
+    await waitFor(() => {
+      expect(document.documentElement.hasAttribute(FEEDBACK_OPEN_ATTR)).toBe(true);
+      expect(screen.queryByTestId('setup-assistant-fab')).not.toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByLabelText('Close'));
+    await waitFor(() => {
+      expect(document.documentElement.hasAttribute(FEEDBACK_OPEN_ATTR)).toBe(false);
+      expect(screen.getByTestId('setup-assistant-fab')).toBeInTheDocument();
+    });
   });
 
   it('submits via the backend API (with diagnostics) and shows success', async () => {

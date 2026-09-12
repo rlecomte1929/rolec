@@ -20,6 +20,7 @@ import { ScreenshotCapture } from './feedback/ScreenshotCapture';
 import { AnnotationModal } from './feedback/AnnotationModal';
 import { Button } from './antigravity/Button';
 import { Badge } from './antigravity/Badge';
+import { publishFeedbackOpen } from './chromeDock';
 
 type Category    = 'bug' | 'idea' | 'other';
 type WidgetState = 'idle' | 'open' | 'capturing' | 'submitting' | 'success' | 'error' | 'reports';
@@ -110,6 +111,13 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
       .then((res) => setReports(res.reports))
       .catch(() => setReportsError(true))
       .finally(() => setReportsLoading(false));
+  }, [state]);
+
+  // AIQ-2272: hide sibling FABs while this panel owns the dock.
+  useEffect(() => {
+    const open = state !== 'idle';
+    publishFeedbackOpen(open);
+    return () => publishFeedbackOpen(false);
   }, [state]);
 
   function close() {
@@ -210,7 +218,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
       ref={containerRef}
       data-html2canvas-ignore
       onMouseDown={(e) => e.stopPropagation()}
-      className="fixed right-4 z-40 flex flex-col items-end gap-2"
+      className="fixed right-4 z-50 flex flex-col items-end gap-2"
       style={{ bottom: 'calc(1rem + var(--consent-banner-offset, 0px))' }}
     >
       {/* Annotation modal — fullscreen via portal, shown when a capture/upload is ready */}

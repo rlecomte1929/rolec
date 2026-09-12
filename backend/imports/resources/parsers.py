@@ -292,9 +292,9 @@ def parse_json_categories(data: List[Dict[str, Any]]) -> List[ImportCategory]:
     out: List[ImportCategory] = []
     for i, d in enumerate(data):
         key = _trim(d.get("key"))
-        # [ANDREA-P1] Otto resource bundles (journey-completion brief §3.B) ship `name`;
-        # the contract says `label`. Accept both so the bundle's own categories/tags are not
-        # silently dropped (every resource row then failed "Category ... not found").
+        # Otto resource bundles emit `name` for the human-readable label; the DB column
+        # and importer field is `label`. Accept `name` as a fallback so such bundles are
+        # not silently dropped (which then fails every resource that references the tag).
         label = _trim(d.get("label")) or _trim(d.get("name"))
         if not key or not label:
             continue
@@ -314,9 +314,8 @@ def parse_json_tags(data: List[Dict[str, Any]]) -> List[ImportTag]:
     out: List[ImportTag] = []
     for i, d in enumerate(data):
         key = _trim(d.get("key"))
-        # [ANDREA-P1] Otto resource bundles (journey-completion brief §3.B) ship `name`;
-        # the contract says `label`. Accept both so the bundle's own categories/tags are not
-        # silently dropped (every resource row then failed "Category ... not found").
+        # Accept `name` as a fallback for `label` (Otto bundles emit `name`) — see
+        # parse_json_categories.
         label = _trim(d.get("label")) or _trim(d.get("name"))
         if not key or not label:
             continue

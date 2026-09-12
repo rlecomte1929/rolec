@@ -3,20 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from './antigravity/Button';
 import { getAnalyticsConsent, grantAnalyticsConsent, revokeAnalyticsConsent } from '../analytics';
 import { useIsAdmin } from '../features/admin/useIsAdmin';
-
-const CONSENT_BANNER_ATTR = 'data-consent-banner';
-const CONSENT_BANNER_OFFSET_VAR = '--consent-banner-offset';
-
-function publishConsentBannerMetrics(heightPx: number | null) {
-  const root = document.documentElement;
-  if (heightPx == null) {
-    root.removeAttribute(CONSENT_BANNER_ATTR);
-    root.style.removeProperty(CONSENT_BANNER_OFFSET_VAR);
-    return;
-  }
-  root.setAttribute(CONSENT_BANNER_ATTR, 'open');
-  root.style.setProperty(CONSENT_BANNER_OFFSET_VAR, `${heightPx}px`);
-}
+import { publishConsentBannerMetrics } from './chromeDock';
 
 /**
  * GDPR analytics consent banner.
@@ -46,22 +33,34 @@ export function ConsentBanner() {
     if (getAnalyticsConsent() === null) setVisible(true);
   }, []);
 
-  // AIQ-2272: publish height so the Feedback FAB lifts clear of this band,
-  // and so stacking (z-[60]) always wins over the later-in-DOM widget.
+  // AIQ-2272: on a compact viewport the band is full-width, so FABs lift by
+  // this height. On md+ the band is a left card and does not share the right
+  // dock — publishing 0px keeps Setup/Feedback from sliding into each other.
   useEffect(() => {
     if (!show) {
       publishConsentBannerMetrics(null);
       return;
     }
     const el = bannerRef.current;
-    const apply = () => publishConsentBannerMetrics(el?.offsetHeight ?? 96);
+    const mq = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(max-width: 767px)')
+      : null;
+    const apply = () => {
+      const compact = mq ? mq.matches : true;
+      publishConsentBannerMetrics(compact ? (el?.offsetHeight ?? 96) : 0);
+    };
     apply();
+    mq?.addEventListener('change', apply);
     if (!el || typeof ResizeObserver === 'undefined') {
-      return () => publishConsentBannerMetrics(null);
+      return () => {
+        mq?.removeEventListener('change', apply);
+        publishConsentBannerMetrics(null);
+      };
     }
     const ro = new ResizeObserver(apply);
     ro.observe(el);
     return () => {
+      mq?.removeEventListener('change', apply);
       ro.disconnect();
       publishConsentBannerMetrics(null);
     };
@@ -85,9 +84,9 @@ export function ConsentBanner() {
       role="dialog"
       aria-label="Analytics consent"
       aria-live="polite"
-      className="fixed bottom-0 inset-x-0 z-[60] border-t border-[#d7e2e8] bg-white shadow-lg"
+      className="fixed bottom-0 inset-x-0 z-[60] border-t border-[#d7e2e8] bg-white shadow-lg md:bottom-4 md:left-4 md:right-auto md:inset-x-auto md:max-w-md md:rounded-lg md:border"
     >
-      <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-3 px-4 py-3 sm:flex-row sm:items-center">
+      <div className="mx-auto flex max-w-5xl flex-col items-stretch gap-3 px-4 py-3 md:max-w-none">
         <p className="text-sm leading-relaxed text-[#0b2b43]">
           We use privacy-first product analytics to improve ReloPass. No personal data
           is included in the events we collect, and analytics data is stored on EU

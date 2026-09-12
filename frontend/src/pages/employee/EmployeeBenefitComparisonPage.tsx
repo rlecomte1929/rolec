@@ -4,6 +4,7 @@ import { AppShell } from '../../components/AppShell';
 import { Button, Card, Container } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import { resolveOverviewState } from '../../features/employee-journey/overviewResolution';
 import { useIsOffline } from '../../hooks/useOnlineStatus';
 import { isIntakeComplete } from '../../features/employee-journey/caseStage';
 import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
@@ -33,7 +34,10 @@ interface ComparisonData {
 }
 
 export const EmployeeBenefitComparisonPage: React.FC = () => {
-  const { assignmentId, isLoading: assignmentLoading, linkedCount, linkedSummaries } =
+  const {
+    assignmentId, isLoading: assignmentLoading, linkedCount, pendingCount,
+    overviewError, overviewDegraded, linkedSummaries,
+  } =
     useEmployeeAssignment();
   const activeRow = linkedSummaries.find((r) => r.assignment_id === assignmentId);
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -87,7 +91,18 @@ export const EmployeeBenefitComparisonPage: React.FC = () => {
   const caseId = comp?.case_id ?? null;
 
   let body: React.ReactNode;
-  if (!assignmentLoading && !assignmentId && linkedCount === 0) {
+  // AIQ-2285/T8: only claim "not linked" once the overview actually resolved.
+  const { unresolved: overviewUnresolved } = resolveOverviewState({
+    overviewError, overviewDegraded, linkedCount, pendingCount,
+  });
+  if (!assignmentLoading && overviewUnresolved && !assignmentId) {
+    body = (
+      <Card padding="lg" className="border-[#e2e8f0]">
+        <p className="mb-1 text-sm font-medium text-[#0b2b43]">We couldn&apos;t load your benefits</p>
+        <p className="text-sm text-[#64748b]">This is usually temporary. Refresh the page to try again.</p>
+      </Card>
+    );
+  } else if (!assignmentLoading && !assignmentId && linkedCount === 0) {
     body = (
       <Card padding="lg" className="border-[#e2e8f0]">
         <p className="mb-1 text-sm font-medium text-[#0b2b43]">No company linked yet</p>
