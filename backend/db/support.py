@@ -27,7 +27,16 @@ _is_sqlite = _raw_url.startswith("sqlite")
 # makes the policy-exception lifecycle actually enqueue an outbox row by default, so the consumer
 # delivers it: REQUESTED → the assigned HR (over-cap alert); DECIDED → the employee (the outcome
 # of the request they filed).
-_EMAIL_DEFAULT_ON = {"POLICY_EXCEPTION_REQUESTED", "POLICY_EXCEPTION_DECIDED"}
+_EMAIL_DEFAULT_ON = {
+    "POLICY_EXCEPTION_REQUESTED",
+    "POLICY_EXCEPTION_DECIDED",
+    # [AIQ-2370] RFQ loop: in-app + outbox row by default. Actual email still
+    # depends on the outbox cron and RELOPASS_OUTBOX_ALLOWED_DOMAINS.
+    "rfq.sent",
+    "rfq.quote_received",
+    "rfq.quotes_ready",
+    "rfq.quote_validated",
+}
 
 
 class SupportMixin:
