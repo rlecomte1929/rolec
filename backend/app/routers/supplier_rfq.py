@@ -48,7 +48,7 @@ class SupplierQuotePayload(BaseModel):
     quote_lines: List[SupplierQuoteLine] = Field(default_factory=list)
 
 
-def require_supplier_link(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+def _require_supplier_link(authorization: Optional[str], *, require_open: bool) -> Dict[str, Any]:
     """Resolve a supplier magic-link token to its rfq_recipients row.
 
     Unlike require_provider_jwt (stateless — it never touches the DB), this hits the invite row
@@ -78,7 +78,7 @@ def require_supplier_link(authorization: Optional[str] = Header(default=None)) -
         raise HTTPException(status_code=401, detail="This link is no longer valid.")
     if row.get("revoked_at"):
         raise HTTPException(status_code=403, detail="This request has been withdrawn.")
-    if row.get("quote_submitted_at"):
+    if require_open and row.get("quote_submitted_at"):
         raise HTTPException(status_code=409, detail="You have already sent a quote for this request.")
 
     exp = row.get("expires_at")
@@ -92,6 +92,16 @@ def require_supplier_link(authorization: Optional[str] = Header(default=None)) -
     return dict(row)
 
 
+def require_supplier_link(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+    """Write gate: a second quote is refused (409)."""
+    return _require_supplier_link(authorization, require_open=True)
+
+
+def require_supplier_link_read(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+    """Read gate: after submit the supplier can still view the brief (already_quoted=true)."""
+    return _require_supplier_link(authorization, require_open=False)
+
+
 def _as_utc(value: Any) -> datetime:
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
@@ -99,7 +109,7 @@ def _as_utc(value: Any) -> datetime:
 
 
 @router.get("/rfq")
-def get_supplier_rfq(recipient: Dict[str, Any] = Depends(require_supplier_link)):
+def get_supplier_rfq(recipient: Dict[str, Any] = Depends(require_supplier_link_read)):
     """What the supplier is being asked to price. No account, no login."""
     rfq = db.get_rfq(str(recipient["rfq_id"]))
     if not rfq:
@@ -209,6 +219,34 @@ def submit_supplier_quote(
     except Exception:
         log.warning(
             "supplier_rfq: quote_received notification failed rfq=%s",
+            recipient["rfq_id"], exc_info=True,
+        )
+    try:
+        from ..services.supplier_link_dispatch import resolve_rfq_targets, send_gated_supplier_email
+        target = next(
+            (t for t in resolve_rfq_targets(str(recipient["rfq_id"]))
+             if str(t.get("recipient_id")) == str(recipient["id"])),
+            {},
+        )
+        send_gated_supplier_email(
+            to_email=str(recipient.get("invited_email") or target.get("email") or ""),
+            verified=bool(target.get("verified")),
+            actor_email=None,
+            template_id="supplier_quote_received_ack",
+            variables={
+                "rfq_ref": (db.get_rfq(str(recipient["rfq_id"])) or {}).get("rfq_ref") or "",
+                "supplier_name": target.get("supplier_name") or "",
+                "quote_total": payload.total_amount,
+                "quote_currency": payload.currency.upper(),
+                "quote_valid_until": payload.valid_until or "",
+                "quote_lines": [{"label": ln.label, "amount": ln.amount} for ln in payload.quote_lines],
+                "magic_link": "",
+                "support_email": "support@relopass.com",
+            },
+        )
+    except Exception:
+        log.warning(
+            "supplier_rfq: quote ack email failed rfq=%s",
             recipient["rfq_id"], exc_info=True,
         )
     return {"ok": True, "quote_id": quote.get("id")}

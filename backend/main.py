@@ -9678,6 +9678,38 @@ def accept_quote(
         notify_quote_validated(rfq_id, quote_id)
     except Exception:
         log.warning("accept_quote: quote_validated notification failed rfq=%s", rfq_id, exc_info=True)
+    # [AIQ-2371] Winner / loser supplier emails — same gates as the invite. Best-effort.
+    try:
+        from .app.services.supplier_link_dispatch import (
+            APP_BASE_URL,
+            resolve_rfq_targets,
+            send_gated_supplier_email,
+        )
+        quote_row = result.get("quote") or {}
+        winner_vid = str(quote_row.get("vendor_id") or "")
+        rfq_ref = str(rfq.get("rfq_ref") or rfq_id)
+        for target in resolve_rfq_targets(rfq_id):
+            vid = str(target.get("vendor_id") or "")
+            if not winner_vid:
+                break
+            template_id = (
+                "supplier_quote_selected" if vid == winner_vid else "supplier_rfq_closed"
+            )
+            send_gated_supplier_email(
+                to_email=str(target.get("email") or ""),
+                verified=bool(target.get("verified")),
+                actor_email=user.get("email"),
+                template_id=template_id,
+                variables={
+                    "rfq_ref": rfq_ref,
+                    "supplier_name": target.get("supplier_name") or "",
+                    "magic_link": f"{APP_BASE_URL}/supplier/quote",
+                    "support_email": "support@relopass.com",
+                },
+                request_id=request_id,
+            )
+    except Exception:
+        log.warning("accept_quote: supplier selected/closed emails failed rfq=%s", rfq_id, exc_info=True)
     return {"ok": True, "quote": result.get("quote"), "validation": result}
 
 
