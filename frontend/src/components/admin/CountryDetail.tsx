@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import type { CountryProfileDTO } from '../../types';
 import type { AdminRequirementReview, KnowledgeScorecard, ReviewStatus } from '../../api/admin';
+import { listRequirementChangelog, type RequirementItemChangelog } from '../../api/admin';
 import { Card, Button, Badge, CountryFlag, Input } from '../antigravity';
 import {
   type RequirementStatusFilter,
@@ -281,6 +282,7 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
                     <RequirementCard
                       key={item.id}
                       item={item}
+                      countryCode={profile.countryCode}
                       busy={busyId === item.id}
                       onReview={onReview}
                     />
@@ -297,10 +299,12 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({
 
 function RequirementCard({
   item,
+  countryCode,
   busy,
   onReview,
 }: {
   item: AdminRequirementReview;
+  countryCode: string;
   busy: boolean;
   onReview: (requirementId: string, status: Exclude<ReviewStatus, 'pending'>) => void;
 }) {
@@ -385,6 +389,57 @@ function RequirementCard({
           </span>
         )}
       </div>
+      <RequirementChangelog countryCode={countryCode} requirementId={item.id} />
+    </div>
+  );
+}
+
+function RequirementChangelog({
+  countryCode,
+  requirementId,
+}: {
+  countryCode: string;
+  requirementId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<RequirementItemChangelog[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async () => {
+    setError(null);
+    try {
+      setRows(await listRequirementChangelog(countryCode, requirementId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load changelog');
+    }
+  };
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        className="text-xs font-semibold text-accent-700 underline"
+        onClick={() => {
+          const next = !open;
+          setOpen(next);
+          if (next && rows === null) void load();
+        }}
+      >
+        {open ? 'Hide version history' : 'Version history'}
+      </button>
+      {open && (
+        <ul className="mt-2 space-y-1 text-xs text-slate-600">
+          {error && <li className="text-red-700">{error}</li>}
+          {rows && rows.length === 0 && <li>No recorded changes yet.</li>}
+          {rows?.map((row) => (
+            <li key={row.changeId}>
+              {row.changeType}
+              {row.changedAt ? ` · ${new Date(row.changedAt).toLocaleString()}` : ''}
+              {row.changedBy ? ` · ${row.changedBy}` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

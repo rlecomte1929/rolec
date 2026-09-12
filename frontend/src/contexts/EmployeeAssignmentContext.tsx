@@ -10,7 +10,7 @@ import {
   shouldLoadEmployeeAssignmentOverview,
 } from '../utils/employeeAssignmentScope';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
-import { classifyOverviewLoadError, type OverviewLoadKind } from '../utils/overviewLoadError';
+import { classifyOverviewLoadError, type OverviewLoadKind } from '../features/employee-journey/overviewLoadError';
 
 const CURRENT_ASSIGNMENT_CACHE_KEY = 'employee:current-assignment';
 const ASSIGNMENTS_OVERVIEW_CACHE_KEY = 'employee:assignments-overview';

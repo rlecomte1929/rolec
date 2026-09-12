@@ -43,9 +43,11 @@ export const RoleSwitcher: React.FC = () => {
     try {
       const res = await authAPI.switchRole(target);
       setStoredRoles(res.roles && res.roles.length ? res.roles : roles);
-      const primary = res.primary_role || target;
-      setActiveRole(primary);
-      navigate(roleHomePath(primary));
+      // Trust the role the user picked. An allowlisted admin's switch-role
+      // payload used to echo primary_role=ADMIN (login contract), which sent
+      // View as Employee straight back to the admin home.
+      setActiveRole(target);
+      navigate(roleHomePath(target));
     } catch {
       /* leave the active role unchanged on failure */
     } finally {

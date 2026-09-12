@@ -25,6 +25,18 @@ import { resolveIntakeIds } from './resolveIntakeIds';
 import { caseIdForAssignment } from '../../../utils/employeeAssignmentScope';
 import { intakeToCaseDraft } from './intakeToCaseDraft';
 import { parseSubmitError } from './parseSubmitError';
+import {
+  OFFICE_UNKNOWN,
+  WORK_MODE_HELP,
+  WORK_MODE_OPTIONS,
+  applyWorkModePatch,
+  hydrateWorkMode,
+  needsContractStart,
+  needsOffice,
+  workAndPlaceComplete,
+  workModeLabel,
+  type WorkMode,
+} from './workStepComplete';
 import { matchCountry } from './countryMatch';
 // Identity fields (nationality, passport) accept the full ISO list; the local
 // COUNTRIES below stays scoped to the relocation origin/destination pickers,
@@ -105,6 +117,7 @@ export interface IntakeData {
   passport_expiry: string;
   members: Member[];
   job_title: string;
+  work_mode: WorkMode;
   contract_type: string;
   contract_start: string;
   salary_band: string;
@@ -202,6 +215,7 @@ const INITIAL_DATA: IntakeData = {
   // pets are added via the "Add member" controls on step 3.
   members: [{ id: 'self', kind: 'self' }],
   job_title: '',
+  work_mode: 'employed',
   // Default to the first option so the controlled <select> (which has no
   // empty placeholder, unlike salary_band) reflects committed state — otherwise
   // it displays "Permanent" while data.contract_type stays '' and stepValid(5)
@@ -675,9 +689,15 @@ function ReviewSummary({ data, goTo, loading = false }: { data: IntakeData; goTo
         ...(children.length ? [['Children', children.map((c) => `${c.name ?? '?'} (${computeAge(c.dob) ?? '?'}y)`).join(', ')] as [string, React.ReactNode]] : []),
       ]} />
       <Card label="Work & commute" step={4} rows={[
-        ['Job', `${data.job_title || '—'} · ${data.contract_type}`],
-        ['Office', data.office_address || <em className="text-red-400">missing</em>],
-        ['Pattern', `${data.work_pattern}${data.work_pattern !== 'Fully remote' ? ` · ≤${data.commute_mins}min` : ''}`],
+        ['How you work', workModeLabel(data.work_mode)],
+        ['Job', `${data.job_title || '—'} · ${data.contract_type || workModeLabel(data.work_mode)}`],
+        [
+          'Office',
+          needsOffice(data.work_mode)
+            ? (data.office_address || <em className="text-red-400">missing</em>)
+            : (data.office_address && data.office_address !== OFFICE_UNKNOWN ? data.office_address : 'Not applicable'),
+        ],
+        ['Pattern', `${data.work_pattern || (data.work_mode === 'digital_nomad' ? 'Fully remote' : '—')}${data.work_pattern && data.work_pattern !== 'Fully remote' ? ` · ≤${data.commute_mins}min` : ''}`],
         ['Salary', data.salary_band || '—'],
       ]} />
     </div>
@@ -845,6 +865,20 @@ export function EmployeeIntakePage() {
     });
   }, [runIntakeSave]);
 
+  const setWorkMode = useCallback((mode: WorkMode) => {
+    setData((d) => {
+      const next = applyWorkModePatch(d, mode);
+      if (draftHydratedRef.current) {
+        pendingSaveDataRef.current = next;
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(() => {
+          void runIntakeSave(next);
+        }, 700);
+      }
+      return next;
+    });
+  }, [runIntakeSave]);
+
   // Unmount flush: if the user navigates away before the 700ms debounce fires,
   // immediately persist any pending data so it's not lost.
   useEffect(() => {
@@ -878,7 +912,9 @@ export function EmployeeIntakePage() {
 
   // AIQ-1345: geocode the office address (debounced) so the "Verified" badge and
   // the commute preview reflect the real, resolved location — not a fake.
-  const officeGeo = useGeocodedAddress(data.office_address);
+  const officeGeo = useGeocodedAddress(
+    data.office_address === OFFICE_UNKNOWN ? '' : data.office_address,
+  );
 
   const addMember = (kind: MemberKind, extra?: Partial<Member>) => {
     const id = kind + Date.now();
@@ -893,7 +929,7 @@ export function EmployeeIntakePage() {
     if (s === 1) return !!(data.origin_country && data.origin_city && data.dest_country && data.dest_city && data.target_date && data.purpose);
     if (s === 2) return !!(data.full_name && data.nationality && data.passport_country && data.passport_expiry);
     if (s === 3) return data.members.length >= 1;
-    if (s === 4) return !!(data.job_title && data.contract_start && data.contract_type && data.office_address && data.work_pattern && data.salary_band);
+    if (s === 4) return workAndPlaceComplete(data);
     return true;
   };
 
@@ -1076,7 +1112,9 @@ export function EmployeeIntakePage() {
           // too). This restores fields with non-empty defaults (members, purpose,
           // contract_type) which the old isEmpty-only check never restored. The
           // merge is a pure function (intakeHydration.ts) so it's unit-tested.
-          setData((d) => mergeIntakeDraft(d, res.intakeDraft as Record<string, unknown>, INITIAL_DATA));
+          setData((d) =>
+            hydrateWorkMode(mergeIntakeDraft(d, res.intakeDraft as Record<string, unknown>, INITIAL_DATA)),
+          );
         }
         // Success — a real draft OR a legitimately-empty one (200 with null draft).
         // Only now is it safe to arm autosave; saving before a confirmed load could
@@ -1355,52 +1393,124 @@ export function EmployeeIntakePage() {
             {/* ── Step 4 — Work & Place ── */}
             {step === 4 && (
               <>
-                <StepHd title="Your work & commute" sub="Most of this is pre-filled by your HR team — confirm or update. Commute settings drive your housing pre-filter." required />
+                <StepHd
+                  title="Your work & commute"
+                  sub={
+                    data.work_mode === 'employed'
+                      ? 'Most of this is pre-filled by your HR team — confirm or update. Commute settings drive your housing pre-filter.'
+                      : 'Tell us how you work. We skip employer contract dates and a destination office when they do not apply.'
+                  }
+                  required
+                />
+                <FieldWrap label="How will you work in the destination?" required className="mb-4">
+                  <MultiChip
+                    value={[data.work_mode]}
+                    onChange={(v) => {
+                      const mode = v[v.length - 1];
+                      if (mode === 'employed' || mode === 'self_employed' || mode === 'digital_nomad') {
+                        setWorkMode(mode);
+                      }
+                    }}
+                    options={WORK_MODE_OPTIONS}
+                  />
+                  <p className="mt-2 text-xs text-slate-600">{WORK_MODE_HELP[data.work_mode]}</p>
+                </FieldWrap>
                 <Grid>
-                  <FieldWrap label="Job title" required prefill={locks.job} onUnlock={() => unlock('job')}>
-                    <Input unstyled className={inputCls(locks.job)} value={data.job_title} disabled={locks.job} placeholder="e.g. Senior Engineer"
+                  <FieldWrap
+                    label={data.work_mode === 'employed' ? 'Job title' : 'Role or activity'}
+                    required
+                    prefill={locks.job}
+                    onUnlock={() => unlock('job')}
+                  >
+                    <Input unstyled className={inputCls(locks.job)} value={data.job_title} disabled={locks.job}
+                      placeholder={data.work_mode === 'employed' ? 'e.g. Senior Engineer' : 'e.g. Founder, consultant'}
                       onChange={(v) => setField('job_title', v)} />
                   </FieldWrap>
-                  <FieldWrap label="Contract type" required prefill={locks.contractType} onUnlock={() => unlock('contractType')}>
-                    <select className={selectCls(locks.contractType)} value={data.contract_type} disabled={locks.contractType}
-                      onChange={(e) => setField('contract_type', e.target.value)}>
-                      <option>Permanent</option><option>Fixed-term</option><option>Secondment</option>
-                    </select>
-                  </FieldWrap>
-                  <FieldWrap label="Contract start date" required prefill={locks.contractStart} onUnlock={() => unlock('contractStart')}>
-                    <Input unstyled type="date" className={inputCls(locks.contractStart)} value={data.contract_start} disabled={locks.contractStart}
-                      onChange={(v) => setField('contract_start', v)} />
-                  </FieldWrap>
-                  <FieldWrap label="Salary band" required prefill={locks.salary} onUnlock={() => unlock('salary')} hint="Used to confirm visa salary thresholds.">
+                  {data.work_mode === 'employed' && (
+                    <FieldWrap label="Contract type" required prefill={locks.contractType} onUnlock={() => unlock('contractType')}>
+                      <select className={selectCls(locks.contractType)} value={data.contract_type} disabled={locks.contractType}
+                        onChange={(e) => setField('contract_type', e.target.value)}>
+                        <option>Permanent</option><option>Fixed-term</option><option>Secondment</option>
+                      </select>
+                    </FieldWrap>
+                  )}
+                  {needsContractStart(data.work_mode) && (
+                    <FieldWrap
+                      label="Contract start date"
+                      required
+                      prefill={locks.contractStart}
+                      onUnlock={() => unlock('contractStart')}
+                    >
+                      <Input unstyled type="date" className={inputCls(locks.contractStart)} value={data.contract_start} disabled={locks.contractStart}
+                        onChange={(v) => setField('contract_start', v)} />
+                    </FieldWrap>
+                  )}
+                  <FieldWrap
+                    label={data.work_mode === 'employed' ? 'Salary band' : 'Typical annual income'}
+                    required
+                    prefill={locks.salary}
+                    onUnlock={() => unlock('salary')}
+                    hint={
+                      data.work_mode === 'employed'
+                        ? 'Used to confirm visa salary thresholds.'
+                        : 'Used where a visa or stay permit has an income threshold.'
+                    }
+                  >
                     <select className={selectCls(locks.salary)} value={data.salary_band} disabled={locks.salary}
                       onChange={(e) => setField('salary_band', e.target.value)}>
                       <option value="">Select…</option>
                       <option>50–100k€</option><option>100–150k€</option><option>150–200k€</option><option>200–300k€</option><option>300k€+</option>
                     </select>
                   </FieldWrap>
-                  <FieldWrap label="Office address at destination" required className="sm:col-span-2" prefill={locks.office} onUnlock={() => unlock('office')}
-                    why="Anchors commute analysis. We'll show neighborhoods within your time radius.">
-                    <AddressAutocompleteInput className={inputCls(locks.office)} value={data.office_address} disabled={locks.office}
-                      placeholder="Start typing…" onChange={(v) => setField('office_address', v)} />
-                    {data.office_address && (
-                      <div className={`flex items-center gap-2 mt-1 px-2.5 py-1.5 rounded-lg text-xs ${
-                        officeGeo.status === 'notfound' ? 'bg-amber-50 text-amber-700' : 'bg-gray-50 text-gray-500'
-                      }`}>
-                        📍 <span className="flex-1">{data.office_address}</span>
-                        {officeGeo.status === 'loading' && <span className="text-gray-500">Locating…</span>}
-                        {officeGeo.status === 'ok' && (
-                          <span className="text-green-600 font-medium">Verified</span>
-                        )}
-                        {officeGeo.status === 'notfound' && (
-                          <span className="font-medium">Couldn&apos;t find that address — check the spelling</span>
-                        )}
-                      </div>
-                    )}
-                  </FieldWrap>
-                  <FieldWrap label="Work pattern" required className="sm:col-span-2">
-                    <MultiChip value={data.work_pattern ? [data.work_pattern] : []} onChange={(v) => setField('work_pattern', v[v.length - 1] || '')}
-                      options={['Full in-office', 'Hybrid', 'Fully remote']} />
-                  </FieldWrap>
+                  {data.work_mode !== 'digital_nomad' && (
+                    <FieldWrap
+                      label="Office address at destination"
+                      required={needsOffice(data.work_mode)}
+                      optional={!needsOffice(data.work_mode)}
+                      className="sm:col-span-2"
+                      prefill={locks.office}
+                      onUnlock={() => unlock('office')}
+                      why={
+                        needsOffice(data.work_mode)
+                          ? "Anchors commute analysis. We'll show neighborhoods within your time radius."
+                          : 'Optional. Skip if you work from home or a coworking space.'
+                      }
+                    >
+                      <AddressAutocompleteInput className={inputCls(locks.office)} value={data.office_address === OFFICE_UNKNOWN ? '' : data.office_address} disabled={locks.office}
+                        placeholder="Start typing…" onChange={(v) => setField('office_address', v)} />
+                      <button
+                        type="button"
+                        className="mt-1.5 text-xs font-medium text-accent-600 hover:underline"
+                        disabled={locks.office}
+                        onClick={() => setField('office_address', OFFICE_UNKNOWN)}
+                      >
+                        I don&apos;t know the destination office yet
+                      </button>
+                      {data.office_address === OFFICE_UNKNOWN && (
+                        <p className="mt-1 text-xs text-slate-500">We&apos;ll skip commute mapping until an address is added.</p>
+                      )}
+                      {data.office_address && data.office_address !== OFFICE_UNKNOWN && (
+                        <div className={`flex items-center gap-2 mt-1 px-2.5 py-1.5 rounded-lg text-xs ${
+                          officeGeo.status === 'notfound' ? 'bg-amber-50 text-amber-700' : 'bg-gray-50 text-gray-500'
+                        }`}>
+                          📍 <span className="flex-1">{data.office_address}</span>
+                          {officeGeo.status === 'loading' && <span className="text-gray-500">Locating…</span>}
+                          {officeGeo.status === 'ok' && (
+                            <span className="text-green-600 font-medium">Verified</span>
+                          )}
+                          {officeGeo.status === 'notfound' && (
+                            <span className="font-medium">Couldn&apos;t find that address — check the spelling</span>
+                          )}
+                        </div>
+                      )}
+                    </FieldWrap>
+                  )}
+                  {data.work_mode !== 'digital_nomad' && (
+                    <FieldWrap label="Work pattern" required className="sm:col-span-2">
+                      <MultiChip value={data.work_pattern ? [data.work_pattern] : []} onChange={(v) => setField('work_pattern', v[v.length - 1] || '')}
+                        options={['Full in-office', 'Hybrid', 'Fully remote']} />
+                    </FieldWrap>
+                  )}
                   {/* AIQ-1349: assignment type drives the duration-aware policy +
                       roadmap. STA gets a lighter journey; LTA/PERMANENT the full one. */}
                   <FieldWrap label="Assignment type" required className="sm:col-span-2"
@@ -1432,7 +1542,7 @@ export function EmployeeIntakePage() {
                   </FieldWrap>
                 </Grid>
 
-                {data.work_pattern !== 'Fully remote' && (
+                {data.work_mode !== 'digital_nomad' && data.work_pattern !== 'Fully remote' && (
                   <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div className="flex flex-col gap-4">
                       <FieldWrap label="Maximum commute you'd accept">
@@ -1476,7 +1586,12 @@ export function EmployeeIntakePage() {
                     </div>
                   </div>
                 )}
-                {data.work_pattern === 'Fully remote' && (
+                {data.work_mode === 'digital_nomad' && (
+                  <div className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+                    ℹ <span><strong>Digital nomad.</strong> Housing will use the destination city, not a commute to an office. Immigration follow-up is a stay-permit track, not a local employment contract.</span>
+                  </div>
+                )}
+                {data.work_mode !== 'digital_nomad' && data.work_pattern === 'Fully remote' && (
                   <div className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
                     ℹ <span><strong>Working fully remote.</strong> We&apos;ll skip commute filtering and lead housing search with neighborhood quality and lifestyle priorities instead.</span>
                   </div>

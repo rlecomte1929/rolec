@@ -116,8 +116,7 @@ const KNOWN_UNREFERENCED = [
   'employeeDocuments', 'employeePolicy', 'employeeRichProfile', 'hrAnalytics',
   'hrCaseDossier', 'hrEmployeeDashboard', 'hrErasureRequests', 'hrPackage',
   'hrPolicyBuilder', 'hrPolicyDashboard', 'hrPolicyManagement',
-  // Bookmark-only: welcome/sidebar now open Vendor Management (`hrServiceProviders`).
-  // `/hr/provider-grid` stays mounted for backward-compat URLs.
+  // Welcome CTA now opens /hr/service-providers?tab=vendor; this path stays for bookmarks.
   'hrProviderGrid',
   'hrReview',
   'hrReviewCase', 'hrVendorCuration',

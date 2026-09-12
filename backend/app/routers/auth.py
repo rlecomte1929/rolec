@@ -626,10 +626,13 @@ def switch_role(
     if requested not in held:
         raise HTTPException(status_code=403, detail="You do not hold that role")
     db.set_primary_role(user["id"], requested)
-    roles, primary = derive_roles(
+    roles, _derived_primary = derive_roles(
         db.get_user_roles(user["id"]), requested, is_admin=bool(user.get("is_admin"))
     )
-    return {"roles": roles, "primary_role": primary}
+    # AIQ-2285: derive_roles forces primary=ADMIN when is_admin (login contract).
+    # Switching must return the role the user asked for so View as Employee
+    # does not bounce an allowlisted admin back to the admin home.
+    return {"roles": roles, "primary_role": requested}
 
 
 @router.post("/api/auth/welcome-seen")

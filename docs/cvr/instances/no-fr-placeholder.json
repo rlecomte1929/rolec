@@ -1,0 +1,65 @@
+{
+  "cvr_version": "1.0",
+  "cvr_uid": "cvr:NO-FR:placeholder",
+  "corridor_id": "NO-FR",
+  "case_id": null,
+  "case_ref": null,
+  "real_case": false,
+  "gold_exemplar": false,
+  "verdict": "incomplete",
+  "score": null,
+  "failed_rules": [
+    {
+      "id": "session_not_run",
+      "reason": "No filed CVR exists for NO→FR in the 2026-08-18 WorkspaceDB export or the repo."
+    }
+  ],
+  "session": {
+    "session_date": "2026-09-12T00:00:00.000Z",
+    "conducted_by": null,
+    "participant_role": null,
+    "employee_nationality": "NO",
+    "employee_type": null,
+    "origin_country": "NO",
+    "destination_country": "FR",
+    "employer_size_band": null,
+    "move_date": null,
+    "notes": "Placeholder so the corridor is tracked. Replace after the first real session."
+  },
+  "reviewer": {
+    "name": null,
+    "lawyer_id": null,
+    "verified_by_lawyer": false
+  },
+  "per_requirement": [],
+  "missed_not_in_catalog": [],
+  "sequence_check": [],
+  "outcomes": {
+    "requirements_correct_ids": [],
+    "requirements_wrong_ids": [],
+    "requirements_missed_ids": [],
+    "non_obvious_confirmed_ids": [],
+    "requirements_correct_count": 0,
+    "requirements_wrong_count": 0,
+    "requirements_missed_count": 0,
+    "non_obvious_confirmed_count": 0,
+    "records_approved_ids": [],
+    "records_held_back": [],
+    "corrections_to_apply": null,
+    "case_outcome": null,
+    "compliance_issues_logged": null
+  },
+  "relief_moment": {
+    "response": null,
+    "surprising_item_id": null,
+    "surprising_item_text": null,
+    "quote": null,
+    "open_text_comment": null,
+    "posthog_event_verified": false
+  },
+  "legacy": {
+    "workspace_db_table": null,
+    "report_path": null,
+    "notes": "No session to backfill."
+  }
+}

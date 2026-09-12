@@ -94,6 +94,10 @@ describe('HrWelcomePage — test-drive HR', () => {
     expect(screen.getByText(/build your relocation policy/i)).toBeInTheDocument();
     expect(screen.getByText(/curate your service providers/i)).toBeInTheDocument();
     expect(screen.getByText(/optional — the full hr setup/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /get started/i })[2]).toHaveAttribute(
+      'href',
+      '/hr/service-providers?tab=vendor',
+    );
   });
 
   it('nests setup cards as h3 under the optional-setup h2', () => {
