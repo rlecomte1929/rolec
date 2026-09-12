@@ -9,7 +9,18 @@ import { getReviewSummary } from '../../../api/contentReview';
 import { AdminOverviewPage } from '../AdminOverviewPage';
 
 vi.mock('../AdminLayout', () => ({
-  AdminLayout: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
+  AdminLayout: ({
+    children,
+    subtitle,
+  }: {
+    children: React.ReactNode;
+    subtitle?: string;
+  }) => (
+    <main>
+      {subtitle ? <p data-testid="admin-today-subtitle">{subtitle}</p> : null}
+      {children}
+    </main>
+  ),
 }));
 
 vi.mock('../../../api/client', () => ({
@@ -73,6 +84,8 @@ describe('AdminOverviewPage metrics', () => {
     expect(screen.queryByTestId('module-companies')).not.toBeInTheDocument();
     expect(screen.queryByTestId('module-prospects')).not.toBeInTheDocument();
     expect(screen.queryByTestId('module-rag-quality')).not.toBeInTheDocument();
+    expect(screen.getByTestId('admin-today-subtitle')).toHaveTextContent('What needs attention today');
+    expect(screen.queryByText(/Executive and Ops stay nested/i)).not.toBeInTheDocument();
   });
 
   it('treats a real zero pending review as empty, not as a fake count', async () => {

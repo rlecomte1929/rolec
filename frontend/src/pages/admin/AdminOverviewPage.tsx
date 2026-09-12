@@ -78,7 +78,7 @@ export const AdminOverviewPage: React.FC = () => {
   return (
     <AdminLayout
       title="Today"
-      subtitle="Three numbers, then four jobs. Executive and Ops stay nested under Home in the sidebar."
+      subtitle="What needs attention today — reviews, tenants, and the next job."
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {reviewEmpty ? (
