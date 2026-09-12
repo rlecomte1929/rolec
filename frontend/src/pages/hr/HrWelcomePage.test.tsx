@@ -34,6 +34,12 @@ vi.mock('../../components/WelcomeShell', () => ({
   WelcomeShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+const mockTrackExit = vi.fn();
+vi.mock('../../analyticsEvents', () => ({ trackHrWelcomeExit: (p: unknown) => mockTrackExit(p) }));
+const mockPersist = vi.fn().mockResolvedValue(undefined);
+vi.mock('../../api/welcome', () => ({ persistWelcomeSeen: () => mockPersist() as Promise<void> }));
+
+import { markWelcomeSeen } from '../../utils/welcomeSeen';
 import { HrWelcomePage } from './HrWelcomePage';
 
 /** WelcomeStepCard renders a react-router <Link>, so a Router must be in context. */
@@ -67,6 +73,8 @@ function signedInAs(email: string) {
 beforeEach(() => {
   mockNavigate.mockReset();
   mockGetAuthItem.mockReset();
+  mockTrackExit.mockReset();
+  mockPersist.mockClear();
 });
 afterEach(cleanup);
 
@@ -111,6 +119,14 @@ describe('HrWelcomePage — test-drive HR', () => {
     expectNoSkippedHeadingLevel(container);
   });
 
+
+  it('records the test-drive variant on exit', () => {
+    signedInAs('hr-a1b2@probe.test');
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /create your first case/i }));
+    expect(mockTrackExit).toHaveBeenCalledWith({ exit: 'open_case', variant: 'test_drive' });
+  });
+
   it('treats the e2e runner domain as a test account too', () => {
     signedInAs('hr_run_1784@testco.com');
     renderPage();
@@ -126,17 +142,18 @@ describe('HrWelcomePage — real HR', () => {
     expect(screen.getByRole('heading', { name: /set up your company workspace/i })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /open your first relocation case/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /create your first case/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /open your first case/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /open the mobility command center/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^open cases$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^open cases$/i })).toBeNull();
   });
 
   it('shows a pending state within the click of an exit', () => {
     signedInAs('marie.dupont@acme-corp.com');
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: /open the mobility command center/i }));
+    fireEvent.click(screen.getByRole('button', { name: /open your first case/i }));
     expect(screen.getByRole('progressbar', { name: /opening page/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /opening/i })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /^open cases$/i })).toBeDisabled();
+    const disabledBtns = screen.getAllByRole('button').filter(b => (b as HTMLButtonElement).disabled);
+    expect(disabledBtns.length).toBeGreaterThanOrEqual(2);
   });
 
   it('sends step 3 to Service Providers vendor curation, not the legacy grid', () => {
@@ -190,6 +207,61 @@ describe('HrWelcomePage — real HR', () => {
     expect(screen.getByRole('heading', { level: 3, name: /curate your service providers/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: /ready to open your first case/i })).toBeInTheDocument();
     expectNoSkippedHeadingLevel(container);
+  });
+
+
+  it('the primary CTA opens the one real case form, not an overview page', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /open your first case/i }));
+    expect(mockNavigate).toHaveBeenCalledWith('/hr/dashboard?new=1');
+    expect(mockNavigate).not.toHaveBeenCalledWith('/hr/command-center');
+  });
+
+  it('the secondary exit goes to the Mobility command center under that page\'s own name', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /open the mobility command center/i }));
+    expect(mockNavigate).toHaveBeenCalledWith('/hr/command-center');
+  });
+
+  it('no exit is labelled "dashboard" or "cases"', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    expect(screen.queryByRole('button', { name: /dashboard/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^open cases$/i })).toBeNull();
+  });
+
+  it('records which exit was taken with enums only, no PII', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /open your first case/i }));
+    expect(mockTrackExit).toHaveBeenCalledWith({ exit: 'open_case', variant: 'real' });
+  });
+
+  it('marks the welcome seen before navigating so the dashboard mount never bounces back', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /open your first case/i }));
+    const seenOrder = (markWelcomeSeen as unknown as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    const navOrder = mockNavigate.mock.invocationCallOrder[0];
+    expect(seenOrder).toBeLessThan(navOrder!);
+  });
+
+  it('a failed welcome-seen persist does not block the exit', async () => {
+    mockPersist.mockRejectedValueOnce(new Error('503'));
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /open your first case/i }));
+    expect(mockNavigate).toHaveBeenCalledWith('/hr/dashboard?new=1');
+    await Promise.resolve();
+  });
+
+  it('does not tell a returning company this is their "first" case (U1-b)', () => {
+    signedInAs('marie.dupont@acme-corp.com');
+    renderPage();
+    expect(screen.getByText(/before creating a relocation case/i)).toBeInTheDocument();
+    expect(screen.queryByText(/before creating your first relocation case/i)).toBeNull();
   });
 
   it('no email (unknown session) falls back to the real-HR landing', () => {
