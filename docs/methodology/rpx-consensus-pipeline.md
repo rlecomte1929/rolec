@@ -42,6 +42,25 @@ workflow to an agent for a known task** — corridor research *is* a known task,
 pipeline of narrow steps, not one long agent chat (which is exactly what failed in Otto — it hit
 Ziegler/Huyen's context "dumb zone" and errored out).
 
+## Entity resolution before voting (learned from the first real run)
+
+Independent passes drift **both** the topic key and the fact key for the same fact
+(`right_of_residence` / `eu_right_of_residence` / `…_worker`; and a unique `fact_key` every time),
+so naive exact-key voting collapses consensus to noise — the first live NO→FR run (5 passes, 71
+statutory-cited facts) scored **0 consensus** for that reason alone. The merge therefore resolves
+facts before voting, deterministically and LLM-free:
+
+1. **Canonical topic** — `CANONICAL_TOPICS` maps known aliases to one form (explicit, no silent
+   structural merges).
+2. **Text clustering within a topic** — facts are grouped by content-token Jaccard on `fact_text`
+   (same fact → near-identical text; different sub-facts → different text), so drifted `fact_key`s
+   for the same fact vote together while distinct sub-facts stay separate.
+
+Re-running the same 5 passes with this step yields **3 consensus (5/5) + 4/5 + 3/5, 0 gaps**. The
+threshold is deliberately conservative (a false merge of two distinct compliance facts is worse
+than an under-count); **semantic/embedding clustering is the next enhancement** to lift the facts
+that vary in phrasing beyond lexical overlap.
+
 ## The consensus bands (RPX-05 card, made executable)
 
 `merge_passes()` groups every candidate by `destination_country | entity_topic_key | fact_key`,
