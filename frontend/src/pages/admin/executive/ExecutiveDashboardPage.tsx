@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AdminLayout } from '../AdminLayout';
 import { Alert, Badge, Button, Card } from '../../../components/antigravity';
 import { StatCard } from '../../../components/admin/overview/StatCard';
+import { metricTooltip, useAdminMetrics } from '../../../api/adminMetrics';
 import { getExecOverview, type ExecOverview, type ExecPanel } from '../../../api/execOverview';
 
 function num(panel: ExecPanel | undefined, key: string): number | null {
@@ -29,6 +30,8 @@ export const ExecutiveDashboardPage: React.FC = () => {
   const [data, setData] = useState<ExecOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { data: metrics } = useAdminMetrics();
+  const tenants = metrics?.tenants_total;
 
   const load = React.useCallback(() => {
     let active = true;
@@ -92,10 +95,10 @@ export const ExecutiveDashboardPage: React.FC = () => {
       )}
 
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4" data-testid="exec-kpis">
-        <StatCard testId="kpi-companies" label="Companies" value={num(data?.growth, 'companies')} sub={`tenants · ${source(data?.growth, loadFailed)}`} loading={loading} fallback={failFallback} definition="Real tenants, excluding synthetic QA/test tenants — the same count shown on Today and Companies (AIQ-2326)." />
-        <StatCard testId="kpi-employees" label="Employees" value={num(data?.growth, 'employees')} sub={`seats · ${source(data?.growth, loadFailed)}`} loading={loading} fallback={failFallback} definition="People with the EMPLOYEE role, excluding test accounts." />
-        <StatCard testId="kpi-signups" label="Signups" value={num(data?.funnel, 'signups')} sub={`profiles · ${source(data?.funnel, loadFailed)}`} loading={loading} fallback={failFallback} definition="All real people profiles (any role), excluding test accounts." />
-        <StatCard testId="kpi-cases" label="Cases" value={num(data?.funnel, 'cases')} sub={`total · ${source(data?.funnel, loadFailed)}`} loading={loading} fallback={failFallback} definition="All case assignments ever created." />
+        <StatCard testId="kpi-companies" label="Tenants" value={tenants?.value ?? num(data?.growth, 'companies')} sub={`tenants · ${source(data?.growth, loadFailed)}`} loading={loading} fallback={failFallback} definition={metricTooltip(tenants)} />
+        <StatCard testId="kpi-employees" label="Employees" value={metrics?.employees?.value ?? num(data?.growth, 'employees')} sub={`seats · ${source(data?.growth, loadFailed)}`} loading={loading} fallback={failFallback} definition={metricTooltip(metrics?.employees)} />
+        <StatCard testId="kpi-signups" label="Signups" value={metrics?.signups?.value ?? num(data?.funnel, 'signups')} sub={`profiles · ${source(data?.funnel, loadFailed)}`} loading={loading} fallback={failFallback} definition={metricTooltip(metrics?.signups)} />
+        <StatCard testId="kpi-cases" label="Cases" value={metrics?.cases_total?.value ?? num(data?.funnel, 'cases')} sub={`total · ${source(data?.funnel, loadFailed)}`} loading={loading} fallback={failFallback} definition={metricTooltip(metrics?.cases_total)} />
         <StatCard testId="kpi-intake" label="In intake" value={num(data?.funnel, 'in_intake')} sub="active intake" loading={loading} fallback={failFallback} />
         <StatCard testId="kpi-completed" label="Completed" value={num(data?.funnel, 'completed')} sub="closed cases" loading={loading} fallback={failFallback} />
         <StatCard testId="kpi-median" label="Median completion" value={num(data?.throughput, 'median_completion_days')} sub={`days · ${source(data?.throughput, loadFailed)}`} loading={loading} fallback={failFallback} />

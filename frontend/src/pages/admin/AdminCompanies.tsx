@@ -256,30 +256,38 @@ export const AdminCompanies: React.FC = () => {
   return (
     <AdminLayout title="Companies" subtitle="Create, edit, plan tier, delete">
       <div data-testid="companies-kpis" className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Tenants"
-          value={adminMetrics?.tenants_total.value ?? '—'}
-          sub="real, excludes test"
-          definition={metricTooltip(adminMetrics?.tenants_total)}
-        />
-        <StatCard
-          label="Active"
-          value={adminMetrics?.tenants_active.value ?? '—'}
-          sub="≥1 case assignment"
-          definition={metricTooltip(adminMetrics?.tenants_active)}
-        />
-        <StatCard
-          label="HR users"
-          value={adminMetrics?.hr_users.value ?? '—'}
-          sub="excludes test"
-          definition={metricTooltip(adminMetrics?.hr_users)}
-        />
-        <StatCard
-          label="Employees"
-          value={adminMetrics?.employees.value ?? '—'}
-          sub="excludes test"
-          definition={metricTooltip(adminMetrics?.employees)}
-        />
+        {adminMetrics?.tenants_total ? (
+          <StatCard
+            label="Tenants"
+            value={adminMetrics.tenants_total.value}
+            sub="real, excludes test"
+            definition={metricTooltip(adminMetrics.tenants_total)}
+          />
+        ) : null}
+        {adminMetrics?.tenants_active ? (
+          <StatCard
+            label="Active"
+            value={adminMetrics.tenants_active.value}
+            sub="≥1 case assignment"
+            definition={metricTooltip(adminMetrics.tenants_active)}
+          />
+        ) : null}
+        {adminMetrics?.hr_users ? (
+          <StatCard
+            label="HR users"
+            value={adminMetrics.hr_users.value}
+            sub="excludes test"
+            definition={metricTooltip(adminMetrics.hr_users)}
+          />
+        ) : null}
+        {adminMetrics?.employees ? (
+          <StatCard
+            label="Employees"
+            value={adminMetrics.employees.value}
+            sub="excludes test"
+            definition={metricTooltip(adminMetrics.employees)}
+          />
+        ) : null}
       </div>
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center gap-2">

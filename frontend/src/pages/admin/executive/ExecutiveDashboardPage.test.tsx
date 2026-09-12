@@ -15,8 +15,24 @@ vi.mock('../AdminLayout', () => ({
   AdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { getExecOverview } from '../../../api/execOverview';
 import { ExecutiveDashboardPage } from './ExecutiveDashboardPage';
+
+vi.mock('../../../api/adminMetrics', async () => {
+  const actual = await vi.importActual<typeof import('../../../api/adminMetrics')>('../../../api/adminMetrics');
+  return {
+    ...actual,
+    useAdminMetrics: vi.fn(() => ({ data: { as_of: '2026-09-12T12:00:00.000Z' }, isLoading: false })),
+  };
+});
+
+const renderPage = () =>
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <ExecutiveDashboardPage />
+    </QueryClientProvider>,
+  );
 
 const mock = getExecOverview as unknown as ReturnType<typeof vi.fn>;
 
@@ -38,7 +54,7 @@ beforeEach(() => mock.mockReset());
 describe('ExecutiveDashboardPage', () => {
   it('renders KPI tiles + AI-health score', async () => {
     mock.mockResolvedValue(OVERVIEW);
-    render(<ExecutiveDashboardPage />);
+    renderPage();
     await waitFor(() => expect(screen.getByTestId('kpi-companies')).toHaveTextContent('3'));
     expect(screen.getByTestId('ai-health')).toHaveTextContent('92');
     expect(screen.getByTestId('kpi-cost')).toHaveTextContent('1.23');
@@ -46,14 +62,14 @@ describe('ExecutiveDashboardPage', () => {
 
   it('shows the not-instrumented reliability + NPS cards', async () => {
     mock.mockResolvedValue(OVERVIEW);
-    render(<ExecutiveDashboardPage />);
+    renderPage();
     expect(await screen.findByTestId('reliability')).toHaveTextContent(/not instrumented/i);
     expect(screen.getByTestId('nps')).toHaveTextContent(/not instrumented/i);
   });
 
   it('degrades an unavailable panel without crashing', async () => {
     mock.mockResolvedValue({ ...OVERVIEW, growth: { available: false, data_source: 'unavailable' } });
-    render(<ExecutiveDashboardPage />);
+    renderPage();
     await waitFor(() => expect(screen.getByTestId('kpi-companies')).toHaveTextContent(/unavailable/i));
   });
 
@@ -65,7 +81,7 @@ describe('ExecutiveDashboardPage', () => {
 
   it('a failed load never renders tiles as "unavailable" — it says so and offers retry', async () => {
     mock.mockRejectedValueOnce(new Error('network'));
-    render(<ExecutiveDashboardPage />);
+    renderPage();
 
     expect(await screen.findByTestId('exec-load-error')).toBeInTheDocument();
     expect(screen.getByTestId('exec-retry')).toBeInTheDocument();
@@ -77,13 +93,13 @@ describe('ExecutiveDashboardPage', () => {
 
   it('names a 429 as a rate limit rather than missing data', async () => {
     mock.mockRejectedValueOnce({ response: { status: 429 } });
-    render(<ExecutiveDashboardPage />);
+    renderPage();
     expect(await screen.findByTestId('exec-load-error')).toHaveTextContent(/rate limit, not missing data/i);
   });
 
   it('Retry refetches and recovers the tiles', async () => {
     mock.mockRejectedValueOnce({ response: { status: 429 } }).mockResolvedValueOnce(OVERVIEW);
-    render(<ExecutiveDashboardPage />);
+    renderPage();
 
     const retry = await screen.findByTestId('exec-retry');
     fireEvent.click(retry);
