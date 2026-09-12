@@ -780,7 +780,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
   // [T2.4] HR not linked to a company yet → onboarding, not a blank builder.
   // Respect embedded vs standalone so the tab and the direct route both degrade.
   if (noCompany) {
-    return embedded ? <HrNoCompanyOnboarding /> : <AppShell wide><HrNoCompanyOnboarding /></AppShell>;
+    return embedded ? <HrNoCompanyOnboarding /> : <AppShell wide hideHeading title="Policy builder"><HrNoCompanyOnboarding /></AppShell>;
   }
 
   // The Policy Assistant docked shell wraps the builder so HR can ask about the
@@ -800,7 +800,7 @@ export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean
   );
 
   if (embedded) return shell;
-  return <AppShell wide>{shell}</AppShell>;
+  return <AppShell wide hideHeading section="HR Operations" title="Policy builder">{shell}</AppShell>;
 }
 
 // ─── Preview modal ──────────────────────────────────────────────────────────

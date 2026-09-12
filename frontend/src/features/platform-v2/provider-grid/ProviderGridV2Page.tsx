@@ -139,7 +139,7 @@ export function ProviderGridV2Page({ embedded = false }: { embedded?: boolean } 
     </>
   );
 
-  return embedded ? inner : <AppShell>{inner}</AppShell>;
+  return embedded ? inner : <AppShell hideHeading section="HR Operations" title="Provider status">{inner}</AppShell>;
 }
 
 // ── Local visual primitives (same idiom as CompaniesV2) ─────────────────────
