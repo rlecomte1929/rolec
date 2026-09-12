@@ -620,13 +620,19 @@ export const EmployeeJourney: React.FC = () => {
       : hasPendingOnly
         ? 'Pending assignments'
         : 'Your relocation';
+  // AIQ-2285/T8: the fallback subtitle asserts the case is missing, and an
+  // unresolved overview reaches it with counts of 0 — so the page header claimed
+  // "no case" directly above the alert saying we could not load it. Say nothing
+  // about link state until resolveOverviewState says the counts are trustworthy.
   const shellSubtitle = assignmentLoading
     ? 'Loading your assignment list.'
-    : hasLinked
-      ? 'Open a case or pick up where you left off.'
-      : hasPendingOnly
-        ? 'Accept your pending case below, then open it to get started.'
-        : 'Your case appears here once it is linked.';
+    : overviewUnresolved
+      ? undefined
+      : hasLinked
+        ? 'Open a case or pick up where you left off.'
+        : hasPendingOnly
+          ? 'Accept your pending case below, then open it to get started.'
+          : 'Your case appears here once it is linked.';
 
   return (
     <AppShell title={shellTitle} subtitle={shellSubtitle} wide>
