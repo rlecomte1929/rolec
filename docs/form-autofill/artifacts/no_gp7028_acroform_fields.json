@@ -1,0 +1,1465 @@
+{
+  "url": "https://www.udi.no/globalassets/global/skjemaer/application_-for_a_permit_for_residence_or_work_gp7028.pdf",
+  "count": 232,
+  "fields": [
+    {
+      "name": "Date",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "DUFnumber",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Fee paid NOK",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Picture",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "First name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Middle name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "If applicable previous name surname",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth daymonthyear",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Place of birth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country of birth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Ethnicity",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Mother tongue",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Other languages you speak",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Gender",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Male",
+        "/Female"
+      ]
+    },
+    {
+      "name": "Profession",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Citizenship specify all",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Place and date of last change in marital status",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postcode",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Town",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Telephone number at home",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Email",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Alternative address if the answer to the application is to be sent another place",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postcode_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Town_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Address in Norway where you live or will live street",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postcode_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Town_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Cell phone number in Norway",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of arrival in Norway",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of entry into the Schengen area",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Have you stayed in Norway previously",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes",
+        "/No"
+      ]
+    },
+    {
+      "name": "Have you previously applied for a residence permit in",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_2",
+        "/No_2"
+      ]
+    },
+    {
+      "name": "How long do you want the permit to last",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "From date",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "To date",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "First name_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Middle name_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "If applicable previous namesurname",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth daymonthyear_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Place of birth_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country of birth_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Mother tongue_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Gender_2",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Male_2",
+        "/Female_2"
+      ]
+    },
+    {
+      "name": "Citizenship specify all_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Address",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postcode_4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Town_4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Norwegian personal ID number if applicable",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Telephone number",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Cell phone number",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Have you been married previously",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_4",
+        "/No_4"
+      ]
+    },
+    {
+      "name": "If yes when year",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "For how long were you married",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Who were you married to",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Employer company name or host family",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Company registration number",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Address_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postcode_5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Town_5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Telephone number_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Email address_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Wage in NOK",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Type of work job title or key task",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Which professional areasfields are you qualified in",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Accomplished degree",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Place of studyeducational institution",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Company registration number_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Subjectfield of study",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Telephone number_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Name of organisation that arranged your studiesschool place where applicable",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "School fees amount per term",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "The reason for your permit Protection asylum Permit on strong humanitarian grounds Other explain",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of departure from Norway daymonthyearRow1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Entry date to Norway daymonthyearRow1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Numbers of days awayRow1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country visitedRow1",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of departure from Norway daymonthyearRow2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Entry date to Norway daymonthyearRow2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Numbers of days awayRow2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country visitedRow2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of departure from Norway daymonthyearRow3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Entry date to Norway daymonthyearRow3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Numbers of days awayRow3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country visitedRow3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of departure from Norway daymonthyearRow4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Entry date to Norway daymonthyearRow4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Numbers of days awayRow4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country visitedRow4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of departure from Norway daymonthyearRow5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Entry date to Norway daymonthyearRow5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Numbers of days awayRow5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country visitedRow5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of departure from Norway daymonthyearRow6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Entry date to Norway daymonthyearRow6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Numbers of days awayRow6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country visitedRow6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "First name_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth daymonthyear_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Address_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postcodeplace",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name first name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Resident of country",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name first name_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Resident of country_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name first name_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Resident of country_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name first name_4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth_4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Resident of country_4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name first name_5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth_5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Resident of country_5",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name first name_6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth_6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Resident of country_6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name first name_7",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth_7",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Resident of country_7",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name first name_8",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth_8",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Resident of country_8",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Number of children",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Number of sisters",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Number of brothers",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Number of siblings residing in Norway",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "If yes in which police districtcountry",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "If yes when and where were you convicted",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Type of offence",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "I am aware that correspondence from the immigration authorities will be sent to my representative",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/On"
+      ]
+    },
+    {
+      "name": "I am aware that my representative will be notified of the decision instead of me",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/On"
+      ]
+    },
+    {
+      "name": "I give the following person power of attorney to act on my behalf in connection with my application",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/On"
+      ]
+    },
+    {
+      "name": "Representatives first name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postcode_6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Town_6",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country_4",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Cell phone number_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "I accept to receive information about my case on sms  email",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/On"
+      ]
+    },
+    {
+      "name": "Place and date",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Your signature",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Place and date_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Parentguardians signature",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Place and date_3",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Parentguardians signature_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Home address",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Travel / identity document number",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Valid until ddmmyy",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Country of issue",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Issuing authority",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Specify any other persons who are entered in the travel document Use a separate sheet if necessary",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "From month / year",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "To month / year",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Other: explain",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Representatives family name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Representative's address",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Marital status group 1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Single",
+        "/Married / civil partner",
+        "/Cohabitant",
+        "/Separated",
+        "/Divorced",
+        "/Widow/widower"
+      ]
+    },
+    {
+      "name": "Reason for the visit",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Other. Specify",
+        "/Work",
+        "/Tourism"
+      ]
+    },
+    {
+      "name": "Have you been expelled from Norway previously?",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_3",
+        "/No_3"
+      ]
+    },
+    {
+      "name": "Travel document Group1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Passport from country of origin",
+        "/Travel warrant, immigrant's passport or similar",
+        "/No travel document"
+      ]
+    },
+    {
+      "name": "Previous stays5",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/No",
+        "/Yes. Please enclose separate application for lifting of the prohibition of entry"
+      ]
+    },
+    {
+      "name": "PermitGroup1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/First time permit",
+        "/Renewal"
+      ]
+    },
+    {
+      "name": "PermitGroup_2",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Spouse/partner",
+        "/Cohabitant",
+        "/Fiancé",
+        "/Biological child",
+        "/Adopted child",
+        "/Foster child",
+        "/Biological/adoptive mother",
+        "/Biological/adoptive fater",
+        "/Other",
+        "/Foster mother",
+        "/Foster father"
+      ]
+    },
+    {
+      "name": "Will you live at the same address (in the same household) for the whole period of the permit?",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_5",
+        "/No_5"
+      ]
+    },
+    {
+      "name": "For first-time application: Will you be supported by the person living in Norway",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_6",
+        "/No_6"
+      ]
+    },
+    {
+      "name": "For renewal: Are you supported by the person living in Norway?",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_7",
+        "/No_7"
+      ]
+    },
+    {
+      "name": "Changes to working situation?",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/No_8",
+        "/Yes_8"
+      ]
+    },
+    {
+      "name": "When applying for a residence permit to get married in Norway Please note the date the marriage or partnership is to take place",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "WorkGroup2",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/100 %",
+        "/Annet %"
+      ]
+    },
+    {
+      "name": "Employment percentage",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "WorkGroup3",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Primary school",
+        "/Upper secondary school, vocational",
+        "/Upper secondary school, general subjects",
+        "/Supplement to upper secondary education",
+        "/University or college",
+        "/Other"
+      ]
+    },
+    {
+      "name": "Relevant work experience",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/No_9",
+        "/Yes_9"
+      ]
+    },
+    {
+      "name": "StudyGroup2",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/No_11",
+        "/Yes_11"
+      ]
+    },
+    {
+      "name": "StudyGroup3",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Own means",
+        "/Grant",
+        "/Other (explain)"
+      ]
+    },
+    {
+      "name": "StudyGroup1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_10",
+        "/No_10"
+      ]
+    },
+    {
+      "name": "ProtectionGroup1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_12",
+        "/No_12"
+      ]
+    },
+    {
+      "name": "ProtectionGroup2",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_13",
+        "/No_13"
+      ]
+    },
+    {
+      "name": "ProtectionGroup3",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Protection (asylum)",
+        "/Permit on strong humanitarian grounds",
+        "/Other, explain"
+      ]
+    },
+    {
+      "name": "TripGroup1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Business",
+        "/Private"
+      ]
+    },
+    {
+      "name": "TripGroup2",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Business",
+        "/Private"
+      ]
+    },
+    {
+      "name": "TripGroup3",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Business",
+        "/Private"
+      ]
+    },
+    {
+      "name": "TripGroup4",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Business",
+        "/Private"
+      ]
+    },
+    {
+      "name": "TripGroup5",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Business",
+        "/Private"
+      ]
+    },
+    {
+      "name": "TripGroup6",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Business",
+        "/Private"
+      ]
+    },
+    {
+      "name": "FamilyGroup1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Male",
+        "/Female"
+      ]
+    },
+    {
+      "name": "Also applying1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Also applying",
+        "/Off"
+      ]
+    },
+    {
+      "name": "ParentsGroup1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Male",
+        "/Female"
+      ]
+    },
+    {
+      "name": "ParentsGroup2",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Male",
+        "/Female"
+      ]
+    },
+    {
+      "name": "Also applying2",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/Yes"
+      ]
+    },
+    {
+      "name": "Also applying3",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/also applying"
+      ]
+    },
+    {
+      "name": "Child number 1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Biological / adopted child",
+        "/Foster child",
+        "/Sibling"
+      ]
+    },
+    {
+      "name": "Child number 2",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Biological / adopted child",
+        "/Foster child",
+        "/Sibling"
+      ]
+    },
+    {
+      "name": "Child number 3",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Biological / adopted child",
+        "/Foster child",
+        "/Sibling"
+      ]
+    },
+    {
+      "name": "Child number 4",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Biological / adopted child",
+        "/Foster child",
+        "/Sibling"
+      ]
+    },
+    {
+      "name": "Child number 5",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Biological / adopted child",
+        "/Foster child",
+        "/Sibling"
+      ]
+    },
+    {
+      "name": "Child number 6",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Biological / adopted child",
+        "/Foster child",
+        "/Sibling"
+      ]
+    },
+    {
+      "name": "FamilyGroup4",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Male",
+        "/Female"
+      ]
+    },
+    {
+      "name": "FamilyGroup5",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Male",
+        "/Female"
+      ]
+    },
+    {
+      "name": "FamilyGroup6",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Male",
+        "/Female"
+      ]
+    },
+    {
+      "name": "FamilyGroup7",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Male",
+        "/Female"
+      ]
+    },
+    {
+      "name": "FamilyGroup8",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Male",
+        "/Female"
+      ]
+    },
+    {
+      "name": "FamilyGroup9",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Male",
+        "/Female"
+      ]
+    },
+    {
+      "name": "Child number 1 also applying",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/Yes"
+      ]
+    },
+    {
+      "name": "Child number 3 also applying",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/Yes"
+      ]
+    },
+    {
+      "name": "Child number 4 also applying",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/Yes"
+      ]
+    },
+    {
+      "name": "Child number 5 also applying",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/Yes"
+      ]
+    },
+    {
+      "name": "Child number 2 also applying",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/Yes"
+      ]
+    },
+    {
+      "name": "Child number 6 also applying",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Off",
+        "/Yes"
+      ]
+    },
+    {
+      "name": "CriminalOffencesGroup1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_14",
+        "/No_14"
+      ]
+    },
+    {
+      "name": "CriminalOffencesGroup2",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_15",
+        "/No_15"
+      ]
+    },
+    {
+      "name": "Prison (days)",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "CriminalOffencesGroup3",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Fine",
+        "/Prison"
+      ]
+    },
+    {
+      "name": "CriminalOffencesGroup4",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_16",
+        "/No_16, explain"
+      ]
+    },
+    {
+      "name": "RemarksGroup2",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_18",
+        "/No_18"
+      ]
+    },
+    {
+      "name": "RemarksGroup3",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_19",
+        "/No_19"
+      ]
+    },
+    {
+      "name": "Have you served the sentence/paid the fine (or is the probation period over)?",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "RemarksGroup1",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes_17",
+        "/No_17"
+      ]
+    },
+    {
+      "name": "If yes state when and for how long",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "State other reason",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "If no, explain why you will not be supported by the person living in Norway",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Reason for not living in the same household for the whole period of the permit",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Fine",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Phone number",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "E-mail",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Email address",
+      "ft": "Tx",
+      "maxLen": null
+    }
+  ],
+  "_provenance": {
+    "extracted": "2026-09-12",
+    "method": "pypdf.get_fields() over the blank AcroForm; /Btn export values resolved via /_States_ then a /Kids -> /AP/N appearance-state walk. Bytes were operator-supplied: in-session egress to web.archive.org and udi.no was policy-blocked (403 at CONNECT), so the intended Wayback 2id_/CDX fetch could not run here; the operator provided the blank forms directly.",
+    "sha256": "a75786d22f4c1bb3284e42667b2f4456167e2b2fd4250c1b3df40a2a0fc2196f",
+    "pdf_bytes": 1888429,
+    "claimed_sha256": "a75786d22f4c1bb3284e42667b2f4456167e2b2fd4250c1b3df40a2a0fc2196f",
+    "sha256_matches_claim": true
+  }
+}

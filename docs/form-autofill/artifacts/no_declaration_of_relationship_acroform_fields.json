@@ -1,0 +1,91 @@
+{
+  "url": "https://www.udi.no/globalassets/global/skjemaer/declaration_of_relationship_e.pdf",
+  "count": 15,
+  "fields": [
+    {
+      "name": "Family name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "First name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth ddmmyyyy",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Family name_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "First name_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth ddmmyyyy_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Address",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postcode",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Town",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Vi have lived together since date",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Place and date",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Place and date_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "penalcodeimmigration",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/on",
+        "/Off"
+      ]
+    },
+    {
+      "name": "Applicant's signature",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "The signature of the Applicant's spouse  cohabitant  partner",
+      "ft": "Tx",
+      "maxLen": null
+    }
+  ],
+  "_provenance": {
+    "extracted": "2026-09-12",
+    "method": "pypdf.get_fields() over the blank AcroForm; /Btn export values resolved via /_States_ then a /Kids -> /AP/N appearance-state walk. Bytes were operator-supplied: in-session egress to web.archive.org and udi.no was policy-blocked (403 at CONNECT), so the intended Wayback 2id_/CDX fetch could not run here; the operator provided the blank forms directly.",
+    "sha256": "6e8b078e0d87d02ecb1017543ab61bff69d7ba10e4d10683edb9ff8bcaf2bbce",
+    "pdf_bytes": 654044
+  }
+}
