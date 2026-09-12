@@ -37,6 +37,9 @@ import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { useValidatedParams, caseParamsSchema } from '../../hooks/useValidatedParams';
 import type { RelocationPlanPhaseTaskDTO } from '../../types/relocationPlanView';
 import { track } from '../../analytics';
+import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import { resolveOverviewState } from '../../features/employee-journey/overviewResolution';
+import { NoCaseLinkedEmptyState } from '../../components/employee/NoCaseLinkedEmptyState';
 import {
   trackCaseCompleted,
   trackCaseRoadmapReviewed,
@@ -69,6 +72,25 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     redirectTo: ROUTE_DEFS.employeeDashboard.path,
   })?.caseId;
   const navigate = useNavigate();
+  const {
+    linkedCount,
+    isLoading: assignmentLoading,
+    overviewError,
+    overviewDegraded,
+    pendingCount,
+  } = useEmployeeAssignment();
+  const { unresolved: overviewUnresolved } = resolveOverviewState({
+    overviewError,
+    overviewDegraded,
+    linkedCount,
+    pendingCount,
+  });
+  const storedRole =
+    typeof localStorage === 'undefined' ? null : localStorage.getItem('relopass_role');
+  const isAdmin = (storedRole || '').toUpperCase() === 'ADMIN';
+  const noCaseLinked =
+    !isAdmin && !assignmentLoading && !overviewUnresolved && linkedCount === 0;
+  const planCaseId = noCaseLinked ? undefined : caseId;
   const selectionRef = useRef<HTMLDivElement>(null);
   const { selection, clear } = useTextSelection(selectionRef);
   // [AIQ-1259b] Policy Assistant ported from the retired /plan page so the
@@ -96,7 +118,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   }, []);
 
   const { data, loading, error, refetch, ensureDefaultsAndReload } =
-    useEmployeeRelocationPlanPageData(caseId);
+    useEmployeeRelocationPlanPageData(planCaseId);
 
   // [AIQ-2057] The plan was readable but not workable — nothing in the employee UI ever
   // called the milestone PATCH that already existed. This is the affordance that turns
@@ -172,7 +194,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   // happening rather than adding a second one.
   const [advisories, setAdvisories] = useState<RoadmapV2Advisory[]>([]);
   useEffect(() => {
-    if (!caseId) return;
+    if (!caseId || noCaseLinked) return;
     let cancelled = false;
     getCaseRoadmapV2(caseId)
       .then((res) => {
@@ -206,7 +228,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [caseId]);
+  }, [caseId, noCaseLinked]);
 
   // Validate gate.
   const [localValidatedAt, setLocalValidatedAt] = useState<string | null>(null);
@@ -255,7 +277,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   // state. It never unlocks anything — the gate stays fail-CLOSED.
   const [paymentUnconfirmed, setPaymentUnconfirmed] = useState(false);
   useEffect(() => {
-    if (!caseId) {
+    if (!caseId || noCaseLinked) {
       setRoadmapUnlocked(true);
       return;
     }
@@ -290,7 +312,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [caseId]);
+  }, [caseId, noCaseLinked]);
 
   const planEmpty = !!data && data.summary.total_tasks === 0;
   const planReady = !!data && data.summary.total_tasks > 0 && data.phases.length > 0;
@@ -330,6 +352,14 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     resetWindow();
     void refetch();
   }, [resetWindow, refetch]);
+
+  if (noCaseLinked) {
+    return (
+      <AppShell section="Employee" title="Roadmap">
+        <NoCaseLinkedEmptyState explanation="Select a case to see your relocation roadmap." />
+      </AppShell>
+    );
+  }
 
   // Paywall gate — runs BEFORE the loading/build-state returns so a locked case reaches
   // the paywall rather than the "being built" fallback (the roadmap fetch 402s when locked).

@@ -7,7 +7,7 @@
  * branches that matter:
  *   1. a linked assignment → the benefit comparison dashboard renders from the
  *      mocked engine output;
- *   2. no linked assignment → the case-aware "No company linked yet" empty card.
+ *   2. no linked assignment → the "No case linked" empty state.
  *
  * AppShell is stubbed (layout + unrelated mount-time network). The render is
  * wrapped in QueryClientProvider (retry:false) + MemoryRouter; the assignment
@@ -164,7 +164,7 @@ describe('EmployeeBenefitComparisonPage — comparison orchestration', () => {
     ctx = noCompanyCtx();
     renderPage();
 
-    expect(await screen.findByText('No company linked yet')).toBeInTheDocument();
+    expect(await screen.findByText(/No case linked/)).toBeInTheDocument();
     // The dashboard must not render, and no comparison fetch fires without a case.
     expect(screen.queryByText('Total policy allocation')).not.toBeInTheDocument();
     expect(getPolicyServiceComparison).not.toHaveBeenCalled();

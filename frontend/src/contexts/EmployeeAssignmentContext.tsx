@@ -137,6 +137,15 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
     }
   }, [linked.length, assignmentId]);
 
+  useEffect(() => {
+    if (query.isError || !query.isFetched) return;
+    if (linked.length === 0) {
+      try {
+        localStorage.removeItem('relopass_last_assignment_id');
+      } catch { /* ignore */ }
+    }
+  }, [query.isError, query.isFetched, linked.length]);
+
   const refetch = useCallback(async () => {
     invalidateApiCache(CURRENT_ASSIGNMENT_CACHE_KEY);
     invalidateApiCache(ASSIGNMENTS_OVERVIEW_CACHE_KEY);

@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
+import { ownedEmployeeCaseId } from '../../../utils/employeeAssignmentScope';
 import { documentsAPI } from '../../../api/documents';
 import { notifyHrEmployeeSaved } from '../../../api/notifications';
 import type { DocumentItem } from './DocumentsScreen';
@@ -48,12 +49,11 @@ export interface UseDocumentsResult {
 // ── Hook ───────────────────────────────────────────────────────────────────────
 
 export function useDocuments(caseIdOverride?: string): UseDocumentsResult {
-  const { assignmentId, isLoading: assignmentLoading } = useEmployeeAssignment();
+  const { assignmentId, isLoading: assignmentLoading, linkedSummaries } = useEmployeeAssignment();
 
-  // Case-scoped routes (/employee/case/:caseId/documents) pass the caseId in via
-  // the route param. The bare /employee/documents route has none, so fall back to
-  // the employee's primary assignment (which equals the case id today).
-  const caseId = caseIdOverride ?? assignmentId;
+  // Case-scoped routes pass a caseId in the URL. Never honor it unless it is
+  // one of this employee's linked assignments (stale localStorage / copied UUID).
+  const caseId = ownedEmployeeCaseId(linkedSummaries, [caseIdOverride, assignmentId]);
 
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);

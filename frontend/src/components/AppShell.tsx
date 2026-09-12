@@ -5,13 +5,18 @@ import { authAPI } from '../api/client';
 import { useBrandingConfig } from '../hooks/useBrandingConfig';
 import { getNavigationError } from '../navigation/safeNavigate';
 import { buildRoute, homeRouteKeyForRole, ROUTE_DEFS } from '../navigation/routes';
-import { employeeUnlinkedActionCopy, employeeUnlinkedBannerClassName } from './employeeUnlinkedBanner';
 import { useRegisterNav } from '../navigation/registry';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { resolveOverviewState } from '../features/employee-journey/overviewResolution';
 import { setPreferredEmployeeAssignmentId } from '../utils/employeeAssignmentScope';
 import { useAdminContext } from '../features/admin/useAdminContext';
 import { adminAPI } from '../api/client';
+import { SetupAssistantFab } from '../features/setup-help/SetupAssistantFab';
+import { SetupAssistantDrawer } from '../features/setup-help/SetupAssistantDrawer';
+import {
+  employeeUnlinkedBannerClassName,
+  UNLINKED_BANNER_DISMISS_KEY,
+} from './employeeUnlinkedBanner';
 import { ChangelogBell } from './ChangelogBell';
 import { NotificationsBell } from './NotificationsBell';
 import { RoleSwitcher } from './RoleSwitcher';
@@ -24,8 +29,6 @@ import { FeedbackWidget } from './FeedbackWidget';
 import { TestDriveFrictionPrompt } from './TestDriveFrictionPrompt';
 import { GlobalApiErrorBanner } from './GlobalApiErrorBanner';
 import { PlatformShellSidebar, type SidebarRole } from './PlatformShellSidebar';
-import { SetupAssistantFab } from '../features/setup-help/SetupAssistantFab';
-import { SetupAssistantDrawer } from '../features/setup-help/SetupAssistantDrawer';
 
 function deriveInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -171,6 +174,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
   const sbRole = sidebarRole(role);
   const userInitials = deriveInitials(name || identity || 'RP');
   const onEmployeeDashboard = location.pathname === ROUTE_DEFS.employeeDashboard.path;
+  const [unlinkedBannerDismissed, setUnlinkedBannerDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(UNLINKED_BANNER_DISMISS_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   // AIQ-2285/T8: `linkedCount === 0` is also what a failed or degraded overview
   // looks like. Without this gate the banner told the employee their account
   // "isn't linked to a relocation case" on EVERY page during a transient outage.
@@ -187,7 +197,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
     !employeeAssignmentLoading &&
     !overviewUnresolved &&
     linkedCount === 0 &&
-    !onEmployeeDashboard;
+    !onEmployeeDashboard &&
+    !unlinkedBannerDismissed;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800">
@@ -286,11 +297,34 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         <GlobalApiErrorBanner />
 
         {showEmployeeBanner && (
-          <div className={employeeUnlinkedBannerClassName}>
-            <span className="mr-2" aria-hidden="true">ℹ</span>
-            Your account isn&apos;t linked to a relocation case yet — most features are on hold.
-            If HR set one up for your email, {employeeUnlinkedActionCopy(onEmployeeDashboard)}
-            {' '}(a case for your verified email links automatically).
+          <div className={`${employeeUnlinkedBannerClassName} flex items-center justify-between gap-3`}>
+            <p>
+              <span className="mr-2" aria-hidden="true">ℹ</span>
+              Your account isn&apos;t linked to a relocation case yet — most features are on hold.
+              If HR set one up for your email,{' '}
+              {/* fix: AIQ-2356 — Dashboard is a real link; banner is session-dismissible */}
+              <Link
+                to={buildRoute('employeeDashboard')}
+                className="font-semibold text-navy-900 underline underline-offset-2 hover:text-navy-950"
+              >
+                Dashboard
+              </Link>
+              {' '}to accept it
+              {' '}(a case for your verified email links automatically).
+            </p>
+            <Button
+              unstyled
+              type="button"
+              className="shrink-0 text-xs font-medium text-navy-800 hover:underline"
+              onClick={() => {
+                try {
+                  sessionStorage.setItem(UNLINKED_BANNER_DISMISS_KEY, '1');
+                } catch { /* ignore quota / private mode */ }
+                setUnlinkedBannerDismissed(true);
+              }}
+            >
+              Dismiss
+            </Button>
           </div>
         )}
 
@@ -335,7 +369,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
                   <Breadcrumb section={section} title={title} homeHref={homeHref} parent={parent} className="mb-3" />
                 ) : null}
                 <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-                {subtitle && <p className="text-sm text-slate-500 mt-1 text-pretty break-words">{subtitle}</p>}
+                {subtitle && (
+                  <p className="text-sm text-slate-500 mt-1 text-pretty break-words">{subtitle}</p>
+                )}
               </div>
             )}
             {children}
