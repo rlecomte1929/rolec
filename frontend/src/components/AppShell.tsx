@@ -93,10 +93,15 @@ interface AppShellProps {
    * When true, AppShell still sets document.title from `title` but does not
    * render the in-page H1/breadcrumb — for pages that own a custom header.
    */
-  hideHeading?: boolean;
+    hideHeading?: boolean;
+  /**
+   * Override the sidebar persona. Inbox uses this so /hr/messages always
+   * shows the HR nav even when localStorage role is EMPLOYEE (AIQ-2362).
+   */
+  navRole?: SidebarRole;
 }
 
-export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, section, wide = false, parent, hideHeading = false }) => {
+export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, section, wide = false, parent, hideHeading = false, navRole }) => {
   const name = getAuthItem('relopass_name');
   const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
@@ -168,7 +173,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
     getAuthItem('relopass_token') ? homeRouteKeyForRole(getAuthItem('relopass_role')) : 'landing'
   );
 
-  const sbRole = sidebarRole(role);
+  const sbRole = navRole ?? sidebarRole(role);
   const userInitials = deriveInitials(name || identity || 'RP');
   const onEmployeeDashboard = location.pathname === ROUTE_DEFS.employeeDashboard.path;
   // AIQ-2285/T8: `linkedCount === 0` is also what a failed or degraded overview
@@ -182,7 +187,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
     pendingCount,
   });
   const showEmployeeBanner =
-    sbRole !== 'ADMIN' &&
+    sbRole === 'EMPLOYEE' &&
     isEmployeeRole &&
     !employeeAssignmentLoading &&
     !overviewUnresolved &&

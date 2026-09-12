@@ -185,7 +185,12 @@ export const NotificationsBell: React.FC = () => {
           </div>
           <div className="max-h-96 overflow-y-auto">
             {items.length === 0 ? (
-              <div className="px-3.5 py-6 text-center text-[12.5px] text-slate-500">No notifications yet</div>
+              <div className="px-3.5 py-6 text-center text-[12.5px] text-slate-500">
+                <p>No notifications yet</p>
+                <p className="mt-1.5 text-[11px] leading-snug">
+                  You&apos;ll see updates here when a case is assigned, HR leaves feedback, or intake is submitted.
+                </p>
+              </div>
             ) : (
               items.map((n) => (
                 <button

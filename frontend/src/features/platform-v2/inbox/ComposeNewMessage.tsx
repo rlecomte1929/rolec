@@ -28,7 +28,9 @@ import type { AssignmentSummary } from '../../../types';
 import { getCountryName } from '../../../utils/countries';
 
 interface RecipientOption {
-  value: string; // assignment_id
+  /** Opaque option value for the DOM — never the assignment UUID (AIQ-2366). */
+  value: string;
+  assignmentId: string;
   label: string;
 }
 
@@ -74,17 +76,18 @@ export function ComposeNewMessage({ open, isHr, onClose, onSent }: ComposeNewMes
         if (isHr) {
           const res = await hrAPI.listAssignments({ limit: 100 });
           opts = (res.assignments || [])
-            .map((a) => ({ value: a.id, label: hrRecipientLabel(a) }))
-            .filter((o) => o.value);
+            .map((a, i) => ({ value: `r-${i}`, assignmentId: a.id, label: hrRecipientLabel(a) }))
+            .filter((o) => o.assignmentId);
         } else {
           const overview = await employeeAPI.getAssignmentsOverview();
           type LinkedRow = { assignment_id?: string; company?: { name?: string } };
           opts = ((overview.linked as LinkedRow[]) || [])
-            .map((r) => ({
-              value: r.assignment_id || '',
+            .map((r, i) => ({
+              value: `r-${i}`,
+              assignmentId: r.assignment_id || '',
               label: `HR${r.company?.name ? ` · ${r.company.name}` : ''}`,
             }))
-            .filter((o) => o.value);
+            .filter((o) => o.assignmentId);
         }
         if (cancelled) return;
         setRecipients(opts);
@@ -117,20 +120,21 @@ export function ComposeNewMessage({ open, isHr, onClose, onSent }: ComposeNewMes
 
   const handleSend = useCallback(async () => {
     const text = body.trim();
-    if (!selected || !text) return;
+    const assignmentId = recipients.find((r) => r.value === selected)?.assignmentId;
+    if (!assignmentId || !text) return;
     setSending(true);
     setSendError(null);
     try {
       const send = isHr ? hrAPI.sendMessage : employeeAPI.sendMessage;
-      await send(selected, text);
-      onSent(selected);
+      await send(assignmentId, text);
+      onSent(assignmentId);
       onClose();
     } catch {
       setSendError("Couldn't send your message. Please try again.");
     } finally {
       setSending(false);
     }
-  }, [selected, body, isHr, onSent, onClose]);
+  }, [selected, body, isHr, onSent, onClose, recipients]);
 
   const recipientLabel = isHr ? 'To (employee)' : 'To';
 
@@ -144,11 +148,21 @@ export function ComposeNewMessage({ open, isHr, onClose, onSent }: ComposeNewMes
         ) : loadingRecipients ? (
           <p className="text-sm text-slate-500">Loading recipients…</p>
         ) : recipients.length === 0 ? (
+          <div>
           <p className="text-sm text-slate-500">
             {isHr
               ? 'No assigned employees to message yet. Create a case and assign an employee first.'
-              : 'No HR contact is linked to your case yet.'}
+              : 'No HR contact is linked to your case yet. Open your dashboard to check whether a relocation case has been assigned to you.'}
           </p>
+          {!isHr && (
+            <a
+              href="/employee/dashboard"
+              className="mt-2 inline-block text-sm font-medium text-navy-800 underline hover:text-navy-900"
+            >
+              Go to your dashboard
+            </a>
+          )}
+          </div>
         ) : (
           <>
             {recipients.length === 1 ? (

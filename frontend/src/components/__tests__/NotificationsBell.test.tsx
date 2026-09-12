@@ -94,5 +94,9 @@ describe('NotificationsBell', () => {
     expect(screen.queryByTestId('notifications-bell-badge')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /notifications/i }));
     expect(await screen.findByText(/no notifications yet/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/when a case is assigned, HR leaves feedback, or intake is submitted/i)
+    ).toBeInTheDocument();
   });
 });
+

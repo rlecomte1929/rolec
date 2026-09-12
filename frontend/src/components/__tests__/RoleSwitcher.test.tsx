@@ -24,7 +24,11 @@ vi.mock('../../utils/demo', () => ({
   normalizeStoredRole: (r: string | null | undefined): string => (r ?? '').trim().toUpperCase(),
 }));
 vi.mock('../../api/client', () => ({ authAPI: { switchRole: (r: string) => switchRole(r) } }));
-vi.mock('react-router-dom', () => ({ useNavigate: () => navigate }));
+let pathname = '/';
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => navigate,
+  useLocation: () => ({ pathname }),
+}));
 
 import { RoleSwitcher } from '../RoleSwitcher';
 
@@ -36,6 +40,7 @@ describe('RoleSwitcher', () => {
     setActiveRole.mockReset();
     switchRole.mockReset();
     navigate.mockReset();
+    pathname = '/';
   });
 
   it('renders nothing for a single-role user', () => {
@@ -70,5 +75,31 @@ describe('RoleSwitcher', () => {
 
     await waitFor(() => expect(setActiveRole).toHaveBeenCalledWith('EMPLOYEE'));
     expect(navigate).toHaveBeenCalledWith('/employee/dashboard');
+  });
+
+  it('keeps inbox-to-inbox when switching from Employee on /messages', async () => {
+    pathname = '/messages';
+    getStoredRoles.mockReturnValue(['HR', 'EMPLOYEE']);
+    getActiveRole.mockReturnValue('EMPLOYEE');
+    switchRole.mockResolvedValue({ roles: ['HR', 'EMPLOYEE'], primary_role: 'HR' });
+
+    render(<RoleSwitcher />);
+    fireEvent.click(screen.getByRole('button', { name: 'HR' }));
+
+    await waitFor(() => expect(setActiveRole).toHaveBeenCalledWith('HR'));
+    expect(navigate).toHaveBeenCalledWith('/hr/messages');
+  });
+
+  it('keeps inbox-to-inbox when switching from HR on /hr/messages', async () => {
+    pathname = '/hr/messages';
+    getStoredRoles.mockReturnValue(['HR', 'EMPLOYEE']);
+    getActiveRole.mockReturnValue('HR');
+    switchRole.mockResolvedValue({ roles: ['HR', 'EMPLOYEE'], primary_role: 'EMPLOYEE' });
+
+    render(<RoleSwitcher />);
+    fireEvent.click(screen.getByRole('button', { name: 'Employee' }));
+
+    await waitFor(() => expect(setActiveRole).toHaveBeenCalledWith('EMPLOYEE'));
+    expect(navigate).toHaveBeenCalledWith('/messages');
   });
 });
