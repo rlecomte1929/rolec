@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from './antigravity/Button';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/client';
+import { roleSwitchInboxPath } from '../features/platform-v2/inbox/inboxPersona';
+import { roleHomePath } from '../navigation/roleHome';
 import {
   getStoredRoles,
   getActiveRole,
@@ -9,7 +10,7 @@ import {
   setActiveRole,
   normalizeStoredRole,
 } from '../utils/demo';
-import { roleHomePath } from '../navigation/roleHome';
+import { Button } from './antigravity/Button';
 
 const ROLE_LABELS: Record<string, string> = {
   HR: 'HR',
@@ -30,6 +31,7 @@ const labelFor = (role: string): string => ROLE_LABELS[normalizeStoredRole(role)
  */
 export const RoleSwitcher: React.FC = () => {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [busy, setBusy] = useState(false);
   const roles = getStoredRoles();
   const active = getActiveRole();
@@ -47,7 +49,7 @@ export const RoleSwitcher: React.FC = () => {
       // payload used to echo primary_role=ADMIN (login contract), which sent
       // View as Employee straight back to the admin home.
       setActiveRole(target);
-      navigate(roleHomePath(target));
+      navigate(roleSwitchInboxPath(target, pathname) ?? roleHomePath(target));
     } catch {
       /* leave the active role unchanged on failure */
     } finally {

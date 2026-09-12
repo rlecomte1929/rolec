@@ -3,7 +3,15 @@
  * Compatible with existing schema: id, assignment_id, hr_user_id, employee_identifier, subject, body, status, created_at.
  */
 
+import { getCountryName } from '../../utils/countries';
 import type { Message, Conversation } from './types';
+
+function destinationSubtitle(row: Record<string, unknown>): string | null {
+  const host = typeof row.host_country === 'string' ? row.host_country.trim() : '';
+  if (host) return getCountryName(host) || host;
+  const caseId = typeof row.case_id === 'string' ? row.case_id.trim() : '';
+  return caseId ? `Case ${caseId.slice(-8).toUpperCase()}` : null;
+}
 
 /** Map API conversation summary row to a lightweight Conversation (messages loaded later). */
 export function conversationFromSummary(row: Record<string, unknown>): Conversation {
@@ -18,6 +26,7 @@ export function conversationFromSummary(row: Record<string, unknown>): Conversat
     messages: [],
     thread_loaded: false,
     case_id: (row.case_id as string | null | undefined) ?? null,
+    list_subtitle: destinationSubtitle(row),
     participant_email: (row.employee_email as string | null | undefined) ?? null,
     archived_at: (row.archived_at as string | null | undefined) ?? null,
   };

@@ -334,7 +334,8 @@ class HrMixin:
                 MAX(a.status) AS assignment_status,
                 MAX(emp_p.full_name) AS employee_full_name,
                 MAX(emp_p.email) AS employee_email,
-                MAX(COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)) AS case_id
+                MAX(COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)) AS case_id,
+                MAX(rc.host_country) AS host_country
             FROM messages m
             INNER JOIN case_assignments a ON {_eq_text("a.id", "m.assignment_id")}
             LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a")}
@@ -383,7 +384,8 @@ class HrMixin:
                 MAX(a.status) AS assignment_status,
                 MAX(emp_p.full_name) AS employee_full_name,
                 MAX(emp_p.email) AS employee_email,
-                MAX(a.case_id) AS case_id
+                MAX(a.case_id) AS case_id,
+                MAX(rc.host_country) AS host_country
             FROM messages m
             INNER JOIN case_assignments a ON {_eq_text("a.id", "m.assignment_id")}
             LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a", "simple")}
@@ -452,6 +454,7 @@ class HrMixin:
                 "has_unread": unread > 0,
                 "archived_at": r.get("archived_at"),
                 "assignment_status": r.get("assignment_status"),
+                "host_country": r.get("host_country"),
             })
         return out
 
