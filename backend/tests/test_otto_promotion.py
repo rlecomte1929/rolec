@@ -75,7 +75,11 @@ def test_a_missing_nationality_does_not_promote():
 
 @pytest.mark.parametrize(
     "nationality,want",
-    [("EU", ["OWN_NATIONAL", "EU_EEA"]), ("non-EEA", ["THIRD_COUNTRY"])],
+    [
+        ("EU", ["OWN_NATIONAL", "EU_EEA"]),
+        ("EEA", ["OWN_NATIONAL", "EU_EEA"]),  # Ireland free-mover batch vocabulary
+        ("non-EEA", ["THIRD_COUNTRY"]),
+    ],
 )
 def test_an_explicit_nationality_maps_to_the_class_set(nationality, want):
     got = resolve(_entity(), [_fact(applies_to={"status": "professional",

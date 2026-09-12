@@ -18,10 +18,13 @@ export const intakeEnvelopeSchema = z.object({
 });
 export type IntakeEnvelope = z.infer<typeof intakeEnvelopeSchema>;
 
-/** GET /api/employee/assignments/overview — top-level envelope (rows stay loose). */
+/** GET /api/employee/assignments/overview — top-level envelope (rows stay loose).
+ *  `overview_degraded` is set when the backend swallowed a build failure into an
+ *  empty 200; z.object strips undeclared keys, so it has to be declared to survive. */
 export const assignmentsOverviewSchema = z.object({
   linked: z.array(z.unknown()),
   pending: z.array(z.unknown()),
+  overview_degraded: z.boolean().optional(),
 });
 
 /** GET /api/employee/assignments/current — top-level envelope. */

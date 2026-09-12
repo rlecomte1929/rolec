@@ -8,6 +8,7 @@ import { buildRoute, homeRouteKeyForRole, ROUTE_DEFS } from '../navigation/route
 import { employeeUnlinkedActionCopy, employeeUnlinkedBannerClassName } from './employeeUnlinkedBanner';
 import { useRegisterNav } from '../navigation/registry';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { resolveOverviewState } from '../features/employee-journey/overviewResolution';
 import { setPreferredEmployeeAssignmentId } from '../utils/employeeAssignmentScope';
 import { useAdminContext } from '../features/admin/useAdminContext';
 import { adminAPI } from '../api/client';
@@ -107,7 +108,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
 
   // GAP 10: Apply company branding CSS vars (primary_colour etc.) to :root
   useBrandingConfig();
-  const { linkedCount, isLoading: employeeAssignmentLoading } = useEmployeeAssignment();
+  const { linkedCount, pendingCount, overviewError, overviewDegraded, isLoading: employeeAssignmentLoading } =
+    useEmployeeAssignment();
   const { context: adminContext, refresh: refreshAdminContext } = useAdminContext();
 
   useRegisterNav('AppShell', [
@@ -163,10 +165,21 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
   const sbRole = sidebarRole(role);
   const userInitials = deriveInitials(name || identity || 'RP');
   const onEmployeeDashboard = location.pathname === ROUTE_DEFS.employeeDashboard.path;
+  // AIQ-2285/T8: `linkedCount === 0` is also what a failed or degraded overview
+  // looks like. Without this gate the banner told the employee their account
+  // "isn't linked to a relocation case" on EVERY page during a transient outage.
+  // Same rule as the dashboard, from the same function.
+  const { unresolved: overviewUnresolved } = resolveOverviewState({
+    overviewError,
+    overviewDegraded,
+    linkedCount,
+    pendingCount,
+  });
   const showEmployeeBanner =
     sbRole !== 'ADMIN' &&
     isEmployeeRole &&
     !employeeAssignmentLoading &&
+    !overviewUnresolved &&
     linkedCount === 0 &&
     !onEmployeeDashboard;
 

@@ -84,6 +84,20 @@ class TestParsers(unittest.TestCase):
         assert items[0].key == "admin"
         assert items[1].description == "Homes"
 
+    def test_parse_json_categories_accepts_name_as_label(self) -> None:
+        # Otto resource bundles emit {key, name}; the DB/importer field is `label`.
+        # Such objects must not be silently dropped — `name` is the human-readable label.
+        items = parse_json_categories([{"key": "healthcare", "name": "Healthcare"}])
+        assert len(items) == 1
+        assert items[0].key == "healthcare"
+        assert items[0].label == "Healthcare"
+
+    def test_parse_json_tags_accepts_name_as_label(self) -> None:
+        items = parse_json_tags([{"key": "pre-departure", "name": "Pre-departure"}])
+        assert len(items) == 1
+        assert items[0].key == "pre-departure"
+        assert items[0].label == "Pre-departure"
+
     def test_parse_json_bundle(self) -> None:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
             json.dump({
