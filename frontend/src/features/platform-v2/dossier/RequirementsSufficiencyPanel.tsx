@@ -3,6 +3,7 @@ import { Button } from '../../../components/antigravity';
 import { ImmigrationDisclaimer } from '../../../components/requirements/ImmigrationDisclaimer';
 import { requirementsAPI } from '../../../api/client';
 import type { RequirementsSufficiency } from '../../../api/client';
+import { trackCorridorWaitlistIntent } from '../../../analyticsEvents';
 import { getCountryName } from '../../../utils/countries';
 
 /**
@@ -88,6 +89,7 @@ export const RequirementsSufficiencyPanel: React.FC<Props> = ({ caseId, intakeHr
   const [state, setState] = useState<LoadState>('loading');
   const [failureKind, setFailureKind] = useState<'forbidden' | 'notFound' | 'error'>('error');
   const [reloadKey, setReloadKey] = useState(0);
+  const [waitlistRecorded, setWaitlistRecorded] = useState(false);
 
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
@@ -201,6 +203,27 @@ export const RequirementsSufficiencyPanel: React.FC<Props> = ({ caseId, intakeHr
               We don’t yet hold reviewed requirements for{' '}
               <strong>{getCountryName(data?.destination_country) || data?.destination_country}</strong>. This corridor is not ready — that
               is a catalog gap, <strong>not</strong> a finding that nothing is required of you.
+              <div className="mt-3">
+                {waitlistRecorded ? (
+                  <p data-testid="sufficiency-waitlist-recorded" className="text-sm text-slate-600">
+                    We’ve recorded demand for this corridor.
+                  </p>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="sufficiency-waitlist-intent"
+                    onClick={() => {
+                      const corridor = data?.destination_country;
+                      if (!corridor) return;
+                      trackCorridorWaitlistIntent({ corridor });
+                      setWaitlistRecorded(true);
+                    }}
+                  >
+                    Tell us you need this corridor
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 

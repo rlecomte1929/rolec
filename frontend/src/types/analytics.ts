@@ -29,6 +29,7 @@ export type EventType =
   | 'paywall_impression'
   | 'payment_initiated'
   | 'payment_completed'
+  | 'corridor_waitlist_intent'
   | 'assignment_submitted'
   | 'assignment_cancelled'
   | 'assignment_completed'

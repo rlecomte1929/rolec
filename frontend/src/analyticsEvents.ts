@@ -204,6 +204,15 @@ export function trackPaymentCompleted(props: { assignment_id: string }): void {
   });
 }
 
+/** Empty-catalog demand. Corridor code only — no email or name. */
+export function trackCorridorWaitlistIntent(props: { corridor: string }): void {
+  track('corridor_waitlist_intent', props);
+  trackEvent('corridor_waitlist_intent', props, {
+    entity_type: 'corridor',
+    entity_id: props.corridor,
+  });
+}
+
 export function trackCaseCompleted(props: {
   corridor_id: string;
   case_id: string;
