@@ -367,6 +367,28 @@ SOURCES: Tuple[RegistrySource, ...] = (
             "tier 2: these rows stay `claimed`."
         ),
     ),
+    # Label Qualité FLE — the French state quality label for centres teaching French as a
+    # foreign language. A genuine ACCREDITATION register, but the public directory at
+    # qualitefle.fr exposes no fetchable per-centre permalink a pattern can pin, so it is
+    # admitted as PUBLIC_REGISTER (tier 2, staged `claimed`); the human at /admin/vetting-queue
+    # confirms the centre against the label list. Scoped to NO-FR (Denis / Paris,
+    # journey-completion 2026-09-12); widen the corridors tuple only when a run actually sources
+    # it elsewhere. Only qualitefle.fr is wired in parsers._DOMAIN_TO_SOURCE: data.education.gouv.fr
+    # hosts this same label as one dataset among thousands, so mapping that whole domain would
+    # mis-attribute every other education dataset to this register.
+    RegistrySource(
+        name="Label Qualité FLE — French language-school quality label",
+        base_url="https://www.qualitefle.fr/",
+        tier=2,
+        acquisition=Acquisition.PUBLIC_REGISTER,
+        corridors=("NO-FR",),
+        categories=("language_integration",),
+        notes=(
+            "State quality label for French-as-a-foreign-language centres. Real accreditation, "
+            "but no per-centre permalink to pin, so PUBLIC_REGISTER tier 2 — rows stage "
+            "`claimed` and are confirmed by a human at /admin/vetting-queue."
+        ),
+    ),
     # ── tax_finance ──────────────────────────────────────────────────────────
     RegistrySource(
         name="Bundessteuerberaterkammer / regional StBK (DE)",
