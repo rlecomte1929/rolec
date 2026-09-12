@@ -122,6 +122,16 @@ def test_worker_synonyms_map_to_employment():
         assert got.purpose == "employment"
 
 
+def test_third_country_nationality_synonym_promotes():
+    """Research passes on a visa corridor emit the class name 'THIRD_COUNTRY' (and dash/underscore
+    variants) as applies_to.nationality; they must map to the third-country class, not be refused.
+    The gate stays strict: this scopes to third-country nationals, never defaults to everyone."""
+    for nat in ("THIRD_COUNTRY", "third_country", "third-country"):
+        got = resolve(_entity(), [_fact(applies_to={"status": "professional", "nationality": nat})])
+        assert isinstance(got, RequirementDraft), f"{nat}: {got}"
+        assert "THIRD_COUNTRY" in got.payload["applies_to_nationality_classes_json"]
+
+
 def test_agreement_across_several_facts_still_promotes():
     got = resolve(
         _entity(),
