@@ -230,6 +230,10 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # France
     "service-public.fr", "legifrance.gouv.fr", "urssaf.fr", "ameli.fr",
     "impots.gouv.fr", "france-visas.gouv.fr", "ofii.fr",
+    # Banque de France — the central bank; publishes the statutory droit-au-compte rule.
+    # Scored UNOFFICIAL on the first real NO->FR consensus run (2026-09-12) and dropped a
+    # valid fact to gaps. Same too-narrow-allowlist failure as CLEISS/CAF below.
+    "banque-france.fr",
     # France — the two social-security bodies a mover actually deals with, neither of which
     # sits under `gouv.fr`. CLEISS is the French liaison body for international social
     # security: it publishes the coordination and totalisation rules for a move between

@@ -17,6 +17,7 @@ import { NotificationsBell } from './NotificationsBell';
 import { RoleSwitcher } from './RoleSwitcher';
 import { Breadcrumb } from './Breadcrumb';
 import { shouldShowAppShellBreadcrumb } from './breadcrumbVisibility';
+import { formatAppDocumentTitle } from '../navigation/documentTitle';
 import { Button } from './antigravity/Button';
 import { CompanyBrand } from './CompanyBrand';
 import { FeedbackWidget } from './FeedbackWidget';
@@ -88,9 +89,14 @@ interface AppShellProps {
    * Example: { label: 'Mobility command center', href: '/hr/command-center' }
    */
   parent?: { label: string; href: string };
+  /**
+   * When true, AppShell still sets document.title from `title` but does not
+   * render the in-page H1/breadcrumb — for pages that own a custom header.
+   */
+  hideHeading?: boolean;
 }
 
-export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, section, wide = false, parent }) => {
+export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, section, wide = false, parent, hideHeading = false }) => {
   const name = getAuthItem('relopass_name');
   const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
@@ -135,7 +141,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
   // A11Y-3: give every in-app route a meaningful tab/screen-reader title
   // (the static index.html title otherwise persists across the whole app).
   useEffect(() => {
-    document.title = title ? `ReloPass — ${title}` : 'ReloPass';
+    document.title = formatAppDocumentTitle(title);
   }, [title]);
 
   // A11Y-4: announce route changes to assistive tech and move focus to the main
@@ -254,13 +260,14 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
             <LogoutButton />
             {/* The breadcrumb links to this same homeHref under the name "ReloPass",
                 while this one is named after the signed-in user — two links, one
-                destination, unrelated names (WCAG 3.2.4), and nothing here suggests it
+                destination, unrelated names (WCAG 3.2.4). The destination is
+                homeRouteKeyForRole(role), not any one page called "dashboard", and nothing here suggests it
                 navigates at all. The aria-label CONTAINS the visible text, so 2.5.3
                 Label in Name still holds. */}
             {identity && (
               <Link
                 to={homeHref}
-                aria-label={`${identity}${role ? `, ${role}` : ''} — go to dashboard`}
+                aria-label={`${identity}${role ? `, ${role}` : ''} — go to your home page`}
                 className="inline-flex flex-col items-end rounded-lg px-3 py-1.5 font-medium text-slate-900 hover:bg-slate-100 transition-colors"
               >
                 <span className="text-xs leading-tight">{identity}</span>
@@ -322,9 +329,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
           <div
             className={`${wide ? 'px-4 py-6 md:px-6' : 'px-4 py-6 md:px-8 md:py-7 max-w-7xl mx-auto'}${fabGutter}`}
           >
-            {title && (
+            {title && !hideHeading && (
               <div className="mb-6">
-                {shouldShowAppShellBreadcrumb(parent) ? (
+                {shouldShowAppShellBreadcrumb(parent, section) ? (
                   <Breadcrumb section={section} title={title} homeHref={homeHref} parent={parent} className="mb-3" />
                 ) : null}
                 <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>

@@ -13,10 +13,15 @@ import type { CommandCenterCaseRow } from '../../../api/client';
 import { displayNameOrEmail } from '../../../utils/caseDisplay';
 import { getCaseStatusLabel } from '../../../utils/caseStatusLabel';
 import { DataTable, ResetColumnsLink, type DataTableColumn } from '../data-table';
-import { useHrCompanyContext } from '../../../contexts/HrCompanyContext';
-import { fetchExecSummary } from '../../../api/nlg';
 import { HrCaseHealthPanel } from '../../../components/case/HrCaseHealthPanel';
 import { getCountryName } from '../../../utils/countries';
+import {
+  INCOMPLETE_CORRIDOR_KEY,
+  INCOMPLETE_CORRIDOR_LABEL,
+  buildCommandCenterInsights,
+  isIncompleteCorridor,
+  spendIsTracked,
+} from './commandCenterInsights';
 
 /**
  * Mobility Control Center — V2.
@@ -175,11 +180,13 @@ function daysAgo(iso?: string | null): number | null {
 // Canonical corridor key — identical to the corridorMix histogram key so the
 // filter, the table, and the sidebar mix all agree on what "US → FR" means.
 function corridorKey(originCountry?: string | null, destCountry?: string | null): string {
+  if (isIncompleteCorridor(originCountry, destCountry)) return INCOMPLETE_CORRIDOR_KEY;
   const o = resolveISO2(originCountry);
   const d = resolveISO2(destCountry);
   return `${o ?? `?${originCountry ?? ''}`}|${d ?? `?${destCountry ?? ''}`}`;
 }
 function corridorLabel(originCountry?: string | null, destCountry?: string | null): string {
+  if (isIncompleteCorridor(originCountry, destCountry)) return INCOMPLETE_CORRIDOR_LABEL;
   const o = getCountryName(originCountry) || originCountry?.trim() || '—';
   const d = getCountryName(destCountry) || destCountry?.trim() || '—';
   return `${o} → ${d}`;
@@ -269,7 +276,7 @@ function Kpi({ label, value, sub, tone = 'default', progress, title }: KpiProps)
       className="relative overflow-hidden rounded-lg border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300"
       title={title}
     >
-      <div className="truncate text-[10px] font-semibold uppercase tracking-widest text-slate-500">{label}</div>
+      <div className="truncate text-xs font-semibold uppercase tracking-widest text-slate-500">{label}</div>
       <div className={`mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums ${valueColor}`}>
         {value}
       </div>
@@ -315,7 +322,6 @@ export function MobilityControlCenterV2Page() {
   // list — they never widen tenant visibility (no scope/endpoint change).
   const [corridorFilter, setCorridorFilter] = useState<string | null>(null);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
-  const { companyId } = useHrCompanyContext();
 
   // Single parallel read of KPIs + cases + pending approvals. Promise.allSettled
   // never rejects, so the query always resolves; partial failures surface via the
@@ -377,16 +383,6 @@ export function MobilityControlCenterV2Page() {
   // filtered-but-non-empty result (that keeps the plain table string).
   const noCasesYet = !loading && cases.length === 0;
 
-  // Parker-J: classical data-to-text exec summary (LLM-free, env-flag gated
-  // server-side). Dependent on the resolved companyId. Null = provider deferred
-  // to LLM (env flag) or unavailable.
-  const execSummaryQuery = useQuery({
-    queryKey: ['hr', 'mobility-control', 'exec-summary', companyId],
-    enabled: !!companyId,
-    queryFn: ({ signal }) => fetchExecSummary(companyId as string, signal).then((res) => res.summary),
-  });
-  const execSummary: string | null = execSummaryQuery.data ?? null;
-
   // ── MOBCC-FU1: client-side header filters ─────────────────────────────────
   const filterActive = corridorFilter !== null || periodFilter !== 'all';
 
@@ -395,7 +391,6 @@ export function MobilityControlCenterV2Page() {
   const corridorOptions = useMemo(() => {
     const m = new Map<string, { key: string; label: string; count: number }>();
     for (const c of cases) {
-      if (!c.originCountry && !c.destCountry) continue;
       const key = corridorKey(c.originCountry, c.destCountry);
       const cur = m.get(key);
       if (cur) cur.count += 1;
@@ -435,18 +430,32 @@ export function MobilityControlCenterV2Page() {
   // canonical ISO-2 codes so the sidebar matches the table flag rendering exactly
   // (e.g. "France" + "FR" + "FRA" all collapse onto the same FR row).
   const corridorMix = useMemo(() => {
-    const counts = new Map<string, { origin: string | null; dest: string | null; rawOrigin: string | null; rawDest: string | null; count: number }>();
+    const counts = new Map<string, { origin: string | null; dest: string | null; rawOrigin: string | null; rawDest: string | null; count: number; incomplete: boolean }>();
     for (const c of filteredCases) {
+      const incomplete = isIncompleteCorridor(c.originCountry, c.destCountry);
       const o = resolveISO2(c.originCountry);
       const d = resolveISO2(c.destCountry);
-      if (!o && !d && !c.originCountry && !c.destCountry) continue;
-      const key = `${o ?? `?${c.originCountry ?? ''}`}|${d ?? `?${c.destCountry ?? ''}`}`;
+      const key = corridorKey(c.originCountry, c.destCountry);
       const cur = counts.get(key);
       if (cur) cur.count += 1;
-      else counts.set(key, { origin: o, dest: d, rawOrigin: c.originCountry ?? null, rawDest: c.destCountry ?? null, count: 1 });
+      else counts.set(key, { origin: o, dest: d, rawOrigin: c.originCountry ?? null, rawDest: c.destCountry ?? null, count: 1, incomplete });
     }
     return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 6);
   }, [filteredCases]);
+
+  const execSummary = useMemo(() => {
+    const incompleteCorridorCount = filteredCases.filter((c) =>
+      isIncompleteCorridor(c.originCountry, c.destCountry),
+    ).length;
+    const redCount = filteredCases.filter((c) => c.riskStatus === 'red').length;
+    const behindCount = filteredCases.filter((c) => c.slaStatus === 'overdue').length;
+    return buildCommandCenterInsights({
+      behindCount,
+      atRiskCount: displayKpis?.atRiskCount ?? 0,
+      incompleteCorridorCount,
+      redCount,
+    });
+  }, [filteredCases, displayKpis]);
 
   const riskFeed = useMemo(() => {
     return filteredCases
@@ -611,7 +620,7 @@ export function MobilityControlCenterV2Page() {
   ], []);
 
   return (
-    <AppShell wide>
+    <AppShell wide hideHeading section="HR Operations" title="Mobility command center">
       <div className="px-2 py-2 xl:px-4 xl:py-4">
         {/* Header — breadcrumb above h1; the 'HR · Global mobility' eyebrow was
             removed per P4 audit ('Mobility Control Center no longer shows
@@ -688,20 +697,25 @@ export function MobilityControlCenterV2Page() {
           />
           <Kpi
             label="Mobility spend"
-            value={formatMoney(totalBudget.est)}
-            sub={totalBudget.limit ? `est. of ${formatMoney(totalBudget.limit)} budget` : '—'}
+            value={spendIsTracked(totalBudget.est, totalBudget.limit) ? formatMoney(totalBudget.est) : 'Not tracked'}
+            sub={
+              spendIsTracked(totalBudget.est, totalBudget.limit)
+                ? (totalBudget.limit ? `est. of ${formatMoney(totalBudget.limit)} budget` : 'Estimated spend')
+                : 'No estimated spend on these cases'
+            }
             tone={displayKpis?.budgetOverrunsCount ? 'danger' : 'default'}
-            title="Estimated relocation spend — the sum of each active case's estimated budget, shown against the total policy budget. Source: GET /api/hr/command-center/cases (case_assignments.budget_estimated / budget_limit). Estimate, not invoiced spend."
-            progress={totalBudget.limit ? Math.min(100, (totalBudget.est / totalBudget.limit) * 100) : 0}
+            title="Estimated relocation spend — the sum of each active case's estimated budget, shown against the total policy budget. Source: GET /api/hr/command-center/cases (case_assignments.budget_estimated / budget_limit). Estimate, not invoiced spend. Shown as Not tracked when no case has a budget figure."
+            progress={
+              spendIsTracked(totalBudget.est, totalBudget.limit) && totalBudget.limit
+                ? Math.min(100, (totalBudget.est / totalBudget.limit) * 100)
+                : 0
+            }
           />
         </div>
 
-        {/* BRAND-3: hide the whole block (incl. the eyebrow) when every KPI is
-            zero — an all-zero summary is noise on a fresh/empty tenant. */}
-        {execSummary &&
-          !(displayKpis && displayKpis.activeCases === 0 && displayKpis.atRiskCount === 0 && displayKpis.completedCount === 0) && (
+        {execSummary && (
           <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Executive summary</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Executive summary</p>
             <p className="mt-1 text-[13px] leading-relaxed text-slate-700 text-pretty break-words">{execSummary}</p>
           </div>
         )}
@@ -717,7 +731,7 @@ export function MobilityControlCenterV2Page() {
 
         {/* [AIQ-2041] Action-first: what needs doing sits ABOVE the case table, so
             the page opens with work rather than with a list to scan. */}
-        <HrCaseHealthPanel />
+        <HrCaseHealthPanel catalog={filteredCases} />
 
         {/* Two-column layout: cases table + right-rail. The right rail grows
             up to 360px on wider monitors but the table always gets the
@@ -782,12 +796,16 @@ export function MobilityControlCenterV2Page() {
               ) : (
                 <ul className="space-y-1.5">
                   {corridorMix.map((c) => (
-                    <li key={`${c.origin ?? c.rawOrigin}-${c.dest ?? c.rawDest}`} className="flex items-center justify-between text-[12.5px]">
-                      <span className="flex items-center gap-2 text-slate-700">
-                        <Flag iso2={c.origin} raw={c.rawOrigin} />
-                        <span className="text-slate-500">›</span>
-                        <Flag iso2={c.dest} raw={c.rawDest} />
-                      </span>
+                    <li key={c.incomplete ? INCOMPLETE_CORRIDOR_KEY : `${c.origin ?? c.rawOrigin}-${c.dest ?? c.rawDest}`} className="flex items-center justify-between text-[12.5px]">
+                      {c.incomplete ? (
+                        <span className="text-slate-600">{INCOMPLETE_CORRIDOR_LABEL}</span>
+                      ) : (
+                        <span className="flex items-center gap-2 text-slate-700">
+                          <Flag iso2={c.origin} raw={c.rawOrigin} />
+                          <span className="text-slate-500">›</span>
+                          <Flag iso2={c.dest} raw={c.rawDest} />
+                        </span>
+                      )}
                       <span className="tabular-nums text-slate-500">{c.count}</span>
                     </li>
                   ))}

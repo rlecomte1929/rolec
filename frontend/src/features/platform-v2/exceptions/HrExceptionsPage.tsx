@@ -775,5 +775,5 @@ export function HrExceptionsPage({ embedded = false }: { embedded?: boolean } = 
     </>
   );
 
-  return embedded ? body : <AppShell wide>{body}</AppShell>;
+  return embedded ? body : <AppShell wide hideHeading section="HR Operations" title="Policy exceptions">{body}</AppShell>;
 }
