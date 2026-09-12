@@ -392,3 +392,30 @@ def test_a_statutory_register_page_lands_despite_no_per_entity_url():
         assert cand.country_code == "IE"
     finally:
         os.unlink(path)
+
+
+# ── [DENIS-NOFR 2026-09-12] FR register wiring: Label Qualité FLE + SIRENE evidence domain ──
+#
+# The NO→FR (Denis / Paris) journey-completion vendors tier-3-rejected en masse: the INSEE
+# SIRENE RegistrySource existed but its human-facing evidence domain was never mapped, and the
+# French FLE-school accreditation label had no source at all. These pin both, and the control
+# proves the mapping stays precise instead of laundering a whole gov data portal.
+
+def test_qualitefle_domain_resolves_to_the_fle_label_at_tier_2():
+    src = source_for_url("https://www.qualitefle.fr/centre/alliance-francaise-de-paris")
+    assert src.name == "Label Qualité FLE — French language-school quality label"
+    assert src.tier == 2
+
+
+def test_sirene_human_facing_domain_now_resolves_to_the_existing_insee_source():
+    src = source_for_url("https://annuaire-entreprises.data.gouv.fr/entreprise/311127278")
+    assert src.name == "INSEE SIRENE / recherche-entreprises (FR)"
+    assert src.tier == 2
+
+
+def test_broad_data_gouv_portal_is_NOT_laundered_into_the_fle_register():
+    """data.education.gouv.fr hosts thousands of datasets, so it must stay SELF_DECLARED
+    (tier 3) rather than mis-attributing every education dataset to the FLE label."""
+    src = source_for_url("https://data.education.gouv.fr/explore/dataset/some-other-dataset/")
+    assert src.name == SELF_DECLARED
+    assert src.tier == 3

@@ -74,6 +74,12 @@ _DOMAIN_TO_SOURCE: Tuple[Tuple[str, str], ...] = (
     ("trustedireland.ie",     "TrustEd Ireland — QQI-authorised English language providers"),
     ("qqi.ie",                "TrustEd Ireland — QQI-authorised English language providers"),
     # France / Paris (NO-FR) — most expose per-entity pages; Barreau is PUBLIC_REGISTER.
+    # [DENIS-NOFR 2026-09-12] The INSEE SIRENE RegistrySource existed but its human-facing
+    # evidence domain was never mapped here, so land_vendor_candidates tier-3-rejected every
+    # SIRENE-cited FR row. Label Qualité FLE is the French state FLE-school accreditation label
+    # (only qualitefle.fr is mapped — NOT the broad data.education.gouv.fr portal).
+    ("qualitefle.fr",                 "Label Qualité FLE — French language-school quality label"),
+    ("annuaire-entreprises.data.gouv.fr", "INSEE SIRENE / recherche-entreprises (FR)"),
     ("regafi.fr",                     "REGAFI — registre des agents financiers (ACPR / Banque de France)"),
     ("annuaire-education.fr",         "Annuaire de l'Éducation nationale (annuaire-education.fr)"),
     ("annuaire.experts-comptables.org", "Ordre des Experts-Comptables — annuaire"),
