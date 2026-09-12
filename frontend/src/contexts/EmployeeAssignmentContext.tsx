@@ -10,6 +10,7 @@ import {
   shouldLoadEmployeeAssignmentOverview,
 } from '../utils/employeeAssignmentScope';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
+import { classifyOverviewLoadError } from '../features/employee-journey/overviewLoadError';
 
 const CURRENT_ASSIGNMENT_CACHE_KEY = 'employee:current-assignment';
 const ASSIGNMENTS_OVERVIEW_CACHE_KEY = 'employee:assignments-overview';
@@ -139,7 +140,7 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
   const authed = isEmployee && token;
   const isLoading = shouldFetch && query.isLoading;
   const overviewError = query.isError
-    ? 'Overview did not load. Check your connection and refresh.'
+    ? classifyOverviewLoadError(query.error).message
     : null;
 
   return (
