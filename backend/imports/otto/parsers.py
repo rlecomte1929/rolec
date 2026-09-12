@@ -88,6 +88,9 @@ _OFFICIAL_SUFFIXES: Tuple[str, ...] = (
     "gouv.fr", "gov.uk", "gov.pt", "gov.pl", "gov.ie", "gov.it", "gov.gr",
     "gob.es", "governo.it", "admin.ch", "overheid.nl", "public.lu",
     "europa.eu", "bund.de", "gc.ca", "govt.nz", "gov.au", "gov",
+    # Norwegian municipalities all publish local statutory rules under `<city>.kommune.no`
+    # (oslo.kommune.no, bergen.kommune.no, …) — same call as `madrid.es` / `service.berlin.de`.
+    "kommune.no",
     # Singapore (FR->SG / Adrien): the statutory bodies all publish under `.gov.sg` —
     # mom.gov.sg (Ministry of Manpower / work passes), ica.gov.sg (Immigration & Checkpoints),
     # iras.gov.sg (tax), cpf.gov.sg (Central Provident Fund). The bare `gov` above does NOT
@@ -246,6 +249,11 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # Norway
     "udi.no", "skatteetaten.no", "politiet.no", "nav.no", "altinn.no", "lovdata.no",
     "helsenorge.no", "brreg.no", "folkeregisteret.no",
+    # Norway — statutory bodies missing on the first live FR→NO consensus run (2026-09-12),
+    # which dropped a 5/5 driving-licence fact and the schooling facts as UNOFFICIAL:
+    # Statens vegvesen (roads/driving licences), Utdanningsdirektoratet (education), and the
+    # Government portal. Municipalities are handled by the `kommune.no` suffix below.
+    "vegvesen.no", "udir.no", "regjeringen.no",
     # Germany
     "bamf.de", "auswaertiges-amt.de", "gesetze-im-internet.de", "bundesregierung.de",
     "make-it-in-germany.com", "arbeitsagentur.de",
