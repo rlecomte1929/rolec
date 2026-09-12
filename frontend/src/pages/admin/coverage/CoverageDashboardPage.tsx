@@ -8,6 +8,7 @@ import {
   type CoverageSummary,
 } from '../../../api/coverage';
 import { buildRoute } from '../../../navigation/routes';
+import { useAdminMetrics, metricTooltip } from '../../../api/adminMetrics';
 import { CoverageMasterGrid, categoryLabel } from './CoverageMasterGrid';
 
 const CAT_KEYS = ['banks', 'movers', 'schools', 'legal_admin', 'tax_finance', 'housing_agencies'];
@@ -49,6 +50,10 @@ const LANE_STYLE: Record<Lane, { stripe: string; tag: string; label: string }> =
 
 const GapsView: React.FC<{ data: CoverageSummary }> = ({ data }) => {
   const [sort, setSort] = useState<'focus' | 'az'>('focus');
+  // AIQ-2326: the shared metric defines "Destinations with data" (distinct from
+  // Country requirements' "Curated countries"); fall back to the coverage totals.
+  const { data: metrics } = useAdminMetrics();
+  const destinationsWithData = metrics?.destinations_with_data;
   const rows = useMemo(() => {
     const next = [...data.countries];
     if (sort === 'az') return next.sort((a, b) => a.name.localeCompare(b.name));
@@ -67,7 +72,13 @@ const GapsView: React.FC<{ data: CoverageSummary }> = ({ data }) => {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <StatCard
+          label="Destinations with data"
+          value={destinationsWithData?.value ?? data.totals.destinations}
+          sub="have facts or providers"
+          definition={metricTooltip(destinationsWithData)}
+        />
         <StatCard emphasis label="Not serving yet" value={notServing.length} sub={`of ${data.totals.destinations} destinations`} />
         <StatCard label="Facts awaiting review" value={fmt(factsPending)} sub="approve to go live" />
         <StatCard label="Providers to vet" value={fmt(provBacklog)} sub="found, not yet approved" />

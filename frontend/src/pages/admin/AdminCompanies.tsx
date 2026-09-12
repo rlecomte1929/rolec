@@ -4,9 +4,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Checkbox } from '../../components/antigravity/Checkbox';
 import { Input } from '../../components/antigravity/Input';
-import { Card, Button } from '../../components/antigravity';
+import { Card, Button, StatCard } from '../../components/antigravity';
 import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
+import { useAdminMetrics, metricTooltip } from '../../api/adminMetrics';
 import type { AdminCompany, CompanyPlanTier } from '../../types';
 import { AdminLayout } from './AdminLayout';
 
@@ -60,6 +61,9 @@ export const AdminCompanies: React.FC = () => {
   const companies: AdminCompany[] = useMemo(() => companiesQuery.data ?? [], [companiesQuery.data]);
   const loading = companiesQuery.isFetching;
   const reloadCompanies = () => queryClient.invalidateQueries({ queryKey: ['admin', 'companies'] });
+  // AIQ-2326: KPI strip reads the shared admin metrics SoT so the tenant count matches
+  // Today and Executive; each tile's tooltip carries the definition + as-of.
+  const { data: adminMetrics } = useAdminMetrics();
 
   const search = () => {
     if (appliedQuery === query) {
@@ -251,6 +255,32 @@ export const AdminCompanies: React.FC = () => {
 
   return (
     <AdminLayout title="Companies" subtitle="Create, edit, plan tier, delete">
+      <div data-testid="companies-kpis" className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="Tenants"
+          value={adminMetrics?.tenants_total.value ?? '—'}
+          sub="real, excludes test"
+          definition={metricTooltip(adminMetrics?.tenants_total)}
+        />
+        <StatCard
+          label="Active"
+          value={adminMetrics?.tenants_active.value ?? '—'}
+          sub="≥1 case assignment"
+          definition={metricTooltip(adminMetrics?.tenants_active)}
+        />
+        <StatCard
+          label="HR users"
+          value={adminMetrics?.hr_users.value ?? '—'}
+          sub="excludes test"
+          definition={metricTooltip(adminMetrics?.hr_users)}
+        />
+        <StatCard
+          label="Employees"
+          value={adminMetrics?.employees.value ?? '—'}
+          sub="excludes test"
+          definition={metricTooltip(adminMetrics?.employees)}
+        />
+      </div>
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
           <Input unstyled

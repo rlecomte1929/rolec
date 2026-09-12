@@ -8,6 +8,9 @@ export interface StatCardProps {
   emphasis?: boolean;
   className?: string;
   title?: string;
+  /** AIQ-2326: hover tooltip explaining what this number means and its as-of time.
+   *  Takes precedence over `title` when both are set. */
+  definition?: string;
 }
 
 /** Shared KPI tile: navy number, optional caption. Semantic color lives in `sub`, not the figure. */
@@ -18,9 +21,10 @@ export const StatCard: React.FC<StatCardProps> = ({
   emphasis = false,
   className = '',
   title,
+  definition,
 }) => (
   <div
-    title={title}
+    title={definition || title}
     className={`rounded-xl border p-4 ${
       emphasis ? 'border-transparent bg-navy-800' : 'border-slate-200 bg-white'
     } ${className}`}

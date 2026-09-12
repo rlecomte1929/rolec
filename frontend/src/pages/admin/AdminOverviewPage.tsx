@@ -134,6 +134,7 @@ export const AdminOverviewPage: React.FC = () => {
             value={stats.contentReviewPending}
             sub={reviewFailed ? 'Source unavailable' : undefined}
             loading={loading}
+            definition="Requirement facts awaiting human review before they can be served."
           />
         )}
         <StatCard
@@ -142,6 +143,7 @@ export const AdminOverviewPage: React.FC = () => {
           value={stats.companies}
           sub={!loading && stats.companies === null ? 'Source unavailable' : undefined}
           loading={loading}
+          definition="Companies excluding synthetic QA/test tenants — the same count shown on Companies and Executive."
         />
         <StatCard
           testId="metric-prospects"
@@ -149,6 +151,7 @@ export const AdminOverviewPage: React.FC = () => {
           value={stats.prospectsTotal}
           sub={!loading && stats.prospectsTotal === null ? 'Source unavailable' : undefined}
           loading={loading}
+          definition="Prospect candidates in the outreach pipeline."
         />
       </div>
 
