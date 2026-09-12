@@ -29,12 +29,13 @@ UNOFFICIAL_URL = "https://some-relocation-blog.com/moving-to-france"
 
 
 def fact(dc="NO", topic="udi_residence", key="udi_permit_fee",
-         url=OFFICIAL_URL, quote="The application fee is NOK 6300."):
+         url=OFFICIAL_URL, quote="The application fee is NOK 6300.",
+         text="The residence-permit application fee is NOK 6300."):
     return {
         "destination_country": dc,
         "entity_topic_key": topic,
         "fact_key": key,
-        "fact_text": "The residence-permit application fee is NOK 6300.",
+        "fact_text": text,
         "source_url": url,
         "evidence_quote": quote,
     }
@@ -88,12 +89,13 @@ class TestConsensusMerge(unittest.TestCase):
         assert len(r.gaps) == 1
 
     def test_distinct_facts_are_kept_separate(self):
+        # Two genuinely different facts under one topic have different fact_text, so text
+        # clustering keeps them apart even though the topic is shared.
+        fee = "The residence-permit application fee is NOK 6300."
+        deadline = "You must register with the police within three months of arrival."
         p = [
-            [fact(key="fee"), fact(key="deadline")],
-            [fact(key="fee"), fact(key="deadline")],
-            [fact(key="fee"), fact(key="deadline")],
-            [fact(key="fee"), fact(key="deadline")],
-            [fact(key="fee"), fact(key="deadline")],
+            [fact(topic="udi", key="fee", text=fee), fact(topic="udi", key="deadline", text=deadline)]
+            for _ in range(5)
         ]
         r = merge_passes(p)
         assert len(r.consensus) == 2
@@ -113,6 +115,51 @@ class TestConsensusEval(unittest.TestCase):
             consensus=[fact(url=UNOFFICIAL_URL)], needs_review=[], gaps=[], report={},
         )
         assert evaluate_consensus(bad)["verdict"] == "FAIL"
+
+
+class TestNormalizationAndClustering(unittest.TestCase):
+    """Independent passes drift both the topic key and the fact key for the same fact.
+    The merge must resolve that (canonical topic + fact-text clustering) or consensus collapses.
+    """
+
+    def test_banque_france_is_official(self):
+        from backend.imports.otto.parsers import OFFICIAL, classify_source
+        assert classify_source(
+            "https://www.banque-france.fr/fr/a-votre-service/particuliers/droit-au-compte-bancaire"
+        ) == OFFICIAL
+
+    def test_topic_alias_collapses_variants(self):
+        # Same fact, same text, but the topic key drifted between passes.
+        T = "An EU or EEA citizen is not required to hold a residence permit to live in France."
+        p = [
+            [fact(dc="FR", topic="eu_right_of_residence", key="a", text=T)],
+            [fact(dc="FR", topic="right_of_residence", key="b", text=T)],
+        ]
+        r = merge_passes(p)
+        assert len(r.consensus) == 1
+        assert r.consensus[0]["applies_to"]["pass_count"] == 2
+
+    def test_text_clustering_aligns_drifted_fact_keys(self):
+        # The real failure mode: 5 passes, same topic, same fact, five different fact_keys.
+        T = ("Anyone who works or resides in France in a stable and regular manner "
+             "is entitled to health cover.")
+        p = [[fact(dc="FR", topic="puma_health_cover", key=f"k{i}", text=T)] for i in range(5)]
+        r = merge_passes(p)
+        assert len(r.consensus) == 1
+        assert r.consensus[0]["applies_to"]["pass_count"] == 5
+
+    def test_distinct_subfacts_within_topic_stay_separate(self):
+        entitlement = ("Anyone who works or resides in France in a stable and regular manner "
+                       "is entitled to health cover.")
+        six_month = ("To open health insurance rights based on residence a person must reside "
+                     "at least six months per year in France.")
+        p = [
+            [fact(dc="FR", topic="puma_health_cover", key=f"e{i}", text=entitlement),
+             fact(dc="FR", topic="puma_health_cover", key=f"s{i}", text=six_month)]
+            for i in range(5)
+        ]
+        r = merge_passes(p)
+        assert len(r.consensus) == 2
 
 
 if __name__ == "__main__":

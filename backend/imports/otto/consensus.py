@@ -29,14 +29,64 @@ from __future__ import annotations
 
 import copy
 import math
+import re
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 from backend.imports.otto.parsers import OFFICIAL, UNOFFICIAL, classify_source
 
 Fact = Dict[str, Any]
-Key = Tuple[str, str, str]
+
+#: Entity-resolution, step 1 — canonical topic keys. Independent research passes name the same
+#: topic differently ("right_of_residence" / "eu_right_of_residence" / "…_worker"). Voting on the
+#: raw key collapses consensus to noise, so map known aliases to a canonical form. Explicit and
+#: deterministic on purpose (no silent structural merges); extend it as corridors are added.
+CANONICAL_TOPICS: Dict[str, str] = {
+    "right_of_residence": "eu_right_of_residence",
+    "right_of_residence_eu": "eu_right_of_residence",
+    "eu_right_of_residence_worker": "eu_right_of_residence",
+    "eea_right_of_residence": "eu_right_of_residence",
+    "eu_residence_permit_optional": "eu_right_of_residence",
+    "driving_licence": "eu_driving_licence",
+    "eea_driving_licence": "eu_driving_licence",
+    "numero_securite_sociale": "social_security_number",
+    "numero_de_securite_sociale": "social_security_number",
+    "securite_sociale": "social_security_number",
+    "opening_bank_account": "bank_account",
+    "bank_account_opening": "bank_account",
+    "family_benefits_caf": "caf_family_benefits",
+    "tax_residence": "income_tax_residence",
+    "puma": "puma_health_cover",
+    "school_enrollment": "school_enrolment",
+    "s1": "s1_portable_document",
+}
+
+#: Content-word filter for fact-text similarity (EN + a little FR). Kept small and stable.
+_STOPWORDS: Set[str] = set(
+    "a an the of to in on for and or is are be as it this that by with from at into you your "
+    "must may can will shall not no if then within their they them there here which who whom "
+    "de la le les des du un une et ou en dans pour par sur au aux que qui ne pas est sont doit "
+    "vous votre son sa ses leur leurs".split()
+)
+
+
+def _canon_topic(topic: Any) -> str:
+    t = str(topic or "").strip().lower()
+    return CANONICAL_TOPICS.get(t, t)
+
+
+def _content_tokens(text: Any) -> Set[str]:
+    """Accent-stripped, stopword-filtered content tokens of a fact_text — the clustering signal."""
+    norm = unicodedata.normalize("NFKD", str(text or "")).encode("ascii", "ignore").decode().lower()
+    return {w for w in re.findall(r"[a-z0-9]+", norm) if len(w) > 2 and w not in _STOPWORDS}
+
+
+def _jaccard(a: Set[str], b: Set[str]) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
 
 
 @dataclass
@@ -49,14 +99,6 @@ class ConsensusResult:
     gaps: List[Dict[str, Any]]
     #: Per-run metrics (pass-count histogram, band counts).
     report: Dict[str, Any] = field(default_factory=dict)
-
-
-def _key(fact: Fact) -> Key:
-    return (
-        str(fact.get("destination_country", "")).strip().upper(),
-        str(fact.get("entity_topic_key", "")).strip(),
-        str(fact.get("fact_key", "")).strip(),
-    )
 
 
 def _has_verbatim_quote(fact: Fact) -> bool:
@@ -82,19 +124,20 @@ def _representative(instances: List[Fact]) -> Fact:
     return sorted(instances, key=rank, reverse=True)[0]
 
 
-def _finalize(rep: Fact, pass_count: int, *, needs_lawyer: bool) -> Fact:
+def _finalize(rep: Fact, pass_count: int, canon_topic: str, *, needs_lawyer: bool) -> Fact:
     out = copy.deepcopy(rep)
     applies = dict(out.get("applies_to") or {})
     applies["pass_count"] = pass_count
     out["applies_to"] = applies
+    out["entity_topic_key"] = canon_topic  # canonical, so re-runs converge on one key
     out["needs_lawyer_review"] = needs_lawyer
     return out
 
 
-def _gap(rep: Fact, pass_count: int, reason: str) -> Dict[str, Any]:
+def _gap(rep: Fact, pass_count: int, canon_topic: str, reason: str) -> Dict[str, Any]:
     return {
         "destination_country": str(rep.get("destination_country", "")).strip().upper(),
-        "entity_topic_key": rep.get("entity_topic_key", ""),
+        "entity_topic_key": canon_topic,
         "fact_key": rep.get("fact_key", ""),
         "source_url": rep.get("source_url", ""),
         "pass_count": pass_count,
@@ -102,16 +145,41 @@ def _gap(rep: Fact, pass_count: int, reason: str) -> Dict[str, Any]:
     }
 
 
+def _cluster_topic(items: List[Tuple[int, Fact]], sim_threshold: float) -> List[Dict[str, Any]]:
+    """Greedily cluster one topic's facts by fact-text similarity (entity resolution, step 2).
+
+    Independent passes drift the fact_key for the same fact, so exact-key voting misses the
+    agreement. The fact_text, however, stays near-identical for the same fact and diverges for
+    genuinely different facts — so cluster on content-token Jaccard. Deterministic: items are
+    pre-sorted, and a fact joins the first cluster it is similar enough to.
+    """
+    ordered = sorted(items, key=lambda pf: (str(pf[1].get("fact_key", "")),
+                                            str(pf[1].get("source_url", "")), pf[0]))
+    clusters: List[Dict[str, Any]] = []
+    for pass_index, fact in ordered:
+        tokens = _content_tokens(fact.get("fact_text"))
+        for c in clusters:
+            if _jaccard(tokens, c["tokens"]) >= sim_threshold:
+                c["passes"].add(pass_index)
+                c["instances"].append(fact)
+                break
+        else:
+            clusters.append({"tokens": tokens, "passes": {pass_index}, "instances": [fact]})
+    return clusters
+
+
 def merge_passes(
     passes: List[List[Fact]],
     *,
     n_passes: int | None = None,
     low_band_ratio: float = 0.6,
+    sim_threshold: float = 0.55,
 ) -> ConsensusResult:
     """Vote N independent research passes into consensus / needs_review / gaps.
 
-    A fact's ``pass_count`` is the number of *distinct* passes that produced its
-    (destination_country | entity_topic_key | fact_key) key.
+    Facts are resolved before voting (independent passes drift both keys): grouped by
+    (destination_country, CANONICAL entity_topic_key), then clustered within a topic by
+    fact-text similarity. A cluster's ``pass_count`` is the number of *distinct* passes in it.
 
     Bands (``n`` = number of passes):
       - ``pass_count == n`` AND official source AND verbatim quote  → **consensus**
@@ -127,40 +195,39 @@ def merge_passes(
 
     middle_floor = math.ceil(low_band_ratio * n)  # >= this and < n is the "middle" band
 
-    groups: Dict[Key, Dict[str, Any]] = {}
+    # Step 1: group by destination + canonical topic.
+    topic_groups: Dict[Tuple[str, str], List[Tuple[int, Fact]]] = {}
     for pass_index, one_pass in enumerate(passes):
         for fact in one_pass:
-            g = groups.setdefault(_key(fact), {"passes": set(), "instances": []})
-            g["passes"].add(pass_index)
-            g["instances"].append(fact)
+            dc = str(fact.get("destination_country", "")).strip().upper()
+            tk = (dc, _canon_topic(fact.get("entity_topic_key")))
+            topic_groups.setdefault(tk, []).append((pass_index, fact))
 
     consensus: List[Fact] = []
     needs_review: List[Fact] = []
     gaps: List[Dict[str, Any]] = []
 
-    for key in sorted(groups):
-        g = groups[key]
-        count = len(g["passes"])
-        rep = _representative(g["instances"])
-        tier = _tier(rep)
-        has_quote = _has_verbatim_quote(rep)
+    # Step 2: cluster each topic by text similarity, then band each cluster.
+    for (dc, canon_topic) in sorted(topic_groups):
+        for cluster in _cluster_topic(topic_groups[(dc, canon_topic)], sim_threshold):
+            count = len(cluster["passes"])
+            rep = _representative(cluster["instances"])
+            tier = _tier(rep)
+            has_quote = _has_verbatim_quote(rep)
 
-        if tier == UNOFFICIAL:
-            gaps.append(_gap(rep, count, "source is unofficial (blog / vendor / law-firm) — rejected"))
-        elif count >= n and tier == OFFICIAL and has_quote:
-            consensus.append(_finalize(rep, count, needs_lawyer=False))
-        elif count >= middle_floor:
-            reason = []
-            if tier != OFFICIAL:
-                reason.append("semi-official publisher")
-            if not has_quote:
-                reason.append("no verbatim quote")
-            needs_review.append(_finalize(rep, count, needs_lawyer=True))
-        elif tier == OFFICIAL and has_quote:
-            # Low-band rescue: a single strong statutory citation is worth a lawyer's look.
-            needs_review.append(_finalize(rep, count, needs_lawyer=True))
-        else:
-            gaps.append(_gap(rep, count, f"low consensus ({count}/{n}) and not statutory + verbatim"))
+            if tier == UNOFFICIAL:
+                gaps.append(_gap(rep, count, canon_topic,
+                                 "source is unofficial (blog / vendor / law-firm) — rejected"))
+            elif count >= n and tier == OFFICIAL and has_quote:
+                consensus.append(_finalize(rep, count, canon_topic, needs_lawyer=False))
+            elif count >= middle_floor:
+                needs_review.append(_finalize(rep, count, canon_topic, needs_lawyer=True))
+            elif tier == OFFICIAL and has_quote:
+                # Low-band rescue: a single strong statutory citation is worth a lawyer's look.
+                needs_review.append(_finalize(rep, count, canon_topic, needs_lawyer=True))
+            else:
+                gaps.append(_gap(rep, count, canon_topic,
+                                 f"low consensus ({count}/{n}) and not statutory + verbatim"))
 
     histogram = Counter()
     for bucket in (consensus, needs_review):
