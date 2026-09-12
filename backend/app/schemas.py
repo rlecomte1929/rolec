@@ -253,6 +253,18 @@ class AdminRequirementReviewDTO(BaseModel):
     attestedAt: Optional[datetime] = None
 
 
+class RequirementItemChangelogDTO(BaseModel):
+    changeId: str
+    requirementId: str
+    countryCode: Optional[str] = None
+    changeType: str
+    previousValue: Optional[Dict[str, Any]] = None
+    newValue: Optional[Dict[str, Any]] = None
+    changedBy: Optional[str] = None
+    changedAt: Optional[datetime] = None
+    changeJustification: Optional[str] = None
+
+
 class KnowledgeScorecardDTO(BaseModel):
     """Catalog sufficiency for one destination. Not a McKinsey index; bars live in the scorer."""
 

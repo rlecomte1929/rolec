@@ -1,0 +1,113 @@
+{
+  "cvr_version": "1.0",
+  "cvr_uid": "cvr:FR-NO:2026-07-15:founder",
+  "corridor_id": "FR-NO",
+  "case_id": null,
+  "case_ref": "2026-07-15-fr-no-f",
+  "real_case": false,
+  "gold_exemplar": true,
+  "verdict": "pass",
+  "score": null,
+  "failed_rules": [],
+  "session": {
+    "session_date": "2026-07-15T00:00:00.000Z",
+    "conducted_by": "Founder / Internal Verification",
+    "participant_role": "Founder / Internal Verification",
+    "employee_nationality": "FR",
+    "employee_type": "eu-national",
+    "origin_country": "FR",
+    "destination_country": "NO",
+    "employer_size_band": "1-10",
+    "move_date": null,
+    "notes": "Backfill from WorkspaceDB kg_case_verification_reports. User name omitted (PII)."
+  },
+  "reviewer": {
+    "name": null,
+    "lawyer_id": null,
+    "verified_by_lawyer": false
+  },
+  "per_requirement": [
+    {
+      "requirement_id": "FR-NO-eu-national-immigration-001",
+      "topic_key": null,
+      "judgment": "correct",
+      "knew_it": false,
+      "is_non_obvious": true,
+      "reaction_quote": "I had no idea the police registration slots fill up weeks in advance.",
+      "what_we_said": null,
+      "what_actually_happened": null,
+      "action": null
+    },
+    {
+      "requirement_id": "FR-NO-eu-national-tax-001",
+      "topic_key": null,
+      "judgment": "correct",
+      "knew_it": null,
+      "is_non_obvious": false,
+      "reaction_quote": null,
+      "what_we_said": null,
+      "what_actually_happened": null,
+      "action": null
+    },
+    {
+      "requirement_id": "FR-NO-eu-national-banking-001",
+      "topic_key": null,
+      "judgment": "correct",
+      "knew_it": false,
+      "is_non_obvious": true,
+      "reaction_quote": null,
+      "what_we_said": null,
+      "what_actually_happened": "Some banks require an employer introduction letter, not just an employment contract.",
+      "action": "Add note for Handelsbanken-style employer letter."
+    },
+    {
+      "requirement_id": "FR-NO-eu-national-employer_compliance-001",
+      "topic_key": null,
+      "judgment": "correct",
+      "knew_it": null,
+      "is_non_obvious": false,
+      "reaction_quote": null,
+      "what_we_said": null,
+      "what_actually_happened": null,
+      "action": null
+    }
+  ],
+  "missed_not_in_catalog": [],
+  "sequence_check": [],
+  "outcomes": {
+    "requirements_correct_ids": [
+      "FR-NO-eu-national-immigration-001",
+      "FR-NO-eu-national-tax-001",
+      "FR-NO-eu-national-banking-001",
+      "FR-NO-eu-national-employer_compliance-001"
+    ],
+    "requirements_wrong_ids": [],
+    "requirements_missed_ids": [],
+    "non_obvious_confirmed_ids": [
+      "FR-NO-eu-national-immigration-001",
+      "FR-NO-eu-national-banking-001"
+    ],
+    "requirements_correct_count": 4,
+    "requirements_wrong_count": 0,
+    "requirements_missed_count": 0,
+    "non_obvious_confirmed_count": 2,
+    "records_approved_ids": [],
+    "records_held_back": [],
+    "corrections_to_apply": "Add note that some banks (e.g. Handelsbanken) require an employer introduction letter, not just an employment contract.",
+    "case_outcome": null,
+    "compliance_issues_logged": "Bank account opening timelines vary significantly by branch and individual advisor. Some branches require a second appointment."
+  },
+  "relief_moment": {
+    "response": true,
+    "surprising_item_id": "FR-NO-eu-national-immigration-001",
+    "surprising_item_text": "Police registration slots fill up weeks in advance",
+    "quote": "I had no idea the police registration slots fill up weeks in advance. I would have tried to book it after settling in and missed the window entirely.",
+    "open_text_comment": null,
+    "posthog_event_verified": false
+  },
+  "legacy": {
+    "workspace_db_table": "kg_case_verification_reports",
+    "report_path": null,
+    "notes": "Mapped from data/workspace-db-export/2026-08-18/kg_case_verification_reports.json"
+  }
+}

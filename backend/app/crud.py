@@ -158,6 +158,9 @@ def _find_requirement_item(db: Session, payload: Dict[str, Any]) -> Optional[mod
 
 
 def _apply_requirement_item_update(db: Session, existing: models.RequirementItem, payload: Dict[str, Any]) -> models.RequirementItem:
+    from .services.requirement_item_changelog import record_field_diff, snapshot_item
+
+    previous = snapshot_item(existing)
     existing.description = payload["description"]
     existing.severity = payload["severity"]
     existing.owner = payload["owner"]
@@ -201,6 +204,12 @@ def _apply_requirement_item_update(db: Session, existing: models.RequirementItem
     # insert (below), carried on update. Same rule as _CARRIED_COLUMNS in
     # admin_form_templates.py.
     existing.last_verified_at = payload["last_verified_at"]
+    record_field_diff(
+        db,
+        existing,
+        previous,
+        changed_by="system:create_requirement_item",
+    )
     db.commit()
     db.refresh(existing)
     return existing
@@ -272,6 +281,18 @@ def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.Requ
     if inserted:
         item = _find_requirement_item(db, payload)
         assert item is not None  # just inserted and committed
+        from .services.requirement_item_changelog import CHANGE_ADDED, record_change, snapshot_item
+
+        record_change(
+            db,
+            requirement_id=item.id,
+            country_code=item.country_code,
+            change_type=CHANGE_ADDED,
+            previous_value=None,
+            new_value=snapshot_item(item),
+            changed_by="system:create_requirement_item",
+            commit=True,
+        )
         return item
 
     # ON CONFLICT DO NOTHING fired: a concurrent import of the same requirement won the

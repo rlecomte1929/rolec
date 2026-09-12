@@ -178,6 +178,26 @@ class RequirementItem(Base):
     last_verified_at = Column(DateTime, nullable=False)
 
 
+class RequirementItemChangelog(Base):
+    """Append-only history for RequirementItem. SQLite-portable (JSON as text)."""
+
+    __tablename__ = "requirement_item_changelog"
+
+    change_id = Column(_UUID, primary_key=True)
+    requirement_id = Column(String, nullable=False, index=True)
+    country_code = Column(String, nullable=True)
+    change_type = Column(String, nullable=False)
+    previous_value = Column(Text, nullable=True)
+    new_value = Column(Text, nullable=True)
+    changed_by = Column(Text, nullable=True)
+    changed_at = Column(DateTime(timezone=True), nullable=False)
+    change_justification = Column(Text, nullable=True)
+    new_source_document = Column(Text, nullable=True)
+    new_source_url = Column(Text, nullable=True)
+    reviewer_sign_off = Column(Text, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+
+
 class ResearchSourceCandidate(Base):
     __tablename__ = "research_source_candidates"
 
