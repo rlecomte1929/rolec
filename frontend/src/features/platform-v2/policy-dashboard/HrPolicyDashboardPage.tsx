@@ -239,7 +239,7 @@ export function HrPolicyDashboardPage() {
   const nextReview = (policy?.next_review_date as string | undefined) ?? null;
 
   return (
-    <AppShell wide>
+    <AppShell wide hideHeading section="HR Operations" title="Policy dashboard">
       {/* Page header */}
       <div className="px-6 py-5 border-b border-slate-100">
         <Breadcrumb section="HR Operations" title="Policy dashboard" className="mb-2" />

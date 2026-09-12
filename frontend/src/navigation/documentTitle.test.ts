@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatAdminDocumentTitle, formatAuthDocumentTitle } from './documentTitle';
+import { formatAdminDocumentTitle, formatAppDocumentTitle, formatAuthDocumentTitle } from './documentTitle';
 
 describe('formatAdminDocumentTitle', () => {
   it('names the screen after ReloPass admin', () => {
@@ -9,6 +9,17 @@ describe('formatAdminDocumentTitle', () => {
   it('falls back when the screen name is missing', () => {
     expect(formatAdminDocumentTitle()).toBe('ReloPass admin');
     expect(formatAdminDocumentTitle('  ')).toBe('ReloPass admin');
+  });
+});
+
+describe('formatAppDocumentTitle', () => {
+  it('puts the page name before ReloPass', () => {
+    expect(formatAppDocumentTitle('Cases')).toBe('Cases - ReloPass');
+  });
+
+  it('falls back when the page name is missing', () => {
+    expect(formatAppDocumentTitle()).toBe('ReloPass');
+    expect(formatAppDocumentTitle('  ')).toBe('ReloPass');
   });
 });
 

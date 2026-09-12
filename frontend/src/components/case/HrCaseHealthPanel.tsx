@@ -14,11 +14,12 @@
  * and nothing here can invent a case. `suggested_action` is a per-stage template
  * or, for a milestone type we do not recognise, that milestone's own curated title.
  */
-import type * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { hrAPI, type CaseHealthFlag } from '../../api/client';
+import { hrAPI, type CaseHealthFlag, type CommandCenterCaseRow } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
+import { displayNameOrEmail } from '../../utils/caseDisplay';
+import { getCountryName } from '../../utils/countries';
 
 /** 'hr' reads as HR's own queue; everything else is someone HR chases. */
 function ownerLabel(owner: string | null): string | null {
@@ -29,7 +30,26 @@ function ownerLabel(owner: string | null): string | null {
   return null;
 }
 
-export const HrCaseHealthPanel: React.FC = () => {
+export function matchAttentionCase(
+  flag: CaseHealthFlag,
+  catalog: CommandCenterCaseRow[],
+): CommandCenterCaseRow | undefined {
+  return catalog.find((row) => row.caseId === flag.case_id || row.id === flag.case_id);
+}
+
+export function attentionOpenCaseAriaLabel(name: string, destination: string): string {
+  return `Open case for ${name} (${destination})`;
+}
+
+function destinationLabel(row: CommandCenterCaseRow | undefined): string {
+  const raw = row?.destCountry?.trim();
+  if (!raw) return 'Destination not set';
+  return getCountryName(raw) || raw;
+}
+
+export const HrCaseHealthPanel: React.FC<{ catalog?: CommandCenterCaseRow[] }> = ({
+  catalog = [],
+}) => {
   const query = useQuery({
     queryKey: ['hr', 'case-health'],
     queryFn: ({ signal }) => hrAPI.getCaseHealth({ signal }),
@@ -67,34 +87,48 @@ export const HrCaseHealthPanel: React.FC = () => {
         {cases.map((c) => {
           const step = c.milestone_title || c.stage || 'Overdue step';
           const who = ownerLabel(c.owner);
+          const matched = matchAttentionCase(c, catalog);
+          const name = displayNameOrEmail(null, matched?.employeeIdentifier);
+          const dest = destinationLabel(matched);
+          const href = buildRoute('hrCommandCenterCase', { id: matched?.id ?? c.case_id });
+          const ariaLabel = attentionOpenCaseAriaLabel(name, dest);
           return (
-            <li key={c.case_id} className="flex flex-wrap items-start gap-x-4 gap-y-1 px-4 py-3">
-              <span
-                className={`mt-0.5 inline-flex shrink-0 items-center rounded px-2 py-0.5 text-[11px] font-semibold ${
-                  c.severity === 'critical'
-                    ? 'border border-red-200 bg-red-50 text-red-700'
-                    : 'border border-amber-200 bg-amber-50 text-amber-700'
-                }`}
+            <li key={c.case_id}>
+              <Link
+                to={href}
+                aria-label={ariaLabel}
+                className="flex min-h-6 flex-wrap items-start gap-x-4 gap-y-1 px-4 py-3 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-navy-800"
               >
-                {c.days_behind != null ? `${c.days_behind}d behind` : 'behind'}
-              </span>
-
-              <div className="min-w-[220px] flex-1">
-                <p className="text-[13px] font-medium text-slate-800">{step}</p>
-                <p className="text-[12px] text-slate-500">
-                  {c.suggested_action ?? 'Review this case and follow up.'}
-                </p>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-3">
-                {who && <span className="text-[12px] text-slate-500">{who}</span>}
-                <Link
-                  to={buildRoute('hrCommandCenterCase', { id: c.case_id })}
-                  className="text-[12px] font-medium text-[#0b2b43] hover:underline"
+                <span
+                  className={`mt-0.5 inline-flex shrink-0 items-center rounded px-2 py-0.5 text-[11px] font-semibold ${
+                    c.severity === 'critical'
+                      ? 'border border-red-200 bg-red-50 text-red-700'
+                      : 'border border-amber-200 bg-amber-50 text-amber-700'
+                  }`}
                 >
-                  Open case
-                </Link>
-              </div>
+                  {c.days_behind != null ? `${c.days_behind}d behind` : 'behind'}
+                </span>
+
+                <div className="min-w-[220px] flex-1">
+                  <p className="text-[13px] font-medium text-slate-800">{name}</p>
+                  <p className="text-[12px] text-slate-500">
+                    {matched?.employeeIdentifier && matched.employeeIdentifier !== name
+                      ? `${matched.employeeIdentifier} · ${dest}`
+                      : dest}
+                  </p>
+                  <p className="mt-0.5 text-[13px] text-slate-800">{step}</p>
+                  <p className="text-[12px] text-slate-500">
+                    {c.suggested_action ?? 'Review this case and follow up.'}
+                  </p>
+                </div>
+
+                <div className="flex min-h-6 shrink-0 items-center gap-3">
+                  {who && <span className="text-[12px] text-slate-500">{who}</span>}
+                  <span className="inline-flex min-h-6 items-center text-[12px] font-medium text-navy-800 underline-offset-2 group-hover:underline">
+                    Open case
+                  </span>
+                </div>
+              </Link>
             </li>
           );
         })}

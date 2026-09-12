@@ -292,7 +292,7 @@ export function HrBacklogPage() {
   );
 
   return (
-    <AppShell>
+    <AppShell hideHeading section="HR Operations" title="Employee backlog">
       <div className="px-6 py-6">
         {/* Header */}
         <div className="mb-5">

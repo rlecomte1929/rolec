@@ -4,6 +4,12 @@ export function formatAdminDocumentTitle(screen?: string): string {
   return name ? `ReloPass admin — ${name}` : 'ReloPass admin';
 }
 
+/** Tab titles for in-app HR/employee pages (AIQ-2347). */
+export function formatAppDocumentTitle(page?: string): string {
+  const name = page?.trim();
+  return name ? `${name} - ReloPass` : 'ReloPass';
+}
+
 /** Tab titles for /auth. */
 export function formatAuthDocumentTitle(
   kind: 'login' | 'register' | 'invite' = 'login',
