@@ -630,8 +630,124 @@ def _phases_from_arrival_anchor(
     return out
 
 
+def _parse_iso_date(value: Any) -> Optional[date]:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except (TypeError, ValueError):
+        return None
+
+
+def _corridor_schedule(
+    case_draft: Optional[Dict[str, Any]],
+    step_dicts: Sequence[Dict[str, Any]],
+    target_move_date: Optional[Any],
+) -> Dict[str, Dict[str, Any]]:
+    """[DEADLINE-ENGINE] Real dates for the corridor steps, from the pathway graph.
+
+    Until now every corridor milestone was written with ``target_date=None``; the plan
+    view then filled ``move_date - phase lead time`` for ALL of them, so the CSEP
+    application, the permit grant, the D-visa application and its grant all showed the
+    same date, and the arrival steps (IRP within 90 days, PPSN before first payroll) had
+    no date at all. The pathway already states durations, prerequisites, the arrival
+    anchor and the legal windows; ``relopass.corridors.scheduler`` already turns those
+    into dates. This binds the two.
+
+    Anchoring: the arrival anchor (TRAVEL_*) is pinned to the target move date, so every
+    pre-arrival step is scheduled BACKWARDS from it (start = completion - duration) and
+    every post-arrival step FORWARDS from it. A step that carries a legal window
+    (``time_window_relative_to``) gets that rule-anchored deadline instead of its
+    projected completion, with the derivation kept in ``notes``.
+
+    Returns ``{step_id: {"target_date": "YYYY-MM-DD", "notes": str, "start_date": ...}}``
+    and ``{}`` whenever there is no target date, no resolvable pathway, or no anchor:
+    the caller then leaves ``target_date`` unset and the old suggested-date fallback stands.
+    """
+    try:
+        from .roadmap_corridor_overlay import _resolve_pathway
+        from ...relopass.corridors.feasibility import arrival_anchor_step, required_lead_time_days
+        from ...relopass.corridors.scheduler import compute_deadlines, schedule_steps
+    except Exception:  # pragma: no cover - defensive
+        return {}
+    draft = case_draft or {}
+    basics = draft.get("relocationBasics") or {}
+    target = _parse_iso_date(target_move_date) or _parse_iso_date(basics.get("targetMoveDate"))
+    if target is None:
+        return {}
+    resolved = _resolve_pathway(
+        basics.get("originCountry") or basics.get("origin_country"),
+        basics.get("destCountry") or basics.get("destination_country"),
+    )
+    if not resolved:
+        return {}
+    agent = resolved[0]
+    wanted = {str(d.get("step_id") or "") for d in step_dicts}
+    retained = [st for st in agent.step_graph if st.step_id in wanted]
+    if not retained:
+        return {}
+    anchor = arrival_anchor_step(retained)
+    if anchor is None:
+        return {}
+    try:
+        lead = required_lead_time_days(retained)
+        base = target - timedelta(days=lead)
+        sched = schedule_steps(retained, base)
+        # Pin the anchor to the target date exactly (the lead time is the critical path
+        # to the anchor, so this is normally a no-op; a parallel root branch cannot move it).
+        drift = (target - sched[anchor.step_id]).days if anchor.step_id in sched else 0
+        if drift:
+            sched = {k: v + timedelta(days=drift) for k, v in sched.items()}
+        legal = {d.step_id: d for d in compute_deadlines(retained, base, schedule=sched)}
+    except Exception:  # noqa: BLE001 - a cyclic/odd graph must never break milestone generation
+        log.warning("corridor schedule failed; corridor milestones keep suggested dates", exc_info=True)
+        return {}
+    by_id = {st.step_id: st for st in retained}
+    out: Dict[str, Dict[str, Any]] = {}
+    for st in retained:
+        if (getattr(st, "outcome_type", "action") or "action") == "nothing_to_do":
+            continue  # a milestone nobody performs on a date (Stamp 4 eligibility) gets no due date
+        done = sched.get(st.step_id)
+        if done is None:
+            continue
+        duration = int(st.expected_duration_days or 0)
+        start = done - timedelta(days=duration)
+        deadline = legal.get(st.step_id)
+        if deadline is not None:
+            out[st.step_id] = {
+                "target_date": deadline.due_date.isoformat(),
+                "start_date": start.isoformat(),
+                "notes": f"Legal deadline: {deadline.derivation}. Expected to take about {duration} day(s).",
+                "legal": True,
+            }
+            continue
+        prereqs = [by_id[p].name for p in st.prerequisite_step_ids if p in by_id]
+        after = f" after \"{prereqs[-1]}\"" if prereqs else ""
+        out[st.step_id] = {
+            "target_date": done.isoformat(),
+            "start_date": start.isoformat(),
+            "notes": (
+                f"Planned: start by {start.isoformat()}, allow about {duration} day(s){after}; "
+                f"projected from the corridor's step durations so that arrival lands on {target.isoformat()}."
+            ),
+            "legal": False,
+        }
+    out["__meta__"] = {
+        "lead_days": lead,
+        "runway_start": base.isoformat(),
+        "target": target.isoformat(),
+        "anchor": anchor.step_id,
+    }
+    return out
+
+
 def _corridor_milestones(
     case_draft: Optional[Dict[str, Any]],
+    target_move_date: Optional[Any] = None,
 ) -> Tuple[List[Dict[str, Any]], frozenset]:
     """Milestones from the case corridor's authored pathway, and the generic milestone_types
     they supersede.
@@ -660,6 +776,8 @@ def _corridor_milestones(
         # scaffold it replaced. Fall back wholesale instead.
         return [], frozenset()
 
+    schedule = _corridor_schedule(case_draft, steps, target_move_date)
+
     rows: List[Dict[str, Any]] = []
     for idx, step in enumerate(steps, start=1):
         sid = str(step.get("step_id") or "").strip()
@@ -668,20 +786,27 @@ def _corridor_milestones(
         # The explicit map wins where it has an opinion: it is the only thing that puts a
         # step in the `immigration` phase, which is the distinction AIQ-1867 asked for.
         phase = _CORRIDOR_STEP_PHASE.get(sid) or derived[sid]
+        dated = schedule.get(sid) or {}
+        # The pathway's "easy to miss" note is the consequence line the employee reads
+        # (relocation_plan_service surfaces `description` as why_this_matters for
+        # corridor rows). Empty for steps that carry none; the requirement overlay may
+        # fill it later from the dossier.
+        note = (step.get("non_obvious_note") or "").strip() or None
         # {phase}_corridor_{NN} — parsed by relocation_plan_service so the step lands in its
         # real phase block. Deliberately not the {phase}_ai_{NN} form: this is curated data.
         rows.append(
             {
                 "milestone_type": f"{phase}_corridor_{idx:02d}",
                 "title": step.get("name") or sid,
-                "description": None,
+                "description": note,
                 "sort_order": 500 + idx,
-                "target_date": None,
+                "target_date": dated.get("target_date"),
                 "status": "pending",
                 "owner": step.get("responsible_party") or "joint",
-                # A blocking step is one nothing downstream can proceed without.
-                "criticality": "high" if step.get("blocking") else "normal",
-                "notes": None,
+                # A blocking step is one nothing downstream can proceed without; a legal
+                # deadline is critical by definition.
+                "criticality": "high" if (step.get("blocking") or dated.get("legal")) else "normal",
+                "notes": dated.get("notes"),
             }
         )
     # The overlay's own `superseded_generic_keys` are roadmap_builder STEP keys
@@ -883,7 +1008,7 @@ def compute_default_milestones(
     # route that names the Critical Skills Employment Permit and the 'D' visa supersedes
     # "Prepare visa / work permit application pack". Showing both would be worse than
     # showing only the generic one — the employee cannot tell which is real.
-    corridor_rows, superseded_generic = _corridor_milestones(case_draft)
+    corridor_rows, superseded_generic = _corridor_milestones(case_draft, target_move_date)
 
     end_anchor = _parse_assignment_end(case_draft)
 

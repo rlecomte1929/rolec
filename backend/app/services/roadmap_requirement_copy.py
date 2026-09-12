@@ -153,6 +153,102 @@ def _requirement_source_urls(item: Any) -> List[str]:
     return urls
 
 
+#: [DEADLINE-ENGINE] Corridor-pathway milestones ("{phase}_corridor_NN") are keyed by their
+#: authored TITLE, not by a seed-YAML requirement title, so the static map above never
+#: reaches them. This map binds a corridor step (by a stable fragment of its title) to the
+#: dossier rows that state its timing, consequence and source. Order = priority; the
+#: first entries are the ones a mover must not miss. Fails safe: no match, no change.
+_CORRIDOR_TITLE_TO_TERMS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
+    ("Critical Skills Employment Permit application", ("critical skills", "employment permit", "csep", "12 weeks")),
+    ("Employment permit granted", ("employment permit", "critical skills")),
+    ("'D' Employment visa application", ("'d' visa", "d visa", "entry visa", "visa-required", "visa required")),
+    ("'D' Employment visa granted", ("entry visa", "visa-required", "d visa")),
+    ("Register immigration permission", ("irp", "burgh quay", "registration office", "90 days", "immigration registration")),
+    ("PPSN", ("ppsn", "personal public service")),
+    ("Register the employment with Revenue", ("revenue", "rpn", "emergency tax", "myaccount", "first payroll")),
+    ("Open an Irish bank account", ("bank account", "proof of address", "iban")),
+    ("Register with a GP", ("gp ", "gp registration", "medical card", "ordinarily resident", "health insurance")),
+    ("Register accompanying family", ("stamp 1g", "join family", "dependant", "dependent", "family reunification", "spouse")),
+    ("Stamp 4 eligibility", ("stamp 4",)),
+    ("Travel to", ("landing", "entry visa", "visa-required")),
+)
+
+_MAX_BOUND_ROWS = 3
+_MAX_SOURCES = 4
+
+
+def _bind_corridor_row(row: Dict[str, Any], items: List[Any]) -> Dict[str, Any]:
+    """Attach dossier timing / consequence / sources to one corridor milestone row.
+
+    The plan the employee acts on carried a bare title for the immigration chain
+    (CSEP, D visa, IRP, PPSN, Revenue, bank, GP, family): no instruction, no source,
+    no consequence. Meanwhile the dossier for the same case holds 149 rows with an
+    explicit ``timing`` and a citation. This joins them, per task:
+
+      * ``instructions``  = the deadline derivation (from the scheduler, kept in
+        ``notes``) + up to 3 dossier rows as "<what>: <when>";
+      * ``sources``       = their citation URLs (the official page to act on);
+      * ``description``   = the first non-obvious row's text when the pathway note is
+        empty (surfaced as why_this_matters by relocation_plan_service).
+    """
+    title = str(row.get("title") or "")
+    title_l = title.lower()
+    terms: Tuple[str, ...] = ()
+    for fragment, fragment_terms in _CORRIDOR_TITLE_TO_TERMS:
+        if fragment.lower() in title_l:
+            terms = fragment_terms
+            break
+    if not terms:
+        return row
+
+    def _score(item: Any) -> int:
+        blob = f"{getattr(item, 'title', '')} {getattr(item, 'description', '')} {getattr(item, 'timing', '')}".lower()
+        hits = sum(1 for t in terms if t in blob)
+        if not hits:
+            return 0
+        score = hits * 10
+        if getattr(item, "timing", None):
+            score += 5
+        if getattr(item, "nonObvious", False):
+            score += 3
+        if str(getattr(item, "severity", "") or "").upper() in ("WARN", "MUST", "CRITICAL"):
+            score += 2
+        return score
+
+    ranked = sorted(
+        ((_score(it), idx, it) for idx, it in enumerate(items)),
+        key=lambda t: (-t[0], t[1]),
+    )
+    matched = [it for sc, _, it in ranked if sc > 0][:_MAX_BOUND_ROWS]
+    if not matched:
+        return row
+
+    out = dict(row)
+    instructions: List[str] = []
+    notes = str(row.get("notes") or "").strip()
+    if notes.startswith(("Legal deadline", "Planned")):
+        instructions.append(notes)
+    for it in matched:
+        timing = str(getattr(it, "timing", "") or "").strip()
+        if timing:
+            instructions.append(f"{str(getattr(it, 'title', '')).strip()}: {timing}")
+    if instructions:
+        out["instructions"] = instructions
+    sources: List[str] = []
+    for it in matched:
+        for url in _requirement_source_urls(it):
+            if url not in sources:
+                sources.append(url)
+    if sources:
+        out["sources"] = sources[:_MAX_SOURCES]
+    if not str(row.get("description") or "").strip():
+        first = next((it for it in matched if getattr(it, "nonObvious", False)), matched[0])
+        desc = str(getattr(first, "description", "") or "").strip()
+        if desc:
+            out["description"] = desc
+    return out
+
+
 def enrich_milestones_with_requirements(
     case_id: str,
     milestones: List[Dict[str, Any]],
@@ -214,12 +310,19 @@ def enrich_milestones_with_requirements(
     if "task_arrival_registration" in overrides:
         overrides["task_eu_registration"] = _FreeMovementStatement()
 
-    if not overrides:
-        return milestones
+    # [DEADLINE-ENGINE] Corridor-pathway rows are bound by title fragment to the dossier
+    # rows that carry their timing / consequence / source. Independent of `overrides`.
+    actionable = [
+        it for it in dto.requirements if getattr(it, "outcomeType", "action") != "nothing_to_do"
+    ]
 
     out: List[Dict[str, Any]] = []
     for m in milestones:
-        item = overrides.get(str(m.get("milestone_type") or ""))
+        mt = str(m.get("milestone_type") or "")
+        if "_corridor_" in mt:
+            out.append(_bind_corridor_row(m, actionable))
+            continue
+        item = overrides.get(mt)
         if item is None:
             out.append(m)
             continue

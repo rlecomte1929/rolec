@@ -172,6 +172,12 @@ def hydrate_task_from_library(
     return _synthetic_entry_for_unknown_milestone(milestone_type, fallback_title)
 
 
+def _is_curated_row(milestone_type: str) -> bool:
+    """Corridor-pathway (``_corridor_``) and origin-exit (``_origin_``) rows carry their own
+    consequence text in ``description``; the static library has nothing for them."""
+    return "_corridor_" in milestone_type or "_origin_" in milestone_type
+
+
 def adapt_milestone_row(row: Mapping[str, Any]) -> EnrichedPlanTask:
     """
     Merge one DB milestone dict with the task library.
@@ -224,7 +230,7 @@ def adapt_milestone_row(row: Mapping[str, Any]) -> EnrichedPlanTask:
         # so nothing else in the library is disturbed.
         why_this_matters=(
             str(row.get("description") or "")
-            if row.get("requirement_copy") and row.get("description")
+            if (row.get("requirement_copy") or _is_curated_row(mt)) and row.get("description")
             else lib.why_this_matters
         ),
         # A row the overlay turned into a STATED ANSWER ("No visa or work permit
@@ -232,7 +238,13 @@ def adapt_milestone_row(row: Mapping[str, Any]) -> EnrichedPlanTask:
         # explain how to register and end with "Timeline: within 3 months of arrival for
         # most EU countries" — which both duplicates the destination's real registration
         # step and contradicts its deadline (Germany's Anmeldung is 14 days).
-        instructions=() if row.get("suppress_instructions") else lib.instructions,
+        instructions=(
+            ()
+            if row.get("suppress_instructions")
+            # [DEADLINE-ENGINE] corridor / origin rows have no library entry; their steps
+            # come from the requirement overlay (deadline derivation + dossier timing).
+            else tuple(str(x) for x in (row.get("instructions") or ())) or lib.instructions
+        ),
         required_inputs=inputs,
         target_date=_norm_date_str(row.get("target_date")),
         notes=_norm_notes(row.get("notes")),

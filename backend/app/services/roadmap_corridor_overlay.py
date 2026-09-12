@@ -31,7 +31,7 @@ worded conditionally and points at the register that really holds the answer. Sa
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from ...relopass.corridors import load_corridor
@@ -200,6 +200,17 @@ def _resolve_visa_required_advisory(nationality: Optional[str]) -> Optional[str]
         f"the UK). You must still register your permission after arrival. "
         f"Source: {src['name']}."
     )
+
+
+def _parse_target_date(value: Any) -> Optional[date]:
+    if not value:
+        return None
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except (TypeError, ValueError):
+        return None
 
 
 def _has_family_relocating(draft: Dict[str, Any]) -> bool:
@@ -374,6 +385,33 @@ def corridor_overlay(case: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
         if not steps:
             return None
+
+        # [DEADLINE-ENGINE] Is the target move date reachable at all? The pre-arrival
+        # runway is the critical path to the arrival anchor (ES_IE: 104 days). If the
+        # target date is closer than that, every pre-arrival step is born overdue and
+        # the employee sees red on day one without being told why. Say it once, up top.
+        try:
+            basics = draft.get("relocationBasics") or {}
+            target = _parse_target_date(basics.get("targetMoveDate"))
+            lead = required_lead_time_days(retained)
+            if target is not None and lead > 0:
+                available = (target - date.today()).days
+                if available < lead:
+                    advisories.append({
+                        "id": "TARGET_DATE_INFEASIBLE",
+                        "cite": None,
+                        "text": (
+                            f"Your target move date ({target.isoformat()}) is {available} day(s) away, but "
+                            f"the {corridor_id.replace('_', '→')} route needs about {lead} days before travel "
+                            f"(job offer, permit, entry visa). Either move the date to "
+                            f"{(date.today() + timedelta(days=lead)).isoformat()} or later, or ask HR to "
+                            f"confirm which steps are already done."
+                        ),
+                        "asserted": True,
+                        "provenance": provenance,
+                    })
+        except Exception:  # noqa: BLE001 - never break the overlay over a date
+            log.debug("target-date feasibility advisory skipped", exc_info=True)
 
         superseded = tuple(
             key
