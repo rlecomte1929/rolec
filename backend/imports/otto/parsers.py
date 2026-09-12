@@ -260,6 +260,9 @@ _OFFICIAL_HOSTS: Tuple[str, ...] = (
     # suppliers/parsers._DOMAIN_TO_SOURCE) were the last official NO agencies the fact-source
     # allowlist still excluded, dropping the EHIC-exit and bank-AML facts as UNOFFICIAL.
     "helfo.no", "finanstilsynet.no",
+    # Digitaliseringsdirektoratet (Digdir) — the national digital-identity / eID authority; its
+    # brukergrupper pages document eID access for emigrants. [DENIS-NOFR corrected BankID fact.]
+    "digdir.no",
     # Germany
     "bamf.de", "auswaertiges-amt.de", "gesetze-im-internet.de", "bundesregierung.de",
     "make-it-in-germany.com", "arbeitsagentur.de",

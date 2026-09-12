@@ -144,6 +144,7 @@ def test_the_france_batch_stays_partial_until_a_file_delivers_the_missing_85():
         # facts. bankid.no (industry consortium) stays UNOFFICIAL — the gate still discriminates.
         ("https://www.helfo.no/english/european-health-insurance-card", OFFICIAL),
         ("https://www.finanstilsynet.no/en/", OFFICIAL),
+        ("https://www.digdir.no/digital-identitet/om-utvalgte-brukergrupper/7400", OFFICIAL),
         ("https://www.bankid.no/en/private/", UNOFFICIAL),
         ("https://www.campusfrance.org/en/tuition-fees", SEMI_OFFICIAL),
         ("https://some-relocation-blog.com/moving-to-france", UNOFFICIAL),
