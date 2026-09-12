@@ -139,6 +139,12 @@ def test_the_france_batch_stays_partial_until_a_file_delivers_the_missing_85():
         # `.ec`, and the bare `gov` does not either. Regression guard for the US->EC batch.
         ("https://www.registrocivil.gob.ec/cedulacion/", OFFICIAL),
         ("https://www.iess.gob.ec/es/afiliados", OFFICIAL),
+        # Norway (Denis NO->FR): Helfo + Finanstilsynet are official agencies on `.no`; they were
+        # missing from _OFFICIAL_HOSTS and scored UNOFFICIAL, dropping the EHIC-exit + bank-AML
+        # facts. bankid.no (industry consortium) stays UNOFFICIAL — the gate still discriminates.
+        ("https://www.helfo.no/english/european-health-insurance-card", OFFICIAL),
+        ("https://www.finanstilsynet.no/en/", OFFICIAL),
+        ("https://www.bankid.no/en/private/", UNOFFICIAL),
         ("https://www.campusfrance.org/en/tuition-fees", SEMI_OFFICIAL),
         ("https://some-relocation-blog.com/moving-to-france", UNOFFICIAL),
         ("https://bigmoverslaw.fr/blog/visas", UNOFFICIAL),
