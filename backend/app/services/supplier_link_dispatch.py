@@ -29,7 +29,6 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from html import escape
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -37,7 +36,7 @@ from sqlalchemy import text
 
 from ...database import db
 from ...db.test_data_filter import looks_like_test_email
-from .rfq_brief import RESPONSE_EXPECTATIONS, render_brief_lines, respond_by
+from .rfq_brief import render_brief_lines, respond_by
 from .supplier_jwt import expires_at, generate_supplier_token, hash_token
 
 log = logging.getLogger(__name__)
@@ -64,73 +63,98 @@ _PERSONAL_DOMAINS = frozenset({
 })
 
 
+def _invite_vars(
+    supplier_name: str,
+    link: str,
+    brief_rows: Optional[List[Dict[str, str]]] = None,
+    deadline: Optional[str] = None,
+    rfq_ref: str = "",
+    service_labels: str = "",
+) -> Dict[str, Any]:
+    by = {r["label"]: r["value"] for r in (brief_rows or [])}
+    return {
+        "supplier_name": supplier_name or "",
+        "magic_link": link,
+        "brief_rows": brief_rows or [],
+        "move_from": by.get("Move from") or "",
+        "move_to": by.get("Move to") or "",
+        "respond_by": deadline or "",
+        "link_expires_days": "14",
+        "service_labels": service_labels or "relocation services",
+        "rfq_ref": rfq_ref,
+        "support_email": "support@relopass.com",
+    }
+
+
 def rfq_email_html(
     supplier_name: str,
     link: str,
     brief_rows: Optional[List[Dict[str, str]]] = None,
     deadline: Optional[str] = None,
+    rfq_ref: str = "",
+    service_labels: str = "",
 ) -> str:
-    """The vendor must be able to judge the job BEFORE clicking.
-
-    This used to say only "a company would like a quote" — a vendor could not tell the route, the
-    date or the scope without clicking, so there was no reason to click. The brief goes IN the
-    mail, and so does what we expect back. A vendor who cannot price does not reply, and their
-    silence would read as "suppliers don't respond" when the truth is "we asked badly".
-
-    Escape before interpolating. `supplier_name` is NOT trusted (the catalog is partly
-    crowd-sourced and partly LLM-scraped) and the brief now carries EMPLOYEE free text
-    (special_items, notes). This HTML is sent from our domain to an external company, so an
-    unescaped value would let a user inject markup — including a link — into mail that appears to
-    come from us. That is a phishing vector, not a rendering bug.
-    """
-    safe_name = escape(supplier_name or "")
-    safe_link = escape(link, quote=True)
-    rows = "".join(
-        f"""<tr>
-              <td style="padding:4px 12px 4px 0;color:#64748b;white-space:nowrap">{escape(r['label'])}</td>
-              <td style="padding:4px 0;color:#0b2b43;font-weight:600">{escape(r['value'])}</td>
-            </tr>"""
-        for r in (brief_rows or [])
-    )
-    brief_html = (
-        f'<table style="border-collapse:collapse;margin:16px 0;font-size:14px">{rows}</table>'
-        if rows else ""
-    )
-    asks_html = ""
-    if deadline:
-        asks = "".join(f"<li style='margin-bottom:4px'>{escape(e)}</li>" for e in RESPONSE_EXPECTATIONS)
-        asks_html = (
-            f'<p style="margin-bottom:6px"><strong>What we need back by {escape(deadline)}:</strong></p>'
-            f'<ul style="margin-top:0;padding-left:18px;font-size:14px;color:#334155">{asks}</ul>'
-        )
-    return f"""
-      <div style="font-family:Inter,Arial,sans-serif;color:#0b2b43;line-height:1.5;max-width:560px">
-        <p>Hello{(' ' + safe_name) if safe_name else ''},</p>
-        <p>A company is relocating an employee and would like a quote from you for the move below.</p>
-        {brief_html}
-        {asks_html}
-        <p><a href="{safe_link}"
-              style="display:inline-block;background:#1f8e8b;color:#fff;padding:12px 20px;
-                     border-radius:8px;text-decoration:none;font-weight:600">
-             Send your quote
-           </a></p>
-        <p style="color:#64748b;font-size:13px">
-          There is no account to create and nothing to install. The link is unique to you and
-          expires in 14 days.
-        </p>
-        <p style="color:#64748b;font-size:13px">ReloPass</p>
-      </div>
-    """
+    """Thin wrapper: invite HTML comes from the pack renderer (AIQ-2371)."""
+    from .rfq_email_templates import render
+    return render(
+        "supplier_rfq_invite",
+        _invite_vars(supplier_name, link, brief_rows, deadline, rfq_ref, service_labels),
+    )["html"]
 
 
-def rfq_email_subject(brief_rows: Optional[List[Dict[str, str]]] = None) -> str:
-    """A vendor triages on the subject line alone. Put the route in it, so they can tell at a
-    glance whether this is even a job they cover."""
+def rfq_email_subject(
+    brief_rows: Optional[List[Dict[str, str]]] = None,
+    rfq_ref: str = "",
+) -> str:
+    """A vendor triages on the subject line alone. Known route stays the existing
+    household-move subject so dispatch tests keep their contract; unknown route
+    uses the pack fallback."""
     by = {r["label"]: r["value"] for r in (brief_rows or [])}
     frm, to = by.get("Move from"), by.get("Move to")
     if frm and to and frm != "Not specified" and to != "Not specified":
         return f"Quote request: household move, {frm} → {to}"
-    return "A relocation company would like a quote from you"
+    from .rfq_email_templates import render
+    return render(
+        "supplier_rfq_invite",
+        _invite_vars("", "", brief_rows, None, rfq_ref),
+    )["subject"]
+
+
+def send_gated_supplier_email(
+    *,
+    to_email: str,
+    verified: bool,
+    actor_email: Optional[str],
+    template_id: str,
+    variables: Dict[str, Any],
+    request_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Winner / loser / ack sends. Same gates as the invite. Never mints a new token."""
+    if not _supplier_email_live():
+        return {"status": "gate_off", "sent": False}
+    email = (to_email or "").strip()
+    if not email:
+        return {"status": "no_address", "sent": False}
+    domain = email.split("@")[-1].lower() if "@" in email else ""
+    if domain in _PERSONAL_DOMAINS:
+        return {"status": "personal_domain", "sent": False}
+    if not verified:
+        return {"status": "unverified", "sent": False}
+    if looks_like_test_email(actor_email):
+        return {"status": "test_persona", "sent": False}
+    from .rfq_email_templates import render
+    from .assignment_invite_email import _resend_send
+    rendered = render(template_id, variables)
+    return _resend_send(
+        to_email=email,
+        subject=rendered["subject"],
+        plain=rendered["text"],
+        html=rendered["html"],
+        request_id=request_id,
+        context=f"rfq:{template_id}",
+        reply_to="support@relopass.com",
+        log_body=False,
+    )
 
 
 def resolve_rfq_targets(rfq_id: str) -> List[Dict[str, Any]]:
@@ -327,14 +351,19 @@ def dispatch_supplier_links(
     brief_rows: List[Dict[str, str]] = []
     deadline = respond_by()
     subject = ""
+    rfq_ref = ""
+    service_labels = ""
     if mode == "email":
         try:
             rfq = db.get_rfq(rfq_id) or {}
+            rfq_ref = str(rfq.get("rfq_ref") or "")
+            keys = [str(i.get("service_key") or "") for i in (rfq.get("items") or []) if i.get("service_key")]
+            service_labels = ", ".join(k for k in keys if k)
             for item in rfq.get("items") or []:
                 brief_rows.extend(render_brief_lines(item.get("requirements") or {}))
         except Exception:
             log.warning("AIQ-1521 could not build the brief for rfq=%s — sending without it", rfq_id)
-        subject = rfq_email_subject(brief_rows)
+        subject = rfq_email_subject(brief_rows, rfq_ref=rfq_ref)
 
     for target in targets:
         email = (target.get("email") or "").strip()
@@ -452,7 +481,10 @@ def dispatch_supplier_links(
                         "from": EMAIL_FROM,
                         "to": [email],
                         "subject": subject,
-                        "html": rfq_email_html(name, link, brief_rows, deadline),
+                        "html": rfq_email_html(
+                            name, link, brief_rows, deadline,
+                            rfq_ref=rfq_ref, service_labels=service_labels,
+                        ),
                     },
                     timeout=15,
                 )

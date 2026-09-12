@@ -108,6 +108,38 @@ export const SupplierQuotePage: React.FC = () => {
     );
   }
 
+  if (done && rfq) {
+    return (
+      <Shell>
+        <h1 className="text-xl font-semibold text-[#0b2b43]">Thank you — your quote is with them</h1>
+        <p className="mt-2 text-slate-600">
+          The company will be in touch directly if they’d like to go ahead. You don’t need to do
+          anything else.
+        </p>
+        <p className="mt-1 text-sm text-slate-500">Request {rfq.rfq_ref}</p>
+        {(rfq.items ?? []).map((it) => (
+          <div key={it.service_key} className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-[#0b2b43]">
+              {SERVICE_LABELS[it.service_key] || it.service_key}
+            </p>
+            <table className="mt-3 w-full text-sm">
+              <tbody>
+                {it.brief.map((row) => (
+                  <tr key={row.label} className="align-top">
+                    <td className="w-40 py-1 pr-3 text-slate-500">{row.label}</td>
+                    <td className={`py-1 font-medium ${row.value === 'Not specified' ? 'text-slate-500 italic' : 'text-[#0b2b43]'}`}>
+                      {row.value}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </Shell>
+    );
+  }
+
   if (done) {
     return (
       <Shell>
