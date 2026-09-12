@@ -48,7 +48,7 @@ describe('ComposeNewMessage (AIQ-1326 — Inbox new-thread compose)', () => {
     render(<ComposeNewMessage open isHr onClose={onClose} onSent={onSent} />);
 
     const select = await screen.findByRole('combobox');
-    fireEvent.change(select, { target: { value: 'aid-2' } });
+    fireEvent.change(select, { target: { value: 'r-1' } });
     fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Welcome aboard' } });
     fireEvent.click(screen.getByRole('button', { name: /send/i }));
 
@@ -107,5 +107,30 @@ describe('ComposeNewMessage (AIQ-1326 — Inbox new-thread compose)', () => {
     mockHr.listAssignments.mockResolvedValue({ assignments: [], total: 0 });
     render(<ComposeNewMessage open isHr onClose={() => {}} onSent={() => {}} />);
     expect(await screen.findByText(/no assigned employees to message yet/i)).toBeInTheDocument();
+  });
+
+  it('does not put assignment UUIDs in option values', async () => {
+    const uuid = '11111111-2222-4333-8444-555555555555';
+    mockHr.listAssignments.mockResolvedValue({
+      assignments: [
+        hrAssignment({ id: uuid }),
+        hrAssignment({ id: 'aid-2', employeeFirstName: 'Bob', employeeLastName: 'Martin' }),
+      ],
+      total: 2,
+    });
+    render(<ComposeNewMessage open isHr onClose={() => {}} onSent={() => {}} />);
+    const select = await screen.findByRole('combobox');
+    expect(select.innerHTML).not.toContain(uuid);
+    expect(select.innerHTML).toContain('value="r-0"');
+  });
+
+  it('points an unlinked employee at their dashboard', async () => {
+    mockEmp.getAssignmentsOverview.mockResolvedValue({ linked: [], pending: [] });
+    render(<ComposeNewMessage open isHr={false} onClose={() => {}} onSent={() => {}} />);
+    expect(await screen.findByText(/no HR contact is linked/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /go to your dashboard/i })).toHaveAttribute(
+      'href',
+      '/employee/dashboard'
+    );
   });
 });

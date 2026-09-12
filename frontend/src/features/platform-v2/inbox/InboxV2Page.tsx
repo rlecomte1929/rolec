@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   Archive,
   Briefcase,
@@ -26,6 +26,7 @@ import {
 import type { Conversation, Message } from '../../messages/types';
 import { AppShell } from '../../../components/AppShell';
 import { ComposeNewMessage } from './ComposeNewMessage';
+import { isHrInboxPath } from './inboxPersona';
 
 type MailboxKey = 'inbox' | 'hr' | 'vendors' | 'authorities' | 'family' | 'sent' | 'archive';
 
@@ -36,15 +37,24 @@ interface MailboxDef {
   match: (c: Conversation) => boolean;
 }
 
-// M-08 (AIQ-1266): contextual empty states so a new employee knows WHEN messages
-// will arrive, instead of a bare "No threads in this mailbox."
-const MAILBOX_EMPTY_COPY: Record<MailboxKey, string> = {
+// M-08 (AIQ-1266) / AIQ-2368: one-line empty states per mailbox, role-aware.
+const MAILBOX_EMPTY_COPY_EMPLOYEE: Record<MailboxKey, string> = {
   inbox: 'Your HR team will message you here once your intake is reviewed. Your first message usually arrives within 2 business days.',
   hr: 'Messages from your HR team appear here once your intake is reviewed.',
   vendors: 'Vendor quotes appear here after you request services from the Services page.',
   authorities: 'Messages from authorities appear here during the immigration process.',
   family: 'Family-related messages appear here.',
   sent: 'Messages you send appear here.',
+  archive: 'Archived conversations appear here.',
+};
+
+const MAILBOX_EMPTY_COPY_HR: Record<MailboxKey, string> = {
+  inbox: 'No conversations yet. Open a case and message the employee to start a thread.',
+  hr: 'Messages you send to employees appear here.',
+  vendors: 'Vendor threads appear here when a supplier is on a case.',
+  authorities: 'Authority correspondence appears here when it is added to a case.',
+  family: 'Family-related threads appear here when they are part of a case.',
+  sent: 'Messages you have sent to employees appear here.',
   archive: 'Archived conversations appear here.',
 };
 
@@ -157,11 +167,22 @@ function deriveStakeholders(conversations: Conversation[]): Stakeholder[] {
 }
 
 export function InboxV2Page() {
+  const { pathname } = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const role = (getAuthItem('relopass_role') || '').toUpperCase();
   const userId = getAuthItem('relopass_id') || '';
   const userName = getAuthItem('relopass_name') || getAuthItem('relopass_email') || 'You';
-  const isHrLike = role === 'HR' || role === 'ADMIN';
+  // AIQ-2362: /hr/messages is always the HR inbox, even if the role switcher
+  // last left localStorage as EMPLOYEE.
+  const isHrLike = isHrInboxPath(pathname);
+  const mailboxes = useMemo(
+    () =>
+      MAILBOXES.map((m) =>
+        m.key === 'hr' ? { ...m, label: isHrLike ? 'Sent to employees' : 'From HR' } : m
+      ),
+    [isHrLike]
+  );
+  const emptyCopy = isHrLike ? MAILBOX_EMPTY_COPY_HR : MAILBOX_EMPTY_COPY_EMPLOYEE;
 
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -183,6 +204,7 @@ export function InboxV2Page() {
   // list refetch surfaces its freshly-created thread.
   const [composeOpen, setComposeOpen] = useState(false);
   const [pendingSelectAid, setPendingSelectAid] = useState<string | null>(null);
+  const [hasLinkedAssignment, setHasLinkedAssignment] = useState(isHrLike);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const conversationsRef = useRef<Conversation[]>([]);
   conversationsRef.current = conversations;
@@ -256,7 +278,9 @@ export function InboxV2Page() {
         if (cancelled) return;
         const labels = new Map<string, string>();
         type LinkedRow = { assignment_id?: string; company?: { name?: string } };
-        for (const row of (overview.linked as LinkedRow[] | undefined) ?? []) {
+        const linked = (overview.linked as LinkedRow[] | undefined) ?? [];
+        setHasLinkedAssignment(linked.some((row) => Boolean(row.assignment_id)));
+        for (const row of linked) {
           const aid = row.assignment_id;
           const nm = row.company?.name?.trim();
           if (aid && nm) labels.set(aid, nm);
@@ -273,6 +297,7 @@ export function InboxV2Page() {
       } catch {
         if (!cancelled) {
           setConversations([]);
+          setHasLinkedAssignment(false);
           setListError('Could not load messages.');
         }
       } finally {
@@ -309,7 +334,7 @@ export function InboxV2Page() {
 
   // Default-select first conversation in the active mailbox once loaded.
   const filteredConversations = useMemo(() => {
-    const def = MAILBOXES.find((m) => m.key === mailbox) ?? MAILBOXES[0]!;
+    const def = mailboxes.find((m) => m.key === mailbox) ?? mailboxes[0]!;
     const needle = debouncedSearch.toLowerCase();
     const matches = conversations.filter((c) => {
       if (!def.match(c)) return false;
@@ -320,7 +345,7 @@ export function InboxV2Page() {
     return matches.sort(
       (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
     );
-  }, [conversations, mailbox, debouncedSearch]);
+  }, [conversations, mailbox, debouncedSearch, mailboxes]);
 
   useEffect(() => {
     if (activeId && filteredConversations.some((c) => c.id === activeId)) return;
@@ -344,7 +369,7 @@ export function InboxV2Page() {
         const built = buildConversationsFromMessages(
           (res.messages || []) as Record<string, unknown>[],
           userId,
-          role || 'HR',
+          isHrLike ? 'HR' : role || 'EMPLOYEE',
           userName
         );
         const msgs = built[0]?.messages ?? [];
@@ -392,13 +417,13 @@ export function InboxV2Page() {
       archive: 0,
     };
     for (const c of conversations) {
-      for (const m of MAILBOXES) {
+      for (const m of mailboxes) {
         if (m.key === 'archive') continue;
         if (m.match(c)) counts[m.key] += 1;
       }
     }
     return counts;
-  }, [conversations]);
+  }, [conversations, mailboxes]);
 
   const stakeholders = useMemo(() => deriveStakeholders(conversations), [conversations]);
 
@@ -499,7 +524,13 @@ export function InboxV2Page() {
   }, [activeConversation]);
 
   return (
-    <AppShell section={role === 'EMPLOYEE' ? 'Employee' : 'HR Operations'} title="Inbox" subtitle={undefined} wide>
+    <AppShell
+      section={isHrLike ? 'HR Operations' : 'Employee'}
+      navRole={isHrLike ? 'HR' : 'EMPLOYEE'}
+      title="Inbox"
+      subtitle={undefined}
+      wide
+    >
       <div className="-mx-6 -my-6 flex h-[calc(100vh-10rem)] min-h-[560px] flex-col overflow-hidden bg-slate-100">
         {/* E4: breadcrumb removed — the AppShell already renders "Employee / Inbox".
             Keep just the thread count to avoid a duplicated breadcrumb trail. */}
@@ -516,7 +547,7 @@ export function InboxV2Page() {
               Mailboxes
             </div>
             <nav className="px-2">
-              {MAILBOXES.map((m) => {
+              {mailboxes.map((m) => {
                 const count = mailboxCounts[m.key];
                 const active = mailbox === m.key;
                 const Icon = m.icon;
@@ -581,12 +612,13 @@ export function InboxV2Page() {
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
               <div className="flex items-baseline gap-2">
                 <h2 className="text-sm font-semibold text-slate-900">
-                  {MAILBOXES.find((m) => m.key === mailbox)?.label || 'Inbox'}
+                  {mailboxes.find((m) => m.key === mailbox)?.label || 'Inbox'}
                 </h2>
                 <span className="text-xs text-slate-500">
                   {filteredConversations.length} thread{filteredConversations.length === 1 ? '' : 's'}
                 </span>
               </div>
+              {(isHrLike || hasLinkedAssignment) && (
               <Button unstyled
                 type="button"
                 title="Start a new message"
@@ -598,6 +630,7 @@ export function InboxV2Page() {
                 </svg>
                 New
               </Button>
+              )}
             </div>
             <div className="px-3 py-2">
               <Input unstyled
@@ -626,9 +659,7 @@ export function InboxV2Page() {
                 </div>
               ) : filteredConversations.length === 0 ? (
                 <div className="px-4 py-6 text-sm text-slate-500">
-                {isHrLike && mailbox === 'inbox'
-                  ? 'No conversations yet. Open a case and message the employee to start a thread.'
-                  : MAILBOX_EMPTY_COPY[mailbox]}
+                {emptyCopy[mailbox]}
               </div>
               ) : (
                 filteredConversations.map((c) => {
@@ -656,6 +687,9 @@ export function InboxV2Page() {
                           {formatThreadTime(c.last_message_at)}
                         </span>
                       </div>
+                      {c.list_subtitle ? (
+                        <div className="mt-0.5 truncate text-[11px] text-slate-500">{c.list_subtitle}</div>
+                      ) : null}
                       <div className="mt-0.5 flex items-baseline justify-between gap-3">
                         <span className="truncate text-[13px] text-slate-700">{subject}</span>
                         {unread ? (
@@ -822,9 +856,13 @@ export function InboxV2Page() {
                   <p className="mt-4 text-sm text-slate-500">Messages could not be loaded.</p>
                 ) : (
                   <>
-                    <p className="mt-4 text-sm font-medium text-slate-700">No conversation selected</p>
+                    <p className="mt-4 text-sm font-medium text-slate-700">
+                      {filteredConversations.length === 0 ? mailboxes.find((m) => m.key === mailbox)?.label || 'Inbox' : 'No conversation selected'}
+                    </p>
                     <p className="mt-1 max-w-xs text-xs text-slate-500">
-                      Pick a thread on the left. Threads appear once HR opens a case or a vendor sends a quote.
+                      {filteredConversations.length === 0
+                        ? emptyCopy[mailbox]
+                        : 'Pick a thread on the left. Threads appear once HR opens a case or a vendor sends a quote.'}
                     </p>
                   </>
                 )}
