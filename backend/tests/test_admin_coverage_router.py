@@ -191,6 +191,7 @@ def test_totals(sqlite_sessionmaker):
     assert set(body["serving_categories"]) == {
         "banks", "movers", "schools", "legal_admin", "tax_finance", "housing_agencies",
         "temp_accommodation", "medical", "language_integration",  # [ANDREA-P1] settle-in categories
+        "partner_career",  # [DENIS-NOFR] dual-career / spouse employment support
     }
 
 
