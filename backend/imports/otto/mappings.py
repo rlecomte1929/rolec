@@ -51,6 +51,12 @@ NATIONALITY_CLASSES: Dict[str, List[str]] = {
     "EEA": [OWN_NATIONAL, EU_EEA],
     "non-EEA": [THIRD_COUNTRY],
     "non-EU": [THIRD_COUNTRY],
+    # Research passes on a visa corridor emit the class name itself as the nationality value.
+    # Accepting it (and dash/underscore variants) is safe: it scopes to third-country nationals,
+    # exactly like non-EEA/non-EU — it never defaults to "applies to everyone".
+    "THIRD_COUNTRY": [THIRD_COUNTRY],
+    "third_country": [THIRD_COUNTRY],
+    "third-country": [THIRD_COUNTRY],
 }
 
 #: `applies_to.status` -> `requirement_items.purpose`. The target enum is exactly
