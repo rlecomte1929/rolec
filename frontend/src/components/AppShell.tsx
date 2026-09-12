@@ -4,7 +4,8 @@ import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { authAPI } from '../api/client';
 import { useBrandingConfig } from '../hooks/useBrandingConfig';
 import { getNavigationError } from '../navigation/safeNavigate';
-import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
+import { buildRoute, homeRouteKeyForRole, ROUTE_DEFS } from '../navigation/routes';
+import { employeeUnlinkedActionCopy, employeeUnlinkedBannerClassName } from './employeeUnlinkedBanner';
 import { useRegisterNav } from '../navigation/registry';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { setPreferredEmployeeAssignmentId } from '../utils/employeeAssignmentScope';
@@ -14,6 +15,7 @@ import { ChangelogBell } from './ChangelogBell';
 import { NotificationsBell } from './NotificationsBell';
 import { RoleSwitcher } from './RoleSwitcher';
 import { Breadcrumb } from './Breadcrumb';
+import { shouldShowAppShellBreadcrumb } from './breadcrumbVisibility';
 import { Button } from './antigravity/Button';
 import { CompanyBrand } from './CompanyBrand';
 import { FeedbackWidget } from './FeedbackWidget';
@@ -55,7 +57,7 @@ const LogoutButton: React.FC = () => {
         }
       }}
       disabled={isLoggingOut}
-      className="text-xs text-slate-500 hover:text-slate-800 disabled:opacity-60"
+      className="inline-flex min-h-6 items-center text-xs text-slate-500 hover:text-slate-800 disabled:opacity-60"
     >
       {isLoggingOut ? 'Logging out…' : 'Log out'}
     </Button>
@@ -160,8 +162,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
 
   const sbRole = sidebarRole(role);
   const userInitials = deriveInitials(name || identity || 'RP');
+  const onEmployeeDashboard = location.pathname === ROUTE_DEFS.employeeDashboard.path;
   const showEmployeeBanner =
-    sbRole !== 'ADMIN' && isEmployeeRole && !employeeAssignmentLoading && linkedCount === 0;
+    sbRole !== 'ADMIN' &&
+    isEmployeeRole &&
+    !employeeAssignmentLoading &&
+    linkedCount === 0 &&
+    !onEmployeeDashboard;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800">
@@ -259,10 +266,11 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         <GlobalApiErrorBanner />
 
         {showEmployeeBanner && (
-          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-sm text-amber-900 shrink-0">
-            <span className="mr-2">⏳</span>
+          <div className={employeeUnlinkedBannerClassName}>
+            <span className="mr-2" aria-hidden="true">ℹ</span>
             Your account isn&apos;t linked to a relocation case yet — most features are on hold.
-            If HR set one up for your email, open the <strong>Dashboard</strong> to accept it (a case for your verified email links automatically).
+            If HR set one up for your email, {employeeUnlinkedActionCopy(onEmployeeDashboard)}
+            {' '}(a case for your verified email links automatically).
           </div>
         )}
 
@@ -303,7 +311,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
           >
             {title && (
               <div className="mb-6">
-                <Breadcrumb section={section} title={title} homeHref={homeHref} parent={parent} className="mb-3" />
+                {shouldShowAppShellBreadcrumb(parent) ? (
+                  <Breadcrumb section={section} title={title} homeHref={homeHref} parent={parent} className="mb-3" />
+                ) : null}
                 <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
                 {subtitle && <p className="text-sm text-slate-500 mt-1 text-pretty break-words">{subtitle}</p>}
               </div>

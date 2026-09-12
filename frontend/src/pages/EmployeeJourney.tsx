@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/antigravity';
@@ -7,6 +7,11 @@ import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { EmployeeNoCaseOnboarding } from '../features/employee-journey/EmployeeNoCaseOnboarding';
+import {
+  assignmentStatusPillCopy,
+  EMPLOYEE_CASE_CODE_EXAMPLE,
+  EMPLOYEE_CASE_LINK_INSTRUCTION,
+} from '../features/employee-journey/employeeCaseLinkCopy';
 import { isIntakeComplete } from '../features/employee-journey/caseStage';
 import { INTAKE_TOTAL_STEPS } from '../features/platform-v2/intake/intakeSteps';
 import { getAuthItem } from '../utils/demo';
@@ -100,14 +105,16 @@ function claimStateLabel(state: string): string {
   return statusLabel(state);
 }
 
-function ManualClaimInstructions({ signedInPrincipal }: { signedInPrincipal: string | null }) {
+export function ManualClaimInstructions({ signedInPrincipal }: { signedInPrincipal: string | null }) {
+  const headingId = useId();
   return (
     <div
       className="mt-4 rounded-lg border border-[#93c5fd] bg-[#eff6ff] px-4 py-3 text-sm text-[#1e3a5f]"
       role="region"
-      aria-label="How to fill the claim form"
+      aria-labelledby={headingId}
+      data-testid="manual-claim-instructions"
     >
-      <div className="font-semibold text-[#0b2b43] mb-2">How to connect your case</div>
+      <div id={headingId} className="font-semibold text-[#0b2b43] mb-2">How to connect your case</div>
       <ol className="list-decimal pl-5 space-y-2 text-[#334155]">
         <li>
           <strong className="text-[#0b2b43]">Your email:</strong> The work email HR used when they set up your move.
@@ -116,7 +123,8 @@ function ManualClaimInstructions({ signedInPrincipal }: { signedInPrincipal: str
           {/* [BUG-260804-1327] Name the source explicitly. Reporters kept trying the short
               Reference shown on the dashboard, which is a display label and is not accepted. */}
           <strong className="text-[#0b2b43]">Code from HR:</strong> The case code in HR&apos;s invitation{' '}
-          <strong className="text-[#0b2b43]">email</strong> (a long series of letters and numbers). The short
+          <strong className="text-[#0b2b43]">email</strong> — a long string of letters and numbers separated
+          by dashes, like <span className="font-mono">{EMPLOYEE_CASE_CODE_EXAMPLE}</span>. The short
           reference shown on a case card is a label, not this code.
         </li>
       </ol>
@@ -162,6 +170,7 @@ export const EmployeeJourney: React.FC = () => {
     linkedSummaries,
     pendingSummaries,
     overviewError,
+    overviewErrorKind,
   } = useEmployeeAssignment();
   const [error, setError] = useState('');
   const [claimId, setClaimId] = useState('');
@@ -465,7 +474,7 @@ export const EmployeeJourney: React.FC = () => {
         reason: 'email_in_assignment_field',
       });
       setError(
-        'That looks like an email address — paste the case code from HR instead. It looks like abc-123-….'
+        `That looks like an email address — paste the case code from HR instead. It looks like ${EMPLOYEE_CASE_CODE_EXAMPLE}.`
       );
       return;
     }
@@ -499,9 +508,9 @@ export const EmployeeJourney: React.FC = () => {
           CLAIM_ASSIGNMENT_NOT_PENDING:
             'This case code is already claimed by another account. If that wasn\'t you, contact your HR team.',
           CLAIM_ASSIGNMENT_IDENTIFIER_MISMATCH:
-            'We couldn\'t find that case code. Double-check the email from HR — codes look like `abc-123-…`.',
+            `We couldn't find that case code. Double-check the email from HR — codes look like ${EMPLOYEE_CASE_CODE_EXAMPLE}.`,
           CLAIM_MISSING_REQUEST_IDENTIFIER:
-            'We couldn\'t find that case code. Double-check the email from HR — codes look like `abc-123-…`.',
+            `We couldn't find that case code. Double-check the email from HR — codes look like ${EMPLOYEE_CASE_CODE_EXAMPLE}.`,
         };
         const friendlyMessage = (code && perModeMessages[code])
           ?? getApiErrorMessage(err, 'Something went wrong linking your case. Please try again or contact HR.');
@@ -572,30 +581,30 @@ export const EmployeeJourney: React.FC = () => {
     if (hasLinked) {
       return (
         <Badge variant="success" size="sm">
-          {linkedCount === 1 ? 'Linked to you: 1 case' : `Linked to you: ${linkedCount} cases`}
+          {assignmentStatusPillCopy('linked')}
         </Badge>
       );
     }
     if (hasPendingOnly) {
       return (
         <Badge variant="info" size="sm">
-          {pendingCount === 1 ? 'Pending assignment to link' : `${pendingCount} pending assignments to link`}
+          {assignmentStatusPillCopy('pending')}
         </Badge>
       );
     }
     if (linkRec?.linkedContactIds?.length && !(linkRec.attachedAssignmentIds && linkRec.attachedAssignmentIds.length)) {
       return (
         <Badge variant="info" size="sm">
-          Connected: waiting for an assignment from HR
+          {assignmentStatusPillCopy('waiting')}
         </Badge>
       );
     }
     return (
       <Badge variant="neutral" size="sm">
-        No case linked yet: use email HR entered or claim below
+        {assignmentStatusPillCopy('unlinked')}
       </Badge>
     );
-  }, [linkRec, hasLinked, hasPendingOnly, linkedCount, pendingCount]);
+  }, [linkRec, hasLinked, hasPendingOnly]);
 
   const shellTitle = assignmentLoading
     ? 'Welcome'
@@ -610,7 +619,7 @@ export const EmployeeJourney: React.FC = () => {
       ? 'Open a case or pick up where you left off.'
       : hasPendingOnly
         ? 'Accept your pending case below, then open it to get started.'
-        : 'Enter the case code from HR to link your case. A case HR set up for your verified email links automatically when you sign in.';
+        : 'Your case appears here once it is linked.';
 
   return (
     <AppShell title={shellTitle} subtitle={shellSubtitle} wide>
@@ -631,11 +640,20 @@ export const EmployeeJourney: React.FC = () => {
       ) : null}
 
       {!assignmentLoading && overviewError ? (
-        <Alert variant="warning" className="mb-6" title="Could not load assignments">
+        <Alert variant="error" className="mb-6" title="Could not load assignments">
           {overviewError}{' '}
-          <Button variant="outline" className="ml-2 mt-2 sm:mt-0" onClick={() => void refetchAssignment()}>
-            Try again
-          </Button>
+          {overviewErrorKind === 'unauthorized' ? (
+            <Link
+              to="/auth?mode=login&reason=session_expired"
+              className="ml-2 mt-2 inline-flex min-h-6 items-center text-sm font-medium text-accent-600 hover:text-accent-700 sm:mt-0"
+            >
+              Sign in again
+            </Link>
+          ) : overviewErrorKind === 'forbidden' ? null : (
+            <Button variant="ghost" size="sm" className="ml-2 mt-2 sm:mt-0" onClick={() => void refetchAssignment()}>
+              Try again
+            </Button>
+          )}
         </Alert>
       ) : null}
 
@@ -678,9 +696,7 @@ export const EmployeeJourney: React.FC = () => {
         </div>
       ) : null}
 
-      {!assignmentLoading && showPrimaryManualClaimPage ? <EmployeeNoCaseOnboarding /> : null}
-
-      {!assignmentLoading ? (
+      {!assignmentLoading && !showPrimaryManualClaimPage ? (
         <Card padding="lg" className="mb-6">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <div className="text-lg font-semibold text-[#0b2b43]">Assignment status</div>
@@ -691,12 +707,12 @@ export const EmployeeJourney: React.FC = () => {
               ? 'Your active cases are below. If HR sent you a separate code, use manual entry at the bottom.'
               : hasPendingOnly
                 ? 'HR has set up a case for you. Accept it below to get started.'
-                : 'Sign in with the email HR used for your move, or enter the case code HR sent you.'}
+                : 'No case is linked yet.'}
           </p>
         </Card>
       ) : null}
 
-      {!assignmentLoading ? (
+      {!assignmentLoading && !showPrimaryManualClaimPage ? (
         <Card
           id="employee-hub-linked-assignments"
           padding="lg"
@@ -858,16 +874,10 @@ export const EmployeeJourney: React.FC = () => {
       ) : null}
 
       {!assignmentLoading && showPrimaryManualClaimPage ? (
-        <Card padding="lg" className="mb-6 border border-[#cbd5e1]">
-          <div className="text-lg font-semibold text-[#0b2b43]">No relocation assigned yet</div>
-          <p className="text-sm text-[#4b5563] mt-2">
-            Ask your HR team to create your case. Once they do, it appears here automatically — no code needed.
-          </p>
-          <div className="mt-6 border-t border-[#e2e8f0] pt-5 text-base font-semibold text-[#0b2b43]">
-            Already have a case code from HR?
-          </div>
-          <p className="text-sm text-[#4b5563] mt-1">
-            Enter the email HR used and the code HR sent you.
+        <Card padding="lg" className="mb-6 border border-[#cbd5e1]" id="employee-unlinked-empty-state">
+          <EmployeeNoCaseOnboarding embedded />
+          <p data-testid="employee-case-link-instruction" className="text-sm text-[#4b5563] mt-4">
+            {EMPLOYEE_CASE_LINK_INSTRUCTION}
           </p>
           <ManualClaimInstructions signedInPrincipal={signedInPrincipal} />
           <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -883,7 +893,7 @@ export const EmployeeJourney: React.FC = () => {
               value={claimId}
               onChange={setClaimId}
               label="Step 2: Case code from HR"
-              placeholder="The code HR sent you — it looks like abc-123-…"
+              placeholder={EMPLOYEE_CASE_CODE_EXAMPLE}
               fullWidth
             />
           </div>
@@ -946,7 +956,7 @@ export const EmployeeJourney: React.FC = () => {
                   value={claimId}
                   onChange={setClaimId}
                   label="Step 2: Code from HR"
-                  placeholder="The code HR sent you (long string of letters and numbers)"
+                  placeholder={EMPLOYEE_CASE_CODE_EXAMPLE}
                   fullWidth
                 />
               </div>

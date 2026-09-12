@@ -13,8 +13,10 @@ describe('EmployeeNoCaseOnboarding', () => {
     expect(screen.getByTestId('employee-no-case-onboarding')).toBeInTheDocument();
     expect(screen.getByText(/your hr team is setting things up/i)).toBeInTheDocument();
     expect(screen.getByText(/nothing's gone wrong/i)).toBeInTheDocument();
-    // keeps the self-serve claim path (CTA kept), not a dead-end
-    expect(screen.getByText(/case code from hr/i)).toBeInTheDocument();
+    // Linking how-to lives once, on the claim card (AIQ-2288).
+    expect(screen.queryByText(/case code from hr/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/link it below/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no code needed/i)).not.toBeInTheDocument();
   });
 
   it('includes the (backed) email-notice line and omits the unavailable HR-contact link', () => {
@@ -26,5 +28,11 @@ describe('EmployeeNoCaseOnboarding', () => {
     // HR-contact data isn't available to a no-case employee → no contact link.
     expect(screen.queryByText(/contact your hr team directly/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('can render without its own card so the claim form can host it', () => {
+    const { container } = render(<EmployeeNoCaseOnboarding embedded />);
+    expect(screen.getByTestId('employee-no-case-onboarding')).toBeInTheDocument();
+    expect(container.querySelector('.rounded-xl')).toBeNull();
   });
 });

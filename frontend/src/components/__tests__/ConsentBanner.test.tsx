@@ -23,6 +23,11 @@ vi.mock('../../api/client', () => ({
   invalidateApiCache: vi.fn(),
 }));
 
+vi.mock('../../api/productFeedback', () => ({
+  submitProductFeedback: vi.fn(),
+  getMyReports: vi.fn(),
+}));
+
 // posthog-js is a passthrough here — opt in/out is a no-op until initAnalytics
 // runs with a key (never in tests). We assert the persisted-decision contract,
 // which is what actually gates capturing on the next SDK load.
@@ -66,6 +71,7 @@ describe('ConsentBanner', () => {
     renderBanner();
     expect(screen.getByRole('dialog', { name: /analytics consent/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /accept analytics/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /privacy policy/i }).className).toContain('min-h-6');
   });
 
   it('Accept persists "granted" and dismisses the banner', () => {
@@ -133,5 +139,31 @@ describe('ConsentBanner', () => {
     store.set('relopass_role', 'ADMIN');
     fireEvent.click(screen.getByRole('button', { name: /go admin/i }));
     expect(screen.queryByRole('dialog', { name: /analytics consent/i })).not.toBeInTheDocument();
+  });
+
+  // AIQ-2272: the Feedback FAB is later in the DOM at the same z-index, so
+  // Accept was unclickable. The banner now publishes an offset + stacks above.
+  it('publishes a stacking offset while visible and clears it on Accept', () => {
+    renderBanner();
+    expect(document.documentElement.getAttribute('data-consent-banner')).toBe('open');
+    expect(document.documentElement.style.getPropertyValue('--consent-banner-offset')).toMatch(/px$/);
+
+    fireEvent.click(screen.getByRole('button', { name: /accept analytics/i }));
+    expect(document.documentElement.getAttribute('data-consent-banner')).toBeNull();
+    expect(document.documentElement.style.getPropertyValue('--consent-banner-offset')).toBe('');
+  });
+
+  it('keeps Accept above the Feedback FAB so the click grants consent', async () => {
+    const { FeedbackWidget } = await import('../FeedbackWidget');
+    render(
+      <MemoryRouter>
+        <ConsentBanner />
+        <FeedbackWidget userId="u1" />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /accept analytics/i }));
+    expect(store.get(CONSENT_KEY)).toBe('granted');
+    expect(screen.queryByRole('dialog', { name: /analytics consent/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 });

@@ -122,11 +122,14 @@ export const ChangelogBell: React.FC = () => {
     return entries[0]?.date ?? null;
   }, [entries]);
 
-  const hasUnread = useMemo(() => {
-    if (!mostRecentDate) return false;
-    if (!seenDate) return true;
-    return mostRecentDate > seenDate;
-  }, [mostRecentDate, seenDate]);
+  const unreadCount = useMemo(() => {
+    if (!entries || entries.length === 0) return 0;
+    if (!seenDate) return entries.length;
+    return entries.filter((entry) => entry.date > seenDate).length;
+  }, [entries, seenDate]);
+  const hasUnread = unreadCount > 0;
+  const changelogBadge = unreadCount > 9 ? '9+' : String(unreadCount);
+  const changelogName = hasUnread ? `What's new, ${unreadCount} unread` : "What's new";
 
   const markAllRead = useCallback(() => {
     if (mostRecentDate) {
@@ -168,15 +171,14 @@ export const ChangelogBell: React.FC = () => {
 
   return (
     <div ref={containerRef} className="relative">
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {hasUnread ? changelogName : ''}
+      </span>
       <Button unstyled
         ref={buttonRef}
         type="button"
         onClick={handleToggle}
-        aria-label={
-          hasUnread
-            ? "What's new (new updates available)"
-            : "What's new"
-        }
+        aria-label={changelogName}
         aria-haspopup="dialog"
         aria-expanded={open}
         className="relative grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
@@ -199,9 +201,11 @@ export const ChangelogBell: React.FC = () => {
         {hasUnread && (
           <span
             aria-hidden="true"
-            className="absolute right-1 top-1 inline-block h-1.5 w-1.5 rounded-full bg-rose-500"
+            className="absolute -right-0.5 -top-0.5 inline-flex min-w-[15px] h-[15px] items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-semibold leading-none text-white"
             data-testid="changelog-bell-unread-dot"
-          />
+          >
+            {changelogBadge}
+          </span>
         )}
       </Button>
 

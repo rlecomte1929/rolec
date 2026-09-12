@@ -22,7 +22,8 @@ test.describe('AIQ-2285 retry / auth coherence', () => {
     // so a combined getByText regex is a Playwright strict-mode violation.
     await expect(page.getByRole('heading', { name: /could not load assignments/i })).toBeVisible();
     await expect(page.getByText(/this account cannot open employee assignments/i)).toBeVisible();
-    await page.getByRole('button', { name: /try again/i }).click();
+    // 403 is not transient — retry would loop the same forbidden response.
+    await expect(page.getByRole('button', { name: /try again/i })).toHaveCount(0);
     await expect(page).toHaveURL(/\/employee\/dashboard/);
     await expect(page.getByRole('heading', { name: /sign in/i })).toHaveCount(0);
     await expect(page.getByText(/content review pending/i)).toHaveCount(0);

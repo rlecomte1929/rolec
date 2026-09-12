@@ -144,15 +144,19 @@ export const NotificationsBell: React.FC = () => {
   );
 
   const badge = useMemo(() => (unread > 9 ? '9+' : String(unread)), [unread]);
+  const notificationsName = unread > 0 ? `Notifications, ${unread} unread` : 'Notifications';
 
   return (
     <div ref={containerRef} className="relative">
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {unread > 0 ? notificationsName : ''}
+      </span>
       <Button
         unstyled
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label={unread > 0 ? `Notifications (${unread} unread)` : 'Notifications'}
+        aria-label={notificationsName}
         aria-haspopup="dialog"
         aria-expanded={open}
         className="relative grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
@@ -161,7 +165,8 @@ export const NotificationsBell: React.FC = () => {
         {unread > 0 && (
           <span
             data-testid="notifications-bell-badge"
-            className="absolute -right-0.5 -top-0.5 inline-flex min-w-[15px] h-[15px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white"
+            aria-hidden="true"
+            className="absolute -right-0.5 -top-0.5 inline-flex min-w-[15px] h-[15px] items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-semibold leading-none text-white"
           >
             {badge}
           </span>

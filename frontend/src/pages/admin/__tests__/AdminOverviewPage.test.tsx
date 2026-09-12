@@ -9,7 +9,18 @@ import { getReviewSummary } from '../../../api/contentReview';
 import { AdminOverviewPage } from '../AdminOverviewPage';
 
 vi.mock('../AdminLayout', () => ({
-  AdminLayout: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
+  AdminLayout: ({
+    children,
+    subtitle,
+  }: {
+    children: React.ReactNode;
+    subtitle?: string;
+  }) => (
+    <main>
+      {subtitle ? <p data-testid="admin-today-subtitle">{subtitle}</p> : null}
+      {children}
+    </main>
+  ),
 }));
 
 vi.mock('../../../api/client', () => ({
@@ -66,13 +77,20 @@ describe('AdminOverviewPage metrics', () => {
     await waitFor(() => expect(within(screen.getByTestId('metric-tenants')).getByText('2')).toBeInTheDocument());
     expect(within(screen.getByTestId('metric-review-open')).getByText('6')).toBeInTheDocument();
     expect(within(screen.getByTestId('metric-prospects')).getByText('17')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Catalog\s+Coverage/i })).toHaveAttribute(
+      'href',
+      expect.stringContaining('coverage'),
+    );
     expect(screen.getByTestId('job-door-catalog')).toHaveTextContent('6 pending');
-    expect(screen.getByTestId('job-door-usage')).toBeInTheDocument();
+    expect(screen.getByTestId('job-door-catalog')).toHaveClass('hover:bg-slate-50');
+    expect(screen.getByTestId('job-door-usage')).toHaveTextContent('Companies');
     expect(screen.getByTestId('job-door-pipeline')).toHaveTextContent('17');
-    expect(screen.getByTestId('job-door-machine')).toBeInTheDocument();
+    expect(screen.getByTestId('job-door-machine')).toHaveTextContent('Feature flags');
     expect(screen.queryByTestId('module-companies')).not.toBeInTheDocument();
     expect(screen.queryByTestId('module-prospects')).not.toBeInTheDocument();
     expect(screen.queryByTestId('module-rag-quality')).not.toBeInTheDocument();
+    expect(screen.getByTestId('admin-today-subtitle')).toHaveTextContent('What needs attention today');
+    expect(screen.queryByText(/Executive and Ops stay nested/i)).not.toBeInTheDocument();
   });
 
   it('treats a real zero pending review as empty, not as a fake count', async () => {

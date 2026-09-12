@@ -46,6 +46,8 @@ describe('NotificationsBell', () => {
     listNotifications.mockResolvedValue([item({ id: 'a' }), item({ id: 'b' }), item({ id: 'c' })]);
     renderBell();
     await waitFor(() => expect(screen.getByTestId('notifications-bell-badge')).toHaveTextContent('3'));
+    expect(screen.getByRole('button', { name: 'Notifications, 3 unread' })).toBeInTheDocument();
+    expect(screen.getByText('Notifications, 3 unread').closest('[aria-live="polite"]')).toBeTruthy();
   });
 
   it('caps the badge at 9+', async () => {

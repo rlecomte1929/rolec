@@ -89,10 +89,13 @@ describe('ChangelogBell', () => {
     });
   });
 
-  it('shows the unread dot when seen-date is unset and there are entries', async () => {
+  it('shows the unread count when seen-date is unset and there are entries', async () => {
     mockChangelogFetch();
     render(<ChangelogBell />);
-    expect(await screen.findByTestId('changelog-bell-unread-dot')).toBeInTheDocument();
+    const badge = await screen.findByTestId('changelog-bell-unread-dot');
+    expect(badge).toHaveTextContent('2');
+    expect(screen.getByRole('button', { name: "What's new, 2 unread" })).toBeInTheDocument();
+    expect(screen.getByText("What's new, 2 unread").closest('[aria-live="polite"]')).toBeTruthy();
   });
 
   it('opens the panel on click, lists entries, and clears the unread dot', async () => {
