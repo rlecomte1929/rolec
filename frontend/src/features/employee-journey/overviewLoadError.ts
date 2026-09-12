@@ -28,3 +28,19 @@ export function classifyOverviewLoadError(err: unknown): { kind: OverviewLoadKin
   }
   return { kind: 'unknown', message: 'Overview did not load. Try again.' };
 }
+
+/** Alert heading — must not say "could not load" when the failure is session or access. */
+export function overviewLoadAlertTitle(kind: OverviewLoadKind | null | undefined): string {
+  switch (kind) {
+    case 'unauthorized':
+      return 'Sign in again';
+    case 'forbidden':
+      return 'This account cannot open assignments';
+    case 'network':
+      return 'Could not reach ReloPass';
+    case 'server':
+      return 'Something went wrong';
+    default:
+      return 'Could not load assignments';
+  }
+}

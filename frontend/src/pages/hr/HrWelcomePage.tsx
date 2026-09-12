@@ -135,7 +135,7 @@ export function HrWelcomePage() {
 
       <div
         data-testid="hr-welcome-layout"
-        className="grid grid-cols-1 gap-10 min-[960px]:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)] min-[960px]:items-start"
+        className="grid grid-cols-1 gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)] xl:items-start"
       >
         <div>
           <h2 className="text-base font-semibold text-navy-800 mb-4">How it works</h2>

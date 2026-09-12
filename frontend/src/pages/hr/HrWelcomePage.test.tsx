@@ -179,12 +179,12 @@ describe('HrWelcomePage — real HR', () => {
     expect(screen.queryAllByRole('link', { name: /get started/i })).toHaveLength(0);
   });
 
-  it('places the first-case CTA beside the steps from 960px up', () => {
+  it('places the first-case CTA beside the steps from xl (1280px) up', () => {
     signedInAs('marie.dupont@acme-corp.com');
     renderPage();
     const layout = screen.getByTestId('hr-welcome-layout');
     expect(layout.className).toContain('grid-cols-1');
-    expect(layout.className).toContain('min-[960px]:grid-cols-');
+    expect(layout.className).toContain('xl:grid-cols-');
     expect(layout.querySelector('aside')).not.toBeNull();
     expect(screen.getByRole('heading', { name: /ready to open your first case/i })).toBeInTheDocument();
   });
