@@ -1,0 +1,320 @@
+{
+  "url": "https://www.udi.no/globalassets/global/skjemaer/offer-of-employment-e.pdf",
+  "count": 53,
+  "fields": [
+    {
+      "name": "Family name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "First name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Middle name",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Date of birth daymonthyear",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Nationality",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Responsible employer name of firm",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Organisation number",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Address",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postal code",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Postal district",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Contact person",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Phone number",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Email",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "internatcomp",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes",
+        "/Nei"
+      ]
+    },
+    {
+      "name": "staffagency",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes",
+        "/No"
+      ]
+    },
+    {
+      "name": "tempempfrom",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "tempempto",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "duration",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "permempl",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "notworkfrom",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "notworkto",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "leies ut",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Ja",
+        "/Nei"
+      ]
+    },
+    {
+      "name": "employment",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Permanent employment from",
+        "/Temporary employment from"
+      ]
+    },
+    {
+      "name": "workwhole",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes",
+        "/No"
+      ]
+    },
+    {
+      "name": "Detailed description of the work tasks",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "uthorisation",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes, the applicant must enclose the approval",
+        "/No"
+      ]
+    },
+    {
+      "name": "formalquali",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/None",
+        "/Work experience, please specify",
+        "/Vocational education (at upper secondary scool level), please specify",
+        "/Higher education, please specify",
+        "/Other type of competence, which?"
+      ]
+    },
+    {
+      "name": "Workexp",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "vocedu",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "higheredu",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "othertype",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "level",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "othertypewhy",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "formalcomplev",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "formalcompdur",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "formcompfield",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "statementnav",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Yes",
+        "/No"
+      ]
+    },
+    {
+      "name": "collagr",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "tariffregulativ",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Ja, kva for avtale/regulativ?",
+        "/Nei"
+      ]
+    },
+    {
+      "name": "paygross",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "paygrosshour",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "hrsyear",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "guaranthrs",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "perc",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "arbeidssted",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "stillingsbet",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "konkretoppdrag",
+      "ft": "Btn",
+      "maxLen": null,
+      "states": [
+        "/Nei",
+        "/Ja"
+      ]
+    },
+    {
+      "name": "varigharbt",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Place and date",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Employers signature and stamp",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Place and date_2",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "Employees signature",
+      "ft": "Tx",
+      "maxLen": null
+    },
+    {
+      "name": "jobtitle",
+      "ft": "Tx",
+      "maxLen": null
+    }
+  ],
+  "_provenance": {
+    "extracted": "2026-09-12",
+    "method": "pypdf.get_fields() over the blank AcroForm; /Btn export values resolved via /_States_ then a /Kids -> /AP/N appearance-state walk. Bytes were operator-supplied: in-session egress to web.archive.org and udi.no was policy-blocked (403 at CONNECT), so the intended Wayback 2id_/CDX fetch could not run here; the operator provided the blank forms directly.",
+    "sha256": "04f9a8d8ad289e9da47c41c13fa143f53e868f9cbddfcb555eb77d43ccf00be3",
+    "pdf_bytes": 913210
+  }
+}
