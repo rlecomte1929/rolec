@@ -67,8 +67,8 @@ describe('PlatformShellSidebar nav hints (AIQ-2278)', () => {
     );
 
     const cases = screen.getByRole('link', { name: 'Cases' });
-    expect(cases).toHaveAttribute('title', 'Case list and the new-relocation form');
-    expect(screen.queryByText(/case list and the new-relocation/i)).toBeNull();
+    expect(cases).toHaveAttribute('title', 'Case list and the new-case form');
+    expect(screen.queryByText(/case list and the new-case/i)).toBeNull();
 
     const providers = screen.getByRole('link', { name: 'Service providers' });
     expect(providers).toHaveAttribute('title', 'Manage vendors and track provider status');

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { LoadingButton } from '../../components/antigravity/LoadingButton';
 import { WelcomeShell } from '../../components/WelcomeShell';
 import { WelcomeStepCard } from '../../components/WelcomeStepCard';
-import { buildRoute } from '../../navigation/routes';
+import { buildRoute, homeRouteKeyForRole } from '../../navigation/routes';
+import { trackHrWelcomeExit, type HrWelcomeExit } from '../../analyticsEvents';
 import { getAuthItem } from '../../utils/demo';
 import { looksLikeTestEmail } from '../../utils/testAccount';
 import { markWelcomeSeen } from '../../utils/welcomeSeen';
@@ -36,17 +37,25 @@ export function HrWelcomePage() {
     void import('../../features/platform-v2/mobility-control/MobilityControlCenterV2Page');
   }, []);
 
-  const leave = (to: string) => {
+  const variant: 'real' | 'test_drive' = isTestDrive ? 'test_drive' : 'real';
+
+  const leave = (exit: HrWelcomeExit, to: string) => {
     if (leaving) return;
     setLeaving(true);
     markWelcomeSeen(userId);
     void persistWelcomeSeen().catch(() => {});
+    trackHrWelcomeExit({ exit, variant });
     navigate(to);
   };
 
-  const handleSkip = () => leave('/hr/dashboard');
-  const handleGoToDashboard = () => leave('/hr/command-center');
-  const handleCreateCase = () => leave(`${buildRoute('hrDashboard')}?new=1`);
+  // 'HR' literal on purpose: an ADMIN previewing the HR welcome must land on the HR
+  // home, not /admin. homeRouteKeyForRole is the resolver behind the login redirect
+  // and the AppShell identity link, so this exit moves with them (AIQ-2177).
+  const handleSkip = () => leave('skip', buildRoute(homeRouteKeyForRole('HR')));
+  const handleOpenCommandCenter = () => leave('command_center', buildRoute('hrCommandCenter'));
+  // The one real case form (HrDashboard.openNewCaseForm) via the ?new=1 deep link
+  // AIQ-1568 added. Both variants use it now (AIQ-2321).
+  const handleOpenFirstCase = () => leave('open_case', `${buildRoute('hrDashboard')}?new=1`);
 
   if (isTestDrive) {
     return (
@@ -62,7 +71,7 @@ export function HrWelcomePage() {
         ) : null}
         <LoadingButton
           variant="primary"
-          onClick={handleCreateCase}
+          onClick={handleOpenFirstCase}
           loading={leaving}
           loadingLabel="Opening…"
         >
@@ -105,7 +114,7 @@ export function HrWelcomePage() {
 
         <button
           type="button"
-          onClick={handleGoToDashboard}
+          onClick={handleOpenCommandCenter}
           disabled={leaving}
           className="inline-flex min-h-6 items-center text-sm text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-60"
         >
@@ -120,7 +129,7 @@ export function HrWelcomePage() {
       <p className="text-sm font-medium text-accent-600 uppercase tracking-wide mb-2">Welcome to ReloPass</p>
       <h1 className="text-2xl font-semibold text-navy-800 mb-3">Set up your company workspace</h1>
       <p className="text-sm text-slate-600 mb-10 max-w-lg">
-        Before creating your first relocation case, a few things will make everything work better. You can do
+        Before creating a relocation case, a few things will make everything work better. You can do
         these in any order — or come back to them later.
       </p>
 
@@ -165,24 +174,24 @@ export function HrWelcomePage() {
           ) : null}
           <h2 className="text-base font-semibold text-navy-800 mb-1">Ready to open your first case?</h2>
           <p className="text-sm text-slate-600 mb-4">
-            You can skip setup for now and start a case directly. The setup steps will remain accessible in the
-            sidebar at any time.
+            You can skip setup for now and start a case directly. The setup steps stay in the sidebar.
           </p>
           <LoadingButton
             variant="primary"
-            onClick={handleGoToDashboard}
+            onClick={handleOpenFirstCase}
             loading={leaving}
             loadingLabel="Opening…"
+            data-testid="hr-welcome-open-first-case"
           >
-            Open the mobility command center
+            Open your first case →
           </LoadingButton>
           <button
             type="button"
-            onClick={handleSkip}
+            onClick={handleOpenCommandCenter}
             disabled={leaving}
             className="mt-3 inline-flex min-h-6 items-center text-sm text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-60"
           >
-            Open Cases
+            {leaving ? 'Opening…' : 'Open the mobility command center'}
           </button>
         </aside>
       </div>

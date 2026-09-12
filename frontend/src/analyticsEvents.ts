@@ -221,3 +221,11 @@ export function trackCaseCompleted(props: {
 }): void {
   track('case_completed', props);
 }
+
+// ─── HR welcome (AIQ-2321) ───────────────────────────────────────────────────
+export type HrWelcomeExit = 'skip' | 'open_case' | 'command_center';
+
+/** Which exit an HR user took from /hr/welcome. Enums only, no ids, no PII. Not mirrored. */
+export function trackHrWelcomeExit(props: { exit: HrWelcomeExit; variant: 'real' | 'test_drive' }): void {
+  track('hr_welcome_exited', props);
+}
