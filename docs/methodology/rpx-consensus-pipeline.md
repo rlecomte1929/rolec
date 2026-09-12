@@ -58,8 +58,16 @@ facts before voting, deterministically and LLM-free:
 
 Re-running the same 5 passes with this step yields **3 consensus (5/5) + 4/5 + 3/5, 0 gaps**. The
 threshold is deliberately conservative (a false merge of two distinct compliance facts is worse
-than an under-count); **semantic/embedding clustering is the next enhancement** to lift the facts
-that vary in phrasing beyond lexical overlap.
+than an under-count).
+
+3. **Embedding clustering (opt-in, higher yield)** — `merge_passes(embed_fn=…)` clusters a
+   destination's facts by fact-text embedding cosine (default 0.86) instead of token overlap,
+   merging the same fact across drifted topic keys *and* differing phrasing. `embed_fn` is
+   injected, so `consensus.py` imports no LLM SDK (the serving/LLM isolation guard is unaffected)
+   and the deterministic path stays the default; the real embedder (OpenAI text-embedding-3-small)
+   is wired only in the CLI (`scripts/rpx_consensus.py --embed`). On the live FR→NO set this lifted
+   **consensus 3 → 5** (the GP/fastlege and National-Population-Register facts, identical in meaning
+   but phrased differently across passes), still 0 gaps.
 
 ## The consensus bands (RPX-05 card, made executable)
 

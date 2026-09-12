@@ -33,7 +33,7 @@ import re
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from backend.imports.otto.parsers import OFFICIAL, UNOFFICIAL, classify_source
 
@@ -168,26 +168,97 @@ def _cluster_topic(items: List[Tuple[int, Fact]], sim_threshold: float) -> List[
     return clusters
 
 
+def _cosine(a: List[float], b: List[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    return 0.0 if na == 0.0 or nb == 0.0 else dot / (na * nb)
+
+
+def _cluster_by_embedding(
+    items: List[Tuple[int, Fact]],
+    embed_fn: Callable[[List[str]], List[List[float]]],
+    threshold: float,
+) -> List[Dict[str, Any]]:
+    """Cluster one destination's facts by fact-text embedding cosine similarity (opt-in).
+
+    The higher-yield path: it merges the same fact even when independent passes drift the topic
+    key *and* phrase it differently enough that token overlap misses it, because the embedding
+    captures meaning, not words. ``embed_fn`` is injected — this module imports no LLM SDK, so it
+    stays deterministic-by-default and the serving/LLM isolation guard is unaffected. The
+    threshold is conservative on purpose: a false merge of two distinct compliance facts is worse
+    than an under-count.
+    """
+    ordered = sorted(items, key=lambda pf: (str(pf[1].get("fact_key", "")),
+                                            str(pf[1].get("source_url", "")), pf[0]))
+    vectors = embed_fn([str(f.get("fact_text", "") or "") for _, f in ordered])
+    clusters: List[Dict[str, Any]] = []
+    for (pass_index, fact), vec in zip(ordered, vectors):
+        for c in clusters:
+            if _cosine(vec, c["vec"]) >= threshold:
+                c["passes"].add(pass_index)
+                c["instances"].append(fact)
+                break
+        else:
+            clusters.append({"vec": vec, "passes": {pass_index}, "instances": [fact]})
+    return clusters
+
+
+def _apply_bands(
+    clusters: List[Dict[str, Any]], n: int, middle_floor: int
+) -> Tuple[List[Fact], List[Fact], List[Dict[str, Any]]]:
+    """Route each resolved cluster into consensus / needs_review / gaps by pass_count + sourcing."""
+    consensus: List[Fact] = []
+    needs_review: List[Fact] = []
+    gaps: List[Dict[str, Any]] = []
+    for cluster in clusters:
+        count = len(cluster["passes"])
+        rep = _representative(cluster["instances"])
+        canon_topic = _canon_topic(rep.get("entity_topic_key"))
+        tier = _tier(rep)
+        has_quote = _has_verbatim_quote(rep)
+        if tier == UNOFFICIAL:
+            gaps.append(_gap(rep, count, canon_topic,
+                             "source is unofficial (blog / vendor / law-firm) — rejected"))
+        elif count >= n and tier == OFFICIAL and has_quote:
+            consensus.append(_finalize(rep, count, canon_topic, needs_lawyer=False))
+        elif count >= middle_floor:
+            needs_review.append(_finalize(rep, count, canon_topic, needs_lawyer=True))
+        elif tier == OFFICIAL and has_quote:
+            # Low-band rescue: a single strong statutory citation is worth a lawyer's look.
+            needs_review.append(_finalize(rep, count, canon_topic, needs_lawyer=True))
+        else:
+            gaps.append(_gap(rep, count, canon_topic,
+                             f"low consensus ({count}/{n}) and not statutory + verbatim"))
+    return consensus, needs_review, gaps
+
+
 def merge_passes(
     passes: List[List[Fact]],
     *,
     n_passes: int | None = None,
     low_band_ratio: float = 0.6,
     sim_threshold: float = 0.55,
+    embed_fn: Optional[Callable[[List[str]], List[List[float]]]] = None,
+    embed_threshold: float = 0.86,
 ) -> ConsensusResult:
     """Vote N independent research passes into consensus / needs_review / gaps.
 
-    Facts are resolved before voting (independent passes drift both keys): grouped by
-    (destination_country, CANONICAL entity_topic_key), then clustered within a topic by
-    fact-text similarity. A cluster's ``pass_count`` is the number of *distinct* passes in it.
+    Facts are resolved before voting because independent passes drift both the topic key and the
+    fact key. Two resolution modes:
 
-    Bands (``n`` = number of passes):
+    - default (deterministic, LLM-free): group by (destination_country, CANONICAL topic), then
+      cluster within a topic by fact-text token Jaccard.
+    - ``embed_fn`` given (opt-in, higher yield): group by destination_country only, then cluster
+      by fact-text embedding cosine — merges the same fact across drifted topic keys and differing
+      phrasing. ``embed_fn(list[str]) -> list[list[float]]`` is injected; this module imports no
+      LLM SDK, so the isolation guard is unaffected.
+
+    A cluster's ``pass_count`` is the number of *distinct* passes in it. Bands (``n`` = passes):
       - ``pass_count == n`` AND official source AND verbatim quote  → **consensus**
-      - ``pass_count >= ceil(low_band_ratio*n)`` (incl. full-count that missed the clean bar,
-        e.g. semi-official or no quote)                             → **needs_review** (lawyer)
-      - below that (low band): kept only if official + verbatim      → **needs_review** (lawyer)
-        otherwise                                                    → **gap**
-      - any unofficial source, at any pass_count                     → **gap** (hard rule)
+      - ``pass_count >= ceil(low_band_ratio*n)`` (incl. full-count that missed the clean bar) → **needs_review**
+      - below that, official + verbatim → **needs_review**; otherwise → **gap**
+      - any unofficial source, at any pass_count → **gap** (hard rule)
     """
     n = n_passes if n_passes is not None else len(passes)
     if n <= 0:
@@ -195,39 +266,24 @@ def merge_passes(
 
     middle_floor = math.ceil(low_band_ratio * n)  # >= this and < n is the "middle" band
 
-    # Step 1: group by destination + canonical topic.
-    topic_groups: Dict[Tuple[str, str], List[Tuple[int, Fact]]] = {}
+    by_dest: Dict[str, List[Tuple[int, Fact]]] = {}
     for pass_index, one_pass in enumerate(passes):
         for fact in one_pass:
             dc = str(fact.get("destination_country", "")).strip().upper()
-            tk = (dc, _canon_topic(fact.get("entity_topic_key")))
-            topic_groups.setdefault(tk, []).append((pass_index, fact))
+            by_dest.setdefault(dc, []).append((pass_index, fact))
 
-    consensus: List[Fact] = []
-    needs_review: List[Fact] = []
-    gaps: List[Dict[str, Any]] = []
+    clusters: List[Dict[str, Any]] = []
+    for dc in sorted(by_dest):
+        if embed_fn is not None:
+            clusters.extend(_cluster_by_embedding(by_dest[dc], embed_fn, embed_threshold))
+        else:
+            by_topic: Dict[str, List[Tuple[int, Fact]]] = {}
+            for pass_index, fact in by_dest[dc]:
+                by_topic.setdefault(_canon_topic(fact.get("entity_topic_key")), []).append((pass_index, fact))
+            for tk in sorted(by_topic):
+                clusters.extend(_cluster_topic(by_topic[tk], sim_threshold))
 
-    # Step 2: cluster each topic by text similarity, then band each cluster.
-    for (dc, canon_topic) in sorted(topic_groups):
-        for cluster in _cluster_topic(topic_groups[(dc, canon_topic)], sim_threshold):
-            count = len(cluster["passes"])
-            rep = _representative(cluster["instances"])
-            tier = _tier(rep)
-            has_quote = _has_verbatim_quote(rep)
-
-            if tier == UNOFFICIAL:
-                gaps.append(_gap(rep, count, canon_topic,
-                                 "source is unofficial (blog / vendor / law-firm) — rejected"))
-            elif count >= n and tier == OFFICIAL and has_quote:
-                consensus.append(_finalize(rep, count, canon_topic, needs_lawyer=False))
-            elif count >= middle_floor:
-                needs_review.append(_finalize(rep, count, canon_topic, needs_lawyer=True))
-            elif tier == OFFICIAL and has_quote:
-                # Low-band rescue: a single strong statutory citation is worth a lawyer's look.
-                needs_review.append(_finalize(rep, count, canon_topic, needs_lawyer=True))
-            else:
-                gaps.append(_gap(rep, count, canon_topic,
-                                 f"low consensus ({count}/{n}) and not statutory + verbatim"))
+    consensus, needs_review, gaps = _apply_bands(clusters, n, middle_floor)
 
     histogram = Counter()
     for bucket in (consensus, needs_review):
@@ -235,6 +291,7 @@ def merge_passes(
             histogram[f["applies_to"]["pass_count"]] += 1
     report = {
         "n_passes": n,
+        "mode": "embedding" if embed_fn is not None else "deterministic",
         "n_consensus": len(consensus),
         "n_needs_review": len(needs_review),
         "n_gaps": len(gaps),
