@@ -45,6 +45,8 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 from urllib.parse import urlsplit
 
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
+
 from backend.app.services.evidence_quote_validator import (
     CorruptedEvidenceError,
     validate_ingest_text,
@@ -451,6 +453,62 @@ class FactRowError(ValueError):
     """
 
 
+class FactIngestRecord(BaseModel):
+    """Otto JSONL object at the ingest gate.
+
+    Required keys match `otto_staging.immigration_fact_candidates` NOT NULL columns that
+    the file must supply. Extra keys (``quote_sha256``, research flags) are allowed.
+    ``source_url`` is a string, not HttpUrl: live citations include ``source_records`` UUIDs.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    destination_country: str
+    entity_topic_key: str
+    fact_key: str
+    fact_text: str
+    source_url: str
+    entity_title: Optional[str] = None
+    fact_type: Optional[str] = None
+    applies_to: Optional[Dict[str, Any]] = None
+    evidence_quote: Optional[str] = None
+    confidence: Optional[str] = None
+
+    @field_validator(
+        "destination_country",
+        "entity_topic_key",
+        "fact_key",
+        "fact_text",
+        "source_url",
+        mode="before",
+    )
+    @classmethod
+    def _required_nonempty(cls, value: Any) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("required")
+        return text
+
+
+def _factrow_error_from_pydantic(exc: ValidationError) -> FactRowError:
+    """Keep the CLI/test wording: name the field, do not dump a pydantic traceback."""
+    missing: List[str] = []
+    for err in exc.errors():
+        loc = ".".join(str(part) for part in err.get("loc", ()))
+        if loc == "applies_to":
+            inp = err.get("input")
+            return FactRowError(
+                f"applies_to must be an object, got {type(inp).__name__}"
+            )
+        if loc in REQUIRED_FIELDS:
+            if loc not in missing:
+                missing.append(loc)
+    if missing:
+        return FactRowError(f"missing required field(s): {', '.join(missing)}")
+    msg = str(exc.errors()[0].get("msg") or "invalid record")
+    return FactRowError(msg)
+
+
 @dataclass
 class FactRow:
     """One validated fact, ready for `otto_staging.immigration_fact_candidates`."""
@@ -633,24 +691,21 @@ def grade(row: FactRow) -> FactRow:
 
 
 def _to_row(rec: Dict[str, Any], batch_id: str, lineno: int) -> FactRow:
-    missing = [k for k in REQUIRED_FIELDS if not str(rec.get(k) or "").strip()]
-    if missing:
-        raise FactRowError(f"missing required field(s): {', '.join(missing)}")
+    try:
+        parsed = FactIngestRecord.model_validate(rec)
+    except ValidationError as exc:
+        raise _factrow_error_from_pydantic(exc) from exc
 
-    applies_to = rec.get("applies_to")
-    if applies_to is not None and not isinstance(applies_to, dict):
-        raise FactRowError(f"applies_to must be an object, got {type(applies_to).__name__}")
-
-    fact_type = str(rec.get("fact_type") or "other").strip().lower()
+    fact_type = str(parsed.fact_type or "other").strip().lower()
     if fact_type not in KNOWN_FACT_TYPES:
         fact_type = "other"
 
     try:
-        fact_text = validate_ingest_text(rec.get("fact_text"), field="fact_text")
+        fact_text = validate_ingest_text(parsed.fact_text, field="fact_text")
         if not fact_text:
             raise FactRowError("missing required field(s): fact_text")
         evidence_quote = validate_ingest_text(
-            rec.get("evidence_quote"),
+            parsed.evidence_quote,
             field="evidence_quote",
             checksum=rec.get("quote_sha256"),
         )
@@ -658,18 +713,18 @@ def _to_row(rec: Dict[str, Any], batch_id: str, lineno: int) -> FactRow:
         raise
 
     row = FactRow(
-        destination_country=str(rec["destination_country"]).strip().upper(),
-        entity_topic_key=str(rec["entity_topic_key"]).strip(),
-        fact_key=str(rec["fact_key"]).strip(),
+        destination_country=parsed.destination_country.upper(),
+        entity_topic_key=parsed.entity_topic_key,
+        fact_key=parsed.fact_key,
         fact_text=fact_text,
-        source_url=str(rec["source_url"]).strip(),
+        source_url=parsed.source_url,
         batch_id=batch_id,
-        entity_title=str(rec.get("entity_title") or "").strip()
-        or _humanise(str(rec["entity_topic_key"])),
+        entity_title=(parsed.entity_title or "").strip()
+        or _humanise(parsed.entity_topic_key),
         fact_type=fact_type,
-        applies_to=applies_to,
+        applies_to=parsed.applies_to,
         evidence_quote=evidence_quote,
-        confidence=str(rec.get("confidence") or "medium").strip().lower(),
+        confidence=str(parsed.confidence or "medium").strip().lower(),
     )
     row.source_class = classify_source(row.source_url)
     return grade(row)
