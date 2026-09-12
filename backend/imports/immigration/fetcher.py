@@ -92,6 +92,21 @@ class FetchedDoc:
         return self.fetch_status == FETCHED and bool(self.text_content)
 
 
+@dataclass(frozen=True)
+class HtmlFetch:
+    """Raw HTML (or a typed failure). Never raised — callers branch on `ok`."""
+
+    source_url: str
+    final_url: str
+    status: int | None
+    html: str
+    error: str | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.error is None and bool(self.html)
+
+
 def _failed(url: str, reason: str) -> FetchedDoc:
     return FetchedDoc(
         source_url=url,
@@ -101,6 +116,16 @@ def _failed(url: str, reason: str) -> FetchedDoc:
         text_content="",
         content_sha256=None,
         fetch_status=FETCH_FAILED,
+        error=reason,
+    )
+
+
+def _failed_html(url: str, reason: str, status: int | None = None) -> HtmlFetch:
+    return HtmlFetch(
+        source_url=url,
+        final_url=url,
+        status=status,
+        html="",
         error=reason,
     )
 
@@ -132,24 +157,30 @@ def extract_text(html: str) -> tuple[str, str]:
     return title.strip(), best[:MAX_TEXT_CHARS]
 
 
-def _fetch_once(url: str) -> FetchedDoc:
+def _get_html_once(url: str, *, timeout: float = TIMEOUT_SECONDS) -> HtmlFetch:
+    """One HTTP GET. Never raises; WAF/timeout/non-HTML come back as `error`."""
     import requests
 
     try:
         resp = requests.get(
             url,
             headers=DEFAULT_HEADERS,
-            timeout=TIMEOUT_SECONDS,
+            timeout=timeout,
             stream=True,
             allow_redirects=True,
         )
         if resp.status_code in RETRY_STATUSES:
-            return _failed(url, f"HTTP {resp.status_code}")
-        resp.raise_for_status()
+            return _failed_html(url, f"HTTP {resp.status_code}", status=resp.status_code)
+        if resp.status_code >= 400:
+            return _failed_html(url, f"HTTP {resp.status_code}", status=resp.status_code)
 
         content_type = (resp.headers.get("Content-Type") or "").lower()
         if "html" not in content_type:
-            return _failed(url, f"non-HTML content type: {content_type or 'unknown'!r}")
+            return _failed_html(
+                url,
+                f"non-HTML content type: {content_type or 'unknown'!r}",
+                status=resp.status_code,
+            )
 
         data = bytearray()
         for chunk in resp.iter_content(chunk_size=16384):
@@ -157,28 +188,71 @@ def _fetch_once(url: str) -> FetchedDoc:
                 continue
             data.extend(chunk)
             if len(data) > MAX_RESPONSE_BYTES:
-                return _failed(url, f"response exceeded {MAX_RESPONSE_BYTES} bytes")
+                return _failed_html(
+                    url,
+                    f"response exceeded {MAX_RESPONSE_BYTES} bytes",
+                    status=resp.status_code,
+                )
 
         html = data.decode(resp.encoding or "utf-8", errors="replace")
-        title, text = extract_text(html)
-        if len(text) < MIN_TEXT_CHARS:
-            return _failed(
-                url,
-                f"only {len(text)} chars extracted (min {MIN_TEXT_CHARS}) — "
-                "the page renders its content with JavaScript",
-            )
-
-        return FetchedDoc(
+        return HtmlFetch(
             source_url=url,
             final_url=str(resp.url),
-            title=title or url,
-            publisher=urlparse(str(resp.url)).netloc,
-            text_content=text,
-            content_sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
-            fetch_status=FETCHED,
+            status=resp.status_code,
+            html=html,
         )
     except Exception as exc:  # requests raises a wide family; none of it should abort the batch
-        return _failed(url, f"{type(exc).__name__}: {exc}")
+        return _failed_html(url, f"{type(exc).__name__}: {exc}")
+
+
+def fetch_html(url: str, *, timeout: float = TIMEOUT_SECONDS) -> HtmlFetch:
+    """Fetch HTML with host delay and backoff. Never raises."""
+    import time
+
+    host = urlparse(url).netloc
+    last: HtmlFetch = _failed_html(url, "exhausted retries")
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        elapsed = time.monotonic() - _last_hit.get(host, 0.0)
+        if elapsed < PER_HOST_DELAY_SECONDS:
+            time.sleep(PER_HOST_DELAY_SECONDS - elapsed)
+        _last_hit[host] = time.monotonic()
+
+        last = _get_html_once(url, timeout=timeout)
+        if last.ok:
+            return last
+        retryable = last.error and (
+            last.error.startswith("HTTP ")
+            or "Timeout" in last.error
+            or "ConnectionError" in last.error
+        )
+        if not retryable or attempt == MAX_ATTEMPTS:
+            return last
+        time.sleep(2.0 * attempt)
+    return last
+
+
+def _fetch_once(url: str) -> FetchedDoc:
+    got = _get_html_once(url)
+    if not got.ok:
+        return _failed(url, got.error or "fetch failed")
+
+    title, text = extract_text(got.html)
+    if len(text) < MIN_TEXT_CHARS:
+        return _failed(
+            url,
+            f"only {len(text)} chars extracted (min {MIN_TEXT_CHARS}) — "
+            "the page renders its content with JavaScript",
+        )
+
+    return FetchedDoc(
+        source_url=url,
+        final_url=got.final_url,
+        title=title or url,
+        publisher=urlparse(got.final_url).netloc,
+        text_content=text,
+        content_sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        fetch_status=FETCHED,
+    )
 
 
 _last_hit: Dict[str, float] = {}
