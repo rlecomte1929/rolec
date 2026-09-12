@@ -59,11 +59,29 @@ def candidate_paths(arg: str) -> List[Path]:
     """Every place the named deliverable could plausibly be, most likely first."""
     given = Path(arg)
     stem = given.name if given.suffix else f"{given.name}.jsonl"
+    batch_dir = given.stem if given.suffix else given.name
+    imports = REPO_ROOT / "docs" / "imports" / batch_dir
     return [
         given,
         REPO_ROOT / WORKSPACE / "data" / stem,
         REPO_ROOT / WORKSPACE / WORKSPACE / "data" / stem,   # the doubled path — see docstring
+        # Committed research lands here as facts.ndjson (AIQ-2028 / PR #2094). A bare
+        # batch id used to print "no such deliverable" while the file was already in git.
+        imports / "facts.ndjson",
+        imports / f"{batch_dir}.ndjson",
+        imports / f"{batch_dir}.jsonl",
     ]
+
+
+def inferred_batch_id(path: Path) -> str:
+    """Directory name wins when the file is the conventional `facts.ndjson`.
+
+    `path.stem` on that file is `facts`, which is not a batch id and would collide
+    every docs/imports load onto one ledger row.
+    """
+    if path.stem == "facts" and path.parent.name:
+        return path.parent.name
+    return path.stem
 
 
 def resolve(arg: str) -> Optional[Path]:
@@ -132,7 +150,7 @@ def main() -> int:
         print("  check that would catch its absence was never run. Re-issue the card.")
         return 2
 
-    batch_id = args.batch_id or path.stem
+    batch_id = args.batch_id or inferred_batch_id(path)
     source_label = args.source_label or batch_id
 
     try:
