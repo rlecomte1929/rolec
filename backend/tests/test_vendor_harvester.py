@@ -336,7 +336,7 @@ def test_pairs_in_scope_is_corridors_x_categories():
     # + XX-TW/VN/ID/PH (wave-9 Asia-Pacific tail) 2026-08-31 → 54 corridors.
     # + XX-CO/PE/UY/CR/PA (wave-10 LatAm cluster) 2026-09-02 → 59 corridors.
     # + XX-HR/SI/SK/LT/LV (wave-11 EU cluster) 2026-09-02 → 64 corridors.
-    assert len(pairs_in_scope()) == len(CORRIDORS) * len(CATEGORIES) == 576  # 64 corridors x 9 categories ([ANDREA-P1] was 384 = 64 x 6)
+    assert len(pairs_in_scope()) == len(CORRIDORS) * len(CATEGORIES) == 640  # 64 corridors x 10 categories ([DENIS-NOFR] +partner_career; was 576 = 64 x 9)
 
 
 def test_unavailable_sources_are_declared_not_hidden():
