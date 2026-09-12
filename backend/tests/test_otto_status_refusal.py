@@ -110,6 +110,18 @@ def test_every_recognised_status_still_promotes():
         assert got.purpose == expected_purpose
 
 
+def test_worker_synonyms_map_to_employment():
+    """Independent research passes describe the person as 'worker'/'employee'/'salaried' —
+    synonyms of the canonical 'professional'. They must promote at purpose='employment', not be
+    refused (the first live NO->FR consensus run staged 5 facts that could not promote for this
+    reason alone). The gate still discriminates: 'tourist' etc. remain refused.
+    """
+    for status in ("worker", "employee", "salaried"):
+        got = resolve(_entity(), [_fact(applies_to={"status": status, "nationality": "EU"})])
+        assert isinstance(got, RequirementDraft), f"{status} should promote, got {got}"
+        assert got.purpose == "employment"
+
+
 def test_agreement_across_several_facts_still_promotes():
     got = resolve(
         _entity(),
