@@ -27,6 +27,10 @@ MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 # persist is exactly what the extractor can consume — a smaller cap here would silently
 # withhold content the LLM had room for. This truncates *parsed* text, not raw HTML.
 MAX_EXCERPT_CHARS = 24_000
+# Same floor as backend.imports.immigration.fetcher.MIN_TEXT_CHARS. A JS shell or
+# login chrome is not a document; storing it as fetched evidence is the NULL-deref.
+MIN_TEXT_CHARS = 600
+_LOGIN_PATH_MARKERS = ("/login", "/signin", "/sign-in", "/log-in", "/sso")
 
 OFFICIAL_DOMAINS: Dict[str, list[str]] = {
     "US": ["uscis.gov", "travel.state.gov", "cbp.gov", "ssa.gov", "irs.gov"],
@@ -43,6 +47,11 @@ def _is_allowed_domain(url: str, destination_country: str) -> bool:
     host = urlparse(url).netloc.lower()
     allowed = OFFICIAL_DOMAINS.get(destination_country.upper(), [])
     return any(host.endswith(domain) for domain in allowed)
+
+
+def _is_login_page(url: str) -> bool:
+    path = urlparse(url).path.lower()
+    return any(path == marker or path.startswith(marker + "/") for marker in _LOGIN_PATH_MARKERS)
 
 
 def _fetch_html(url: str, destination_country: str) -> Tuple[str, str]:
@@ -159,14 +168,37 @@ def ingest_url_to_knowledge_doc(
     content_hash = None
     try:
         final_url, html = _fetch_html(url, destination_country)
+        if _is_login_page(final_url):
+            raise ValueError("Login-page redirect")
         title, excerpt = _extract_text(html)
         if not excerpt:
             raise ValueError("Empty content after extraction")
+        if len(excerpt) < MIN_TEXT_CHARS:
+            raise ValueError(
+                f"only {len(excerpt)} chars extracted (min {MIN_TEXT_CHARS})"
+            )
         content_hash = hashlib.sha256(excerpt.encode("utf-8")).hexdigest()
         fetch_status = "fetched"
     except Exception as exc:
         fetch_status = "fetch_failed"
         fetch_error = str(exc)
+        source_host = urlparse(final_url).netloc
+        log.warning(
+            "official_ingest: fetch failed source_host=%s failure_reason=%s url=%s",
+            source_host,
+            fetch_error,
+            final_url,
+        )
+        # Failed fetch is NULL: do not persist empty text_content as evidence.
+        # knowledge_docs.text_content is NOT NULL — skipping the upsert avoids a
+        # placeholder row. Existing real excerpts are left untouched.
+        return {
+            "doc_id": None,
+            "rule_id": None,
+            "fetch_status": fetch_status,
+            "facts_created": 0,
+            "error": fetch_error,
+        }
 
     pack = db.ensure_knowledge_pack(destination_country, domain_area)
     doc = db.upsert_knowledge_doc_by_url(
@@ -174,12 +206,12 @@ def ingest_url_to_knowledge_doc(
         source_url=final_url,
         title=title or final_url,
         publisher=urlparse(final_url).netloc,
-        text_content=excerpt or "",
+        text_content=excerpt,
         fetched_at=fetched_at,
         fetch_status=fetch_status,
-        content_excerpt=excerpt or None,
+        content_excerpt=excerpt,
         content_sha256=content_hash,
-        last_verified_at=fetched_at if fetch_status == "fetched" else None,
+        last_verified_at=fetched_at,
     )
 
     rule_id = None
